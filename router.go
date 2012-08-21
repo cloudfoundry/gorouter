@@ -1,143 +1,76 @@
-package main
+package router
 
 import (
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	"io"
 	"log"
-	"math/rand"
-	"net"
 	"net/http"
 	"runtime"
-	"strings"
-	"sync"
 	"time"
 )
 
-type registerMessage struct {
-	Host string            `json:"host"`
-	Port uint16            `json:"port"`
-	Uris []string          `json:"uris"`
-	Tags map[string]string `json:"tags"`
-	Dea  string            `json:"dea"`
+type Router struct {
+	proxy      *Proxy
+	natsClient *nats.Client
+
+	config Config
 }
 
-type Proxy struct {
-	sync.Mutex
-	r map[string][]*registerMessage
+func NewRouter(c *Config) *Router {
+	router := new(Router)
+
+	router.config = *c
+	router.proxy = NewProxy()
+	router.natsClient = startNATS(c.Nats.Host, c.Nats.User, c.Nats.Pass)
+
+	return router
 }
 
-func NewProxy() *Proxy {
-	p := new(Proxy)
-	p.r = make(map[string][]*registerMessage)
-	return p
-}
+func (r *Router) Run() {
+	reg := r.natsClient.NewSubscription("router.register")
+	reg.Subscribe()
 
-func (p *Proxy) Register(m *registerMessage) {
-	p.Lock()
-	defer p.Unlock()
+	// Start message
+	r.natsClient.Publish("router.start", []byte(""))
 
-	// Store in registry
-	s := p.r[m.Uris[0]]
-	if s == nil {
-		s = make([]*registerMessage, 0)
-	}
+	go func() {
+		for m := range reg.Inbox {
+			var rm registerMessage
 
-	s = append(s, m)
-	p.r[m.Uris[0]] = s
-}
+			e := json.Unmarshal(m.Payload, &rm)
+			if e != nil {
+				// TODO: maybe logger
+				continue
+			}
 
-func (p *Proxy) Lookup(req *http.Request) *registerMessage {
-	host := req.Host
-
-	// Remove :<port>
-	i := strings.Index(host, ":")
-	if i >= 0 {
-		host = host[0:i]
-	}
-
-	p.Lock()
-	defer p.Unlock()
-
-	s := p.r[host]
-	if s == nil {
-		return nil
-	}
-
-	return s[rand.Intn(len(s))]
-}
-
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
+			// TODO: use logger
+			fmt.Printf("router.register: %#v\n", rm)
+			r.proxy.Register(&rm)
 		}
-	}
-}
+	}()
 
-func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	r := p.Lookup(req)
-	if r == nil {
-		rw.WriteHeader(http.StatusNotFound)
-		return
-	}
+	go startStatusHTTP(r.config.StatusPort)
 
-	outreq := new(http.Request)
-	*outreq = *req // includes shallow copies of maps, but okay
-
-	outreq.URL.Scheme = "http"
-	outreq.URL.Host = fmt.Sprintf("%s:%d", r.Host, r.Port)
-
-	outreq.Proto = "HTTP/1.1"
-	outreq.ProtoMajor = 1
-	outreq.ProtoMinor = 1
-	outreq.Close = false
-
-	// Remove the connection header to the backend.  We want a
-	// persistent connection, regardless of what the client sent
-	// to us.  This is modifying the same underlying map from req
-	// (shallow copied above) so we only copy it if necessary.
-	if outreq.Header.Get("Connection") != "" {
-		outreq.Header = make(http.Header)
-		copyHeader(outreq.Header, req.Header)
-		outreq.Header.Del("Connection")
-	}
-
-	if clientIp, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		outreq.Header.Set("X-Forwarded-For", clientIp)
-	}
-
-	res, err := http.DefaultTransport.RoundTrip(outreq)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", r.config.Port), r.proxy)
 	if err != nil {
-		log.Printf("http: proxy error: %v", err)
-		rw.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	copyHeader(rw.Header(), res.Header)
-
-	rw.WriteHeader(res.StatusCode)
-
-	if res.Body != nil {
-		var dst io.Writer = rw
-		io.Copy(dst, res.Body)
+		log.Panic("ListenAndServe ", err)
 	}
 }
 
-func StartNATS() *nats.Client {
+func startNATS(host, user, pass string) *nats.Client {
 	c := nats.NewClient()
 
 	go func() {
-		e := c.RunWithDefaults("127.0.0.1:4222", "", "")
+		e := c.RunWithDefaults(host, user, pass)
 		panic(e)
 	}()
 
 	return c
 }
 
-func MemStatsServer(ws *websocket.Conn) {
+func memStatsServer(ws *websocket.Conn) {
 	var e error
 
 	var t *time.Ticker = time.NewTicker(100 * time.Millisecond)
@@ -161,8 +94,8 @@ func MemStatsServer(ws *websocket.Conn) {
 	}
 }
 
-func StartHTTP() {
-	http.Handle("/ws", websocket.Handler(MemStatsServer))
+func startStatusHTTP(port int) {
+	http.Handle("/ws", websocket.Handler(memStatsServer))
 	http.Handle("/", http.FileServer(http.Dir(".")))
 
 	http.HandleFunc("/data.json", func(w http.ResponseWriter, r *http.Request) {
@@ -178,38 +111,5 @@ func StartHTTP() {
 	})
 
 	fmt.Printf("Starting...\n")
-	log.Fatal(http.ListenAndServe(":8081", nil))
-}
-
-func main() {
-	var p = NewProxy()
-
-	n := StartNATS()
-
-	reg := n.NewSubscription("router.register")
-	reg.Subscribe()
-
-	// Start message
-	n.Publish("router.start", []byte(""))
-
-	go func() {
-		for m := range reg.Inbox {
-			var rm registerMessage
-
-			e := json.Unmarshal(m.Payload, &rm)
-			if e != nil {
-				continue
-			}
-
-			fmt.Printf("router.register: %#v\n", rm)
-			p.Register(&rm)
-		}
-	}()
-
-	go StartHTTP()
-
-	err := http.ListenAndServe(":8080", p)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
