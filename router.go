@@ -14,6 +14,7 @@ import (
 type Router struct {
 	proxy      *Proxy
 	natsClient *nats.Client
+	status     *ServerStatus
 
 	config Config
 }
@@ -24,6 +25,9 @@ func NewRouter(c *Config) *Router {
 	router.config = *c
 	router.proxy = NewProxy()
 	router.natsClient = startNATS(c.Nats.Host, c.Nats.User, c.Nats.Pass)
+	router.status = NewServerStatus()
+
+	router.proxy.status = router.status
 
 	return router
 }
@@ -51,7 +55,7 @@ func (r *Router) Run() {
 		}
 	}()
 
-	go startStatusHTTP(r.config.StatusPort)
+	go r.startStatusHTTP()
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", r.config.Port), r.proxy)
 	if err != nil {
@@ -94,22 +98,20 @@ func memStatsServer(ws *websocket.Conn) {
 	}
 }
 
-func startStatusHTTP(port int) {
+func (r *Router) startStatusHTTP() {
 	http.Handle("/ws", websocket.Handler(memStatsServer))
 	http.Handle("/", http.FileServer(http.Dir(".")))
 
-	http.HandleFunc("/data.json", func(w http.ResponseWriter, r *http.Request) {
-		var ms runtime.MemStats
-
-		runtime.ReadMemStats(&ms)
+	http.HandleFunc("/data.json", func(w http.ResponseWriter, req *http.Request) {
+		// var ms runtime.MemStats
+		// runtime.ReadMemStats(&ms)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 
 		enc := json.NewEncoder(w)
-		enc.Encode(ms)
+		enc.Encode(r.status)
 	})
 
-	fmt.Printf("Starting...\n")
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	http.ListenAndServe(fmt.Sprintf(":%d", r.config.StatusPort), nil)
 }

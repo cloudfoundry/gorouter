@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type registerMessage struct {
@@ -21,7 +22,8 @@ type registerMessage struct {
 
 type Proxy struct {
 	sync.Mutex
-	r map[string][]*registerMessage
+	r      map[string][]*registerMessage
+	status *ServerStatus
 }
 
 func NewProxy() *Proxy {
@@ -42,6 +44,8 @@ func (p *Proxy) Register(m *registerMessage) {
 
 	s = append(s, m)
 	p.r[m.Uris[0]] = s
+
+	p.status.Urls = len(p.r)
 }
 
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
@@ -65,6 +69,10 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+
+	p.status.IncRequests()
+
 	r := p.Lookup(req)
 	if r == nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -99,9 +107,12 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	res, err := http.DefaultTransport.RoundTrip(outreq)
 	if err != nil {
 		log.Printf("http: proxy error: %v", err)
+		p.recordStatus(500, start, r.Tags)
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	p.recordStatus(res.StatusCode, start, r.Tags)
 
 	copyHeader(rw.Header(), res.Header)
 
@@ -111,6 +122,12 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var dst io.Writer = rw
 		io.Copy(dst, res.Body)
 	}
+}
+
+func (p *Proxy) recordStatus(status int, start time.Time, tags map[string]string) {
+	latency := int(time.Since(start).Nanoseconds() / 1000000)
+
+	p.status.RecordResponse(status, latency, tags)
 }
 
 func copyHeader(dst, src http.Header) {
