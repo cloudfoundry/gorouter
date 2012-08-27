@@ -12,10 +12,13 @@ type ServerStatus struct {
 	HttpMetric
 	sync.Mutex
 
-	Urls           int                    `json:"urls"`
-	Droplets       int                    `json:"droplets"`
-	RequestsPerSec int                    `json:"requests_per_sec"`
-	Tags           map[string]HttpMetrics `json:"tags"`
+	Urls        int                    `json:"urls"`
+	Droplets    int                    `json:"droplets"`
+	BadRequests int                    `json:"bad_requests"`
+	Tags        map[string]HttpMetrics `json:"tags"`
+
+	// TODO: Support in future
+	//	RequestsPerSec int                    `json:"requests_per_sec"`
 }
 
 type HttpMetric struct {
@@ -58,6 +61,29 @@ func (s *ServerStatus) IncRequests() {
 	defer s.Unlock()
 
 	s.Requests++
+}
+
+func (s *ServerStatus) IncBadRequests() {
+	s.Lock()
+	defer s.Unlock()
+
+	s.BadRequests++
+}
+
+func (s *ServerStatus) IncRequestsWithTags(tags map[string]string) {
+	s.Lock()
+	defer s.Unlock()
+
+	for key, value := range tags {
+		if s.Tags[key] == nil {
+			continue
+		}
+
+		if s.Tags[key][value] == nil {
+			s.Tags[key][value] = NewHttpMetric(key + "." + value)
+		}
+		s.Tags[key][value].Requests++
+	}
 }
 
 func (s *ServerStatus) IncDroplets() {

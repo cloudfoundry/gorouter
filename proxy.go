@@ -115,8 +115,17 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	r := p.Lookup(req)
 	if r == nil {
+		p.recordStatus(400, start, nil)
+		if p.status == nil {
+			p.status.IncBadRequests()
+		}
+
 		rw.WriteHeader(http.StatusNotFound)
 		return
+	}
+
+	if p.status != nil {
+		p.status.IncRequestsWithTags(r.Tags)
 	}
 
 	outreq := new(http.Request)
@@ -147,7 +156,12 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	res, err := http.DefaultTransport.RoundTrip(outreq)
 	if err != nil {
 		log.Printf("http: proxy error: %v", err)
+
 		p.recordStatus(500, start, r.Tags)
+		if p.status != nil {
+			p.status.IncBadRequests()
+		}
+
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}

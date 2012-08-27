@@ -20,6 +20,29 @@ func (s *ServerStatusSuite) TestNewStatus(c *C) {
 	checkEmptyStatus(c, s.status)
 }
 
+func (s *ServerStatusSuite) TestUpdateRequests(c *C) {
+	s.status.IncRequests()
+	c.Check(s.status.Requests, Equals, 1)
+
+	s.status.IncRequests()
+	c.Check(s.status.Requests, Equals, 2)
+}
+
+func (s *ServerStatusSuite) TestUpdateBadRequests(c *C) {
+	s.status.IncBadRequests()
+	c.Check(s.status.BadRequests, Equals, 1)
+
+	s.status.IncBadRequests()
+	c.Check(s.status.BadRequests, Equals, 2)
+}
+
+func (s *ServerStatusSuite) TestUpdateRequestsTag(c *C) {
+	s.status.IncRequestsWithTags(map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
+	c.Check(s.status.Tags["component"]["cc"].Requests, Equals, 1)
+	c.Check(s.status.Tags["framework"]["sinatra"].Requests, Equals, 1)
+	c.Check(s.status.Tags["runtime"]["ruby18"].Requests, Equals, 1)
+}
+
 func (s *ServerStatusSuite) TestUpdateStatusNilTag(c *C) {
 	s.status.RecordResponse(200, 10, nil)
 
