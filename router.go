@@ -32,12 +32,9 @@ func NewRouter(c *Config) *Router {
 	return router
 }
 
-func (r *Router) Run() {
+func (r *Router) SubscribeRegister() {
 	reg := r.natsClient.NewSubscription("router.register")
 	reg.Subscribe()
-
-	// Start message
-	r.natsClient.Publish("router.start", []byte(""))
 
 	go func() {
 		for m := range reg.Inbox {
@@ -54,6 +51,35 @@ func (r *Router) Run() {
 			r.proxy.Register(&rm)
 		}
 	}()
+}
+
+func (r *Router) SubscribeUnregister() {
+	unreg := r.natsClient.NewSubscription("router.unregister")
+	unreg.Subscribe()
+
+	go func() {
+		for m := range unreg.Inbox {
+			var rm registerMessage
+
+			e := json.Unmarshal(m.Payload, &rm)
+			if e != nil {
+				// TODO: maybe logger
+				continue
+			}
+
+			// TODO: use logger
+			fmt.Printf("router.unregister: %#v\n", rm)
+			r.proxy.Unregister(&rm)
+		}
+	}()
+}
+
+func (r *Router) Run() {
+	r.SubscribeRegister()
+	r.SubscribeUnregister()
+
+	// Start message
+	r.natsClient.Publish("router.start", []byte(""))
 
 	go r.startStatusHTTP()
 

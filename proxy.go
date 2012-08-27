@@ -18,6 +18,7 @@ type registerMessage struct {
 	Uris []string          `json:"uris"`
 	Tags map[string]string `json:"tags"`
 	Dea  string            `json:"dea"`
+	App  int               `json:"app"`
 }
 
 type Proxy struct {
@@ -36,16 +37,53 @@ func (p *Proxy) Register(m *registerMessage) {
 	p.Lock()
 	defer p.Unlock()
 
-	// Store in registry
-	s := p.r[m.Uris[0]]
-	if s == nil {
-		s = make([]*registerMessage, 0)
+	// Store droplet in registry
+	for _, uri := range m.Uris {
+		s := p.r[uri]
+		if s == nil {
+			s = make([]*registerMessage, 0)
+		}
+
+		s = append(s, m)
+		p.r[uri] = s
 	}
 
-	s = append(s, m)
-	p.r[m.Uris[0]] = s
+	if p.status != nil {
+		p.status.Urls = len(p.r)
+	}
+}
 
-	p.status.Urls = len(p.r)
+func (p *Proxy) Unregister(m *registerMessage) {
+	p.Lock()
+	defer p.Unlock()
+
+	// Delete droplets from registry
+	for _, uri := range m.Uris {
+		s := p.r[uri]
+		if s == nil {
+			continue
+		}
+
+		j := len(s) - 1
+		for i := 0; i <= j; {
+			rm := s[i]
+			if rm.Host == m.Host && rm.Port == m.Port {
+				s[i] = s[j]
+				j--
+			} else {
+				i++
+			}
+		}
+		s = s[:j+1]
+
+		if len(s) == 0 {
+			delete(p.r, uri)
+		}
+	}
+
+	if p.status != nil {
+		p.status.Urls = len(p.r)
+	}
 }
 
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
@@ -71,7 +109,9 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 
-	p.status.IncRequests()
+	if p.status != nil {
+		p.status.IncRequests()
+	}
 
 	r := p.Lookup(req)
 	if r == nil {
@@ -125,9 +165,10 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (p *Proxy) recordStatus(status int, start time.Time, tags map[string]string) {
-	latency := int(time.Since(start).Nanoseconds() / 1000000)
-
-	p.status.RecordResponse(status, latency, tags)
+	if p.status != nil {
+		latency := int(time.Since(start).Nanoseconds() / 1000000)
+		p.status.RecordResponse(status, latency, tags)
+	}
 }
 
 func copyHeader(dst, src http.Header) {
