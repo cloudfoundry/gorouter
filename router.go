@@ -15,16 +15,13 @@ type Router struct {
 	proxy      *Proxy
 	natsClient *nats.Client
 	status     *ServerStatus
-
-	config Config
 }
 
-func NewRouter(c *Config) *Router {
+func NewRouter() *Router {
 	router := new(Router)
 
-	router.config = *c
 	router.proxy = NewProxy()
-	router.natsClient = startNATS(c.Nats.Host, c.Nats.User, c.Nats.Pass)
+	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
 	router.status = NewServerStatus()
 
 	router.proxy.status = router.status
@@ -83,7 +80,7 @@ func (r *Router) Run() {
 
 	go r.startStatusHTTP()
 
-	err := http.ListenAndServe(fmt.Sprintf(":%d", r.config.Port), r.proxy)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {
 		log.Panic("ListenAndServe ", err)
 	}
@@ -139,5 +136,5 @@ func (r *Router) startStatusHTTP() {
 		enc.Encode(r.status)
 	})
 
-	http.ListenAndServe(fmt.Sprintf(":%d", r.config.StatusPort), nil)
+	http.ListenAndServe(fmt.Sprintf(":%d", config.StatusPort), nil)
 }

@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+var VCAP_BACKEND_HEADER = "X-Vcap-Backend"
+var VCAP_ROUTER_HEADER = "X-Vcap-Router"
+var VCAP_TRACE_HEADER = "X-Vcap-Trace"
+
 type registerMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
@@ -131,8 +135,9 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	outreq := new(http.Request)
 	*outreq = *req // includes shallow copies of maps, but okay
 
+	outHost := fmt.Sprintf("%s:%d", r.Host, r.Port)
 	outreq.URL.Scheme = "http"
-	outreq.URL.Host = fmt.Sprintf("%s:%d", r.Host, r.Port)
+	outreq.URL.Host = outHost
 
 	outreq.Proto = "HTTP/1.1"
 	outreq.ProtoMajor = 1
@@ -169,6 +174,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.recordStatus(res.StatusCode, start, r.Tags)
 
 	copyHeader(rw.Header(), res.Header)
+
+	if req.Header.Get(VCAP_TRACE_HEADER) != "" {
+		rw.Header().Set(VCAP_ROUTER_HEADER, config.ip)
+		rw.Header().Set(VCAP_BACKEND_HEADER, outHost)
+	}
 
 	rw.WriteHeader(res.StatusCode)
 

@@ -14,9 +14,9 @@ func init() {
 }
 
 func main() {
-	config := router.GenerateConfig(configFile)
+	router.GenerateConfig(configFile)
 
-	r := router.NewRouter(config)
+	r := router.NewRouter()
 
 	r.Run()
 }

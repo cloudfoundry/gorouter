@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"net"
 	"net/url"
 	"os"
 )
@@ -10,6 +11,8 @@ type Config struct {
 	Port       int
 	StatusPort int
 	Nats       NatsConfig
+
+	ip string
 }
 
 type NatsConfig struct {
@@ -19,23 +22,21 @@ type NatsConfig struct {
 	Pass string
 }
 
-func GenerateConfig(configFile string) *Config {
+var config Config
+
+func GenerateConfig(configFile string) {
 	file, err := os.OpenFile(configFile, os.O_RDONLY, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	var config *Config = new(Config)
-
 	decoder := json.NewDecoder(file)
-	err = decoder.Decode(config)
+	err = decoder.Decode(&config)
 	if err != nil {
 		panic(err)
 	}
 
-	postProcess(config)
-
-	return config
+	postProcess(&config)
 }
 
 func postProcess(config *Config) {
@@ -53,4 +54,25 @@ func postProcess(config *Config) {
 	if config.Nats.Host == "" {
 		panic("nats server not configured.")
 	}
+
+	config.ip, _ = localIP()
+}
+
+func localIP() (string, error) {
+	addr, err := net.ResolveUDPAddr("udp", "1.2.3.4:1")
+	if err != nil {
+		return "", err
+	}
+
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return "", err
+	}
+
+	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		return "", err
+	}
+
+	return host, nil
 }
