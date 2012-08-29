@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port       int
 	StatusPort int
+	SessionKey string
 	Nats       NatsConfig
 
 	ip string
@@ -38,6 +39,12 @@ func InitConfigFromFile(configFile string) {
 	SanitizeConfig(&config)
 }
 
+func InitConfig(c *Config) {
+	SanitizeConfig(c)
+
+	config = *c
+}
+
 func SanitizeConfig(config *Config) *Config {
 	if config.Nats.URI != "" {
 		u, err := url.Parse(config.Nats.URI)
@@ -55,6 +62,10 @@ func SanitizeConfig(config *Config) *Config {
 	}
 
 	config.ip, _ = localIP()
+
+	if config.SessionKey == "" {
+		config.SessionKey = "14fbc303b76bacd1e0a3ab641c11d114"
+	}
 
 	return config
 }

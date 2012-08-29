@@ -12,9 +12,14 @@ import (
 	"time"
 )
 
-var VCAP_BACKEND_HEADER = "X-Vcap-Backend"
-var VCAP_ROUTER_HEADER = "X-Vcap-Router"
-var VCAP_TRACE_HEADER = "X-Vcap-Trace"
+const (
+	VcapBackendHeader = "X-Vcap-Backend"
+	VcapRouterHeader  = "X-Vcap-Router"
+	VcapTraceHeader   = "X-Vcap-Trace"
+
+	VcapCookieId    = "__VCAP_ID__"
+	StickyCookieKey = "JSESSIONID"
+)
 
 type registerMessage struct {
 	Host string            `json:"host"`
@@ -23,17 +28,22 @@ type registerMessage struct {
 	Tags map[string]string `json:"tags"`
 	Dea  string            `json:"dea"`
 	App  int               `json:"app"`
+
+	Sticky string
 }
 
 type Proxy struct {
 	sync.Mutex
+
 	r      map[string][]*registerMessage
 	status *ServerStatus
+	se     *SessionEncoder
 }
 
-func NewProxy() *Proxy {
+func NewProxy(se *SessionEncoder) *Proxy {
 	p := new(Proxy)
 	p.r = make(map[string][]*registerMessage)
+	p.se = se
 	return p
 }
 
@@ -91,6 +101,7 @@ func (p *Proxy) Unregister(m *registerMessage) {
 }
 
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
+	var rm *registerMessage
 	host := req.Host
 
 	// Remove :<port>
@@ -107,7 +118,33 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 		return nil
 	}
 
-	return s[rand.Intn(len(s))]
+	var sticky string
+	for _, v := range req.Cookies() {
+		if v.Name == VcapCookieId {
+			sticky = v.Value
+			break
+		}
+	}
+
+	if sticky != "" {
+		sHost, sPort := p.se.decryptStickyCookie(sticky)
+
+		// Check sticky session
+		if sHost != "" && sPort != 0 {
+			for _, droplet := range s {
+				if droplet.Host == sHost && droplet.Port == sPort {
+					rm = droplet
+					break
+				}
+			}
+		}
+	}
+
+	if rm == nil {
+		rm = s[rand.Intn(len(s))]
+	}
+
+	return rm
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -175,9 +212,25 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	copyHeader(rw.Header(), res.Header)
 
-	if req.Header.Get(VCAP_TRACE_HEADER) != "" {
-		rw.Header().Set(VCAP_ROUTER_HEADER, config.ip)
-		rw.Header().Set(VCAP_BACKEND_HEADER, outHost)
+	if req.Header.Get(VcapTraceHeader) != "" {
+		rw.Header().Set(VcapRouterHeader, config.ip)
+		rw.Header().Set(VcapBackendHeader, outHost)
+	}
+
+	needSticky := false
+	for _, v := range res.Cookies() {
+		if v.Name == StickyCookieKey {
+			needSticky = true
+			break
+		}
+	}
+
+	if needSticky {
+		cookie := &http.Cookie{
+			Name:  VcapCookieId,
+			Value: p.se.getStickyCookie(r),
+		}
+		http.SetCookie(rw, cookie)
 	}
 
 	rw.WriteHeader(res.StatusCode)

@@ -2,6 +2,7 @@ package router
 
 import (
 	"code.google.com/p/go.net/websocket"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
@@ -20,10 +21,15 @@ type Router struct {
 func NewRouter() *Router {
 	router := new(Router)
 
-	router.proxy = NewProxy()
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
 	router.status = NewServerStatus()
 
+	se, err := NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
+	if err != nil {
+		panic(err)
+	}
+
+	router.proxy = NewProxy(se)
 	router.proxy.status = router.status
 
 	return router
