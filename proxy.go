@@ -53,6 +53,7 @@ func (p *Proxy) Register(m *registerMessage) {
 
 	// Store droplet in registry
 	for _, uri := range m.Uris {
+		uri = strings.ToLower(uri)
 		s := p.r[uri]
 		if s == nil {
 			s = make([]*registerMessage, 0)
@@ -109,6 +110,8 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 	if i >= 0 {
 		host = host[0:i]
 	}
+
+	host = strings.ToLower(host)
 
 	p.Lock()
 	defer p.Unlock()

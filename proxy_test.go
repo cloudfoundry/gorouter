@@ -35,6 +35,18 @@ var barReg = &registerMessage{
 	App: 54321,
 }
 
+var upperFooReg = &registerMessage{
+	Host: "192.168.1.1",
+	Port: 1234,
+	Uris: []string{"FOO.VCAP.ME"},
+	Tags: map[string]string{
+		"runtime":   "ruby18",
+		"framework": "sinatra",
+	},
+	Dea: "",
+	App: 12345,
+}
+
 var emptyReg = &registerMessage{}
 
 func (s *ProxySuite) SetUpTest(c *C) {
@@ -60,6 +72,19 @@ func (s *ProxySuite) TestUnreg(c *C) {
 	c.Check(len(s.proxy.r), Equals, 0)
 }
 
+func (s *ProxySuite) TestRegUppercase(c *C) {
+	s.proxy.Register(upperFooReg)
+
+	req := &http.Request{
+		Host: "foo.vcap.me",
+	}
+
+	m := s.proxy.Lookup(req)
+	c.Assert(m, NotNil)
+	c.Check(m.Host, Equals, "192.168.1.1")
+	c.Check(m.Port, Equals, uint16(1234))
+}
+
 func (s *ProxySuite) TestLookup(c *C) {
 	s.proxy.Register(fooReg)
 
@@ -67,6 +92,19 @@ func (s *ProxySuite) TestLookup(c *C) {
 		Host: "foo.vcap.me",
 	}
 	m := s.proxy.Lookup(req)
+	c.Assert(m, NotNil)
+	c.Check(m.Host, Equals, "192.168.1.1")
+	c.Check(m.Port, Equals, uint16(1234))
+}
+
+func (s *ProxySuite) TestLookupUppercase(c *C) {
+	s.proxy.Register(fooReg)
+
+	req := &http.Request{
+		Host: "FOO.VCAP.ME",
+	}
+	m := s.proxy.Lookup(req)
+	c.Assert(m, NotNil)
 	c.Check(m.Host, Equals, "192.168.1.1")
 	c.Check(m.Port, Equals, uint16(1234))
 }
