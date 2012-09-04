@@ -9,11 +9,17 @@ import (
 
 type Config struct {
 	Port       int
-	StatusPort int
 	SessionKey string
+	Status     StatusConfig
 	Nats       NatsConfig
 
 	ip string
+}
+
+type StatusConfig struct {
+	Port     int
+	User     string
+	Password string
 }
 
 type NatsConfig struct {

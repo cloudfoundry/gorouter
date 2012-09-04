@@ -1,5 +1,8 @@
 port: 8083
-statusport: 8084
+status:
+  port: 8084
+  user: "user"
+  password: "password"
 # session key should be a string of length 32
 sessionkey: "14fbc303b76bacd1e0a3ab641c11d114"
 nats:
