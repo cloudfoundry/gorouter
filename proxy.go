@@ -59,8 +59,18 @@ func (p *Proxy) Register(m *registerMessage) {
 			s = make([]*registerMessage, 0)
 		}
 
-		s = append(s, m)
-		p.r[uri] = s
+		exist := false
+		for _, d := range s {
+			if d.Host == m.Host && d.Port == m.Port {
+				exist = true
+				break
+			}
+		}
+
+		if !exist {
+			s = append(s, m)
+			p.r[uri] = s
+		}
 	}
 
 	if p.status != nil {
@@ -101,8 +111,7 @@ func (p *Proxy) Unregister(m *registerMessage) {
 	}
 }
 
-func (p *Proxy) Lookup(req *http.Request) *registerMessage {
-	var rm *registerMessage
+func (p *Proxy) lookup(req *http.Request) []*registerMessage {
 	host := req.Host
 
 	// Remove :<port>
@@ -113,14 +122,24 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 
 	host = strings.ToLower(host)
 
+	return p.r[host]
+}
+
+func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 	p.Lock()
 	defer p.Unlock()
 
-	s := p.r[host]
+	s := p.lookup(req)
 	if s == nil {
 		return nil
 	}
 
+	// If there's only one backend, choose that
+	if len(s) == 1 {
+		return s[0]
+	}
+
+	// Choose backend depending on sticky session
 	var sticky string
 	for _, v := range req.Cookies() {
 		if v.Name == VcapCookieId {
@@ -129,6 +148,7 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 		}
 	}
 
+	var rm *registerMessage
 	if sticky != "" {
 		sHost, sPort := p.se.decryptStickyCookie(sticky)
 
@@ -143,6 +163,7 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 		}
 	}
 
+	// No valid sticky session found, choose one randomly
 	if rm == nil {
 		rm = s[rand.Intn(len(s))]
 	}
