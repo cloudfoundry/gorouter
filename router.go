@@ -31,7 +31,12 @@ func NewRouter() *Router {
 	router.proxy.status = router.status
 
 	component := &vcap.VcapComponent{
-		Type:  "Router",
+		Type:        "Router",
+		Index:       config.Index,
+		Host:        host(),
+		Credentials: []string{config.Status.User, config.Status.Password},
+		Varz:        router.status,
+		Healthz:     "ok",
 	}
 	vcap.Register(component, router.natsClient)
 
@@ -87,8 +92,6 @@ func (r *Router) Run() {
 	// Start message
 	r.natsClient.Publish("router.start", []byte(""))
 
-	go r.startStatusHTTP()
-
 	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {
 		log.Panic("ListenAndServe ", err)
@@ -104,4 +107,17 @@ func startNATS(host, user, pass string) *nats.Client {
 	}()
 
 	return c
+}
+
+func host() string {
+	if config.Status.Port == 0 {
+		return ""
+	}
+
+	ip, err := vcap.LocalIP()
+	if err != nil {
+		panic(err)
+	}
+
+	return fmt.Sprintf("%s:%d", ip, config.Status.Port)
 }

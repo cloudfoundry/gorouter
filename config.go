@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port       int
 	SessionKey string
+	Index      uint
 	Status     StatusConfig
 	Nats       NatsConfig
 

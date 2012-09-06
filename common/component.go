@@ -4,20 +4,56 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
+	"runtime"
+	"sync"
 	"time"
 )
 
 type VcapComponent struct {
-	Type        string
-	Index       uint
-	UUID        string
-	Host        string
-	Credentials []string
-	Start       time.Time
-	Uptime      time.Duration
+	// These fields are from individual components
+	Type        string      `json:"type"`
+	Index       uint        `json:"index"`
+	Host        string      `json:"host"`
+	Credentials []string    `json:"credentials"`
+	Healthz     interface{} `json:"-"`
+	Varz        interface{} `json:"-"`
+
+	// These fields are automatically generated
+	UUID   string        `json:"uuid"`
+	Start  time.Time     `json:"start"`
+	Uptime time.Duration `json:"uptime"`
 }
 
+type Healthz struct {
+	Health interface{} `json:"health"`
+}
+
+type Varz struct {
+	sync.Mutex
+
+	Uptime   time.Duration    `json:"uptime"`
+	Start    time.Time        `json:"start"`
+	MemStats runtime.MemStats `json:"memstats"`
+	Var      interface{}      `json:"var"`
+}
+
+var healthz Healthz
+var varz Varz
 var Component VcapComponent
+
+func UpdateHealthz() *Healthz {
+	return &healthz
+}
+
+func UpdateVarz() *Varz {
+	varz.Lock()
+	defer varz.Unlock()
+
+	varz.Uptime = time.Since(varz.Start)
+	runtime.ReadMemStats(&varz.MemStats)
+
+	return &varz
+}
 
 func Register(c *VcapComponent, natsClient *nats.Client) {
 	Component = *c
@@ -25,6 +61,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		panic("type is required")
 	}
 
+	Component.Start = time.Now()
 	Component.UUID = fmt.Sprintf("%d-%s", Component.Index, GenerateUUID())
 
 	if Component.Host == "" {
@@ -48,9 +85,11 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		Component.Credentials = []string{user, password}
 	}
 
-	Component.Start = time.Now()
+	// Init healthz/varz
+	healthz.Health = Component.Healthz
+	varz.Start = Component.Start
+	varz.Var = Component.Varz
 
-	// TODO start /varz /healthz server here
 	go startStatusServer()
 
 	// subscribe nats
@@ -72,7 +111,4 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 func updateUptime() {
 	Component.Uptime = time.Since(Component.Start)
-}
-
-func startStatusServer() {
 }
