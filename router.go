@@ -37,6 +37,7 @@ func NewRouter() *Router {
 		Credentials: []string{config.Status.User, config.Status.Password},
 		Varz:        router.status,
 		Healthz:     "ok",
+		Config:      config,
 	}
 	vcap.Register(component, router.natsClient)
 

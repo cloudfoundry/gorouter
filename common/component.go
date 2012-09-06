@@ -17,6 +17,7 @@ type VcapComponent struct {
 	Credentials []string    `json:"credentials"`
 	Healthz     interface{} `json:"-"`
 	Varz        interface{} `json:"-"`
+	Config      interface{} `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string        `json:"uuid"`
@@ -34,7 +35,9 @@ type Varz struct {
 	Uptime   time.Duration    `json:"uptime"`
 	Start    time.Time        `json:"start"`
 	MemStats runtime.MemStats `json:"memstats"`
+	NumCores int              `json:"num_cores"`
 	Var      interface{}      `json:"var"`
+	Config   interface{}      `json:"config"`
 }
 
 var healthz Healthz
@@ -89,6 +92,8 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	healthz.Health = Component.Healthz
 	varz.Start = Component.Start
 	varz.Var = Component.Varz
+	varz.NumCores = runtime.NumCPU()
+	varz.Config = Component.Config
 
 	go startStatusServer()
 
