@@ -3,8 +3,8 @@ package router
 import (
 	"io/ioutil"
 	"launchpad.net/goyaml"
-	"net"
 	"net/url"
+	vcap "router/common"
 )
 
 type Config struct {
@@ -69,30 +69,11 @@ func SanitizeConfig(config *Config) *Config {
 		panic("nats server not configured.")
 	}
 
-	config.ip, _ = localIP()
+	config.ip, _ = vcap.LocalIP()
 
 	if config.SessionKey == "" {
 		config.SessionKey = "14fbc303b76bacd1e0a3ab641c11d114"
 	}
 
 	return config
-}
-
-func localIP() (string, error) {
-	addr, err := net.ResolveUDPAddr("udp", "1.2.3.4:1")
-	if err != nil {
-		return "", err
-	}
-
-	conn, err := net.DialUDP("udp", nil, addr)
-	if err != nil {
-		return "", err
-	}
-
-	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
-	if err != nil {
-		return "", err
-	}
-
-	return host, nil
 }

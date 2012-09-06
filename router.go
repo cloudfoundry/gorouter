@@ -7,6 +7,7 @@ import (
 	nats "github.com/cloudfoundry/gonats"
 	"log"
 	"net/http"
+	vcap "router/common"
 )
 
 type Router struct {
@@ -28,6 +29,11 @@ func NewRouter() *Router {
 
 	router.proxy = NewProxy(se)
 	router.proxy.status = router.status
+
+	component := &vcap.VcapComponent{
+		Type:  "Router",
+	}
+	vcap.Register(component, router.natsClient)
 
 	return router
 }
