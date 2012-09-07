@@ -47,3 +47,12 @@ func GenerateUUID() string {
 	uuid := fmt.Sprintf("%x", b)
 	return uuid
 }
+
+func ProcessExist(pid int) bool {
+	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
+	if err != nil {
+		return false
+	}
+
+	return true
+}

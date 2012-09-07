@@ -11,6 +11,7 @@ type Config struct {
 	Port       int
 	SessionKey string
 	Index      uint
+	Pidfile    string
 	Status     StatusConfig
 	Nats       NatsConfig
 

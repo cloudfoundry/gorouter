@@ -8,21 +8,31 @@ import (
 	"log"
 	"net/http"
 	vcap "router/common"
+	"syscall"
 )
 
 type Router struct {
 	proxy      *Proxy
 	natsClient *nats.Client
 	status     *ServerStatus
+	pidfile    *vcap.PidFile
 }
 
 func NewRouter() *Router {
 	router := new(Router)
 
+	pidfile, err := vcap.NewPidFile(config.Pidfile)
+	if err != nil {
+		panic(err)
+	}
+	pidfile.UnlinkOnSignal(syscall.SIGTERM, syscall.SIGINT)
+	router.pidfile = pidfile
+
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
 	router.status = NewServerStatus()
 
-	se, err := NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
+	var se *SessionEncoder
+	se, err = NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
 	if err != nil {
 		panic(err)
 	}
