@@ -20,9 +20,9 @@ type VcapComponent struct {
 	Config      interface{} `json:"-"`
 
 	// These fields are automatically generated
-	UUID   string        `json:"uuid"`
-	Start  time.Time     `json:"start"`
-	Uptime time.Duration `json:"uptime"`
+	UUID   string    `json:"uuid"`
+	Start  time.Time `json:"start"`
+	Uptime Duration  `json:"uptime"`
 }
 
 type Healthz struct {
@@ -32,7 +32,7 @@ type Healthz struct {
 type Varz struct {
 	sync.Mutex
 
-	Uptime   time.Duration    `json:"uptime"`
+	Uptime   Duration    `json:"uptime"`
 	Start    time.Time        `json:"start"`
 	MemStats runtime.MemStats `json:"memstats"`
 	NumCores int              `json:"num_cores"`
@@ -52,7 +52,7 @@ func UpdateVarz() *Varz {
 	varz.Lock()
 	defer varz.Unlock()
 
-	varz.Uptime = time.Since(varz.Start)
+	varz.Uptime = Duration(time.Since(varz.Start))
 	runtime.ReadMemStats(&varz.MemStats)
 
 	return &varz
@@ -115,5 +115,5 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 }
 
 func updateUptime() {
-	Component.Uptime = time.Since(Component.Start)
+	Component.Uptime = Duration(time.Since(Component.Start))
 }
