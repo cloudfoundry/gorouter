@@ -59,8 +59,10 @@ func SanitizeConfig(config *Config) *Config {
 		}
 
 		config.Nats.Host = u.Host
-		config.Nats.User = u.User.Username()
-		config.Nats.Pass, _ = u.User.Password()
+		if u.User != nil {
+			config.Nats.User = u.User.Username()
+			config.Nats.Pass, _ = u.User.Password()
+		}
 	}
 
 	if config.Nats.Host == "" {
