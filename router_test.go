@@ -26,11 +26,6 @@ func Test(t *testing.T) {
 	TestingT(t)
 }
 
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(200)
-	io.WriteString(w, "Hello, world")
-}
-
 type RouterSuite struct {
 	natsServer *spec.NatsServer
 	natsClient *nats.Client
@@ -60,6 +55,7 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 
 func (s *RouterSuite) TearDownSuite(c *C) {
 	s.router.pidfile.Unlink()
+	s.natsServer.Stop()
 }
 
 func (s *RouterSuite) TestDiscover(c *C) {
@@ -127,6 +123,23 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app.VerifyAppStatus(404, c)
 }
 
+func (s *RouterSuite) TestStickySession(c *C) {
+	apps := make([]*TestApp, 10)
+	for i := 0; i < len(apps); i++ {
+		apps[i] = NewTestApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient)
+		apps[i].Listen()
+	}
+
+	session, port1 := sendRequest("sticky.vcap.me", uint16(8083), c)
+	port2 := sendRequestWithSticky("sticky.vcap.me", uint16(8083), session, c)
+
+	c.Check(port1, Equals, port2)
+
+	for _, app := range apps {
+		app.Unregister()
+	}
+}
+
 func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 	var client http.Client
 	var req *http.Request
@@ -149,10 +162,10 @@ func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 }
 
 type TestApp struct {
-	port       uint16
-	urls       []string
+	port       uint16   // app listening port
+	urls       []string // host registered host name
 	natsClient *nats.Client
-	rPort      uint16
+	rPort      uint16 // router listening port
 }
 
 func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client) *TestApp {
@@ -172,6 +185,7 @@ func (a *TestApp) Listen() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", testHandler)
+	mux.HandleFunc("/sticky", stickyHandler(a.port))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", a.port),
@@ -181,6 +195,24 @@ func (a *TestApp) Listen() {
 	a.Register()
 
 	go server.ListenAndServe()
+}
+
+func testHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+	io.WriteString(w, "Hello, world")
+}
+
+func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie := &http.Cookie{
+			Name:  "JSESSIONID",
+			Value: "xxx",
+		}
+		http.SetCookie(w, cookie)
+		w.WriteHeader(200)
+
+		io.WriteString(w, fmt.Sprintf("%d", port))
+	}
 }
 
 func (a *TestApp) Register() {
@@ -206,4 +238,53 @@ func (a *TestApp) VerifyAppStatus(status int, c *C) {
 		c.Assert(err, IsNil)
 		c.Check(resp.StatusCode, Equals, status)
 	}
+}
+
+func sendRequest(url string, rPort uint16, c *C) (string, string) {
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+	var port []byte
+
+	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
+	req, err = http.NewRequest("GET", uri, nil)
+
+	resp, err = client.Do(req)
+	c.Assert(err, IsNil)
+
+	port, err = ioutil.ReadAll(resp.Body)
+
+	var session string
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "__VCAP_ID__" {
+			session = cookie.Value
+		}
+	}
+
+	return session, string(port)
+}
+
+func sendRequestWithSticky(url string, rPort uint16, session string, c *C) string {
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+	var port []byte
+
+	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
+	req, err = http.NewRequest("GET", uri, nil)
+
+	cookie := &http.Cookie{
+		Name:  "__VCAP_ID__",
+		Value: session,
+	}
+	req.AddCookie(cookie)
+
+	resp, err = client.Do(req)
+	c.Assert(err, IsNil)
+
+	port, err = ioutil.ReadAll(resp.Body)
+
+	return string(port)
 }
