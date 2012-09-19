@@ -1,0 +1,4 @@
+port: 8083
+statusport: 8084
+nats:
+  uri: "nats://nats:nats@localhost:4222"

@@ -8,13 +8,13 @@ import (
 var configFile string
 
 func init() {
-	flag.StringVar(&configFile, "c", "config/router.json", "Configuration File")
+	flag.StringVar(&configFile, "c", "config/router.yml", "Configuration File")
 
 	flag.Parse()
 }
 
 func main() {
-	router.GenerateConfig(configFile)
+	router.InitConfigFromFile(configFile)
 
 	r := router.NewRouter()
 

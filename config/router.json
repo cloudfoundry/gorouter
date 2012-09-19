@@ -1,7 +1,0 @@
-{
-  "port": 8083,
-  "statusPort": 8084,
-  "nats": {
-    "URI": "nats://nats:nats@localhost:4222"
-  }
-}

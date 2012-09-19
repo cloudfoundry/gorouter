@@ -1,10 +1,10 @@
 package router
 
 import (
-	"encoding/json"
+	"io/ioutil"
+	"launchpad.net/goyaml"
 	"net"
 	"net/url"
-	"os"
 )
 
 type Config struct {
@@ -24,22 +24,21 @@ type NatsConfig struct {
 
 var config Config
 
-func GenerateConfig(configFile string) {
-	file, err := os.OpenFile(configFile, os.O_RDONLY, 0)
+func InitConfigFromFile(configFile string) {
+	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		panic(err)
 	}
 
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&config)
+	err = goyaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		panic(err)
 	}
 
-	postProcess(&config)
+	SanitizeConfig(&config)
 }
 
-func postProcess(config *Config) {
+func SanitizeConfig(config *Config) *Config {
 	if config.Nats.URI != "" {
 		u, err := url.Parse(config.Nats.URI)
 		if err != nil {
@@ -56,6 +55,8 @@ func postProcess(config *Config) {
 	}
 
 	config.ip, _ = localIP()
+
+	return config
 }
 
 func localIP() (string, error) {
