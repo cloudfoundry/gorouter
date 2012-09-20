@@ -16,7 +16,7 @@ const (
 
 func BenchmarkEncryption(b *testing.B) {
 	s, _ := NewAESSessionEncoder([]byte(SessionKey), base64.StdEncoding)
-	config.SessionKey = []byte(SessionKey)
+	config.SessionKey = SessionKey
 
 	for i := 0; i < b.N; i++ {
 		s.encryptStickyCookie(Host, Port)
@@ -25,7 +25,7 @@ func BenchmarkEncryption(b *testing.B) {
 
 func BenchmarkDecryption(b *testing.B) {
 	s, _ := NewAESSessionEncoder([]byte(SessionKey), base64.StdEncoding)
-	config.SessionKey = []byte(SessionKey)
+	config.SessionKey = SessionKey
 
 	for i := 0; i < b.N; i++ {
 		s.decryptStickyCookie(Session)
