@@ -123,6 +123,15 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app.VerifyAppStatus(404, c)
 }
 
+func (s *RouterSuite) TestTraceHeader(c *C) {
+	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient)
+	app.Listen()
+	app.VerifyAppStatus(200, c)
+	app.VerifyTraceHeader(c)
+
+	app.Unregister()
+}
+
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*TestApp, 10)
 	for i := 0; i < len(apps); i++ {
@@ -237,6 +246,28 @@ func (a *TestApp) VerifyAppStatus(status int, c *C) {
 		resp, err := http.Get(uri)
 		c.Assert(err, IsNil)
 		c.Check(resp.StatusCode, Equals, status)
+	}
+}
+
+func (a *TestApp) VerifyTraceHeader(c *C) {
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+
+	routerIP, _ := common.LocalIP()
+
+	for _, url := range a.urls {
+		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
+
+		req, err = http.NewRequest("GET", uri, nil)
+		req.Header.Add(VcapTraceHeader, "anything")
+		resp, err = client.Do(req)
+
+		c.Assert(err, IsNil)
+		c.Check(resp.StatusCode, Equals, 200)
+		c.Check(resp.Header.Get(VcapBackendHeader), Equals, fmt.Sprintf("localhost:%d", a.port))
+		c.Check(resp.Header.Get(VcapRouterHeader), Equals, routerIP)
 	}
 }
 
