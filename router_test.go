@@ -115,7 +115,7 @@ func (s *RouterSuite) TestDiscover(c *C) {
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient)
+	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	app.VerifyAppStatus(200, c)
 
@@ -124,7 +124,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
-	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient)
+	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	app.VerifyAppStatus(200, c)
 	app.VerifyTraceHeader(c)
@@ -132,15 +132,52 @@ func (s *RouterSuite) TestTraceHeader(c *C) {
 	app.Unregister()
 }
 
+func (s *RouterSuite) TestStatus(c *C) {
+	app := NewTestApp([]string{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
+	app.Listen()
+
+	// Record original status report
+	status := s.router.status
+	requests := status.Requests
+	responses2xx := status.Responses2xx
+
+	metric := status.Tags["framework"]["rails"]
+	tagRequests := 0
+	tagResponses2xx := 0
+	if metric != nil {
+		tagRequests = metric.Requests
+		tagResponses2xx = metric.Responses2xx
+	}
+
+	// Send requests
+	sendRequests("count.vcap.me", uint16(8083), 100)
+
+	// Verify status report update
+	requests = status.Requests - requests
+	responses2xx = status.Responses2xx - responses2xx
+	c.Check(requests, Equals, 100)
+	c.Check(responses2xx, Equals, 100)
+
+	metric = status.Tags["framework"]["rails"]
+	c.Assert(metric, NotNil)
+
+	tagRequests = metric.Requests - tagRequests
+	tagResponses2xx = metric.Responses2xx - tagResponses2xx
+	c.Check(tagRequests, Equals, 100)
+	c.Check(tagResponses2xx, Equals, 100)
+
+	app.Unregister()
+}
+
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*TestApp, 10)
 	for i := 0; i < len(apps); i++ {
-		apps[i] = NewTestApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient)
+		apps[i] = NewTestApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
 		apps[i].Listen()
 	}
 
-	session, port1 := sendRequest("sticky.vcap.me", uint16(8083), c)
-	port2 := sendRequestWithSticky("sticky.vcap.me", uint16(8083), session, c)
+	session, port1 := getSessionAndAppPort("sticky.vcap.me", uint16(8083), c)
+	port2 := getAppPortWithSticky("sticky.vcap.me", uint16(8083), session, c)
 
 	c.Check(port1, Equals, port2)
 
@@ -172,12 +209,13 @@ func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 
 type TestApp struct {
 	port       uint16   // app listening port
+	rPort      uint16   // router listening port
 	urls       []string // host registered host name
 	natsClient *nats.Client
-	rPort      uint16 // router listening port
+	tags       map[string]string
 }
 
-func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client) *TestApp {
+func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()
@@ -186,6 +224,7 @@ func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client) *TestApp {
 	app.rPort = rPort
 	app.urls = urls
 	app.natsClient = natsClient
+	app.tags = tags
 
 	return app
 }
@@ -226,7 +265,7 @@ func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
 
 func (a *TestApp) Register() {
 	var rm = registerMessage{
-		"localhost", a.port, a.urls, nil, "dea", "0", "",
+		"localhost", a.port, a.urls, a.tags, "dea", "0", "",
 	}
 	b, _ := json.Marshal(rm)
 	a.natsClient.Publish("router.register", b)
@@ -271,7 +310,15 @@ func (a *TestApp) VerifyTraceHeader(c *C) {
 	}
 }
 
-func sendRequest(url string, rPort uint16, c *C) (string, string) {
+func sendRequests(url string, rPort uint16, times int) {
+	uri := fmt.Sprintf("http://%s:%d", url, rPort)
+
+	for i := 0; i < times; i++ {
+		http.Get(uri)
+	}
+}
+
+func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -296,7 +343,7 @@ func sendRequest(url string, rPort uint16, c *C) (string, string) {
 	return session, string(port)
 }
 
-func sendRequestWithSticky(url string, rPort uint16, session string, c *C) string {
+func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
