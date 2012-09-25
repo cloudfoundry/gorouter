@@ -33,7 +33,7 @@ func (s *ConfigSuite) TearDownTest(c *C) {
 func (s *ConfigSuite) TestInitConfig(c *C) {
 	InitConfig(s.config)
 
-	c.Assert(config.Port, Equals, 8080)
+	c.Assert(config.Port, Equals, uint16(8080))
 	c.Assert(config.SessionKey, Equals, "14fbc303b76bacd1e0a3ab641c11d114")
 
 	ip, err := vcap.LocalIP()

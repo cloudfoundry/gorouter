@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 )
 
 func LocalIP() (string, error) {
@@ -25,17 +26,26 @@ func LocalIP() (string, error) {
 	return host, nil
 }
 
-func GrabEphemeralPort() (string, error) {
-	listener, err := net.Listen("tcp", ":0")
+func GrabEphemeralPort() (port uint16, err error) {
+	var listener net.Listener
+	var portStr string
+	var p int
+
+	listener, err = net.Listen("tcp", ":0")
 	if err != nil {
-		return "", err
+		return
+	}
+	defer listener.Close()
+
+	_, portStr, err = net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		return
 	}
 
-	_, port, err := net.SplitHostPort(listener.Addr().String())
+	p, err = strconv.Atoi(portStr)
+	port = uint16(p)
 
-	listener.Close()
-
-	return port, err
+	return
 }
 
 func GenerateUUID() string {

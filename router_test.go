@@ -14,7 +14,6 @@ import (
 	"router/common"
 	"router/common/spec"
 	"runtime"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -219,8 +218,8 @@ func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[s
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()
-	pi, _ := strconv.Atoi(port)
-	app.port = uint16(pi)
+
+	app.port = port
 	app.rPort = rPort
 	app.urls = urls
 	app.natsClient = natsClient
