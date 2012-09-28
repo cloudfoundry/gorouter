@@ -100,13 +100,6 @@ func (s *ServerStatus) IncRequestsWithTags(tags map[string]string) {
 	}
 }
 
-func (s *ServerStatus) IncDroplets() {
-	s.Lock()
-	defer s.Unlock()
-
-	s.Droplets++
-}
-
 func (s *ServerStatus) RecordResponse(status int, latency int, tags map[string]string) {
 	if latency < 0 {
 		return

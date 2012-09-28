@@ -32,10 +32,15 @@ type registerMessage struct {
 	Sticky string
 }
 
+func (r *registerMessage) HostPort() string {
+	return fmt.Sprintf("%s:%d", r.Host, r.Port)
+}
+
 type Proxy struct {
 	sync.Mutex
 
 	r      map[string][]*registerMessage
+	d      map[string]int
 	status *ServerStatus
 	se     *SessionEncoder
 }
@@ -43,7 +48,9 @@ type Proxy struct {
 func NewProxy(se *SessionEncoder) *Proxy {
 	p := new(Proxy)
 	p.r = make(map[string][]*registerMessage)
+	p.d = make(map[string]int)
 	p.se = se
+
 	return p
 }
 
@@ -70,17 +77,18 @@ func (p *Proxy) Register(m *registerMessage) {
 		if !exist {
 			s = append(s, m)
 			p.r[uri] = s
+			p.d[m.HostPort()]++
 		}
 	}
 
-	if p.status != nil {
-		p.status.Urls = len(p.r)
-	}
+	p.updateStatus()
 }
 
 func (p *Proxy) Unregister(m *registerMessage) {
 	p.Lock()
 	defer p.Unlock()
+
+	hp := m.HostPort()
 
 	// Delete droplets from registry
 	for _, uri := range m.Uris {
@@ -89,25 +97,35 @@ func (p *Proxy) Unregister(m *registerMessage) {
 			continue
 		}
 
-		j := len(s) - 1
-		for i := 0; i <= j; {
-			rm := s[i]
-			if rm.Host == m.Host && rm.Port == m.Port {
-				s[i] = s[j]
-				j--
-			} else {
-				i++
+		exist := false
+		for i, d := range s {
+			if d.Host == m.Host && d.Port == m.Port {
+				s[i] = s[len(s)-1]
+				exist = true
+				break
 			}
 		}
-		s = s[:j+1]
 
-		if len(s) == 0 {
-			delete(p.r, uri)
+		if exist {
+			s = s[:len(s)-1]
+			if len(s) == 0 {
+				delete(p.r, uri)
+			}
+
+			p.d[hp]--
+			if p.d[hp] == 0 {
+				delete(p.d, hp)
+			}
 		}
 	}
 
+	p.updateStatus()
+}
+
+func (p *Proxy) updateStatus() {
 	if p.status != nil {
 		p.status.Urls = len(p.r)
+		p.status.Droplets = len(p.d)
 	}
 }
 
