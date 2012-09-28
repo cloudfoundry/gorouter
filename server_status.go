@@ -2,7 +2,10 @@ package router
 
 import (
 	"sync"
+	"time"
 )
+
+const RPSInterval = 60 // in seconds
 
 type HttpMetrics map[string]*HttpMetric
 
@@ -15,13 +18,11 @@ type ServerStatus struct {
 	HttpMetric
 	sync.Mutex
 
-	Urls        int                    `json:"urls"`
-	Droplets    int                    `json:"droplets"`
-	BadRequests int                    `json:"bad_requests"`
-	Tags        map[string]HttpMetrics `json:"tags"`
-
-	// TODO: Support in future
-	//	RequestsPerSec int                    `json:"requests_per_sec"`
+	Urls           int                    `json:"urls"`
+	Droplets       int                    `json:"droplets"`
+	BadRequests    int                    `json:"bad_requests"`
+	Tags           map[string]HttpMetrics `json:"tags"`
+	RequestsPerSec int                    `json:"requests_per_sec"`
 }
 
 type HttpMetric struct {
@@ -46,6 +47,16 @@ func NewServerStatus() *ServerStatus {
 	for _, tag := range tags {
 		s.Tags[tag] = make(HttpMetrics)
 	}
+
+	go func() {
+		for {
+			requests := s.Requests
+
+			time.Sleep(RPSInterval * time.Second)
+
+			s.RequestsPerSec = (s.Requests - requests) / RPSInterval
+		}
+	}()
 
 	return s
 }
