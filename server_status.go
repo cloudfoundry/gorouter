@@ -7,8 +7,11 @@ import (
 type HttpMetrics map[string]*HttpMetric
 
 type ServerStatus struct {
-	// TODO: Need to copy/paste all fileds in Metric here
-	// workaround for json package doesn't support anonymous fields
+	// NOTE: Due to this golang bug http://golang.org/issue/3069
+	//       embedded anonymous fields are ignored by json marshaller,
+	//       so all the fields in HttpMetric won't appear in json message.
+	//
+	//       Good news is the fix of this bug is targetted at go 1.1
 	HttpMetric
 	sync.Mutex
 
