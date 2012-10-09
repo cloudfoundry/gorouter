@@ -2,6 +2,8 @@ package router
 
 import (
 	"encoding/base64"
+	"net/http"
+	"strconv"
 	"testing"
 )
 
@@ -30,4 +32,69 @@ func BenchmarkDecryption(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		s.decryptStickyCookie(Session)
 	}
+}
+
+func BenchmarkRegister(b *testing.B) {
+	s, _ := NewAESSessionEncoder([]byte(SessionKey), base64.StdEncoding)
+	p := NewProxy(s)
+	p.status = NewServerStatus()
+
+	for i := 0; i < b.N; i++ {
+		str := strconv.Itoa(i)
+		rm := &registerMessage{"localhost", uint16(i), []string{"bench.vcap.me." + str}, nil, "", 0, ""}
+		p.Register(rm)
+	}
+}
+
+func BenchmarkProxy(b *testing.B) {
+	b.StopTimer()
+
+	// Start app
+	server := &http.Server{
+		Addr: ":40899",
+	}
+	go server.ListenAndServe()
+
+	// New Proxy
+	s, _ := NewAESSessionEncoder([]byte(SessionKey), base64.StdEncoding)
+	p := NewProxy(s)
+	p.status = NewServerStatus()
+
+	// Register app
+	rm := &registerMessage{"localhost", 40899, []string{"bench.vcap.me"}, map[string]string{"component": "cc", "runtime": "ruby"}, "", 0, ""}
+	p.Register(rm)
+
+	// Load 10000 registered apps
+	for i := 0; i < 10000; i++ {
+		str := strconv.Itoa(i)
+		rm := &registerMessage{"localhost", uint16(i), []string{"bench.vcap.me." + str}, nil, "", 0, ""}
+		p.Register(rm)
+	}
+
+	// New request and response writer
+	req, _ := http.NewRequest("GET", "bench.vcap.me", nil)
+	req.Host = "bench.vcap.me"
+	rw := new(NullResponseWriter)
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		p.ServeHTTP(rw, req)
+	}
+}
+
+type NullResponseWriter struct {
+	header http.Header
+}
+
+func (rw *NullResponseWriter) Header() http.Header {
+	return rw.header
+}
+
+func (rw *NullResponseWriter) Write(b []byte) (int, error) {
+	return 0, nil
+}
+
+func (rw *NullResponseWriter) WriteHeader(i int) {
+	// do nothing
 }
