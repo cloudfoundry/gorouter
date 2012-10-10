@@ -4,20 +4,25 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
+	"log"
 	"runtime"
-	"sync"
+	"syscall"
 	"time"
 )
 
+var Component VcapComponent
+var healthz *Healthz
+var varz *Varz
+
 type VcapComponent struct {
 	// These fields are from individual components
-	Type        string      `json:"type"`
-	Index       uint        `json:"index"`
-	Host        string      `json:"host"`
-	Credentials []string    `json:"credentials"`
-	Healthz     interface{} `json:"-"`
-	Varz        interface{} `json:"-"`
-	Config      interface{} `json:"-"`
+	Type          string      `json:"type"`
+	Index         uint        `json:"index"`
+	Host          string      `json:"host"`
+	Credentials   []string    `json:"credentials"`
+	Config        interface{} `json:"-"`
+	ComponentVarz *Varz       `json:"-"`
+	Healthz       interface{} `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string    `json:"uuid"`
@@ -29,33 +34,22 @@ type Healthz struct {
 	Health interface{} `json:"health"`
 }
 
-type Varz struct {
-	sync.Mutex
-
-	Uptime   Duration         `json:"uptime"`
-	Start    time.Time        `json:"start"`
-	MemStats runtime.MemStats `json:"memstats"`
-	NumCores int              `json:"num_cores"`
-	Var      interface{}      `json:"var"`
-	Config   interface{}      `json:"config"`
-}
-
-var healthz Healthz
-var varz Varz
-var Component VcapComponent
-
 func UpdateHealthz() *Healthz {
-	return &healthz
+	return healthz
 }
 
 func UpdateVarz() *Varz {
 	varz.Lock()
 	defer varz.Unlock()
 
-	varz.Uptime = Duration(time.Since(varz.Start))
-	runtime.ReadMemStats(&varz.MemStats)
+	r := new(syscall.Rusage)
+	syscall.Getrusage(syscall.RUSAGE_SELF, r)
 
-	return &varz
+	varz.MemStat = r.Maxrss
+	varz.Cpu = r.Utime.Nano() + r.Stime.Nano()
+	varz.Uptime = time.Since(Component.Start)
+
+	return varz
 }
 
 func Register(c *VcapComponent, natsClient *nats.Client) {
@@ -78,7 +72,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 			panic(err)
 		}
 
-		Component.Host = fmt.Sprintf("%s:%d", host, port)
+		Component.Host = fmt.Sprintf("%s:%s", host, port)
 	}
 
 	if Component.Credentials == nil || len(Component.Credentials) != 2 {
@@ -88,12 +82,14 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		Component.Credentials = []string{user, password}
 	}
 
-	// Init healthz/varz
-	healthz.Health = Component.Healthz
-	varz.Start = Component.Start
-	varz.Var = Component.Varz
+	varz = Component.ComponentVarz
 	varz.NumCores = runtime.NumCPU()
-	varz.Config = Component.Config
+	// The component doesn't provide a way to encode the unique metrics, use the default one
+	if varz.EncodeUniqueVarz == nil {
+		varz.EncodeUniqueVarz = DefaultUniqueVarzEncoder
+	}
+
+	healthz = &Healthz{Component.Healthz}
 
 	go startStatusServer()
 
@@ -103,17 +99,15 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	go func() {
 		for m := range discover.Inbox {
-			updateUptime()
-
+			Component.Uptime = Duration(time.Since(Component.Start))
 			bytes, _ := json.Marshal(Component)
 			natsClient.Publish(string(m.ReplyTo), bytes)
 		}
 	}()
 
-	bytes, _ := json.Marshal(Component)
+	bytes, err := json.Marshal(Component)
+	if err != nil {
+		log.Println(err)
+	}
 	natsClient.Publish("vcap.component.announce", bytes)
-}
-
-func updateUptime() {
-	Component.Uptime = Duration(time.Since(Component.Start))
 }

@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"router/common"
 	"router/common/spec"
-	"runtime"
 	"testing"
 	"time"
 )
@@ -69,6 +68,10 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	// Test if router responses to discover message
 	sig := make(chan common.VcapComponent)
 
+	// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
+	// sure that router has run at least for one second
+	time.Sleep(time.Second)
+
 	s.natsClient.Request("vcap.component.discover", []byte{}, func(sub *nats.Subscription) {
 		var component common.VcapComponent
 
@@ -94,22 +97,18 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	// Check varz/healthz is accessible
 	var b []byte
 	var err error
-	var varz common.Varz
-	var emptyStats runtime.MemStats
 
 	// Verify varz
 	vbody := verifyZ(cc.Host, "/varz", cc.Credentials[0], cc.Credentials[1], c)
 	defer vbody.Close()
 	b, err = ioutil.ReadAll(vbody)
 	c.Check(err, IsNil)
+	varz := make(map[string]interface{})
 	json.Unmarshal(b, &varz)
 
-	c.Check(varz.Start, Equals, cc.Start)
-	c.Check(varz.Uptime > 0, Equals, true)
-	c.Check(varz.NumCores > 0, Equals, true)
-	c.Check(varz.Var, NotNil)
-	c.Check(varz.Config, NotNil)
-	c.Check(varz.MemStats, Not(Equals), emptyStats)
+	c.Assert(varz["num_cores"], Not(Equals), 0)
+	c.Assert(varz["type"], Equals, "Router")
+	c.Assert(varz["uuid"], Not(Equals), "")
 
 	// Verify healthz
 	hbody := verifyZ(cc.Host, "/healthz", cc.Credentials[0], cc.Credentials[1], c)

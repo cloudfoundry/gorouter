@@ -42,16 +42,20 @@ func NewRouter() *Router {
 	router.proxy = NewProxy(se)
 	router.proxy.status = router.status
 
-	// register self
-	component := &vcap.VcapComponent{
-		Type:        "Router",
-		Index:       config.Index,
-		Host:        host(),
-		Credentials: []string{config.Status.User, config.Status.Password},
-		Varz:        router.status,
-		Healthz:     "ok",
-		Config:      config,
+	varz := &vcap.Varz{
+		UniqueVarz: router.status,
 	}
+
+	component := &vcap.VcapComponent{
+		Type:          "Router",
+		Index:         config.Index,
+		Host:          host(),
+		Credentials:   []string{config.Status.User, config.Status.Password},
+		Config:        config,
+		ComponentVarz: varz,
+		Healthz:       "ok",
+	}
+
 	vcap.Register(component, router.natsClient)
 
 	return router
