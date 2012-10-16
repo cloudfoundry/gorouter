@@ -54,12 +54,11 @@ func (r *Router) SubscribeRegister() {
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {
-				// TODO: maybe logger
+				log.Printf("unable to unmarshal %s : %s", string(m.Payload), e)
 				continue
 			}
 
-			// TODO: use logger
-			fmt.Printf("router.register: %#v\n", rm)
+			log.Printf("router.register: %#v\n", rm)
 			r.proxy.Register(&rm)
 		}
 	}()
@@ -75,12 +74,11 @@ func (r *Router) SubscribeUnregister() {
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {
-				// TODO: maybe logger
+				log.Printf("unable to unmarshal %s : %s", string(m.Payload), e)
 				continue
 			}
 
-			// TODO: use logger
-			fmt.Printf("router.unregister: %#v\n", rm)
+			log.Printf("router.unregister: %#v\n", rm)
 			r.proxy.Unregister(&rm)
 		}
 	}()
