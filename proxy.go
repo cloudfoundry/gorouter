@@ -27,7 +27,7 @@ type registerMessage struct {
 	Uris []string          `json:"uris"`
 	Tags map[string]string `json:"tags"`
 	Dea  string            `json:"dea"`
-	App  int               `json:"app"`
+	App  string            `json:"app"`
 
 	Sticky string
 }

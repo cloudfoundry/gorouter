@@ -41,7 +41,11 @@ func BenchmarkRegister(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)
-		rm := &registerMessage{"localhost", uint16(i), []string{"bench.vcap.me." + str}, nil, "", 0, ""}
+		rm := &registerMessage{
+			Host: "localhost",
+			Port: uint16(i),
+			Uris: []string{"bench.vcap.me." + str},
+		}
 		p.Register(rm)
 	}
 }
@@ -61,13 +65,22 @@ func BenchmarkProxy(b *testing.B) {
 	p.status = NewServerStatus()
 
 	// Register app
-	rm := &registerMessage{"localhost", 40899, []string{"bench.vcap.me"}, map[string]string{"component": "cc", "runtime": "ruby"}, "", 0, ""}
+	rm := &registerMessage{
+		Host: "localhost",
+		Port: 40899,
+		Uris: []string{"bench.vcap.me"},
+		Tags: map[string]string{"component": "cc", "runtime": "ruby"},
+	}
 	p.Register(rm)
 
 	// Load 10000 registered apps
 	for i := 0; i < 10000; i++ {
 		str := strconv.Itoa(i)
-		rm := &registerMessage{"localhost", uint16(i), []string{"bench.vcap.me." + str}, nil, "", 0, ""}
+		rm := &registerMessage{
+			Host: "localhost",
+			Port: uint16(i),
+			Uris: []string{"bench.vcap.me." + str},
+		}
 		p.Register(rm)
 	}
 

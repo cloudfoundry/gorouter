@@ -20,7 +20,7 @@ var fooReg = &registerMessage{
 		"framework": "sinatra",
 	},
 	Dea: "",
-	App: 12345,
+	App: "12345",
 }
 
 var barReg = &registerMessage{
@@ -32,7 +32,7 @@ var barReg = &registerMessage{
 		"framework": "node",
 	},
 	Dea: "",
-	App: 54321,
+	App: "54321",
 }
 
 var upperFooReg = &registerMessage{
@@ -44,7 +44,7 @@ var upperFooReg = &registerMessage{
 		"framework": "sinatra",
 	},
 	Dea: "",
-	App: 12345,
+	App: "12345",
 }
 
 var bar2Reg = &registerMessage{
@@ -56,7 +56,7 @@ var bar2Reg = &registerMessage{
 		"framework": "node",
 	},
 	Dea: "",
-	App: 54321,
+	App: "54321",
 }
 
 var emptyReg = &registerMessage{}
