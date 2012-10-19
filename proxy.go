@@ -192,6 +192,13 @@ func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 
+	// Return 200 OK for heartbeats from LB
+	if req.UserAgent() == "HTTP-Monitor/1.1" {
+		rw.WriteHeader(http.StatusOK)
+		fmt.Fprintln(rw, "ok")
+		return
+	}
+
 	if p.status != nil {
 		p.status.IncRequests()
 	}
