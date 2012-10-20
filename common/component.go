@@ -78,7 +78,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 			panic(err)
 		}
 
-		Component.Host = fmt.Sprintf("%s:%s", host, port)
+		Component.Host = fmt.Sprintf("%s:%d", host, port)
 	}
 
 	if Component.Credentials == nil || len(Component.Credentials) != 2 {

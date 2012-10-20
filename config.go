@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	Port       int
+	Port       uint16
 	SessionKey string
 	Index      uint
 	Pidfile    string
@@ -19,7 +19,7 @@ type Config struct {
 }
 
 type StatusConfig struct {
-	Port     int
+	Port     uint16
 	User     string
 	Password string
 }
