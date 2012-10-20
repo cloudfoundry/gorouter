@@ -32,7 +32,7 @@ type Healthz struct {
 type Varz struct {
 	sync.Mutex
 
-	Uptime   Duration    `json:"uptime"`
+	Uptime   Duration         `json:"uptime"`
 	Start    time.Time        `json:"start"`
 	MemStats runtime.MemStats `json:"memstats"`
 	NumCores int              `json:"num_cores"`
