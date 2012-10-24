@@ -9,3 +9,8 @@ pidfile: "/tmp/router.pid"
 sessionkey: "14fbc303b76bacd1e0a3ab641c11d114"
 nats:
   uri: "nats://nats:nats@localhost:4222"
+logging:
+  level: debug
+  file: /tmp/router.log
+  syslog: false
+  # TODO: add steno web interface

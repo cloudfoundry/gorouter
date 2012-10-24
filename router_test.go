@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
+	steno "github.com/cloudfoundry/gosteno"
 	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
-	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"router/common"
 	"router/common/spec"
@@ -19,8 +18,15 @@ import (
 )
 
 func Test(t *testing.T) {
-	file, _ := os.OpenFile("/dev/null", os.O_WRONLY, 0666)
-	log.SetOutput(file)
+	config := &steno.Config{
+		Sinks: []steno.Sink{},
+		Codec: steno.JSON_CODEC,
+		Level: steno.LOG_INFO,
+	}
+
+	steno.Init(config)
+
+	log = steno.NewLogger("test")
 
 	TestingT(t)
 }
@@ -45,7 +51,9 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 		SessionKey: "14fbc303b76bacd1e0a3ab641c11d114",
 		Nats:       NatsConfig{URI: "nats://localhost:8089"},
 		Status:     StatusConfig{8084, "user", "pass"},
+		Log:        LogConfig{"info", "/dev/null", false},
 	})
+
 	s.router = NewRouter()
 	go s.router.Run()
 

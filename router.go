@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	"log"
 	"net/http"
 	vcap "router/common"
 	"syscall"
@@ -21,6 +20,7 @@ type Router struct {
 func NewRouter() *Router {
 	router := new(Router)
 
+	// setup pidfile
 	pidfile, err := vcap.NewPidFile(config.Pidfile)
 	if err != nil {
 		panic(err)
@@ -28,9 +28,11 @@ func NewRouter() *Router {
 	pidfile.UnlinkOnSignal(syscall.SIGTERM, syscall.SIGINT)
 	router.pidfile = pidfile
 
+	// setup nats
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
 	router.status = NewServerStatus()
 
+	// setup session encoder
 	var se *SessionEncoder
 	se, err = NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
 	if err != nil {
@@ -40,6 +42,7 @@ func NewRouter() *Router {
 	router.proxy = NewProxy(se)
 	router.proxy.status = router.status
 
+	// register self
 	component := &vcap.VcapComponent{
 		Type:        "Router",
 		Index:       config.Index,
@@ -64,11 +67,11 @@ func (r *Router) SubscribeRegister() {
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {
-				log.Printf("unable to unmarshal %s : %s", string(m.Payload), e)
+				log.Warnf("unable to unmarshal %s : %s", string(m.Payload), e)
 				continue
 			}
 
-			log.Printf("router.register: %#v\n", rm)
+			log.Debugf("router.register: %#v\n", rm)
 			r.proxy.Register(&rm)
 		}
 	}()
@@ -84,11 +87,11 @@ func (r *Router) SubscribeUnregister() {
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {
-				log.Printf("unable to unmarshal %s : %s", string(m.Payload), e)
+				log.Warnf("unable to unmarshal %s : %s", string(m.Payload), e)
 				continue
 			}
 
-			log.Printf("router.unregister: %#v\n", rm)
+			log.Debugf("router.unregister: %#v\n", rm)
 			r.proxy.Unregister(&rm)
 		}
 	}()
@@ -103,7 +106,7 @@ func (r *Router) Run() {
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {
-		log.Panic("ListenAndServe ", err)
+		log.Fatalf("ListenAndServe %s\n", err)
 	}
 }
 

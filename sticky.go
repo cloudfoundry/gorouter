@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 )
@@ -39,10 +38,10 @@ func NewAESSessionEncoder(sessionKey []byte, encoding *base64.Encoding) (*Sessio
 
 func (se *SessionEncoder) getStickyCookie(rm *registerMessage) string {
 	if rm.Sticky != "" {
-		log.Println("found sticky in cache")
+		log.Debug("found sticky in cache")
 		return rm.Sticky
 	} else {
-		log.Println("save sticky session in droplet cache")
+		log.Debug("save sticky session in droplet cache")
 		rm.Sticky = se.encryptStickyCookie(rm.Host, rm.Port)
 	}
 
@@ -51,7 +50,7 @@ func (se *SessionEncoder) getStickyCookie(rm *registerMessage) string {
 
 func (se *SessionEncoder) encryptStickyCookie(host string, port uint16) string {
 	hostPort := fmt.Sprintf("%s:%d", host, port)
-	log.Printf("encrypting %s\n", hostPort)
+	log.Debugf("encrypting %s\n", hostPort)
 
 	var hp [SessionLength]byte
 	hp[0] = byte(len(hostPort))
@@ -66,10 +65,10 @@ func (se *SessionEncoder) encryptStickyCookie(host string, port uint16) string {
 }
 
 func (se *SessionEncoder) decryptStickyCookie(sticky string) (string, uint16) {
-	log.Printf("decrypting %s\n", sticky)
+	log.Debugf("decrypting %s\n", sticky)
 
 	if len(sticky) > MaxBase64EncodedSessionLength {
-		log.Printf("sticky session length(%d) exceeds SessionLength(%d)",
+		log.Debugf("sticky session length(%d) exceeds SessionLength(%d)",
 			len(sticky),
 			MaxBase64EncodedSessionLength)
 		return "", 0
@@ -77,7 +76,7 @@ func (se *SessionEncoder) decryptStickyCookie(sticky string) (string, uint16) {
 
 	c, err := se.encoding.DecodeString(sticky)
 	if err != nil || len(c) != SessionLength {
-		log.Println("invalid token")
+		log.Debug("invalid token")
 		return "", 0
 	}
 
@@ -86,20 +85,20 @@ func (se *SessionEncoder) decryptStickyCookie(sticky string) (string, uint16) {
 
 	length := int(bytes[0])
 	if length > SessionLength-1 {
-		log.Println("invalid token")
+		log.Debug("invalid token")
 		return "", 0
 	}
 	hostPort := string(bytes[1 : length+1])
 
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		log.Println(err)
+		log.Debugf("error parsing host port: %s\n", err)
 		return "", 0
 	}
 
 	p, err := strconv.Atoi(port)
 	if err != nil {
-		log.Println(err)
+		log.Debugf("error parsing host port: %s\n", err)
 		return "", 0
 	}
 

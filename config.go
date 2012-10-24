@@ -7,6 +7,8 @@ import (
 	vcap "router/common"
 )
 
+var config Config
+
 type Config struct {
 	Port       uint16
 	SessionKey string
@@ -14,6 +16,7 @@ type Config struct {
 	Pidfile    string
 	Status     StatusConfig
 	Nats       NatsConfig
+	Log        LogConfig "logging"
 
 	ip string
 }
@@ -31,7 +34,11 @@ type NatsConfig struct {
 	Pass string
 }
 
-var config Config
+type LogConfig struct {
+	Level  string
+	File   string
+	Syslog bool
+}
 
 func InitConfigFromFile(configFile string) {
 	configBytes, err := ioutil.ReadFile(configFile)

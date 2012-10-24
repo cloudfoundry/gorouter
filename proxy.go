@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -246,7 +245,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	res, err := http.DefaultTransport.RoundTrip(outreq)
 	if err != nil {
-		log.Printf("http: proxy error: %v", err)
+		log.Errorf("http: proxy error: %v", err)
 
 		p.recordStatus(500, start, r.Tags)
 		if p.status != nil {

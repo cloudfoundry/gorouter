@@ -15,8 +15,7 @@ func init() {
 
 func main() {
 	router.InitConfigFromFile(configFile)
+	router.SetupLogger()
 
-	r := router.NewRouter()
-
-	r.Run()
+	router.NewRouter().Run()
 }
