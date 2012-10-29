@@ -115,7 +115,7 @@ func startNATS(host, user, pass string) *nats.Client {
 
 	go func() {
 		e := c.RunWithDefaults(host, user, pass)
-		panic(e)
+		log.Fatalf("Failed to connect to nats server: %s", e.Error())
 	}()
 
 	return c

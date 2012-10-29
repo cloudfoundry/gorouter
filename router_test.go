@@ -121,22 +121,57 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	c.Check(match, Equals, true)
 }
 
+func waitMsgReceived(s *RouterSuite, a *TestApp, r bool, t time.Duration) bool {
+	i := time.Millisecond * 50
+	m := int(t / i)
+
+	for j := 0; j < m; j++ {
+		received := true
+		for _, v := range a.urls {
+			if _, status := s.router.proxy.r[v]; status != r {
+				received = false
+				break
+			}
+		}
+		if received {
+			return true
+		}
+		time.Sleep(i)
+	}
+
+	return false
+}
+
+func (s *RouterSuite) waitAppRegistered(app *TestApp, timeout time.Duration) bool {
+	return waitMsgReceived(s, app, true, timeout)
+}
+
+func (s *RouterSuite) waitAppUnregistered(app *TestApp, timeout time.Duration) bool {
+	return waitMsgReceived(s, app, false, timeout)
+}
+
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
+	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
+
 	app.VerifyAppStatus(200, c)
 
 	app.Unregister()
+	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 	app.VerifyAppStatus(404, c)
 }
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
 	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
+	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+
 	app.VerifyAppStatus(200, c)
 	app.VerifyTraceHeader(c)
 
 	app.Unregister()
+	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 }
 
 func (s *RouterSuite) TestStatus(c *C) {
