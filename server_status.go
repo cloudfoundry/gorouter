@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const RPSInterval = 60 // in seconds
+const RPSInterval = 30 // in seconds
 
 type HttpMetrics map[string]*HttpMetric
 
@@ -23,6 +23,8 @@ type ServerStatus struct {
 	BadRequests    int                    `json:"bad_requests"`
 	Tags           map[string]HttpMetrics `json:"tags"`
 	RequestsPerSec int                    `json:"requests_per_sec"`
+	Top10Apps      [10]AppRPS             `json:"top10_app_requests"`
+	appRequests    *AppRequests
 }
 
 type HttpMetric struct {
@@ -35,10 +37,16 @@ type HttpMetric struct {
 	ResponsesXxx int           `json:"responses_xxx"`
 }
 
+type AppRPS struct {
+	Url string `json:"url"`
+	Rps int    `json:"rps"`
+}
+
 func NewServerStatus() *ServerStatus {
 	s := new(ServerStatus)
 
 	s.Tags = make(map[string]HttpMetrics)
+	s.appRequests = NewAppRequests()
 
 	s.Latency = NewDistribution(s, "overall")
 	s.Latency.Reset()
@@ -50,11 +58,9 @@ func NewServerStatus() *ServerStatus {
 
 	go func() {
 		for {
-			requests := s.Requests
-
 			time.Sleep(RPSInterval * time.Second)
 
-			s.RequestsPerSec = (s.Requests - requests) / RPSInterval
+			s.updateRPS()
 		}
 	}()
 
@@ -70,11 +76,42 @@ func NewHttpMetric(name string) *HttpMetric {
 	return m
 }
 
+func (s *ServerStatus) updateRPS() {
+	requests := s.appRequests.SnapshotAndReset()
+
+	tops := requests.SortedSlice()
+
+	s.Lock()
+	defer s.Unlock()
+
+	for i := 0; i < 10; i++ {
+		if i >= len(tops) {
+			break
+		}
+
+		s.Top10Apps[i] = AppRPS{tops[i].Url, tops[i].Num / RPSInterval}
+	}
+
+	s.RequestsPerSec = requests.Total / RPSInterval
+}
+
+func (s *ServerStatus) RegisterApp(app string) {
+	s.appRequests.Register(app)
+}
+
+func (s *ServerStatus) UnregisterApp(app string) {
+	s.appRequests.Unregister(app)
+}
+
 func (s *ServerStatus) IncRequests() {
 	s.Lock()
 	defer s.Unlock()
 
 	s.Requests++
+}
+
+func (s *ServerStatus) IncAppRequests(url string) {
+	s.appRequests.Inc(url)
 }
 
 func (s *ServerStatus) IncBadRequests() {

@@ -65,6 +65,10 @@ func (p *Proxy) Register(m *registerMessage) {
 			s = make([]*registerMessage, 0)
 		}
 
+		if p.status != nil {
+			p.status.RegisterApp(uri)
+		}
+
 		exist := false
 		for _, d := range s {
 			if d.Host == m.Host && d.Port == m.Port {
@@ -108,6 +112,9 @@ func (p *Proxy) Unregister(m *registerMessage) {
 		if exist {
 			s = s[:len(s)-1]
 			if len(s) == 0 {
+				if p.status != nil {
+					p.status.UnregisterApp(uri)
+				}
 				delete(p.r, uri)
 			}
 
@@ -129,17 +136,9 @@ func (p *Proxy) updateStatus() {
 }
 
 func (p *Proxy) lookup(req *http.Request) []*registerMessage {
-	host := req.Host
+	url := getUrl(req)
 
-	// Remove :<port>
-	i := strings.Index(host, ":")
-	if i >= 0 {
-		host = host[0:i]
-	}
-
-	host = strings.ToLower(host)
-
-	return p.r[host]
+	return p.r[url]
 }
 
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
@@ -215,6 +214,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if p.status != nil {
 		p.status.IncRequestsWithTags(r.Tags)
+		p.status.IncAppRequests(getUrl(req))
 	}
 
 	outreq := new(http.Request)
@@ -302,4 +302,16 @@ func copyHeader(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+func getUrl(req *http.Request) string {
+	host := req.Host
+
+	// Remove :<port>
+	i := strings.Index(host, ":")
+	if i >= 0 {
+		host = host[0:i]
+	}
+
+	return strings.ToLower(host)
 }
