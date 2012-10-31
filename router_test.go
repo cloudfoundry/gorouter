@@ -50,7 +50,7 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 		SessionKey: "14fbc303b76bacd1e0a3ab641c11d114",
 		Nats:       NatsConfig{URI: "nats://localhost:8089"},
 		Status:     StatusConfig{8084, "user", "pass"},
-		Log:        LogConfig{"info", "/dev/null", false},
+		Log:        LogConfig{"info", "/dev/null", ""},
 	})
 
 	s.router = NewRouter()

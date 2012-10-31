@@ -30,8 +30,8 @@ func SetupLogger() {
 	} else {
 		sinks = append(sinks, steno.NewIOSink(os.Stdout))
 	}
-	if config.Log.Syslog {
-		sinks = append(sinks, steno.NewSyslogSink())
+	if config.Log.Syslog != "" {
+		sinks = append(sinks, steno.NewSyslogSink(config.Log.Syslog))
 	}
 
 	stenoConfig := &steno.Config{

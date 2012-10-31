@@ -12,5 +12,5 @@ nats:
 logging:
   level: debug
   file: /tmp/router.log
-  syslog: false
+  syslog: vcap.router
   # TODO: add steno web interface

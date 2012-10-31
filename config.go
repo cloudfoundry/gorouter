@@ -37,7 +37,7 @@ type NatsConfig struct {
 type LogConfig struct {
 	Level  string
 	File   string
-	Syslog bool
+	Syslog string
 }
 
 func InitConfigFromFile(configFile string) {
