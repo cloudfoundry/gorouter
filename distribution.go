@@ -50,5 +50,10 @@ func (d *Distribution) Snapshot() metrics.DistributionSnapshot {
 }
 
 func (d *Distribution) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.m.Snapshot())
+	l := make(map[string]interface{})
+	s := d.m.Snapshot()
+	l["value"] = s.Mean
+	l["samples"] = s.Count
+
+	return json.Marshal(l)
 }
