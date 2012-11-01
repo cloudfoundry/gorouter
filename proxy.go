@@ -38,17 +38,19 @@ func (r *registerMessage) HostPort() string {
 type Proxy struct {
 	sync.Mutex
 
-	r      map[string][]*registerMessage
-	d      map[string]int
-	status *ServerStatus
-	se     *SessionEncoder
+	r    map[string][]*registerMessage
+	d    map[string]int
+	varz *Varz
+	se   *SessionEncoder
 }
 
-func NewProxy(se *SessionEncoder) *Proxy {
+func NewProxy(se *SessionEncoder, varz *Varz) *Proxy {
 	p := new(Proxy)
 	p.r = make(map[string][]*registerMessage)
 	p.d = make(map[string]int)
+
 	p.se = se
+	p.varz = varz
 
 	return p
 }
@@ -65,9 +67,7 @@ func (p *Proxy) Register(m *registerMessage) {
 			s = make([]*registerMessage, 0)
 		}
 
-		if p.status != nil {
-			p.status.RegisterApp(uri)
-		}
+		p.varz.RegisterApp(uri)
 
 		exist := false
 		for _, d := range s {
@@ -112,9 +112,7 @@ func (p *Proxy) Unregister(m *registerMessage) {
 		if exist {
 			s = s[:len(s)-1]
 			if len(s) == 0 {
-				if p.status != nil {
-					p.status.UnregisterApp(uri)
-				}
+				p.varz.UnregisterApp(uri)
 				delete(p.r, uri)
 			}
 
@@ -129,10 +127,8 @@ func (p *Proxy) Unregister(m *registerMessage) {
 }
 
 func (p *Proxy) updateStatus() {
-	if p.status != nil {
-		p.status.Urls = len(p.r)
-		p.status.Droplets = len(p.d)
-	}
+	p.varz.Urls = len(p.r)
+	p.varz.Droplets = len(p.d)
 }
 
 func (p *Proxy) lookup(req *http.Request) []*registerMessage {
@@ -197,25 +193,19 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if p.status != nil {
-		p.status.IncRequests()
-	}
+	p.varz.IncRequests()
 
 	r := p.Lookup(req)
 	if r == nil {
 		p.recordStatus(400, start, nil)
-		if p.status == nil {
-			p.status.IncBadRequests()
-		}
+		p.varz.IncBadRequests()
 
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if p.status != nil {
-		p.status.IncRequestsWithTags(r.Tags)
-		p.status.IncAppRequests(getUrl(req))
-	}
+	p.varz.IncRequestsWithTags(r.Tags)
+	p.varz.IncAppRequests(getUrl(req))
 
 	outreq := new(http.Request)
 	*outreq = *req // includes shallow copies of maps, but okay
@@ -248,9 +238,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("http: proxy error: %v", err)
 
 		p.recordStatus(500, start, r.Tags)
-		if p.status != nil {
-			p.status.IncBadRequests()
-		}
+		p.varz.IncBadRequests()
 
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
@@ -290,10 +278,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (p *Proxy) recordStatus(status int, start time.Time, tags map[string]string) {
-	if p.status != nil {
-		latency := int(time.Since(start).Nanoseconds() / 1000000)
-		p.status.RecordResponse(status, latency, tags)
-	}
+	latency := int(time.Since(start).Nanoseconds() / 1000000)
+	p.varz.RecordResponse(status, latency, tags)
 }
 
 func copyHeader(dst, src http.Header) {

@@ -13,7 +13,7 @@ import (
 type Router struct {
 	proxy      *Proxy
 	natsClient *nats.Client
-	status     *ServerStatus
+	varz       *Varz
 	pidfile    *vcap.PidFile
 }
 
@@ -30,7 +30,7 @@ func NewRouter() *Router {
 
 	// setup nats
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
-	router.status = NewServerStatus()
+	router.varz = NewVarz()
 
 	// setup session encoder
 	var se *SessionEncoder
@@ -39,21 +39,20 @@ func NewRouter() *Router {
 		panic(err)
 	}
 
-	router.proxy = NewProxy(se)
-	router.proxy.status = router.status
+	router.proxy = NewProxy(se, router.varz)
 
 	varz := &vcap.Varz{
-		UniqueVarz: router.status,
+		UniqueVarz: router.varz,
 	}
 
 	component := &vcap.VcapComponent{
-		Type:          "Router",
-		Index:         config.Index,
-		Host:          host(),
-		Credentials:   []string{config.Status.User, config.Status.Password},
-		Config:        config,
-		ComponentVarz: varz,
-		Healthz:       "ok",
+		Type:        "Router",
+		Index:       config.Index,
+		Host:        host(),
+		Credentials: []string{config.Status.User, config.Status.Password},
+		Config:      config,
+		Varz:        varz,
+		Healthz:     "ok",
 	}
 
 	vcap.Register(component, router.natsClient)

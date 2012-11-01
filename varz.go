@@ -9,7 +9,7 @@ const RPSInterval = 30 // in seconds
 
 type HttpMetrics map[string]*HttpMetric
 
-type ServerStatus struct {
+type Varz struct {
 	// NOTE: Due to this golang bug http://golang.org/issue/3069
 	//       embedded anonymous fields are ignored by json marshaller,
 	//       so all the fields in HttpMetric won't appear in json message.
@@ -42,8 +42,8 @@ type AppRPS struct {
 	Rps int    `json:"rps"`
 }
 
-func NewServerStatus() *ServerStatus {
-	s := new(ServerStatus)
+func NewVarz() *Varz {
+	s := new(Varz)
 
 	s.Tags = make(map[string]HttpMetrics)
 	s.appRequests = NewAppRequests()
@@ -76,7 +76,7 @@ func NewHttpMetric(name string) *HttpMetric {
 	return m
 }
 
-func (s *ServerStatus) updateRPS() {
+func (s *Varz) updateRPS() {
 	requests := s.appRequests.SnapshotAndReset()
 
 	tops := requests.SortedSlice()
@@ -95,33 +95,33 @@ func (s *ServerStatus) updateRPS() {
 	s.RequestsPerSec = requests.Total / RPSInterval
 }
 
-func (s *ServerStatus) RegisterApp(app string) {
+func (s *Varz) RegisterApp(app string) {
 	s.appRequests.Register(app)
 }
 
-func (s *ServerStatus) UnregisterApp(app string) {
+func (s *Varz) UnregisterApp(app string) {
 	s.appRequests.Unregister(app)
 }
 
-func (s *ServerStatus) IncRequests() {
+func (s *Varz) IncRequests() {
 	s.Lock()
 	defer s.Unlock()
 
 	s.Requests++
 }
 
-func (s *ServerStatus) IncAppRequests(url string) {
+func (s *Varz) IncAppRequests(url string) {
 	s.appRequests.Inc(url)
 }
 
-func (s *ServerStatus) IncBadRequests() {
+func (s *Varz) IncBadRequests() {
 	s.Lock()
 	defer s.Unlock()
 
 	s.BadRequests++
 }
 
-func (s *ServerStatus) IncRequestsWithTags(tags map[string]string) {
+func (s *Varz) IncRequestsWithTags(tags map[string]string) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -137,7 +137,7 @@ func (s *ServerStatus) IncRequestsWithTags(tags map[string]string) {
 	}
 }
 
-func (s *ServerStatus) RecordResponse(status int, latency int, tags map[string]string) {
+func (s *Varz) RecordResponse(status int, latency int, tags map[string]string) {
 	if latency < 0 {
 		return
 	}

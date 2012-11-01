@@ -173,16 +173,16 @@ func (s *RouterSuite) TestTraceHeader(c *C) {
 	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 }
 
-func (s *RouterSuite) TestStatus(c *C) {
+func (s *RouterSuite) TestVarz(c *C) {
 	app := NewTestApp([]string{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
-	// Record original status report
-	status := s.router.status
-	requests := status.Requests
-	responses2xx := status.Responses2xx
+	// Record original varz
+	varz := s.router.varz
+	requests := varz.Requests
+	responses2xx := varz.Responses2xx
 
-	metric := status.Tags["framework"]["rails"]
+	metric := varz.Tags["framework"]["rails"]
 	tagRequests := 0
 	tagResponses2xx := 0
 	if metric != nil {
@@ -193,13 +193,13 @@ func (s *RouterSuite) TestStatus(c *C) {
 	// Send requests
 	sendRequests("count.vcap.me", uint16(8083), 100)
 
-	// Verify status report update
-	requests = status.Requests - requests
-	responses2xx = status.Responses2xx - responses2xx
+	// Verify varz update
+	requests = varz.Requests - requests
+	responses2xx = varz.Responses2xx - responses2xx
 	c.Check(requests, Equals, 100)
 	c.Check(responses2xx, Equals, 100)
 
-	metric = status.Tags["framework"]["rails"]
+	metric = varz.Tags["framework"]["rails"]
 	c.Assert(metric, NotNil)
 
 	tagRequests = metric.Requests - tagRequests

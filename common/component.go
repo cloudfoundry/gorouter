@@ -16,13 +16,13 @@ var varz *Varz
 
 type VcapComponent struct {
 	// These fields are from individual components
-	Type          string      `json:"type"`
-	Index         uint        `json:"index"`
-	Host          string      `json:"host"`
-	Credentials   []string    `json:"credentials"`
-	Config        interface{} `json:"-"`
-	ComponentVarz *Varz       `json:"-"`
-	Healthz       interface{} `json:"-"`
+	Type        string      `json:"type"`
+	Index       uint        `json:"index"`
+	Host        string      `json:"host"`
+	Credentials []string    `json:"credentials"`
+	Config      interface{} `json:"-"`
+	Varz        *Varz       `json:"-"`
+	Healthz     interface{} `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string    `json:"uuid"`
@@ -82,7 +82,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		Component.Credentials = []string{user, password}
 	}
 
-	varz = Component.ComponentVarz
+	varz = Component.Varz
 	varz.NumCores = runtime.NumCPU()
 	// The component doesn't provide a way to encode the unique metrics, use the default one
 	if varz.EncodeUniqueVarz == nil {
