@@ -10,13 +10,14 @@ import (
 var config Config
 
 type Config struct {
-	Port       uint16
-	SessionKey string
-	Index      uint
-	Pidfile    string
-	Status     StatusConfig
-	Nats       NatsConfig
-	Log        LogConfig "logging"
+	Port              uint16
+	SessionKey        string
+	Index             uint
+	Pidfile           string
+	Status            StatusConfig
+	Nats              NatsConfig
+	Log               LogConfig "logging"
+	FlushAppsInterval int       "flush_apps_interval,omitempty"
 
 	ip string
 }

@@ -38,19 +38,22 @@ func (r *registerMessage) HostPort() string {
 type Proxy struct {
 	sync.Mutex
 
-	r    map[string][]*registerMessage
-	d    map[string]int
-	varz *Varz
-	se   *SessionEncoder
+	r          map[string][]*registerMessage
+	d          map[string]int
+	varz       *Varz
+	se         *SessionEncoder
+	activeApps *AppList
 }
 
-func NewProxy(se *SessionEncoder, varz *Varz) *Proxy {
+func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz) *Proxy {
 	p := new(Proxy)
+
 	p.r = make(map[string][]*registerMessage)
 	p.d = make(map[string]int)
 
 	p.se = se
 	p.varz = varz
+	p.activeApps = activeApps
 
 	return p
 }
@@ -203,6 +206,9 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	// Save the app_id of active app
+	p.activeApps.Insert(r.App)
 
 	p.varz.IncRequestsWithTags(r.Tags)
 	p.varz.IncAppRequests(getUrl(req))

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	vcap "router/common"
 	"syscall"
+	"time"
 )
 
 type Router struct {
@@ -15,6 +16,7 @@ type Router struct {
 	natsClient *nats.Client
 	varz       *Varz
 	pidfile    *vcap.PidFile
+	activeApps *AppList
 }
 
 func NewRouter() *Router {
@@ -30,7 +32,12 @@ func NewRouter() *Router {
 
 	// setup nats
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
+
+	// setup varz
 	router.varz = NewVarz()
+
+	// setup active apps list
+	router.activeApps = NewAppList()
 
 	// setup session encoder
 	var se *SessionEncoder
@@ -39,7 +46,7 @@ func NewRouter() *Router {
 		panic(err)
 	}
 
-	router.proxy = NewProxy(se, router.varz)
+	router.proxy = NewProxy(se, router.activeApps, router.varz)
 
 	varz := &vcap.Varz{
 		UniqueVarz: router.varz,
@@ -100,12 +107,33 @@ func (r *Router) SubscribeUnregister() {
 	}()
 }
 
+func (r *Router) ScheduleAppsFlushing() {
+	if config.FlushAppsInterval == 0 {
+		return
+	}
+
+	go func() {
+		for {
+			time.Sleep(time.Duration(config.FlushAppsInterval) * time.Second)
+
+			b, _ := r.activeApps.EncodeAndReset()
+			log.Debugf("flushing active_apps, app size: %d, msg size: %d\n", r.activeApps.Size(), len(b))
+
+			r.natsClient.Publish("router.active_apps", b)
+		}
+	}()
+}
+
 func (r *Router) Run() {
+	// Subscribe register/unregister router
 	r.SubscribeRegister()
 	r.SubscribeUnregister()
 
 	// Start message
 	r.natsClient.Publish("router.start", []byte(""))
+
+	// Schedule flushing active app's app_id
+	r.ScheduleAppsFlushing()
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {

@@ -62,7 +62,7 @@ var bar2Reg = &registerMessage{
 var emptyReg = &registerMessage{}
 
 func (s *ProxySuite) SetUpTest(c *C) {
-	s.proxy = NewProxy(nil, NewVarz())
+	s.proxy = NewProxy(nil, nil, NewVarz())
 }
 
 func (s *ProxySuite) TestReg(c *C) {
