@@ -20,7 +20,7 @@ type Varz struct {
 
 	// Dynamic common metrics
 	MemStat int64
-	Cpu     int64
+	Cpu     float64
 	Uptime  time.Duration
 
 	// Every component's unique metrics
@@ -62,8 +62,10 @@ func (v *Varz) encodeCommonVarz() map[string]interface{} {
 	c["num_cores"] = v.NumCores
 
 	c["mem"] = v.MemStat
-	// TODO: A simple but not ideal way to show the cpu usage, should be improved
-	c["cpu"] = float64(v.Cpu) / float64(v.Uptime.Nanoseconds())
+	// Round the value to the nearest hundredth
+	// NB: The value of cpu utilization could be greater than 1.0, that means
+	//     this process is running with more than one cpu core.
+	c["cpu"] = float64(int64(v.Cpu*100)) / 100
 	c["uptime"] = formatDuration(v.Uptime)
 
 	return c
