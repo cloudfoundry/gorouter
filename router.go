@@ -81,7 +81,7 @@ func (r *Router) SubscribeRegister() {
 				continue
 			}
 
-			log.Debugf("router.register: %#v\n", rm)
+			log.Debugf("router.register: %#v", rm)
 			r.proxy.Register(&rm)
 		}
 	}()
@@ -101,7 +101,7 @@ func (r *Router) SubscribeUnregister() {
 				continue
 			}
 
-			log.Debugf("router.unregister: %#v\n", rm)
+			log.Debugf("router.unregister: %#v", rm)
 			r.proxy.Unregister(&rm)
 		}
 	}()
@@ -117,7 +117,7 @@ func (r *Router) ScheduleAppsFlushing() {
 			time.Sleep(time.Duration(config.FlushAppsInterval) * time.Second)
 
 			b, _ := r.activeApps.EncodeAndReset()
-			log.Debugf("flushing active_apps, app size: %d, msg size: %d\n", r.activeApps.Size(), len(b))
+			log.Debugf("flushing active_apps, app size: %d, msg size: %d", r.activeApps.Size(), len(b))
 
 			r.natsClient.Publish("router.active_apps", b)
 		}
@@ -137,7 +137,7 @@ func (r *Router) Run() {
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {
-		log.Fatalf("ListenAndServe %s\n", err)
+		log.Fatalf("ListenAndServe %s", err)
 	}
 }
 
