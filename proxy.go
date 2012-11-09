@@ -36,7 +36,7 @@ func (r *registerMessage) HostPort() string {
 }
 
 type Proxy struct {
-	sync.Mutex
+	sync.RWMutex
 
 	r          map[string][]*registerMessage
 	d          map[string]int
@@ -60,7 +60,6 @@ func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz) *Proxy {
 
 func (p *Proxy) Register(m *registerMessage) {
 	p.Lock()
-	defer p.Unlock()
 
 	// Store droplet in registry
 	for _, uri := range m.Uris {
@@ -87,14 +86,15 @@ func (p *Proxy) Register(m *registerMessage) {
 		}
 	}
 
+	p.Unlock()
+
 	p.updateStatus()
 }
 
 func (p *Proxy) Unregister(m *registerMessage) {
-	p.Lock()
-	defer p.Unlock()
-
 	hp := m.HostPort()
+
+	p.Lock()
 
 	// Delete droplets from registry
 	for _, uri := range m.Uris {
@@ -128,6 +128,8 @@ func (p *Proxy) Unregister(m *registerMessage) {
 		}
 	}
 
+	p.Unlock()
+
 	p.updateStatus()
 }
 
@@ -143,10 +145,10 @@ func (p *Proxy) lookup(req *http.Request) []*registerMessage {
 }
 
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
-	p.Lock()
-	defer p.Unlock()
-
+	p.RLock()
 	s := p.lookup(req)
+	p.RUnlock()
+
 	if s == nil {
 		return nil
 	}
