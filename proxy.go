@@ -117,6 +117,8 @@ func (p *Proxy) Unregister(m *registerMessage) {
 			if len(s) == 0 {
 				p.varz.UnregisterApp(uri)
 				delete(p.r, uri)
+			} else {
+				p.r[uri] = s
 			}
 
 			p.d[hp]--

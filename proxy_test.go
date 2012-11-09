@@ -77,10 +77,14 @@ func (s *ProxySuite) TestReg(c *C) {
 }
 
 func (s *ProxySuite) TestUnreg(c *C) {
-	s.proxy.Register(fooReg)
+	s.proxy.Register(barReg)
+	s.proxy.Register(bar2Reg)
 	c.Check(len(s.proxy.r), Equals, 2)
 
-	s.proxy.Unregister(fooReg)
+	s.proxy.Unregister(barReg)
+	c.Check(len(s.proxy.r["bar.vcap.me"]), Equals, 1)
+
+	s.proxy.Unregister(bar2Reg)
 	c.Check(len(s.proxy.r), Equals, 0)
 }
 
