@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	"log"
+	steno "github.com/cloudfoundry/gosteno"
 	"runtime"
 	"time"
 )
@@ -17,13 +17,14 @@ var procStat *ProcessStatus
 
 type VcapComponent struct {
 	// These fields are from individual components
-	Type        string      `json:"type"`
-	Index       uint        `json:"index"`
-	Host        string      `json:"host"`
-	Credentials []string    `json:"credentials"`
-	Config      interface{} `json:"-"`
-	Varz        *Varz       `json:"-"`
-	Healthz     interface{} `json:"-"`
+	Type        string       `json:"type"`
+	Index       uint         `json:"index"`
+	Host        string       `json:"host"`
+	Credentials []string     `json:"credentials"`
+	Config      interface{}  `json:"-"`
+	Varz        *Varz        `json:"-"`
+	Healthz     interface{}  `json:"-"`
+	Logger      steno.Logger `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string    `json:"uuid"`
@@ -53,6 +54,7 @@ func UpdateVarz() *Varz {
 func Register(c *VcapComponent, natsClient *nats.Client) {
 	Component = *c
 	if Component.Type == "" {
+		log.Fatal("Component type is required")
 		panic("type is required")
 	}
 
@@ -78,6 +80,10 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		password := GenerateUUID()
 
 		Component.Credentials = []string{user, password}
+	}
+
+	if Component.Logger != nil {
+		log = Component.Logger
 	}
 
 	varz = Component.Varz
@@ -106,7 +112,8 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	bytes, err := json.Marshal(Component)
 	if err != nil {
-		log.Println(err)
+		log.Error(err.Error())
 	}
 	natsClient.Publish("vcap.component.announce", bytes)
+	log.Debugf("Component %s registered successfully", Component.Type)
 }

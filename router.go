@@ -64,6 +64,7 @@ func NewRouter() *Router {
 		Host:        host(),
 		Credentials: []string{config.Status.User, config.Status.Password},
 		Config:      config,
+		Logger:      log,
 		Varz:        varz,
 		Healthz:     "ok",
 	}

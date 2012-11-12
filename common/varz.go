@@ -3,7 +3,6 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 	"sync"
@@ -106,7 +105,7 @@ func parseFromUniqueVarz(m interface{}, data map[string]interface{}) {
 	}
 
 	if typeInfo.Kind() != reflect.Struct {
-		log.Printf("%v type can't have attributes inspected\n", typeInfo.Kind())
+		log.Errorf("%v type can't have attributes inspected\n", typeInfo.Kind())
 		return
 	}
 
