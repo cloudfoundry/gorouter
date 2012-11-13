@@ -18,6 +18,7 @@ type Config struct {
 	Nats              NatsConfig
 	Log               LogConfig "logging"
 	FlushAppsInterval int       "flush_apps_interval,omitempty"
+	GoMaxProcs        int       "go_max_procs,omitempty"
 
 	ip string
 }

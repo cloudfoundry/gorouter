@@ -15,3 +15,4 @@ logging:
   syslog: vcap.router
   # TODO: add steno web interface
 #flush_apps_interval: 30
+#go_max_procs: 8

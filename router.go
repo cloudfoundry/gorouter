@@ -7,6 +7,7 @@ import (
 	nats "github.com/cloudfoundry/gonats"
 	"net/http"
 	vcap "router/common"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -21,6 +22,11 @@ type Router struct {
 
 func NewRouter() *Router {
 	router := new(Router)
+
+	// setup no procs
+	if config.GoMaxProcs != 0 {
+		runtime.GOMAXPROCS(config.GoMaxProcs)
+	}
 
 	// setup pidfile
 	pidfile, err := vcap.NewPidFile(config.Pidfile)
