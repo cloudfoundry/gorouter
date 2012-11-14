@@ -6,13 +6,14 @@ import (
 	nats "github.com/cloudfoundry/gonats"
 	"log"
 	"runtime"
-	"syscall"
 	"time"
 )
 
 var Component VcapComponent
 var healthz *Healthz
 var varz *Varz
+
+var procStat *ProcessStatus
 
 type VcapComponent struct {
 	// These fields are from individual components
@@ -42,11 +43,8 @@ func UpdateVarz() *Varz {
 	varz.Lock()
 	defer varz.Unlock()
 
-	r := new(syscall.Rusage)
-	syscall.Getrusage(syscall.RUSAGE_SELF, r)
-
-	varz.MemStat = r.Maxrss
-	varz.Cpu = r.Utime.Nano() + r.Stime.Nano()
+	varz.MemStat = procStat.MemRss
+	varz.Cpu = procStat.CpuUsage
 	varz.Uptime = time.Since(Component.Start)
 
 	return varz
@@ -84,10 +82,11 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	varz = Component.Varz
 	varz.NumCores = runtime.NumCPU()
-	// The component doesn't provide a way to encode the unique metrics, use the default one
+	// If the component doesn't provide a way to encode the unique metrics, use the default one
 	if varz.EncodeUniqueVarz == nil {
 		varz.EncodeUniqueVarz = DefaultUniqueVarzEncoder
 	}
+	procStat = NewProcessStatus()
 
 	healthz = &Healthz{Component.Healthz}
 
