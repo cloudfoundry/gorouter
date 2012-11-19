@@ -1,0 +1,7 @@
+#!/bin/bash
+
+base=$(readlink -nf $(dirname $0)/..)
+
+export GOPATH=$base:$base/vendor
+
+exec $@
