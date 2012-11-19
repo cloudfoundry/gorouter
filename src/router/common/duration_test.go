@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	. "launchpad.net/gocheck"
 	"time"
 )
@@ -37,4 +38,25 @@ func (s *DurationSuite) TestUnmarshalJSON(c *C) {
 	var dd Duration
 	dd.UnmarshalJSON(b)
 	c.Assert(dd, Equals, d)
+}
+
+func (s *DurationSuite) TestTimeMarshalJSON(c *C) {
+	n := time.Now()
+	f := "2006-01-02 15:04:05 -0700"
+
+	t := Time(n)
+	b, e := json.Marshal(t)
+	c.Assert(e, IsNil)
+	c.Assert(string(b), Equals, fmt.Sprintf(`"%s"`, n.Format(f)))
+}
+
+func (s *DurationSuite) TestTimeUnmarshalJSON(c *C) {
+	t := Time(time.Unix(time.Now().Unix(), 0)) // The precision of Time is 'second'
+	b, err := json.Marshal(t)
+	c.Assert(err, IsNil)
+
+	var tt Time
+	err = tt.UnmarshalJSON(b)
+	c.Assert(err, IsNil)
+	c.Assert(tt, Equals, t)
 }

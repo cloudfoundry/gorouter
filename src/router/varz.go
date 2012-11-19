@@ -10,13 +10,14 @@ const RPSInterval = 30 // in seconds
 type HttpMetrics map[string]*HttpMetric
 
 type Varz struct {
+	sync.Mutex `json:"-"`
+
 	// NOTE: Due to this golang bug http://golang.org/issue/3069
 	//       embedded anonymous fields are ignored by json marshaller,
 	//       so all the fields in HttpMetric won't appear in json message.
 	//
 	//       Good news is the fix of this bug is targetted at go 1.1
-	HttpMetric
-	sync.Mutex
+	HttpMetric `encode:"yes"`
 
 	Urls           int                    `json:"urls"`
 	Droplets       int                    `json:"droplets"`
