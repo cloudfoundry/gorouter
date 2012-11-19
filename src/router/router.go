@@ -75,11 +75,11 @@ func NewRouter() *Router {
 }
 
 func (r *Router) SubscribeRegister() {
-	reg := r.natsClient.NewSubscription("router.register")
-	reg.Subscribe()
+	s := r.natsClient.NewSubscription("router.register")
+	s.Subscribe()
 
 	go func() {
-		for m := range reg.Inbox {
+		for m := range s.Inbox {
 			var rm registerMessage
 
 			e := json.Unmarshal(m.Payload, &rm)
@@ -95,11 +95,11 @@ func (r *Router) SubscribeRegister() {
 }
 
 func (r *Router) SubscribeUnregister() {
-	unreg := r.natsClient.NewSubscription("router.unregister")
-	unreg.Subscribe()
+	s := r.natsClient.NewSubscription("router.unregister")
+	s.Subscribe()
 
 	go func() {
-		for m := range unreg.Inbox {
+		for m := range s.Inbox {
 			var rm registerMessage
 
 			e := json.Unmarshal(m.Payload, &rm)
