@@ -89,7 +89,9 @@ func (m *registerMessage) InstanceId() InstanceId {
 
 	if m.instanceId == "" {
 		// Synthesize ID when it isn't set
-		m.instanceId = InstanceId(fmt.Sprintf("%s-%s:%d", m.App, m.Host, m.Port))
+		if m.Host != "" && m.Port != 0 {
+			m.instanceId = InstanceId(fmt.Sprintf("%s:%d", m.Host, m.Port))
+		}
 	}
 
 	return m.instanceId
