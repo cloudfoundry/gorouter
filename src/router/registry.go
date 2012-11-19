@@ -159,6 +159,9 @@ func (r *Registry) Register(m *registerMessage) {
 	defer r.Unlock()
 
 	i := m.InstanceId()
+	if i == "" {
+		return
+	}
 
 	n := r.byInstanceId[i]
 	if n != nil {

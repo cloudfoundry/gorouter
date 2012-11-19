@@ -47,8 +47,6 @@ var bar2Reg = &registerMessage{
 	App: "54321",
 }
 
-var emptyReg = &registerMessage{}
-
 func (s *RegistrySuite) SetUpTest(c *C) {
 	s.Registry = NewRegistry()
 }
@@ -59,9 +57,12 @@ func (s *RegistrySuite) TestRegister(c *C) {
 
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
+}
 
-	s.Register(emptyReg)
-	c.Check(s.NumUris(), Equals, 4)
+func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
+	s.Register(&registerMessage{})
+	c.Check(s.NumUris(), Equals, 0)
+	c.Check(s.NumInstances(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreDuplicates(c *C) {
