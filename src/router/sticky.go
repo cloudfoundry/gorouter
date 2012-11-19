@@ -36,16 +36,8 @@ func NewAESSessionEncoder(sessionKey []byte, encoding *base64.Encoding) (*Sessio
 	return NewSessionEncoder(cc, encoding), nil
 }
 
-func (se *SessionEncoder) getStickyCookie(rm *registerMessage) string {
-	if rm.Sticky != "" {
-		log.Debug("found sticky in cache")
-		return rm.Sticky
-	} else {
-		log.Debug("save sticky session in droplet cache")
-		rm.Sticky = se.encryptStickyCookie(rm.Host, rm.Port)
-	}
-
-	return rm.Sticky
+func (se *SessionEncoder) getStickyCookie(e Endpoint) string {
+	return se.encryptStickyCookie(e.Host, e.Port)
 }
 
 func (se *SessionEncoder) encryptStickyCookie(host string, port uint16) string {

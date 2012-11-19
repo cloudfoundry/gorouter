@@ -127,7 +127,7 @@ func waitMsgReceived(s *RouterSuite, a *TestApp, r bool, t time.Duration) bool {
 	for j := 0; j < m; j++ {
 		received := true
 		for _, v := range a.urls {
-			ms := s.router.registry.Lookup(&http.Request{Host: v})
+			ms := s.router.registry.Lookup(&http.Request{Host: string(v)})
 			status := (ms != nil)
 			if status != r {
 				received = false
@@ -152,7 +152,7 @@ func (s *RouterSuite) waitAppUnregistered(app *TestApp, timeout time.Duration) b
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 
@@ -164,7 +164,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
-	app := NewTestApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -176,7 +176,7 @@ func (s *RouterSuite) TestTraceHeader(c *C) {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := NewTestApp([]string{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
+	app := NewTestApp([]Uri{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	// Record original varz
@@ -215,7 +215,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*TestApp, 10)
 	for i := 0; i < len(apps); i++ {
-		apps[i] = NewTestApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
+		apps[i] = NewTestApp([]Uri{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
 		apps[i].Listen()
 	}
 
@@ -251,14 +251,14 @@ func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 }
 
 type TestApp struct {
-	port       uint16   // app listening port
-	rPort      uint16   // router listening port
-	urls       []string // host registered host name
+	port       uint16 // app listening port
+	rPort      uint16 // router listening port
+	urls       []Uri  // host registered host name
 	natsClient *nats.Client
 	tags       map[string]string
 }
 
-func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
+func NewTestApp(urls []Uri, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()
@@ -307,17 +307,29 @@ func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
 }
 
 func (a *TestApp) Register() {
-	var rm = registerMessage{
-		"localhost", a.port, a.urls, a.tags, "dea", "0", "",
+	rm := registerMessage{
+		Host: "localhost",
+		Port: a.port,
+		Uris: a.urls,
+		Tags: a.tags,
+		Dea:  "dea",
+		App:  "0",
 	}
+
 	b, _ := json.Marshal(rm)
 	a.natsClient.Publish("router.register", b)
 }
 
 func (a *TestApp) Unregister() {
-	var rm = registerMessage{
-		"localhost", a.port, a.urls, nil, "dea", "0", "",
+	rm := registerMessage{
+		Host: "localhost",
+		Port: a.port,
+		Uris: a.urls,
+		Tags: nil,
+		Dea:  "dea",
+		App:  "0",
 	}
+
 	b, _ := json.Marshal(rm)
 	a.natsClient.Publish("router.unregister", b)
 }

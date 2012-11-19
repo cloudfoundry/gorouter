@@ -42,7 +42,7 @@ func BenchmarkRegister(b *testing.B) {
 		rm := &registerMessage{
 			Host: "localhost",
 			Port: uint16(i),
-			Uris: []string{"bench.vcap.me." + str},
+			Uris: []Uri{Uri("bench.vcap.me." + str)},
 		}
 		p.Register(rm)
 	}

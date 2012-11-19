@@ -45,50 +45,58 @@ func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz, r *Registry) 
 	return p
 }
 
-func (p *Proxy) Lookup(req *http.Request) *registerMessage {
-	p.RLock()
-	s := p.Registry.Lookup(req)
-	p.RUnlock()
+func (p *Proxy) Lookup(req *http.Request) (Endpoint, bool) {
+	var e Endpoint
+	var ok bool
 
-	if s == nil {
-		return nil
-	}
+	// Loop in case of a race between Lookup and LookupByInstanceId
+	for {
+		is := p.Registry.Lookup(req)
 
-	// If there's only one backend, choose that
-	if len(s) == 1 {
-		return s[0]
-	}
-
-	// Choose backend depending on sticky session
-	var sticky string
-	for _, v := range req.Cookies() {
-		if v.Name == VcapCookieId {
-			sticky = v.Value
-			break
+		if len(is) == 0 {
+			return e, false
 		}
-	}
 
-	var rm *registerMessage
-	if sticky != "" {
-		sHost, sPort := p.se.decryptStickyCookie(sticky)
+		// If there's only one endpoint, choose that
+		if len(is) == 1 {
+			e, ok = p.Registry.LookupByInstanceId(is[0])
+			if ok {
+				return e, true
+			} else {
+				continue
+			}
+		}
 
-		// Check sticky session
-		if sHost != "" && sPort != 0 {
-			for _, droplet := range s {
-				if droplet.Host == sHost && droplet.Port == sPort {
-					rm = droplet
-					break
+		// Choose backend depending on sticky session
+		sticky, err := req.Cookie(VcapCookieId)
+		if err == nil {
+			sh, sp := p.se.decryptStickyCookie(sticky.Value)
+			if sh != "" && sp != 0 {
+				es, ok := p.Registry.LookupByInstanceIds(is)
+				if ok {
+					// Return endpoint if host and port match
+					for _, e := range es {
+						if sh == e.Host && sp == e.Port {
+							return e, true
+						}
+					}
+
+					// No matching endpoint found
 				}
 			}
 		}
+
+		e, ok = p.Registry.LookupByInstanceId(is[rand.Intn(len(is))])
+		if ok {
+			return e, true
+		} else {
+			continue
+		}
 	}
 
-	// No valid sticky session found, choose one randomly
-	if rm == nil {
-		rm = s[rand.Intn(len(s))]
-	}
+	panic("not reached")
 
-	return rm
+	return e, ok
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -103,8 +111,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	p.varz.IncRequests()
 
-	r := p.Lookup(req)
-	if r == nil {
+	e, ok := p.Lookup(req)
+	if !ok {
 		p.recordStatus(400, start, nil)
 		p.varz.IncBadRequests()
 
@@ -113,15 +121,15 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Save the app_id of active app
-	p.activeApps.Insert(r.App)
+	p.activeApps.Insert(e.ApplicationId)
 
-	p.varz.IncRequestsWithTags(r.Tags)
+	p.varz.IncRequestsWithTags(e.Tags)
 	p.varz.IncAppRequests(getUrl(req))
 
 	outreq := new(http.Request)
 	*outreq = *req // includes shallow copies of maps, but okay
 
-	outHost := fmt.Sprintf("%s:%d", r.Host, r.Port)
+	outHost := fmt.Sprintf("%s:%d", e.Host, e.Port)
 	outreq.URL.Scheme = "http"
 	outreq.URL.Host = outHost
 
@@ -148,14 +156,14 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Errorf("http: proxy error: %v", err)
 
-		p.recordStatus(500, start, r.Tags)
+		p.recordStatus(500, start, e.Tags)
 		p.varz.IncBadRequests()
 
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	p.recordStatus(res.StatusCode, start, r.Tags)
+	p.recordStatus(res.StatusCode, start, e.Tags)
 
 	copyHeader(rw.Header(), res.Header)
 
@@ -175,7 +183,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if needSticky {
 		cookie := &http.Cookie{
 			Name:  VcapCookieId,
-			Value: p.se.getStickyCookie(r),
+			Value: p.se.getStickyCookie(e),
 		}
 		http.SetCookie(rw, cookie)
 	}
