@@ -127,7 +127,9 @@ func waitMsgReceived(s *RouterSuite, a *TestApp, r bool, t time.Duration) bool {
 	for j := 0; j < m; j++ {
 		received := true
 		for _, v := range a.urls {
-			if _, status := s.router.proxy.r[v]; status != r {
+			ms := s.router.registry.Lookup(&http.Request{Host: v})
+			status := (ms != nil)
+			if status != r {
 				received = false
 				break
 			}

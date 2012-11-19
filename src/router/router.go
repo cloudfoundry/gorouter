@@ -18,6 +18,7 @@ type Router struct {
 	varz       *Varz
 	pidfile    *vcap.PidFile
 	activeApps *AppList
+	registry   *Registry
 }
 
 func NewRouter() *Router {
@@ -52,7 +53,9 @@ func NewRouter() *Router {
 		panic(err)
 	}
 
-	router.proxy = NewProxy(se, router.activeApps, router.varz)
+	router.registry = NewRegistry()
+	router.registry.varz = router.varz
+	router.proxy = NewProxy(se, router.activeApps, router.varz, router.registry)
 
 	varz := &vcap.Varz{
 		UniqueVarz: router.varz,
@@ -89,7 +92,7 @@ func (r *Router) SubscribeRegister() {
 			}
 
 			log.Debugf("router.register: %#v", rm)
-			r.proxy.Register(&rm)
+			r.registry.Register(&rm)
 		}
 	}()
 }
@@ -109,7 +112,7 @@ func (r *Router) SubscribeUnregister() {
 			}
 
 			log.Debugf("router.unregister: %#v", rm)
-			r.proxy.Unregister(&rm)
+			r.registry.Unregister(&rm)
 		}
 	}()
 }

@@ -20,23 +20,9 @@ const (
 	StickyCookieKey = "JSESSIONID"
 )
 
-type registerMessage struct {
-	Host string            `json:"host"`
-	Port uint16            `json:"port"`
-	Uris []string          `json:"uris"`
-	Tags map[string]string `json:"tags"`
-	Dea  string            `json:"dea"`
-	App  string            `json:"app"`
-
-	Sticky string
-}
-
-func (r *registerMessage) HostPort() string {
-	return fmt.Sprintf("%s:%d", r.Host, r.Port)
-}
-
 type Proxy struct {
 	sync.RWMutex
+	*Registry
 
 	r          map[string][]*registerMessage
 	d          map[string]int
@@ -45,9 +31,10 @@ type Proxy struct {
 	activeApps *AppList
 }
 
-func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz) *Proxy {
+func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz, r *Registry) *Proxy {
 	p := new(Proxy)
 
+	p.Registry = r
 	p.r = make(map[string][]*registerMessage)
 	p.d = make(map[string]int)
 
@@ -58,95 +45,9 @@ func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz) *Proxy {
 	return p
 }
 
-func (p *Proxy) Register(m *registerMessage) {
-	p.Lock()
-
-	// Store droplet in registry
-	for _, uri := range m.Uris {
-		uri = strings.ToLower(uri)
-		s := p.r[uri]
-		if s == nil {
-			s = make([]*registerMessage, 0)
-		}
-
-		p.varz.RegisterApp(uri)
-
-		exist := false
-		for _, d := range s {
-			if d.Host == m.Host && d.Port == m.Port {
-				exist = true
-				break
-			}
-		}
-
-		if !exist {
-			s = append(s, m)
-			p.r[uri] = s
-			p.d[m.HostPort()]++
-		}
-	}
-
-	p.Unlock()
-
-	p.updateStatus()
-}
-
-func (p *Proxy) Unregister(m *registerMessage) {
-	hp := m.HostPort()
-
-	p.Lock()
-
-	// Delete droplets from registry
-	for _, uri := range m.Uris {
-		s := p.r[uri]
-		if s == nil {
-			continue
-		}
-
-		exist := false
-		for i, d := range s {
-			if d.Host == m.Host && d.Port == m.Port {
-				s[i] = s[len(s)-1]
-				exist = true
-				break
-			}
-		}
-
-		if exist {
-			s = s[:len(s)-1]
-			if len(s) == 0 {
-				p.varz.UnregisterApp(uri)
-				delete(p.r, uri)
-			} else {
-				p.r[uri] = s
-			}
-
-			p.d[hp]--
-			if p.d[hp] == 0 {
-				delete(p.d, hp)
-			}
-		}
-	}
-
-	p.Unlock()
-
-	p.updateStatus()
-}
-
-func (p *Proxy) updateStatus() {
-	p.varz.Urls = len(p.r)
-	p.varz.Droplets = len(p.d)
-}
-
-func (p *Proxy) lookup(req *http.Request) []*registerMessage {
-	url := getUrl(req)
-
-	return p.r[url]
-}
-
 func (p *Proxy) Lookup(req *http.Request) *registerMessage {
 	p.RLock()
-	s := p.lookup(req)
+	s := p.Registry.Lookup(req)
 	p.RUnlock()
 
 	if s == nil {
