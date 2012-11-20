@@ -2,7 +2,6 @@ package stats
 
 import (
 	"container/heap"
-	"sort"
 	"sync"
 	"time"
 )
@@ -14,7 +13,8 @@ const (
 
 type activeAppsEntry struct {
 	t  int64 // Last update
-	ti int   // Index in time heap
+	ti int   // Index in time min-heap
+	tj int   // Index in time max-heap
 
 	ApplicationId string
 }
@@ -25,36 +25,72 @@ func (x *activeAppsEntry) Mark(t int64) {
 	}
 }
 
-type byTimeHeap []*activeAppsEntry
-
-func (x byTimeHeap) Len() int {
-	return len(x)
+type activeAppsHeap struct {
+	s []*activeAppsEntry
 }
 
-func (x byTimeHeap) Less(i, j int) bool {
-	return x[i].t < x[j].t
+func (x *activeAppsHeap) Len() int {
+	return len(x.s)
 }
 
-func (x byTimeHeap) Swap(i, j int) {
-	x[i], x[j] = x[j], x[i]
-	x[i].ti = i
-	x[j].ti = j
+func (x *activeAppsHeap) Swap(i, j int) {
+	x.s[i], x.s[j] = x.s[j], x.s[i]
+	x.SetIndex(i, i)
+	x.SetIndex(j, j)
 }
 
-func (x *byTimeHeap) Push(a interface{}) {
-	y := *x
-	b := a.(*activeAppsEntry)
-	b.ti = len(y)
-	*x = append(y, b)
+func (x *activeAppsHeap) Push(a interface{}) {
+	x.s = append(x.s, a.(*activeAppsEntry))
+	x.SetIndex(len(x.s)-1, len(x.s)-1)
 }
 
-func (x *byTimeHeap) Pop() interface{} {
-	y := *x
-	n := len(y)
-	z := y[n-1]
-	z.ti = -1
-	*x = y[0 : n-1]
+func (x *activeAppsHeap) Pop() interface{} {
+	x.SetIndex(len(x.s)-1, -1)
+	z := x.s[len(x.s)-1]
+	x.s = x.s[0 : len(x.s)-1]
 	return z
+}
+
+func (x *activeAppsHeap) SetIndex(i, j int) {
+	// No-op
+}
+
+func (x *activeAppsHeap) Copy() []*activeAppsEntry {
+	y := make([]*activeAppsEntry, len(x.s))
+	copy(y, x.s)
+	return y
+}
+
+type byTimeMinHeap struct{ activeAppsHeap }
+
+func (x *byTimeMinHeap) Less(i, j int) bool {
+	return x.s[i].t < x.s[j].t
+}
+
+func (x *byTimeMinHeap) SetIndex(i, j int) {
+	x.s[i].ti = j
+}
+
+type byTimeMinHeapReadOnly struct{ byTimeMinHeap }
+
+func (x *byTimeMinHeapReadOnly) SetIndex(i, j int) {
+	// No-op
+}
+
+type byTimeMaxHeap struct{ activeAppsHeap }
+
+func (x *byTimeMaxHeap) Less(i, j int) bool {
+	return x.s[i].t > x.s[j].t
+}
+
+func (x *byTimeMaxHeap) SetIndex(i, j int) {
+	x.s[i].tj = j
+}
+
+type byTimeMaxHeapReadOnly struct{ byTimeMaxHeap }
+
+func (x *byTimeMaxHeapReadOnly) SetIndex(i, j int) {
+	// No-op
 }
 
 type ActiveApps struct {
@@ -63,7 +99,8 @@ type ActiveApps struct {
 	t *time.Ticker
 
 	m map[string]*activeAppsEntry
-	h byTimeHeap
+	i byTimeMinHeap
+	j byTimeMaxHeap
 }
 
 func NewActiveApps() *ActiveApps {
@@ -85,17 +122,6 @@ func NewActiveApps() *ActiveApps {
 	return x
 }
 
-func (x *ActiveApps) heapRemove(y *activeAppsEntry) {
-	z := heap.Remove(&x.h, y.ti).(*activeAppsEntry)
-	if z != y {
-		panic("expected z == y")
-	}
-}
-
-func (x *ActiveApps) heapAdd(y *activeAppsEntry) {
-	heap.Push(&x.h, y)
-}
-
 func (x *ActiveApps) Mark(ApplicationId string, z time.Time) {
 	t := z.Unix()
 
@@ -104,7 +130,8 @@ func (x *ActiveApps) Mark(ApplicationId string, z time.Time) {
 
 	y := x.m[ApplicationId]
 	if y != nil {
-		x.heapRemove(y)
+		heap.Remove(&x.i, y.ti)
+		heap.Remove(&x.j, y.tj)
 	} else {
 		// New entry
 		y = &activeAppsEntry{ApplicationId: ApplicationId}
@@ -113,44 +140,53 @@ func (x *ActiveApps) Mark(ApplicationId string, z time.Time) {
 
 	y.Mark(t)
 
-	x.heapAdd(y)
+	heap.Push(&x.i, y)
+	heap.Push(&x.j, y)
 }
 
-func (x *ActiveApps) Trim(z time.Time) {
-	var i, j int
-
-	t := z.Unix()
+func (x *ActiveApps) Trim(y time.Time) {
+	t := y.Unix()
 
 	x.Lock()
 	defer x.Unlock()
 
-	// Find index of first entry with t' > t
-	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t > t })
+	for x.i.Len() > 0 {
+		// Pop from the min-heap
+		z := heap.Pop(&x.i).(*activeAppsEntry)
+		if z.t > t {
+			// Push back to the min-heap
+			heap.Push(&x.i, z)
+			break
+		}
 
-	// Remove entries with t' <= t from map
-	for j = 0; j < i; j++ {
-		delete(x.m, x.h[0].ApplicationId)
-		x.heapRemove(x.h[0])
+		// Remove from max-heap
+		heap.Remove(&x.j, z.tj)
+
+		// Remove from map
+		delete(x.m, z.ApplicationId)
 	}
 }
 
-func (x *ActiveApps) ActiveSince(z time.Time) []string {
-	var i, j int
-
-	t := z.Unix()
+func (x *ActiveApps) ActiveSince(y time.Time) []string {
+	t := y.Unix()
 
 	x.Lock()
 	defer x.Unlock()
 
-	// Find index of first entry with t' >= t
-	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t >= t })
+	a := byTimeMaxHeapReadOnly{}
+	a.s = x.j.Copy()
 
 	// Collect active applications
-	h := x.h[i:]
-	y := make([]string, len(h))
-	for j = 0; j < len(y); j++ {
-		y[j] = h[j].ApplicationId
+	b := make([]string, 0)
+	for a.Len() > 0 {
+		z := heap.Pop(&a).(*activeAppsEntry)
+		if z.t < t {
+			break
+		}
+
+		// Add active application
+		b = append(b, z.ApplicationId)
 	}
 
-	return y
+	return b
 }

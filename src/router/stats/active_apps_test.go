@@ -15,15 +15,20 @@ func (s *ActiveAppsSuite) SetUpTest(c *C) {
 	s.ActiveApps = NewActiveApps()
 }
 
+func (s *ActiveAppsSuite) checkHeapLen(c *C, n int) {
+	c.Check(s.i.Len(), Equals, n)
+	c.Check(s.j.Len(), Equals, n)
+}
+
 func (s *ActiveAppsSuite) TestMark(c *C) {
 	s.Mark("a", time.Unix(1, 0))
-	c.Check(len(s.h), Equals, 1)
+	s.checkHeapLen(c, 1)
 
 	s.Mark("b", time.Unix(1, 0))
-	c.Check(len(s.h), Equals, 2)
+	s.checkHeapLen(c, 2)
 
 	s.Mark("b", time.Unix(2, 0))
-	c.Check(len(s.h), Equals, 2)
+	s.checkHeapLen(c, 2)
 }
 
 func (s *ActiveAppsSuite) TestTrim(c *C) {
@@ -31,19 +36,19 @@ func (s *ActiveAppsSuite) TestTrim(c *C) {
 		s.Mark(x, time.Unix(int64(i), 0))
 	}
 
-	c.Check(len(s.h), Equals, 3)
+	s.checkHeapLen(c, 3)
 
 	s.Trim(time.Unix(0, 0))
-	c.Check(len(s.h), Equals, 2)
+	s.checkHeapLen(c, 2)
 
 	s.Trim(time.Unix(1, 0))
-	c.Check(len(s.h), Equals, 1)
+	s.checkHeapLen(c, 1)
 
 	s.Trim(time.Unix(2, 0))
-	c.Check(len(s.h), Equals, 0)
+	s.checkHeapLen(c, 0)
 
 	s.Trim(time.Unix(3, 0))
-	c.Check(len(s.h), Equals, 0)
+	s.checkHeapLen(c, 0)
 }
 
 func (s *ActiveAppsSuite) TestActiveSince(c *C) {
@@ -53,7 +58,7 @@ func (s *ActiveAppsSuite) TestActiveSince(c *C) {
 	c.Check(s.ActiveSince(time.Unix(5, 0)), DeepEquals, []string{})
 
 	s.Mark("b", time.Unix(3, 0))
-	c.Check(s.ActiveSince(time.Unix(1, 0)), DeepEquals, []string{"a", "b"})
+	c.Check(s.ActiveSince(time.Unix(1, 0)), DeepEquals, []string{"b", "a"})
 	c.Check(s.ActiveSince(time.Unix(3, 0)), DeepEquals, []string{"b"})
 	c.Check(s.ActiveSince(time.Unix(5, 0)), DeepEquals, []string{})
 }
