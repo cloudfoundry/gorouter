@@ -120,10 +120,10 @@ func (x *ActiveApps) Trim(t time.Time) {
 	x.Lock()
 	defer x.Unlock()
 
-	// Find index of first entry with t' >= t
-	i = sort.Search(len(x.h), func(i int) bool { return !x.h[i].t.Before(t) })
+	// Find index of first entry with t' > t
+	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t.After(t) })
 
-	// Remove entries with t' < t from map
+	// Remove entries with t' <= t from map
 	for j = 0; j < i; j++ {
 		delete(x.m, x.h[0].ApplicationId)
 		x.heapRemove(x.h[0])

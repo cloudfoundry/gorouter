@@ -33,16 +33,16 @@ func (s *ActiveAppsSuite) TestTrim(c *C) {
 
 	c.Check(len(s.h), Equals, 3)
 
-	s.Trim(time.Unix(1, 0))
+	s.Trim(time.Unix(0, 0))
 	c.Check(len(s.h), Equals, 2)
 
-	s.Trim(time.Unix(2, 0))
+	s.Trim(time.Unix(1, 0))
 	c.Check(len(s.h), Equals, 1)
 
-	s.Trim(time.Unix(3, 0))
+	s.Trim(time.Unix(2, 0))
 	c.Check(len(s.h), Equals, 0)
 
-	s.Trim(time.Unix(4, 0))
+	s.Trim(time.Unix(3, 0))
 	c.Check(len(s.h), Equals, 0)
 }
 
