@@ -2,130 +2,82 @@ package common
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 )
 
-type UniqueVarzEncoder func(m interface{}) map[string]interface{}
-
 type Varz struct {
-	sync.Mutex
+	sync.Mutex `json:"-"`
 
 	// Static common metrics
-	NumCores int
+	NumCores int `json:"num_cores"`
 
 	// Dynamic common metrics
-	MemStat int64
-	Cpu     float64
-	Uptime  time.Duration
+	MemStat int64   `json:"mem"`
+	Cpu     float64 `json:"cpu"`
+
+	Uptime Duration `json:"uptime"`
 
 	// Every component's unique metrics
-	UniqueVarz       interface{}       `json:"-"`
-	EncodeUniqueVarz UniqueVarzEncoder `json:"-"`
+	UniqueVarz interface{} `encode:"yes"`
 }
 
 func (v *Varz) MarshalJSON() ([]byte, error) {
-	s := v.encodeComponentInfo()
-	c := v.encodeCommonVarz()
-	u := v.EncodeUniqueVarz(v.UniqueVarz)
+	d := parseVarz(v)
 
+	// Merge component's information from VcapComponent
+	c := parseVarz(Component)
 	for k, v := range c {
-		s[k] = v
+		if d[k] == nil { // prevent fields of varz being overridden
+			d[k] = v
+		}
 	}
-	for k, v := range u {
-		s[k] = v
-	}
 
-	return json.Marshal(s)
+	return json.Marshal(d)
 }
 
-func (v *Varz) encodeComponentInfo() map[string]interface{} {
-	s := make(map[string]interface{})
+func parseVarz(varz interface{}) map[string]interface{} {
+	data := make(map[string]interface{})
 
-	s["type"] = Component.Type
-	s["index"] = Component.Index
-	s["host"] = Component.Host
-	s["uuid"] = Component.UUID
-	s["start"] = formatTime(Component.Start)
-	s["config"] = Component.Config
+	parseVarzRecursively(varz, data)
 
-	return s
+	return data
 }
 
-func (v *Varz) encodeCommonVarz() map[string]interface{} {
-	c := make(map[string]interface{})
-
-	c["num_cores"] = v.NumCores
-
-	c["mem"] = v.MemStat
-	// Round the value to the nearest hundredth
-	// NB: The value of cpu utilization could be greater than 1.0, that means
-	//     this process is running with more than one cpu core.
-	c["cpu"] = float64(int64(v.Cpu*100)) / 100
-	c["uptime"] = formatDuration(v.Uptime)
-
-	return c
-}
-
-func formatDuration(d time.Duration) string {
-	t := int64(d.Seconds())
-	day := t / (60 * 60 * 24)
-	t = t % (60 * 60 * 24)
-	hour := t / (60 * 60)
-	t = t % (60 * 60)
-	min := t / 60
-	sec := t % 60
-
-	ds := fmt.Sprintf("%dd:%dh:%dm:%ds", day, hour, min, sec)
-	return ds
-}
-
-func formatTime(t time.Time) string {
-	f := "2006-01-02 15:04:05 -0700"
-	return t.Format(f)
-}
-
-func DefaultUniqueVarzEncoder(m interface{}) map[string]interface{} {
-	d := make(map[string]interface{})
-	parseFromUniqueVarz(m, d)
-	return d
-}
-
-func parseFromUniqueVarz(m interface{}, data map[string]interface{}) {
-	typeInfo := reflect.TypeOf(m)
+func parseVarzRecursively(varz interface{}, data map[string]interface{}) {
+	typeInfo := reflect.TypeOf(varz)
 	var value reflect.Value
 	if typeInfo.Kind() == reflect.Ptr {
 		typeInfo = typeInfo.Elem()
-		value = reflect.ValueOf(m).Elem()
+		value = reflect.ValueOf(varz).Elem()
 	} else {
-		value = reflect.ValueOf(m)
+		value = reflect.ValueOf(varz)
 	}
 
 	if typeInfo.Kind() != reflect.Struct {
-		log.Errorf("%v type can't have attributes inspected\n", typeInfo.Kind())
 		return
 	}
 
 	for i := 0; i < typeInfo.NumField(); i++ {
 		t := typeInfo.Field(i)
+
 		if !isExported(t.Name) {
 			continue
 		}
-		if !t.Anonymous {
-			k := t.Tag.Get("json")
-			if k == "-" {
-				continue
-			}
+
+		k := t.Tag.Get("json")
+		if k == "-" {
+			continue
+		}
+
+		if t.Tag.Get("encode") == "yes" {
+			parseVarzRecursively(value.Field(i).Interface(), data)
+		} else {
 			if k == "" {
 				k = strings.ToLower(t.Name)
 			}
 			data[k] = value.Field(i).Interface()
-		} else {
-			// TODO: the level of recursion should be concerned in case of nested anonymous fields
-			parseFromUniqueVarz(value.Field(i).Interface(), data)
 		}
 	}
 }

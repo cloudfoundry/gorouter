@@ -21,15 +21,15 @@ type VcapComponent struct {
 	Index       uint         `json:"index"`
 	Host        string       `json:"host"`
 	Credentials []string     `json:"credentials"`
-	Config      interface{}  `json:"-"`
+	Config      interface{}  `json:"config"`
 	Varz        *Varz        `json:"-"`
 	Healthz     interface{}  `json:"-"`
 	Logger      steno.Logger `json:"-"`
 
 	// These fields are automatically generated
-	UUID   string    `json:"uuid"`
-	Start  time.Time `json:"start"`
-	Uptime Duration  `json:"uptime"`
+	UUID   string   `json:"uuid"`
+	Start  Time     `json:"start"`
+	Uptime Duration `json:"uptime"`
 }
 
 type Healthz struct {
@@ -46,7 +46,7 @@ func UpdateVarz() *Varz {
 
 	varz.MemStat = procStat.MemRss
 	varz.Cpu = procStat.CpuUsage
-	varz.Uptime = time.Since(Component.Start)
+	varz.Uptime = Component.Start.Elapsed()
 
 	return varz
 }
@@ -58,7 +58,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 		panic("type is required")
 	}
 
-	Component.Start = time.Now()
+	Component.Start = Time(time.Now())
 	Component.UUID = fmt.Sprintf("%d-%s", Component.Index, GenerateUUID())
 
 	if Component.Host == "" {
@@ -88,10 +88,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	varz = Component.Varz
 	varz.NumCores = runtime.NumCPU()
-	// If the component doesn't provide a way to encode the unique metrics, use the default one
-	if varz.EncodeUniqueVarz == nil {
-		varz.EncodeUniqueVarz = DefaultUniqueVarzEncoder
-	}
+
 	procStat = NewProcessStatus()
 
 	healthz = &Healthz{Component.Healthz}
@@ -104,7 +101,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	go func() {
 		for m := range discover.Inbox {
-			Component.Uptime = Duration(time.Since(Component.Start))
+			Component.Uptime = Component.Start.Elapsed()
 			bytes, _ := json.Marshal(Component)
 			natsClient.Publish(string(m.ReplyTo), bytes)
 		}
