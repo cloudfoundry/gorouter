@@ -34,12 +34,12 @@ func (ms Uris) Sub(ns Uris) Uris {
 	return rs
 }
 
-type InstanceId string
-type InstanceIds []InstanceId
+type BackendId string
+type BackendIds []BackendId
 
-func (is InstanceIds) Has(i InstanceId) bool {
-	for _, j := range is {
-		if j == i {
+func (x BackendIds) Has(y BackendId) bool {
+	for _, xb := range x {
+		if xb == y {
 			return true
 		}
 	}
@@ -47,21 +47,21 @@ func (is InstanceIds) Has(i InstanceId) bool {
 	return false
 }
 
-func (is InstanceIds) Remove(ia InstanceId) (InstanceIds, bool) {
-	for i, ib := range is {
-		if ia == ib {
-			is[i] = is[len(is)-1]
-			is = is[:len(is)-1]
-			return is, true
+func (x BackendIds) Remove(y BackendId) (BackendIds, bool) {
+	for i, xb := range x {
+		if xb == y {
+			x[i] = x[len(x)-1]
+			x = x[:len(x)-1]
+			return x, true
 		}
 	}
 
-	return is, false
+	return x, false
 }
 
-type Endpoint struct {
+type Backend struct {
 	ApplicationId string
-	InstanceId    InstanceId
+	BackendId     BackendId
 	Host          string
 	Port          uint16
 	Tags          map[string]string
@@ -70,8 +70,7 @@ type Endpoint struct {
 type registerMessage struct {
 	sync.Mutex
 
-	// TODO: this must be passed by the DEA
-	instanceId InstanceId
+	b BackendId
 
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
@@ -83,22 +82,22 @@ type registerMessage struct {
 	Sticky string
 }
 
-func (m *registerMessage) InstanceId() InstanceId {
+func (m *registerMessage) BackendId() BackendId {
 	m.Lock()
 	defer m.Unlock()
 
-	if m.instanceId == "" {
+	if m.b == "" {
 		// Synthesize ID when it isn't set
 		if m.Host != "" && m.Port != 0 {
-			m.instanceId = InstanceId(fmt.Sprintf("%s:%d", m.Host, m.Port))
+			m.b = BackendId(fmt.Sprintf("%s:%d", m.Host, m.Port))
 		}
 	}
 
-	return m.instanceId
+	return m.b
 }
 
 func (m *registerMessage) Equals(n *registerMessage) bool {
-	return m.InstanceId() == n.InstanceId()
+	return m.BackendId() == n.BackendId()
 }
 
 type Registry struct {
@@ -106,15 +105,15 @@ type Registry struct {
 
 	varz *Varz
 
-	byUri        map[Uri]InstanceIds
-	byInstanceId map[InstanceId]*registerMessage
+	byUri       map[Uri]BackendIds
+	byBackendId map[BackendId]*registerMessage
 }
 
 func NewRegistry() *Registry {
 	r := &Registry{}
 
-	r.byUri = make(map[Uri]InstanceIds)
-	r.byInstanceId = make(map[InstanceId]*registerMessage)
+	r.byUri = make(map[Uri]BackendIds)
+	r.byBackendId = make(map[BackendId]*registerMessage)
 
 	return r
 }
@@ -126,44 +125,44 @@ func (r *Registry) NumUris() int {
 	return len(r.byUri)
 }
 
-func (r *Registry) NumInstances() int {
+func (r *Registry) NumBackends() int {
 	r.RLock()
 	defer r.RUnlock()
 
-	return len(r.byInstanceId)
+	return len(r.byBackendId)
 }
 
-func (r *Registry) registerUri(u Uri, i InstanceId) {
+func (r *Registry) registerUri(u Uri, i BackendId) {
 	u = u.ToLower()
 
-	is := r.byUri[u]
-	if is == nil {
-		is = make(InstanceIds, 0)
+	x := r.byUri[u]
+	if x == nil {
+		x = make([]BackendId, 0)
 
 		if r.varz != nil {
 			r.varz.RegisterApp(string(u))
 		}
 	} else {
-		if is.Has(i) {
+		if x.Has(i) {
 			// The caller is expected to filter this
-			panic("is already has i")
+			panic("list of backend ids already contains backend")
 		}
 	}
 
-	is = append(is, i)
-	r.byUri[u] = is
+	x = append(x, i)
+	r.byUri[u] = x
 }
 
 func (r *Registry) Register(m *registerMessage) {
 	r.Lock()
 	defer r.Unlock()
 
-	i := m.InstanceId()
+	i := m.BackendId()
 	if i == "" {
 		return
 	}
 
-	n := r.byInstanceId[i]
+	n := r.byBackendId[i]
 	if n != nil {
 		// Unregister uri's that are no longer referenced
 		for _, u := range n.Uris.Sub(m.Uris) {
@@ -181,37 +180,37 @@ func (r *Registry) Register(m *registerMessage) {
 	}
 
 	// Overwrite message
-	r.byInstanceId[i] = m
+	r.byBackendId[i] = m
 
 	if r.varz != nil {
 		r.varz.Urls = len(r.byUri)
-		r.varz.Droplets = len(r.byInstanceId)
+		r.varz.Droplets = len(r.byBackendId)
 	}
 }
 
-func (r *Registry) unregisterUri(u Uri, i InstanceId) {
+func (r *Registry) unregisterUri(u Uri, i BackendId) {
 	u = u.ToLower()
 
-	is := r.byUri[u]
-	if is == nil {
-		// The caller is expected to filter this
+	x := r.byUri[u]
+	if x == nil {
+		// The caller bs expected to filter this
 		panic("no such uri")
 	}
 
-	is, ok := is.Remove(i)
+	x, ok := x.Remove(i)
 	if !ok {
 		// The caller is expected to filter this
-		panic("is does not have i")
+		panic("list of backend ids already contains backend")
 	}
 
-	if len(is) == 0 {
+	if len(x) == 0 {
 		delete(r.byUri, u)
 
 		if r.varz != nil {
 			r.varz.UnregisterApp(string(u))
 		}
 	} else {
-		r.byUri[u] = is
+		r.byUri[u] = x
 	}
 }
 
@@ -219,26 +218,26 @@ func (r *Registry) Unregister(m *registerMessage) {
 	r.Lock()
 	defer r.Unlock()
 
-	i := m.InstanceId()
+	i := m.BackendId()
 
 	// The message may contain URIs the registry doesn't know about.
 	// Only unregister what the registry knows about.
-	n := r.byInstanceId[i]
+	n := r.byBackendId[i]
 	if n != nil {
 		for _, u := range n.Uris {
 			r.unregisterUri(u, i)
 		}
 	}
 
-	delete(r.byInstanceId, i)
+	delete(r.byBackendId, i)
 
 	if r.varz != nil {
 		r.varz.Urls = len(r.byUri)
-		r.varz.Droplets = len(r.byInstanceId)
+		r.varz.Droplets = len(r.byBackendId)
 	}
 }
 
-func (r *Registry) Lookup(req *http.Request) InstanceIds {
+func (r *Registry) Lookup(req *http.Request) BackendIds {
 	host := req.Host
 
 	// Remove :<port>
@@ -253,42 +252,42 @@ func (r *Registry) Lookup(req *http.Request) InstanceIds {
 	return r.byUri[Uri(host).ToLower()]
 }
 
-func (r *Registry) LookupByInstanceId(i InstanceId) (Endpoint, bool) {
+func (r *Registry) LookupByBackendId(i BackendId) (Backend, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	var e Endpoint
+	var b Backend
 
-	m, ok := r.byInstanceId[i]
+	m, ok := r.byBackendId[i]
 	if ok {
-		e = Endpoint{
-			InstanceId:    i,
+		b = Backend{
+			BackendId:     i,
 			ApplicationId: m.App,
 			Host:          m.Host,
 			Port:          m.Port,
 			Tags:          m.Tags,
 		}
 
-		return e, true
+		return b, true
 	}
 
-	return e, false
+	return b, false
 }
 
-func (r *Registry) LookupByInstanceIds(is InstanceIds) ([]Endpoint, bool) {
-	ms := make([]Endpoint, len(is))
+func (r *Registry) LookupByBackendIds(x []BackendId) ([]Backend, bool) {
+	y := make([]Backend, len(x))
 
 	r.RLock()
 	defer r.RUnlock()
 
-	for j, i := range is {
-		m, ok := r.byInstanceId[i]
+	for i, j := range x {
+		m, ok := r.byBackendId[j]
 		if !ok {
 			return nil, false
 		}
 
-		ms[j] = Endpoint{
-			InstanceId:    i,
+		y[i] = Backend{
+			BackendId:     j,
 			ApplicationId: m.App,
 			Host:          m.Host,
 			Port:          m.Port,
@@ -296,5 +295,5 @@ func (r *Registry) LookupByInstanceIds(is InstanceIds) ([]Endpoint, bool) {
 		}
 	}
 
-	return ms, true
+	return y, true
 }

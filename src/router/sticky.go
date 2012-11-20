@@ -36,8 +36,8 @@ func NewAESSessionEncoder(sessionKey []byte, encoding *base64.Encoding) (*Sessio
 	return NewSessionEncoder(cc, encoding), nil
 }
 
-func (se *SessionEncoder) getStickyCookie(e Endpoint) string {
-	return se.encryptStickyCookie(e.Host, e.Port)
+func (se *SessionEncoder) getStickyCookie(x Backend) string {
+	return se.encryptStickyCookie(x.Host, x.Port)
 }
 
 func (se *SessionEncoder) encryptStickyCookie(host string, port uint16) string {

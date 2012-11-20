@@ -62,21 +62,21 @@ func (s *RegistrySuite) TestRegister(c *C) {
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
 	s.Register(&registerMessage{})
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumInstances(), Equals, 0)
+	c.Check(s.NumBackends(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreDuplicates(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumInstances(), Equals, 1)
+	c.Check(s.NumBackends(), Equals, 1)
 
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumInstances(), Equals, 1)
+	c.Check(s.NumBackends(), Equals, 1)
 
 	s.Unregister(barReg)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumInstances(), Equals, 0)
+	c.Check(s.NumBackends(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterUppercase(c *C) {
@@ -101,19 +101,19 @@ func (s *RegistrySuite) TestRegisterUppercase(c *C) {
 func (s *RegistrySuite) TestUnregister(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumInstances(), Equals, 1)
+	c.Check(s.NumBackends(), Equals, 1)
 
 	s.Register(bar2Reg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumInstances(), Equals, 2)
+	c.Check(s.NumBackends(), Equals, 2)
 
 	s.Unregister(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumInstances(), Equals, 1)
+	c.Check(s.NumBackends(), Equals, 1)
 
 	s.Unregister(bar2Reg)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumInstances(), Equals, 0)
+	c.Check(s.NumBackends(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
@@ -146,11 +146,11 @@ func (s *RegistrySuite) TestLookup(c *C) {
 
 	m1 := s.Lookup(&http.Request{Host: "foo.vcap.me"})
 	c.Check(len(m1), Equals, 1)
-	c.Check(m1[0], Equals, m.InstanceId())
+	c.Check(m1[0], Equals, m.BackendId())
 
 	m2 := s.Lookup(&http.Request{Host: "FOO.VCAP.ME"})
 	c.Check(len(m2), Equals, 1)
-	c.Check(m2[0], Equals, m.InstanceId())
+	c.Check(m2[0], Equals, m.BackendId())
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {

@@ -45,23 +45,23 @@ func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz, r *Registry) 
 	return p
 }
 
-func (p *Proxy) Lookup(req *http.Request) (Endpoint, bool) {
-	var e Endpoint
+func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {
+	var b Backend
 	var ok bool
 
-	// Loop in case of a race between Lookup and LookupByInstanceId
+	// Loop in case of a race between Lookup and LookupByBackendId
 	for {
-		is := p.Registry.Lookup(req)
+		x := p.Registry.Lookup(req)
 
-		if len(is) == 0 {
-			return e, false
+		if len(x) == 0 {
+			return b, false
 		}
 
-		// If there's only one endpoint, choose that
-		if len(is) == 1 {
-			e, ok = p.Registry.LookupByInstanceId(is[0])
+		// If there's only one backend, choose that
+		if len(x) == 1 {
+			b, ok = p.Registry.LookupByBackendId(x[0])
 			if ok {
-				return e, true
+				return b, true
 			} else {
 				continue
 			}
@@ -72,23 +72,23 @@ func (p *Proxy) Lookup(req *http.Request) (Endpoint, bool) {
 		if err == nil {
 			sh, sp := p.se.decryptStickyCookie(sticky.Value)
 			if sh != "" && sp != 0 {
-				es, ok := p.Registry.LookupByInstanceIds(is)
+				y, ok := p.Registry.LookupByBackendIds(x)
 				if ok {
-					// Return endpoint if host and port match
-					for _, e := range es {
-						if sh == e.Host && sp == e.Port {
-							return e, true
+					// Return backend if host and port match
+					for _, b := range y {
+						if sh == b.Host && sp == b.Port {
+							return b, true
 						}
 					}
 
-					// No matching endpoint found
+					// No matching backend found
 				}
 			}
 		}
 
-		e, ok = p.Registry.LookupByInstanceId(is[rand.Intn(len(is))])
+		b, ok = p.Registry.LookupByBackendId(x[rand.Intn(len(x))])
 		if ok {
-			return e, true
+			return b, true
 		} else {
 			continue
 		}
@@ -96,7 +96,7 @@ func (p *Proxy) Lookup(req *http.Request) (Endpoint, bool) {
 
 	panic("not reached")
 
-	return e, ok
+	return b, ok
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
