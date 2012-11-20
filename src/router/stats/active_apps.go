@@ -13,14 +13,14 @@ const (
 )
 
 type activeAppsEntry struct {
-	t  time.Time // Last update
-	ti int       // Index in time heap
+	t  int64 // Last update
+	ti int   // Index in time heap
 
 	ApplicationId string
 }
 
-func (x *activeAppsEntry) Mark(t time.Time) {
-	if x.t.Before(t) {
+func (x *activeAppsEntry) Mark(t int64) {
+	if x.t < t {
 		x.t = t
 	}
 }
@@ -32,7 +32,7 @@ func (x byTimeHeap) Len() int {
 }
 
 func (x byTimeHeap) Less(i, j int) bool {
-	return x[i].t.Before(x[j].t)
+	return x[i].t < x[j].t
 }
 
 func (x byTimeHeap) Swap(i, j int) {
@@ -96,7 +96,9 @@ func (x *ActiveApps) heapAdd(y *activeAppsEntry) {
 	heap.Push(&x.h, y)
 }
 
-func (x *ActiveApps) Mark(ApplicationId string, t time.Time) {
+func (x *ActiveApps) Mark(ApplicationId string, z time.Time) {
+	t := z.Unix()
+
 	x.Lock()
 	defer x.Unlock()
 
@@ -114,14 +116,16 @@ func (x *ActiveApps) Mark(ApplicationId string, t time.Time) {
 	x.heapAdd(y)
 }
 
-func (x *ActiveApps) Trim(t time.Time) {
+func (x *ActiveApps) Trim(z time.Time) {
 	var i, j int
+
+	t := z.Unix()
 
 	x.Lock()
 	defer x.Unlock()
 
 	// Find index of first entry with t' > t
-	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t.After(t) })
+	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t > t })
 
 	// Remove entries with t' <= t from map
 	for j = 0; j < i; j++ {
@@ -130,14 +134,16 @@ func (x *ActiveApps) Trim(t time.Time) {
 	}
 }
 
-func (x *ActiveApps) ActiveSince(t time.Time) []string {
+func (x *ActiveApps) ActiveSince(z time.Time) []string {
 	var i, j int
+
+	t := z.Unix()
 
 	x.Lock()
 	defer x.Unlock()
 
 	// Find index of first entry with t' >= t
-	i = sort.Search(len(x.h), func(i int) bool { return !x.h[i].t.Before(t) })
+	i = sort.Search(len(x.h), func(i int) bool { return x.h[i].t >= t })
 
 	// Collect active applications
 	h := x.h[i:]
