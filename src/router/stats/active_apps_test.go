@@ -21,6 +21,9 @@ func (s *ActiveAppsSuite) TestMark(c *C) {
 
 	s.Mark("b", time.Unix(1, 0))
 	c.Check(len(s.h), Equals, 2)
+
+	s.Mark("b", time.Unix(2, 0))
+	c.Check(len(s.h), Equals, 2)
 }
 
 func (s *ActiveAppsSuite) TestTrim(c *C) {

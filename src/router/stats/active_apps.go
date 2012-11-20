@@ -106,6 +106,7 @@ func (x *ActiveApps) Mark(ApplicationId string, t time.Time) {
 	} else {
 		// New entry
 		y = &activeAppsEntry{ApplicationId: ApplicationId}
+		x.m[ApplicationId] = y
 	}
 
 	y.Mark(t)
