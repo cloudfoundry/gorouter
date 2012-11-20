@@ -35,7 +35,7 @@ func BenchmarkDecryption(b *testing.B) {
 
 func BenchmarkRegister(b *testing.B) {
 	s, _ := NewAESSessionEncoder([]byte(SessionKey), base64.StdEncoding)
-	p := NewProxy(s, nil, NewVarz(), NewRegistry())
+	p := NewProxy(s, NewVarz(), NewRegistry())
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)

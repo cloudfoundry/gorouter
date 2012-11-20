@@ -3,8 +3,10 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"router/stats"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Uri string
@@ -103,6 +105,8 @@ func (m *registerMessage) Equals(n *registerMessage) bool {
 type Registry struct {
 	sync.RWMutex
 
+	*stats.ActiveApps
+
 	varz *Varz
 
 	byUri       map[Uri]BackendIds
@@ -111,6 +115,8 @@ type Registry struct {
 
 func NewRegistry() *Registry {
 	r := &Registry{}
+
+	r.ActiveApps = stats.NewActiveApps()
 
 	r.byUri = make(map[Uri]BackendIds)
 	r.byBackendId = make(map[BackendId]*registerMessage)
@@ -296,4 +302,10 @@ func (r *Registry) LookupByBackendIds(x []BackendId) ([]Backend, bool) {
 	}
 
 	return y, true
+}
+
+func (r *Registry) CaptureBackendRequest(x Backend, t time.Time) {
+	if x.ApplicationId != "" {
+		r.ActiveApps.Mark(x.ApplicationId, t)
+	}
 }

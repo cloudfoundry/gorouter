@@ -1,6 +1,8 @@
 package router
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,7 +19,6 @@ type Router struct {
 	natsClient *nats.Client
 	varz       *Varz
 	pidfile    *vcap.PidFile
-	activeApps *AppList
 	registry   *Registry
 }
 
@@ -43,9 +44,6 @@ func NewRouter() *Router {
 	// setup varz
 	router.varz = NewVarz()
 
-	// setup active apps list
-	router.activeApps = NewAppList()
-
 	// setup session encoder
 	var se *SessionEncoder
 	se, err = NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
@@ -55,7 +53,7 @@ func NewRouter() *Router {
 
 	router.registry = NewRegistry()
 	router.registry.varz = router.varz
-	router.proxy = NewProxy(se, router.activeApps, router.varz, router.registry)
+	router.proxy = NewProxy(se, router.varz, router.registry)
 
 	varz := &vcap.Varz{
 		UniqueVarz: router.varz,
@@ -117,19 +115,43 @@ func (r *Router) SubscribeUnregister() {
 	}()
 }
 
-func (r *Router) ScheduleAppsFlushing() {
+func (r *Router) flushApps(t time.Time) {
+	x := r.registry.ActiveSince(t)
+
+	y, err := json.Marshal(x)
+	if err != nil {
+		log.Warnf("json.Marshal: %s", err)
+		return
+	}
+
+	b := bytes.Buffer{}
+	w := zlib.NewWriter(&b)
+	w.Write(y)
+	w.Close()
+
+	z := b.Bytes()
+
+	log.Debugf("Active apps: %d, message size: %d", len(x), len(z))
+
+	r.natsClient.Publish("router.active_apps", z)
+}
+
+func (r *Router) ScheduleFlushApps() {
 	if config.FlushAppsInterval == 0 {
 		return
 	}
 
 	go func() {
+		t := time.NewTicker(time.Duration(config.FlushAppsInterval) * time.Second)
+		n := time.Now()
+
 		for {
-			time.Sleep(time.Duration(config.FlushAppsInterval) * time.Second)
-
-			b, _ := r.activeApps.EncodeAndReset()
-			log.Debugf("flushing active_apps, app size: %d, msg size: %d", r.activeApps.Size(), len(b))
-
-			r.natsClient.Publish("router.active_apps", b)
+			select {
+			case <-t.C:
+				n_ := time.Now()
+				r.flushApps(n)
+				n = n_
+			}
 		}
 	}()
 }
@@ -143,7 +165,7 @@ func (r *Router) Run() {
 	r.natsClient.Publish("router.start", []byte(""))
 
 	// Schedule flushing active app's app_id
-	r.ScheduleAppsFlushing()
+	r.ScheduleFlushApps()
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
 	if err != nil {

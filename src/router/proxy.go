@@ -24,14 +24,13 @@ type Proxy struct {
 	sync.RWMutex
 	*Registry
 
-	r          map[string][]*registerMessage
-	d          map[string]int
-	varz       *Varz
-	se         *SessionEncoder
-	activeApps *AppList
+	r    map[string][]*registerMessage
+	d    map[string]int
+	varz *Varz
+	se   *SessionEncoder
 }
 
-func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz, r *Registry) *Proxy {
+func NewProxy(se *SessionEncoder, varz *Varz, r *Registry) *Proxy {
 	p := new(Proxy)
 
 	p.Registry = r
@@ -40,7 +39,6 @@ func NewProxy(se *SessionEncoder, activeApps *AppList, varz *Varz, r *Registry) 
 
 	p.se = se
 	p.varz = varz
-	p.activeApps = activeApps
 
 	return p
 }
@@ -120,8 +118,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Save the app_id of active app
-	p.activeApps.Insert(e.ApplicationId)
+	p.Registry.CaptureBackendRequest(e, start)
 
 	p.varz.IncRequestsWithTags(e.Tags)
 	p.varz.IncAppRequests(getUrl(req))
