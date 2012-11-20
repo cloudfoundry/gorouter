@@ -2,11 +2,8 @@ package stats
 
 import (
 	. "launchpad.net/gocheck"
-	"testing"
 	"time"
 )
-
-func Test(t *testing.T) { TestingT(t) }
 
 type ActiveAppsSuite struct {
 	*ActiveApps
