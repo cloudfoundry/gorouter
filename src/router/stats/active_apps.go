@@ -25,69 +25,55 @@ func (x *activeAppsEntry) Mark(t int64) {
 	}
 }
 
-type activeAppsHeap struct {
-	s []*activeAppsEntry
-}
+type byTimeMinHeap struct{ Heap }
 
-func (x *activeAppsHeap) Len() int {
-	return len(x.s)
+func (x *byTimeMinHeap) Init() {
+	x.Heap.HeapType = x
 }
-
-func (x *activeAppsHeap) Swap(i, j int) {
-	x.s[i], x.s[j] = x.s[j], x.s[i]
-	x.SetIndex(i, i)
-	x.SetIndex(j, j)
-}
-
-func (x *activeAppsHeap) Push(a interface{}) {
-	x.s = append(x.s, a.(*activeAppsEntry))
-	x.SetIndex(len(x.s)-1, len(x.s)-1)
-}
-
-func (x *activeAppsHeap) Pop() interface{} {
-	x.SetIndex(len(x.s)-1, -1)
-	z := x.s[len(x.s)-1]
-	x.s = x.s[0 : len(x.s)-1]
-	return z
-}
-
-func (x *activeAppsHeap) SetIndex(i, j int) {
-	// No-op
-}
-
-func (x *activeAppsHeap) Copy() []*activeAppsEntry {
-	y := make([]*activeAppsEntry, len(x.s))
-	copy(y, x.s)
-	return y
-}
-
-type byTimeMinHeap struct{ activeAppsHeap }
 
 func (x *byTimeMinHeap) Less(i, j int) bool {
-	return x.s[i].t < x.s[j].t
+	yi := x.Heap.h[i].(*activeAppsEntry)
+	yj := x.Heap.h[j].(*activeAppsEntry)
+	return yi.t < yj.t
 }
 
 func (x *byTimeMinHeap) SetIndex(i, j int) {
-	x.s[i].ti = j
+	y := x.Heap.h[i].(*activeAppsEntry)
+	y.ti = j
 }
 
 type byTimeMinHeapReadOnly struct{ byTimeMinHeap }
+
+func (x *byTimeMinHeapReadOnly) Init() {
+	x.Heap.HeapType = x
+}
 
 func (x *byTimeMinHeapReadOnly) SetIndex(i, j int) {
 	// No-op
 }
 
-type byTimeMaxHeap struct{ activeAppsHeap }
+type byTimeMaxHeap struct{ Heap }
+
+func (x *byTimeMaxHeap) Init() {
+	x.Heap.HeapType = x
+}
 
 func (x *byTimeMaxHeap) Less(i, j int) bool {
-	return x.s[i].t > x.s[j].t
+	yi := x.Heap.h[i].(*activeAppsEntry)
+	yj := x.Heap.h[j].(*activeAppsEntry)
+	return yi.t > yj.t
 }
 
 func (x *byTimeMaxHeap) SetIndex(i, j int) {
-	x.s[i].tj = j
+	y := x.Heap.h[i].(*activeAppsEntry)
+	y.tj = j
 }
 
 type byTimeMaxHeapReadOnly struct{ byTimeMaxHeap }
+
+func (x *byTimeMaxHeapReadOnly) Init() {
+	x.Heap.HeapType = x
+}
 
 func (x *byTimeMaxHeapReadOnly) SetIndex(i, j int) {
 	// No-op
@@ -109,6 +95,8 @@ func NewActiveApps() *ActiveApps {
 	x.t = time.NewTicker(1 * time.Minute)
 
 	x.m = make(map[string]*activeAppsEntry)
+	x.i.Init()
+	x.j.Init()
 
 	go func() {
 		for {
@@ -174,7 +162,8 @@ func (x *ActiveApps) ActiveSince(y time.Time) []string {
 	defer x.Unlock()
 
 	a := byTimeMaxHeapReadOnly{}
-	a.s = x.j.Copy()
+	a.Heap = x.j.Copy()
+	a.Init()
 
 	// Collect active applications
 	b := make([]string, 0)
