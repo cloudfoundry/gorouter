@@ -121,7 +121,6 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.Registry.CaptureBackendRequest(e, start)
 
 	p.varz.IncRequestsWithTags(e.Tags)
-	p.varz.IncAppRequests(getUrl(req))
 
 	outreq := new(http.Request)
 	*outreq = *req // includes shallow copies of maps, but okay

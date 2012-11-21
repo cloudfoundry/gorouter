@@ -1,6 +1,7 @@
 package router
 
 import (
+	"router/stats"
 	"sync"
 	"time"
 )
@@ -11,6 +12,8 @@ type HttpMetrics map[string]*HttpMetric
 
 type Varz struct {
 	sync.Mutex `json:"-"`
+
+	*Registry `json:"-"`
 
 	// NOTE: Due to this golang bug http://golang.org/issue/3069
 	//       embedded anonymous fields are ignored by json marshaller,
@@ -25,7 +28,6 @@ type Varz struct {
 	Tags           map[string]HttpMetrics `json:"tags"`
 	RequestsPerSec int                    `json:"requests_per_sec"`
 	Top10Apps      [10]AppRPS             `json:"top10_app_requests"`
-	appRequests    *AppRequests
 }
 
 type HttpMetric struct {
@@ -40,14 +42,13 @@ type HttpMetric struct {
 
 type AppRPS struct {
 	Url string `json:"url"`
-	Rps int    `json:"rps"`
+	Rps int64  `json:"rps"`
 }
 
 func NewVarz() *Varz {
 	s := new(Varz)
 
 	s.Tags = make(map[string]HttpMetrics)
-	s.appRequests = NewAppRequests()
 
 	s.Latency = NewDistribution(s, "overall")
 	s.Latency.Reset()
@@ -58,10 +59,16 @@ func NewVarz() *Varz {
 	}
 
 	go func() {
-		for {
-			time.Sleep(RPSInterval * time.Second)
+		rps := time.NewTicker(RPSInterval * time.Second)
+		counts := time.NewTicker(1 * time.Second)
 
-			s.updateRPS()
+		for {
+			select {
+			case <-rps.C:
+				s.updateRPS()
+			case <-counts.C:
+				s.updateCounts()
+			}
 		}
 	}()
 
@@ -77,31 +84,27 @@ func NewHttpMetric(name string) *HttpMetric {
 	return m
 }
 
-func (s *Varz) updateRPS() {
-	requests := s.appRequests.SnapshotAndReset()
+func (s *Varz) updateCounts() {
+	s.Lock()
+	defer s.Unlock()
 
-	tops := requests.SortedSlice()
+	s.Urls = s.Registry.NumUris()
+	s.Droplets = s.Registry.NumBackends()
+}
+
+func (s *Varz) updateRPS() {
+	t := time.Now().Add(-RPSInterval * time.Second)
 
 	s.Lock()
 	defer s.Unlock()
 
-	for i := 0; i < 10; i++ {
-		if i >= len(tops) {
-			break
-		}
-
-		s.Top10Apps[i] = AppRPS{tops[i].Url, tops[i].Num / RPSInterval}
+	x := s.Registry.TopApps.TopSince(t, 10)
+	for i, y := range x {
+		s.Top10Apps[i] = AppRPS{y.ApplicationId, y.Requests / int64(stats.TopAppsEntryLifetime.Seconds())}
 	}
 
-	s.RequestsPerSec = requests.Total / RPSInterval
-}
-
-func (s *Varz) RegisterApp(app string) {
-	s.appRequests.Register(app)
-}
-
-func (s *Varz) UnregisterApp(app string) {
-	s.appRequests.Unregister(app)
+	// TODO: use a proper meter for this stat
+	s.RequestsPerSec = 0
 }
 
 func (s *Varz) IncRequests() {
@@ -109,10 +112,6 @@ func (s *Varz) IncRequests() {
 	defer s.Unlock()
 
 	s.Requests++
-}
-
-func (s *Varz) IncAppRequests(url string) {
-	s.appRequests.Inc(url)
 }
 
 func (s *Varz) IncBadRequests() {

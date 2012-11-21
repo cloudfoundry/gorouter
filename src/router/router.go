@@ -52,8 +52,9 @@ func NewRouter() *Router {
 	}
 
 	router.registry = NewRegistry()
-	router.registry.varz = router.varz
 	router.proxy = NewProxy(se, router.varz, router.registry)
+
+	router.varz.Registry = router.registry
 
 	varz := &vcap.Varz{
 		UniqueVarz: router.varz,

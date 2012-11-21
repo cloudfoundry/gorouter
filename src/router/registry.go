@@ -106,8 +106,7 @@ type Registry struct {
 	sync.RWMutex
 
 	*stats.ActiveApps
-
-	varz *Varz
+	*stats.TopApps
 
 	byUri       map[Uri]BackendIds
 	byBackendId map[BackendId]*registerMessage
@@ -117,6 +116,7 @@ func NewRegistry() *Registry {
 	r := &Registry{}
 
 	r.ActiveApps = stats.NewActiveApps()
+	r.TopApps = stats.NewTopApps()
 
 	r.byUri = make(map[Uri]BackendIds)
 	r.byBackendId = make(map[BackendId]*registerMessage)
@@ -144,10 +144,6 @@ func (r *Registry) registerUri(u Uri, i BackendId) {
 	x := r.byUri[u]
 	if x == nil {
 		x = make([]BackendId, 0)
-
-		if r.varz != nil {
-			r.varz.RegisterApp(string(u))
-		}
 	} else {
 		if x.Has(i) {
 			// The caller is expected to filter this
@@ -187,11 +183,6 @@ func (r *Registry) Register(m *registerMessage) {
 
 	// Overwrite message
 	r.byBackendId[i] = m
-
-	if r.varz != nil {
-		r.varz.Urls = len(r.byUri)
-		r.varz.Droplets = len(r.byBackendId)
-	}
 }
 
 func (r *Registry) unregisterUri(u Uri, i BackendId) {
@@ -211,10 +202,6 @@ func (r *Registry) unregisterUri(u Uri, i BackendId) {
 
 	if len(x) == 0 {
 		delete(r.byUri, u)
-
-		if r.varz != nil {
-			r.varz.UnregisterApp(string(u))
-		}
 	} else {
 		r.byUri[u] = x
 	}
@@ -236,11 +223,6 @@ func (r *Registry) Unregister(m *registerMessage) {
 	}
 
 	delete(r.byBackendId, i)
-
-	if r.varz != nil {
-		r.varz.Urls = len(r.byUri)
-		r.varz.Droplets = len(r.byBackendId)
-	}
 }
 
 func (r *Registry) Lookup(req *http.Request) BackendIds {
@@ -307,5 +289,6 @@ func (r *Registry) LookupByBackendIds(x []BackendId) ([]Backend, bool) {
 func (r *Registry) CaptureBackendRequest(x Backend, t time.Time) {
 	if x.ApplicationId != "" {
 		r.ActiveApps.Mark(x.ApplicationId, t)
+		r.TopApps.Mark(x.ApplicationId, t)
 	}
 }
