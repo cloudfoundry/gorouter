@@ -13,10 +13,9 @@ var _ = Suite(&ConfigSuite{})
 
 func (s *ConfigSuite) SetUpTest(c *C) {
 	s.config = &Config{
-		Port:       8080,
-		SessionKey: "14fbc303b76bacd1e0a3ab641c11d114",
-		Status:     StatusConfig{8081, "user", "pass"},
-		Nats:       NatsConfig{"nats://natsuser:natspass@localhost:4222", "", "", ""},
+		Port:   8080,
+		Status: StatusConfig{8081, "user", "pass"},
+		Nats:   NatsConfig{"nats://natsuser:natspass@localhost:4222", "", "", ""},
 	}
 
 	c.Assert(config, Equals, Config{})
@@ -34,7 +33,6 @@ func (s *ConfigSuite) TestInitConfig(c *C) {
 	InitConfig(s.config)
 
 	c.Assert(config.Port, Equals, uint16(8080))
-	c.Assert(config.SessionKey, Equals, "14fbc303b76bacd1e0a3ab641c11d114")
 
 	ip, err := vcap.LocalIP()
 	c.Assert(err, IsNil)

@@ -27,17 +27,15 @@ type Proxy struct {
 	r    map[string][]*registerMessage
 	d    map[string]int
 	varz *Varz
-	se   *SessionEncoder
 }
 
-func NewProxy(se *SessionEncoder, varz *Varz, r *Registry) *Proxy {
+func NewProxy(varz *Varz, r *Registry) *Proxy {
 	p := new(Proxy)
 
 	p.Registry = r
 	p.r = make(map[string][]*registerMessage)
 	p.d = make(map[string]int)
 
-	p.se = se
 	p.varz = varz
 
 	return p
@@ -68,19 +66,16 @@ func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {
 		// Choose backend depending on sticky session
 		sticky, err := req.Cookie(VcapCookieId)
 		if err == nil {
-			sh, sp := p.se.decryptStickyCookie(sticky.Value)
-			if sh != "" && sp != 0 {
-				y, ok := p.Registry.LookupByBackendIds(x)
-				if ok {
-					// Return backend if host and port match
-					for _, b := range y {
-						if sh == b.Host && sp == b.Port {
-							return b, true
-						}
+			y, ok := p.Registry.LookupByBackendIds(x)
+			if ok {
+				// Return backend if host and port match
+				for _, b := range y {
+					if sticky.Value == b.PrivateInstanceId {
+						return b, true
 					}
-
-					// No matching backend found
 				}
+
+				// No matching backend found
 			}
 		}
 
@@ -176,10 +171,10 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if needSticky {
+	if needSticky && e.PrivateInstanceId != "" {
 		cookie := &http.Cookie{
 			Name:  VcapCookieId,
-			Value: p.se.getStickyCookie(e),
+			Value: e.PrivateInstanceId,
 		}
 		http.SetCookie(rw, cookie)
 	}

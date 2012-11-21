@@ -5,8 +5,6 @@ status:
   user: "user"
   password: "password"
 pidfile: "/tmp/router.pid"
-# session key should be a string of length 32
-sessionkey: "14fbc303b76bacd1e0a3ab641c11d114"
 nats:
   uri: "nats://nats:nats@localhost:4222"
 logging:

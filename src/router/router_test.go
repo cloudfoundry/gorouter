@@ -44,13 +44,12 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	c.Assert(err, IsNil)
 
 	InitConfig(&Config{
-		Port:       8083,
-		Index:      2,
-		Pidfile:    "/tmp/router_test.pid",
-		SessionKey: "14fbc303b76bacd1e0a3ab641c11d114",
-		Nats:       NatsConfig{URI: "nats://localhost:8089"},
-		Status:     StatusConfig{8084, "user", "pass"},
-		Log:        LogConfig{"info", "/dev/null", ""},
+		Port:    8083,
+		Index:   2,
+		Pidfile: "/tmp/router_test.pid",
+		Nats:    NatsConfig{URI: "nats://localhost:8089"},
+		Status:  StatusConfig{8084, "user", "pass"},
+		Log:     LogConfig{"info", "/dev/null", ""},
 	})
 
 	s.router = NewRouter()
@@ -314,6 +313,8 @@ func (a *TestApp) Register() {
 		Tags: a.tags,
 		Dea:  "dea",
 		App:  "0",
+
+		PrivateInstanceId: common.GenerateUUID(),
 	}
 
 	b, _ := json.Marshal(rm)

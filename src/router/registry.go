@@ -67,6 +67,8 @@ type Backend struct {
 	Host          string
 	Port          uint16
 	Tags          map[string]string
+
+	PrivateInstanceId string
 }
 
 type registerMessage struct {
@@ -82,6 +84,8 @@ type registerMessage struct {
 	App  string            `json:"app"`
 
 	Sticky string
+
+	PrivateInstanceId string `json:"private_instance_id"`
 }
 
 func (m *registerMessage) BackendId() BackendId {
@@ -254,6 +258,8 @@ func (r *Registry) LookupByBackendId(i BackendId) (Backend, bool) {
 			Host:          m.Host,
 			Port:          m.Port,
 			Tags:          m.Tags,
+
+			PrivateInstanceId: m.PrivateInstanceId,
 		}
 
 		return b, true
@@ -280,6 +286,8 @@ func (r *Registry) LookupByBackendIds(x []BackendId) ([]Backend, bool) {
 			Host:          m.Host,
 			Port:          m.Port,
 			Tags:          m.Tags,
+
+			PrivateInstanceId: m.PrivateInstanceId,
 		}
 	}
 

@@ -82,9 +82,5 @@ func SanitizeConfig(config *Config) *Config {
 
 	config.ip, _ = vcap.LocalIP()
 
-	if config.SessionKey == "" {
-		config.SessionKey = "14fbc303b76bacd1e0a3ab641c11d114"
-	}
-
 	return config
 }

@@ -3,7 +3,6 @@ package router
 import (
 	"bytes"
 	"compress/zlib"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
@@ -44,15 +43,8 @@ func NewRouter() *Router {
 	// setup varz
 	router.varz = NewVarz()
 
-	// setup session encoder
-	var se *SessionEncoder
-	se, err = NewAESSessionEncoder([]byte(config.SessionKey), base64.StdEncoding)
-	if err != nil {
-		panic(err)
-	}
-
 	router.registry = NewRegistry()
-	router.proxy = NewProxy(se, router.varz, router.registry)
+	router.proxy = NewProxy(router.varz, router.registry)
 
 	router.varz.Registry = router.registry
 
