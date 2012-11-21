@@ -1,7 +1,9 @@
 package stats
 
 import (
+	"fmt"
 	. "launchpad.net/gocheck"
+	"math/rand"
 	"time"
 )
 
@@ -61,4 +63,39 @@ func (s *ActiveAppsSuite) TestActiveSince(c *C) {
 	c.Check(s.ActiveSince(time.Unix(1, 0)), DeepEquals, []string{"b", "a"})
 	c.Check(s.ActiveSince(time.Unix(3, 0)), DeepEquals, []string{"b"})
 	c.Check(s.ActiveSince(time.Unix(5, 0)), DeepEquals, []string{})
+}
+
+func (s *ActiveAppsSuite) benchmarkMark(c *C, apps int) {
+	var i int
+
+	c.StopTimer()
+
+	s.SetUpTest(c)
+
+	x := make([]string, 0)
+	for i = 0; i < apps; i++ {
+		x = append(x, fmt.Sprintf("%d", i))
+	}
+
+	c.StartTimer()
+
+	for i = 0; i < c.N; i++ {
+		s.Mark(x[rand.Intn(len(x))], time.Unix(int64(i), 0))
+	}
+}
+
+func (s *ActiveAppsSuite) BenchmarkMarkDifferent10(c *C) {
+	s.benchmarkMark(c, 10)
+}
+
+func (s *ActiveAppsSuite) BenchmarkMarkDifferent100(c *C) {
+	s.benchmarkMark(c, 100)
+}
+
+func (s *ActiveAppsSuite) BenchmarkMarkDifferent1000(c *C) {
+	s.benchmarkMark(c, 1000)
+}
+
+func (s *ActiveAppsSuite) BenchmarkMarkDifferent10000(c *C) {
+	s.benchmarkMark(c, 10000)
 }
