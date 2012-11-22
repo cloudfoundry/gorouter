@@ -174,39 +174,67 @@ func (s *RouterSuite) TestTraceHeader(c *C) {
 	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 }
 
+func (s *RouterSuite) readVarz() map[string]interface{} {
+	x, err := s.router.varz.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+
+	y := make(map[string]interface{})
+	err = json.Unmarshal(x, &y)
+	if err != nil {
+		panic(err)
+	}
+
+	return y
+}
+
+func f(x interface{}, s ...string) interface{} {
+	var ok bool
+
+	for _, y := range s {
+		z := x.(map[string]interface{})
+		x, ok = z[y]
+		if !ok {
+			panic(fmt.Sprintf("no key: %s", s))
+		}
+	}
+
+	return x
+}
+
 func (s *RouterSuite) TestVarz(c *C) {
 	app := NewTestApp([]Uri{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
-	// Record original varz
-	varz := s.router.varz
-	requests := varz.Requests
-	responses2xx := varz.Responses2xx
-
-	metric := varz.Tags["framework"]["rails"]
-	tagRequests := 0
-	tagResponses2xx := 0
-	if metric != nil {
-		tagRequests = metric.Requests
-		tagResponses2xx = metric.Responses2xx
-	}
+	// Send seed request
+	sendRequests("count.vcap.me", uint16(8083), 1)
+	vA := s.readVarz()
 
 	// Send requests
 	sendRequests("count.vcap.me", uint16(8083), 100)
+	vB := s.readVarz()
 
 	// Verify varz update
-	requests = varz.Requests - requests
-	responses2xx = varz.Responses2xx - responses2xx
-	c.Check(requests, Equals, 100)
-	c.Check(responses2xx, Equals, 100)
+	RequestsA := int(f(vA, "all", "requests").(float64))
+	RequestsB := int(f(vB, "all", "requests").(float64))
+	allRequests := RequestsB - RequestsA
+	c.Check(allRequests, Equals, 100)
 
-	metric = varz.Tags["framework"]["rails"]
-	c.Assert(metric, NotNil)
+	Responses2xxA := int(f(vA, "all", "responses_2xx").(float64))
+	Responses2xxB := int(f(vB, "all", "responses_2xx").(float64))
+	allResponses2xx := Responses2xxB - Responses2xxA
+	c.Check(allResponses2xx, Equals, 100)
 
-	tagRequests = metric.Requests - tagRequests
-	tagResponses2xx = metric.Responses2xx - tagResponses2xx
-	c.Check(tagRequests, Equals, 100)
-	c.Check(tagResponses2xx, Equals, 100)
+	RailsRequestsA := int(f(vA, "tags", "framework", "rails", "requests").(float64))
+	RailsRequestsB := int(f(vB, "tags", "framework", "rails", "requests").(float64))
+	allRailsRequests := RailsRequestsB - RailsRequestsA
+	c.Check(allRailsRequests, Equals, 100)
+
+	RailsResponses2xxA := int(f(vA, "tags", "framework", "rails", "requests").(float64))
+	RailsResponses2xxB := int(f(vB, "tags", "framework", "rails", "requests").(float64))
+	allRailsResponses2xx := RailsResponses2xxB - RailsResponses2xxA
+	c.Check(allRailsResponses2xx, Equals, 100)
 
 	app.Unregister()
 }

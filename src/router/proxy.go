@@ -23,10 +23,10 @@ const (
 type Proxy struct {
 	sync.RWMutex
 	*Registry
+	*Varz
 
-	r    map[string][]*registerMessage
-	d    map[string]int
-	varz *Varz
+	r map[string][]*registerMessage
+	d map[string]int
 }
 
 func NewProxy(varz *Varz, r *Registry) *Proxy {
@@ -36,7 +36,7 @@ func NewProxy(varz *Varz, r *Registry) *Proxy {
 	p.r = make(map[string][]*registerMessage)
 	p.d = make(map[string]int)
 
-	p.varz = varz
+	p.Varz = varz
 
 	return p
 }
@@ -102,20 +102,15 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	p.varz.IncRequests()
-
 	e, ok := p.Lookup(req)
 	if !ok {
-		p.recordStatus(400, start, nil)
-		p.varz.IncBadRequests()
-
 		rw.WriteHeader(http.StatusNotFound)
+		p.Varz.CaptureBadRequest(req)
 		return
 	}
 
 	p.Registry.CaptureBackendRequest(e, start)
-
-	p.varz.IncRequestsWithTags(e.Tags)
+	p.Varz.CaptureBackendRequest(e, req)
 
 	outreq := new(http.Request)
 	*outreq = *req // includes shallow copies of maps, but okay
@@ -144,17 +139,15 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	res, err := http.DefaultTransport.RoundTrip(outreq)
+	latency := time.Since(start)
 	if err != nil {
 		log.Errorf("http: proxy error: %v", err)
-
-		p.recordStatus(500, start, e.Tags)
-		p.varz.IncBadRequests()
-
 		rw.WriteHeader(http.StatusInternalServerError)
+		p.Varz.CaptureBackendResponse(e, res, latency)
 		return
 	}
 
-	p.recordStatus(res.StatusCode, start, e.Tags)
+	p.Varz.CaptureBackendResponse(e, res, latency)
 
 	copyHeader(rw.Header(), res.Header)
 
@@ -185,11 +178,6 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var dst io.Writer = rw
 		io.Copy(dst, res.Body)
 	}
-}
-
-func (p *Proxy) recordStatus(status int, start time.Time, tags map[string]string) {
-	latency := int(time.Since(start).Nanoseconds() / 1000000)
-	p.varz.RecordResponse(status, latency, tags)
 }
 
 func copyHeader(dst, src http.Header) {
