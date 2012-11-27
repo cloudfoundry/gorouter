@@ -68,8 +68,6 @@ func (s *ActiveAppsSuite) TestActiveSince(c *C) {
 func (s *ActiveAppsSuite) benchmarkMark(c *C, apps int) {
 	var i int
 
-	c.StopTimer()
-
 	s.SetUpTest(c)
 
 	x := make([]string, 0)
@@ -77,7 +75,7 @@ func (s *ActiveAppsSuite) benchmarkMark(c *C, apps int) {
 		x = append(x, fmt.Sprintf("%d", i))
 	}
 
-	c.StartTimer()
+	c.ResetTimer()
 
 	for i = 0; i < c.N; i++ {
 		s.Mark(x[rand.Intn(len(x))], time.Unix(int64(i), 0))
