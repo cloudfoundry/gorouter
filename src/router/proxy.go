@@ -24,17 +24,12 @@ type Proxy struct {
 	sync.RWMutex
 	*Registry
 	*Varz
-
-	r map[string][]*registerMessage
-	d map[string]int
 }
 
 func NewProxy(varz *Varz, r *Registry) *Proxy {
 	p := new(Proxy)
 
 	p.Registry = r
-	p.r = make(map[string][]*registerMessage)
-	p.d = make(map[string]int)
 
 	p.Varz = varz
 
