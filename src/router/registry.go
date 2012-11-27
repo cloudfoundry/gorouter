@@ -83,8 +83,6 @@ type registerMessage struct {
 	Dea  string            `json:"dea"`
 	App  string            `json:"app"`
 
-	Sticky string
-
 	PrivateInstanceId string `json:"private_instance_id"`
 }
 
