@@ -102,6 +102,10 @@ func (x *HttpMetric) MarshalJSON() ([]byte, error) {
 		y.Latency[fmt.Sprintf("%d", int(e*100))] = z[i] / float64(time.Second)
 	}
 
+	// Add fields for backwards compatibility with the collector
+	y.Latency["value"] = p[0] / float64(time.Millisecond)
+	y.Latency["samples"] = 1
+
 	return json.Marshal(y)
 }
 
