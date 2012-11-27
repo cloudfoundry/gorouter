@@ -1,134 +1,201 @@
 package router
 
-//import (
-//  . "launchpad.net/gocheck"
-//)
+import (
+	"encoding/json"
+	"fmt"
+	. "launchpad.net/gocheck"
+	"net/http"
+	"time"
+)
 
-//var NO_TAG = map[string]string{}
+type VarzSuite struct {
+	*Varz
+}
 
-//type VarzSuite struct {
-//  varz *Varz
-//}
+var _ = Suite(&VarzSuite{})
 
-//var _ = Suite(&VarzSuite{})
+func (s *VarzSuite) SetUpTest(c *C) {
+	s.Varz = NewVarz()
+	s.Varz.Registry = NewRegistry()
+}
 
-//func (s *VarzSuite) SetUpTest(c *C) {
-//  s.varz = NewVarz()
-//}
+func (s *VarzSuite) f(x ...string) interface{} {
+	var z interface{}
+	var ok bool
 
-//func (s *VarzSuite) TestNewVarz(c *C) {
-//  checkEmptyVarz(c, s.varz)
-//}
+	b, err := json.Marshal(s.Varz)
+	if err != nil {
+		panic(err)
+	}
 
-//func (s *VarzSuite) TestUpdateRequests(c *C) {
-//  s.varz.IncRequests()
-//  c.Check(s.varz.Requests, Equals, 1)
+	y := make(map[string]interface{})
+	err = json.Unmarshal(b, &y)
+	if err != nil {
+		panic(err)
+	}
 
-//  s.varz.IncRequests()
-//  c.Check(s.varz.Requests, Equals, 2)
-//}
+	z = y
 
-//func (s *VarzSuite) TestUpdateBadRequests(c *C) {
-//  s.varz.IncBadRequests()
-//  c.Check(s.varz.BadRequests, Equals, 1)
+	for _, e := range x {
+		u := z.(map[string]interface{})
+		z, ok = u[e]
+		if !ok {
+			panic(fmt.Sprintf("no key: %s", e))
+		}
+	}
 
-//  s.varz.IncBadRequests()
-//  c.Check(s.varz.BadRequests, Equals, 2)
-//}
+	return z
+}
 
-//func (s *VarzSuite) TestUpdateRequestsTag(c *C) {
-//  s.varz.IncRequestsWithTags(map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  c.Check(s.varz.Tags["component"]["cc"].Requests, Equals, 1)
-//  c.Check(s.varz.Tags["framework"]["sinatra"].Requests, Equals, 1)
-//  c.Check(s.varz.Tags["runtime"]["ruby18"].Requests, Equals, 1)
-//}
+func (s *VarzSuite) TestEmptyUniqueVarz(c *C) {
+	v := s.Varz
 
-//func (s *VarzSuite) TestUpdateVarzNilTag(c *C) {
-//  s.varz.RecordResponse(200, 10, nil)
+	members := []string{
+		"all",
+		"tags",
+		"urls",
+		"droplets",
+		"bad_requests",
+		"requests_per_sec",
+		"top10_app_requests",
+	}
 
-//  c.Check(s.varz.Responses2xx, Equals, 1)
-//}
+	validateJsonMembers(v, members, c)
+}
 
-//func (s *VarzSuite) TestUpdateVarzInvalidCode(c *C) {
-//  s.varz.RecordResponse(-1, 10, NO_TAG)
-//  s.varz.RecordResponse(999, 10, NO_TAG)
+func validateJsonMembers(v interface{}, members []string, c *C) {
+	b, e := json.Marshal(v)
+	c.Assert(e, IsNil)
 
-//  c.Check(s.varz.ResponsesXxx, Equals, 2)
-//}
+	d := make(map[string]interface{})
+	e = json.Unmarshal(b, &d)
+	c.Assert(e, IsNil)
 
-//func (s *VarzSuite) TestUpdateVarzInvalidLatency(c *C) {
-//  s.varz.RecordResponse(200, -10, NO_TAG)
-//  checkEmptyVarz(c, s.varz)
-//}
+	for _, k := range members {
+		if _, ok := d[k]; !ok {
+			c.Fatalf(`member "%s" not found`, k)
+		}
+	}
+}
 
-//func (s *VarzSuite) TestUpdateVarzTag(c *C) {
-//  s.varz = NewVarz()
-//  s.varz.RecordResponse(200, 10, map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  s.varz.checkResponseAndLatency(c, 200, 10)
-//  s.varz.Tags["component"]["cc"].checkResponseAndLatency(c, 200, 10)
-//  s.varz.Tags["framework"]["sinatra"].checkResponseAndLatency(c, 200, 10)
-//  s.varz.Tags["runtime"]["ruby18"].checkResponseAndLatency(c, 200, 10)
+func readVarzMemberFromJson(v interface{}, k string, c *C) interface{} {
+	b, e := json.Marshal(v)
+	c.Assert(e, IsNil)
 
-//  s.varz = NewVarz()
-//  s.varz.RecordResponse(300, 10, map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  s.varz.checkResponseAndLatency(c, 300, 10)
-//  s.varz.Tags["component"]["cc"].checkResponseAndLatency(c, 300, 10)
-//  s.varz.Tags["framework"]["sinatra"].checkResponseAndLatency(c, 300, 10)
-//  s.varz.Tags["runtime"]["ruby18"].checkResponseAndLatency(c, 300, 10)
+	d := make(map[string]interface{})
+	e = json.Unmarshal(b, &d)
+	c.Assert(e, IsNil)
 
-//  s.varz = NewVarz()
-//  s.varz.RecordResponse(400, 10, map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  s.varz.checkResponseAndLatency(c, 400, 10)
-//  s.varz.Tags["component"]["cc"].checkResponseAndLatency(c, 400, 10)
-//  s.varz.Tags["framework"]["sinatra"].checkResponseAndLatency(c, 400, 10)
-//  s.varz.Tags["runtime"]["ruby18"].checkResponseAndLatency(c, 400, 10)
+	return d[k]
+}
 
-//  s.varz = NewVarz()
-//  s.varz.RecordResponse(500, 10, map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  s.varz.checkResponseAndLatency(c, 500, 10)
-//  s.varz.Tags["component"]["cc"].checkResponseAndLatency(c, 500, 10)
-//  s.varz.Tags["framework"]["sinatra"].checkResponseAndLatency(c, 500, 10)
-//  s.varz.Tags["runtime"]["ruby18"].checkResponseAndLatency(c, 500, 10)
+func (s *VarzSuite) TestUpdateBadRequests(c *C) {
+	r := http.Request{}
 
-//  s.varz = NewVarz()
-//  s.varz.RecordResponse(999, 10, map[string]string{"component": "cc", "framework": "sinatra", "runtime": "ruby18"})
-//  s.varz.checkResponseAndLatency(c, 999, 10)
-//  s.varz.Tags["component"]["cc"].checkResponseAndLatency(c, 999, 10)
-//  s.varz.Tags["framework"]["sinatra"].checkResponseAndLatency(c, 999, 10)
-//  s.varz.Tags["runtime"]["ruby18"].checkResponseAndLatency(c, 999, 10)
-//}
+	s.CaptureBadRequest(&r)
+	c.Assert(s.f("bad_requests"), Equals, float64(1))
 
-//func (metric *HttpMetric) checkResponseAndLatency(c *C, httpCode int, latency int) {
-//  switch httpCode {
-//  case 200:
-//    c.Check(metric.Responses2xx, Equals, 1)
-//  case 300:
-//    c.Check(metric.Responses3xx, Equals, 1)
-//  case 400:
-//    c.Check(metric.Responses4xx, Equals, 1)
-//  case 500:
-//    c.Check(metric.Responses5xx, Equals, 1)
-//  default:
-//    c.Check(metric.ResponsesXxx, Equals, 1)
-//  }
-//  c.Check(metric.Latency.Snapshot().Mean, Equals, float64(latency))
-//  c.Check(metric.Latency.Snapshot().Count, Equals, uint64(1))
-//}
+	s.CaptureBadRequest(&r)
+	c.Assert(s.f("bad_requests"), Equals, float64(2))
+}
 
-//func checkEmptyVarz(c *C, s *Varz) {
-//  c.Check(s.Requests, Equals, 0)
-//  c.Check(s.Urls, Equals, 0)
-//  c.Check(s.Droplets, Equals, 0)
-//  c.Check(s.Responses2xx, Equals, 0)
-//  c.Check(s.Responses3xx, Equals, 0)
-//  c.Check(s.Responses4xx, Equals, 0)
-//  c.Check(s.Responses5xx, Equals, 0)
-//  c.Check(s.ResponsesXxx, Equals, 0)
+func (s *VarzSuite) TestUpdateRequests(c *C) {
+	b := Backend{}
+	r := http.Request{}
 
-//  // there are 3 categories of tags
-//  c.Check(len(s.Tags), Equals, 3)
+	s.CaptureBackendRequest(b, &r)
+	c.Assert(s.f("all", "requests"), Equals, float64(1))
 
-//  for _, tag := range s.Tags {
-//    c.Check(len(tag), Equals, 0)
-//  }
-//}
+	s.CaptureBackendRequest(b, &r)
+	c.Assert(s.f("all", "requests"), Equals, float64(2))
+}
+
+func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
+	b1 := Backend{
+		Tags: map[string]string{
+			"component": "cc",
+			"runtime":   "ruby18",
+			"framework": "sinatra",
+		},
+	}
+
+	b2 := Backend{
+		Tags: map[string]string{
+			"component": "cc",
+			"runtime":   "ruby18",
+			"framework": "rails",
+		},
+	}
+
+	r1 := http.Request{}
+	r2 := http.Request{}
+
+	s.CaptureBackendRequest(b1, &r1)
+	s.CaptureBackendRequest(b2, &r2)
+
+	c.Assert(s.f("tags", "component", "cc", "requests"), Equals, float64(2))
+	c.Assert(s.f("tags", "runtime", "ruby18", "requests"), Equals, float64(2))
+	c.Assert(s.f("tags", "framework", "sinatra", "requests"), Equals, float64(1))
+	c.Assert(s.f("tags", "framework", "rails", "requests"), Equals, float64(1))
+}
+
+func (s *VarzSuite) TestUpdateResponse(c *C) {
+	var b Backend
+	var d time.Duration
+
+	r1 := &http.Response{
+		StatusCode: http.StatusOK,
+	}
+
+	r2 := &http.Response{
+		StatusCode: http.StatusNotFound,
+	}
+
+	s.CaptureBackendResponse(b, r1, d)
+	s.CaptureBackendResponse(b, r2, d)
+	s.CaptureBackendResponse(b, r2, d)
+
+	c.Assert(s.f("all", "responses_2xx"), Equals, float64(1))
+	c.Assert(s.f("all", "responses_4xx"), Equals, float64(2))
+}
+
+func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
+	var d time.Duration
+
+	b1 := Backend{
+		Tags: map[string]string{
+			"component": "cc",
+			"runtime":   "ruby18",
+			"framework": "sinatra",
+		},
+	}
+
+	b2 := Backend{
+		Tags: map[string]string{
+			"component": "cc",
+			"runtime":   "ruby18",
+			"framework": "rails",
+		},
+	}
+
+	r1 := &http.Response{
+		StatusCode: http.StatusOK,
+	}
+
+	r2 := &http.Response{
+		StatusCode: http.StatusNotFound,
+	}
+
+	s.CaptureBackendResponse(b1, r1, d)
+	s.CaptureBackendResponse(b2, r2, d)
+	s.CaptureBackendResponse(b2, r2, d)
+
+	c.Assert(s.f("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
+	c.Assert(s.f("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
+	c.Assert(s.f("tags", "runtime", "ruby18", "responses_2xx"), Equals, float64(1))
+	c.Assert(s.f("tags", "runtime", "ruby18", "responses_4xx"), Equals, float64(2))
+	c.Assert(s.f("tags", "framework", "sinatra", "responses_2xx"), Equals, float64(1))
+	c.Assert(s.f("tags", "framework", "sinatra", "responses_4xx"), Equals, float64(0))
+	c.Assert(s.f("tags", "framework", "rails", "responses_2xx"), Equals, float64(0))
+	c.Assert(s.f("tags", "framework", "rails", "responses_4xx"), Equals, float64(2))
+}
