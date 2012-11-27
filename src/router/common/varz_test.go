@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	. "launchpad.net/gocheck"
 )
 
@@ -9,53 +10,67 @@ type VarzSuite struct {
 
 var _ = Suite(&VarzSuite{})
 
-func (s *VarzSuite) TestParseSimpleVarz(c *C) {
-	type metrics struct {
-		Responses2xx int `json:"responses_2xx"`
-		ResponsesXxx int `json:"-"`
+func (s *VarzSuite) SetUpTest(c *C) {
+	Component = VcapComponent{
+		Credentials: []string{"foo", "bar"},
+		Config:      map[string]interface{}{"ip": "localhost", "port": 8080},
 	}
-	m := metrics{
-		Responses2xx: 12,
-		ResponsesXxx: 10,
-	}
-
-	d := parseVarz(m)
-
-	c.Assert(d["-"], Equals, nil)
-	c.Assert(d["ResponsesXxx"], IsNil)
-	c.Assert(d["responses_2xx"], Equals, 12)
 }
 
-func (s *VarzSuite) TestParseComplexVarz(c *C) {
-	type Foo struct {
-		Bar string `json:"bar"`
-	}
-	type metrics struct {
-		Foo `json:"foo" encode:"yes"` // anonymous field
+func (s *VarzSuite) TearDownTest(c *C) {
+	Component = VcapComponent{}
+}
 
-		Responses2xx int `json:"responses_2xx"`
-		ResponsesXxx int `json:"-"`
-	}
-	type varz struct {
-		Type    string  `json:"type"`
-		Metrics metrics `json:"metrics" encode:"yes"`
+func (s *VarzSuite) TestEmptyVarz(c *C) {
+	v := &Varz{}
+	b, e := json.Marshal(v)
+	c.Assert(e, IsNil)
+
+	m := make(map[string]interface{})
+	e = json.Unmarshal(b, &m)
+	c.Assert(e, IsNil)
+
+	members := []string{
+		"type",
+		"index",
+		"host",
+		"credentials",
+		"config",
+		"start",
+		"uuid",
+		"uptime",
+		"num_cores",
+		"mem",
+		"cpu",
 	}
 
-	m := metrics{
-		Responses2xx: 12,
-		ResponsesXxx: 10,
+	for _, k := range members {
+		if _, ok := m[k]; !ok {
+			c.Fatalf(`member "%s" not found`, k)
+		}
 	}
-	m.Bar = "whatever"
-	v := varz{
-		Type:    "Router",
-		Metrics: m,
+}
+
+func (s *VarzSuite) TestTransformStruct(c *C) {
+	component := struct {
+		Type  string `json:"type"`
+		Index int    `json:"index"`
+	}{
+		Type:  "Router",
+		Index: 1,
 	}
 
-	d := parseVarz(v)
+	m := make(map[string]interface{})
+	transform(component, &m)
+	c.Assert(m["type"], Equals, "Router")
+	c.Assert(m["index"], Equals, float64(1))
+}
 
-	c.Assert(d["type"], Equals, "Router")
-	c.Assert(d["metrics"], IsNil)
-	c.Assert(d["responses_2xx"], Equals, 12)
-	c.Assert(d["foo"], IsNil)
-	c.Assert(d["bar"], Equals, m.Bar)
+func (s *VarzSuite) TestTransformMap(c *C) {
+	data := map[string]interface{}{"type": "Dea", "index": 1}
+
+	m := make(map[string]interface{})
+	transform(data, &m)
+	c.Assert(m["type"], Equals, "Dea")
+	c.Assert(m["index"], Equals, float64(1))
 }
