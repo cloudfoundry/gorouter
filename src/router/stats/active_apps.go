@@ -159,11 +159,12 @@ func (x *ActiveApps) ActiveSince(y time.Time) []string {
 	t := y.Unix()
 
 	x.Lock()
-	defer x.Unlock()
 
 	a := byTimeMaxHeapReadOnly{}
 	a.Heap = x.j.Copy()
 	a.Init()
+
+	x.Unlock()
 
 	// Collect active applications
 	b := make([]string, 0)

@@ -224,13 +224,14 @@ type topAppsTopEntry struct {
 
 func (x *TopApps) TopSince(y time.Time, n int) []topAppsTopEntry {
 	x.Lock()
-	defer x.Unlock()
 
 	x.trim(y.Add(-1 * time.Second))
 
 	a := byRequestsHeapReadOnly{}
 	a.Heap = x.n.Copy()
 	a.Init()
+
+	x.Unlock()
 
 	// Collect the top N applications
 	s := make([]topAppsTopEntry, 0, n)
