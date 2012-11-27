@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	metrics "github.com/rcrowley/go-metrics"
 	"net/http"
 	"router/stats"
@@ -93,11 +94,13 @@ func (x *HttpMetric) MarshalJSON() ([]byte, error) {
 	y.Responses5xx = x.Responses5xx.Count()
 	y.ResponsesXxx = x.ResponsesXxx.Count()
 
-	z := x.Latency.Percentiles([]float64{0.5, 0.75, 0.99})
+	p := []float64{0.50, 0.75, 0.90, 0.95, 0.99}
+	z := x.Latency.Percentiles(p)
+
 	y.Latency = make(map[string]float64)
-	y.Latency["50"] = z[0]
-	y.Latency["75"] = z[1]
-	y.Latency["99"] = z[2]
+	for i, e := range p {
+		y.Latency[fmt.Sprintf("%d", int(e*100))] = z[i] / float64(time.Second)
+	}
 
 	return json.Marshal(y)
 }

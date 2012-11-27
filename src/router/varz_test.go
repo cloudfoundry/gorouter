@@ -199,3 +199,20 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	c.Assert(s.f("tags", "framework", "rails", "responses_2xx"), Equals, float64(0))
 	c.Assert(s.f("tags", "framework", "rails", "responses_4xx"), Equals, float64(2))
 }
+
+func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
+	var b Backend
+	var d = 1 * time.Millisecond
+
+	r := &http.Response{
+		StatusCode: http.StatusOK,
+	}
+
+	s.CaptureBackendResponse(b, r, d)
+
+	c.Assert(s.f("all", "latency", "50").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("all", "latency", "75").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("all", "latency", "90").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("all", "latency", "95").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("all", "latency", "99").(float64), Equals, float64(d)/float64(time.Second))
+}
