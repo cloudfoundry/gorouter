@@ -77,13 +77,13 @@ func (x *byFirstMarkTimeHeap) SetIndex(i, j int) {
 	y.ti = j
 }
 
-type byFirstMarkTimeHeapReadOnly struct{ byFirstMarkTimeHeap }
+type byFirstMarkTimeHeapSnapshot struct{ byFirstMarkTimeHeap }
 
-func (x *byFirstMarkTimeHeapReadOnly) Init() {
+func (x *byFirstMarkTimeHeapSnapshot) Init() {
 	x.Heap.HeapType = x
 }
 
-func (x *byFirstMarkTimeHeapReadOnly) SetIndex(i, j int) {
+func (x *byFirstMarkTimeHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
@@ -104,13 +104,13 @@ func (x *byRequestsHeap) SetIndex(i, j int) {
 	y.ni = j
 }
 
-type byRequestsHeapReadOnly struct{ byRequestsHeap }
+type byRequestsHeapSnapshot struct{ byRequestsHeap }
 
-func (x *byRequestsHeapReadOnly) Init() {
+func (x *byRequestsHeapSnapshot) Init() {
 	x.Heap.HeapType = x
 }
 
-func (x *byRequestsHeapReadOnly) SetIndex(i, j int) {
+func (x *byRequestsHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
@@ -227,7 +227,7 @@ func (x *TopApps) TopSince(y time.Time, n int) []topAppsTopEntry {
 
 	x.trim(y.Add(-1 * time.Second))
 
-	a := byRequestsHeapReadOnly{}
+	a := byRequestsHeapSnapshot{}
 	a.Heap = x.n.Copy()
 	a.Init()
 

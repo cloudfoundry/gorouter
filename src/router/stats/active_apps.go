@@ -42,13 +42,13 @@ func (x *byTimeMinHeap) SetIndex(i, j int) {
 	y.ti = j
 }
 
-type byTimeMinHeapReadOnly struct{ byTimeMinHeap }
+type byTimeMinHeapSnapshot struct{ byTimeMinHeap }
 
-func (x *byTimeMinHeapReadOnly) Init() {
+func (x *byTimeMinHeapSnapshot) Init() {
 	x.Heap.HeapType = x
 }
 
-func (x *byTimeMinHeapReadOnly) SetIndex(i, j int) {
+func (x *byTimeMinHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
@@ -69,13 +69,13 @@ func (x *byTimeMaxHeap) SetIndex(i, j int) {
 	y.tj = j
 }
 
-type byTimeMaxHeapReadOnly struct{ byTimeMaxHeap }
+type byTimeMaxHeapSnapshot struct{ byTimeMaxHeap }
 
-func (x *byTimeMaxHeapReadOnly) Init() {
+func (x *byTimeMaxHeapSnapshot) Init() {
 	x.Heap.HeapType = x
 }
 
-func (x *byTimeMaxHeapReadOnly) SetIndex(i, j int) {
+func (x *byTimeMaxHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
@@ -160,7 +160,7 @@ func (x *ActiveApps) ActiveSince(y time.Time) []string {
 
 	x.Lock()
 
-	a := byTimeMaxHeapReadOnly{}
+	a := byTimeMaxHeapSnapshot{}
 	a.Heap = x.j.Copy()
 	a.Init()
 
