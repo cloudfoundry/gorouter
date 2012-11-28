@@ -17,7 +17,6 @@ type Router struct {
 	proxy      *Proxy
 	natsClient *nats.Client
 	varz       *Varz
-	pidfile    *vcap.PidFile
 	registry   *Registry
 }
 
@@ -28,14 +27,6 @@ func NewRouter() *Router {
 	if config.GoMaxProcs != 0 {
 		runtime.GOMAXPROCS(config.GoMaxProcs)
 	}
-
-	// setup pidfile
-	pidfile, err := vcap.NewPidFile(config.Pidfile)
-	if err != nil {
-		panic(err)
-	}
-	pidfile.UnlinkOnSignal(syscall.SIGTERM, syscall.SIGINT)
-	router.pidfile = pidfile
 
 	// setup nats
 	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)

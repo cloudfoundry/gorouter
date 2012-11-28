@@ -44,12 +44,11 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	c.Assert(err, IsNil)
 
 	InitConfig(&Config{
-		Port:    8083,
-		Index:   2,
-		Pidfile: "/tmp/router_test.pid",
-		Nats:    NatsConfig{URI: "nats://localhost:8089"},
-		Status:  StatusConfig{8084, "user", "pass"},
-		Log:     LogConfig{"info", "/dev/null", ""},
+		Port:   8083,
+		Index:  2,
+		Nats:   NatsConfig{URI: "nats://localhost:8089"},
+		Status: StatusConfig{8084, "user", "pass"},
+		Log:    LogConfig{"info", "/dev/null", ""},
 	})
 
 	s.router = NewRouter()
@@ -59,7 +58,6 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 }
 
 func (s *RouterSuite) TearDownSuite(c *C) {
-	s.router.pidfile.Unlink()
 	s.natsServer.Stop()
 }
 

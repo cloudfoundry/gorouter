@@ -4,7 +4,6 @@ status:
   port: 8084
   user: "user"
   password: "password"
-pidfile: "/tmp/router.pid"
 nats:
   uri: "nats://nats:nats@localhost:4222"
 logging:
