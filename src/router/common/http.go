@@ -9,7 +9,7 @@ import (
 func init() {
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
 		enc := json.NewEncoder(w)
 		enc.Encode(UpdateHealthz())
@@ -17,7 +17,7 @@ func init() {
 
 	http.HandleFunc("/varz", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
 		enc := json.NewEncoder(w)
 		enc.Encode(UpdateVarz())
