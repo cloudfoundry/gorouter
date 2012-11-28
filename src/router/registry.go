@@ -1,6 +1,7 @@
 package router
 
 import (
+	"container/list"
 	"fmt"
 	"net/http"
 	"router/stats"
@@ -8,6 +9,8 @@ import (
 	"sync"
 	"time"
 )
+
+const StalesCheckInterval = time.Second * 120
 
 type Uri string
 type Uris []Uri
@@ -88,6 +91,8 @@ type registerMessage struct {
 	App  string            `json:"app"`
 
 	PrivateInstanceId string `json:"private_instance_id"`
+
+	time time.Time
 }
 
 func (m *registerMessage) BackendId() BackendId {
@@ -116,6 +121,10 @@ type Registry struct {
 
 	byUri       map[Uri]BackendIds
 	byBackendId map[BackendId]*registerMessage
+
+	tracker        *list.List
+	trackerIndexes map[BackendId]*list.Element
+	maxStaleAge    time.Duration
 }
 
 func NewRegistry() *Registry {
@@ -126,6 +135,11 @@ func NewRegistry() *Registry {
 
 	r.byUri = make(map[Uri]BackendIds)
 	r.byBackendId = make(map[BackendId]*registerMessage)
+
+	r.tracker = list.New()
+	r.trackerIndexes = make(map[BackendId]*list.Element)
+	r.maxStaleAge = time.Second * 120
+	go r.checkAndPurge()
 
 	return r
 }
@@ -161,15 +175,8 @@ func (r *Registry) registerUri(u Uri, i BackendId) {
 	r.byUri[u] = x
 }
 
-func (r *Registry) Register(m *registerMessage) {
-	r.Lock()
-	defer r.Unlock()
-
+func (r *Registry) register(m *registerMessage) {
 	i := m.BackendId()
-	if i == "" {
-		return
-	}
-
 	n := r.byBackendId[i]
 	if n != nil {
 		// Unregister uri's that are no longer referenced
@@ -189,6 +196,19 @@ func (r *Registry) Register(m *registerMessage) {
 
 	// Overwrite message
 	r.byBackendId[i] = m
+}
+
+func (r *Registry) Register(m *registerMessage) {
+	i := m.BackendId()
+	if i == "" {
+		return
+	}
+
+	r.Lock()
+	defer r.Unlock()
+
+	r.register(m)
+	r.addToTracker(m)
 }
 
 func (r *Registry) unregisterUri(u Uri, i BackendId) {
@@ -213,10 +233,7 @@ func (r *Registry) unregisterUri(u Uri, i BackendId) {
 	}
 }
 
-func (r *Registry) Unregister(m *registerMessage) {
-	r.Lock()
-	defer r.Unlock()
-
+func (r *Registry) unregister(m *registerMessage) {
 	i := m.BackendId()
 
 	// The message may contain URIs the registry doesn't know about.
@@ -229,6 +246,66 @@ func (r *Registry) Unregister(m *registerMessage) {
 	}
 
 	delete(r.byBackendId, i)
+}
+
+func (r *Registry) Unregister(m *registerMessage) {
+	r.Lock()
+	defer r.Unlock()
+	r.unregister(m)
+	r.removeFromTracker(m)
+}
+
+func (r *Registry) addToTracker(m *registerMessage) {
+	b := m.BackendId()
+	n := r.trackerIndexes[b]
+	if n != nil {
+		r.tracker.Remove(n)
+	}
+
+	m.time = time.Now()
+	e := r.tracker.PushBack(m)
+	r.trackerIndexes[b] = e
+}
+
+func (r *Registry) removeFromTracker(m *registerMessage) {
+	b := m.BackendId()
+	if n := r.trackerIndexes[b]; n != nil {
+		r.tracker.Remove(n)
+	}
+	delete(r.trackerIndexes, m.BackendId())
+}
+
+func (r *Registry) purgeStaleDroplets() {
+	for r.tracker.Len() > 0 {
+		f := r.tracker.Front()
+		rr := f.Value.(*registerMessage)
+		if rr.time.Add(r.maxStaleAge).After(time.Now()) {
+			break
+		}
+		r.unregister(rr)
+
+		delete(r.trackerIndexes, rr.BackendId())
+		r.tracker.Remove(f)
+		log.Infof("Purged stale droplet: %v ", rr)
+	}
+}
+
+func (r *Registry) PurgeStaleDroplets() {
+	r.Lock()
+	defer r.Unlock()
+
+	r.purgeStaleDroplets()
+}
+
+func (r *Registry) checkAndPurge() {
+	tick := time.Tick(StalesCheckInterval)
+	for {
+		select {
+		case <-tick:
+			log.Info("Start to check and purge stale droplets")
+			r.PurgeStaleDroplets()
+		}
+	}
 }
 
 func (r *Registry) Lookup(req *http.Request) BackendIds {

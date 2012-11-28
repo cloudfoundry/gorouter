@@ -3,6 +3,7 @@ package router
 import (
 	. "launchpad.net/gocheck"
 	"net/http"
+	"time"
 )
 
 type RegistrySuite struct {
@@ -57,6 +58,9 @@ func (s *RegistrySuite) TestRegister(c *C) {
 
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
+
+	c.Assert(s.tracker.Len(), Equals, 2)
+	c.Assert(len(s.trackerIndexes), Equals, 2)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
@@ -171,4 +175,37 @@ func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
 
 	ms := s.Lookup(&http.Request{Host: "bar.vcap.me"})
 	c.Check(len(ms), Equals, 2)
+}
+
+func (s *RegistrySuite) TestTracker(c *C) {
+	s.Register(fooReg)
+	s.Register(barReg)
+	c.Assert(s.tracker.Len(), Equals, 2)
+	c.Assert(s.trackerIndexes, HasLen, 2)
+
+	s.Unregister(fooReg)
+	s.Unregister(barReg)
+	c.Assert(s.tracker.Len(), Equals, 0)
+	c.Assert(s.trackerIndexes, HasLen, 0)
+}
+
+func (s *RegistrySuite) TestPurgeStaleApps(c *C) {
+	s.maxStaleAge = time.Millisecond * 250
+
+	s.Register(fooReg)
+	s.Register(barReg)
+	c.Check(s.NumUris(), Equals, 4)
+	c.Check(s.NumBackends(), Equals, 2)
+	c.Assert(s.tracker.Len(), Equals, 2)
+	c.Assert(s.trackerIndexes, HasLen, 2)
+
+	time.Sleep(time.Millisecond * 300)
+	s.PurgeStaleDroplets()
+
+	s.Register(bar2Reg)
+
+	c.Check(s.NumUris(), Equals, 2)
+	c.Check(s.NumBackends(), Equals, 1)
+	c.Assert(s.tracker.Len(), Equals, 1)
+	c.Assert(s.trackerIndexes, HasLen, 1)
 }
