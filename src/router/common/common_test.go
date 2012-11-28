@@ -3,15 +3,9 @@ package common
 import (
 	. "launchpad.net/gocheck"
 	"os"
-	"testing"
 )
 
-func Test(t *testing.T) {
-	TestingT(t)
-}
-
-type CommonSuite struct {
-}
+type CommonSuite struct{}
 
 var _ = Suite(&CommonSuite{})
 
