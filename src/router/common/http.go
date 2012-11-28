@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"net/http"
+	_ "net/http/pprof"
 	. "router/common/http"
 )
 
