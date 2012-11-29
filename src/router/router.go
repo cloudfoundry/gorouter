@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	"net/http"
+	"net"
 	vcap "router/common"
+	"router/proxy"
 	"runtime"
 	"time"
 )
@@ -140,6 +141,8 @@ func (r *Router) ScheduleFlushApps() {
 }
 
 func (r *Router) Run() {
+	var err error
+
 	// Subscribe register/unregister router
 	r.SubscribeRegister()
 	r.SubscribeUnregister()
@@ -150,9 +153,15 @@ func (r *Router) Run() {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r.proxy)
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
-		log.Fatalf("ListenAndServe %s", err)
+		log.Fatalf("net.Listen: %s", err)
+	}
+
+	s := proxy.Server{Handler: r.proxy}
+	err = s.Serve(l)
+	if err != nil {
+		log.Fatalf("proxy.Serve: %s", err)
 	}
 }
 
