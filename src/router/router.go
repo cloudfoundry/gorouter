@@ -9,7 +9,6 @@ import (
 	"net/http"
 	vcap "router/common"
 	"runtime"
-	"syscall"
 	"time"
 )
 
