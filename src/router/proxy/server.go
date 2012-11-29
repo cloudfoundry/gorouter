@@ -102,7 +102,6 @@ type conn struct {
 	lr         *io.LimitedReader // io.LimitReader(rwc)
 	buf        *bufio.ReadWriter // buffered(lr,rwc), reading from bufio->limitReader->rwc
 	hijacked   bool              // connection has been hijacked by handler
-	body       []byte
 }
 
 // A response represents the server side of an HTTP response.
@@ -116,7 +115,6 @@ type response struct {
 	written       int64         // number of bytes written in body
 	contentLength int64         // explicitly-declared Content-Length; or -1
 	status        int           // status code passed to WriteHeader
-	needSniff     bool          // need to sniff to find Content-Type
 
 	// close connection after this reply.  set on request and
 	// updated after response from handler if there's a
@@ -154,7 +152,7 @@ func (w *response) ReadFrom(src io.Reader) (n int64, err error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
-	if !w.chunking && w.bodyAllowed() && !w.needSniff {
+	if !w.chunking && w.bodyAllowed() {
 		w.Flush()
 		if rf, ok := w.conn.rwc.(io.ReaderFrom); ok {
 			n, err = rf.ReadFrom(src)
@@ -176,7 +174,6 @@ func (srv *Server) newConn(rwc net.Conn) (c *conn, err error) {
 	c.remoteAddr = rwc.RemoteAddr().String()
 	c.server = srv
 	c.rwc = rwc
-	c.body = make([]byte, sniffLen)
 	c.lr = io.LimitReader(rwc, noLimit).(*io.LimitedReader)
 	br := bufio.NewReader(c.lr)
 	bw := bufio.NewWriter(rwc)
@@ -251,7 +248,6 @@ func (c *conn) readRequest() (w *response, err error) {
 	w.req = req
 	w.header = make(http.Header)
 	w.contentLength = -1
-	c.body = c.body[:0]
 	return w, nil
 }
 
@@ -338,11 +334,6 @@ func (w *response) WriteHeader(code int) {
 				w.header.Del(header)
 			}
 		}
-	} else {
-		// If no content type, apply sniffing algorithm to body.
-		if w.header.Get("Content-Type") == "" && w.req.Method != "HEAD" {
-			w.needSniff = true
-		}
 	}
 
 	if _, ok := w.header["Date"]; !ok {
@@ -404,36 +395,7 @@ func (w *response) WriteHeader(code int) {
 	}
 	io.WriteString(w.conn.buf, proto+" "+codestring+" "+text+"\r\n")
 	w.header.Write(w.conn.buf)
-
-	// If we need to sniff the body, leave the header open.
-	// Otherwise, end it here.
-	if !w.needSniff {
-		io.WriteString(w.conn.buf, "\r\n")
-	}
-}
-
-// sniff uses the first block of written data,
-// stored in w.conn.body, to decide the Content-Type
-// for the HTTP body.
-func (w *response) sniff() {
-	if !w.needSniff {
-		return
-	}
-	w.needSniff = false
-
-	data := w.conn.body
-	fmt.Fprintf(w.conn.buf, "Content-Type: %s\r\n\r\n", DetectContentType(data))
-
-	if len(data) == 0 {
-		return
-	}
-	if w.chunking {
-		fmt.Fprintf(w.conn.buf, "%x\r\n", len(data))
-	}
-	_, err := w.conn.buf.Write(data)
-	if w.chunking && err == nil {
-		io.WriteString(w.conn.buf, "\r\n")
-	}
+	io.WriteString(w.conn.buf, "\r\n")
 }
 
 // bodyAllowed returns true if a Write is allowed for this response type.
@@ -465,32 +427,6 @@ func (w *response) Write(data []byte) (n int, err error) {
 		return 0, ErrContentLength
 	}
 
-	var m int
-	if w.needSniff {
-		// We need to sniff the beginning of the output to
-		// determine the content type.  Accumulate the
-		// initial writes in w.conn.body.
-		// Cap m so that append won't allocate.
-		m = cap(w.conn.body) - len(w.conn.body)
-		if m > len(data) {
-			m = len(data)
-		}
-		w.conn.body = append(w.conn.body, data[:m]...)
-		data = data[m:]
-		if len(data) == 0 {
-			// Copied everything into the buffer.
-			// Wait for next write.
-			return m, nil
-		}
-
-		// Filled the buffer; more data remains.
-		// Sniff the content (flushes the buffer)
-		// and then proceed with the remainder
-		// of the data as a normal Write.
-		// Calling sniff clears needSniff.
-		w.sniff()
-	}
-
 	// TODO(rsc): if chunking happened after the buffering,
 	// then there would be fewer chunk headers.
 	// On the other hand, it would make hijacking more difficult.
@@ -507,7 +443,7 @@ func (w *response) Write(data []byte) (n int, err error) {
 		}
 	}
 
-	return m + n, err
+	return n, err
 }
 
 func (w *response) finishRequest() {
@@ -529,9 +465,6 @@ func (w *response) finishRequest() {
 	}
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
-	}
-	if w.needSniff {
-		w.sniff()
 	}
 	if w.chunking {
 		io.WriteString(w.conn.buf, "0\r\n")
@@ -558,7 +491,6 @@ func (w *response) Flush() {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
-	w.sniff()
 	w.conn.buf.Flush()
 }
 
