@@ -622,21 +622,6 @@ type Server struct {
 	MaxHeaderBytes int           // maximum size of request headers, DefaultMaxHeaderBytes if 0
 }
 
-// ListenAndServe listens on the TCP network address srv.Addr and then
-// calls Serve to handle requests on incoming connections.  If
-// srv.Addr is blank, ":http" is used.
-func (srv *Server) ListenAndServe() error {
-	addr := srv.Addr
-	if addr == "" {
-		addr = ":http"
-	}
-	l, e := net.Listen("tcp", addr)
-	if e != nil {
-		return e
-	}
-	return srv.Serve(l)
-}
-
 // Serve accepts incoming connections on the Listener l, creating a
 // new service thread for each.  The service threads read requests and
 // then call srv.Handler to reply to them.
