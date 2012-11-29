@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	steno "github.com/cloudfoundry/gosteno"
 	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
@@ -12,23 +11,8 @@ import (
 	"regexp"
 	"router/common"
 	"router/common/spec"
-	"testing"
 	"time"
 )
-
-func Test(t *testing.T) {
-	config := &steno.Config{
-		Sinks: []steno.Sink{},
-		Codec: steno.JSON_CODEC,
-		Level: steno.LOG_INFO,
-	}
-
-	steno.Init(config)
-
-	log = steno.NewLogger("test")
-
-	TestingT(t)
-}
 
 type RouterSuite struct {
 	natsServer *spec.NatsServer
