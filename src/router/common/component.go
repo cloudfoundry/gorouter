@@ -64,11 +64,13 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	if Component.Host == "" {
 		host, err := LocalIP()
 		if err != nil {
+			log.Fatal(err.Error())
 			panic(err)
 		}
 
 		port, err := GrabEphemeralPort()
 		if err != nil {
+			log.Fatal(err.Error())
 			panic(err)
 		}
 
@@ -102,15 +104,20 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	go func() {
 		for m := range discover.Inbox {
 			Component.Uptime = Component.Start.Elapsed()
-			bytes, _ := json.Marshal(Component)
-			natsClient.Publish(string(m.ReplyTo), bytes)
+			b, e := json.Marshal(Component)
+			if e != nil {
+				log.Warnf(e.Error())
+			}
+			natsClient.Publish(string(m.ReplyTo), b)
 		}
 	}()
 
-	bytes, err := json.Marshal(Component)
-	if err != nil {
-		log.Error(err.Error())
+	b, e := json.Marshal(Component)
+	if e != nil {
+		log.Fatal(e.Error())
+		panic("Component's information should be correct")
 	}
-	natsClient.Publish("vcap.component.announce", bytes)
-	log.Debugf("Component %s registered successfully", Component.Type)
+	natsClient.Publish("vcap.component.announce", b)
+
+	log.Infof("Component %s registered successfully", Component.Type)
 }
