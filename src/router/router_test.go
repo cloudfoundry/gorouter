@@ -244,10 +244,11 @@ func (s *RouterSuite) TestStickySession(c *C) {
 		apps[i].Listen()
 	}
 
-	session, port1 := getSessionAndAppPort("sticky.vcap.me", uint16(8083), c)
+	session, port1, path := getSessionAndAppPort("sticky.vcap.me", uint16(8083), c)
 	port2 := getAppPortWithSticky("sticky.vcap.me", uint16(8083), session, c)
 
 	c.Check(port1, Equals, port2)
+	c.Check(path, Equals, "/")
 
 	for _, app := range apps {
 		app.Unregister()
@@ -400,7 +401,7 @@ func sendRequests(url string, rPort uint16, times int) {
 	}
 }
 
-func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string) {
+func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string, string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -416,13 +417,15 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string) {
 	port, err = ioutil.ReadAll(resp.Body)
 
 	var session string
+	var path string
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "__VCAP_ID__" {
 			session = cookie.Value
+			path = cookie.Path
 		}
 	}
 
-	return session, string(port)
+	return session, string(port), path
 }
 
 func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string {
