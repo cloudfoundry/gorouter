@@ -563,7 +563,7 @@ func (c *conn) serve() {
 
 		handler := c.server.Handler
 		if handler == nil {
-			handler = DefaultServeMux
+			handler = http.DefaultServeMux
 		}
 
 		// HTTP cannot have multiple simultaneous active requests.[*]
@@ -600,8 +600,8 @@ func (w *response) Hijack() (rwc net.Conn, buf *bufio.ReadWriter, err error) {
 // Serve accepts incoming HTTP connections on the listener l,
 // creating a new service thread for each.  The service threads
 // read requests and then call handler to reply to them.
-// Handler is typically nil, in which case the DefaultServeMux is used.
-func Serve(l net.Listener, handler Handler) error {
+// http.Handler is typically nil, in which case the DefaultServeMux is used.
+func Serve(l net.Listener, handler http.Handler) error {
 	srv := &Server{Handler: handler}
 	return srv.Serve(l)
 }
@@ -609,7 +609,7 @@ func Serve(l net.Listener, handler Handler) error {
 // A Server defines parameters for running an HTTP server.
 type Server struct {
 	Addr           string        // TCP address to listen on, ":http" if empty
-	Handler        Handler       // handler to invoke, http.DefaultServeMux if nil
+	Handler        http.Handler  // handler to invoke, http.DefaultServeMux if nil
 	ReadTimeout    time.Duration // maximum duration before timing out read of the request
 	WriteTimeout   time.Duration // maximum duration before timing out write of the response
 	MaxHeaderBytes int           // maximum size of request headers, DefaultMaxHeaderBytes if 0
@@ -697,7 +697,7 @@ func (srv *Server) Serve(l net.Listener) error {
 //			log.Fatal("ListenAndServe: ", err)
 //		}
 //	}
-func ListenAndServe(addr string, handler Handler) error {
+func ListenAndServe(addr string, handler http.Handler) error {
 	server := &Server{Addr: addr, Handler: handler}
 	return server.ListenAndServe()
 }
