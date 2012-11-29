@@ -217,7 +217,7 @@ func (c *conn) readRequest() (w *response, err error) {
 	}
 	c.lr.N = int64(c.server.maxHeaderBytes()) + 4096 /* bufio slop */
 	var req *http.Request
-	if req, err = ReadRequest(c.buf.Reader); err != nil {
+	if req, err = http.ReadRequest(c.buf.Reader); err != nil {
 		if c.lr.N == 0 {
 			return nil, errTooLarge
 		}
