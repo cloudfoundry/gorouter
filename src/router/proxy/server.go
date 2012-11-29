@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -91,12 +90,20 @@ type conn struct {
 
 type request struct {
 	*http.Request
+	w *response
 }
 
 // A response represents the server side of an HTTP response.
 type response struct {
-	conn          *conn
-	req           *request    // request for this response
+	conn *conn
+
+	reqWantsHttp10KeepAlive bool
+	reqMethod               string
+	reqProtoAtLeast10       bool
+	reqProtoAtLeast11       bool
+	reqExpectsContinue      bool
+	reqContentLength        int64
+
 	chunking      bool        // using chunked transfer encoding for reply body
 	wroteHeader   bool        // reply header has been written
 	wroteContinue bool        // 100 Continue response was written
@@ -227,17 +234,17 @@ const TimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
 var errTooLarge = errors.New("http: request too large")
 
 // Read next request from connection.
-func (c *conn) readRequest() (w *response, err error) {
+func (c *conn) readRequest() (r *request, w *response, err error) {
 	if c.hijacked {
-		return nil, ErrHijacked
+		return nil, nil, ErrHijacked
 	}
 	c.lr.N = int64(c.server.maxHeaderBytes()) + 4096 /* bufio slop */
 	var req *http.Request
 	if req, err = http.ReadRequest(c.buf.Reader); err != nil {
 		if c.lr.N == 0 {
-			return nil, errTooLarge
+			return nil, nil, errTooLarge
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	c.lr.N = noLimit
 
@@ -245,10 +252,21 @@ func (c *conn) readRequest() (w *response, err error) {
 
 	w = new(response)
 	w.conn = c
-	w.req = &request{req}
+
+	r = new(request)
+	r.Request = req
+	r.w = w
+
+	w.reqWantsHttp10KeepAlive = r.wantsHttp10KeepAlive()
+	w.reqMethod = r.Method
+	w.reqProtoAtLeast10 = r.ProtoAtLeast(1, 0)
+	w.reqProtoAtLeast11 = r.ProtoAtLeast(1, 1)
+	w.reqExpectsContinue = r.expectsContinue()
+	w.reqContentLength = r.ContentLength
+
 	w.header = make(http.Header)
 	w.contentLength = -1
-	return w, nil
+	return r, w, nil
 }
 
 func (w *response) Header() http.Header {
@@ -292,12 +310,12 @@ func (w *response) WriteHeader(code int) {
 		}
 	}
 
-	if w.req.wantsHttp10KeepAlive() && (w.req.Method == "HEAD" || hasCL) {
+	if w.reqWantsHttp10KeepAlive && (w.reqMethod == "HEAD" || hasCL) {
 		_, connectionHeaderSet := w.header["Connection"]
 		if !connectionHeaderSet {
 			w.header.Set("Connection", "keep-alive")
 		}
-	} else if !w.req.ProtoAtLeast(1, 1) {
+	} else if !w.reqProtoAtLeast11 {
 		// Client did not ask to keep connection alive.
 		w.closeAfterReply = true
 	}
@@ -310,17 +328,18 @@ func (w *response) WriteHeader(code int) {
 	// replying, if the handler hasn't already done so.  But we
 	// don't want to do an unbounded amount of reading here for
 	// DoS reasons, so we only try up to a threshold.
-	if w.req.ContentLength != 0 && !w.closeAfterReply {
-		ecr, isExpecter := w.req.Body.(*expectContinueReader)
-		if !isExpecter || ecr.resp.wroteContinue {
-			n, _ := io.CopyN(ioutil.Discard, w.req.Body, maxPostHandlerReadBytes+1)
-			if n >= maxPostHandlerReadBytes {
-				w.requestTooLarge()
-				w.header.Set("Connection", "close")
-			} else {
-				w.req.Body.Close()
-			}
-		}
+	if w.reqContentLength != 0 && !w.closeAfterReply {
+		// TODO: fix
+		//ecr, isExpecter := w.req.Body.(*expectContinueReader)
+		//if !isExpecter || ecr.resp.wroteContinue {
+		//  n, _ := io.CopyN(ioutil.Discard, w.req.Body, maxPostHandlerReadBytes+1)
+		//  if n >= maxPostHandlerReadBytes {
+		//    w.requestTooLarge()
+		//    w.header.Set("Connection", "close")
+		//  } else {
+		//    w.req.Body.Close()
+		//  }
+		//}
 	}
 
 	if code == http.StatusNotModified {
@@ -351,12 +370,12 @@ func (w *response) WriteHeader(code int) {
 		hasCL = false
 	}
 
-	if w.req.Method == "HEAD" || code == http.StatusNotModified {
+	if w.reqMethod == "HEAD" || code == http.StatusNotModified {
 		// do nothing
 	} else if hasCL {
 		w.contentLength = contentLength
 		w.header.Del("Transfer-Encoding")
-	} else if w.req.ProtoAtLeast(1, 1) {
+	} else if w.reqProtoAtLeast11 {
 		// HTTP/1.1 or greater: use chunked transfer encoding
 		// to avoid closing the connection at EOF.
 		// TODO: this blows away any custom or stacked Transfer-Encoding they
@@ -376,7 +395,7 @@ func (w *response) WriteHeader(code int) {
 	if w.chunking {
 		w.header.Del("Content-Length")
 	}
-	if !w.req.ProtoAtLeast(1, 0) {
+	if !w.reqProtoAtLeast10 {
 		return
 	}
 
@@ -385,7 +404,7 @@ func (w *response) WriteHeader(code int) {
 	}
 
 	proto := "HTTP/1.0"
-	if w.req.ProtoAtLeast(1, 1) {
+	if w.reqProtoAtLeast11 {
 		proto = "HTTP/1.1"
 	}
 	codestring := strconv.Itoa(code)
@@ -404,7 +423,7 @@ func (w *response) bodyAllowed() bool {
 	if !w.wroteHeader {
 		panic("")
 	}
-	return w.status != http.StatusNotModified && w.req.Method != "HEAD"
+	return w.status != http.StatusNotModified && w.reqMethod != "HEAD"
 }
 
 func (w *response) Write(data []byte) (n int, err error) {
@@ -446,7 +465,9 @@ func (w *response) Write(data []byte) (n int, err error) {
 	return n, err
 }
 
-func (w *response) finishRequest() {
+func (r *request) finishRequest() {
+	w := r.w
+
 	// If the handler never wrote any bytes and never sent a Content-Length
 	// response header, set the length explicitly to zero. This helps
 	// HTTP/1.0 clients keep their "keep-alive" connections alive, and for
@@ -457,7 +478,7 @@ func (w *response) finishRequest() {
 	}
 	// If this was an HTTP/1.0 request with keep-alive and we sent a
 	// Content-Length back, we can make this a keep-alive response ...
-	if w.req.wantsHttp10KeepAlive() {
+	if w.reqWantsHttp10KeepAlive {
 		sentLength := w.header.Get("Content-Length") != ""
 		if sentLength && w.header.Get("Connection") == "keep-alive" {
 			w.closeAfterReply = false
@@ -475,10 +496,10 @@ func (w *response) finishRequest() {
 	// Close the body, unless we're about to close the whole TCP connection
 	// anyway.
 	if !w.closeAfterReply {
-		w.req.Body.Close()
+		r.Body.Close()
 	}
-	if w.req.MultipartForm != nil {
-		w.req.MultipartForm.RemoveAll()
+	if r.MultipartForm != nil {
+		r.MultipartForm.RemoveAll()
 	}
 
 	if w.contentLength != -1 && w.contentLength != w.written {
@@ -525,7 +546,7 @@ func (c *conn) serve() {
 	}()
 
 	for {
-		w, err := c.readRequest()
+		req, w, err := c.readRequest()
 		if err != nil {
 			msg := "400 Bad Request"
 			if err == errTooLarge {
@@ -545,7 +566,6 @@ func (c *conn) serve() {
 		}
 
 		// Expect 100 Continue support
-		req := w.req
 		if req.expectsContinue() {
 			if req.ProtoAtLeast(1, 1) {
 				// Wrap the Body reader with one that replies on the connection
@@ -554,7 +574,7 @@ func (c *conn) serve() {
 			if req.ContentLength == 0 {
 				w.Header().Set("Connection", "close")
 				w.WriteHeader(http.StatusBadRequest)
-				w.finishRequest()
+				req.finishRequest()
 				break
 			}
 			req.Header.Del("Expect")
@@ -573,7 +593,7 @@ func (c *conn) serve() {
 			// respond with a 417 (Expectation Failed) status."
 			w.Header().Set("Connection", "close")
 			w.WriteHeader(http.StatusExpectationFailed)
-			w.finishRequest()
+			req.finishRequest()
 			break
 		}
 
@@ -587,11 +607,11 @@ func (c *conn) serve() {
 		// so we might as well run the handler in this goroutine.
 		// [*] Not strictly true: HTTP pipelining.  We could let them all process
 		// in parallel even if their responses need to be serialized.
-		handler.ServeHTTP(w, w.req.Request)
+		handler.ServeHTTP(w, req.Request)
 		if c.hijacked {
 			return
 		}
-		w.finishRequest()
+		req.finishRequest()
 		if w.closeAfterReply {
 			break
 		}
