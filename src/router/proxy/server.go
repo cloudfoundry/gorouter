@@ -19,12 +19,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
-	"path"
 	"runtime/debug"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 )
 
