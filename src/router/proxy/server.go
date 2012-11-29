@@ -389,8 +389,8 @@ func (w *response) WriteHeader(code int) {
 		proto = "HTTP/1.1"
 	}
 	codestring := strconv.Itoa(code)
-	text, ok := statusText[code]
-	if !ok {
+	text := http.StatusText(code)
+	if text == "" {
 		text = "status code " + codestring
 	}
 	io.WriteString(w.conn.buf, proto+" "+codestring+" "+text+"\r\n")
