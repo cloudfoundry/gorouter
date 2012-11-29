@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -88,17 +89,21 @@ type conn struct {
 	hijacked   bool              // connection has been hijacked by handler
 }
 
+type request struct {
+	*http.Request
+}
+
 // A response represents the server side of an HTTP response.
 type response struct {
 	conn          *conn
-	req           *http.Request // request for this response
-	chunking      bool          // using chunked transfer encoding for reply body
-	wroteHeader   bool          // reply header has been written
-	wroteContinue bool          // 100 Continue response was written
-	header        http.Header   // reply header parameters
-	written       int64         // number of bytes written in body
-	contentLength int64         // explicitly-declared Content-Length; or -1
-	status        int           // status code passed to WriteHeader
+	req           *request    // request for this response
+	chunking      bool        // using chunked transfer encoding for reply body
+	wroteHeader   bool        // reply header has been written
+	wroteContinue bool        // 100 Continue response was written
+	header        http.Header // reply header parameters
+	written       int64       // number of bytes written in body
+	contentLength int64       // explicitly-declared Content-Length; or -1
+	status        int         // status code passed to WriteHeader
 
 	// close connection after this reply.  set on request and
 	// updated after response from handler if there's a
@@ -114,6 +119,17 @@ type response struct {
 	// subsequent requests on this connection and stop reading
 	// input from it.
 	requestBodyLimitHit bool
+}
+
+func (r *request) expectsContinue() bool {
+	return strings.ToLower(r.Header.Get("Expect")) == "100-continue"
+}
+
+func (r *request) wantsHttp10KeepAlive() bool {
+	if r.ProtoMajor != 1 || r.ProtoMinor != 0 {
+		return false
+	}
+	return strings.Contains(strings.ToLower(r.Header.Get("Connection")), "keep-alive")
 }
 
 // requestTooLarge is called by maxBytesReader when too much input has
@@ -229,7 +245,7 @@ func (c *conn) readRequest() (w *response, err error) {
 
 	w = new(response)
 	w.conn = c
-	w.req = req
+	w.req = &request{req}
 	w.header = make(http.Header)
 	w.contentLength = -1
 	return w, nil
@@ -571,7 +587,7 @@ func (c *conn) serve() {
 		// so we might as well run the handler in this goroutine.
 		// [*] Not strictly true: HTTP pipelining.  We could let them all process
 		// in parallel even if their responses need to be serialized.
-		handler.ServeHTTP(w, w.req)
+		handler.ServeHTTP(w, w.req.Request)
 		if c.hijacked {
 			return
 		}
