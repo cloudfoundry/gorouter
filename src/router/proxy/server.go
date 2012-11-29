@@ -597,15 +597,6 @@ func (w *response) Hijack() (rwc net.Conn, buf *bufio.ReadWriter, err error) {
 	return
 }
 
-// Serve accepts incoming HTTP connections on the listener l,
-// creating a new service thread for each.  The service threads
-// read requests and then call handler to reply to them.
-// http.Handler is typically nil, in which case the DefaultServeMux is used.
-func Serve(l net.Listener, handler http.Handler) error {
-	srv := &Server{Handler: handler}
-	return srv.Serve(l)
-}
-
 // A Server defines parameters for running an HTTP server.
 type Server struct {
 	Addr           string        // TCP address to listen on, ":http" if empty
@@ -668,36 +659,4 @@ func (srv *Server) Serve(l net.Listener) error {
 		go c.serve()
 	}
 	panic("not reached")
-}
-
-// ListenAndServe listens on the TCP network address addr
-// and then calls Serve with handler to handle requests
-// on incoming connections.  Handler is typically nil,
-// in which case the DefaultServeMux is used.
-//
-// A trivial example server is:
-//
-//	package main
-//
-//	import (
-//		"io"
-//		"net/http"
-//		"log"
-//	)
-//
-//	// hello world, the web server
-//	func HelloServer(w http.ResponseWriter, req *http.Request) {
-//		io.WriteString(w, "hello, world!\n")
-//	}
-//
-//	func main() {
-//		http.HandleFunc("/hello", HelloServer)
-//		err := http.ListenAndServe(":12345", nil)
-//		if err != nil {
-//			log.Fatal("ListenAndServe: ", err)
-//		}
-//	}
-func ListenAndServe(addr string, handler http.Handler) error {
-	server := &Server{Addr: addr, Handler: handler}
-	return server.ListenAndServe()
 }
