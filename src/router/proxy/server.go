@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"path"
 	"runtime/debug"
@@ -44,7 +45,7 @@ var (
 // and that the HTTP server can move on to the next request on
 // the connection.
 type Handler interface {
-	ServeHTTP(ResponseWriter, *Request)
+	ServeHTTP(ResponseWriter, *http.Request)
 }
 
 // A ResponseWriter interface is used by an HTTP handler to
@@ -53,7 +54,7 @@ type ResponseWriter interface {
 	// Header returns the header map that will be sent by WriteHeader.
 	// Changing the header after a call to WriteHeader (or Write) has
 	// no effect.
-	Header() Header
+	Header() http.Header
 
 	// Write writes the data to the connection as part of an HTTP reply.
 	// If WriteHeader has not yet been called, Write calls WriteHeader(http.StatusOK)
@@ -107,15 +108,15 @@ type conn struct {
 // A response represents the server side of an HTTP response.
 type response struct {
 	conn          *conn
-	req           *Request // request for this response
-	chunking      bool     // using chunked transfer encoding for reply body
-	wroteHeader   bool     // reply header has been written
-	wroteContinue bool     // 100 Continue response was written
-	header        Header   // reply header parameters
-	written       int64    // number of bytes written in body
-	contentLength int64    // explicitly-declared Content-Length; or -1
-	status        int      // status code passed to WriteHeader
-	needSniff     bool     // need to sniff to find Content-Type
+	req           *http.Request // request for this response
+	chunking      bool          // using chunked transfer encoding for reply body
+	wroteHeader   bool          // reply header has been written
+	wroteContinue bool          // 100 Continue response was written
+	header        http.Header   // reply header parameters
+	written       int64         // number of bytes written in body
+	contentLength int64         // explicitly-declared Content-Length; or -1
+	status        int           // status code passed to WriteHeader
+	needSniff     bool          // need to sniff to find Content-Type
 
 	// close connection after this reply.  set on request and
 	// updated after response from handler if there's a
@@ -234,7 +235,7 @@ func (c *conn) readRequest() (w *response, err error) {
 		return nil, ErrHijacked
 	}
 	c.lr.N = int64(c.server.maxHeaderBytes()) + 4096 /* bufio slop */
-	var req *Request
+	var req *http.Request
 	if req, err = ReadRequest(c.buf.Reader); err != nil {
 		if c.lr.N == 0 {
 			return nil, errTooLarge
@@ -248,17 +249,17 @@ func (c *conn) readRequest() (w *response, err error) {
 	w = new(response)
 	w.conn = c
 	w.req = req
-	w.header = make(Header)
+	w.header = make(http.Header)
 	w.contentLength = -1
 	c.body = c.body[:0]
 	return w, nil
 }
 
-func (w *response) Header() Header {
+func (w *response) Header() http.Header {
 	return w.header
 }
 
-// maxPostHandlerReadBytes is the max number of Request.Body bytes not
+// maxPostHandlerReadBytes is the max number of http.Request.Body bytes not
 // consumed by a handler that the server will read from the client
 // in order to keep a connection alive.  If there are more bytes than
 // this then the server to be paranoid instead sends a "Connection:
@@ -684,10 +685,10 @@ func (w *response) Hijack() (rwc net.Conn, buf *bufio.ReadWriter, err error) {
 // ordinary functions as HTTP handlers.  If f is a function
 // with the appropriate signature, HandlerFunc(f) is a
 // Handler object that calls f.
-type HandlerFunc func(ResponseWriter, *Request)
+type HandlerFunc func(ResponseWriter, *http.Request)
 
 // ServeHTTP calls f(w, r).
-func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *http.Request) {
 	f(w, r)
 }
 
@@ -701,7 +702,7 @@ func Error(w ResponseWriter, error string, code int) {
 }
 
 // NotFound replies to the request with an HTTP 404 not found error.
-func NotFound(w ResponseWriter, r *Request) { Error(w, "404 page not found", StatusNotFound) }
+func NotFound(w ResponseWriter, r *http.Request) { Error(w, "404 page not found", StatusNotFound) }
 
 // NotFoundHandler returns a simple request handler
 // that replies to each request with a ``404 page not found'' reply.
@@ -713,7 +714,7 @@ func NotFoundHandler() Handler { return HandlerFunc(NotFound) }
 // request for a path that doesn't begin with prefix by
 // replying with an HTTP 404 not found error.
 func StripPrefix(prefix string, h Handler) Handler {
-	return HandlerFunc(func(w ResponseWriter, r *Request) {
+	return HandlerFunc(func(w ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, prefix) {
 			NotFound(w, r)
 			return
@@ -725,7 +726,7 @@ func StripPrefix(prefix string, h Handler) Handler {
 
 // Redirect replies to the request with a redirect to url,
 // which may be a path relative to the request path.
-func Redirect(w ResponseWriter, r *Request, urlStr string, code int) {
+func Redirect(w ResponseWriter, r *http.Request, urlStr string, code int) {
 	if u, err := url.Parse(urlStr); err == nil {
 		// If url was relative, make absolute by
 		// combining with request path.
@@ -802,7 +803,7 @@ type redirectHandler struct {
 	code int
 }
 
-func (rh *redirectHandler) ServeHTTP(w ResponseWriter, r *Request) {
+func (rh *redirectHandler) ServeHTTP(w ResponseWriter, r *http.Request) {
 	Redirect(w, r, rh.url, rh.code)
 }
 
@@ -900,7 +901,7 @@ func (mux *ServeMux) match(path string) Handler {
 }
 
 // handler returns the handler to use for the request r.
-func (mux *ServeMux) handler(r *Request) Handler {
+func (mux *ServeMux) handler(r *http.Request) Handler {
 	mux.mu.RLock()
 	defer mux.mu.RUnlock()
 
@@ -917,7 +918,7 @@ func (mux *ServeMux) handler(r *Request) Handler {
 
 // ServeHTTP dispatches the request to the handler whose
 // pattern most closely matches the request URL.
-func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *Request) {
+func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *http.Request) {
 	if r.Method != "CONNECT" {
 		// Clean path to canonical form and redirect.
 		if p := cleanPath(r.URL.Path); p != r.URL.Path {
@@ -957,7 +958,7 @@ func (mux *ServeMux) Handle(pattern string, handler Handler) {
 }
 
 // HandleFunc registers the handler function for the given pattern.
-func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *http.Request)) {
 	mux.Handle(pattern, HandlerFunc(handler))
 }
 
@@ -969,7 +970,7 @@ func Handle(pattern string, handler Handler) { DefaultServeMux.Handle(pattern, h
 // HandleFunc registers the handler function for the given pattern
 // in the DefaultServeMux.
 // The documentation for ServeMux explains how patterns are matched.
-func HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+func HandleFunc(pattern string, handler func(ResponseWriter, *http.Request)) {
 	DefaultServeMux.HandleFunc(pattern, handler)
 }
 
@@ -1110,7 +1111,7 @@ func (h *timeoutHandler) errorBody() string {
 	return "<html><head><title>Timeout</title></head><body><h1>Timeout</h1></body></html>"
 }
 
-func (h *timeoutHandler) ServeHTTP(w ResponseWriter, r *Request) {
+func (h *timeoutHandler) ServeHTTP(w ResponseWriter, r *http.Request) {
 	done := make(chan bool)
 	tw := &timeoutWriter{w: w}
 	go func() {
@@ -1139,7 +1140,7 @@ type timeoutWriter struct {
 	wroteHeader bool
 }
 
-func (tw *timeoutWriter) Header() Header {
+func (tw *timeoutWriter) Header() http.Header {
 	return tw.w.Header()
 }
 
