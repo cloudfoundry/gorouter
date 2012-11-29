@@ -12,7 +12,6 @@ package http
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -96,13 +95,12 @@ type Hijacker interface {
 
 // A conn represents the server side of an HTTP connection.
 type conn struct {
-	remoteAddr string               // network address of remote side
-	server     *Server              // the Server on which the connection arrived
-	rwc        net.Conn             // i/o connection
-	lr         *io.LimitedReader    // io.LimitReader(rwc)
-	buf        *bufio.ReadWriter    // buffered(lr,rwc), reading from bufio->limitReader->rwc
-	hijacked   bool                 // connection has been hijacked by handler
-	tlsState   *tls.ConnectionState // or nil when not using TLS
+	remoteAddr string            // network address of remote side
+	server     *Server           // the Server on which the connection arrived
+	rwc        net.Conn          // i/o connection
+	lr         *io.LimitedReader // io.LimitReader(rwc)
+	buf        *bufio.ReadWriter // buffered(lr,rwc), reading from bufio->limitReader->rwc
+	hijacked   bool              // connection has been hijacked by handler
 	body       []byte
 }
 
@@ -246,7 +244,6 @@ func (c *conn) readRequest() (w *response, err error) {
 	c.lr.N = noLimit
 
 	req.RemoteAddr = c.remoteAddr
-	req.TLS = c.tlsState
 
 	w = new(response)
 	w.conn = c
@@ -593,15 +590,6 @@ func (c *conn) serve() {
 			c.rwc.Close()
 		}
 	}()
-
-	if tlsConn, ok := c.rwc.(*tls.Conn); ok {
-		if err := tlsConn.Handshake(); err != nil {
-			c.close()
-			return
-		}
-		c.tlsState = new(tls.ConnectionState)
-		*c.tlsState = tlsConn.ConnectionState()
-	}
 
 	for {
 		w, err := c.readRequest()
@@ -1001,7 +989,6 @@ type Server struct {
 	ReadTimeout    time.Duration // maximum duration before timing out read of the request
 	WriteTimeout   time.Duration // maximum duration before timing out write of the response
 	MaxHeaderBytes int           // maximum size of request headers, DefaultMaxHeaderBytes if 0
-	TLSConfig      *tls.Config   // optional TLS config, used by ListenAndServeTLS
 }
 
 // ListenAndServe listens on the TCP network address srv.Addr and then
@@ -1089,77 +1076,6 @@ func (srv *Server) Serve(l net.Listener) error {
 func ListenAndServe(addr string, handler Handler) error {
 	server := &Server{Addr: addr, Handler: handler}
 	return server.ListenAndServe()
-}
-
-// ListenAndServeTLS acts identically to ListenAndServe, except that it
-// expects HTTPS connections. Additionally, files containing a certificate and
-// matching private key for the server must be provided. If the certificate
-// is signed by a certificate authority, the certFile should be the concatenation
-// of the server's certificate followed by the CA's certificate.
-//
-// A trivial example server is:
-//
-//	import (
-//		"log"
-//		"net/http"
-//	)
-//
-//	func handler(w http.ResponseWriter, req *http.Request) {
-//		w.Header().Set("Content-Type", "text/plain")
-//		w.Write([]byte("This is an example server.\n"))
-//	}
-//
-//	func main() {
-//		http.HandleFunc("/", handler)
-//		log.Printf("About to listen on 10443. Go to https://127.0.0.1:10443/")
-//		err := http.ListenAndServeTLS(":10443", "cert.pem", "key.pem", nil)
-//		if err != nil {
-//			log.Fatal(err)
-//		}
-//	}
-//
-// One can use generate_cert.go in crypto/tls to generate cert.pem and key.pem.
-func ListenAndServeTLS(addr string, certFile string, keyFile string, handler Handler) error {
-	server := &Server{Addr: addr, Handler: handler}
-	return server.ListenAndServeTLS(certFile, keyFile)
-}
-
-// ListenAndServeTLS listens on the TCP network address srv.Addr and
-// then calls Serve to handle requests on incoming TLS connections.
-//
-// Filenames containing a certificate and matching private key for
-// the server must be provided. If the certificate is signed by a
-// certificate authority, the certFile should be the concatenation
-// of the server's certificate followed by the CA's certificate.
-//
-// If srv.Addr is blank, ":https" is used.
-func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
-	addr := srv.Addr
-	if addr == "" {
-		addr = ":https"
-	}
-	config := &tls.Config{}
-	if srv.TLSConfig != nil {
-		*config = *srv.TLSConfig
-	}
-	if config.NextProtos == nil {
-		config.NextProtos = []string{"http/1.1"}
-	}
-
-	var err error
-	config.Certificates = make([]tls.Certificate, 1)
-	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return err
-	}
-
-	conn, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-
-	tlsListener := tls.NewListener(conn, config)
-	return srv.Serve(tlsListener)
 }
 
 // TimeoutHandler returns a Handler that runs h with the given time limit.
