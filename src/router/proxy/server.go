@@ -7,7 +7,7 @@
 // TODO(rsc):
 //	logging
 
-package http
+package proxy
 
 import (
 	"bufio"
