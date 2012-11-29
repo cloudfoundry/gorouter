@@ -152,7 +152,7 @@ func (w *response) ReadFrom(src io.Reader) (n int64, err error) {
 	// Call WriteHeader before checking w.chunking if it hasn't
 	// been called yet, since WriteHeader is what sets w.chunking.
 	if !w.wroteHeader {
-		w.WriteHeader(StatusOK)
+		w.WriteHeader(http.StatusOK)
 	}
 	if !w.chunking && w.bodyAllowed() && !w.needSniff {
 		w.Flush()
@@ -327,7 +327,7 @@ func (w *response) WriteHeader(code int) {
 		}
 	}
 
-	if code == StatusNotModified {
+	if code == http.StatusNotModified {
 		// Must not have body.
 		for _, header := range []string{"Content-Type", "Content-Length", "Transfer-Encoding"} {
 			if w.header.Get(header) != "" {
@@ -360,7 +360,7 @@ func (w *response) WriteHeader(code int) {
 		hasCL = false
 	}
 
-	if w.req.Method == "HEAD" || code == StatusNotModified {
+	if w.req.Method == "HEAD" || code == http.StatusNotModified {
 		// do nothing
 	} else if hasCL {
 		w.contentLength = contentLength
@@ -442,7 +442,7 @@ func (w *response) bodyAllowed() bool {
 	if !w.wroteHeader {
 		panic("")
 	}
-	return w.status != StatusNotModified && w.req.Method != "HEAD"
+	return w.status != http.StatusNotModified && w.req.Method != "HEAD"
 }
 
 func (w *response) Write(data []byte) (n int, err error) {
@@ -451,7 +451,7 @@ func (w *response) Write(data []byte) (n int, err error) {
 		return 0, ErrHijacked
 	}
 	if !w.wroteHeader {
-		w.WriteHeader(StatusOK)
+		w.WriteHeader(http.StatusOK)
 	}
 	if len(data) == 0 {
 		return 0, nil
@@ -528,7 +528,7 @@ func (w *response) finishRequest() {
 		}
 	}
 	if !w.wroteHeader {
-		w.WriteHeader(StatusOK)
+		w.WriteHeader(http.StatusOK)
 	}
 	if w.needSniff {
 		w.sniff()
@@ -556,7 +556,7 @@ func (w *response) finishRequest() {
 
 func (w *response) Flush() {
 	if !w.wroteHeader {
-		w.WriteHeader(StatusOK)
+		w.WriteHeader(http.StatusOK)
 	}
 	w.sniff()
 	w.conn.buf.Flush()
@@ -621,7 +621,7 @@ func (c *conn) serve() {
 			}
 			if req.ContentLength == 0 {
 				w.Header().Set("Connection", "close")
-				w.WriteHeader(StatusBadRequest)
+				w.WriteHeader(http.StatusBadRequest)
 				w.finishRequest()
 				break
 			}
@@ -640,7 +640,7 @@ func (c *conn) serve() {
 			// extension that it does not support, it MUST
 			// respond with a 417 (Expectation Failed) status."
 			w.Header().Set("Connection", "close")
-			w.WriteHeader(StatusExpectationFailed)
+			w.WriteHeader(http.StatusExpectationFailed)
 			w.finishRequest()
 			break
 		}
@@ -702,7 +702,7 @@ func Error(w ResponseWriter, error string, code int) {
 }
 
 // NotFound replies to the request with an HTTP 404 not found error.
-func NotFound(w ResponseWriter, r *http.Request) { Error(w, "404 page not found", StatusNotFound) }
+func NotFound(w ResponseWriter, r *http.Request) { Error(w, "404 page not found", http.StatusNotFound) }
 
 // NotFoundHandler returns a simple request handler
 // that replies to each request with a ``404 page not found'' reply.
@@ -923,7 +923,7 @@ func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *http.Request) {
 		// Clean path to canonical form and redirect.
 		if p := cleanPath(r.URL.Path); p != r.URL.Path {
 			w.Header().Set("Location", p)
-			w.WriteHeader(StatusMovedPermanently)
+			w.WriteHeader(http.StatusMovedPermanently)
 			return
 		}
 	}
@@ -953,7 +953,7 @@ func (mux *ServeMux) Handle(pattern string, handler Handler) {
 	// It can be overridden by an explicit registration.
 	n := len(pattern)
 	if n > 0 && pattern[n-1] == '/' && !mux.m[pattern[0:n-1]].explicit {
-		mux.m[pattern[0:n-1]] = muxEntry{h: RedirectHandler(pattern, StatusMovedPermanently)}
+		mux.m[pattern[0:n-1]] = muxEntry{h: RedirectHandler(pattern, http.StatusMovedPermanently)}
 	}
 }
 
@@ -1125,7 +1125,7 @@ func (h *timeoutHandler) ServeHTTP(w ResponseWriter, r *http.Request) {
 		tw.mu.Lock()
 		defer tw.mu.Unlock()
 		if !tw.wroteHeader {
-			tw.w.WriteHeader(StatusServiceUnavailable)
+			tw.w.WriteHeader(http.StatusServiceUnavailable)
 			tw.w.Write([]byte(h.errorBody()))
 		}
 		tw.timedOut = true
