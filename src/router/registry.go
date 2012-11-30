@@ -71,6 +71,10 @@ type Backend struct {
 	PrivateInstanceId string
 }
 
+func (b Backend) CanonicalAddr() string {
+	return fmt.Sprintf("%s:%d", b.Host, b.Port)
+}
+
 type registerMessage struct {
 	sync.Mutex
 

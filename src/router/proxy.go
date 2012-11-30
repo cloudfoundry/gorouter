@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -97,58 +96,53 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	e, ok := p.Lookup(req)
+	x, ok := p.Lookup(req)
 	if !ok {
 		rw.WriteHeader(http.StatusNotFound)
 		p.Varz.CaptureBadRequest(req)
 		return
 	}
 
-	p.Registry.CaptureBackendRequest(e, start)
-	p.Varz.CaptureBackendRequest(e, req)
+	p.Registry.CaptureBackendRequest(x, start)
+	p.Varz.CaptureBackendRequest(x, req)
 
-	outreq := new(http.Request)
-	*outreq = *req // includes shallow copies of maps, but okay
+	req.URL.Scheme = "http"
+	req.URL.Host = x.CanonicalAddr()
+	req.Proto = "HTTP/1.1"
+	req.ProtoMajor = 1
+	req.ProtoMinor = 1
 
-	outHost := fmt.Sprintf("%s:%d", e.Host, e.Port)
-	outreq.URL.Scheme = "http"
-	outreq.URL.Host = outHost
+	// Use a new connection for every request
+	// Keep-alive can be bolted on later, if we want to
+	req.Close = true
+	req.Header.Del("Connection")
 
-	outreq.Proto = "HTTP/1.1"
-	outreq.ProtoMajor = 1
-	outreq.ProtoMinor = 1
-	outreq.Close = false
-
-	// Remove the connection header to the backend.  We want a
-	// persistent connection, regardless of what the client sent
-	// to us.  This is modifying the same underlying map from req
-	// (shallow copied above) so we only copy it if necessary.
-	if outreq.Header.Get("Connection") != "" {
-		outreq.Header = make(http.Header)
-		copyHeader(outreq.Header, req.Header)
-		outreq.Header.Del("Connection")
+	// Add X-Forwarded-For
+	if host, _, err := net.SplitHostPort(req.RemoteAddr); err != nil {
+		req.Header.Add("X-Forwarded-For", host)
 	}
 
-	if clientIp, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		outreq.Header.Set("X-Forwarded-For", clientIp)
-	}
+	res, err := http.DefaultTransport.RoundTrip(req)
 
-	res, err := http.DefaultTransport.RoundTrip(outreq)
 	latency := time.Since(start)
 	if err != nil {
 		log.Errorf("http: proxy error: %v", err)
 		rw.WriteHeader(http.StatusInternalServerError)
-		p.Varz.CaptureBackendResponse(e, res, latency)
+		p.Varz.CaptureBackendResponse(x, res, latency)
 		return
 	}
 
-	p.Varz.CaptureBackendResponse(e, res, latency)
+	p.Varz.CaptureBackendResponse(x, res, latency)
 
-	copyHeader(rw.Header(), res.Header)
+	for k, vv := range res.Header {
+		for _, v := range vv {
+			rw.Header().Add(k, v)
+		}
+	}
 
 	if req.Header.Get(VcapTraceHeader) != "" {
 		rw.Header().Set(VcapRouterHeader, config.ip)
-		rw.Header().Set(VcapBackendHeader, outHost)
+		rw.Header().Set(VcapBackendHeader, x.CanonicalAddr())
 	}
 
 	needSticky := false
@@ -159,11 +153,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if needSticky && e.PrivateInstanceId != "" {
+	if needSticky && x.PrivateInstanceId != "" {
 		cookie := &http.Cookie{
 			Name:  VcapCookieId,
-			Value: e.PrivateInstanceId,
-			Path: "/",
+			Value: x.PrivateInstanceId,
+			Path:  "/",
 		}
 		http.SetCookie(rw, cookie)
 	}
@@ -174,24 +168,4 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var dst io.Writer = rw
 		io.Copy(dst, res.Body)
 	}
-}
-
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
-	}
-}
-
-func getUrl(req *http.Request) string {
-	host := req.Host
-
-	// Remove :<port>
-	i := strings.Index(host, ":")
-	if i >= 0 {
-		host = host[0:i]
-	}
-
-	return strings.ToLower(host)
 }
