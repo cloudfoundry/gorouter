@@ -44,11 +44,13 @@ type LogConfig struct {
 func InitConfigFromFile(configFile string) {
 	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
+		log.Fatal(err.Error())
 		panic(err)
 	}
 
 	err = goyaml.Unmarshal(configBytes, &config)
 	if err != nil {
+		log.Fatal(err.Error())
 		panic(err)
 	}
 
@@ -65,6 +67,7 @@ func SanitizeConfig(config *Config) *Config {
 	if config.Nats.URI != "" {
 		u, err := url.Parse(config.Nats.URI)
 		if err != nil {
+			log.Fatal(err.Error())
 			panic(err)
 		}
 
@@ -76,6 +79,7 @@ func SanitizeConfig(config *Config) *Config {
 	}
 
 	if config.Nats.Host == "" {
+		log.Fatal("nats server not configured")
 		panic("nats server not configured.")
 	}
 

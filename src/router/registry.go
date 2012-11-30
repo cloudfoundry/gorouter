@@ -148,6 +148,7 @@ func (r *Registry) registerUri(u Uri, i BackendId) {
 		x = make([]BackendId, 0)
 	} else {
 		if x.Has(i) {
+			// TODO: add Panic method to gosteno, then replace panic with gosteno.Panic
 			// The caller is expected to filter this
 			panic("list of backend ids already contains backend")
 		}

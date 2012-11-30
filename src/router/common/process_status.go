@@ -39,7 +39,11 @@ func NewProcessStatus() *ProcessStatus {
 }
 
 func (p *ProcessStatus) Update() {
-	syscall.Getrusage(syscall.RUSAGE_SELF, p.rusage)
+	e := syscall.Getrusage(syscall.RUSAGE_SELF, p.rusage)
+	if e != nil {
+		log.Error(e.Error())
+		return
+	}
 
 	p.MemRss = p.rusage.Maxrss
 
