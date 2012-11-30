@@ -163,6 +163,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		cookie := &http.Cookie{
 			Name:  VcapCookieId,
 			Value: e.PrivateInstanceId,
+			Path: "/",
 		}
 		http.SetCookie(rw, cookie)
 	}
