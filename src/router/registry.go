@@ -152,9 +152,8 @@ func (r *Registry) registerUri(u Uri, i BackendId) {
 		x = make([]BackendId, 0)
 	} else {
 		if x.Has(i) {
-			// TODO: add Panic method to gosteno, then replace panic with gosteno.Panic
 			// The caller is expected to filter this
-			panic("list of backend ids already contains backend")
+			log.Fatal("list of backend ids already contains backend")
 		}
 	}
 
@@ -198,13 +197,13 @@ func (r *Registry) unregisterUri(u Uri, i BackendId) {
 	x := r.byUri[u]
 	if x == nil {
 		// The caller bs expected to filter this
-		panic("no such uri")
+		log.Fatal("no such uri")
 	}
 
 	x, ok := x.Remove(i)
 	if !ok {
 		// The caller is expected to filter this
-		panic("list of backend ids already contains backend")
+		log.Fatal("list of backend ids already contains backend")
 	}
 
 	if len(x) == 0 {

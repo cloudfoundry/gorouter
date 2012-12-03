@@ -184,7 +184,6 @@ func host() string {
 	ip, err := vcap.LocalIP()
 	if err != nil {
 		log.Fatal(err.Error())
-		panic(err)
 	}
 
 	return fmt.Sprintf("%s:%d", ip, config.Status.Port)

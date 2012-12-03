@@ -435,3 +435,7 @@ func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string
 
 	return string(port)
 }
+
+func (s *RouterSuite) TestRouterRunErrors(c *C) {
+	c.Assert(func() { s.router.Run() }, PanicMatches, "net.Listen.*")
+}

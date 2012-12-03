@@ -81,7 +81,7 @@ func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {
 		}
 	}
 
-	panic("not reached")
+	log.Fatal("not reached")
 
 	return b, ok
 }
