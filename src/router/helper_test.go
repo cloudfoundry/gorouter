@@ -9,7 +9,7 @@ import (
 func Test(t *testing.T) {
 	config := &steno.Config{
 		Sinks: []steno.Sink{},
-		Codec: steno.JSON_CODEC,
+		Codec: steno.NewJsonCodec(),
 		Level: steno.LOG_INFO,
 	}
 

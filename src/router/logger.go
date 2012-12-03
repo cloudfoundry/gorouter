@@ -10,7 +10,7 @@ var log steno.Logger
 func init() {
 	stenoConfig := &steno.Config{
 		Sinks: []steno.Sink{steno.NewIOSink(os.Stderr)},
-		Codec: steno.JSON_CODEC,
+		Codec: steno.NewJsonCodec(),
 		Level: steno.LOG_ALL,
 	}
 
@@ -36,7 +36,7 @@ func SetupLogger() {
 
 	stenoConfig := &steno.Config{
 		Sinks: sinks,
-		Codec: steno.JSON_CODEC,
+		Codec: steno.NewJsonCodec(),
 		Level: level,
 	}
 
