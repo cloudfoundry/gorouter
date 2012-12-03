@@ -2,6 +2,7 @@ package router
 
 import (
 	"bytes"
+	"strings"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
@@ -100,6 +101,28 @@ func (s *RouterSuite) TestDiscover(c *C) {
 
 	c.Check(err, IsNil)
 	c.Check(match, Equals, true)
+}
+
+func (s *RouterSuite) TestXFF(c *C) {
+	var request http.Request
+	// dummy backend that records the request
+	app := NewTestApp([]Uri{"xff.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app.AddHandler("/", func (w http.ResponseWriter, r *http.Request) {
+		request = *r
+	})
+	app.Listen()
+	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+
+	// do shit
+	r, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", "xff.vcap.me", 8083), nil)
+	c.Assert(err, IsNil)
+	r.Header.Set("X-Forwarded-For", "1.2.3.4")
+	resp, err := http.DefaultClient.Do(r)
+	c.Assert(err, IsNil)
+	c.Check(resp.StatusCode, Equals, http.StatusOK)
+	c.Check(strings.HasPrefix(request.Header.Get("X-Forwarded-For"), "1.2.3.4, "), Equals, true)
+	app.Unregister()
+	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 }
 
 func (s *RouterSuite) waitMsgReceived(a *TestApp, r bool, t time.Duration) bool {

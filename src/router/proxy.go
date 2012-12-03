@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"strings"
 )
 
 const (
@@ -118,8 +119,15 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	req.Header.Del("Connection")
 
 	// Add X-Forwarded-For
-	if host, _, err := net.SplitHostPort(req.RemoteAddr); err != nil {
-		req.Header.Add("X-Forwarded-For", host)
+	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		// We assume there is a trusted upstream (L7 LB) that properly
+		// strips client's XFF header
+
+		// This is sloppy but fine since we don't share this request or
+		// headers. Otherwise we should copy the underlying header and
+		// append
+		xff := append(req.Header["X-Forwarded-For"], host)
+		req.Header.Set("X-Forwarded-For", strings.Join(xff, ", "))
 	}
 
 	res, err := http.DefaultTransport.RoundTrip(req)
