@@ -51,7 +51,12 @@ func (s *VarzSuite) TestEmptyUniqueVarz(c *C) {
 	v := s.Varz
 
 	members := []string{
-		"all",
+		"responses_2xx",
+		"responses_3xx",
+		"responses_4xx",
+		"responses_5xx",
+		"responses_xxx",
+		"latency",
 		"tags",
 		"urls",
 		"droplets",
@@ -60,10 +65,10 @@ func (s *VarzSuite) TestEmptyUniqueVarz(c *C) {
 		"top10_app_requests",
 	}
 
-	validateJsonMembers(v, members, c)
+	s.validateJsonMembers(v, members, c)
 }
 
-func validateJsonMembers(v interface{}, members []string, c *C) {
+func (s *VarzSuite) validateJsonMembers(v interface{}, members []string, c *C) {
 	b, e := json.Marshal(v)
 	c.Assert(e, IsNil)
 
@@ -76,17 +81,6 @@ func validateJsonMembers(v interface{}, members []string, c *C) {
 			c.Fatalf(`member "%s" not found`, k)
 		}
 	}
-}
-
-func readVarzMemberFromJson(v interface{}, k string, c *C) interface{} {
-	b, e := json.Marshal(v)
-	c.Assert(e, IsNil)
-
-	d := make(map[string]interface{})
-	e = json.Unmarshal(b, &d)
-	c.Assert(e, IsNil)
-
-	return d[k]
 }
 
 func (s *VarzSuite) TestUpdateBadRequests(c *C) {
@@ -104,10 +98,10 @@ func (s *VarzSuite) TestUpdateRequests(c *C) {
 	r := http.Request{}
 
 	s.CaptureBackendRequest(b, &r)
-	c.Assert(s.f("all", "requests"), Equals, float64(1))
+	c.Assert(s.f("requests"), Equals, float64(1))
 
 	s.CaptureBackendRequest(b, &r)
-	c.Assert(s.f("all", "requests"), Equals, float64(2))
+	c.Assert(s.f("requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
@@ -155,8 +149,8 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 	s.CaptureBackendResponse(b, r2, d)
 	s.CaptureBackendResponse(b, r2, d)
 
-	c.Assert(s.f("all", "responses_2xx"), Equals, float64(1))
-	c.Assert(s.f("all", "responses_4xx"), Equals, float64(2))
+	c.Assert(s.f("responses_2xx"), Equals, float64(1))
+	c.Assert(s.f("responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
@@ -210,9 +204,9 @@ func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
 
 	s.CaptureBackendResponse(b, r, d)
 
-	c.Assert(s.f("all", "latency", "50").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("all", "latency", "75").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("all", "latency", "90").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("all", "latency", "95").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("all", "latency", "99").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("latency", "50").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("latency", "75").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("latency", "90").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("latency", "95").(float64), Equals, float64(d)/float64(time.Second))
+	c.Assert(s.f("latency", "99").(float64), Equals, float64(d)/float64(time.Second))
 }

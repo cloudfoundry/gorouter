@@ -183,9 +183,12 @@ func (x *Varz) MarshalJSON() ([]byte, error) {
 
 	x.updateTop()
 
-	b, err := json.Marshal(x.varz)
+	d := make(map[string]interface{})
+	transform(x.varz.All, d)
+	transform(x.varz, d)
+	delete(d, "all")
 
-	return b, err
+	return json.Marshal(d)
 }
 
 func (x *Varz) updateTop() {
@@ -257,4 +260,21 @@ func (x *Varz) CaptureBackendResponse(b Backend, res *http.Response, d time.Dura
 	}
 
 	x.varz.All.CaptureResponse(res, d)
+}
+
+func transform(x interface{}, y map[string]interface{}) error {
+	var b []byte
+	var err error
+
+	b, err = json.Marshal(x)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(b, &y)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

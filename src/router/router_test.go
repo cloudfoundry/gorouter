@@ -198,13 +198,13 @@ func (s *RouterSuite) TestVarz(c *C) {
 	vB := s.readVarz()
 
 	// Verify varz update
-	RequestsA := int(f(vA, "all", "requests").(float64))
-	RequestsB := int(f(vB, "all", "requests").(float64))
+	RequestsA := int(f(vA, "requests").(float64))
+	RequestsB := int(f(vB, "requests").(float64))
 	allRequests := RequestsB - RequestsA
 	c.Check(allRequests, Equals, 100)
 
-	Responses2xxA := int(f(vA, "all", "responses_2xx").(float64))
-	Responses2xxB := int(f(vB, "all", "responses_2xx").(float64))
+	Responses2xxA := int(f(vA, "responses_2xx").(float64))
+	Responses2xxB := int(f(vB, "responses_2xx").(float64))
 	allResponses2xx := Responses2xxB - Responses2xxA
 	c.Check(allResponses2xx, Equals, 100)
 
