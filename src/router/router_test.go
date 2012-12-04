@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
@@ -101,7 +102,7 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	c.Check(match, Equals, true)
 }
 
-func waitMsgReceived(s *RouterSuite, a *TestApp, r bool, t time.Duration) bool {
+func (s *RouterSuite) waitMsgReceived(a *TestApp, r bool, t time.Duration) bool {
 	i := time.Millisecond * 50
 	m := int(t / i)
 
@@ -125,15 +126,16 @@ func waitMsgReceived(s *RouterSuite, a *TestApp, r bool, t time.Duration) bool {
 }
 
 func (s *RouterSuite) waitAppRegistered(app *TestApp, timeout time.Duration) bool {
-	return waitMsgReceived(s, app, true, timeout)
+	return s.waitMsgReceived(app, true, timeout)
 }
 
 func (s *RouterSuite) waitAppUnregistered(app *TestApp, timeout time.Duration) bool {
-	return waitMsgReceived(s, app, false, timeout)
+	return s.waitMsgReceived(app, false, timeout)
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app.AddHandler("/", greetHandler)
 	app.Listen()
 	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 
@@ -146,6 +148,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
 	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app.AddHandler("/", greetHandler)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -187,6 +190,7 @@ func f(x interface{}, s ...string) interface{} {
 
 func (s *RouterSuite) TestVarz(c *C) {
 	app := NewTestApp([]Uri{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
+	app.AddHandler("/", greetHandler)
 	app.Listen()
 
 	// Send seed request
@@ -225,6 +229,7 @@ func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*TestApp, 10)
 	for i := 0; i < len(apps); i++ {
 		apps[i] = NewTestApp([]Uri{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
+		apps[i].AddHandler("/sticky", stickyHandler(apps[i].port))
 		apps[i].Listen()
 	}
 
@@ -260,12 +265,50 @@ func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 	return resp.Body
 }
 
+func (s *RouterSuite) TestRouterRunErrors(c *C) {
+	c.Assert(func() { s.router.Run() }, PanicMatches, "net.Listen.*")
+}
+
+func (s *RouterSuite) TestProxyPutRequest(c *C) {
+	app := NewTestApp([]Uri{"greet.vcap.me"}, uint16(8083), s.natsClient, nil)
+
+	var rr *http.Request
+	var msg string
+	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+		rr = r
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		msg = string(b)
+	})
+	app.Listen()
+	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+
+	url := fmt.Sprintf("http://%s:%d/", app.urls[0], app.rPort)
+
+	buf := bytes.NewBufferString("foobar")
+	r, err := http.NewRequest("PUT", url, buf)
+	c.Assert(err, IsNil)
+
+	resp, err := http.DefaultClient.Do(r)
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusOK)
+
+	c.Assert(rr, NotNil)
+	c.Assert(rr.Method, Equals, "PUT")
+	c.Assert(rr.Proto, Equals, "HTTP/1.1")
+	c.Assert(msg, Equals, "foobar")
+}
+
 type TestApp struct {
 	port       uint16 // app listening port
 	rPort      uint16 // router listening port
 	urls       []Uri  // host registered host name
 	natsClient *nats.Client
 	tags       map[string]string
+	mux        *http.ServeMux
 }
 
 func NewTestApp(urls []Uri, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
@@ -279,18 +322,20 @@ func NewTestApp(urls []Uri, rPort uint16, natsClient *nats.Client, tags map[stri
 	app.natsClient = natsClient
 	app.tags = tags
 
+	app.mux = http.NewServeMux()
+
 	return app
 }
 
-func (a *TestApp) Listen() {
-	mux := http.NewServeMux()
+func (a *TestApp) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
+	a.mux.HandleFunc(path, handler)
+}
 
-	mux.HandleFunc("/", testHandler)
-	mux.HandleFunc("/sticky", stickyHandler(a.port))
+func (a *TestApp) Listen() {
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", a.port),
-		Handler: mux,
+		Handler: a.mux,
 	}
 
 	a.Register()
@@ -298,8 +343,7 @@ func (a *TestApp) Listen() {
 	go server.ListenAndServe()
 }
 
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(200)
+func greetHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello, world")
 }
 
@@ -310,8 +354,6 @@ func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
 			Value: "xxx",
 		}
 		http.SetCookie(w, cookie)
-		w.WriteHeader(200)
-
 		io.WriteString(w, fmt.Sprintf("%d", port))
 	}
 }
@@ -434,8 +476,4 @@ func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string
 	port, err = ioutil.ReadAll(resp.Body)
 
 	return string(port)
-}
-
-func (s *RouterSuite) TestRouterRunErrors(c *C) {
-	c.Assert(func() { s.router.Run() }, PanicMatches, "net.Listen.*")
 }
