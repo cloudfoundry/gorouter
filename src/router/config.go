@@ -18,6 +18,7 @@ type Config struct {
 	Log               LogConfig "logging"
 	FlushAppsInterval int       "flush_apps_interval,omitempty"
 	GoMaxProcs        int       "go_max_procs,omitempty"
+	ProxyWarmupTime   int       "proxy_warmup_time,omitempty"
 
 	ip string
 }

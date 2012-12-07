@@ -23,7 +23,7 @@ type Router struct {
 func NewRouter() *Router {
 	router := new(Router)
 
-	// setup no procs
+	// setup number of procs
 	if config.GoMaxProcs != 0 {
 		runtime.GOMAXPROCS(config.GoMaxProcs)
 	}
@@ -159,6 +159,10 @@ func (r *Router) Run() {
 	}
 
 	s := proxy.Server{Handler: r.proxy}
+	if config.ProxyWarmupTime != 0 {
+		log.Info("Warming up proxy server ...")
+		time.Sleep(time.Duration(config.ProxyWarmupTime) * time.Second)
+	}
 	err = s.Serve(l)
 	if err != nil {
 		log.Fatalf("proxy.Serve: %s", err)

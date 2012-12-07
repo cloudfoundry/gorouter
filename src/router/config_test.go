@@ -66,3 +66,13 @@ func (s *ConfigSuite) TestInitNatsWithAuth(c *C) {
 
 	c.Assert(config.Nats, Equals, NatsConfig{"nats://natsuser:natspass@localhost:4222", "localhost:4222", "natsuser", "natspass"})
 }
+
+func (s *ConfigSuite) TestInitFromFile(c *C) {
+	f := "config/router.yml"
+	InitConfigFromFile(f)
+
+	c.Assert(config.Port, Equals, uint16(8083))
+	c.Assert(config.FlushAppsInterval, Equals, 30)
+	c.Assert(config.GoMaxProcs, Equals, 8)
+	c.Assert(config.ProxyWarmupTime, Equals, 5)
+}
