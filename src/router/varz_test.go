@@ -19,6 +19,14 @@ func (s *VarzSuite) SetUpTest(c *C) {
 	s.Varz.Registry = NewRegistry()
 }
 
+// Extract value using key(s) from JSON data
+// For example, when extracting value from
+//       {
+//         "foo": { "bar" : 1 },
+//         "foobar": 2,
+//        }
+// f("foo", "bar") returns 1
+// f("foobar") returns 2
 func (s *VarzSuite) f(x ...string) interface{} {
 	var z interface{}
 	var ok bool
@@ -47,7 +55,7 @@ func (s *VarzSuite) f(x ...string) interface{} {
 	return z
 }
 
-func (s *VarzSuite) TestEmptyUniqueVarz(c *C) {
+func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 	v := s.Varz
 
 	members := []string{
@@ -57,18 +65,16 @@ func (s *VarzSuite) TestEmptyUniqueVarz(c *C) {
 		"responses_5xx",
 		"responses_xxx",
 		"latency",
+		"rate",
 		"tags",
 		"urls",
 		"droplets",
+		"requests",
 		"bad_requests",
 		"requests_per_sec",
 		"top10_app_requests",
 	}
 
-	s.validateJsonMembers(v, members, c)
-}
-
-func (s *VarzSuite) validateJsonMembers(v interface{}, members []string, c *C) {
 	b, e := json.Marshal(v)
 	c.Assert(e, IsNil)
 
