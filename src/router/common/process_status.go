@@ -30,7 +30,7 @@ func NewProcessStatus() *ProcessStatus {
 			case <-timer:
 				p.Update()
 			case <-p.stopSignal:
-				break
+				return
 			}
 		}
 	}()
@@ -41,8 +41,7 @@ func NewProcessStatus() *ProcessStatus {
 func (p *ProcessStatus) Update() {
 	e := syscall.Getrusage(syscall.RUSAGE_SELF, p.rusage)
 	if e != nil {
-		log.Error(e.Error())
-		return
+		log.Fatal(e.Error())
 	}
 
 	p.MemRss = p.rusage.Maxrss
