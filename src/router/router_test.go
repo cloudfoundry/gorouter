@@ -113,7 +113,6 @@ func (s *RouterSuite) TestXFF(c *C) {
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
-	// do shit
 	r, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", "xff.vcap.me", 8083), nil)
 	c.Assert(err, IsNil)
 	r.Header.Set("X-Forwarded-For", "1.2.3.4")
@@ -160,7 +159,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.AddHandler("/", greetHandler)
 	app.Listen()
-	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
+	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
 	app.VerifyAppStatus(200, c)
 
