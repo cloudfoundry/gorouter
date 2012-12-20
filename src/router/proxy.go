@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 const (

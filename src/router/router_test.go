@@ -2,7 +2,6 @@ package router
 
 import (
 	"bytes"
-	"strings"
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
@@ -13,6 +12,7 @@ import (
 	"regexp"
 	"router/common"
 	"router/common/spec"
+	"strings"
 	"time"
 )
 
@@ -107,7 +107,7 @@ func (s *RouterSuite) TestXFF(c *C) {
 	var request http.Request
 	// dummy backend that records the request
 	app := NewTestApp([]Uri{"xff.vcap.me"}, uint16(8083), s.natsClient, nil)
-	app.AddHandler("/", func (w http.ResponseWriter, r *http.Request) {
+	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		request = *r
 	})
 	app.Listen()
@@ -249,12 +249,15 @@ func (s *RouterSuite) TestVarz(c *C) {
 
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*TestApp, 10)
-	for i := 0; i < len(apps); i++ {
+	for i := range apps {
 		apps[i] = NewTestApp([]Uri{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
 		apps[i].AddHandler("/sticky", stickyHandler(apps[i].port))
 		apps[i].Listen()
 	}
 
+	for _, app := range apps {
+		c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
+	}
 	session, port1, path := getSessionAndAppPort("sticky.vcap.me", uint16(8083), c)
 	port2 := getAppPortWithSticky("sticky.vcap.me", uint16(8083), session, c)
 
