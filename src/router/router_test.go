@@ -215,6 +215,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 	app.AddHandler("/", greetHandler)
 	app.Listen()
 
+	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	// Send seed request
 	sendRequests("count.vcap.me", uint16(8083), 1)
 	vA := s.readVarz()
