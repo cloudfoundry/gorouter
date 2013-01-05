@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"router/common"
 	"router/common/spec"
+	"router/test"
 	"strings"
 	"time"
 )
@@ -106,7 +107,7 @@ func (s *RouterSuite) TestDiscover(c *C) {
 func (s *RouterSuite) TestXFF(c *C) {
 	var request http.Request
 	// dummy backend that records the request
-	app := NewTestApp([]Uri{"xff.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewTestApp([]string{"xff.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		request = *r
 	})
@@ -124,13 +125,13 @@ func (s *RouterSuite) TestXFF(c *C) {
 	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
 }
 
-func (s *RouterSuite) waitMsgReceived(a *TestApp, r bool, t time.Duration) bool {
+func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) bool {
 	i := time.Millisecond * 50
 	m := int(t / i)
 
 	for j := 0; j < m; j++ {
 		received := true
-		for _, v := range a.urls {
+		for _, v := range a.Urls() {
 			ms := s.router.registry.Lookup(&http.Request{Host: string(v)})
 			status := (ms != nil)
 			if status != r {
@@ -147,17 +148,16 @@ func (s *RouterSuite) waitMsgReceived(a *TestApp, r bool, t time.Duration) bool 
 	return false
 }
 
-func (s *RouterSuite) waitAppRegistered(app *TestApp, timeout time.Duration) bool {
+func (s *RouterSuite) waitAppRegistered(app *test.TestApp, timeout time.Duration) bool {
 	return s.waitMsgReceived(app, true, timeout)
 }
 
-func (s *RouterSuite) waitAppUnregistered(app *TestApp, timeout time.Duration) bool {
+func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Duration) bool {
 	return s.waitMsgReceived(app, false, timeout)
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
-	app.AddHandler("/", greetHandler)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -169,8 +169,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
-	app := NewTestApp([]Uri{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
-	app.AddHandler("/", greetHandler)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -211,8 +210,7 @@ func f(x interface{}, s ...string) interface{} {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := NewTestApp([]Uri{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
-	app.AddHandler("/", greetHandler)
+	app := test.NewGreetApp([]string{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
@@ -249,10 +247,9 @@ func (s *RouterSuite) TestVarz(c *C) {
 }
 
 func (s *RouterSuite) TestStickySession(c *C) {
-	apps := make([]*TestApp, 10)
+	apps := make([]*test.TestApp, 10)
 	for i := range apps {
-		apps[i] = NewTestApp([]Uri{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
-		apps[i].AddHandler("/sticky", stickyHandler(apps[i].port))
+		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
 		apps[i].Listen()
 	}
 
@@ -296,7 +293,7 @@ func (s *RouterSuite) TestRouterRunErrors(c *C) {
 }
 
 func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := NewTestApp([]Uri{"greet.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewTestApp([]string{"greet.vcap.me"}, uint16(8083), s.natsClient, nil)
 
 	var rr *http.Request
 	var msg string
@@ -312,7 +309,7 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
-	url := fmt.Sprintf("http://%s:%d/", app.urls[0], app.rPort)
+	url := app.Endpoint()
 
 	buf := bytes.NewBufferString("foobar")
 	r, err := http.NewRequest("PUT", url, buf)
@@ -326,123 +323,6 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 	c.Assert(rr.Method, Equals, "PUT")
 	c.Assert(rr.Proto, Equals, "HTTP/1.1")
 	c.Assert(msg, Equals, "foobar")
-}
-
-type TestApp struct {
-	port       uint16 // app listening port
-	rPort      uint16 // router listening port
-	urls       []Uri  // host registered host name
-	natsClient *nats.Client
-	tags       map[string]string
-	mux        *http.ServeMux
-}
-
-func NewTestApp(urls []Uri, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
-	app := new(TestApp)
-
-	port, _ := common.GrabEphemeralPort()
-
-	app.port = port
-	app.rPort = rPort
-	app.urls = urls
-	app.natsClient = natsClient
-	app.tags = tags
-
-	app.mux = http.NewServeMux()
-
-	return app
-}
-
-func (a *TestApp) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
-	a.mux.HandleFunc(path, handler)
-}
-
-func (a *TestApp) Listen() {
-
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", a.port),
-		Handler: a.mux,
-	}
-
-	a.Register()
-
-	go server.ListenAndServe()
-}
-
-func greetHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, world")
-}
-
-func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie := &http.Cookie{
-			Name:  "JSESSIONID",
-			Value: "xxx",
-		}
-		http.SetCookie(w, cookie)
-		io.WriteString(w, fmt.Sprintf("%d", port))
-	}
-}
-
-func (a *TestApp) Register() {
-	rm := registerMessage{
-		Host: "localhost",
-		Port: a.port,
-		Uris: a.urls,
-		Tags: a.tags,
-		Dea:  "dea",
-		App:  "0",
-
-		PrivateInstanceId: common.GenerateUUID(),
-	}
-
-	b, _ := json.Marshal(rm)
-	a.natsClient.Publish("router.register", b)
-}
-
-func (a *TestApp) Unregister() {
-	rm := registerMessage{
-		Host: "localhost",
-		Port: a.port,
-		Uris: a.urls,
-		Tags: nil,
-		Dea:  "dea",
-		App:  "0",
-	}
-
-	b, _ := json.Marshal(rm)
-	a.natsClient.Publish("router.unregister", b)
-}
-
-func (a *TestApp) VerifyAppStatus(status int, c *C) {
-	for _, url := range a.urls {
-		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
-		resp, err := http.Get(uri)
-		c.Assert(err, IsNil)
-		c.Check(resp.StatusCode, Equals, status)
-	}
-}
-
-func (a *TestApp) VerifyTraceHeader(c *C) {
-	var client http.Client
-	var req *http.Request
-	var resp *http.Response
-	var err error
-
-	routerIP, _ := common.LocalIP()
-
-	for _, url := range a.urls {
-		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
-
-		req, err = http.NewRequest("GET", uri, nil)
-		req.Header.Add(VcapTraceHeader, "anything")
-		resp, err = client.Do(req)
-
-		c.Assert(err, IsNil)
-		c.Check(resp.StatusCode, Equals, 200)
-		c.Check(resp.Header.Get(VcapBackendHeader), Equals, fmt.Sprintf("localhost:%d", a.port))
-		c.Check(resp.Header.Get(VcapRouterHeader), Equals, routerIP)
-	}
 }
 
 func sendRequests(url string, rPort uint16, times int) {

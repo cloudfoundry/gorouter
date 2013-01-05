@@ -1,0 +1,141 @@
+package test
+
+import (
+	"encoding/json"
+	"fmt"
+	nats "github.com/cloudfoundry/gonats"
+	. "launchpad.net/gocheck"
+	"net/http"
+	"router/common"
+)
+
+type TestApp struct {
+	port       uint16 // app listening port
+	rPort      uint16 // router listening port
+	urls       []string // host registered host name
+	natsClient *nats.Client
+	tags       map[string]string
+	mux        *http.ServeMux
+}
+
+func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
+	app := new(TestApp)
+
+	port, _ := common.GrabEphemeralPort()
+
+	app.port = port
+	app.rPort = rPort
+	app.urls = urls
+	app.natsClient = natsClient
+	app.tags = tags
+
+	app.mux = http.NewServeMux()
+
+	return app
+}
+
+func (a *TestApp) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
+	a.mux.HandleFunc(path, handler)
+}
+
+func (a *TestApp) Urls() []string {
+	return a.urls
+}
+
+func (a *TestApp) Endpoint() string {
+	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
+}
+
+func (a *TestApp) Listen() {
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", a.port),
+		Handler: a.mux,
+	}
+
+	a.Register()
+
+	go server.ListenAndServe()
+}
+
+func (a *TestApp) Register() {
+	rm := registerMessage{
+		Host: "localhost",
+		Port: a.port,
+		Uris: a.urls,
+		Tags: a.tags,
+		Dea:  "dea",
+		App:  "0",
+
+		PrivateInstanceId: common.GenerateUUID(),
+	}
+
+	b, _ := json.Marshal(rm)
+	a.natsClient.Publish("router.register", b)
+}
+
+func (a *TestApp) Unregister() {
+	rm := registerMessage{
+		Host: "localhost",
+		Port: a.port,
+		Uris: a.urls,
+		Tags: nil,
+		Dea:  "dea",
+		App:  "0",
+	}
+
+	b, _ := json.Marshal(rm)
+	a.natsClient.Publish("router.unregister", b)
+}
+
+func (a *TestApp) VerifyAppStatus(status int, c *C) {
+	for _, url := range a.urls {
+		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
+		resp, err := http.Get(uri)
+		c.Assert(err, IsNil)
+		c.Check(resp.StatusCode, Equals, status)
+	}
+}
+
+func (a *TestApp) VerifyTraceHeader(c *C) {
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+
+	routerIP, _ := common.LocalIP()
+
+	for _, url := range a.urls {
+		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
+
+		req, err = http.NewRequest("GET", uri, nil)
+		req.Header.Add(VcapTraceHeader, "anything")
+		resp, err = client.Do(req)
+
+		c.Assert(err, IsNil)
+		c.Check(resp.StatusCode, Equals, 200)
+		c.Check(resp.Header.Get(VcapBackendHeader), Equals, fmt.Sprintf("localhost:%d", a.port))
+		c.Check(resp.Header.Get(VcapRouterHeader), Equals, routerIP)
+	}
+}
+
+// Types imported from router
+const (
+	VcapBackendHeader = "X-Vcap-Backend"
+	VcapRouterHeader  = "X-Vcap-Router"
+	VcapTraceHeader   = "X-Vcap-Trace"
+
+	VcapCookieId    = "__VCAP_ID__"
+	StickyCookieKey = "JSESSIONID"
+)
+
+type registerMessage struct {
+	Host string            `json:"host"`
+	Port uint16            `json:"port"`
+	Uris []string          `json:"uris"`
+	Tags map[string]string `json:"tags"`
+	Dea  string            `json:"dea"`
+	App  string            `json:"app"`
+
+	PrivateInstanceId string `json:"private_instance_id"`
+}
