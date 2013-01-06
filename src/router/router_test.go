@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
+	"net"
 	"net/http"
 	"regexp"
 	"router/common"
@@ -323,6 +325,42 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 	c.Assert(rr.Method, Equals, "PUT")
 	c.Assert(rr.Proto, Equals, "HTTP/1.1")
 	c.Assert(msg, Equals, "foobar")
+}
+
+func (s *RouterSuite) Test100ContinueRequest(c *C) {
+	app := test.NewTestApp([]string{"foo.vcap.me"}, uint16(8083), s.natsClient, nil)
+	rCh := make(chan *http.Request)
+	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+		_, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		rCh <- r
+	})
+	app.Listen()
+	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+
+	conn, err := net.Dial("tcp", "foo.vcap.me:8083")
+	c.Assert(err, IsNil)
+	defer conn.Close()
+
+	fmt.Fprintf(conn, "POST / HTTP/1.1\r\n"+
+		"Host: foo.vcap.me:8083\r\n"+
+		"Connection: close\r\n"+
+		"Content-Length: 1\r\n"+
+		"Expect: 100-continue\r\n"+
+		"\r\n")
+
+	fmt.Fprintf(conn, "a")
+
+	buf := bufio.NewReader(conn)
+	line, err := buf.ReadString('\n')
+	c.Assert(err, IsNil)
+	c.Assert(strings.Contains(line, "100 Continue"), Equals, true)
+
+	rr := <-rCh
+	c.Assert(rr, NotNil)
+	c.Assert(rr.Header.Get("Expect"), Equals, "")
 }
 
 func sendRequests(url string, rPort uint16, times int) {
