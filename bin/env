@@ -1,6 +1,6 @@
 #!/bin/bash
 
-base=$(readlink -nf $(dirname $0)/..)
+base=$(dirname $0)/..
 
 export GOPATH=$base:$base/vendor
 
