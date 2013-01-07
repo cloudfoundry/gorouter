@@ -23,27 +23,31 @@ type RouterSuite struct {
 	natsServer *spec.NatsServer
 	natsClient *nats.Client
 	router     *Router
+	proxyPort  uint16
 }
 
 var _ = Suite(&RouterSuite{})
 
 func (s *RouterSuite) SetUpSuite(c *C) {
-	s.natsServer = spec.NewNatsServer(8089, "/tmp/router_nats_test.pid")
+	natsPort := nextAvailPort()
+	s.natsServer = spec.NewNatsServer(natsPort, "/tmp/router_nats_test.pid")
 	err := s.natsServer.Start()
 	c.Assert(err, IsNil)
 
+	s.proxyPort = nextAvailPort()
+	statusPort := nextAvailPort()
 	InitConfig(&Config{
-		Port:   8083,
+		Port:   s.proxyPort,
 		Index:  2,
-		Nats:   NatsConfig{URI: "nats://localhost:8089"},
-		Status: StatusConfig{8084, "user", "pass"},
+		Nats:   NatsConfig{URI: fmt.Sprintf("nats://localhost:%d", natsPort)},
+		Status: StatusConfig{statusPort, "user", "pass"},
 		Log:    LogConfig{"info", "/dev/null", ""},
 	})
 
 	s.router = NewRouter()
 	go s.router.Run()
 
-	s.natsClient = startNATS("localhost:8089", "", "")
+	s.natsClient = startNATS(fmt.Sprintf("localhost:%d", natsPort), "", "")
 }
 
 func (s *RouterSuite) TearDownSuite(c *C) {
@@ -109,14 +113,14 @@ func (s *RouterSuite) TestDiscover(c *C) {
 func (s *RouterSuite) TestXFF(c *C) {
 	var request http.Request
 	// dummy backend that records the request
-	app := test.NewTestApp([]string{"xff.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewTestApp([]string{"xff.vcap.me"}, s.proxyPort, s.natsClient, nil)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		request = *r
 	})
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
-	r, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", "xff.vcap.me", 8083), nil)
+	r, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", "xff.vcap.me", s.proxyPort), nil)
 	c.Assert(err, IsNil)
 	r.Header.Set("X-Forwarded-For", "1.2.3.4")
 	resp, err := http.DefaultClient.Do(r)
@@ -159,7 +163,7 @@ func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Durati
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, s.proxyPort, s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -171,7 +175,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestTraceHeader(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, s.proxyPort, s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -212,16 +216,16 @@ func f(x interface{}, s ...string) interface{} {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := test.NewGreetApp([]string{"count.vcap.me"}, uint16(8083), s.natsClient, map[string]string{"framework": "rails"})
+	app := test.NewGreetApp([]string{"count.vcap.me"}, s.proxyPort, s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	// Send seed request
-	sendRequests("count.vcap.me", uint16(8083), 1)
+	sendRequests("count.vcap.me", s.proxyPort, 1)
 	vA := s.readVarz()
 
 	// Send requests
-	sendRequests("count.vcap.me", uint16(8083), 100)
+	sendRequests("count.vcap.me", s.proxyPort, 100)
 	vB := s.readVarz()
 
 	// Verify varz update
@@ -251,15 +255,15 @@ func (s *RouterSuite) TestVarz(c *C) {
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*test.TestApp, 10)
 	for i := range apps {
-		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, uint16(8083), s.natsClient, nil)
+		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.proxyPort, s.natsClient, nil)
 		apps[i].Listen()
 	}
 
 	for _, app := range apps {
 		c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	}
-	session, port1, path := getSessionAndAppPort("sticky.vcap.me", uint16(8083), c)
-	port2 := getAppPortWithSticky("sticky.vcap.me", uint16(8083), session, c)
+	session, port1, path := getSessionAndAppPort("sticky.vcap.me", s.proxyPort, c)
+	port2 := getAppPortWithSticky("sticky.vcap.me", s.proxyPort, session, c)
 
 	c.Check(port1, Equals, port2)
 	c.Check(path, Equals, "/")
@@ -295,7 +299,7 @@ func (s *RouterSuite) TestRouterRunErrors(c *C) {
 }
 
 func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := test.NewTestApp([]string{"greet.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewTestApp([]string{"greet.vcap.me"}, s.proxyPort, s.natsClient, nil)
 
 	var rr *http.Request
 	var msg string
@@ -328,7 +332,7 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 }
 
 func (s *RouterSuite) Test100ContinueRequest(c *C) {
-	app := test.NewTestApp([]string{"foo.vcap.me"}, uint16(8083), s.natsClient, nil)
+	app := test.NewTestApp([]string{"foo.vcap.me"}, s.proxyPort, s.natsClient, nil)
 	rCh := make(chan *http.Request)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := ioutil.ReadAll(r.Body)
@@ -340,16 +344,17 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
-	conn, err := net.Dial("tcp", "foo.vcap.me:8083")
+	host := fmt.Sprintf("foo.vcap.me:%d", s.proxyPort)
+	conn, err := net.Dial("tcp", host)
 	c.Assert(err, IsNil)
 	defer conn.Close()
 
 	fmt.Fprintf(conn, "POST / HTTP/1.1\r\n"+
-		"Host: foo.vcap.me:8083\r\n"+
+		"Host: %s\r\n"+
 		"Connection: close\r\n"+
 		"Content-Length: 1\r\n"+
 		"Expect: 100-continue\r\n"+
-		"\r\n")
+		"\r\n", host)
 
 	fmt.Fprintf(conn, "a")
 
@@ -420,4 +425,12 @@ func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string
 	port, err = ioutil.ReadAll(resp.Body)
 
 	return string(port)
+}
+
+func nextAvailPort() uint16 {
+	p, e := common.GrabEphemeralPort()
+	if e != nil {
+		panic(e)
+	}
+	return p
 }
