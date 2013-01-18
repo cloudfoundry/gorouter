@@ -53,16 +53,16 @@ func InitConfigFromFile(configFile string) {
 		log.Fatal(err.Error())
 	}
 
-	SanitizeConfig(&config)
+	sanitizeConfig(&config)
 }
 
 func InitConfig(c *Config) {
-	SanitizeConfig(c)
-
 	config = *c
+
+	sanitizeConfig(&config)
 }
 
-func SanitizeConfig(config *Config) *Config {
+func sanitizeConfig(config *Config) {
 	if config.Nats.URI != "" {
 		u, err := url.Parse(config.Nats.URI)
 		if err != nil {
@@ -80,7 +80,9 @@ func SanitizeConfig(config *Config) *Config {
 		log.Fatal("nats server not configured")
 	}
 
-	config.ip, _ = vcap.LocalIP()
-
-	return config
+	var err error
+	config.ip, err = vcap.LocalIP()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
