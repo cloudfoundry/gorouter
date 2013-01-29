@@ -139,7 +139,7 @@ func NewRegistry() *Registry {
 	r.tracker = list.New()
 	r.trackerIndexes = make(map[BackendId]*list.Element)
 	r.maxStaleAge = time.Second * 120
-	go r.checkAndPurge()
+	go r.checkAndPrune()
 
 	return r
 }
@@ -275,7 +275,7 @@ func (r *Registry) removeFromTracker(m *registerMessage) {
 	delete(r.trackerIndexes, m.BackendId())
 }
 
-func (r *Registry) purgeStaleDroplets() {
+func (r *Registry) pruneStaleDroplets() {
 	for r.tracker.Len() > 0 {
 		f := r.tracker.Front()
 		rr := f.Value.(*registerMessage)
@@ -286,24 +286,24 @@ func (r *Registry) purgeStaleDroplets() {
 
 		delete(r.trackerIndexes, rr.BackendId())
 		r.tracker.Remove(f)
-		log.Infof("Purged stale droplet: %v ", rr)
+		log.Infof("Pruned stale droplet: %v ", rr)
 	}
 }
 
-func (r *Registry) PurgeStaleDroplets() {
+func (r *Registry) PruneStaleDroplets() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.purgeStaleDroplets()
+	r.pruneStaleDroplets()
 }
 
-func (r *Registry) checkAndPurge() {
+func (r *Registry) checkAndPrune() {
 	tick := time.Tick(StalesCheckInterval)
 	for {
 		select {
 		case <-tick:
-			log.Info("Start to check and purge stale droplets")
-			r.PurgeStaleDroplets()
+			log.Info("Start to check and prune stale droplets")
+			r.PruneStaleDroplets()
 		}
 	}
 }

@@ -189,7 +189,7 @@ func (s *RegistrySuite) TestTracker(c *C) {
 	c.Assert(s.trackerIndexes, HasLen, 0)
 }
 
-func (s *RegistrySuite) TestPurgeStaleApps(c *C) {
+func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.maxStaleAge = time.Millisecond * 250
 
 	s.Register(fooReg)
@@ -200,7 +200,7 @@ func (s *RegistrySuite) TestPurgeStaleApps(c *C) {
 	c.Assert(s.trackerIndexes, HasLen, 2)
 
 	time.Sleep(time.Millisecond * 300)
-	s.PurgeStaleDroplets()
+	s.PruneStaleDroplets()
 
 	s.Register(bar2Reg)
 
