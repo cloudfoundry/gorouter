@@ -44,7 +44,7 @@ func (p *ProcessStatus) Update() {
 		log.Fatal(e.Error())
 	}
 
-	p.MemRss = p.rusage.Maxrss
+	p.MemRss = int64(p.rusage.Maxrss)
 
 	t := p.rusage.Utime.Nano() + p.rusage.Stime.Nano()
 	p.CpuUsage = float64(t-p.lastCpuTime) / float64(RefreshInterval.Nanoseconds())
