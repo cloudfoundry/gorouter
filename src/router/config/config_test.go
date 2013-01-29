@@ -97,22 +97,22 @@ func (s *ConfigSuite) TestConfig(c *C) {
 port: 8082
 index: 1
 
-flush_apps_interval: 1
 go_max_procs: 2
 
 publish_start_message_interval: 1
 prune_stale_droplets_interval: 2
 droplet_stale_threshold: 3
+publish_active_apps_interval: 4
 `)
 
 	c.Check(s.Port, Equals, uint16(8081))
 	c.Check(s.Index, Equals, uint(0))
-	c.Check(s.FlushAppsInterval, Equals, 0)
 	c.Check(s.GoMaxProcs, Equals, 8)
 
 	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 30*time.Second)
 	c.Check(s.DropletStaleThreshold, Equals, 120*time.Second)
+	c.Check(s.PublishActiveAppsInterval, Equals, 0*time.Second)
 
 	goyaml.Unmarshal(b, &s.Config)
 
@@ -120,10 +120,10 @@ droplet_stale_threshold: 3
 
 	c.Check(s.Port, Equals, uint16(8082))
 	c.Check(s.Index, Equals, uint(1))
-	c.Check(s.FlushAppsInterval, Equals, 1)
 	c.Check(s.GoMaxProcs, Equals, 2)
 
 	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 2*time.Second)
 	c.Check(s.DropletStaleThreshold, Equals, 3*time.Second)
+	c.Check(s.PublishActiveAppsInterval, Equals, 4*time.Second)
 }

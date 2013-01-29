@@ -135,20 +135,20 @@ func (r *Router) flushApps(t time.Time) {
 }
 
 func (r *Router) ScheduleFlushApps() {
-	if r.config.FlushAppsInterval == 0 {
+	if r.config.PublishActiveAppsInterval == 0 {
 		return
 	}
 
 	go func() {
-		t := time.NewTicker(time.Duration(r.config.FlushAppsInterval) * time.Second)
-		n := time.Now()
+		t := time.NewTicker(r.config.PublishActiveAppsInterval)
+		x := time.Now()
 
 		for {
 			select {
 			case <-t.C:
-				n_ := time.Now()
-				r.flushApps(n)
-				n = n_
+				y := time.Now()
+				r.flushApps(x)
+				x = y
 			}
 		}
 	}()

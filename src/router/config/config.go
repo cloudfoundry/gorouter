@@ -52,17 +52,18 @@ type Config struct {
 	Port  uint16 "port"
 	Index uint   "index"
 
-	FlushAppsInterval int "flush_apps_interval,omitempty"
-	GoMaxProcs        int "go_max_procs,omitempty"
+	GoMaxProcs int "go_max_procs,omitempty"
 
 	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
 	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
+	PublishActiveAppsIntervalInSeconds   int "publish_active_apps_interval"
 
 	// These fields are populated by the `Process` function.
 	PublishStartMessageInterval time.Duration
 	PruneStaleDropletsInterval  time.Duration
 	DropletStaleThreshold       time.Duration
+	PublishActiveAppsInterval   time.Duration
 
 	Ip string
 }
@@ -75,12 +76,12 @@ var defaultConfig = Config{
 	Port:  8081,
 	Index: 0,
 
-	FlushAppsInterval: 0, // Disabled
-	GoMaxProcs:        8,
+	GoMaxProcs: 8,
 
 	PublishStartMessageIntervalInSeconds: 30,
 	PruneStaleDropletsIntervalInSeconds:  30,
 	DropletStaleThresholdInSeconds:       120,
+	PublishActiveAppsIntervalInSeconds:   0,
 }
 
 func DefaultConfig() *Config {
@@ -110,6 +111,7 @@ func (c *Config) Process() {
 	c.PublishStartMessageInterval = time.Duration(c.PublishStartMessageIntervalInSeconds) * time.Second
 	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second
 	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
+	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
 
 	c.Ip, err = vcap.LocalIP()
 	if err != nil {
