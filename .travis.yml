@@ -1,0 +1,3 @@
+language: go
+
+script: bin/go test router -gocheck.v=true
