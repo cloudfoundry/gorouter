@@ -298,12 +298,14 @@ func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
 	req, err = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = client.Do(req)
 	c.Check(err, IsNil)
+	c.Assert(resp, Not(IsNil))
 	c.Check(resp.StatusCode, Equals, 401)
 
 	// varz Basic auth
 	req.SetBasicAuth(user, pass)
 	resp, err = client.Do(req)
 	c.Check(err, IsNil)
+	c.Assert(resp, Not(IsNil))
 	c.Check(resp.StatusCode, Equals, 200)
 
 	return resp.Body
