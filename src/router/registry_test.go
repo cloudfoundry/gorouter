@@ -3,6 +3,7 @@ package router
 import (
 	. "launchpad.net/gocheck"
 	"net/http"
+	"router/config"
 	"time"
 )
 
@@ -49,7 +50,12 @@ var bar2Reg = &registerMessage{
 }
 
 func (s *RegistrySuite) SetUpTest(c *C) {
-	s.Registry = NewRegistry()
+	var x *config.Config
+
+	x = config.DefaultConfig()
+	x.DropletStaleThreshold = 1
+
+	s.Registry = NewRegistry(x)
 }
 
 func (s *RegistrySuite) TestRegister(c *C) {
@@ -190,8 +196,6 @@ func (s *RegistrySuite) TestTracker(c *C) {
 }
 
 func (s *RegistrySuite) TestPruneStaleApps(c *C) {
-	s.maxStaleAge = time.Millisecond * 250
-
 	s.Register(fooReg)
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
@@ -199,7 +203,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	c.Assert(s.tracker.Len(), Equals, 2)
 	c.Assert(s.trackerIndexes, HasLen, 2)
 
-	time.Sleep(time.Millisecond * 300)
+	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
 	s.PruneStaleDroplets()
 
 	s.Register(bar2Reg)

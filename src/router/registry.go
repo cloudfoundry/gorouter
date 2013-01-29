@@ -4,13 +4,12 @@ import (
 	"container/list"
 	"fmt"
 	"net/http"
+	"router/config"
 	"router/stats"
 	"strings"
 	"sync"
 	"time"
 )
-
-const StalesCheckInterval = time.Second * 120
 
 type Uri string
 type Uris []Uri
@@ -124,10 +123,12 @@ type Registry struct {
 
 	tracker        *list.List
 	trackerIndexes map[BackendId]*list.Element
-	maxStaleAge    time.Duration
+
+	pruneStaleDropletsInterval time.Duration
+	dropletStaleThreshold      time.Duration
 }
 
-func NewRegistry() *Registry {
+func NewRegistry(c *config.Config) *Registry {
 	r := &Registry{}
 
 	r.ActiveApps = stats.NewActiveApps()
@@ -138,7 +139,10 @@ func NewRegistry() *Registry {
 
 	r.tracker = list.New()
 	r.trackerIndexes = make(map[BackendId]*list.Element)
-	r.maxStaleAge = time.Second * 120
+
+	r.pruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsInterval) * time.Second
+	r.dropletStaleThreshold = time.Duration(c.DropletStaleThreshold) * time.Second
+
 	go r.checkAndPrune()
 
 	return r
@@ -279,7 +283,7 @@ func (r *Registry) pruneStaleDroplets() {
 	for r.tracker.Len() > 0 {
 		f := r.tracker.Front()
 		rr := f.Value.(*registerMessage)
-		if rr.time.Add(r.maxStaleAge).After(time.Now()) {
+		if rr.time.Add(r.dropletStaleThreshold).After(time.Now()) {
 			break
 		}
 		r.unregister(rr)
@@ -298,7 +302,7 @@ func (r *Registry) PruneStaleDroplets() {
 }
 
 func (r *Registry) checkAndPrune() {
-	tick := time.Tick(StalesCheckInterval)
+	tick := time.Tick(r.pruneStaleDropletsInterval)
 	for {
 		select {
 		case <-tick:

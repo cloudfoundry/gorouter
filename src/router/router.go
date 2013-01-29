@@ -38,7 +38,8 @@ func NewRouter(c *config.Config) *Router {
 	// setup varz
 	r.varz = NewVarz()
 
-	r.registry = NewRegistry()
+	r.registry = NewRegistry(r.config)
+
 	r.proxy = &Proxy{
 		Config:   r.config,
 		Varz:     r.varz,
@@ -165,7 +166,7 @@ func (r *Router) SendStartMessage() {
 	r.natsClient.Publish("router.start", b)
 
 	go func() {
-		t := time.NewTicker(30 * time.Second)
+		t := time.NewTicker(time.Duration(r.config.PublishStartMessageInterval) * time.Second)
 
 		for {
 			select {

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"router/config"
 	"strconv"
 	"testing"
 )
@@ -11,7 +12,7 @@ const (
 )
 
 func BenchmarkRegister(b *testing.B) {
-	p := NewProxy(NewVarz(), NewRegistry())
+	p := NewProxy(NewVarz(), NewRegistry(config.DefaultConfig()))
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)

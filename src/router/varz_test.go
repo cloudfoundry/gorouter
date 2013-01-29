@@ -5,6 +5,7 @@ import (
 	"fmt"
 	. "launchpad.net/gocheck"
 	"net/http"
+	"router/config"
 	"time"
 )
 
@@ -16,7 +17,7 @@ var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
 	s.Varz = NewVarz()
-	s.Varz.Registry = NewRegistry()
+	s.Varz.Registry = NewRegistry(config.DefaultConfig())
 }
 
 // Extract value using key(s) from JSON data

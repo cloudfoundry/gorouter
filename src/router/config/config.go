@@ -55,6 +55,10 @@ type Config struct {
 	GoMaxProcs        int "go_max_procs,omitempty"
 	ProxyWarmupTime   int "proxy_warmup_time,omitempty"
 
+	PublishStartMessageInterval int "publish_start_message_interval"
+	PruneStaleDropletsInterval  int "prune_stale_droplets_interval"
+	DropletStaleThreshold       int "droplet_stale_threshold"
+
 	Ip string
 }
 
@@ -69,6 +73,10 @@ var defaultConfig = Config{
 	FlushAppsInterval: 0, // Disabled
 	GoMaxProcs:        8,
 	ProxyWarmupTime:   15,
+
+	PublishStartMessageInterval: 30,
+	PruneStaleDropletsInterval:  30,
+	DropletStaleThreshold:       120,
 }
 
 func DefaultConfig() *Config {
