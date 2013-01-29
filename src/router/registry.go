@@ -3,6 +3,7 @@ package router
 import (
 	"container/list"
 	"fmt"
+	steno "github.com/cloudfoundry/gosteno"
 	"net/http"
 	"router/config"
 	"router/stats"
@@ -115,6 +116,8 @@ func (m *registerMessage) Equals(n *registerMessage) bool {
 type Registry struct {
 	sync.RWMutex
 
+	steno.Logger
+
 	*stats.ActiveApps
 	*stats.TopApps
 
@@ -130,6 +133,8 @@ type Registry struct {
 
 func NewRegistry(c *config.Config) *Registry {
 	r := &Registry{}
+
+	r.Logger = steno.NewLogger("registry")
 
 	r.ActiveApps = stats.NewActiveApps()
 	r.TopApps = stats.NewTopApps()
@@ -171,9 +176,11 @@ func (r *Registry) registerUri(u Uri, i BackendId) {
 	} else {
 		if x.Has(i) {
 			// The caller is expected to filter this
-			log.Fatal("list of backend ids already contains backend")
+			log.Fatal("List of backend ids already contains backend")
 		}
 	}
+
+	r.Debugf("Register %s (%s)", u, i)
 
 	x = append(x, i)
 	r.byUri[u] = x
@@ -221,14 +228,16 @@ func (r *Registry) unregisterUri(u Uri, i BackendId) {
 	x := r.byUri[u]
 	if x == nil {
 		// The caller bs expected to filter this
-		log.Fatal("no such uri")
+		log.Fatal("No such uri")
 	}
 
 	x, ok := x.Remove(i)
 	if !ok {
 		// The caller is expected to filter this
-		log.Fatal("list of backend ids already contains backend")
+		log.Fatal("List of backend ids already contains backend")
 	}
+
+	r.Debugf("Unregister %s (%s)", u, i)
 
 	if len(x) == 0 {
 		delete(r.byUri, u)
