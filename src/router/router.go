@@ -153,6 +153,29 @@ func (r *Router) ScheduleFlushApps() {
 	}()
 }
 
+func (r *Router) SendStartMessage() {
+	d := map[string]string{"id": vcap.GenerateUUID()}
+
+	b, err := json.Marshal(d)
+	if err != nil {
+		panic(err)
+	}
+
+	// Send start message once at start
+	r.natsClient.Publish("router.start", b)
+
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+
+		for {
+			select {
+			case <-t.C:
+				r.natsClient.Publish("router.start", b)
+			}
+		}
+	}()
+}
+
 func (r *Router) Run() {
 	var err error
 
@@ -160,8 +183,8 @@ func (r *Router) Run() {
 	r.SubscribeRegister()
 	r.SubscribeUnregister()
 
-	// Start message
-	r.natsClient.Publish("router.start", []byte(""))
+	// Kickstart sending start messages
+	r.SendStartMessage()
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
