@@ -14,12 +14,14 @@ import (
 	"regexp"
 	"router/common"
 	"router/common/spec"
+	"router/config"
 	"router/test"
 	"strings"
 	"time"
 )
 
 type RouterSuite struct {
+	Config     *config.Config
 	natsServer *spec.NatsServer
 	natsClient *nats.Client
 	router     *Router
@@ -36,15 +38,28 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 
 	s.proxyPort = nextAvailPort()
 	statusPort := nextAvailPort()
-	InitConfig(&Config{
-		Port:   s.proxyPort,
-		Index:  2,
-		Nats:   NatsConfig{URI: fmt.Sprintf("nats://localhost:%d", natsPort)},
-		Status: StatusConfig{statusPort, "user", "pass"},
-		Log:    LogConfig{"info", "/dev/null", ""},
-	})
 
-	s.router = NewRouter()
+	s.Config = config.DefaultConfig()
+
+	s.Config.Port = s.proxyPort
+	s.Config.Index = 2
+
+	s.Config.Status = config.StatusConfig{
+		Port: statusPort,
+		User: "user",
+		Pass: "pass",
+	}
+
+	s.Config.Nats = config.NatsConfig{
+		Host: fmt.Sprintf("localhost:%d", natsPort),
+	}
+
+	s.Config.Logging = config.LoggingConfig{
+		File:  "/dev/null",
+		Level: "info",
+	}
+
+	s.router = NewRouter(s.Config)
 	go s.router.Run()
 
 	s.natsClient = startNATS(fmt.Sprintf("localhost:%d", natsPort), "", "")

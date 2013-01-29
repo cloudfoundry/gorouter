@@ -3,6 +3,7 @@ package router
 import (
 	steno "github.com/cloudfoundry/gosteno"
 	"os"
+	"router/config"
 )
 
 var log steno.Logger
@@ -18,26 +19,27 @@ func init() {
 	log = steno.NewLogger("init")
 }
 
-func SetupLogger() {
-	level, err := steno.GetLogLevel(config.Log.Level)
+func SetupLoggerFromConfig(c *config.Config) {
+	l, err := steno.GetLogLevel(c.Logging.Level)
 	if err != nil {
 		panic(err)
 	}
 
-	sinks := make([]steno.Sink, 0)
-	if config.Log.File != "" {
-		sinks = append(sinks, steno.NewFileSink(config.Log.File))
+	s := make([]steno.Sink, 0)
+	if c.Logging.File != "" {
+		s = append(s, steno.NewFileSink(c.Logging.File))
 	} else {
-		sinks = append(sinks, steno.NewIOSink(os.Stdout))
+		s = append(s, steno.NewIOSink(os.Stdout))
 	}
-	if config.Log.Syslog != "" {
-		sinks = append(sinks, steno.NewSyslogSink(config.Log.Syslog))
+
+	if c.Logging.Syslog != "" {
+		s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
 	}
 
 	stenoConfig := &steno.Config{
-		Sinks: sinks,
+		Sinks: s,
 		Codec: steno.NewJsonCodec(),
-		Level: level,
+		Level: l,
 	}
 
 	steno.Init(stenoConfig)

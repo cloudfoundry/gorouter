@@ -3,19 +3,24 @@ package main
 import (
 	"flag"
 	"router"
+	"router/config"
 )
 
 var configFile string
 
 func init() {
-	flag.StringVar(&configFile, "c", "config/router.yml", "Configuration File")
+	flag.StringVar(&configFile, "c", "", "Configuration File")
 
 	flag.Parse()
 }
 
 func main() {
-	router.InitConfigFromFile(configFile)
-	router.SetupLogger()
+	c := config.DefaultConfig()
+	if configFile != "" {
+		c = config.InitConfigFromFile(configFile)
+	}
 
-	router.NewRouter().Run()
+	router.SetupLoggerFromConfig(c)
+
+	router.NewRouter(c).Run()
 }

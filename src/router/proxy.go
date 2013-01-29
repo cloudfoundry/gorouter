@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"router/config"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ const (
 
 type Proxy struct {
 	sync.RWMutex
+
+	*config.Config
 	*Registry
 	*Varz
 }
@@ -149,7 +152,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Header.Get(VcapTraceHeader) != "" {
-		rw.Header().Set(VcapRouterHeader, config.ip)
+		rw.Header().Set(VcapRouterHeader, p.Config.Ip)
 		rw.Header().Set(VcapBackendHeader, x.CanonicalAddr())
 	}
 

@@ -8,55 +8,68 @@ import (
 	nats "github.com/cloudfoundry/gonats"
 	"net"
 	vcap "router/common"
+	"router/config"
 	"router/proxy"
 	"runtime"
 	"time"
 )
 
 type Router struct {
+	config     *config.Config
 	proxy      *Proxy
 	natsClient *nats.Client
 	varz       *Varz
 	registry   *Registry
 }
 
-func NewRouter() *Router {
-	router := new(Router)
+func NewRouter(c *config.Config) *Router {
+	r := &Router{
+		config: c,
+	}
 
 	// setup number of procs
-	if config.GoMaxProcs != 0 {
-		runtime.GOMAXPROCS(config.GoMaxProcs)
+	if r.config.GoMaxProcs != 0 {
+		runtime.GOMAXPROCS(r.config.GoMaxProcs)
 	}
 
 	// setup nats
-	router.natsClient = startNATS(config.Nats.Host, config.Nats.User, config.Nats.Pass)
+	r.natsClient = startNATS(r.config.Nats.Host, r.config.Nats.User, r.config.Nats.Pass)
 
 	// setup varz
-	router.varz = NewVarz()
+	r.varz = NewVarz()
 
-	router.registry = NewRegistry()
-	router.proxy = NewProxy(router.varz, router.registry)
+	r.registry = NewRegistry()
+	r.proxy = &Proxy{
+		Config:   r.config,
+		Varz:     r.varz,
+		Registry: r.registry,
+	}
 
-	router.varz.Registry = router.registry
+	r.varz.Registry = r.registry
 
 	varz := &vcap.Varz{
-		UniqueVarz: router.varz,
+		UniqueVarz: r.varz,
+	}
+
+	var host string
+	if r.config.Status.Port != 0 {
+		host = fmt.Sprintf("%s:%d", r.config.Ip, r.config.Status.Port)
 	}
 
 	component := &vcap.VcapComponent{
 		Type:        "Router",
-		Index:       config.Index,
-		Host:        host(),
-		Credentials: []string{config.Status.User, config.Status.Password},
-		Config:      config,
+		Index:       r.config.Index,
+		Host:        host,
+		Credentials: []string{r.config.Status.User, r.config.Status.Pass},
+		Config:      r.config,
 		Logger:      log,
 		Varz:        varz,
 		Healthz:     "ok",
 	}
 
-	vcap.Register(component, router.natsClient)
+	vcap.Register(component, r.natsClient)
 
-	return router
+	return r
 }
 
 func (r *Router) SubscribeRegister() {
@@ -121,12 +134,12 @@ func (r *Router) flushApps(t time.Time) {
 }
 
 func (r *Router) ScheduleFlushApps() {
-	if config.FlushAppsInterval == 0 {
+	if r.config.FlushAppsInterval == 0 {
 		return
 	}
 
 	go func() {
-		t := time.NewTicker(time.Duration(config.FlushAppsInterval) * time.Second)
+		t := time.NewTicker(time.Duration(r.config.FlushAppsInterval) * time.Second)
 		n := time.Now()
 
 		for {
@@ -153,15 +166,15 @@ func (r *Router) Run() {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
 		log.Fatalf("net.Listen: %s", err)
 	}
 
 	s := proxy.Server{Handler: r.proxy}
-	if config.ProxyWarmupTime != 0 {
+	if r.config.ProxyWarmupTime != 0 {
 		log.Info("Warming up proxy server ...")
-		time.Sleep(time.Duration(config.ProxyWarmupTime) * time.Second)
+		time.Sleep(time.Duration(r.config.ProxyWarmupTime) * time.Second)
 	}
 	err = s.Serve(l)
 	if err != nil {
@@ -178,17 +191,4 @@ func startNATS(host, user, pass string) *nats.Client {
 	}()
 
 	return c
-}
-
-func host() string {
-	if config.Status.Port == 0 {
-		return ""
-	}
-
-	ip, err := vcap.LocalIP()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	return fmt.Sprintf("%s:%d", ip, config.Status.Port)
 }

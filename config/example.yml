@@ -1,0 +1,22 @@
+status:
+  port: 8082
+  user:
+  pass:
+
+nats:
+  uri: "nats://localhost:4222"
+  host:
+  user:
+  pass:
+
+logging:
+  file:
+  syslog:
+  level: debug
+
+port: 8081
+index: 0
+
+flush_apps_interval: 0
+go_max_procs: 8
+proxy_warmup_time: 15
