@@ -54,7 +54,6 @@ type Config struct {
 
 	FlushAppsInterval int "flush_apps_interval,omitempty"
 	GoMaxProcs        int "go_max_procs,omitempty"
-	ProxyWarmupTime   int "proxy_warmup_time,omitempty"
 
 	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
@@ -78,7 +77,6 @@ var defaultConfig = Config{
 
 	FlushAppsInterval: 0, // Disabled
 	GoMaxProcs:        8,
-	ProxyWarmupTime:   15,
 
 	PublishStartMessageIntervalInSeconds: 30,
 	PruneStaleDropletsIntervalInSeconds:  30,

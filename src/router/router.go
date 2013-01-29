@@ -195,11 +195,17 @@ func (r *Router) Run() {
 		log.Fatalf("net.Listen: %s", err)
 	}
 
-	s := proxy.Server{Handler: r.proxy}
-	if r.config.ProxyWarmupTime != 0 {
-		log.Info("Warming up proxy server ...")
-		time.Sleep(time.Duration(r.config.ProxyWarmupTime) * time.Second)
+	// Wait for one start message send interval, such that the router's registry
+	// can be populated before serving requests.
+	if r.config.PublishStartMessageInterval != 0 {
+		log.Infof("Waiting %s before listening...", r.config.PublishStartMessageInterval)
+		time.Sleep(r.config.PublishStartMessageInterval)
 	}
+
+	log.Infof("Listening on %s", l.Addr())
+
+	s := proxy.Server{Handler: r.proxy}
+
 	err = s.Serve(l)
 	if err != nil {
 		log.Fatalf("proxy.Serve: %s", err)
