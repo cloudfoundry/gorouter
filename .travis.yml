@@ -1,3 +1,5 @@
 language: common
 
-script: bin/go test router -gocheck.v=true
+script:
+  - gem install nats
+  - bin/go test router -gocheck.v=true
