@@ -1,5 +1,3 @@
-language: go
-
-install:
+language: common
 
 script: bin/go test router -gocheck.v=true
