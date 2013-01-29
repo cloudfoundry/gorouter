@@ -18,6 +18,8 @@ func LocalIP() (string, error) {
 		return "", err
 	}
 
+	defer conn.Close()
+
 	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
 	if err != nil {
 		return "", err
