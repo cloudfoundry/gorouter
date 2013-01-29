@@ -140,8 +140,8 @@ func NewRegistry(c *config.Config) *Registry {
 	r.tracker = list.New()
 	r.trackerIndexes = make(map[BackendId]*list.Element)
 
-	r.pruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsInterval) * time.Second
-	r.dropletStaleThreshold = time.Duration(c.DropletStaleThreshold) * time.Second
+	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
+	r.dropletStaleThreshold = c.DropletStaleThreshold
 
 	go r.checkAndPrune()
 

@@ -3,6 +3,7 @@ package config
 import (
 	. "launchpad.net/gocheck"
 	"launchpad.net/goyaml"
+	"time"
 )
 
 type ConfigSuite struct {
@@ -111,11 +112,13 @@ droplet_stale_threshold: 3
 	c.Check(s.GoMaxProcs, Equals, 8)
 	c.Check(s.ProxyWarmupTime, Equals, 15)
 
-	c.Check(s.PublishStartMessageInterval, Equals, 30)
-	c.Check(s.PruneStaleDropletsInterval, Equals, 30)
-	c.Check(s.DropletStaleThreshold, Equals, 120)
+	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
+	c.Check(s.PruneStaleDropletsInterval, Equals, 30*time.Second)
+	c.Check(s.DropletStaleThreshold, Equals, 120*time.Second)
 
 	goyaml.Unmarshal(b, &s.Config)
+
+	s.Config.Process()
 
 	c.Check(s.Port, Equals, uint16(8082))
 	c.Check(s.Index, Equals, uint(1))
@@ -123,7 +126,7 @@ droplet_stale_threshold: 3
 	c.Check(s.GoMaxProcs, Equals, 2)
 	c.Check(s.ProxyWarmupTime, Equals, 3)
 
-	c.Check(s.PublishStartMessageInterval, Equals, 1)
-	c.Check(s.PruneStaleDropletsInterval, Equals, 2)
-	c.Check(s.DropletStaleThreshold, Equals, 3)
+	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
+	c.Check(s.PruneStaleDropletsInterval, Equals, 2*time.Second)
+	c.Check(s.DropletStaleThreshold, Equals, 3*time.Second)
 }

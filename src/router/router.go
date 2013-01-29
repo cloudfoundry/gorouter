@@ -166,7 +166,7 @@ func (r *Router) SendStartMessage() {
 	r.natsClient.Publish("router.start", b)
 
 	go func() {
-		t := time.NewTicker(time.Duration(r.config.PublishStartMessageInterval) * time.Second)
+		t := time.NewTicker(r.config.PublishStartMessageInterval)
 
 		for {
 			select {

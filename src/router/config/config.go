@@ -5,6 +5,7 @@ import (
 	"launchpad.net/goyaml"
 	"net/url"
 	vcap "router/common"
+	"time"
 )
 
 type StatusConfig struct {
@@ -55,9 +56,14 @@ type Config struct {
 	GoMaxProcs        int "go_max_procs,omitempty"
 	ProxyWarmupTime   int "proxy_warmup_time,omitempty"
 
-	PublishStartMessageInterval int "publish_start_message_interval"
-	PruneStaleDropletsInterval  int "prune_stale_droplets_interval"
-	DropletStaleThreshold       int "droplet_stale_threshold"
+	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
+	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
+	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
+
+	// These fields are populated by the `Process` function.
+	PublishStartMessageInterval time.Duration
+	PruneStaleDropletsInterval  time.Duration
+	DropletStaleThreshold       time.Duration
 
 	Ip string
 }
@@ -74,9 +80,9 @@ var defaultConfig = Config{
 	GoMaxProcs:        8,
 	ProxyWarmupTime:   15,
 
-	PublishStartMessageInterval: 30,
-	PruneStaleDropletsInterval:  30,
-	DropletStaleThreshold:       120,
+	PublishStartMessageIntervalInSeconds: 30,
+	PruneStaleDropletsIntervalInSeconds:  30,
+	DropletStaleThresholdInSeconds:       120,
 }
 
 func DefaultConfig() *Config {
@@ -102,6 +108,10 @@ func (c *Config) Process() {
 			c.Nats.Pass, _ = u.User.Password()
 		}
 	}
+
+	c.PublishStartMessageInterval = time.Duration(c.PublishStartMessageIntervalInSeconds) * time.Second
+	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second
+	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
 
 	c.Ip, err = vcap.LocalIP()
 	if err != nil {
