@@ -2,4 +2,4 @@ language: common
 
 script:
   - gem install nats
-  - bin/go test router -gocheck.v=true
+  - bin/test
