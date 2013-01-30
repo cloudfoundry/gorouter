@@ -47,6 +47,11 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	// Hardcode the IP to localhost to avoid leaving the machine while running tests
 	s.Config.Ip = "127.0.0.1"
 
+	s.Config.PublishStartMessageInterval = 10 * time.Millisecond
+	s.Config.PruneStaleDropletsInterval = 10 * time.Millisecond
+	s.Config.DropletStaleThreshold = 1 * time.Second
+	s.Config.PublishActiveAppsInterval = 0
+
 	s.Config.Status = config.StatusConfig{
 		Port: statusPort,
 		User: "user",
