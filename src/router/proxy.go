@@ -103,6 +103,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	x, ok := p.Lookup(req)
 	if !ok {
 		rw.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(rw, "%d %s", http.StatusNotFound, http.StatusText(http.StatusNotFound))
 		p.Varz.CaptureBadRequest(req)
 		return
 	}
@@ -136,9 +137,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	res, err := http.DefaultTransport.RoundTrip(req)
 
 	latency := time.Since(start)
+
 	if err != nil {
-		log.Errorf("http: proxy error: %v", err)
-		rw.WriteHeader(http.StatusInternalServerError)
+		log.Warnf("Error from upstream: %s", err)
+		rw.WriteHeader(http.StatusBadGateway)
+		fmt.Fprintf(rw, "%d %s", http.StatusBadGateway, http.StatusText(http.StatusBadGateway))
 		p.Varz.CaptureBackendResponse(x, res, latency)
 		return
 	}
