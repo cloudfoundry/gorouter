@@ -10,8 +10,8 @@ import (
 )
 
 type TestApp struct {
-	port       uint16 // app listening port
-	rPort      uint16 // router listening port
+	port       uint16   // app listening port
+	rPort      uint16   // router listening port
 	urls       []string // host registered host name
 	natsClient *nats.Client
 	tags       map[string]string
@@ -47,7 +47,6 @@ func (a *TestApp) Endpoint() string {
 }
 
 func (a *TestApp) Listen() {
-
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", a.port),
 		Handler: a.mux,
