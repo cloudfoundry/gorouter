@@ -29,7 +29,7 @@ func (s *BasicAuthSuite) Bootstrap(x Authenticator) *http.Request {
 
 	z := &http.Server{Handler: y}
 
-	l, err := net.Listen("tcp", "127.0.0.1:")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(err)
 	}
