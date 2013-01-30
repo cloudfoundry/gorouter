@@ -94,10 +94,10 @@ func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 	r := http.Request{}
 
 	s.CaptureBadRequest(&r)
-	c.Assert(s.f("bad_requests"), Equals, float64(1))
+	c.Check(s.f("bad_requests"), Equals, float64(1))
 
 	s.CaptureBadRequest(&r)
-	c.Assert(s.f("bad_requests"), Equals, float64(2))
+	c.Check(s.f("bad_requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {
@@ -105,10 +105,10 @@ func (s *VarzSuite) TestUpdateRequests(c *C) {
 	r := http.Request{}
 
 	s.CaptureBackendRequest(b, &r)
-	c.Assert(s.f("requests"), Equals, float64(1))
+	c.Check(s.f("requests"), Equals, float64(1))
 
 	s.CaptureBackendRequest(b, &r)
-	c.Assert(s.f("requests"), Equals, float64(2))
+	c.Check(s.f("requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
@@ -134,10 +134,10 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 	s.CaptureBackendRequest(b1, &r1)
 	s.CaptureBackendRequest(b2, &r2)
 
-	c.Assert(s.f("tags", "component", "cc", "requests"), Equals, float64(2))
-	c.Assert(s.f("tags", "runtime", "ruby18", "requests"), Equals, float64(2))
-	c.Assert(s.f("tags", "framework", "sinatra", "requests"), Equals, float64(1))
-	c.Assert(s.f("tags", "framework", "rails", "requests"), Equals, float64(1))
+	c.Check(s.f("tags", "component", "cc", "requests"), Equals, float64(2))
+	c.Check(s.f("tags", "runtime", "ruby18", "requests"), Equals, float64(2))
+	c.Check(s.f("tags", "framework", "sinatra", "requests"), Equals, float64(1))
+	c.Check(s.f("tags", "framework", "rails", "requests"), Equals, float64(1))
 }
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
@@ -156,8 +156,8 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 	s.CaptureBackendResponse(b, r2, d)
 	s.CaptureBackendResponse(b, r2, d)
 
-	c.Assert(s.f("responses_2xx"), Equals, float64(1))
-	c.Assert(s.f("responses_4xx"), Equals, float64(2))
+	c.Check(s.f("responses_2xx"), Equals, float64(1))
+	c.Check(s.f("responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
@@ -191,14 +191,14 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	s.CaptureBackendResponse(b2, r2, d)
 	s.CaptureBackendResponse(b2, r2, d)
 
-	c.Assert(s.f("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
-	c.Assert(s.f("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
-	c.Assert(s.f("tags", "runtime", "ruby18", "responses_2xx"), Equals, float64(1))
-	c.Assert(s.f("tags", "runtime", "ruby18", "responses_4xx"), Equals, float64(2))
-	c.Assert(s.f("tags", "framework", "sinatra", "responses_2xx"), Equals, float64(1))
-	c.Assert(s.f("tags", "framework", "sinatra", "responses_4xx"), Equals, float64(0))
-	c.Assert(s.f("tags", "framework", "rails", "responses_2xx"), Equals, float64(0))
-	c.Assert(s.f("tags", "framework", "rails", "responses_4xx"), Equals, float64(2))
+	c.Check(s.f("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
+	c.Check(s.f("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
+	c.Check(s.f("tags", "runtime", "ruby18", "responses_2xx"), Equals, float64(1))
+	c.Check(s.f("tags", "runtime", "ruby18", "responses_4xx"), Equals, float64(2))
+	c.Check(s.f("tags", "framework", "sinatra", "responses_2xx"), Equals, float64(1))
+	c.Check(s.f("tags", "framework", "sinatra", "responses_4xx"), Equals, float64(0))
+	c.Check(s.f("tags", "framework", "rails", "responses_2xx"), Equals, float64(0))
+	c.Check(s.f("tags", "framework", "rails", "responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
@@ -211,9 +211,9 @@ func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
 
 	s.CaptureBackendResponse(b, r, d)
 
-	c.Assert(s.f("latency", "50").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("latency", "75").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("latency", "90").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("latency", "95").(float64), Equals, float64(d)/float64(time.Second))
-	c.Assert(s.f("latency", "99").(float64), Equals, float64(d)/float64(time.Second))
+	c.Check(s.f("latency", "50").(float64), Equals, float64(d)/float64(time.Second))
+	c.Check(s.f("latency", "75").(float64), Equals, float64(d)/float64(time.Second))
+	c.Check(s.f("latency", "90").(float64), Equals, float64(d)/float64(time.Second))
+	c.Check(s.f("latency", "95").(float64), Equals, float64(d)/float64(time.Second))
+	c.Check(s.f("latency", "99").(float64), Equals, float64(d)/float64(time.Second))
 }
