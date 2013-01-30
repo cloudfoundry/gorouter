@@ -2,4 +2,6 @@ language: common
 
 script:
   - gem install nats
+  - bin/go version
+  - bin/go env
   - bin/test
