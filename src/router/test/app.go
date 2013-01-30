@@ -102,8 +102,6 @@ func (a *TestApp) VerifyTraceHeader(c *C) {
 	var resp *http.Response
 	var err error
 
-	routerIP, _ := common.LocalIP()
-
 	for _, url := range a.urls {
 		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
 
@@ -114,7 +112,7 @@ func (a *TestApp) VerifyTraceHeader(c *C) {
 		c.Assert(err, IsNil)
 		c.Check(resp.StatusCode, Equals, 200)
 		c.Check(resp.Header.Get(VcapBackendHeader), Equals, fmt.Sprintf("localhost:%d", a.port))
-		c.Check(resp.Header.Get(VcapRouterHeader), Equals, routerIP)
+		c.Check(resp.Header.Get(VcapRouterHeader), Equals, "127.0.0.1")
 	}
 }
 

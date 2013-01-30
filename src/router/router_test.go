@@ -44,6 +44,9 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	s.Config.Port = s.proxyPort
 	s.Config.Index = 2
 
+	// Hardcode the IP to localhost to avoid leaving the machine while running tests
+	s.Config.Ip = "127.0.0.1"
+
 	s.Config.Status = config.StatusConfig{
 		Port: statusPort,
 		User: "user",
