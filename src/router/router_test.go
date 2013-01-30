@@ -48,8 +48,8 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	s.Config.Ip = "127.0.0.1"
 
 	s.Config.PublishStartMessageInterval = 10 * time.Millisecond
-	s.Config.PruneStaleDropletsInterval = 10 * time.Millisecond
-	s.Config.DropletStaleThreshold = 1 * time.Second
+	s.Config.PruneStaleDropletsInterval = 0
+	s.Config.DropletStaleThreshold = 0
 	s.Config.PublishActiveAppsInterval = 0
 
 	s.Config.Status = config.StatusConfig{
@@ -244,11 +244,11 @@ func (s *RouterSuite) TestVarz(c *C) {
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	// Send seed request
-	sendRequests("count.vcap.me", s.proxyPort, 1)
+	sendRequests(c, "count.vcap.me", s.proxyPort, 1)
 	vA := s.readVarz()
 
 	// Send requests
-	sendRequests("count.vcap.me", s.proxyPort, 100)
+	sendRequests(c, "count.vcap.me", s.proxyPort, 100)
 	vB := s.readVarz()
 
 	// Verify varz update
@@ -393,11 +393,16 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	c.Assert(rr.Header.Get("Expect"), Equals, "")
 }
 
-func sendRequests(url string, rPort uint16, times int) {
+func sendRequests(c *C, url string, rPort uint16, times int) {
 	uri := fmt.Sprintf("http://%s:%d", url, rPort)
 
 	for i := 0; i < times; i++ {
-		http.Get(uri)
+		r, err := http.Get(uri)
+		if err != nil {
+			panic(err)
+		}
+
+		c.Check(r.StatusCode, Equals, http.StatusOK)
 	}
 }
 

@@ -311,6 +311,10 @@ func (r *Registry) PruneStaleDroplets() {
 }
 
 func (r *Registry) checkAndPrune() {
+	if r.pruneStaleDropletsInterval == 0 {
+		return
+	}
+
 	tick := time.Tick(r.pruneStaleDropletsInterval)
 	for {
 		select {
