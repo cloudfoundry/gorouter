@@ -161,14 +161,6 @@ type Varz interface {
 	CaptureBackendResponse(b Backend, res *http.Response, d time.Duration)
 }
 
-type NullVarz struct{}
-
-func (_ NullVarz) MarshalJSON() ([]byte, error) { return json.Marshal(nil) }
-
-func (_ NullVarz) CaptureBadRequest(req *http.Request)                                   {}
-func (_ NullVarz) CaptureBackendRequest(b Backend, req *http.Request)                    {}
-func (_ NullVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {}
-
 type RealVarz struct {
 	sync.Mutex
 	r *Registry

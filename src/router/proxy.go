@@ -90,6 +90,20 @@ func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
+		hj := rw.(http.Hijacker)
+
+		c, brw, err := hj.Hijack()
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Fprintf(brw, "HTTP/1.0 400 Bad Request\r\n\r\n")
+		brw.Flush()
+		c.Close()
+		return
+	}
+
 	start := time.Now()
 
 	// Return 200 OK for heartbeats from LB
@@ -112,9 +126,6 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	req.URL.Scheme = "http"
 	req.URL.Host = x.CanonicalAddr()
-	req.Proto = "HTTP/1.1"
-	req.ProtoMajor = 1
-	req.ProtoMinor = 1
 
 	// Use a new connection for every request
 	// Keep-alive can be bolted on later, if we want to
