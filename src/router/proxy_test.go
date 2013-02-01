@@ -42,6 +42,16 @@ func newConn(x net.Conn, c *C) *conn {
 	}
 }
 
+func (x *conn) ReadRequest() (*http.Request, string) {
+	req, err := http.ReadRequest(x.br)
+	x.c.Assert(err, IsNil)
+
+	b, err := ioutil.ReadAll(req.Body)
+	x.c.Assert(err, IsNil)
+
+	return req, string(b)
+}
+
 func (x *conn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, urlStr, body)
 	x.c.Assert(err, IsNil)
@@ -292,4 +302,45 @@ func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
 	resp, body := x.ReadResponse()
 	s.Check(resp.StatusCode, Equals, http.StatusBadGateway)
 	s.Check(body, Equals, "502 Bad Gateway")
+}
+
+func (s *ProxySuite) TestXFFIsAdded(c *C) {
+	s.C = c
+
+	done := make(chan bool)
+
+	s.RegisterHandler("app", func(x *conn) {
+		req, _ := x.ReadRequest()
+		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "127.0.0.1")
+		done <- true
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "app"
+	x.WriteRequest(req)
+
+	<-done
+}
+
+func (s *ProxySuite) TestXFFIsAppended(c *C) {
+	s.C = c
+
+	done := make(chan bool)
+
+	s.RegisterHandler("app", func(x *conn) {
+		req, _ := x.ReadRequest()
+		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "1.2.3.4, 127.0.0.1")
+		done <- true
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "app"
+	req.Header.Add("X-Forwarded-For", "1.2.3.4")
+	x.WriteRequest(req)
+
+	<-done
 }

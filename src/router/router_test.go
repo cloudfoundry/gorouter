@@ -133,27 +133,6 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	c.Check(match, Equals, true)
 }
 
-func (s *RouterSuite) TestXFF(c *C) {
-	var request http.Request
-	// dummy backend that records the request
-	app := test.NewTestApp([]string{"xff.vcap.me"}, s.proxyPort, s.natsClient, nil)
-	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		request = *r
-	})
-	app.Listen()
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
-
-	r, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", "xff.vcap.me", s.proxyPort), nil)
-	c.Assert(err, IsNil)
-	r.Header.Set("X-Forwarded-For", "1.2.3.4")
-	resp, err := http.DefaultClient.Do(r)
-	c.Assert(err, IsNil)
-	c.Check(resp.StatusCode, Equals, http.StatusOK)
-	c.Check(strings.HasPrefix(request.Header.Get("X-Forwarded-For"), "1.2.3.4, "), Equals, true)
-	app.Unregister()
-	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
-}
-
 func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) bool {
 	i := time.Millisecond * 50
 	m := int(t / i)
