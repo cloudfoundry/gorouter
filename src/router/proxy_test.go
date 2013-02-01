@@ -3,6 +3,8 @@ package router
 import (
 	"bufio"
 	"encoding/json"
+	"io"
+	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
@@ -37,6 +39,28 @@ func newConn(x net.Conn, c *C) *conn {
 		Reader: bufio.NewReader(x),
 		Writer: bufio.NewWriter(x),
 	}
+}
+
+func (x *conn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
+	req, err := http.NewRequest(method, urlStr, body)
+	x.c.Assert(err, IsNil)
+	return req
+}
+
+func (x *conn) WriteRequest(req *http.Request) {
+	err := req.Write(x)
+	x.c.Assert(err, IsNil)
+	x.Flush()
+}
+
+func (x *conn) ReadResponse() (*http.Response, string) {
+	resp, err := http.ReadResponse(x.Reader, &http.Request{})
+	x.c.Assert(err, IsNil)
+
+	b, err := ioutil.ReadAll(resp.Body)
+	x.c.Assert(err, IsNil)
+
+	return resp, string(b)
 }
 
 func (x *conn) CheckLine(expected string) {
@@ -221,4 +245,17 @@ func (s *ProxySuite) TestDoesNotRespondToUnsupportedHttp(c *C) {
 	})
 
 	x.CheckLine("HTTP/1.0 400 Bad Request")
+}
+
+func (s *ProxySuite) TestRespondsToLoadBalancerCheck(c *C) {
+	s.C = c
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+	x.WriteRequest(req)
+
+	_, body := x.ReadResponse()
+	s.Check(body, Equals, "ok\n")
 }
