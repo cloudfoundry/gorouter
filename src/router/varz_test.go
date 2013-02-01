@@ -10,14 +10,14 @@ import (
 )
 
 type VarzSuite struct {
-	*Varz
+	Varz
 }
 
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
-	s.Varz = NewVarz()
-	s.Varz.Registry = NewRegistry(config.DefaultConfig())
+	r := NewRegistry(config.DefaultConfig())
+	s.Varz = NewVarz(r)
 }
 
 // Extract value using key(s) from JSON data

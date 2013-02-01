@@ -18,8 +18,8 @@ type Router struct {
 	config     *config.Config
 	proxy      *Proxy
 	natsClient *nats.Client
-	varz       *Varz
 	registry   *Registry
+	varz       Varz
 }
 
 func NewRouter(c *config.Config) *Router {
@@ -35,18 +35,9 @@ func NewRouter(c *config.Config) *Router {
 	// setup nats
 	r.natsClient = startNATS(r.config.Nats.Host, r.config.Nats.User, r.config.Nats.Pass)
 
-	// setup varz
-	r.varz = NewVarz()
-
 	r.registry = NewRegistry(r.config)
-
-	r.proxy = &Proxy{
-		Config:   r.config,
-		Varz:     r.varz,
-		Registry: r.registry,
-	}
-
-	r.varz.Registry = r.registry
+	r.varz = NewVarz(r.registry)
+	r.proxy = NewProxy(r.registry, r.varz)
 
 	varz := &vcap.Varz{
 		UniqueVarz: r.varz,

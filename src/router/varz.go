@@ -33,10 +33,18 @@ type varz struct {
 	TopApps []topAppsEntry `json:"top10_app_requests"`
 }
 
-type Varz struct {
+type Varz interface {
+	json.Marshaler
+
+	CaptureBadRequest(req *http.Request)
+	CaptureBackendRequest(b Backend, req *http.Request)
+	CaptureBackendResponse(b Backend, res *http.Response, d time.Duration)
+}
+
+type RealVarz struct {
 	sync.Mutex
 
-	*Registry
+	r *Registry
 
 	varz
 }
@@ -161,8 +169,8 @@ func (x TaggedHttpMetric) CaptureResponse(t string, y *http.Response, z time.Dur
 	x.httpMetric(t).CaptureResponse(y, z)
 }
 
-func NewVarz() *Varz {
-	x := &Varz{}
+func NewVarz(r *Registry) Varz {
+	x := &RealVarz{r: r}
 
 	x.All = NewHttpMetric()
 	x.Tags.Component = make(map[string]*HttpMetric)
@@ -172,12 +180,12 @@ func NewVarz() *Varz {
 	return x
 }
 
-func (x *Varz) MarshalJSON() ([]byte, error) {
+func (x *RealVarz) MarshalJSON() ([]byte, error) {
 	x.Lock()
 	defer x.Unlock()
 
-	x.varz.Urls = x.Registry.NumUris()
-	x.varz.Droplets = x.Registry.NumBackends()
+	x.varz.Urls = x.r.NumUris()
+	x.varz.Droplets = x.r.NumBackends()
 
 	x.varz.RequestsPerSec = x.varz.All.Rate.Rate1()
 
@@ -191,9 +199,9 @@ func (x *Varz) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d)
 }
 
-func (x *Varz) updateTop() {
+func (x *RealVarz) updateTop() {
 	t := time.Now().Add(-1 * time.Minute)
-	y := x.Registry.TopApps.TopSince(t, 10)
+	y := x.r.TopApps.TopSince(t, 10)
 
 	x.varz.TopApps = make([]topAppsEntry, 0)
 	for _, z := range y {
@@ -205,14 +213,14 @@ func (x *Varz) updateTop() {
 	}
 }
 
-func (x *Varz) CaptureBadRequest(req *http.Request) {
+func (x *RealVarz) CaptureBadRequest(req *http.Request) {
 	x.Lock()
 	defer x.Unlock()
 
 	x.BadRequests++
 }
 
-func (x *Varz) CaptureBackendRequest(b Backend, req *http.Request) {
+func (x *RealVarz) CaptureBackendRequest(b Backend, req *http.Request) {
 	x.Lock()
 	defer x.Unlock()
 
@@ -237,7 +245,7 @@ func (x *Varz) CaptureBackendRequest(b Backend, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *Varz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {
+func (x *RealVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 

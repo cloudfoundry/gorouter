@@ -26,15 +26,14 @@ type Proxy struct {
 
 	*config.Config
 	*Registry
-	*Varz
+	Varz
 }
 
-func NewProxy(varz *Varz, r *Registry) *Proxy {
-	p := new(Proxy)
-
-	p.Registry = r
-
-	p.Varz = varz
+func NewProxy(r *Registry, v Varz) *Proxy {
+	p := &Proxy{
+		Registry: r,
+		Varz:     v,
+	}
 
 	return p
 }
