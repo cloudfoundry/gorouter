@@ -37,7 +37,7 @@ func NewRouter(c *config.Config) *Router {
 
 	r.registry = NewRegistry(r.config)
 	r.varz = NewVarz(r.registry)
-	r.proxy = NewProxy(r.registry, r.varz)
+	r.proxy = NewProxy(r.config, r.registry, r.varz)
 
 	varz := &vcap.Varz{
 		UniqueVarz: r.varz,

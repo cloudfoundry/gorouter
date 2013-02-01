@@ -104,8 +104,9 @@ type ProxySuite struct {
 var _ = Suite(&ProxySuite{})
 
 func (s *ProxySuite) SetUpTest(c *C) {
-	s.r = NewRegistry(config.DefaultConfig())
-	s.p = NewProxy(s.r, nullVarz{})
+	x := config.DefaultConfig()
+	s.r = NewRegistry(x)
+	s.p = NewProxy(x, s.r, nullVarz{})
 
 	s.done = make(chan bool)
 }

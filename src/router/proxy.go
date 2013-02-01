@@ -29,13 +29,12 @@ type Proxy struct {
 	Varz
 }
 
-func NewProxy(r *Registry, v Varz) *Proxy {
-	p := &Proxy{
+func NewProxy(c *config.Config, r *Registry, v Varz) *Proxy {
+	return &Proxy{
+		Config:   c,
 		Registry: r,
 		Varz:     v,
 	}
-
-	return p
 }
 
 func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {

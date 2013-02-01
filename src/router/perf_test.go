@@ -12,8 +12,9 @@ const (
 )
 
 func BenchmarkRegister(b *testing.B) {
-	r := NewRegistry(config.DefaultConfig())
-	p := NewProxy(r, NewVarz(r))
+	c := config.DefaultConfig()
+	r := NewRegistry(c)
+	p := NewProxy(c, r, NewVarz(r))
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)
