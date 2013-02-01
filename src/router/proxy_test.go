@@ -25,19 +25,20 @@ func (_ nullVarz) CaptureBackendRequest(b Backend, req *http.Request)           
 func (_ nullVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {}
 
 type conn struct {
-	x net.Conn
+	net.Conn
+
 	c *C
 
-	*bufio.Reader
-	*bufio.Writer
+	br *bufio.Reader
+	bw *bufio.Writer
 }
 
 func newConn(x net.Conn, c *C) *conn {
 	return &conn{
-		x:      x,
-		c:      c,
-		Reader: bufio.NewReader(x),
-		Writer: bufio.NewWriter(x),
+		Conn: x,
+		c:    c,
+		br:   bufio.NewReader(x),
+		bw:   bufio.NewWriter(x),
 	}
 }
 
@@ -48,13 +49,13 @@ func (x *conn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
 }
 
 func (x *conn) WriteRequest(req *http.Request) {
-	err := req.Write(x)
+	err := req.Write(x.bw)
 	x.c.Assert(err, IsNil)
-	x.Flush()
+	x.bw.Flush()
 }
 
 func (x *conn) ReadResponse() (*http.Response, string) {
-	resp, err := http.ReadResponse(x.Reader, &http.Request{})
+	resp, err := http.ReadResponse(x.br, &http.Request{})
 	x.c.Assert(err, IsNil)
 
 	b, err := ioutil.ReadAll(resp.Body)
@@ -64,7 +65,7 @@ func (x *conn) ReadResponse() (*http.Response, string) {
 }
 
 func (x *conn) CheckLine(expected string) {
-	l, err := x.ReadString('\n')
+	l, err := x.br.ReadString('\n')
 	x.c.Check(err, IsNil)
 	x.c.Check(strings.TrimRight(l, "\r\n"), Equals, expected)
 }
@@ -78,9 +79,9 @@ func (x *conn) CheckLines(expected []string) {
 }
 
 func (x *conn) WriteLine(line string) {
-	x.WriteString(line)
-	x.WriteString("\r\n")
-	x.Flush()
+	x.bw.WriteString(line)
+	x.bw.WriteString("\r\n")
+	x.bw.Flush()
 }
 
 func (x *conn) WriteLines(lines []string) {
@@ -259,4 +260,36 @@ func (s *ProxySuite) TestRespondsToLoadBalancerCheck(c *C) {
 
 	_, body := x.ReadResponse()
 	s.Check(body, Equals, "ok\n")
+}
+
+func (s *ProxySuite) TestRespondsToUnknownHostWith404(c *C) {
+	s.C = c
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Header.Set("Host", "unknown")
+	x.WriteRequest(req)
+
+	resp, body := x.ReadResponse()
+	s.Check(resp.StatusCode, Equals, http.StatusNotFound)
+	s.Check(body, Equals, "404 Not Found")
+}
+
+func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
+	s.C = c
+
+	s.RegisterHandler("enfant-terrible", func(x *conn) {
+		x.Close()
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "enfant-terrible"
+	x.WriteRequest(req)
+
+	resp, body := x.ReadResponse()
+	s.Check(resp.StatusCode, Equals, http.StatusBadGateway)
+	s.Check(body, Equals, "502 Bad Gateway")
 }

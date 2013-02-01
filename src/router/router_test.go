@@ -393,44 +393,6 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	c.Assert(rr.Header.Get("Expect"), Equals, "")
 }
 
-func (s *RouterSuite) TestRouterSends404WithBody(c *C) {
-	x := fmt.Sprintf("http://idontexist.vcap.me:%d", s.proxyPort)
-
-	r, err := http.Get(x)
-	c.Check(err, IsNil)
-
-	c.Assert(r, Not(IsNil))
-	c.Check(r.StatusCode, Equals, http.StatusNotFound)
-
-	b, err := ioutil.ReadAll(r.Body)
-	c.Check(err, IsNil)
-	c.Check(string(b), Equals, "404 Not Found")
-}
-
-func (s *RouterSuite) TestRouterSends502WithBody(c *C) {
-	app := test.NewTestApp([]string{"blowup.vcap.me"}, s.proxyPort, s.natsClient, nil)
-	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		hj := w.(http.Hijacker)
-		c, _, _ := hj.Hijack()
-		c.Close()
-	})
-
-	app.Listen()
-	defer app.Unregister()
-
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
-
-	r, err := http.Get(app.Endpoint())
-	c.Check(err, IsNil)
-
-	c.Assert(r, Not(IsNil))
-	c.Check(r.StatusCode, Equals, http.StatusBadGateway)
-
-	b, err := ioutil.ReadAll(r.Body)
-	c.Check(err, IsNil)
-	c.Check(string(b), Equals, "502 Bad Gateway")
-}
-
 func sendRequests(c *C, url string, rPort uint16, times int) {
 	uri := fmt.Sprintf("http://%s:%d", url, rPort)
 
