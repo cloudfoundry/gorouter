@@ -33,22 +33,6 @@ type varz struct {
 	TopApps []topAppsEntry `json:"top10_app_requests"`
 }
 
-type Varz interface {
-	json.Marshaler
-
-	CaptureBadRequest(req *http.Request)
-	CaptureBackendRequest(b Backend, req *http.Request)
-	CaptureBackendResponse(b Backend, res *http.Response, d time.Duration)
-}
-
-type RealVarz struct {
-	sync.Mutex
-
-	r *Registry
-
-	varz
-}
-
 type httpMetric struct {
 	Requests int64      `json:"requests"`
 	Rate     [3]float64 `json:"rate"`
@@ -167,6 +151,28 @@ func (x TaggedHttpMetric) CaptureRequest(t string) {
 
 func (x TaggedHttpMetric) CaptureResponse(t string, y *http.Response, z time.Duration) {
 	x.httpMetric(t).CaptureResponse(y, z)
+}
+
+type Varz interface {
+	json.Marshaler
+
+	CaptureBadRequest(req *http.Request)
+	CaptureBackendRequest(b Backend, req *http.Request)
+	CaptureBackendResponse(b Backend, res *http.Response, d time.Duration)
+}
+
+type NullVarz struct{}
+
+func (_ NullVarz) MarshalJSON() ([]byte, error) { return json.Marshal(nil) }
+
+func (_ NullVarz) CaptureBadRequest(req *http.Request)                                   {}
+func (_ NullVarz) CaptureBackendRequest(b Backend, req *http.Request)                    {}
+func (_ NullVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {}
+
+type RealVarz struct {
+	sync.Mutex
+	r *Registry
+	varz
 }
 
 func NewVarz(r *Registry) Varz {
