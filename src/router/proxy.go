@@ -114,9 +114,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	x, ok := p.Lookup(req)
 	if !ok {
-		rw.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(rw, "%d %s", http.StatusNotFound, http.StatusText(http.StatusNotFound))
 		p.Varz.CaptureBadRequest(req)
+		p.WriteNotFound(rw)
 		return
 	}
 
@@ -154,10 +153,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	latency := time.Since(start)
 
 	if err != nil {
-		log.Warnf("Error from upstream: %s", err)
-		rw.WriteHeader(http.StatusBadGateway)
-		fmt.Fprintf(rw, "%d %s", http.StatusBadGateway, http.StatusText(http.StatusBadGateway))
 		p.Varz.CaptureBackendResponse(x, res, latency)
+		p.WriteBadGateway(err, rw)
 		return
 	}
 
@@ -210,8 +207,7 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 
 	dc, _, err := hj.Hijack()
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		log.Warnf("Error: %s", err)
+		p.WriteBadGateway(err, rw)
 		return
 	}
 
@@ -220,9 +216,7 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 	// Dial backend
 	uc, err := net.Dial("tcp", req.URL.Host)
 	if err != nil {
-		// TODO: return Bad Gateway
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		log.Warnf("Error: %s", err)
+		p.WriteBadGateway(err, rw)
 		return
 	}
 
@@ -231,9 +225,7 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 	// Write request
 	err = req.Write(uc)
 	if err != nil {
-		// TODO: return Bad Gateway
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		log.Warnf("Error: %s", err)
+		p.WriteBadGateway(err, rw)
 		return
 	}
 
@@ -251,4 +243,18 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 
 	// Don't care about error, both connections will be closed if necessary
 	<-errch
+}
+
+func (p *Proxy) WriteStatus(rw http.ResponseWriter, code int) {
+	body := fmt.Sprintf("%d %s", code, http.StatusText(code))
+	http.Error(rw, body, code)
+}
+
+func (p *Proxy) WriteBadGateway(err error, rw http.ResponseWriter) {
+	log.Warnf("Error: %s", err)
+	p.WriteStatus(rw, http.StatusBadGateway)
+}
+
+func (p *Proxy) WriteNotFound(rw http.ResponseWriter) {
+	p.WriteStatus(rw, http.StatusNotFound)
 }

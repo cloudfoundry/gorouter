@@ -298,7 +298,7 @@ func (s *ProxySuite) TestRespondsToUnknownHostWith404(c *C) {
 
 	resp, body := x.ReadResponse()
 	s.Check(resp.StatusCode, Equals, http.StatusNotFound)
-	s.Check(body, Equals, "404 Not Found")
+	s.Check(body, Equals, "404 Not Found\n")
 }
 
 func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
@@ -316,7 +316,7 @@ func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
 
 	resp, body := x.ReadResponse()
 	s.Check(resp.StatusCode, Equals, http.StatusBadGateway)
-	s.Check(body, Equals, "502 Bad Gateway")
+	s.Check(body, Equals, "502 Bad Gateway\n")
 }
 
 func (s *ProxySuite) TestXFFIsAdded(c *C) {
