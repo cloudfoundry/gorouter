@@ -74,6 +74,21 @@ func (x *conn) ReadResponse() (*http.Response, string) {
 	return resp, string(b)
 }
 
+func (x *conn) NewResponse(s int) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusSwitchingProtocols,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+	}
+}
+
+func (x *conn) WriteResponse(resp *http.Response) {
+	err := resp.Write(x.bw)
+	x.c.Assert(err, IsNil)
+	x.bw.Flush()
+}
+
 func (x *conn) CheckLine(expected string) {
 	l, err := x.br.ReadString('\n')
 	x.c.Check(err, IsNil)
@@ -343,4 +358,40 @@ func (s *ProxySuite) TestXFFIsAppended(c *C) {
 	x.WriteRequest(req)
 
 	<-done
+}
+
+func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
+	s.C = c
+
+	s.RegisterHandler("ws", func(x *conn) {
+		req, _ := x.ReadRequest()
+		c.Check(req.Header.Get("Upgrade"), Equals, "websocket")
+		c.Check(req.Header.Get("Connection"), Equals, "Upgrade")
+
+		resp := x.NewResponse(http.StatusSwitchingProtocols)
+		resp.Header.Set("Upgrade", "websocket")
+		resp.Header.Set("Connection", "Upgrade")
+
+		x.WriteResponse(resp)
+
+		x.CheckLine("hello from client")
+		x.WriteLine("hello from server")
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/chat", nil)
+	req.Host = "ws"
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+
+	x.WriteRequest(req)
+
+	resp, _ := x.ReadResponse()
+	c.Check(resp.StatusCode, Equals, http.StatusSwitchingProtocols)
+	c.Check(resp.Header.Get("Upgrade"), Equals, "websocket")
+	c.Check(resp.Header.Get("Connection"), Equals, "Upgrade")
+
+	x.WriteLine("hello from client")
+	x.CheckLine("hello from server")
 }

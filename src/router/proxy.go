@@ -126,11 +126,6 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	req.URL.Scheme = "http"
 	req.URL.Host = x.CanonicalAddr()
 
-	// Use a new connection for every request
-	// Keep-alive can be bolted on later, if we want to
-	req.Close = true
-	req.Header.Del("Connection")
-
 	// Add X-Forwarded-For
 	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 		// We assume there is a trusted upstream (L7 LB) that properly
@@ -142,6 +137,17 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		xff := append(req.Header["X-Forwarded-For"], host)
 		req.Header.Set("X-Forwarded-For", strings.Join(xff, ", "))
 	}
+
+	// Check if the connection is going to be upgraded to a WebSocket connection
+	if p.CheckWebSocket(rw, req) {
+		p.ServeWebSocket(rw, req)
+		return
+	}
+
+	// Use a new connection for every request
+	// Keep-alive can be bolted on later, if we want to
+	req.Close = true
+	req.Header.Del("Connection")
 
 	res, err := http.DefaultTransport.RoundTrip(req)
 
@@ -191,4 +197,58 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var dst io.Writer = rw
 		io.Copy(dst, res.Body)
 	}
+}
+
+func (p *Proxy) CheckWebSocket(rw http.ResponseWriter, req *http.Request) bool {
+	return req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket"
+}
+
+func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
+	var err error
+
+	hj := rw.(http.Hijacker)
+
+	dc, _, err := hj.Hijack()
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		log.Warnf("Error: %s", err)
+		return
+	}
+
+	defer dc.Close()
+
+	// Dial backend
+	uc, err := net.Dial("tcp", req.URL.Host)
+	if err != nil {
+		// TODO: return Bad Gateway
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		log.Warnf("Error: %s", err)
+		return
+	}
+
+	defer uc.Close()
+
+	// Write request
+	err = req.Write(uc)
+	if err != nil {
+		// TODO: return Bad Gateway
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		log.Warnf("Error: %s", err)
+		return
+	}
+
+	errch := make(chan error, 2)
+
+	copy := func(dst io.Writer, src io.Reader) {
+		_, err := io.Copy(dst, src)
+		if err != nil {
+			errch <- err
+		}
+	}
+
+	go copy(uc, dc)
+	go copy(dc, uc)
+
+	// Don't care about error, both connections will be closed if necessary
+	<-errch
 }
