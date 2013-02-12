@@ -108,6 +108,25 @@ func (s *RegistrySuite) TestRegisterUppercase(c *C) {
 	c.Check(s.NumUris(), Equals, 1)
 }
 
+func (s *RegistrySuite) TestRegisterDoesntReplace(c *C) {
+	m1 := &registerMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"foo.vcap.me"},
+	}
+
+	m2 := &registerMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"bar.vcap.me"},
+	}
+
+	s.Register(m1)
+	s.Register(m2)
+
+	c.Check(s.NumUris(), Equals, 2)
+}
+
 func (s *RegistrySuite) TestUnregister(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
@@ -145,6 +164,25 @@ func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
 	c.Check(s.NumUris(), Equals, 0)
 }
 
+func (s *RegistrySuite) TestUnregisterDoesntDemolish(c *C) {
+	m1 := &registerMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"foo.vcap.me", "bar.vcap.me"},
+	}
+
+	m2 := &registerMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"foo.vcap.me"},
+	}
+
+	s.Register(m1)
+	s.Unregister(m2)
+
+	c.Check(s.NumUris(), Equals, 1)
+}
+
 func (s *RegistrySuite) TestLookup(c *C) {
 	m := &registerMessage{
 		Host: "192.168.1.1",
@@ -156,11 +194,11 @@ func (s *RegistrySuite) TestLookup(c *C) {
 
 	m1 := s.Lookup(&http.Request{Host: "foo.vcap.me"})
 	c.Check(len(m1), Equals, 1)
-	c.Check(m1[0], Equals, m.BackendId())
+	c.Check(m1[0], Equals, BackendId("192.168.1.1:1234"))
 
 	m2 := s.Lookup(&http.Request{Host: "FOO.VCAP.ME"})
 	c.Check(len(m2), Equals, 1)
-	c.Check(m2[0], Equals, m.BackendId())
+	c.Check(m2[0], Equals, BackendId("192.168.1.1:1234"))
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
