@@ -62,29 +62,6 @@ func (x Uris) Remove(y Uri) (Uris, bool) {
 }
 
 type BackendId string
-type BackendIds []BackendId
-
-func (x BackendIds) Has(y BackendId) bool {
-	for _, xb := range x {
-		if xb == y {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (x BackendIds) Remove(y BackendId) (BackendIds, bool) {
-	for i, xb := range x {
-		if xb == y {
-			x[i] = x[len(x)-1]
-			x = x[:len(x)-1]
-			return x, true
-		}
-	}
-
-	return x, false
-}
 
 type Backend struct {
 	sync.Mutex
