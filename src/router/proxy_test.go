@@ -20,9 +20,9 @@ type nullVarz struct{}
 
 func (_ nullVarz) MarshalJSON() ([]byte, error) { return json.Marshal(nil) }
 
-func (_ nullVarz) CaptureBadRequest(req *http.Request)                                   {}
-func (_ nullVarz) CaptureBackendRequest(b Backend, req *http.Request)                    {}
-func (_ nullVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {}
+func (_ nullVarz) CaptureBadRequest(req *http.Request)                                    {}
+func (_ nullVarz) CaptureBackendRequest(b *Backend, req *http.Request)                    {}
+func (_ nullVarz) CaptureBackendResponse(b *Backend, res *http.Response, d time.Duration) {}
 
 type conn struct {
 	net.Conn

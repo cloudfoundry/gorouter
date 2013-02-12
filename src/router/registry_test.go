@@ -2,7 +2,6 @@ package router
 
 import (
 	. "launchpad.net/gocheck"
-	"net/http"
 	"router/config"
 	"time"
 )
@@ -192,13 +191,16 @@ func (s *RegistrySuite) TestLookup(c *C) {
 
 	s.Register(m)
 
-	m1 := s.Lookup(&http.Request{Host: "foo.vcap.me"})
-	c.Check(len(m1), Equals, 1)
-	c.Check(m1[0], Equals, BackendId("192.168.1.1:1234"))
+	var b *Backend
+	var ok bool
 
-	m2 := s.Lookup(&http.Request{Host: "FOO.VCAP.ME"})
-	c.Check(len(m2), Equals, 1)
-	c.Check(m2[0], Equals, BackendId("192.168.1.1:1234"))
+	b, ok = s.Lookup("foo.vcap.me")
+	c.Assert(ok, Equals, true)
+	c.Check(b.BackendId, Equals, BackendId("192.168.1.1:1234"))
+
+	b, ok = s.Lookup("FOO.VCAP.ME")
+	c.Assert(ok, Equals, true)
+	c.Check(b.BackendId, Equals, BackendId("192.168.1.1:1234"))
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
@@ -217,8 +219,8 @@ func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
 	s.Register(m1)
 	s.Register(m2)
 
-	ms := s.Lookup(&http.Request{Host: "bar.vcap.me"})
-	c.Check(len(ms), Equals, 2)
+	c.Check(s.NumUris(), Equals, 2)
+	c.Check(s.NumBackends(), Equals, 2)
 }
 
 func (s *RegistrySuite) TestTracker(c *C) {

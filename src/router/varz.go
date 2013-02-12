@@ -157,8 +157,8 @@ type Varz interface {
 	json.Marshaler
 
 	CaptureBadRequest(req *http.Request)
-	CaptureBackendRequest(b Backend, req *http.Request)
-	CaptureBackendResponse(b Backend, res *http.Response, d time.Duration)
+	CaptureBackendRequest(b *Backend, req *http.Request)
+	CaptureBackendResponse(b *Backend, res *http.Response, d time.Duration)
 }
 
 type RealVarz struct {
@@ -218,7 +218,7 @@ func (x *RealVarz) CaptureBadRequest(req *http.Request) {
 	x.BadRequests++
 }
 
-func (x *RealVarz) CaptureBackendRequest(b Backend, req *http.Request) {
+func (x *RealVarz) CaptureBackendRequest(b *Backend, req *http.Request) {
 	x.Lock()
 	defer x.Unlock()
 
@@ -243,7 +243,7 @@ func (x *RealVarz) CaptureBackendRequest(b Backend, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *RealVarz) CaptureBackendResponse(b Backend, res *http.Response, d time.Duration) {
+func (x *RealVarz) CaptureBackendResponse(b *Backend, res *http.Response, d time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 

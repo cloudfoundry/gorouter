@@ -140,9 +140,8 @@ func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) 
 	for j := 0; j < m; j++ {
 		received := true
 		for _, v := range a.Urls() {
-			ms := s.router.registry.Lookup(&http.Request{Host: string(v)})
-			status := (ms != nil)
-			if status != r {
+			_, ok := s.router.registry.Lookup(v)
+			if ok != r {
 				received = false
 				break
 			}

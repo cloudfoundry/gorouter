@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"router/config"
@@ -37,55 +36,32 @@ func NewProxy(c *config.Config, r *Registry, v Varz) *Proxy {
 	}
 }
 
-func (p *Proxy) Lookup(req *http.Request) (Backend, bool) {
-	var b Backend
-	var ok bool
+func hostWithoutPort(req *http.Request) string {
+	host := req.Host
 
-	// Loop in case of a race between Lookup and LookupByBackendId
-	for {
-		x := p.Registry.Lookup(req)
+	// Remove :<port>
+	pos := strings.Index(host, ":")
+	if pos >= 0 {
+		host = host[0:pos]
+	}
 
-		if len(x) == 0 {
-			return b, false
-		}
+	return host
+}
 
-		// If there's only one backend, choose that
-		if len(x) == 1 {
-			b, ok = p.Registry.LookupByBackendId(x[0])
-			if ok {
-				return b, true
-			} else {
-				continue
-			}
-		}
+func (p *Proxy) Lookup(req *http.Request) (*Backend, bool) {
+	h := hostWithoutPort(req)
 
-		// Choose backend depending on sticky session
-		sticky, err := req.Cookie(VcapCookieId)
-		if err == nil {
-			y, ok := p.Registry.LookupByBackendIds(x)
-			if ok {
-				// Return backend if host and port match
-				for _, b := range y {
-					if sticky.Value == b.PrivateInstanceId {
-						return b, true
-					}
-				}
-
-				// No matching backend found
-			}
-		}
-
-		b, ok = p.Registry.LookupByBackendId(x[rand.Intn(len(x))])
+	// Try choosing a backend using sticky session
+	sticky, err := req.Cookie(VcapCookieId)
+	if err == nil {
+		b, ok := p.Registry.LookupByPrivateInstanceId(h, sticky.Value)
 		if ok {
-			return b, true
-		} else {
-			continue
+			return b, ok
 		}
 	}
 
-	log.Fatal("not reached")
-
-	return b, ok
+	// Choose backend using host alone
+	return p.Registry.Lookup(h)
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {

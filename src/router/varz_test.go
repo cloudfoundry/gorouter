@@ -101,7 +101,7 @@ func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {
-	b := Backend{}
+	b := &Backend{}
 	r := http.Request{}
 
 	s.CaptureBackendRequest(b, &r)
@@ -112,7 +112,7 @@ func (s *VarzSuite) TestUpdateRequests(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
-	b1 := Backend{
+	b1 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
 			"runtime":   "ruby18",
@@ -120,7 +120,7 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 		},
 	}
 
-	b2 := Backend{
+	b2 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
 			"runtime":   "ruby18",
@@ -141,7 +141,7 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
-	var b Backend
+	var b *Backend = &Backend{}
 	var d time.Duration
 
 	r1 := &http.Response{
@@ -163,7 +163,7 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	var d time.Duration
 
-	b1 := Backend{
+	b1 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
 			"runtime":   "ruby18",
@@ -171,7 +171,7 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 		},
 	}
 
-	b2 := Backend{
+	b2 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
 			"runtime":   "ruby18",
@@ -202,7 +202,7 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
-	var b Backend
+	var b *Backend = &Backend{}
 	var d = 1 * time.Millisecond
 
 	r := &http.Response{

@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
-	"net/http"
+	"math/rand"
 	"router/config"
 	"router/stats"
 	"strings"
@@ -359,60 +359,38 @@ func (r *Registry) checkAndPrune() {
 	}
 }
 
-func (r *Registry) Lookup(req *http.Request) BackendIds {
-	host := req.Host
-
-	// Remove :<port>
-	pos := strings.Index(host, ":")
-	if pos >= 0 {
-		host = host[0:pos]
-	}
-
+func (r *Registry) Lookup(host string) (*Backend, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	var rv BackendIds
-	for _, b := range r.byUri[Uri(host).ToLower()] {
-		rv = append(rv, b.BackendId)
+	x, ok := r.byUri[Uri(host).ToLower()]
+	if !ok {
+		return nil, false
 	}
 
-	return rv
+	// Return random backend from slice of backends for the specified uri
+	return x[rand.Intn(len(x))], true
 }
 
-func (r *Registry) LookupByBackendId(i BackendId) (Backend, bool) {
+func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*Backend, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	var b Backend
-
-	x, ok := r.byBackendId[i]
-	if ok {
-		b = *x
-		return b, true
+	x, ok := r.byUri[Uri(host).ToLower()]
+	if !ok {
+		return nil, false
 	}
 
-	return b, false
-}
-
-func (r *Registry) LookupByBackendIds(x []BackendId) ([]Backend, bool) {
-	y := make([]Backend, len(x))
-
-	r.RLock()
-	defer r.RUnlock()
-
-	for i, j := range x {
-		b, ok := r.byBackendId[j]
-		if !ok {
-			return nil, false
+	for _, b := range x {
+		if b.PrivateInstanceId == p {
+			return b, true
 		}
-
-		y[i] = *b
 	}
 
-	return y, true
+	return nil, false
 }
 
-func (r *Registry) CaptureBackendRequest(x Backend, t time.Time) {
+func (r *Registry) CaptureBackendRequest(x *Backend, t time.Time) {
 	if x.ApplicationId != "" {
 		r.ActiveApps.Mark(x.ApplicationId, t)
 		r.TopApps.Mark(x.ApplicationId, t)
