@@ -70,7 +70,7 @@ func (r *Router) SubscribeRegister() {
 
 	go func() {
 		for m := range s.Inbox {
-			var rm registerMessage
+			var rm registryMessage
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {
@@ -89,7 +89,7 @@ func (r *Router) SubscribeUnregister() {
 
 	go func() {
 		for m := range s.Inbox {
-			var rm registerMessage
+			var rm registryMessage
 
 			e := json.Unmarshal(m.Payload, &rm)
 			if e != nil {

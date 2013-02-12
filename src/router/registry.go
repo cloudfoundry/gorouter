@@ -103,7 +103,7 @@ type Backend struct {
 	t time.Time
 }
 
-func newBackend(i BackendId, m *registerMessage, l steno.Logger) *Backend {
+func newBackend(i BackendId, m *registryMessage, l steno.Logger) *Backend {
 	b := &Backend{
 		Logger: l,
 
@@ -149,7 +149,7 @@ func (b *Backend) unregister(u Uri) bool {
 }
 
 // This is a transient struct. It doesn't maintain state.
-type registerMessage struct {
+type registryMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
 	Uris Uris              `json:"uris"`
@@ -160,7 +160,7 @@ type registerMessage struct {
 	PrivateInstanceId string `json:"private_instance_id"`
 }
 
-func (m registerMessage) BackendId() (b BackendId, ok bool) {
+func (m registryMessage) BackendId() (b BackendId, ok bool) {
 	if m.Host != "" && m.Port != 0 {
 		b = BackendId(fmt.Sprintf("%s:%d", m.Host, m.Port))
 		ok = true
@@ -233,7 +233,7 @@ func (r *Registry) registerUri(b *Backend, u Uri) {
 	}
 }
 
-func (r *Registry) Register(m *registerMessage) {
+func (r *Registry) Register(m *registryMessage) {
 	i, ok := m.BackendId()
 	if !ok {
 		return
@@ -283,7 +283,7 @@ func (r *Registry) unregisterUri(b *Backend, u Uri) {
 	}
 }
 
-func (r *Registry) Unregister(m *registerMessage) {
+func (r *Registry) Unregister(m *registryMessage) {
 	i, ok := m.BackendId()
 	if !ok {
 		return

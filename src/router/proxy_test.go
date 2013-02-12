@@ -152,7 +152,7 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 		panic(err)
 	}
 
-	m := registerMessage{
+	m := registryMessage{
 		Host: h,
 		Port: uint16(x),
 		Uris: []Uri{Uri(u)},

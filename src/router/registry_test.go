@@ -13,7 +13,7 @@ type RegistrySuite struct {
 
 var _ = Suite(&RegistrySuite{})
 
-var fooReg = &registerMessage{
+var fooReg = &registryMessage{
 	Host: "192.168.1.1",
 	Port: 1234,
 	Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
@@ -25,7 +25,7 @@ var fooReg = &registerMessage{
 	App: "12345",
 }
 
-var barReg = &registerMessage{
+var barReg = &registryMessage{
 	Host: "192.168.1.2",
 	Port: 4321,
 	Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
@@ -37,7 +37,7 @@ var barReg = &registerMessage{
 	App: "54321",
 }
 
-var bar2Reg = &registerMessage{
+var bar2Reg = &registryMessage{
 	Host: "192.168.1.3",
 	Port: 1234,
 	Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
@@ -70,7 +70,7 @@ func (s *RegistrySuite) TestRegister(c *C) {
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
-	s.Register(&registerMessage{})
+	s.Register(&registryMessage{})
 	c.Check(s.NumUris(), Equals, 0)
 	c.Check(s.NumBackends(), Equals, 0)
 }
@@ -90,13 +90,13 @@ func (s *RegistrySuite) TestRegisterIgnoreDuplicates(c *C) {
 }
 
 func (s *RegistrySuite) TestRegisterUppercase(c *C) {
-	m1 := &registerMessage{
+	m1 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me"},
 	}
 
-	m2 := &registerMessage{
+	m2 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1235,
 		Uris: []Uri{"FOO.VCAP.ME"},
@@ -109,13 +109,13 @@ func (s *RegistrySuite) TestRegisterUppercase(c *C) {
 }
 
 func (s *RegistrySuite) TestRegisterDoesntReplace(c *C) {
-	m1 := &registerMessage{
+	m1 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me"},
 	}
 
-	m2 := &registerMessage{
+	m2 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"bar.vcap.me"},
@@ -146,13 +146,13 @@ func (s *RegistrySuite) TestUnregister(c *C) {
 }
 
 func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
-	m1 := &registerMessage{
+	m1 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me"},
 	}
 
-	m2 := &registerMessage{
+	m2 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"FOO.VCAP.ME"},
@@ -165,13 +165,13 @@ func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
 }
 
 func (s *RegistrySuite) TestUnregisterDoesntDemolish(c *C) {
-	m1 := &registerMessage{
+	m1 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me", "bar.vcap.me"},
 	}
 
-	m2 := &registerMessage{
+	m2 := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me"},
@@ -184,7 +184,7 @@ func (s *RegistrySuite) TestUnregisterDoesntDemolish(c *C) {
 }
 
 func (s *RegistrySuite) TestLookup(c *C) {
-	m := &registerMessage{
+	m := &registryMessage{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me"},
@@ -202,13 +202,13 @@ func (s *RegistrySuite) TestLookup(c *C) {
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
-	m1 := &registerMessage{
+	m1 := &registryMessage{
 		Host: "192.168.1.2",
 		Port: 1234,
 		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
 	}
 
-	m2 := &registerMessage{
+	m2 := &registryMessage{
 		Host: "192.168.1.2",
 		Port: 1235,
 		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
