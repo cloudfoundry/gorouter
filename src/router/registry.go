@@ -1,12 +1,12 @@
 package router
 
 import (
-	"container/list"
 	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
 	"math/rand"
 	"router/config"
 	"router/stats"
+	"router/util"
 	"strings"
 	"sync"
 	"time"
@@ -157,8 +157,7 @@ type Registry struct {
 	byUri       map[Uri][]*Backend
 	byBackendId map[BackendId]*Backend
 
-	tracker        *list.List
-	trackerIndexes map[BackendId]*list.Element
+	staleTracker *util.ListMap
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
@@ -175,8 +174,7 @@ func NewRegistry(c *config.Config) *Registry {
 	r.byUri = make(map[Uri][]*Backend)
 	r.byBackendId = make(map[BackendId]*Backend)
 
-	r.tracker = list.New()
-	r.trackerIndexes = make(map[BackendId]*list.Element)
+	r.staleTracker = util.NewListMap()
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
@@ -229,7 +227,8 @@ func (r *Registry) Register(m *registryMessage) {
 		r.registerUri(b, u)
 	}
 
-	r.updateInTracker(b)
+	b.t = time.Now()
+	r.staleTracker.PushBack(b)
 }
 
 func (r *Registry) unregisterUri(b *Backend, u Uri) {
@@ -256,7 +255,7 @@ func (r *Registry) unregisterUri(b *Backend, u Uri) {
 	// Remove backend if it no longer has uris
 	if len(b.U) == 0 {
 		delete(r.byBackendId, b.BackendId)
-		r.removeFromTracker(b)
+		r.staleTracker.Delete(b)
 	}
 }
 
@@ -279,29 +278,9 @@ func (r *Registry) Unregister(m *registryMessage) {
 	}
 }
 
-func (r *Registry) updateInTracker(b *Backend) {
-	n := r.trackerIndexes[b.BackendId]
-	if n != nil {
-		r.tracker.Remove(n)
-	}
-
-	b.t = time.Now()
-	e := r.tracker.PushBack(b)
-	r.trackerIndexes[b.BackendId] = e
-}
-
-func (r *Registry) removeFromTracker(b *Backend) {
-	if n := r.trackerIndexes[b.BackendId]; n != nil {
-		r.tracker.Remove(n)
-	}
-
-	delete(r.trackerIndexes, b.BackendId)
-}
-
 func (r *Registry) pruneStaleDroplets() {
-	for r.tracker.Len() > 0 {
-		f := r.tracker.Front()
-		b := f.Value.(*Backend)
+	for r.staleTracker.Len() > 0 {
+		b := r.staleTracker.Front().(*Backend)
 		if b.t.Add(r.dropletStaleThreshold).After(time.Now()) {
 			break
 		}

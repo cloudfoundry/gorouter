@@ -64,8 +64,7 @@ func (s *RegistrySuite) TestRegister(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
 
-	c.Assert(s.tracker.Len(), Equals, 2)
-	c.Assert(len(s.trackerIndexes), Equals, 2)
+	c.Assert(s.staleTracker.Len(), Equals, 2)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
@@ -226,13 +225,11 @@ func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
 func (s *RegistrySuite) TestTracker(c *C) {
 	s.Register(fooReg)
 	s.Register(barReg)
-	c.Assert(s.tracker.Len(), Equals, 2)
-	c.Assert(s.trackerIndexes, HasLen, 2)
+	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	s.Unregister(fooReg)
 	s.Unregister(barReg)
-	c.Assert(s.tracker.Len(), Equals, 0)
-	c.Assert(s.trackerIndexes, HasLen, 0)
+	c.Assert(s.staleTracker.Len(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestPruneStaleApps(c *C) {
@@ -240,8 +237,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
 	c.Check(s.NumBackends(), Equals, 2)
-	c.Assert(s.tracker.Len(), Equals, 2)
-	c.Assert(s.trackerIndexes, HasLen, 2)
+	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
 	s.PruneStaleDroplets()
@@ -250,6 +246,5 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 
 	c.Check(s.NumUris(), Equals, 2)
 	c.Check(s.NumBackends(), Equals, 1)
-	c.Assert(s.tracker.Len(), Equals, 1)
-	c.Assert(s.trackerIndexes, HasLen, 1)
+	c.Assert(s.staleTracker.Len(), Equals, 1)
 }
