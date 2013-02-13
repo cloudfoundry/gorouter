@@ -125,6 +125,19 @@ func (s *RegistrySuite) TestRegisterDoesntReplace(c *C) {
 	c.Check(s.NumUris(), Equals, 2)
 }
 
+func (s *RegistrySuite) TestRegisterWithoutUris(c *C) {
+	m := &registryMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{},
+	}
+
+	s.Register(m)
+
+	c.Check(s.NumUris(), Equals, 0)
+	c.Check(s.NumBackends(), Equals, 0)
+}
+
 func (s *RegistrySuite) TestUnregister(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)

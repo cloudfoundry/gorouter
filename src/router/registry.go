@@ -210,7 +210,7 @@ func (r *Registry) registerUri(b *Backend, u Uri) {
 
 func (r *Registry) Register(m *registryMessage) {
 	i, ok := m.BackendId()
-	if !ok {
+	if !ok || len(m.Uris) == 0 {
 		return
 	}
 
