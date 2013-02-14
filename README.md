@@ -25,8 +25,3 @@ removing unnecessary latency.
 
 * 1/25/13: While this implementation can easily support WebSocket
   connections it does not yet.
-
-## File a Bug
-
-To file a bug against Cloud Foundry Open Source and its components, sign up and use our
-bug tracking system: [http://cloudfoundry.atlassian.net](http://cloudfoundry.atlassian.net)
