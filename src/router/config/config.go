@@ -49,10 +49,10 @@ type Config struct {
 	Nats    NatsConfig    "nats"
 	Logging LoggingConfig "logging"
 
-	Port  uint16 "port"
-	Index uint   "index"
-
-	GoMaxProcs int "go_max_procs,omitempty"
+	Port       uint16 "port"
+	Index      uint   "index"
+	Pidfile    string "pidfile"
+	GoMaxProcs int    "go_max_procs,omitempty"
 
 	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
@@ -73,9 +73,9 @@ var defaultConfig = Config{
 	Nats:    defaultNatsConfig,
 	Logging: defaultLoggingConfig,
 
-	Port:  8081,
-	Index: 0,
-
+	Port:       8081,
+	Index:      0,
+	Pidfile:    "",
 	GoMaxProcs: 8,
 
 	PublishStartMessageIntervalInSeconds: 30,

@@ -96,7 +96,7 @@ func (s *ConfigSuite) TestConfig(c *C) {
 	var b = []byte(`
 port: 8082
 index: 1
-
+pidfile: /tmp/pidfile
 go_max_procs: 2
 
 publish_start_message_interval: 1
@@ -107,6 +107,7 @@ publish_active_apps_interval: 4
 
 	c.Check(s.Port, Equals, uint16(8081))
 	c.Check(s.Index, Equals, uint(0))
+	c.Check(s.Pidfile, Equals, "")
 	c.Check(s.GoMaxProcs, Equals, 8)
 
 	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
@@ -120,6 +121,7 @@ publish_active_apps_interval: 4
 
 	c.Check(s.Port, Equals, uint16(8082))
 	c.Check(s.Index, Equals, uint(1))
+	c.Check(s.Pidfile, Equals, "/tmp/pidfile")
 	c.Check(s.GoMaxProcs, Equals, 2)
 
 	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
