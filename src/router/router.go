@@ -10,6 +10,7 @@ import (
 	vcap "router/common"
 	"router/config"
 	"router/proxy"
+	"router/util"
 	"runtime"
 	"time"
 )
@@ -190,6 +191,8 @@ func (r *Router) Run() {
 		log.Infof("Waiting %s before listening...", r.config.PublishStartMessageInterval)
 		time.Sleep(r.config.PublishStartMessageInterval)
 	}
+
+	util.WritePidFile(r.config.Pidfile)
 
 	log.Infof("Listening on %s", l.Addr())
 
