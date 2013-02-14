@@ -180,16 +180,16 @@ func (r *Router) Run() {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
-	if err != nil {
-		log.Fatalf("net.Listen: %s", err)
-	}
-
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.
 	if r.config.PublishStartMessageInterval != 0 {
 		log.Infof("Waiting %s before listening...", r.config.PublishStartMessageInterval)
 		time.Sleep(r.config.PublishStartMessageInterval)
+	}
+
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	if err != nil {
+		log.Fatalf("net.Listen: %s", err)
 	}
 
 	util.WritePidFile(r.config.Pidfile)
