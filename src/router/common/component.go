@@ -36,6 +36,11 @@ type Healthz struct {
 	Health interface{} `json:"health"`
 }
 
+type RouterStart struct {
+	Id string	`json:"id"`
+	Hosts []string	`json:"hosts"`
+}
+
 func UpdateHealthz() *Healthz {
 	return healthz
 }
