@@ -395,3 +395,50 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 	x.WriteLine("hello from client")
 	x.CheckLine("hello from server")
 }
+
+func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
+	s.C = c
+
+	s.RegisterHandler("chunk", func(x *conn) {
+		r, w := io.Pipe()
+
+		// Write 3 times on a 100ms interval
+		go func() {
+			t := time.NewTicker(100 * time.Millisecond)
+			defer t.Stop()
+			defer w.Close()
+			for i := 0; i < 3; i++ {
+				select {
+				case <-t.C:
+					w.Write([]byte("hello"))
+				}
+			}
+		}()
+
+		resp := newResponse(http.StatusOK)
+		resp.TransferEncoding = []string{"chunked"}
+		resp.Body = r
+		resp.Write(x)
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "chunk"
+	req.Write(x)
+
+	resp, err := http.ReadResponse(x.br, &http.Request{})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusOK)
+	c.Assert(resp.TransferEncoding, DeepEquals, []string{"chunked"})
+
+	// Expect 3 individual reads to complete
+	for i := 0; i < 3; i++ {
+		var b [16]byte
+
+		n, err := resp.Body.Read(b[0:])
+		c.Assert(err, IsNil)
+		c.Check(n, Equals, 5)
+		c.Check(string(b[0:n]), Equals, "hello")
+	}
+}

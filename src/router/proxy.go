@@ -168,6 +168,14 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if res.Body != nil {
 		var dst io.Writer = rw
+
+		// Use MaxLatencyFlusher if needed
+		if v, ok := rw.(writeFlusher); ok {
+			u := NewMaxLatencyWriter(v, 50*time.Millisecond)
+			defer u.Stop()
+			dst = u
+		}
+
 		io.Copy(dst, res.Body)
 	}
 }
