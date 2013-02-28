@@ -74,9 +74,9 @@ func (x *conn) ReadResponse() (*http.Response, string) {
 	return resp, string(b)
 }
 
-func (x *conn) NewResponse(s int) *http.Response {
+func newResponse(status int) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusSwitchingProtocols,
+		StatusCode: status,
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Header:     make(http.Header),
@@ -368,7 +368,7 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 		c.Check(req.Header.Get("Upgrade"), Equals, "websocket")
 		c.Check(req.Header.Get("Connection"), Equals, "Upgrade")
 
-		resp := x.NewResponse(http.StatusSwitchingProtocols)
+		resp := newResponse(http.StatusSwitchingProtocols)
 		resp.Header.Set("Upgrade", "websocket")
 		resp.Header.Set("Connection", "Upgrade")
 
