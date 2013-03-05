@@ -145,7 +145,11 @@ func (r *Router) ScheduleFlushApps() {
 }
 
 func (r *Router) SendStartMessage() {
-	d := map[string]string{"id": vcap.GenerateUUID()}
+	host, err := vcap.LocalIP()
+	if err != nil {
+		panic(err)
+	}
+	d := vcap.RouterStart{vcap.GenerateUUID(), []string{host}}
 
 	b, err := json.Marshal(d)
 	if err != nil {
