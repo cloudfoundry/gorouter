@@ -1,7 +1,9 @@
-# gorouter (EXPERIMENTAL)
+# gorouter
 
 This repository contains the source code for a Go implementation of the Cloud
 Foundry router.
+
+This router is now used on CloudFoundry.com, replacing the old implementation.
 
 ## Summary
 
@@ -20,6 +22,8 @@ via HTTP CONNECT). Second, all logic is contained in a single process,
 removing unnecessary latency.
 
 ## Notes
+
+* 03/05/13: Code is now used on CloudFoundry.com.
 
 * 1/25/13: The code in this repository has not yet been used on CloudFoundry.com.
 
