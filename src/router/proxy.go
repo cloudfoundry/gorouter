@@ -142,7 +142,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if req.Header.Get(VcapTraceHeader) != "" {
+	if p.Config.TraceKey != "" && req.Header.Get(VcapTraceHeader) == p.Config.TraceKey {
 		rw.Header().Set(VcapRouterHeader, p.Config.Ip)
 		rw.Header().Set(VcapBackendHeader, x.CanonicalAddr())
 	}

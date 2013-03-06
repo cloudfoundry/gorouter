@@ -106,7 +106,7 @@ func (a *TestApp) VerifyTraceHeader(c *C) {
 		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
 
 		req, err = http.NewRequest("GET", uri, nil)
-		req.Header.Add(VcapTraceHeader, "anything")
+		req.Header.Add(VcapTraceHeader, "my_trace_key")
 		resp, err = client.Do(req)
 
 		c.Assert(err, IsNil)

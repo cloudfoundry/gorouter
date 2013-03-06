@@ -43,6 +43,7 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 
 	s.Config.Port = s.proxyPort
 	s.Config.Index = 2
+	s.Config.TraceKey = "my_trace_key"
 
 	// Hardcode the IP to localhost to avoid leaving the machine while running tests
 	s.Config.Ip = "127.0.0.1"
