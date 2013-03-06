@@ -131,6 +131,7 @@ var _ = Suite(&ProxySuite{})
 
 func (s *ProxySuite) SetUpTest(c *C) {
 	x := config.DefaultConfig()
+	x.TraceKey = "my_trace_key"
 	s.r = NewRegistry(x)
 	s.p = NewProxy(x, s.r, nullVarz{})
 
@@ -161,7 +162,7 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 	s.r.Register(&m)
 }
 
-func (s *ProxySuite) RegisterHandler(u string, h connHandler) {
+func (s *ProxySuite) RegisterHandler(u string, h connHandler) net.Listener {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(err)
@@ -185,6 +186,8 @@ func (s *ProxySuite) RegisterHandler(u string, h connHandler) {
 	}()
 
 	s.registerAddr(u, ln.Addr())
+
+	return ln
 }
 
 func (s *ProxySuite) StartProxy() net.Addr {
@@ -317,6 +320,48 @@ func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
 	resp, body := x.ReadResponse()
 	s.Check(resp.StatusCode, Equals, http.StatusBadGateway)
 	s.Check(body, Equals, "502 Bad Gateway\n")
+}
+
+func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
+	s.C = c
+
+	ln := s.RegisterHandler("trace-test", func(x *conn) {
+		resp := newResponse(http.StatusOK)
+		x.WriteResponse(resp)
+		x.Close()
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "trace-test"
+	req.Header.Set("X-Vcap-Trace", "my_trace_key")
+	x.WriteRequest(req)
+
+	resp, _ := x.ReadResponse()
+	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, ln.Addr().String())
+	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, s.p.Config.Ip)
+}
+
+func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
+	s.C = c
+
+	s.RegisterHandler("trace-test", func(x *conn) {
+		resp := newResponse(http.StatusOK)
+		x.WriteResponse(resp)
+		x.Close()
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "trace-test"
+	req.Header.Set("X-Vcap-Trace", "a_bad_trace_key")
+	x.WriteRequest(req)
+
+	resp, _ := x.ReadResponse()
+	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, "")
+	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, "")
 }
 
 func (s *ProxySuite) TestXFFIsAdded(c *C) {

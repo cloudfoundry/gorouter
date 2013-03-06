@@ -176,18 +176,6 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app.VerifyAppStatus(404, c)
 }
 
-func (s *RouterSuite) TestTraceHeader(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, s.proxyPort, s.natsClient, nil)
-	app.Listen()
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
-
-	app.VerifyAppStatus(200, c)
-	app.VerifyTraceHeader(c)
-
-	app.Unregister()
-	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
-}
-
 func (s *RouterSuite) readVarz() map[string]interface{} {
 	x, err := s.router.varz.MarshalJSON()
 	if err != nil {

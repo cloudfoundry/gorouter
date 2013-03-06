@@ -96,26 +96,6 @@ func (a *TestApp) VerifyAppStatus(status int, c *C) {
 	}
 }
 
-func (a *TestApp) VerifyTraceHeader(c *C) {
-	var client http.Client
-	var req *http.Request
-	var resp *http.Response
-	var err error
-
-	for _, url := range a.urls {
-		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
-
-		req, err = http.NewRequest("GET", uri, nil)
-		req.Header.Add(VcapTraceHeader, "my_trace_key")
-		resp, err = client.Do(req)
-
-		c.Assert(err, IsNil)
-		c.Check(resp.StatusCode, Equals, 200)
-		c.Check(resp.Header.Get(VcapBackendHeader), Equals, fmt.Sprintf("localhost:%d", a.port))
-		c.Check(resp.Header.Get(VcapRouterHeader), Equals, "127.0.0.1")
-	}
-}
-
 // Types imported from router
 const (
 	VcapBackendHeader = "X-Vcap-Backend"
