@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/cloudfoundry/gorouter.png)](https://travis-ci.org/cloudfoundry/gorouter)
+
 # gorouter
 
 This repository contains the source code for a Go implementation of the Cloud
