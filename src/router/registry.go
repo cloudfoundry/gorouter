@@ -307,7 +307,7 @@ func (r *Registry) checkAndPrune() {
 	for {
 		select {
 		case <-tick:
-			log.Info("Start to check and prune stale droplets")
+			log.Debug("Start to check and prune stale droplets")
 			r.PruneStaleDroplets()
 		}
 	}
