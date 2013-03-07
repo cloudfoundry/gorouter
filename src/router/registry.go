@@ -283,11 +283,11 @@ func (r *Registry) pruneStaleDroplets() {
 			break
 		}
 
+		log.Infof("Pruning stale droplet: %v ", b.BackendId)
+
 		for _, u := range b.U {
 			r.unregisterUri(b, u)
 		}
-
-		log.Infof("Pruned stale droplet: %v ", b.BackendId)
 	}
 }
 
