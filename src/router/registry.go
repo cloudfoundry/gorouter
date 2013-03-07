@@ -104,9 +104,8 @@ func (b *Backend) CanonicalAddr() string {
 }
 
 func (b *Backend) register(u Uri) bool {
-	b.Debugf("Register %s (%s)", u, b.BackendId)
-
 	if !b.U.Has(u) {
+		b.Infof("Register %s (%s)", u, b.BackendId)
 		b.U = append(b.U, u)
 		return true
 	}
@@ -115,10 +114,9 @@ func (b *Backend) register(u Uri) bool {
 }
 
 func (b *Backend) unregister(u Uri) bool {
-	b.Debugf("Unregister %s (%s)", u, b.BackendId)
-
 	x, ok := b.U.Remove(u)
 	if ok {
+		b.Infof("Unregister %s (%s)", u, b.BackendId)
 		b.U = x
 	}
 
