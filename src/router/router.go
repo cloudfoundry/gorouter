@@ -106,7 +106,7 @@ func (r *Router) flushApps(t time.Time) {
 
 	y, err := json.Marshal(x)
 	if err != nil {
-		log.Warnf("json.Marshal: %s", err)
+		log.Warnf("flushApps: Error marshalling JSON: %s", err)
 		return
 	}
 
