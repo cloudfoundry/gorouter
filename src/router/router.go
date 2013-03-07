@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
+	steno "github.com/cloudfoundry/gosteno"
 	"net"
 	vcap "router/common"
 	"router/config"
@@ -65,42 +66,39 @@ func NewRouter(c *config.Config) *Router {
 	return r
 }
 
-func (r *Router) SubscribeRegister() {
-	s := r.natsClient.NewSubscription("router.register")
+func (r *Router) subscribeRegistry(subject string, fn func(*registryMessage)) {
+	s := r.natsClient.NewSubscription(subject)
 	s.Subscribe()
 
 	go func() {
 		for m := range s.Inbox {
 			var rm registryMessage
 
-			e := json.Unmarshal(m.Payload, &rm)
-			if e != nil {
-				log.Warnf("Error unmarshalling JSON: %s (%s)", e, string(m.Payload))
+			err := json.Unmarshal(m.Payload, &rm)
+			if err != nil {
+				lm := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
+				log.Log(steno.LOG_WARN, lm, map[string]interface{}{"payload": string(m.Payload)})
 				continue
 			}
 
-			r.registry.Register(&rm)
+			lm := fmt.Sprintf("%s: Received message", subject)
+			log.Log(steno.LOG_DEBUG, lm, map[string]interface{}{"message": rm})
+
+			fn(&rm)
 		}
 	}()
 }
 
+func (r *Router) SubscribeRegister() {
+	r.subscribeRegistry("router.register", func(rm *registryMessage) {
+		r.registry.Register(rm)
+	})
+}
+
 func (r *Router) SubscribeUnregister() {
-	s := r.natsClient.NewSubscription("router.unregister")
-	s.Subscribe()
-
-	go func() {
-		for m := range s.Inbox {
-			var rm registryMessage
-
-			e := json.Unmarshal(m.Payload, &rm)
-			if e != nil {
-				log.Warnf("Error unmarshalling JSON: %s (%s)", e, string(m.Payload))
-				continue
-			}
-
-			r.registry.Unregister(&rm)
-		}
-	}()
+	r.subscribeRegistry("router.unregister", func(rm *registryMessage) {
+		r.registry.Unregister(rm)
+	})
 }
 
 func (r *Router) flushApps(t time.Time) {
