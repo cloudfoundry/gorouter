@@ -431,3 +431,23 @@ func nextAvailPort() uint16 {
 	}
 	return p
 }
+
+func (s *RouterSuite) TestInfoApi(c *C) {
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+
+	s.natsClient.PublishAndConfirm("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
+
+	req, err = http.NewRequest("GET", "http://" + s.Config.InfoHostPort, nil)
+	resp, err = client.Do(req)
+	c.Check(err, IsNil)
+	c.Assert(resp, Not(IsNil))
+	c.Check(resp.StatusCode, Equals, 200)
+
+	b, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	c.Check(err, IsNil)
+	c.Check(string(b), Matches, ".*1\\.2\\.3\\.4:1234.*")
+}

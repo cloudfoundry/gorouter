@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
 	"math/rand"
@@ -78,6 +79,10 @@ type Backend struct {
 
 	U Uris
 	t time.Time
+}
+
+func (b *Backend) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.CanonicalAddr())
 }
 
 func newBackend(i BackendId, m *registryMessage, l *steno.Logger) *Backend {
@@ -362,4 +367,11 @@ func (r *Registry) CaptureBackendRequest(x *Backend, t time.Time) {
 		r.ActiveApps.Mark(x.ApplicationId, t)
 		r.TopApps.Mark(x.ApplicationId, t)
 	}
+}
+
+func (r *Registry) MarshalJSON() ([]byte, error) {
+	r.RLock()
+	defer r.RUnlock()
+
+	return json.Marshal(r.byUri)
 }
