@@ -3,6 +3,7 @@ package router
 import (
 	. "launchpad.net/gocheck"
 	"router/config"
+	"encoding/json"
 	"time"
 )
 
@@ -260,4 +261,17 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	c.Check(s.NumUris(), Equals, 2)
 	c.Check(s.NumBackends(), Equals, 1)
 	c.Assert(s.staleTracker.Len(), Equals, 1)
+}
+
+func (s *RegistrySuite) TestInfoMarshalling(c *C) {
+	m := &registryMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"foo.vcap.me"},
+	}
+
+	s.Register(m)
+	marshalled, err := json.Marshal(s)
+	c.Check(err, IsNil)
+	c.Check(string(marshalled), Equals, "{\"foo.vcap.me\":[\"192.168.1.1:1234\"]}")
 }
