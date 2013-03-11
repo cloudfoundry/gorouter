@@ -66,7 +66,7 @@ type BackendId string
 type Backend struct {
 	sync.Mutex
 
-	steno.Logger
+	*steno.Logger
 
 	BackendId BackendId
 
@@ -80,7 +80,7 @@ type Backend struct {
 	t time.Time
 }
 
-func newBackend(i BackendId, m *registryMessage, l steno.Logger) *Backend {
+func newBackend(i BackendId, m *registryMessage, l *steno.Logger) *Backend {
 	b := &Backend{
 		Logger: l,
 
@@ -101,6 +101,20 @@ func newBackend(i BackendId, m *registryMessage, l steno.Logger) *Backend {
 
 func (b *Backend) CanonicalAddr() string {
 	return fmt.Sprintf("%s:%d", b.Host, b.Port)
+}
+
+func (b *Backend) ToLogData() interface{} {
+	return struct {
+		ApplicationId string
+		Host          string
+		Port          uint16
+		Tags          map[string]string
+	}{
+		b.ApplicationId,
+		b.Host,
+		b.Port,
+		b.Tags,
+	}
 }
 
 func (b *Backend) register(u Uri) bool {
@@ -147,7 +161,7 @@ func (m registryMessage) BackendId() (b BackendId, ok bool) {
 type Registry struct {
 	sync.RWMutex
 
-	steno.Logger
+	*steno.Logger
 
 	*stats.ActiveApps
 	*stats.TopApps

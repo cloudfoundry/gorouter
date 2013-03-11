@@ -1,7 +1,9 @@
 package router
 
 import (
+	"bufio"
 	"fmt"
+	steno "github.com/cloudfoundry/gosteno"
 	"io"
 	"net"
 	"net/http"
@@ -22,15 +24,49 @@ const (
 
 type Proxy struct {
 	sync.RWMutex
-
+	*steno.Logger
 	*config.Config
 	*Registry
 	Varz
 }
 
+type responseWriter struct {
+	http.ResponseWriter
+	*steno.Logger
+}
+
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj := rw.ResponseWriter.(http.Hijacker)
+	return hj.Hijack()
+}
+
+func (rw *responseWriter) WriteStatus(code int) {
+	body := fmt.Sprintf("%d %s", code, http.StatusText(code))
+	rw.Warn(body)
+	http.Error(rw, body, code)
+}
+
+func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
+	if src == nil {
+		return 0, nil
+	}
+
+	var dst io.Writer = rw
+
+	// Use MaxLatencyFlusher if needed
+	if v, ok := rw.ResponseWriter.(writeFlusher); ok {
+		u := NewMaxLatencyWriter(v, 50*time.Millisecond)
+		defer u.Stop()
+		dst = u
+	}
+
+	return io.Copy(dst, src)
+}
+
 func NewProxy(c *config.Config, r *Registry, v Varz) *Proxy {
 	return &Proxy{
 		Config:   c,
+		Logger:   steno.NewLogger("proxy"),
 		Registry: r,
 		Varz:     v,
 	}
@@ -64,11 +100,16 @@ func (p *Proxy) Lookup(req *http.Request) (*Backend, bool) {
 	return p.Registry.Lookup(h)
 }
 
-func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
-		hj := rw.(http.Hijacker)
+func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
+	rw := responseWriter{
+		ResponseWriter: hrw,
+		Logger:         p.Logger.Copy(),
+	}
 
-		c, brw, err := hj.Hijack()
+	rw.Set("RemoteAddr", req.RemoteAddr)
+
+	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
+		c, brw, err := rw.Hijack()
 		if err != nil {
 			panic(err)
 		}
@@ -91,9 +132,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	x, ok := p.Lookup(req)
 	if !ok {
 		p.Varz.CaptureBadRequest(req)
-		p.WriteNotFound(rw)
+		rw.WriteStatus(http.StatusNotFound)
 		return
 	}
+
+	rw.Set("Backend", x.ToLogData())
 
 	p.Registry.CaptureBackendRequest(x, start)
 	p.Varz.CaptureBackendRequest(x, req)
@@ -130,7 +173,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		p.Varz.CaptureBackendResponse(x, res, latency)
-		p.WriteBadGateway(err, rw)
+		rw.Warnf("Error reading from upstream: %s", err)
+		rw.WriteStatus(http.StatusBadGateway)
 		return
 	}
 
@@ -165,33 +209,22 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.WriteHeader(res.StatusCode)
-
-	if res.Body != nil {
-		var dst io.Writer = rw
-
-		// Use MaxLatencyFlusher if needed
-		if v, ok := rw.(writeFlusher); ok {
-			u := NewMaxLatencyWriter(v, 50*time.Millisecond)
-			defer u.Stop()
-			dst = u
-		}
-
-		io.Copy(dst, res.Body)
-	}
+	rw.CopyFrom(res.Body)
 }
 
 func (p *Proxy) CheckWebSocket(rw http.ResponseWriter, req *http.Request) bool {
 	return req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket"
 }
 
-func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
+func (p *Proxy) ServeWebSocket(rw responseWriter, req *http.Request) {
 	var err error
 
-	hj := rw.(http.Hijacker)
+	rw.Set("Upgrade", "websocket")
 
-	dc, _, err := hj.Hijack()
+	dc, _, err := rw.Hijack()
 	if err != nil {
-		p.WriteBadGateway(err, rw)
+		rw.Warnf("hj.Hijack: %s", err)
+		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -200,7 +233,8 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 	// Dial backend
 	uc, err := net.Dial("tcp", req.URL.Host)
 	if err != nil {
-		p.WriteBadGateway(err, rw)
+		rw.Warnf("net.Dial: %s", err)
+		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -209,7 +243,8 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 	// Write request
 	err = req.Write(uc)
 	if err != nil {
-		p.WriteBadGateway(err, rw)
+		rw.Warnf("Writing request: %s", err)
+		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -227,18 +262,4 @@ func (p *Proxy) ServeWebSocket(rw http.ResponseWriter, req *http.Request) {
 
 	// Don't care about error, both connections will be closed if necessary
 	<-errch
-}
-
-func (p *Proxy) WriteStatus(rw http.ResponseWriter, code int) {
-	body := fmt.Sprintf("%d %s", code, http.StatusText(code))
-	http.Error(rw, body, code)
-}
-
-func (p *Proxy) WriteBadGateway(err error, rw http.ResponseWriter) {
-	log.Warnf("Error: %s", err)
-	p.WriteStatus(rw, http.StatusBadGateway)
-}
-
-func (p *Proxy) WriteNotFound(rw http.ResponseWriter) {
-	p.WriteStatus(rw, http.StatusNotFound)
 }

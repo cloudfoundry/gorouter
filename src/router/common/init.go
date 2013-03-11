@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var log steno.Logger
+var log *steno.Logger
 
 func init() {
 	stenoConfig := &steno.Config{

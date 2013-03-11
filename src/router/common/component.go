@@ -17,14 +17,14 @@ var procStat *ProcessStatus
 
 type VcapComponent struct {
 	// These fields are from individual components
-	Type        string       `json:"type"`
-	Index       uint         `json:"index"`
-	Host        string       `json:"host"`
-	Credentials []string     `json:"credentials"`
-	Config      interface{}  `json:"config"`
-	Varz        *Varz        `json:"-"`
-	Healthz     interface{}  `json:"-"`
-	Logger      steno.Logger `json:"-"`
+	Type        string        `json:"type"`
+	Index       uint          `json:"index"`
+	Host        string        `json:"host"`
+	Credentials []string      `json:"credentials"`
+	Config      interface{}   `json:"config"`
+	Varz        *Varz         `json:"-"`
+	Healthz     interface{}   `json:"-"`
+	Logger      *steno.Logger `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string   `json:"uuid"`
@@ -37,8 +37,8 @@ type Healthz struct {
 }
 
 type RouterStart struct {
-	Id string	`json:"id"`
-	Hosts []string	`json:"hosts"`
+	Id    string   `json:"id"`
+	Hosts []string `json:"hosts"`
 }
 
 func UpdateHealthz() *Healthz {
