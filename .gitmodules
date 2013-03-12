@@ -1,3 +1,9 @@
 [submodule "vendor"]
 	path = vendor
 	url = https://github.com/cloudfoundry/govendor
+[submodule "src/github.com/cloudfoundry/gosteno"]
+	path = src/github.com/cloudfoundry/gosteno
+	url = https://github.com/cloudfoundry/gosteno
+[submodule "src/github.com/cloudfoundry/gonats"]
+	path = src/github.com/cloudfoundry/gonats
+	url = https://github.com/cloudfoundry/gonats
