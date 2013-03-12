@@ -107,6 +107,7 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.Set("RemoteAddr", req.RemoteAddr)
+	rw.Set("Host", req.Host)
 
 	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
 		c, brw, err := rw.Hijack()
