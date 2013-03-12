@@ -178,7 +178,7 @@ type Registry struct {
 func NewRegistry(c *config.Config) *Registry {
 	r := &Registry{}
 
-	r.Logger = steno.NewLogger("registry")
+	r.Logger = steno.NewLogger("router.registry")
 
 	r.ActiveApps = stats.NewActiveApps()
 	r.TopApps = stats.NewTopApps()

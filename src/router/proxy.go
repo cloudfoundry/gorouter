@@ -66,7 +66,7 @@ func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
 func NewProxy(c *config.Config, r *Registry, v Varz) *Proxy {
 	return &Proxy{
 		Config:   c,
-		Logger:   steno.NewLogger("proxy"),
+		Logger:   steno.NewLogger("router.proxy"),
 		Registry: r,
 		Varz:     v,
 	}

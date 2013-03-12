@@ -16,7 +16,7 @@ func init() {
 	}
 
 	steno.Init(stenoConfig)
-	log = steno.NewLogger("init")
+	log = steno.NewLogger("router.init")
 }
 
 func SetupLoggerFromConfig(c *config.Config) {
@@ -43,5 +43,5 @@ func SetupLoggerFromConfig(c *config.Config) {
 	}
 
 	steno.Init(stenoConfig)
-	log = steno.NewLogger("router")
+	log = steno.NewLogger("router.global")
 }
