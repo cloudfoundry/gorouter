@@ -108,6 +108,8 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 
 	rw.Set("RemoteAddr", req.RemoteAddr)
 	rw.Set("Host", req.Host)
+	rw.Set("X-Forwarded-For", req.Header["X-Forwarded-For"])
+	rw.Set("X-Forwarded-Proto", req.Header["X-Forwarded-Proto"])
 
 	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
 		c, brw, err := rw.Hijack()
