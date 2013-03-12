@@ -182,6 +182,9 @@ func (r *Router) Run() {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
+	infoHandler := InfoHandler{addr: r.config.InfoHostPort, m: r.registry}
+	go infoHandler.Run()
+
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.
 	if r.config.PublishStartMessageInterval != 0 {

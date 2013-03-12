@@ -100,6 +100,8 @@ pidfile: /tmp/pidfile
 go_max_procs: 2
 trace_key: "foo"
 
+info_host_port: "127.0.0.1:23457"
+
 publish_start_message_interval: 1
 prune_stale_droplets_interval: 2
 droplet_stale_threshold: 3
@@ -111,6 +113,8 @@ publish_active_apps_interval: 4
 	c.Check(s.Pidfile, Equals, "")
 	c.Check(s.GoMaxProcs, Equals, 8)
 	c.Check(s.TraceKey, Equals, "")
+
+	c.Check(s.InfoHostPort, Equals, ":23456")
 
 	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 30*time.Second)
@@ -126,6 +130,8 @@ publish_active_apps_interval: 4
 	c.Check(s.Pidfile, Equals, "/tmp/pidfile")
 	c.Check(s.GoMaxProcs, Equals, 2)
 	c.Check(s.TraceKey, Equals, "foo")
+
+	c.Check(s.InfoHostPort, Equals, "127.0.0.1:23457")
 
 	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 2*time.Second)
