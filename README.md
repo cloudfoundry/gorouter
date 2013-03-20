@@ -23,6 +23,32 @@ router, it can more easily support WebSockets, and other types of traffic (e.g.
 via HTTP CONNECT). Second, all logic is contained in a single process,
 removing unnecessary latency.
 
+
+## Install from source
+
+    $ git clone https://github.com/cloudfoundry/gorouter.git
+    $ cd gorouter
+    $ git submodule init
+    $ git submodule update
+    $ ./bin/go install router/router
+    $ gem install nats
+
+## Start gorouter
+
+    $ nats-server
+    $ ./bin/router
+
+## Use gorouter
+
+Periodically send `router.register` message :
+
+    $ nats-pub 'router.register' '{ "dea": "974f4d94991a9f04f0277b9696cd785d", "host": "localhost", "port": 3000, "uris": [ "helloworld.vcap.me" ], "tags": { "framework": "sinatra", "runtime": "ruby18" } }'
+    Published [router.register] : '{ "dea": "974f4d94991a9f04f0277b9696cd785d", "host": "localhost", "port": 3000, "uris": [ "helloworld.vcap.me" ], "tags": { "framework": "sinatra", "runtime": "ruby18" } }'
+
+Now you can access your webapp
+
+    $ curl helloworld.vcap.me:808
+
 ## Notes
 
 * 03/05/13: Code is now used on CloudFoundry.com.
