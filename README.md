@@ -23,31 +23,63 @@ router, it can more easily support WebSockets, and other types of traffic (e.g.
 via HTTP CONNECT). Second, all logic is contained in a single process,
 removing unnecessary latency.
 
+## Getting started
 
-## Install from source
+The following instructions may help you get started with gorouter in a
+standalone environment.
 
-    $ git clone https://github.com/cloudfoundry/gorouter.git
-    $ cd gorouter
-    $ git submodule init
-    $ git submodule update
-    $ ./bin/go install router/router
-    $ gem install nats
+### Setup
 
-## Start gorouter
+```
+git clone https://github.com/cloudfoundry/gorouter.git
+cd gorouter
+git submodule update --init
+./bin/go install router/router
+gem install nats
+```
 
-    $ nats-server
-    $ ./bin/router
+### Start
 
-## Use gorouter
+```
+# Start NATS server in daemon mode
+nats-server -d
 
-Periodically send `router.register` message :
+# Start gorouter
+./bin/router
+```
 
-    $ nats-pub 'router.register' '{ "dea": "974f4d94991a9f04f0277b9696cd785d", "host": "localhost", "port": 3000, "uris": [ "helloworld.vcap.me" ], "tags": { "framework": "sinatra", "runtime": "ruby18" } }'
-    Published [router.register] : '{ "dea": "974f4d94991a9f04f0277b9696cd785d", "host": "localhost", "port": 3000, "uris": [ "helloworld.vcap.me" ], "tags": { "framework": "sinatra", "runtime": "ruby18" } }'
+### Usage
 
-Now you can access your webapp
+When gorouter is used in Cloud Foundry, it receives route updates via NATS.
+Routes that haven't been updated in 2 minutes (by default) are pruned.
+Therefore, to maintain an active route, it needs to be updated at least every 2 minutes.
+The format of these route updates are as follows:
 
-    $ curl helloworld.vcap.me:808
+```json
+{
+  "host": "127.0.0.1",
+  "port": 4567,
+  "uris": [
+    "my_first_url.vcap.me",
+    "my_second_url.vcap.me"
+  ],
+  "tags": {
+    "another_key": "another_value",
+    "some_key": "some_value"
+  }
+}
+```
+
+Such a message can be sent to both the `router.register` subject to register
+URIs, and to the `router.unregister` subject to unregister URIs, respectively.
+
+```
+$ nohup ruby -rsinatra -e 'get("/") { "Hello!" }' &
+$ nats-pub 'router.register' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+$ curl my_first_url.vcap.me:8080
+Hello!
+```
 
 ## Notes
 
