@@ -20,7 +20,6 @@ var fooReg = &registryMessage{
 		"runtime":   "ruby18",
 		"framework": "sinatra",
 	},
-	Dea: "",
 	App: "12345",
 }
 
@@ -32,7 +31,6 @@ var barReg = &registryMessage{
 		"runtime":   "javascript",
 		"framework": "node",
 	},
-	Dea: "",
 	App: "54321",
 }
 
@@ -44,7 +42,6 @@ var bar2Reg = &registryMessage{
 		"runtime":   "javascript",
 		"framework": "node",
 	},
-	Dea: "",
 	App: "54321",
 }
 

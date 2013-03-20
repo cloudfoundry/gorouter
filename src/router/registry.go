@@ -143,7 +143,6 @@ type registryMessage struct {
 	Port uint16            `json:"port"`
 	Uris Uris              `json:"uris"`
 	Tags map[string]string `json:"tags"`
-	Dea  string            `json:"dea"`
 	App  string            `json:"app"`
 
 	PrivateInstanceId string `json:"private_instance_id"`
