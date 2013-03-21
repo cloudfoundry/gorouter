@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	. "router/common/http"
 	nats "github.com/cloudfoundry/gonats"
 	steno "github.com/cloudfoundry/gosteno"
 	"runtime"
@@ -100,7 +102,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	healthz = &Healthz{Component.Healthz}
 
-	go startStatusServer()
+	go c.ListenAndServe()
 
 	// subscribe nats
 	discover := natsClient.NewSubscription("vcap.component.discover")
@@ -125,4 +127,35 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	natsClient.Publish("vcap.component.announce", b)
 
 	log.Infof("Component %s registered successfully", Component.Type)
+}
+
+func (c* VcapComponent)ListenAndServe() {
+	hs := http.NewServeMux()
+
+	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		enc := json.NewEncoder(w)
+		enc.Encode(UpdateHealthz())
+	})
+
+	hs.HandleFunc("/varz", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		enc := json.NewEncoder(w)
+		enc.Encode(UpdateVarz())
+	})
+
+	f := func(user, password string) bool {
+		return user == c.Credentials[0] && password == c.Credentials[1]
+	}
+
+	s := &http.Server{
+		Addr:    c.Host,
+		Handler: &BasicAuth{hs, f},
+	}
+
+	s.ListenAndServe()
 }
