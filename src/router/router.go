@@ -59,6 +59,9 @@ func NewRouter(c *config.Config) *Router {
 		Logger:      log,
 		Varz:        varz,
 		Healthz:     "ok",
+		// InfoRoutes:  map[string]InfoRouterHandler{
+		// 	"/routes": InfoHandler{m: r.registry},
+		// }
 	}
 
 	vcap.Register(component, r.natsClient)

@@ -3,10 +3,10 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	. "router/common/http"
 	nats "github.com/cloudfoundry/gonats"
 	steno "github.com/cloudfoundry/gosteno"
+	"net/http"
+	. "router/common/http"
 	"runtime"
 	"time"
 )
@@ -19,14 +19,15 @@ var procStat *ProcessStatus
 
 type VcapComponent struct {
 	// These fields are from individual components
-	Type        string        `json:"type"`
-	Index       uint          `json:"index"`
-	Host        string        `json:"host"`
-	Credentials []string      `json:"credentials"`
-	Config      interface{}   `json:"config"`
-	Varz        *Varz         `json:"-"`
-	Healthz     interface{}   `json:"-"`
-	Logger      *steno.Logger `json:"-"`
+	Type        string                    `json:"type"`
+	Index       uint                      `json:"index"`
+	Host        string                    `json:"host"`
+	Credentials []string                  `json:"credentials"`
+	Config      interface{}               `json:"config"`
+	Varz        *Varz                     `json:"-"`
+	Healthz     interface{}               `json:"-"`
+	InfoRoutes  map[string]json.Marshaler `json:"-"`
+	Logger      *steno.Logger             `json:"-"`
 
 	// These fields are automatically generated
 	UUID   string   `json:"uuid"`
@@ -129,7 +130,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	log.Infof("Component %s registered successfully", Component.Type)
 }
 
-func (c* VcapComponent)ListenAndServe() {
+func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
 
 	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
@@ -148,6 +149,16 @@ func (c* VcapComponent)ListenAndServe() {
 		enc.Encode(UpdateVarz())
 	})
 
+	for path, marshaler := range c.InfoRoutes {
+		hs.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+
+			enc := json.NewEncoder(w)
+			enc.Encode(marshaler)
+		})
+	}
+
 	f := func(user, password string) bool {
 		return user == c.Credentials[0] && password == c.Credentials[1]
 	}
@@ -157,5 +168,8 @@ func (c* VcapComponent)ListenAndServe() {
 		Handler: &BasicAuth{hs, f},
 	}
 
-	s.ListenAndServe()
+	err := s.ListenAndServe()
+	if err != nil {
+		panic(err)
+	}
 }
