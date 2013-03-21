@@ -55,8 +55,6 @@ type Config struct {
 	GoMaxProcs int    "go_max_procs,omitempty"
 	TraceKey   string "trace_key"
 
-	InfoHostPort   string "info_host_port"
-
 	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
 	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
@@ -80,8 +78,6 @@ var defaultConfig = Config{
 	Index:      0,
 	Pidfile:    "",
 	GoMaxProcs: 8,
-
-	InfoHostPort: ":23456",
 
 	PublishStartMessageIntervalInSeconds: 30,
 	PruneStaleDropletsIntervalInSeconds:  30,

@@ -59,9 +59,9 @@ func NewRouter(c *config.Config) *Router {
 		Logger:      log,
 		Varz:        varz,
 		Healthz:     "ok",
-		// InfoRoutes:  map[string]InfoRouterHandler{
-		// 	"/routes": InfoHandler{m: r.registry},
-		// }
+		InfoRoutes: map[string]json.Marshaler{
+			"/routes": r.registry,
+		},
 	}
 
 	vcap.Register(component, r.natsClient)
@@ -184,9 +184,6 @@ func (r *Router) Run() {
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
-
-	infoHandler := InfoHandler{addr: r.config.InfoHostPort, m: r.registry}
-	go infoHandler.Run()
 
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.

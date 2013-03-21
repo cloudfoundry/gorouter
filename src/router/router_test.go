@@ -440,14 +440,18 @@ func (s *RouterSuite) TestInfoApi(c *C) {
 
 	s.natsClient.PublishAndConfirm("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
 
-	req, err = http.NewRequest("GET", "http://" + s.Config.InfoHostPort, nil)
+	host := fmt.Sprintf("http://%s:%d/routes", s.Config.Ip, s.Config.Status.Port)
+
+	req, err = http.NewRequest("GET", host, nil)
+	req.SetBasicAuth("user", "pass")
+
 	resp, err = client.Do(req)
-	c.Check(err, IsNil)
+	c.Assert(err, IsNil)
 	c.Assert(resp, Not(IsNil))
 	c.Check(resp.StatusCode, Equals, 200)
 
-	b, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
-	c.Check(err, IsNil)
-	c.Check(string(b), Matches, ".*1\\.2\\.3\\.4:1234.*")
+	c.Assert(err, IsNil)
+	c.Check(string(body), Matches, ".*1\\.2\\.3\\.4:1234.*\n")
 }
