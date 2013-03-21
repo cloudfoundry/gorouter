@@ -81,6 +81,15 @@ $ curl my_first_url.vcap.me:8080
 Hello!
 ```
 
+### Instrumentation
+
+Gorouter provides `/varz` and `/healthz` http endpoints for monitoring. In
+addition, gorouter exposes the entire routing table at the `/routes` endpoint.
+
+All of the endpoints require http basic authentication, credentials for which
+can be acquired through NATS. Credentials can be explicitly set in the config
+file's `status` section.
+
 ## Notes
 
 * 03/05/13: Code is now used on CloudFoundry.com.
