@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
+	"net"
 	"net/http"
+	"runtime"
 )
 
 type ComponentSuite struct {
@@ -40,7 +42,7 @@ func (s *ComponentSuite) TestInfoRouteAccessUnauthorized(c *C) {
 	s.Component.InfoRoutes = map[string]json.Marshaler{
 		path: &MarshalableValue{Value: map[string]string{"key": "value"}},
 	}
-	go s.Component.ListenAndServe()
+	s.serveComponent(c)
 
 	req := s.buildGetRequest(c, path)
 	code, _, _ := s.doGetRequest(c, req)
@@ -63,7 +65,7 @@ func (s *ComponentSuite) TestInfoRouteAccessAuthorized(c *C) {
 	s.Component.InfoRoutes = map[string]json.Marshaler{
 		path: &MarshalableValue{Value: map[string]string{"key": "value"}},
 	}
-	go s.Component.ListenAndServe()
+	s.serveComponent(c)
 
 	req := s.buildGetRequest(c, path)
 	req.SetBasicAuth("username", "password")
@@ -75,13 +77,29 @@ func (s *ComponentSuite) TestInfoRouteAccessAuthorized(c *C) {
 }
 
 func (s *ComponentSuite) TestInfoRouteAccessNonExistent(c *C) {
-	go s.Component.ListenAndServe()
+	s.serveComponent(c)
 
 	req := s.buildGetRequest(c, "/non-existent-path")
 	req.SetBasicAuth("username", "password")
 
 	code, _, _ := s.doGetRequest(c, req)
 	c.Check(code, Equals, 404)
+}
+
+func (s *ComponentSuite) serveComponent(c *C) {
+	go s.Component.ListenAndServe()
+
+	for i := 0; i < 200; i++ {
+		// Yield to component's server listen goroutine
+		runtime.Gosched()
+
+		conn, err := net.Dial("tcp", s.Component.Host)
+		if err == nil {
+			conn.Close()
+			return
+		}
+	}
+	panic("Could not connect to vcap.Component")
 }
 
 func (s *ComponentSuite) buildGetRequest(c *C, path string) *http.Request {
