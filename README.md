@@ -83,12 +83,43 @@ Hello!
 
 ### Instrumentation
 
-Gorouter provides `/varz` and `/healthz` http endpoints for monitoring. In
-addition, gorouter exposes the entire routing table at the `/routes` endpoint.
+Gorouter provides `/varz` and `/healthz` http endpoints for monitoring.
+
+The `/routes` endpoint returns the entire routing table as JSON. Each route has an associated array of host:port entries.
 
 All of the endpoints require http basic authentication, credentials for which
-can be acquired through NATS. Credentials can be explicitly set in the config
+can be acquired through NATS. The `port`, `user` and password (`pass` is the config attribute) can be explicitly set in the gorouter.yml config
 file's `status` section.
+
+```
+status:
+  port: 8080
+  user: some_user
+  pass: some_password
+```
+
+Example interaction with curl:
+
+```
+curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
+* About to connect() to 127.0.0.1 port 8080 (#0)
+*   Trying 127.0.0.1...
+* connected
+* Connected to 127.0.0.1 (127.0.0.1) port 8080 (#0)
+* Server auth using Basic with user 'someuser'
+> GET /routes HTTP/1.1
+> Authorization: Basic c29tZXVzZXI6c29tZXBhc3M=
+> User-Agent: curl/7.24.0 (x86_64-apple-darwin12.0) libcurl/7.24.0 OpenSSL/0.9.8r zlib/1.2.5
+> Host: 127.0.0.1:8080
+> Accept: */*
+> 
+< HTTP/1.1 200 OK
+< Content-Type: application/json
+< Date: Mon, 25 Mar 2013 20:31:27 GMT
+< Transfer-Encoding: chunked
+< 
+{"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
+```
 
 ## Notes
 
