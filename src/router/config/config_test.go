@@ -99,6 +99,7 @@ index: 1
 pidfile: /tmp/pidfile
 go_max_procs: 2
 trace_key: "foo"
+access_log: "/tmp/access_log"
 
 publish_start_message_interval: 1
 prune_stale_droplets_interval: 2
@@ -111,6 +112,7 @@ publish_active_apps_interval: 4
 	c.Check(s.Pidfile, Equals, "")
 	c.Check(s.GoMaxProcs, Equals, 8)
 	c.Check(s.TraceKey, Equals, "")
+	c.Check(s.AccessLog, Equals, "")
 
 	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 30*time.Second)
@@ -126,6 +128,7 @@ publish_active_apps_interval: 4
 	c.Check(s.Pidfile, Equals, "/tmp/pidfile")
 	c.Check(s.GoMaxProcs, Equals, 2)
 	c.Check(s.TraceKey, Equals, "foo")
+	c.Check(s.AccessLog, Equals, "/tmp/access_log")
 
 	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 2*time.Second)

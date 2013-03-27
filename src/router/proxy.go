@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"router/config"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ type Proxy struct {
 	*config.Config
 	*Registry
 	Varz
+	*AccessLogger
 }
 
 type responseWriter struct {
@@ -64,12 +66,24 @@ func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
 }
 
 func NewProxy(c *config.Config, r *Registry, v Varz) *Proxy {
-	return &Proxy{
+	p := &Proxy{
 		Config:   c,
 		Logger:   steno.NewLogger("router.proxy"),
 		Registry: r,
 		Varz:     v,
 	}
+
+	if c.AccessLog != "" {
+		f, err := os.OpenFile(c.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			panic(err)
+		}
+
+		p.AccessLogger = NewAccessLogger(f)
+		go p.AccessLogger.Run()
+	}
+
+	return p
 }
 
 func hostWithoutPort(req *http.Request) string {
@@ -111,6 +125,11 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	rw.Set("X-Forwarded-For", req.Header["X-Forwarded-For"])
 	rw.Set("X-Forwarded-Proto", req.Header["X-Forwarded-Proto"])
 
+	a := AccessLogRecord{
+		Request:   req,
+		StartedAt: time.Now(),
+	}
+
 	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
 		c, brw, err := rw.Hijack()
 		if err != nil {
@@ -140,6 +159,8 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.Set("Backend", x.ToLogData())
+
+	a.Backend = x
 
 	p.Registry.CaptureBackendRequest(x, start)
 	p.Varz.CaptureBackendRequest(x, req)
@@ -173,6 +194,9 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	res, err := http.DefaultTransport.RoundTrip(req)
 
 	latency := time.Since(start)
+
+	a.FirstByteAt = time.Now()
+	a.Response = res
 
 	if err != nil {
 		p.Varz.CaptureBackendResponse(x, res, latency)
@@ -212,7 +236,14 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.WriteHeader(res.StatusCode)
-	rw.CopyFrom(res.Body)
+	n, _ := rw.CopyFrom(res.Body)
+
+	a.FinishedAt = time.Now()
+	a.BodyBytesSent = n
+
+	if p.AccessLogger != nil {
+		p.AccessLogger.Log(a)
+	}
 }
 
 func (p *Proxy) CheckWebSocket(rw http.ResponseWriter, req *http.Request) bool {

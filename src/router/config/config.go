@@ -54,6 +54,7 @@ type Config struct {
 	Pidfile    string "pidfile"
 	GoMaxProcs int    "go_max_procs,omitempty"
 	TraceKey   string "trace_key"
+	AccessLog  string "access_log"
 
 	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
