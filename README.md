@@ -121,6 +121,17 @@ curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
 {"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
 ```
 
+## Logs
+
+The router's logging is specified in its YAML configuration file, in a [steno configuration format](http://github.com/cloudfoundry/steno#from-yaml-file).
+The meanings of the router's log levels are as follows:
+
+* `fatal` - An error has occurred that makes the current request unservicable.
+Examples: the router can't bind to its TCP port, a CF component has published invalid data to the router.
+* `warn` - An unexpected state has occurred. Examples: the router tried to publish data that could not be encoded as JSON
+* `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
+to prune routes for stale droplets.
+
 ## Notes
 
 * 03/05/13: Code is now used on CloudFoundry.com.
