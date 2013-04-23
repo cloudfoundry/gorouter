@@ -177,6 +177,8 @@ type Registry struct {
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
+
+	isStateStale func() bool
 }
 
 func NewRegistry(c *config.Config) *Registry {
@@ -194,6 +196,8 @@ func NewRegistry(c *config.Config) *Registry {
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
+
+	r.isStateStale = func() bool { return false }
 
 	go r.checkAndPrune()
 
@@ -244,6 +248,7 @@ func (r *Registry) Register(m *registryMessage) {
 	}
 
 	b.t = time.Now()
+
 	r.staleTracker.PushBack(b)
 }
 
@@ -295,6 +300,10 @@ func (r *Registry) Unregister(m *registryMessage) {
 }
 
 func (r *Registry) pruneStaleDroplets() {
+	if r.isStateStale() {
+		return
+	}
+
 	for r.staleTracker.Len() > 0 {
 		b := r.staleTracker.Front().(*Backend)
 		if b.t.Add(r.dropletStaleThreshold).After(time.Now()) {

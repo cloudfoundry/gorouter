@@ -25,53 +25,26 @@ type RouterSuite struct {
 	natsServer *spec.NatsServer
 	natsClient *nats.Client
 	router     *Router
-	proxyPort  uint16
 }
 
 var _ = Suite(&RouterSuite{})
 
 func (s *RouterSuite) SetUpSuite(c *C) {
 	natsPort := nextAvailPort()
-	s.natsServer = spec.NewNatsServer(natsPort, "/tmp/router_nats_test.pid")
+
+	s.natsServer = spec.NewNatsServer(natsPort, fmt.Sprintf("/tmp/router_nats_test-%d.pid", natsPort))
 	err := s.natsServer.Start()
 	c.Assert(err, IsNil)
 
-	s.proxyPort = nextAvailPort()
+	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
 
-	s.Config = config.DefaultConfig()
-
-	s.Config.Port = s.proxyPort
-	s.Config.Index = 2
-	s.Config.TraceKey = "my_trace_key"
-
-	// Hardcode the IP to localhost to avoid leaving the machine while running tests
-	s.Config.Ip = "127.0.0.1"
-
-	s.Config.PublishStartMessageInterval = 10 * time.Millisecond
-	s.Config.PruneStaleDropletsInterval = 0
-	s.Config.DropletStaleThreshold = 0
-	s.Config.PublishActiveAppsInterval = 0
-
-	s.Config.Status = config.StatusConfig{
-		Port: statusPort,
-		User: "user",
-		Pass: "pass",
-	}
-
-	s.Config.Nats = config.NatsConfig{
-		Host: fmt.Sprintf("localhost:%d", natsPort),
-	}
-
-	s.Config.Logging = config.LoggingConfig{
-		File:  "/dev/null",
-		Level: "info",
-	}
+	s.Config = spec.SpecConfig(natsPort, statusPort, proxyPort)
 
 	s.router = NewRouter(s.Config)
 	go s.router.Run()
 
-	s.natsClient = startNATS(fmt.Sprintf("localhost:%d", natsPort), "", "")
+	s.natsClient = s.router.natsClient
 }
 
 func (s *RouterSuite) TearDownSuite(c *C) {
@@ -165,7 +138,7 @@ func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Durati
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, s.proxyPort, s.natsClient, nil)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, s.Config.Port, s.natsClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -206,16 +179,16 @@ func f(x interface{}, s ...string) interface{} {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := test.NewGreetApp([]string{"count.vcap.me"}, s.proxyPort, s.natsClient, map[string]string{"framework": "rails"})
+	app := test.NewGreetApp([]string{"count.vcap.me"}, s.Config.Port, s.natsClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	// Send seed request
-	sendRequests(c, "count.vcap.me", s.proxyPort, 1)
+	sendRequests(c, "count.vcap.me", s.Config.Port, 1)
 	vA := s.readVarz()
 
 	// Send requests
-	sendRequests(c, "count.vcap.me", s.proxyPort, 100)
+	sendRequests(c, "count.vcap.me", s.Config.Port, 100)
 	vB := s.readVarz()
 
 	// Verify varz update
@@ -245,15 +218,15 @@ func (s *RouterSuite) TestVarz(c *C) {
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*test.TestApp, 10)
 	for i := range apps {
-		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.proxyPort, s.natsClient, nil)
+		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.Config.Port, s.natsClient, nil)
 		apps[i].Listen()
 	}
 
 	for _, app := range apps {
 		c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	}
-	session, port1, path := getSessionAndAppPort("sticky.vcap.me", s.proxyPort, c)
-	port2 := getAppPortWithSticky("sticky.vcap.me", s.proxyPort, session, c)
+	session, port1, path := getSessionAndAppPort("sticky.vcap.me", s.Config.Port, c)
+	port2 := getAppPortWithSticky("sticky.vcap.me", s.Config.Port, session, c)
 
 	c.Check(port1, Equals, port2)
 	c.Check(path, Equals, "/")
@@ -291,7 +264,7 @@ func (s *RouterSuite) TestRouterRunErrors(c *C) {
 }
 
 func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := test.NewTestApp([]string{"greet.vcap.me"}, s.proxyPort, s.natsClient, nil)
+	app := test.NewTestApp([]string{"greet.vcap.me"}, s.Config.Port, s.natsClient, nil)
 
 	var rr *http.Request
 	var msg string
@@ -324,7 +297,7 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 }
 
 func (s *RouterSuite) Test100ContinueRequest(c *C) {
-	app := test.NewTestApp([]string{"foo.vcap.me"}, s.proxyPort, s.natsClient, nil)
+	app := test.NewTestApp([]string{"foo.vcap.me"}, s.Config.Port, s.natsClient, nil)
 	rCh := make(chan *http.Request)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := ioutil.ReadAll(r.Body)
@@ -336,7 +309,7 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
-	host := fmt.Sprintf("foo.vcap.me:%d", s.proxyPort)
+	host := fmt.Sprintf("foo.vcap.me:%d", s.Config.Port)
 	conn, err := net.Dial("tcp", host)
 	c.Assert(err, IsNil)
 	defer conn.Close()

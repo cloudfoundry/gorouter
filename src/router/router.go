@@ -35,9 +35,13 @@ func NewRouter(c *config.Config) *Router {
 	}
 
 	// setup nats
-	r.natsClient = startNATS(r.config.Nats.Host, r.config.Nats.User, r.config.Nats.Pass)
+	go r.establishNATS()
 
 	r.registry = NewRegistry(r.config)
+	r.registry.isStateStale = func() bool {
+		return !r.natsClient.Ping()
+	}
+
 	r.varz = NewVarz(r.registry)
 	r.proxy = NewProxy(r.config, r.registry, r.varz)
 
@@ -209,13 +213,22 @@ func (r *Router) Run() {
 	}
 }
 
-func startNATS(host, user, pass string) *nats.Client {
-	c := nats.NewClient()
+func (r *Router) establishNATS() {
+	r.natsClient = nats.NewClient()
+
+	host := r.config.Nats.Host
+	user := r.config.Nats.User
+	pass := r.config.Nats.Pass
 
 	go func() {
-		e := c.RunWithDefaults(host, user, pass)
-		log.Fatalf("Failed to connect to nats server: %s", e.Error())
-	}()
+		for {
+			e := r.natsClient.RunWithDefaults(host, user, pass)
 
-	return c
+			log.Warnf("Failed to connect to nats server: %s", e.Error())
+
+			time.Sleep(1 * time.Second)
+
+			r.natsClient = nats.NewClient()
+		}
+	}()
 }
