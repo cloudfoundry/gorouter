@@ -35,7 +35,7 @@ func NewRouter(c *config.Config) *Router {
 	}
 
 	// setup nats
-	go r.establishNATS()
+	r.establishNATS()
 
 	r.registry = NewRegistry(r.config)
 	r.registry.isStateStale = func() bool {
