@@ -301,6 +301,7 @@ func (r *Registry) Unregister(m *registryMessage) {
 
 func (r *Registry) pruneStaleDroplets() {
 	if r.isStateStale() {
+		r.resetTracker()
 		return
 	}
 
@@ -315,6 +316,12 @@ func (r *Registry) pruneStaleDroplets() {
 		for _, u := range b.U {
 			r.unregisterUri(b, u)
 		}
+	}
+}
+
+func (r *Registry) resetTracker() {
+	for r.staleTracker.Len() > 0 {
+		r.staleTracker.Delete(r.staleTracker.Front().(*Backend))
 	}
 }
 
