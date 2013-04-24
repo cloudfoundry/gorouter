@@ -50,8 +50,11 @@ nats-server -d
 
 ### Usage
 
-When gorouter is used in Cloud Foundry, it receives route updates via NATS.
-Routes that haven't been updated in 2 minutes (by default) are pruned.
+When gorouter is used in Cloud Foundry, it receives route updates via NATS
+after sending `router.start`.  Routes that haven't responded with
+`router.register` in 2 minutes (configurable) are pruned unless connection to
+NATS was lost.
+
 Therefore, to maintain an active route, it needs to be updated at least every 2 minutes.
 The format of these route updates are as follows:
 
