@@ -237,26 +237,51 @@ func (s *RouterSuite) TestStickySession(c *C) {
 }
 
 func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
+  var vbody io.ReadCloser
+  if path == "/varz" {
+    vbody = verifyZ_with_auth(host, path, user, pass, c)
+  } else if path == "/healthz" {
+    vbody = verifyZ_without_auth(host, path, c)
+  }
+  return vbody
+}
+
+func verifyZ_without_auth(host, path string, c *C) io.ReadCloser {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
 	var err error
 
-	// Request without username:password should be rejected
 	req, err = http.NewRequest("GET", "http://"+host+path, nil)
-	resp, err = client.Do(req)
-	c.Check(err, IsNil)
-	c.Assert(resp, Not(IsNil))
-	c.Check(resp.StatusCode, Equals, 401)
-
-	// varz Basic auth
-	req.SetBasicAuth(user, pass)
 	resp, err = client.Do(req)
 	c.Check(err, IsNil)
 	c.Assert(resp, Not(IsNil))
 	c.Check(resp.StatusCode, Equals, 200)
 
 	return resp.Body
+}
+
+func verifyZ_with_auth(host, path, user, pass string, c *C) io.ReadCloser {
+  var client http.Client
+  var req *http.Request
+  var resp *http.Response
+  var err error
+
+  // Request without username:password should be rejected
+  req, err = http.NewRequest("GET", "http://"+host+path, nil)
+  resp, err = client.Do(req)
+  c.Check(err, IsNil)
+  c.Assert(resp, Not(IsNil))
+  c.Check(resp.StatusCode, Equals, 401)
+
+  // varz Basic auth
+  req.SetBasicAuth(user, pass)
+  resp, err = client.Do(req)
+  c.Check(err, IsNil)
+  c.Assert(resp, Not(IsNil))
+  c.Check(resp.StatusCode, Equals, 200)
+
+  return resp.Body
 }
 
 func (s *RouterSuite) TestRouterRunErrors(c *C) {
