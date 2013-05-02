@@ -6,4 +6,7 @@
 	url = https://github.com/cloudfoundry/gosteno
 [submodule "src/github.com/cloudfoundry/gonats"]
 	path = src/github.com/cloudfoundry/gonats
-	url = https://github.com/cloudfoundry/gonats
+  url = https://github.com/cloudfoundry/gonats
+[submodule "src/github.com/mreiferson/go-httpclient"]
+  path = src/github.com/mreiferson/go-httpclient
+  url = https://github.com/mreiferson/go-httpclient
