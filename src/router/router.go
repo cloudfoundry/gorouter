@@ -48,6 +48,10 @@ func NewRouter(c *config.Config) *Router {
 	varz := &vcap.Varz{
 		UniqueVarz: r.varz,
 	}
+	
+	healthz := &vcap.Healthz{
+	  LockableObject: r.registry,
+	}
 
 	var host string
 	if r.config.Status.Port != 0 {
@@ -62,7 +66,7 @@ func NewRouter(c *config.Config) *Router {
 		Config:      r.config,
 		Logger:      log,
 		Varz:        varz,
-		Healthz:     "ok",
+		Healthz:     healthz,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r.registry,
 		},

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	nats "github.com/cloudfoundry/gonats"
-	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
@@ -18,6 +17,7 @@ import (
 	"router/test"
 	"strings"
 	"time"
+	httpclient "github.com/mreiferson/go-httpclient"
 )
 
 type RouterSuite struct {
@@ -81,30 +81,8 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	c.Check(cc.Start, Not(Equals), emptyTime)
 	c.Check(cc.Uptime, Not(Equals), emptyDuration)
 
-	// Check varz/healthz is accessible
-	var b []byte
-	var err error
-
-	// Verify varz
-	vbody := verifyZ(cc.Host, "/varz", cc.Credentials[0], cc.Credentials[1], c)
-	defer vbody.Close()
-	b, err = ioutil.ReadAll(vbody)
-	c.Check(err, IsNil)
-	varz := make(map[string]interface{})
-	json.Unmarshal(b, &varz)
-
-	c.Assert(varz["num_cores"], Not(Equals), 0)
-	c.Assert(varz["type"], Equals, "Router")
-	c.Assert(varz["uuid"], Not(Equals), "")
-
-	// Verify healthz
-	hbody := verifyZ(cc.Host, "/healthz", cc.Credentials[0], cc.Credentials[1], c)
-	defer hbody.Close()
-	b, err = ioutil.ReadAll(hbody)
-	match, _ := regexp.Match("ok", b)
-
-	c.Check(err, IsNil)
-	c.Check(match, Equals, true)
+	verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1], c)
+	verify_health_z(cc.Host, s.router.registry, c)
 }
 
 func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) bool {
@@ -236,39 +214,44 @@ func (s *RouterSuite) TestStickySession(c *C) {
 	}
 }
 
-func verifyZ(host, path, user, pass string, c *C) io.ReadCloser {
-  var vbody io.ReadCloser
-  if path == "/varz" {
-    vbody = verifyZ_with_auth(host, path, user, pass, c)
-  } else if path == "/healthz" {
-    vbody = verifyZ_without_auth(host, path, c)
-  }
-  return vbody
-}
 
-func verifyZ_without_auth(host, path string, c *C) io.ReadCloser {
-	var client http.Client
+func verify_health_z(host string, registry *Registry, c *C) {
 	var req *http.Request
 	var resp *http.Response
 	var err error
+	path := "/healthz"
 
-	req, err = http.NewRequest("GET", "http://"+host+path, nil)
-	resp, err = client.Do(req)
+	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
+	bytes := verify_success(req, c)
+	match, _ := regexp.Match("ok", bytes)
 	c.Check(err, IsNil)
-	c.Assert(resp, Not(IsNil))
-	c.Check(resp.StatusCode, Equals, 200)
+	c.Check(match, Equals, true)
 
-	return resp.Body
+	// Check that healthz does not reply during deadlock
+	registry.Lock()
+	defer registry.Unlock()
+	httpClient := httpclient.New()
+	httpClient.ConnectTimeout = 5 * time.Second
+	req, err = http.NewRequest("GET", "http://"+host+path, nil)
+	resp, err = httpClient.Do(req)
+
+	c.Assert(err, Not(IsNil))
+	match, _ = regexp.Match("i/o timeout", []byte(err.Error()))
+	c.Assert(match, Equals, true)
+	c.Check(resp, IsNil)
+	
+	httpClient.FinishRequest(req)
 }
 
-func verifyZ_with_auth(host, path, user, pass string, c *C) io.ReadCloser {
+func verify_var_z(host, user, pass string, c *C) {
   var client http.Client
   var req *http.Request
   var resp *http.Response
   var err error
+  path := "/varz"
 
   // Request without username:password should be rejected
-  req, err = http.NewRequest("GET", "http://"+host+path, nil)
+  req, _ = http.NewRequest("GET", "http://"+host+path, nil)
   resp, err = client.Do(req)
   c.Check(err, IsNil)
   c.Assert(resp, Not(IsNil))
@@ -276,12 +259,28 @@ func verifyZ_with_auth(host, path, user, pass string, c *C) io.ReadCloser {
 
   // varz Basic auth
   req.SetBasicAuth(user, pass)
-  resp, err = client.Do(req)
-  c.Check(err, IsNil)
-  c.Assert(resp, Not(IsNil))
-  c.Check(resp.StatusCode, Equals, 200)
+  bytes := verify_success(req, c)
+	varz := make(map[string]interface{})
+	json.Unmarshal(bytes, &varz)
 
-  return resp.Body
+	c.Assert(varz["num_cores"], Not(Equals), 0)
+	c.Assert(varz["type"], Equals, "Router")
+	c.Assert(varz["uuid"], Not(Equals), "")
+}
+
+func verify_success(req *http.Request, c *C) []byte {
+	var client http.Client
+	resp, err := client.Do(req)
+	defer resp.Body.Close()
+
+	c.Check(err, IsNil)
+	c.Assert(resp, Not(IsNil))
+	c.Check(resp.StatusCode, Equals, 200)
+
+	bytes, err := ioutil.ReadAll(resp.Body)
+	c.Check(err, IsNil)
+
+	return bytes
 }
 
 func (s *RouterSuite) TestRouterRunErrors(c *C) {

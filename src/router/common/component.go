@@ -25,7 +25,7 @@ type VcapComponent struct {
 	Credentials []string                  `json:"credentials"`
 	Config      interface{}               `json:"config"`
 	Varz        *Varz                     `json:"-"`
-	Healthz     interface{}               `json:"-"`
+	Healthz     *Healthz                  `json:"-"`
 	InfoRoutes  map[string]json.Marshaler `json:"-"`
 	Logger      *steno.Logger             `json:"-"`
 
@@ -35,16 +35,14 @@ type VcapComponent struct {
 	Uptime Duration `json:"uptime"`
 }
 
-type Healthz struct {
-	Health interface{} `json:"health"`
-}
-
 type RouterStart struct {
 	Id    string   `json:"id"`
 	Hosts []string `json:"hosts"`
 }
 
 func UpdateHealthz() *Healthz {
+  healthz.LockableObject.Lock()
+  healthz.LockableObject.Unlock()
 	return healthz
 }
 
@@ -101,7 +99,7 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 
 	procStat = NewProcessStatus()
 
-	healthz = &Healthz{Component.Healthz}
+	healthz = Component.Healthz
 
 	go c.ListenAndServe()
 
