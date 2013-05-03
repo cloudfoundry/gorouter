@@ -17,7 +17,6 @@ import (
 	"router/test"
 	"strings"
 	"time"
-	httpclient "github.com/mreiferson/go-httpclient"
 )
 
 type RouterSuite struct {
@@ -215,6 +214,14 @@ func (s *RouterSuite) TestStickySession(c *C) {
 }
 
 
+func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		c, err := net.Dial(netw, addr)
+		c.SetDeadline(time.Now().Add(2 * time.Second))
+    return c, err
+  }
+}
+
 func verify_health_z(host string, registry *Registry, c *C) {
 	var req *http.Request
 	var resp *http.Response
@@ -230,8 +237,13 @@ func verify_health_z(host string, registry *Registry, c *C) {
 	// Check that healthz does not reply during deadlock
 	registry.Lock()
 	defer registry.Unlock()
-	httpClient := httpclient.New()
-	httpClient.ConnectTimeout = 5 * time.Second
+
+	httpClient := http.Client{
+  	Transport: &http.Transport{
+  		Dial: timeoutDialler(),
+    },
+  }
+
 	req, err = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = httpClient.Do(req)
 
@@ -240,7 +252,6 @@ func verify_health_z(host string, registry *Registry, c *C) {
 	c.Assert(match, Equals, true)
 	c.Check(resp, IsNil)
 	
-	httpClient.FinishRequest(req)
 }
 
 func verify_var_z(host, user, pass string, c *C) {
