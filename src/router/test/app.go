@@ -3,22 +3,22 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	nats "github.com/cloudfoundry/gonats"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"router/common"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 )
 
 type TestApp struct {
 	port       uint16   // app listening port
 	rPort      uint16   // router listening port
 	urls       []string // host registered host name
-	natsClient *nats.Client
+	mbusClient mbus.CFMessageBus
 	tags       map[string]string
 	mux        *http.ServeMux
 }
 
-func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
+func NewTestApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()
@@ -26,7 +26,7 @@ func NewTestApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[s
 	app.port = port
 	app.rPort = rPort
 	app.urls = urls
-	app.natsClient = natsClient
+	app.mbusClient = mbusClient
 	app.tags = tags
 
 	app.mux = http.NewServeMux()
@@ -70,7 +70,7 @@ func (a *TestApp) Register() {
 	}
 
 	b, _ := json.Marshal(rm)
-	a.natsClient.Publish("router.register", b)
+	a.mbusClient.Publish("router.register", b)
 }
 
 func (a *TestApp) Unregister() {
@@ -84,7 +84,7 @@ func (a *TestApp) Unregister() {
 	}
 
 	b, _ := json.Marshal(rm)
-	a.natsClient.Publish("router.unregister", b)
+	a.mbusClient.Publish("router.unregister", b)
 }
 
 func (a *TestApp) VerifyAppStatus(status int, c *C) {

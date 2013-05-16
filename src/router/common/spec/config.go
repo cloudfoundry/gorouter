@@ -1,7 +1,6 @@
 package spec
 
 import (
-	"fmt"
 	"router/config"
 	"time"
 )
@@ -27,7 +26,10 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	}
 
 	c.Nats = config.NatsConfig{
-		Host: fmt.Sprintf("localhost:%d", natsPort),
+		Host: "localhost",
+		Port: natsPort,
+		User: "nats",
+		Pass: "nats",
 	}
 
 	c.Logging = config.LoggingConfig{

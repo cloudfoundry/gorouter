@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	nats "github.com/cloudfoundry/gonats"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
@@ -17,12 +16,14 @@ import (
 	"router/test"
 	"strings"
 	"time"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	"os/exec"
 )
 
 type RouterSuite struct {
 	Config     *config.Config
-	natsServer *spec.NatsServer
-	natsClient *nats.Client
+	natsServerCmd *exec.Cmd
+	mbusClient mbus.CFMessageBus
 	router     *Router
 }
 
@@ -31,9 +32,7 @@ var _ = Suite(&RouterSuite{})
 func (s *RouterSuite) SetUpSuite(c *C) {
 	natsPort := nextAvailPort()
 
-	s.natsServer = spec.NewNatsServer(natsPort, fmt.Sprintf("/tmp/router_nats_test-%d.pid", natsPort))
-	err := s.natsServer.Start()
-	c.Assert(err, IsNil)
+	s.natsServerCmd = mbus.StartNats(int(natsPort))
 
 	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
@@ -43,11 +42,12 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	s.router = NewRouter(s.Config)
 	go s.router.Run()
 
-	s.natsClient = s.router.natsClient
+	<-s.WaitUntilNatsIsUp()
+	s.mbusClient = s.router.mbusClient
 }
 
 func (s *RouterSuite) TearDownSuite(c *C) {
-	s.natsServer.Stop()
+	mbus.StopNats(s.natsServerCmd)
 }
 
 func (s *RouterSuite) TestDiscover(c *C) {
@@ -58,14 +58,9 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	// sure that router has run at least for one second
 	time.Sleep(time.Second)
 
-	s.natsClient.Request("vcap.component.discover", []byte{}, func(sub *nats.Subscription) {
+	s.mbusClient.Request("vcap.component.discover", []byte{}, func(payload []byte) {
 		var component common.VcapComponent
-
-		for m := range sub.Inbox {
-			_ = json.Unmarshal(m.Payload, &component)
-
-			break
-		}
+		_ = json.Unmarshal(payload, &component)
 		sig <- component
 	})
 
@@ -115,7 +110,7 @@ func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Durati
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, s.Config.Port, s.natsClient, nil)
+	app := test.NewGreetApp([]string{"test.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -156,7 +151,7 @@ func f(x interface{}, s ...string) interface{} {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := test.NewGreetApp([]string{"count.vcap.me"}, s.Config.Port, s.natsClient, map[string]string{"framework": "rails"})
+	app := test.NewGreetApp([]string{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
@@ -195,7 +190,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*test.TestApp, 10)
 	for i := range apps {
-		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.Config.Port, s.natsClient, nil)
+		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 		apps[i].Listen()
 	}
 
@@ -299,7 +294,7 @@ func (s *RouterSuite) TestRouterRunErrors(c *C) {
 }
 
 func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := test.NewTestApp([]string{"greet.vcap.me"}, s.Config.Port, s.natsClient, nil)
+	app := test.NewTestApp([]string{"greet.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 
 	var rr *http.Request
 	var msg string
@@ -331,8 +326,22 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 	c.Assert(msg, Equals, "foobar")
 }
 
+func (s *RouterSuite) WaitUntilNatsIsUp() chan bool {
+	natsConnected := make(chan bool, 1)
+	go func() {
+		for {
+			if s.router.mbusClient.Publish("asdf", []byte("data")) == nil {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		natsConnected <- true
+	}()
+	return natsConnected
+}
+
 func (s *RouterSuite) Test100ContinueRequest(c *C) {
-	app := test.NewTestApp([]string{"foo.vcap.me"}, s.Config.Port, s.natsClient, nil)
+	app := test.NewTestApp([]string{"foo.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	rCh := make(chan *http.Request)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := ioutil.ReadAll(r.Body)
@@ -341,6 +350,9 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 		}
 		rCh <- r
 	})
+	
+	<-s.WaitUntilNatsIsUp()
+
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -446,7 +458,9 @@ func (s *RouterSuite) TestInfoApi(c *C) {
 	var resp *http.Response
 	var err error
 
-	s.natsClient.PublishAndConfirm("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
+	<-s.WaitUntilNatsIsUp()
+	s.mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
+	time.Sleep(250 * time.Millisecond)
 
 	host := fmt.Sprintf("http://%s:%d/routes", s.Config.Ip, s.Config.Status.Port)
 

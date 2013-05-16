@@ -4,6 +4,9 @@
 [submodule "src/github.com/cloudfoundry/gosteno"]
 	path = src/github.com/cloudfoundry/gosteno
 	url = https://github.com/cloudfoundry/gosteno
-[submodule "src/github.com/cloudfoundry/gonats"]
-	path = src/github.com/cloudfoundry/gonats
-  url = https://github.com/cloudfoundry/gonats
+[submodule "src/github.com/apcera/nats"]
+	path = src/github.com/apcera/nats
+	url = git@github.com:apcera/nats
+[submodule "src/github.com/cloudfoundry/go_cfmessagebus"]
+	path = src/github.com/cloudfoundry/go_cfmessagebus
+	url = git@github.com:cloudfoundry/go_cfmessagebus

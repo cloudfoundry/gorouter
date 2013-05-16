@@ -1,8 +1,7 @@
 package router
 
 import (
-	"fmt"
-	nats "github.com/cloudfoundry/gonats"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	. "launchpad.net/gocheck"
 	"router/common/spec"
 	"router/config"
@@ -12,20 +11,16 @@ import (
 
 type IntegrationSuite struct {
 	Config     *config.Config
-	natsServer *spec.NatsServer
-	natsClient *nats.Client
+	mbusClient mbus.CFMessageBus
 	router     *Router
 }
 
 var _ = Suite(&IntegrationSuite{})
 
+
 func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	natsPort := nextAvailPort()
-	s.natsServer = spec.NewNatsServer(natsPort, fmt.Sprintf("/tmp/router_nats_test-%d.pid", natsPort))
-	defer s.natsServer.Stop()
-
-	err := s.natsServer.Start()
-	c.Assert(err, IsNil)
+	cmd := mbus.StartNats(int(natsPort))
 
 	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
@@ -36,7 +31,19 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	s.router = NewRouter(s.Config)
 	go s.router.Run()
 
-	s.natsClient = s.router.natsClient
+	natsConnected := make(chan bool, 1)
+	go func() {
+		for {
+			if s.router.mbusClient.Publish("Ping", []byte("data")) == nil {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		natsConnected <- true
+	}()
+
+	<-natsConnected
+	s.mbusClient = s.router.mbusClient
 
 	heartbeatInterval := 1 * time.Second
 	staleThreshold := 5 * time.Second
@@ -44,7 +51,7 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 
 	s.router.registry.dropletStaleThreshold = staleThreshold
 
-	app := test.NewGreetApp([]string{"test.nats.dying.vcap.me"}, proxyPort, s.natsClient, nil)
+	app := test.NewGreetApp([]string{"test.nats.dying.vcap.me"}, proxyPort, s.mbusClient, nil)
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
@@ -62,7 +69,7 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 
 	app.VerifyAppStatus(200, c)
 
-	s.natsServer.Stop()
+	mbus.StopNats(cmd)
 
 	time.Sleep(staleCheckInterval + staleThreshold + 1*time.Second)
 

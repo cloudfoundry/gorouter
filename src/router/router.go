@@ -5,7 +5,7 @@ import (
 	"compress/zlib"
 	"encoding/json"
 	"fmt"
-	nats "github.com/cloudfoundry/gonats"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	steno "github.com/cloudfoundry/gosteno"
 	"net"
 	vcap "router/common"
@@ -19,9 +19,10 @@ import (
 type Router struct {
 	config     *config.Config
 	proxy      *Proxy
-	natsClient *nats.Client
+	mbusClient mbus.CFMessageBus
 	registry   *Registry
 	varz       Varz
+	component  *vcap.VcapComponent
 }
 
 func NewRouter(c *config.Config) *Router {
@@ -34,16 +35,20 @@ func NewRouter(c *config.Config) *Router {
 		runtime.GOMAXPROCS(r.config.GoMaxProcs)
 	}
 
-	// setup nats
-	r.establishNATS()
+	r.establishMBus()
 
 	r.registry = NewRegistry(r.config)
 	r.registry.isStateStale = func() bool {
-		return !r.natsClient.Ping()
+		return !r.mbusClient.Ping()
 	}
 
 	r.varz = NewVarz(r.registry)
 	r.proxy = NewProxy(r.config, r.registry, r.varz)
+
+	var host string
+	if r.config.Status.Port != 0 {
+		host = fmt.Sprintf("%s:%d", r.config.Ip, r.config.Status.Port)
+	}
 
 	varz := &vcap.Varz{
 		UniqueVarz: r.varz,
@@ -53,12 +58,7 @@ func NewRouter(c *config.Config) *Router {
 	  LockableObject: r.registry,
 	}
 
-	var host string
-	if r.config.Status.Port != 0 {
-		host = fmt.Sprintf("%s:%d", r.config.Ip, r.config.Status.Port)
-	}
-
-	component := &vcap.VcapComponent{
+	r.component = &vcap.VcapComponent{
 		Type:        "Router",
 		Index:       r.config.Index,
 		Host:        host,
@@ -72,32 +72,31 @@ func NewRouter(c *config.Config) *Router {
 		},
 	}
 
-	vcap.Register(component, r.natsClient)
+	vcap.StartComponent(r.component)
 
 	return r
 }
 
+func(r *Router) RegisterComponent() {
+	vcap.Register(r.component, r.mbusClient)
+}
+
 func (r *Router) subscribeRegistry(subject string, fn func(*registryMessage)) {
-	s := r.natsClient.NewSubscription(subject)
-	s.Subscribe()
+	callback := func(payload []byte) {
+		var rm registryMessage
 
-	go func() {
-		for m := range s.Inbox {
-			var rm registryMessage
-
-			err := json.Unmarshal(m.Payload, &rm)
-			if err != nil {
-				lm := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
-				log.Log(steno.LOG_WARN, lm, map[string]interface{}{"payload": string(m.Payload)})
-				continue
-			}
-
-			lm := fmt.Sprintf("%s: Received message", subject)
-			log.Log(steno.LOG_DEBUG, lm, map[string]interface{}{"message": rm})
-
-			fn(&rm)
+		err := json.Unmarshal(payload, &rm)
+		if err != nil {
+			lm := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
+			log.Log(steno.LOG_WARN, lm, map[string]interface{}{"payload": string(payload)})
 		}
-	}()
+
+		lm := fmt.Sprintf("%s: Received message", subject)
+		log.Log(steno.LOG_DEBUG, lm, map[string]interface{}{"message": rm})
+
+		fn(&rm)
+	}
+	r.mbusClient.Subscribe(subject, callback)
 }
 
 func (r *Router) SubscribeRegister() {
@@ -130,7 +129,7 @@ func (r *Router) flushApps(t time.Time) {
 
 	log.Debugf("Active apps: %d, message size: %d", len(x), len(z))
 
-	r.natsClient.Publish("router.active_apps", z)
+	r.mbusClient.Publish("router.active_apps", z)
 }
 
 func (r *Router) ScheduleFlushApps() {
@@ -166,7 +165,7 @@ func (r *Router) SendStartMessage() {
 	}
 
 	// Send start message once at start
-	r.natsClient.Publish("router.start", b)
+	r.mbusClient.Publish("router.start", b)
 
 	go func() {
 		t := time.NewTicker(r.config.PublishStartMessageInterval)
@@ -174,7 +173,7 @@ func (r *Router) SendStartMessage() {
 		for {
 			select {
 			case <-t.C:
-				r.natsClient.Publish("router.start", b)
+				r.mbusClient.Publish("router.start", b)
 			}
 		}
 	}()
@@ -183,12 +182,25 @@ func (r *Router) SendStartMessage() {
 func (r *Router) Run() {
 	var err error
 
-	// Subscribe register/unregister router
-	r.SubscribeRegister()
-	r.SubscribeUnregister()
+	go func() {
+		for {
+			err = r.mbusClient.Connect()
+			if err == nil {
+				break
+			}
+			log.Errorf("Could not connect to NATS: ", err.Error())
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+
+	r.RegisterComponent()
 
 	// Kickstart sending start messages
 	r.SendStartMessage()
+
+	// Subscribe register/unregister router
+	r.SubscribeRegister()
+	r.SubscribeUnregister()
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
@@ -215,24 +227,20 @@ func (r *Router) Run() {
 	if err != nil {
 		log.Fatalf("proxy.Serve: %s", err)
 	}
+
 }
 
-func (r *Router) establishNATS() {
-	r.natsClient = nats.NewClient()
+func (r *Router) establishMBus() {
+	mbusClient, err := mbus.NewCFMessageBus("NATS")
+	r.mbusClient = mbusClient
+	if err != nil {
+		panic("Could not connect to NATS")
+	}
 
 	host := r.config.Nats.Host
 	user := r.config.Nats.User
 	pass := r.config.Nats.Pass
+	port := r.config.Nats.Port
 
-	go func() {
-		for {
-			e := r.natsClient.RunWithDefaults(host, user, pass)
-
-			log.Warnf("Failed to connect to nats server: %s", e.Error())
-
-			time.Sleep(1 * time.Second)
-
-			r.natsClient = nats.NewClient()
-		}
-	}()
+	r.mbusClient.Configure(host, int(port), user, pass)
 }

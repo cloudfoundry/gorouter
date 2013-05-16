@@ -4,8 +4,8 @@ status:
   pass:
 
 nats:
-  uri: "nats://localhost:4222"
-  host:
+  host: "localhost"
+  port: 4222
   user:
   pass:
 

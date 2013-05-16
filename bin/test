@@ -16,12 +16,14 @@ done
 echo --- Testing
 for p in $(packages)
 do
-  echo $p
+  if [[ -z $1 || $p == $1 ]]; then
+    echo $p
 
-  if grep -q launchpad.net/gocheck src/$p/*.go
-  then
-    bin/go test $p -test.v=true -gocheck.v=true
-  else
-    bin/go test $p -test.v=true
+    if grep -q launchpad.net/gocheck src/$p/*.go
+    then
+      bin/go test $p -test.v=true -gocheck.v=true
+    else
+      bin/go test $p -test.v=true
+    fi
   fi
 done

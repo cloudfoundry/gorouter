@@ -35,40 +35,24 @@ status:
 	c.Check(s.Status.Pass, Equals, "pass")
 }
 
-func (s *ConfigSuite) TestNatsWithoutUri(c *C) {
+func (s *ConfigSuite) TestNats(c *C) {
 	var b = []byte(`
 nats:
-  host: remotehost:4223
+  host: remotehost
+  port: 4223
   user: user
   pass: pass
 `)
 
-	c.Check(s.Nats.Host, Equals, "localhost:4222")
+	c.Check(s.Nats.Host, Equals, "localhost")
+	c.Check(s.Nats.Port, Equals, uint16(4222))
 	c.Check(s.Nats.User, Equals, "")
 	c.Check(s.Nats.Pass, Equals, "")
 
 	goyaml.Unmarshal(b, &s.Config)
 
-	c.Check(s.Nats.Host, Equals, "remotehost:4223")
-	c.Check(s.Nats.User, Equals, "user")
-	c.Check(s.Nats.Pass, Equals, "pass")
-}
-
-func (s *ConfigSuite) TestNatsWithUri(c *C) {
-	var b = []byte(`
-nats:
-  uri: nats://user:pass@remotehost:4223/
-`)
-
-	c.Check(s.Nats.Host, Equals, "localhost:4222")
-	c.Check(s.Nats.User, Equals, "")
-	c.Check(s.Nats.Pass, Equals, "")
-
-	goyaml.Unmarshal(b, &s.Config)
-
-	s.Config.Process()
-
-	c.Check(s.Nats.Host, Equals, "remotehost:4223")
+	c.Check(s.Nats.Host, Equals, "remotehost")
+	c.Check(s.Nats.Port, Equals, uint16(4223))
 	c.Check(s.Nats.User, Equals, "user")
 	c.Check(s.Nats.Pass, Equals, "pass")
 }

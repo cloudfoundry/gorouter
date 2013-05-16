@@ -3,7 +3,6 @@ package config
 import (
 	"io/ioutil"
 	"launchpad.net/goyaml"
-	"net/url"
 	vcap "router/common"
 	"time"
 )
@@ -21,15 +20,15 @@ var defaultStatusConfig = StatusConfig{
 }
 
 type NatsConfig struct {
-	Uri  string "uri"
 	Host string "host"
+	Port uint16 "port"
 	User string "user"
 	Pass string "pass"
 }
 
 var defaultNatsConfig = NatsConfig{
-	Uri:  "",
-	Host: "localhost:4222",
+	Host: "localhost",
+	Port: 4222,
 	User: "",
 	Pass: "",
 }
@@ -96,19 +95,6 @@ func DefaultConfig() *Config {
 
 func (c *Config) Process() {
 	var err error
-
-	if c.Nats.Uri != "" {
-		u, err := url.Parse(c.Nats.Uri)
-		if err != nil {
-			panic(err)
-		}
-
-		c.Nats.Host = u.Host
-		if u.User != nil {
-			c.Nats.User = u.User.Username()
-			c.Nats.Pass, _ = u.User.Password()
-		}
-	}
 
 	c.PublishStartMessageInterval = time.Duration(c.PublishStartMessageIntervalInSeconds) * time.Second
 	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second

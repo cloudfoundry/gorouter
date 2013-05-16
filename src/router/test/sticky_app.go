@@ -2,13 +2,13 @@ package test
 
 import (
 	"fmt"
-	nats "github.com/cloudfoundry/gonats"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"io"
 	"net/http"
 )
 
-func NewStickyApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
-	app := NewTestApp(urls, rPort, natsClient, tags)
+func NewStickyApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
+	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/sticky", stickyHandler(app.port))
 
 	return app

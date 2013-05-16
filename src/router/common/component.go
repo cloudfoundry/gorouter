@@ -3,7 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	nats "github.com/cloudfoundry/gonats"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	steno "github.com/cloudfoundry/gosteno"
 	"net/http"
 	. "router/common/http"
@@ -57,7 +57,7 @@ func UpdateVarz() *Varz {
 	return varz
 }
 
-func Register(c *VcapComponent, natsClient *nats.Client) {
+func StartComponent(c *VcapComponent) {
 	Component = *c
 	if Component.Type == "" {
 		log.Fatal("Component type is required")
@@ -102,28 +102,25 @@ func Register(c *VcapComponent, natsClient *nats.Client) {
 	healthz = Component.Healthz
 
 	go c.ListenAndServe()
+}
 
-	// subscribe nats
-	discover := natsClient.NewSubscription("vcap.component.discover")
-	discover.Subscribe()
-
-	go func() {
-		for m := range discover.Inbox {
-			Component.Uptime = Component.Start.Elapsed()
-			b, e := json.Marshal(Component)
-			if e != nil {
-				log.Warnf(e.Error())
-			}
-			natsClient.Publish(string(m.ReplyTo), b)
+func Register(c *VcapComponent, mbusClient mbus.CFMessageBus) {
+	mbusClient.RespondToChannel("vcap.component.discover", func(payload []byte) []byte {
+		Component.Uptime = Component.Start.Elapsed()
+		b, e := json.Marshal(Component)
+		if e != nil {
+			log.Warnf(e.Error())
+			return nil
 		}
-	}()
+		return b
+	})
 
 	b, e := json.Marshal(Component)
 	if e != nil {
 		log.Fatal(e.Error())
 		panic("Component's information should be correct")
 	}
-	natsClient.Publish("vcap.component.announce", b)
+	mbusClient.Publish("vcap.component.announce", b)
 
 	log.Infof("Component %s registered successfully", Component.Type)
 }

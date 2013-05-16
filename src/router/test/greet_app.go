@@ -1,13 +1,13 @@
 package test
 
 import (
-	nats "github.com/cloudfoundry/gonats"
 	"io"
 	"net/http"
+  mbus "github.com/cloudfoundry/go_cfmessagebus"
 )
 
-func NewGreetApp(urls []string, rPort uint16, natsClient *nats.Client, tags map[string]string) *TestApp {
-	app := NewTestApp(urls, rPort, natsClient, tags)
+func NewGreetApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
+	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/", greetHandler)
 
 	return app
