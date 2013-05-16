@@ -6,7 +6,7 @@
 	url = https://github.com/cloudfoundry/gosteno
 [submodule "src/github.com/apcera/nats"]
 	path = src/github.com/apcera/nats
-	url = git@github.com:apcera/nats
+	url = https://github.com/apcera/nats
 [submodule "src/github.com/cloudfoundry/go_cfmessagebus"]
 	path = src/github.com/cloudfoundry/go_cfmessagebus
-	url = git@github.com:cloudfoundry/go_cfmessagebus
+	url = https://github.com/cloudfoundry/go_cfmessagebus
