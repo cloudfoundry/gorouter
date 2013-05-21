@@ -55,7 +55,7 @@ func NewRouter(c *config.Config) *Router {
 	}
 	
 	healthz := &vcap.Healthz{
-	  LockableObject: r.registry,
+		LockableObject: r.registry,
 	}
 
 	r.component = &vcap.VcapComponent{
@@ -77,7 +77,7 @@ func NewRouter(c *config.Config) *Router {
 	return r
 }
 
-func(r *Router) RegisterComponent() {
+func (r *Router) RegisterComponent() {
 	vcap.Register(r.component, r.mbusClient)
 }
 
@@ -101,12 +101,14 @@ func (r *Router) subscribeRegistry(subject string, fn func(*registryMessage)) {
 
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(rm *registryMessage) {
+		log.Infof("Got router.register: %v", rm)
 		r.registry.Register(rm)
 	})
 }
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(rm *registryMessage) {
+		log.Infof("Got router.unregister: %v", rm)
 		r.registry.Unregister(rm)
 	})
 }
@@ -173,6 +175,7 @@ func (r *Router) SendStartMessage() {
 		for {
 			select {
 			case <-t.C:
+				log.Info("Sending start message")
 				r.mbusClient.Publish("router.start", b)
 			}
 		}

@@ -252,31 +252,32 @@ func (r *Registry) Register(m *registryMessage) {
 	r.staleTracker.PushBack(b)
 }
 
-func (r *Registry) unregisterUri(b *Backend, u Uri) {
-	u = u.ToLower()
+func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
+	uri = uri.ToLower()
 
-	ok := b.unregister(u)
+	ok := backend.unregister(uri)
 	if ok {
-		x := r.byUri[u]
-		for i, y := range x {
-			if y == b {
-				x[i] = x[len(x)-1]
-				x = x[:len(x)-1]
+		backends := r.byUri[uri]
+		for i, b := range backends {
+			if b == backend {
+				// Remove b from list of backends
+				backends[i] = backends[len(backends)-1]
+				backends = backends[:len(backends)-1]
 				break
 			}
 		}
 
-		if len(x) == 0 {
-			delete(r.byUri, u)
+		if len(backends) == 0 {
+			delete(r.byUri, uri)
 		} else {
-			r.byUri[u] = x
+			r.byUri[uri] = backends
 		}
 	}
 
 	// Remove backend if it no longer has uris
-	if len(b.U) == 0 {
-		delete(r.byBackendId, b.BackendId)
-		r.staleTracker.Delete(b)
+	if len(backend.U) == 0 {
+		delete(r.byBackendId, backend.BackendId)
+		r.staleTracker.Delete(backend)
 	}
 }
 
@@ -301,6 +302,7 @@ func (r *Registry) Unregister(m *registryMessage) {
 
 func (r *Registry) pruneStaleDroplets() {
 	if r.isStateStale() {
+		log.Info("State is stale; NOT pruning")
 		r.resetTracker()
 		return
 	}
@@ -308,6 +310,7 @@ func (r *Registry) pruneStaleDroplets() {
 	for r.staleTracker.Len() > 0 {
 		b := r.staleTracker.Front().(*Backend)
 		if b.t.Add(r.dropletStaleThreshold).After(time.Now()) {
+			log.Infof("Droplet is not stale; NOT pruning: %v", b.BackendId)
 			break
 		}
 
