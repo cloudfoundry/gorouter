@@ -77,8 +77,8 @@ type Backend struct {
 	Tags              map[string]string
 	PrivateInstanceId string
 
-	U Uris
-	t time.Time
+	U          Uris
+	updated_at time.Time
 }
 
 func (b *Backend) MarshalJSON() ([]byte, error) {
@@ -97,8 +97,8 @@ func newBackend(i BackendId, m *registryMessage, l *steno.Logger) *Backend {
 		Tags:              m.Tags,
 		PrivateInstanceId: m.PrivateInstanceId,
 
-		U: make([]Uri, 0),
-		t: time.Now(),
+		U:          make([]Uri, 0),
+		updated_at: time.Now(),
 	}
 
 	return b
@@ -228,28 +228,28 @@ func (r *Registry) registerUri(b *Backend, u Uri) {
 	}
 }
 
-func (r *Registry) Register(m *registryMessage) {
-	i, ok := m.BackendId()
-	if !ok || len(m.Uris) == 0 {
+func (registry *Registry) Register(message *registryMessage) {
+	i, ok := message.BackendId()
+	if !ok || len(message.Uris) == 0 {
 		return
 	}
 
-	r.Lock()
-	defer r.Unlock()
+	registry.Lock()
+	defer registry.Unlock()
 
-	b, ok := r.byBackendId[i]
+	backend, ok := registry.byBackendId[i]
 	if !ok {
-		b = newBackend(i, m, r.Logger)
-		r.byBackendId[i] = b
+		backend = newBackend(i, message, registry.Logger)
+		registry.byBackendId[i] = backend
 	}
 
-	for _, u := range m.Uris {
-		r.registerUri(b, u)
+	for _, uri := range message.Uris {
+		registry.registerUri(backend, uri)
 	}
 
-	b.t = time.Now()
+	backend.updated_at = time.Now()
 
-	r.staleTracker.PushBack(b)
+	registry.staleTracker.PushBack(backend)
 }
 
 func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
@@ -300,39 +300,39 @@ func (r *Registry) Unregister(m *registryMessage) {
 	}
 }
 
-func (r *Registry) pruneStaleDroplets() {
-	if r.isStateStale() {
+func (registry *Registry) pruneStaleDroplets() {
+	if registry.isStateStale() {
 		log.Info("State is stale; NOT pruning")
-		r.resetTracker()
+		registry.resetTracker()
 		return
 	}
 
-	for r.staleTracker.Len() > 0 {
-		b := r.staleTracker.Front().(*Backend)
-		if b.t.Add(r.dropletStaleThreshold).After(time.Now()) {
-			log.Infof("Droplet is not stale; NOT pruning: %v", b.BackendId)
+	for registry.staleTracker.Len() > 0 {
+		backend := registry.staleTracker.Front().(*Backend)
+		if backend.updated_at.Add(registry.dropletStaleThreshold).After(time.Now()) {
+			log.Infof("Droplet is not stale; NOT pruning: %v", backend.BackendId)
 			break
 		}
 
-		log.Infof("Pruning stale droplet: %v ", b.BackendId)
+		log.Infof("Pruning stale droplet: %v ", backend.BackendId)
 
-		for _, u := range b.U {
-			r.unregisterUri(b, u)
+		for _, uri := range backend.U {
+			registry.unregisterUri(backend, uri)
 		}
 	}
 }
 
-func (r *Registry) resetTracker() {
-	for r.staleTracker.Len() > 0 {
-		r.staleTracker.Delete(r.staleTracker.Front().(*Backend))
+func (registry *Registry) resetTracker() {
+	for registry.staleTracker.Len() > 0 {
+		registry.staleTracker.Delete(registry.staleTracker.Front().(*Backend))
 	}
 }
 
-func (r *Registry) PruneStaleDroplets() {
-	r.Lock()
-	defer r.Unlock()
+func (registry *Registry) PruneStaleDroplets() {
+	registry.Lock()
+	defer registry.Unlock()
 
-	r.pruneStaleDroplets()
+	registry.pruneStaleDroplets()
 }
 
 func (r *Registry) checkAndPrune() {

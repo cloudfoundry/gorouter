@@ -53,7 +53,7 @@ func NewRouter(c *config.Config) *Router {
 	varz := &vcap.Varz{
 		UniqueVarz: r.varz,
 	}
-	
+
 	healthz := &vcap.Healthz{
 		LockableObject: r.registry,
 	}
@@ -81,28 +81,31 @@ func (r *Router) RegisterComponent() {
 	vcap.Register(r.component, r.mbusClient)
 }
 
-func (r *Router) subscribeRegistry(subject string, fn func(*registryMessage)) {
+func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
 	callback := func(payload []byte) {
-		var rm registryMessage
+		var msg registryMessage
 
-		err := json.Unmarshal(payload, &rm)
+		err := json.Unmarshal(payload, &msg)
 		if err != nil {
-			lm := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
-			log.Log(steno.LOG_WARN, lm, map[string]interface{}{"payload": string(payload)})
+			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
+			log.Log(steno.LOG_WARN, logMessage, map[string]interface{}{"payload": string(payload)})
 		}
 
-		lm := fmt.Sprintf("%s: Received message", subject)
-		log.Log(steno.LOG_DEBUG, lm, map[string]interface{}{"message": rm})
+		logMessage := fmt.Sprintf("%s: Received message", subject)
+		log.Log(steno.LOG_DEBUG, logMessage, map[string]interface{}{"message": msg})
 
-		fn(&rm)
+		successCallback(&msg)
 	}
-	r.mbusClient.Subscribe(subject, callback)
+	err := r.mbusClient.Subscribe(subject, callback)
+	if err != nil {
+		log.Errorf("Error subscribing to %s: %s", subject, err.Error())
+	}
 }
 
-func (r *Router) SubscribeRegister() {
-	r.subscribeRegistry("router.register", func(rm *registryMessage) {
-		log.Infof("Got router.register: %v", rm)
-		r.registry.Register(rm)
+func (router *Router) SubscribeRegister() {
+	router.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
+		log.Infof("Got router.register: %v", registryMessage)
+		router.registry.Register(registryMessage)
 	})
 }
 
@@ -176,18 +179,20 @@ func (r *Router) SendStartMessage() {
 			select {
 			case <-t.C:
 				log.Info("Sending start message")
-				r.mbusClient.Publish("router.start", b)
+				err := r.mbusClient.Publish("router.start", b)
+				if err != nil {
+					log.Errorf("Error publishing to router.start: %s", err.Error())
+				}
 			}
 		}
 	}()
 }
 
-func (r *Router) Run() {
+func (router *Router) Run() {
 	var err error
-
 	go func() {
 		for {
-			err = r.mbusClient.Connect()
+			err = router.mbusClient.Connect()
 			if err == nil {
 				break
 			}
@@ -196,41 +201,40 @@ func (r *Router) Run() {
 		}
 	}()
 
-	r.RegisterComponent()
+	router.RegisterComponent()
 
 	// Kickstart sending start messages
-	r.SendStartMessage()
+	router.SendStartMessage()
 
 	// Subscribe register/unregister router
-	r.SubscribeRegister()
-	r.SubscribeUnregister()
+	router.SubscribeRegister()
+	router.SubscribeUnregister()
 
 	// Schedule flushing active app's app_id
-	r.ScheduleFlushApps()
+	router.ScheduleFlushApps()
 
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.
-	if r.config.PublishStartMessageInterval != 0 {
-		log.Infof("Waiting %s before listening...", r.config.PublishStartMessageInterval)
-		time.Sleep(r.config.PublishStartMessageInterval)
+	if router.config.PublishStartMessageInterval != 0 {
+		log.Infof("Waiting %s before listening...", router.config.PublishStartMessageInterval)
+		time.Sleep(router.config.PublishStartMessageInterval)
 	}
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", router.config.Port))
 	if err != nil {
 		log.Fatalf("net.Listen: %s", err)
 	}
 
-	util.WritePidFile(r.config.Pidfile)
+	util.WritePidFile(router.config.Pidfile)
 
-	log.Infof("Listening on %s", l.Addr())
+	log.Infof("Listening on %s", listen.Addr())
 
-	s := proxy.Server{Handler: r.proxy}
+	server := proxy.Server{Handler: router.proxy}
 
-	err = s.Serve(l)
+	err = server.Serve(listen)
 	if err != nil {
 		log.Fatalf("proxy.Serve: %s", err)
 	}
-
 }
 
 func (r *Router) establishMBus() {

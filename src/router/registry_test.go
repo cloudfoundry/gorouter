@@ -1,9 +1,9 @@
 package router
 
 import (
+	"encoding/json"
 	. "launchpad.net/gocheck"
 	"router/config"
-	"encoding/json"
 	"time"
 )
 

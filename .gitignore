@@ -5,3 +5,5 @@ bin/*
 /pkg
 *.test
 /tmp
+*.iml
+.idea/

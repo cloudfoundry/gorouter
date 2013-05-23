@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
+	"os/exec"
 	"regexp"
 	"router/common"
 	"router/common/spec"
@@ -16,15 +18,13 @@ import (
 	"router/test"
 	"strings"
 	"time"
-	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	"os/exec"
 )
 
 type RouterSuite struct {
-	Config     *config.Config
+	Config        *config.Config
 	natsServerCmd *exec.Cmd
-	mbusClient mbus.CFMessageBus
-	router     *Router
+	mbusClient    mbus.CFMessageBus
+	router        *Router
 }
 
 var _ = Suite(&RouterSuite{})
@@ -208,13 +208,12 @@ func (s *RouterSuite) TestStickySession(c *C) {
 	}
 }
 
-
 func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
 	return func(netw, addr string) (net.Conn, error) {
 		c, err := net.Dial(netw, addr)
 		c.SetDeadline(time.Now().Add(2 * time.Second))
-    return c, err
-  }
+		return c, err
+	}
 }
 
 func verify_health_z(host string, registry *Registry, c *C) {
@@ -234,10 +233,10 @@ func verify_health_z(host string, registry *Registry, c *C) {
 	defer registry.Unlock()
 
 	httpClient := http.Client{
-  	Transport: &http.Transport{
-  		Dial: timeoutDialler(),
-    },
-  }
+		Transport: &http.Transport{
+			Dial: timeoutDialler(),
+		},
+	}
 
 	req, err = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = httpClient.Do(req)
@@ -246,26 +245,26 @@ func verify_health_z(host string, registry *Registry, c *C) {
 	match, _ = regexp.Match("i/o timeout", []byte(err.Error()))
 	c.Assert(match, Equals, true)
 	c.Check(resp, IsNil)
-	
+
 }
 
 func verify_var_z(host, user, pass string, c *C) {
-  var client http.Client
-  var req *http.Request
-  var resp *http.Response
-  var err error
-  path := "/varz"
+	var client http.Client
+	var req *http.Request
+	var resp *http.Response
+	var err error
+	path := "/varz"
 
-  // Request without username:password should be rejected
-  req, _ = http.NewRequest("GET", "http://"+host+path, nil)
-  resp, err = client.Do(req)
-  c.Check(err, IsNil)
-  c.Assert(resp, Not(IsNil))
-  c.Check(resp.StatusCode, Equals, 401)
+	// Request without username:password should be rejected
+	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
+	resp, err = client.Do(req)
+	c.Check(err, IsNil)
+	c.Assert(resp, Not(IsNil))
+	c.Check(resp.StatusCode, Equals, 401)
 
-  // varz Basic auth
-  req.SetBasicAuth(user, pass)
-  bytes := verify_success(req, c)
+	// varz Basic auth
+	req.SetBasicAuth(user, pass)
+	bytes := verify_success(req, c)
 	varz := make(map[string]interface{})
 	json.Unmarshal(bytes, &varz)
 
@@ -350,7 +349,7 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 		}
 		rCh <- r
 	})
-	
+
 	<-s.WaitUntilNatsIsUp()
 
 	app.Listen()

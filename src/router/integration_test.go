@@ -17,7 +17,6 @@ type IntegrationSuite struct {
 
 var _ = Suite(&IntegrationSuite{})
 
-
 func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	natsPort := nextAvailPort()
 	cmd := mbus.StartNats(int(natsPort))
