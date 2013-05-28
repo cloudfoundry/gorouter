@@ -24,6 +24,6 @@ func (s *HealthzSuite) TestJsonMarshal(c *C) {
   healthz := &Healthz{
     LockableObject: &sync.Mutex{},
   }
-  bytes, _ := healthz.MarshalJSON()
-  c.Assert(string(bytes), Equals, "{\"health\":\"ok\"}")
+  ok := healthz.Value()
+  c.Assert(ok, Equals, "ok")
 }

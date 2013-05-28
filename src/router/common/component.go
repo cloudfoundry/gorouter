@@ -41,6 +41,7 @@ type RouterStart struct {
 }
 
 func UpdateHealthz() *Healthz {
+	// lock and unlock immediately to determine if we are in deadlock state
   healthz.LockableObject.Lock()
   healthz.LockableObject.Unlock()
 	return healthz
@@ -129,11 +130,10 @@ func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
 
 	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 
-		enc := json.NewEncoder(w)
-		enc.Encode(UpdateHealthz())
+		fmt.Fprintf(w, UpdateHealthz().Value())
 	})
 
 	hs.HandleFunc("/varz", func(w http.ResponseWriter, req *http.Request) {

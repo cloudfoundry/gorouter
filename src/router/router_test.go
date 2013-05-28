@@ -224,9 +224,8 @@ func verify_health_z(host string, registry *Registry, c *C) {
 
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
 	bytes := verify_success(req, c)
-	match, _ := regexp.Match("ok", bytes)
 	c.Check(err, IsNil)
-	c.Check(match, Equals, true)
+	c.Check(string(bytes), Equals, "ok")
 
 	// Check that healthz does not reply during deadlock
 	registry.Lock()
@@ -242,7 +241,7 @@ func verify_health_z(host string, registry *Registry, c *C) {
 	resp, err = httpClient.Do(req)
 
 	c.Assert(err, Not(IsNil))
-	match, _ = regexp.Match("i/o timeout", []byte(err.Error()))
+	match, _ := regexp.Match("i/o timeout", []byte(err.Error()))
 	c.Assert(match, Equals, true)
 	c.Check(resp, IsNil)
 
