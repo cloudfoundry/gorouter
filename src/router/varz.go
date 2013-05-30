@@ -20,8 +20,6 @@ type varz struct {
 	All  *HttpMetric `json:"all"`
 	Tags struct {
 		Component TaggedHttpMetric `json:"component"`
-		Framework TaggedHttpMetric `json:"framework"`
-		Runtime   TaggedHttpMetric `json:"runtime"`
 	} `json:"tags"`
 
 	Urls     int `json:"urls"`
@@ -172,8 +170,6 @@ func NewVarz(r *Registry) Varz {
 
 	x.All = NewHttpMetric()
 	x.Tags.Component = make(map[string]*HttpMetric)
-	x.Tags.Framework = make(map[string]*HttpMetric)
-	x.Tags.Runtime = make(map[string]*HttpMetric)
 
 	return x
 }
@@ -230,16 +226,6 @@ func (x *RealVarz) CaptureBackendRequest(b *Backend, req *http.Request) {
 		x.varz.Tags.Component.CaptureRequest(t)
 	}
 
-	t, ok = b.Tags["framework"]
-	if ok {
-		x.varz.Tags.Framework.CaptureRequest(t)
-	}
-
-	t, ok = b.Tags["runtime"]
-	if ok {
-		x.varz.Tags.Runtime.CaptureRequest(t)
-	}
-
 	x.varz.All.CaptureRequest()
 }
 
@@ -253,16 +239,6 @@ func (x *RealVarz) CaptureBackendResponse(b *Backend, res *http.Response, d time
 	t, ok = b.Tags["component"]
 	if ok {
 		x.varz.Tags.Component.CaptureResponse(t, res, d)
-	}
-
-	t, ok = b.Tags["framework"]
-	if ok {
-		x.varz.Tags.Framework.CaptureResponse(t, res, d)
-	}
-
-	t, ok = b.Tags["runtime"]
-	if ok {
-		x.varz.Tags.Runtime.CaptureResponse(t, res, d)
 	}
 
 	x.varz.All.CaptureResponse(res, d)

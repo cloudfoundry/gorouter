@@ -115,16 +115,12 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 	b1 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
-			"runtime":   "ruby18",
-			"framework": "sinatra",
 		},
 	}
 
 	b2 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
-			"runtime":   "ruby18",
-			"framework": "rails",
 		},
 	}
 
@@ -135,9 +131,6 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 	s.CaptureBackendRequest(b2, &r2)
 
 	c.Check(s.f("tags", "component", "cc", "requests"), Equals, float64(2))
-	c.Check(s.f("tags", "runtime", "ruby18", "requests"), Equals, float64(2))
-	c.Check(s.f("tags", "framework", "sinatra", "requests"), Equals, float64(1))
-	c.Check(s.f("tags", "framework", "rails", "requests"), Equals, float64(1))
 }
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
@@ -166,16 +159,12 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	b1 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
-			"runtime":   "ruby18",
-			"framework": "sinatra",
 		},
 	}
 
 	b2 := &Backend{
 		Tags: map[string]string{
 			"component": "cc",
-			"runtime":   "ruby18",
-			"framework": "rails",
 		},
 	}
 
@@ -193,12 +182,6 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 
 	c.Check(s.f("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
 	c.Check(s.f("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
-	c.Check(s.f("tags", "runtime", "ruby18", "responses_2xx"), Equals, float64(1))
-	c.Check(s.f("tags", "runtime", "ruby18", "responses_4xx"), Equals, float64(2))
-	c.Check(s.f("tags", "framework", "sinatra", "responses_2xx"), Equals, float64(1))
-	c.Check(s.f("tags", "framework", "sinatra", "responses_4xx"), Equals, float64(0))
-	c.Check(s.f("tags", "framework", "rails", "responses_2xx"), Equals, float64(0))
-	c.Check(s.f("tags", "framework", "rails", "responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {

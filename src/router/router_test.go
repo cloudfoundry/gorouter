@@ -174,16 +174,6 @@ func (s *RouterSuite) TestVarz(c *C) {
 	allResponses2xx := Responses2xxB - Responses2xxA
 	c.Check(allResponses2xx, Equals, 100)
 
-	RailsRequestsA := int(f(vA, "tags", "framework", "rails", "requests").(float64))
-	RailsRequestsB := int(f(vB, "tags", "framework", "rails", "requests").(float64))
-	allRailsRequests := RailsRequestsB - RailsRequestsA
-	c.Check(allRailsRequests, Equals, 100)
-
-	RailsResponses2xxA := int(f(vA, "tags", "framework", "rails", "requests").(float64))
-	RailsResponses2xxB := int(f(vB, "tags", "framework", "rails", "requests").(float64))
-	allRailsResponses2xx := RailsResponses2xxB - RailsResponses2xxA
-	c.Check(allRailsResponses2xx, Equals, 100)
-
 	app.Unregister()
 }
 
