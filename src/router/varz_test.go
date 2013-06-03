@@ -11,12 +11,14 @@ import (
 
 type VarzSuite struct {
 	Varz
+	*Registry
 }
 
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
 	r := NewRegistry(config.DefaultConfig())
+	s.Registry = r
 	s.Varz = NewVarz(r)
 }
 
@@ -90,6 +92,22 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 	}
 }
 
+func (s *VarzSuite) TestUrlsInVarz(c *C) {
+	c.Check(s.f("urls"), Equals, float64(0))
+
+	var fooReg = &registryMessage{
+		Host: "192.168.1.1",
+		Port: 1234,
+		Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
+		Tags: map[string]string{},
+		App: "12345",
+	}
+	// Add a route
+	s.Registry.Register(fooReg)
+
+	c.Check(s.f("urls"), Equals, float64(2))
+}
+
 func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 	r := http.Request{}
 
@@ -104,10 +122,10 @@ func (s *VarzSuite) TestUpdateRequests(c *C) {
 	b := &Backend{}
 	r := http.Request{}
 
-	s.CaptureBackendRequest(b, &r)
+	s.Varz.CaptureBackendRequest(b, &r)
 	c.Check(s.f("requests"), Equals, float64(1))
 
-	s.CaptureBackendRequest(b, &r)
+	s.Varz.CaptureBackendRequest(b, &r)
 	c.Check(s.f("requests"), Equals, float64(2))
 }
 
@@ -127,8 +145,8 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 	r1 := http.Request{}
 	r2 := http.Request{}
 
-	s.CaptureBackendRequest(b1, &r1)
-	s.CaptureBackendRequest(b2, &r2)
+	s.Varz.CaptureBackendRequest(b1, &r1)
+	s.Varz.CaptureBackendRequest(b2, &r2)
 
 	c.Check(s.f("tags", "component", "cc", "requests"), Equals, float64(2))
 }
