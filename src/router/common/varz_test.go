@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	steno "github.com/cloudfoundry/gosteno"
 	. "launchpad.net/gocheck"
 )
 
@@ -22,13 +23,15 @@ func (s *VarzSuite) TearDownTest(c *C) {
 }
 
 func (s *VarzSuite) TestEmptyVarz(c *C) {
-	v := &Varz{}
-	b, e := json.Marshal(v)
-	c.Assert(e, IsNil)
+	varz := &Varz{}
+	varz.LogCounts = NewLogCounter()
 
-	m := make(map[string]interface{})
-	e = json.Unmarshal(b, &m)
-	c.Assert(e, IsNil)
+	bytes, err := json.Marshal(varz)
+	c.Assert(err, IsNil)
+
+	data := make(map[string]interface{})
+	err = json.Unmarshal(bytes, &data)
+	c.Assert(err, IsNil)
 
 	members := []string{
 		"type",
@@ -42,13 +45,30 @@ func (s *VarzSuite) TestEmptyVarz(c *C) {
 		"num_cores",
 		"mem",
 		"cpu",
+		"log_counts",
 	}
 
-	for _, k := range members {
-		if _, ok := m[k]; !ok {
-			c.Fatalf(`member "%s" not found`, k)
+	for _, key := range members {
+		if _, ok := data[key]; !ok {
+			c.Fatalf(`member "%s" not found`, key)
 		}
 	}
+}
+
+func (s *VarzSuite) TestLogCounts(c *C) {
+	varz := &Varz{}
+	varz.LogCounts = NewLogCounter()
+
+	varz.LogCounts.AddRecord(&steno.Record{Level: steno.LOG_INFO})
+
+	bytes, _ := json.Marshal(varz)
+	data := make(map[string]interface{})
+	json.Unmarshal(bytes, &data)
+
+	counts := data["log_counts"].(map[string]interface{})
+	count := counts["info"]
+
+	c.Assert(count, Equals, 1.0)
 }
 
 func (s *VarzSuite) TestTransformStruct(c *C) {

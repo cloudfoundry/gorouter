@@ -26,55 +26,56 @@ type Router struct {
 }
 
 func NewRouter(c *config.Config) *Router {
-	r := &Router{
+	router := &Router{
 		config: c,
 	}
 
 	// setup number of procs
-	if r.config.GoMaxProcs != 0 {
-		runtime.GOMAXPROCS(r.config.GoMaxProcs)
+	if router.config.GoMaxProcs != 0 {
+		runtime.GOMAXPROCS(router.config.GoMaxProcs)
 	}
 
-	r.establishMBus()
+	router.establishMBus()
 
-	r.registry = NewRegistry(r.config)
-	r.registry.isStateStale = func() bool {
-		return !r.mbusClient.Ping()
+	router.registry = NewRegistry(router.config)
+	router.registry.isStateStale = func() bool {
+		return !router.mbusClient.Ping()
 	}
 
-	r.varz = NewVarz(r.registry)
-	r.proxy = NewProxy(r.config, r.registry, r.varz)
+	router.varz = NewVarz(router.registry)
+	router.proxy = NewProxy(router.config, router.registry, router.varz)
 
 	var host string
-	if r.config.Status.Port != 0 {
-		host = fmt.Sprintf("%s:%d", r.config.Ip, r.config.Status.Port)
+	if router.config.Status.Port != 0 {
+		host = fmt.Sprintf("%s:%d", router.config.Ip, router.config.Status.Port)
 	}
 
 	varz := &vcap.Varz{
-		UniqueVarz: r.varz,
+		UniqueVarz: router.varz,
 	}
+	varz.LogCounts = logCounter
 
 	healthz := &vcap.Healthz{
-		LockableObject: r.registry,
+		LockableObject: router.registry,
 	}
 
-	r.component = &vcap.VcapComponent{
+	router.component = &vcap.VcapComponent{
 		Type:        "Router",
-		Index:       r.config.Index,
+		Index:       router.config.Index,
 		Host:        host,
-		Credentials: []string{r.config.Status.User, r.config.Status.Pass},
-		Config:      r.config,
+		Credentials: []string{router.config.Status.User, router.config.Status.Pass},
+		Config:      router.config,
 		Logger:      log,
 		Varz:        varz,
 		Healthz:     healthz,
 		InfoRoutes: map[string]json.Marshaler{
-			"/routes": r.registry,
+			"/routes": router.registry,
 		},
 	}
 
-	vcap.StartComponent(r.component)
+	vcap.StartComponent(router.component)
 
-	return r
+	return router
 }
 
 func (r *Router) RegisterComponent() {

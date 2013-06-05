@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type varz_ struct {
+type GenericVarz struct {
 	// Static common metrics
 	NumCores int `json:"num_cores"`
 
@@ -14,15 +14,13 @@ type varz_ struct {
 	Cpu     float64 `json:"cpu"`
 
 	Uptime Duration `json:"uptime"`
+	LogCounts *LogCounter `json:"log_counts"`
 }
 
 type Varz struct {
 	sync.Mutex
-
-	varz_
-
-	// Every component's unique metrics
-	UniqueVarz interface{}
+	GenericVarz
+	UniqueVarz interface{} // Every component's unique metrics
 }
 
 func transform(x interface{}, y *map[string]interface{}) error {
@@ -52,7 +50,7 @@ func (v *Varz) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	err = transform(v.varz_, &r)
+	err = transform(v.GenericVarz, &r)
 	if err != nil {
 		return nil, err
 	}

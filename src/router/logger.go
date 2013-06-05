@@ -3,10 +3,12 @@ package router
 import (
 	steno "github.com/cloudfoundry/gosteno"
 	"os"
+	"router/common"
 	"router/config"
 )
 
 var log *steno.Logger
+var logCounter = common.NewLogCounter()
 
 func init() {
 	stenoConfig := &steno.Config{
@@ -35,6 +37,8 @@ func SetupLoggerFromConfig(c *config.Config) {
 	if c.Logging.Syslog != "" {
 		s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
 	}
+
+	s = append(s, logCounter)
 
 	stenoConfig := &steno.Config{
 		Sinks: s,

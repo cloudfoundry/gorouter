@@ -21,9 +21,9 @@ do
 
     if grep -q launchpad.net/gocheck src/$p/*.go
     then
-      bin/go test $p -test.v=true -gocheck.v=true
+      bin/go test $p -test.v=true -gocheck.v=true $*
     else
-      bin/go test $p -test.v=true
+      bin/go test $p -test.v=true $*
     fi
   fi
 done
