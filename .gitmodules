@@ -10,3 +10,6 @@
 [submodule "src/github.com/apcera/nats"]
 	path = src/github.com/apcera/nats
 	url = https://github.com/apcera/nats
+[submodule "src/github.com/rcrowley/go-metrics"]
+	path = src/github.com/rcrowley/go-metrics
+	url = https://github.com/rcrowley/go-metrics
