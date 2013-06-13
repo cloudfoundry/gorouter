@@ -3,7 +3,7 @@ go:
   - 1.1
   - tip
 
-install: go get ./src/github.com/...
+install: go get -d -v ./src/github.com/...
 
 script:
   - gem install nats
