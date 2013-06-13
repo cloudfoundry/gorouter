@@ -1,4 +1,5 @@
 language: common
+go: 1.1
 
 script:
   - gem install nats
