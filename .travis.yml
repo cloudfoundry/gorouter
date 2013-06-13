@@ -7,6 +7,6 @@ install: go get -d -v ./src/github.com/...
 
 script:
   - gem install nats
-  - go version
-  - go env
+  - bin/go version
+  - bin/go env
   - bin/test

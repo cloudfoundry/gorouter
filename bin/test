@@ -10,7 +10,7 @@ echo --- Installing
 for p in $(packages)
 do
   echo $p
-  go test -i $p
+  bin/go test -i $p
 done
 
 echo --- Testing
@@ -21,9 +21,9 @@ do
 
     if grep -q launchpad.net/gocheck src/$p/*.go
     then
-      go test $p -test.v=true -gocheck.v=true $*
+      bin/go test $p -test.v=true -gocheck.v=true $*
     else
-      go test $p -test.v=true $*
+      bin/go test $p -test.v=true $*
     fi
   fi
 done
