@@ -3,10 +3,9 @@ go:
   - 1.1
   - tip
 
-install: go get -d -v ./src/github.com/...
-
-script:
+install:
   - gem install nats
-  - bin/go version
-  - bin/go env
-  - bin/test
+  - export GOPATH=$TRAVIS_BUILD_DIR
+  - go build ./...
+
+script: bin/test router
