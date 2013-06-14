@@ -260,6 +260,22 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	c.Assert(s.staleTracker.Len(), Equals, 1)
 }
 
+func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
+	s.Register(fooReg)
+	s.Register(barReg)
+	c.Check(s.NumUris(), Equals, 4)
+	c.Check(s.NumBackends(), Equals, 2)
+	c.Assert(s.staleTracker.Len(), Equals, 2)
+
+	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
+	s.isStateStale = func() bool { return true }
+	s.PruneStaleDroplets()
+
+	c.Check(s.NumUris(), Equals, 4)
+	c.Check(s.NumBackends(), Equals, 2)
+	c.Assert(s.staleTracker.Len(), Equals, 0)
+}
+
 func (s *RegistrySuite) TestInfoMarshalling(c *C) {
 	m := &registryMessage{
 		Host: "192.168.1.1",
