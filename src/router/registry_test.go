@@ -276,6 +276,34 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	c.Assert(s.staleTracker.Len(), Equals, 0)
 }
 
+func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
+	// when pruning stale droplets,
+	// and the stale check takes a while,
+	// and a read request comes in (i.e. from Lookup),
+	// the read request completes before the stale check
+
+	s.Register(fooReg)
+
+	completeSequence := make(chan string)
+
+	s.isStateStale = func() bool {
+		time.Sleep(5 * time.Second)
+		completeSequence <- "stale"
+		return false
+	}
+
+	go s.PruneStaleDroplets()
+
+	go func() {
+		s.Lookup("foo.vcap.me")
+		completeSequence <- "lookup"
+	}()
+
+	firstCompleted := <-completeSequence
+
+	c.Assert(firstCompleted, Equals, "lookup")
+}
+
 func (s *RegistrySuite) TestInfoMarshalling(c *C) {
 	m := &registryMessage{
 		Host: "192.168.1.1",
