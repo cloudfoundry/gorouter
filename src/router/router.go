@@ -88,7 +88,7 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 
 		err := json.Unmarshal(payload, &msg)
 		if err != nil {
-			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON: %s", subject, err)
+			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
 			log.Log(steno.LOG_WARN, logMessage, map[string]interface{}{"payload": string(payload)})
 		}
 
