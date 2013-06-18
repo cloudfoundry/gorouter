@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"math/rand"
 	"router/config"
 	"router/stats"
@@ -178,11 +179,13 @@ type Registry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	isStateStale func() bool
+	messageBus mbus.CFMessageBus
 }
 
-func NewRegistry(c *config.Config) *Registry {
-	r := &Registry{}
+func NewRegistry(c *config.Config, messageBusClient mbus.CFMessageBus) *Registry {
+	r := &Registry{
+		messageBus: messageBusClient,
+	}
 
 	r.Logger = steno.NewLogger("router.registry")
 
@@ -197,11 +200,15 @@ func NewRegistry(c *config.Config) *Registry {
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
 
-	r.isStateStale = func() bool { return false }
-
-	go r.checkAndPrune()
-
 	return r
+}
+
+func (r *Registry) StartPruningCycle() {
+	go r.checkAndPrune()
+}
+
+func (r *Registry) isStateStale() bool {
+	return !r.messageBus.Ping()
 }
 
 func (r *Registry) NumUris() int {

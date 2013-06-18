@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"code.google.com/p/gomock/gomock"
+	"router/test"
 )
 
 type connHandler func(*conn)
@@ -132,7 +134,9 @@ var _ = Suite(&ProxySuite{})
 func (s *ProxySuite) SetUpTest(c *C) {
 	x := config.DefaultConfig()
 	x.TraceKey = "my_trace_key"
-	s.r = NewRegistry(x)
+
+	mocksController := gomock.NewController(c)
+	s.r = NewRegistry(x, test.NewMockCFMessageBus(mocksController))
 	s.p = NewProxy(x, s.r, nullVarz{})
 
 	s.done = make(chan bool)

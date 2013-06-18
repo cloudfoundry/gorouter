@@ -5,10 +5,14 @@ import (
 	. "launchpad.net/gocheck"
 	"router/config"
 	"time"
+	"code.google.com/p/gomock/gomock"
+	"router/test"
 )
 
 type RegistrySuite struct {
 	*Registry
+	messageBus *test.MockCFMessageBus
+	mocksController *gomock.Controller
 }
 
 var _ = Suite(&RegistrySuite{})
@@ -47,12 +51,19 @@ var bar2Reg = &registryMessage{
 }
 
 func (s *RegistrySuite) SetUpTest(c *C) {
-	var x *config.Config
+	var configObj *config.Config
 
-	x = config.DefaultConfig()
-	x.DropletStaleThreshold = 1
+	configObj = config.DefaultConfig()
+	configObj.DropletStaleThreshold = 1
 
-	s.Registry = NewRegistry(x)
+	s.mocksController = gomock.NewController(c)
+	s.messageBus = test.NewMockCFMessageBus(s.mocksController)
+
+	s.Registry = NewRegistry(configObj, s.messageBus)
+}
+
+func (s *RegistrySuite) TearDownTest(c *C) {
+	s.mocksController.Finish()
 }
 
 func (s *RegistrySuite) TestRegister(c *C) {
@@ -243,6 +254,10 @@ func (s *RegistrySuite) TestTracker(c *C) {
 	c.Assert(s.staleTracker.Len(), Equals, 0)
 }
 
+func (s *RegistrySuite) TestMessageBusPingTimesout(c *C) {
+
+}
+
 func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(fooReg)
 	s.Register(barReg)
@@ -268,7 +283,7 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
-	s.isStateStale = func() bool { return true }
+	s.messageBus.EXPECT().Ping().Return(false)
 	s.PruneStaleDroplets()
 
 	c.Check(s.NumUris(), Equals, 4)
@@ -286,11 +301,10 @@ func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
 
 	completeSequence := make(chan string)
 
-	s.isStateStale = func() bool {
+	s.messageBus.EXPECT().Ping().Do(func() {
 		time.Sleep(5 * time.Second)
 		completeSequence <- "stale"
-		return false
-	}
+	}).Return(false)
 
 	go s.PruneStaleDroplets()
 

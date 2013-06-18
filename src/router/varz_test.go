@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"router/config"
 	"time"
+	"code.google.com/p/gomock/gomock"
+	"router/test"
 )
 
 type VarzSuite struct {
@@ -17,7 +19,8 @@ type VarzSuite struct {
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
-	r := NewRegistry(config.DefaultConfig())
+	mocksController := gomock.NewController(c)
+	r := NewRegistry(config.DefaultConfig(), test.NewMockCFMessageBus(mocksController))
 	s.Registry = r
 	s.Varz = NewVarz(r)
 }

@@ -4,6 +4,8 @@ import (
 	"router/config"
 	"strconv"
 	"testing"
+	"code.google.com/p/gomock/gomock"
+	"router/test"
 )
 
 const (
@@ -13,7 +15,8 @@ const (
 
 func BenchmarkRegister(b *testing.B) {
 	c := config.DefaultConfig()
-	r := NewRegistry(c)
+	mocksController := gomock.NewController(b)
+	r := NewRegistry(c, test.NewMockCFMessageBus(mocksController))
 	p := NewProxy(c, r, NewVarz(r))
 
 	for i := 0; i < b.N; i++ {

@@ -13,3 +13,6 @@
 [submodule "src/github.com/vito/yagnats"]
 	path = src/github.com/vito/yagnats
 	url = https://github.com/vito/yagnats.git
+[submodule "src/code.google.com/p/gomock"]
+	path = src/code.google.com/p/gomock
+	url = https://github.com/rafrombrc/gomock.git

@@ -37,10 +37,8 @@ func NewRouter(c *config.Config) *Router {
 
 	router.establishMBus()
 
-	router.registry = NewRegistry(router.config)
-	router.registry.isStateStale = func() bool {
-		return !router.mbusClient.Ping()
-	}
+	router.registry = NewRegistry(router.config, router.mbusClient)
+	router.registry.StartPruningCycle()
 
 	router.varz = NewVarz(router.registry)
 	router.proxy = NewProxy(router.config, router.registry, router.varz)
