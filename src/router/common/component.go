@@ -36,8 +36,9 @@ type VcapComponent struct {
 }
 
 type RouterStart struct {
-	Id    string   `json:"id"`
-	Hosts []string `json:"hosts"`
+	Id                               string   `json:"id"`
+	Hosts                            []string `json:"hosts"`
+	MinimumRegisterIntervalInSeconds int      `json:"minimumRegisterIntervalInSeconds"`
 }
 
 func UpdateHealthz() *Healthz {

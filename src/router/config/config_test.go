@@ -89,6 +89,7 @@ publish_start_message_interval: 1
 prune_stale_droplets_interval: 2
 droplet_stale_threshold: 3
 publish_active_apps_interval: 4
+start_response_delay_interval: 15
 `)
 
 	c.Check(s.Port, Equals, uint16(8081))
@@ -98,10 +99,11 @@ publish_active_apps_interval: 4
 	c.Check(s.TraceKey, Equals, "")
 	c.Check(s.AccessLog, Equals, "")
 
-	c.Check(s.PublishStartMessageInterval, Equals, 30*time.Second)
+	c.Check(s.PublishStartMessageIntervalInSeconds, Equals, 30)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 30*time.Second)
 	c.Check(s.DropletStaleThreshold, Equals, 120*time.Second)
 	c.Check(s.PublishActiveAppsInterval, Equals, 0*time.Second)
+	c.Check(s.StartResponseDelayInterval, Equals, 5*time.Second)
 
 	goyaml.Unmarshal(b, &s.Config)
 
@@ -114,8 +116,9 @@ publish_active_apps_interval: 4
 	c.Check(s.TraceKey, Equals, "foo")
 	c.Check(s.AccessLog, Equals, "/tmp/access_log")
 
-	c.Check(s.PublishStartMessageInterval, Equals, 1*time.Second)
+	c.Check(s.PublishStartMessageIntervalInSeconds, Equals, 1)
 	c.Check(s.PruneStaleDropletsInterval, Equals, 2*time.Second)
 	c.Check(s.DropletStaleThreshold, Equals, 3*time.Second)
 	c.Check(s.PublishActiveAppsInterval, Equals, 4*time.Second)
+	c.Check(s.StartResponseDelayInterval, Equals, 15*time.Second)
 }

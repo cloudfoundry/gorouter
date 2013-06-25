@@ -16,7 +16,7 @@ done
 echo --- Testing
 for p in $(packages)
 do
-  if [[ -z $1 || $p == $1 ]]; then
+  if [[ -z $1 || $p =~ $1 ]]; then
     echo $p
 
     if grep -q launchpad.net/gocheck src/$p/*.go

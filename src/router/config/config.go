@@ -59,12 +59,13 @@ type Config struct {
 	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
 	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
 	PublishActiveAppsIntervalInSeconds   int "publish_active_apps_interval"
+	StartResponseDelayIntervalInSeconds  int "start_response_delay_interval"
 
 	// These fields are populated by the `Process` function.
-	PublishStartMessageInterval time.Duration
 	PruneStaleDropletsInterval  time.Duration
 	DropletStaleThreshold       time.Duration
 	PublishActiveAppsInterval   time.Duration
+	StartResponseDelayInterval  time.Duration
 
 	Ip string
 }
@@ -83,6 +84,7 @@ var defaultConfig = Config{
 	PruneStaleDropletsIntervalInSeconds:  30,
 	DropletStaleThresholdInSeconds:       120,
 	PublishActiveAppsIntervalInSeconds:   0,
+	StartResponseDelayIntervalInSeconds:  5,
 }
 
 func DefaultConfig() *Config {
@@ -96,10 +98,10 @@ func DefaultConfig() *Config {
 func (c *Config) Process() {
 	var err error
 
-	c.PublishStartMessageInterval = time.Duration(c.PublishStartMessageIntervalInSeconds) * time.Second
 	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second
 	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
 	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
+	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 
 	c.Ip, err = vcap.LocalIP()
 	if err != nil {

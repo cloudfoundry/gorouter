@@ -104,13 +104,13 @@ func (x *HttpMetric) CaptureRequest() {
 	x.Rate.Mark(1)
 }
 
-func (x *HttpMetric) CaptureResponse(y *http.Response, z time.Duration) {
-	var s int
-	if y != nil {
-		s = y.StatusCode / 100
+func (x *HttpMetric) CaptureResponse(response *http.Response, duration time.Duration) {
+	var statusCode int
+	if response != nil {
+		statusCode = response.StatusCode / 100
 	}
 
-	switch s {
+	switch statusCode {
 	case 2:
 		x.Responses2xx.Inc(1)
 	case 3:
@@ -123,7 +123,7 @@ func (x *HttpMetric) CaptureResponse(y *http.Response, z time.Duration) {
 		x.ResponsesXxx.Inc(1)
 	}
 
-	x.Latency.Update(z.Nanoseconds())
+	x.Latency.Update(duration.Nanoseconds())
 }
 
 type TaggedHttpMetric map[string]*HttpMetric
@@ -229,19 +229,19 @@ func (x *RealVarz) CaptureBackendRequest(b *Backend, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *RealVarz) CaptureBackendResponse(b *Backend, res *http.Response, d time.Duration) {
+func (x *RealVarz) CaptureBackendResponse(backend *Backend, response *http.Response, duration time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 
-	var t string
+	var tags string
 	var ok bool
 
-	t, ok = b.Tags["component"]
+	tags, ok = backend.Tags["component"]
 	if ok {
-		x.varz.Tags.Component.CaptureResponse(t, res, d)
+		x.varz.Tags.Component.CaptureResponse(tags, response, duration)
 	}
 
-	x.varz.All.CaptureResponse(res, d)
+	x.varz.All.CaptureResponse(response, duration)
 }
 
 func transform(x interface{}, y map[string]interface{}) error {

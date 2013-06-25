@@ -14,7 +14,8 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	// Hardcode the IP to localhost to avoid leaving the machine while running tests
 	c.Ip = "127.0.0.1"
 
-	c.PublishStartMessageInterval = 10 * time.Millisecond
+	c.StartResponseDelayInterval = 10 * time.Millisecond
+	c.PublishStartMessageIntervalInSeconds = 10
 	c.PruneStaleDropletsInterval = 0
 	c.DropletStaleThreshold = 0
 	c.PublishActiveAppsInterval = 0

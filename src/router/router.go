@@ -161,7 +161,7 @@ func (r *Router) SendStartMessage() {
 	if err != nil {
 		panic(err)
 	}
-	d := vcap.RouterStart{vcap.GenerateUUID(), []string{host}}
+	d := vcap.RouterStart{vcap.GenerateUUID(), []string{host}, r.config.StartResponseDelayIntervalInSeconds}
 
 	b, err := json.Marshal(d)
 	if err != nil {
@@ -170,21 +170,6 @@ func (r *Router) SendStartMessage() {
 
 	// Send start message once at start
 	r.mbusClient.Publish("router.start", b)
-
-	go func() {
-		t := time.NewTicker(r.config.PublishStartMessageInterval)
-
-		for {
-			select {
-			case <-t.C:
-				log.Info("Sending start message")
-				err := r.mbusClient.Publish("router.start", b)
-				if err != nil {
-					log.Errorf("Error publishing to router.start: %s", err.Error())
-				}
-			}
-		}
-	}()
 }
 
 func (router *Router) Run() {
@@ -214,9 +199,9 @@ func (router *Router) Run() {
 
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.
-	if router.config.PublishStartMessageInterval != 0 {
-		log.Infof("Waiting %s before listening...", router.config.PublishStartMessageInterval)
-		time.Sleep(router.config.PublishStartMessageInterval)
+	if router.config.StartResponseDelayInterval != 0 {
+		log.Infof("Waiting %s before listening...", router.config.StartResponseDelayInterval)
+		time.Sleep(router.config.StartResponseDelayInterval)
 	}
 
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", router.config.Port))
