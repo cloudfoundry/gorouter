@@ -115,6 +115,13 @@ func (r *Router) SubscribeUnregister() {
 	})
 }
 
+func (r *Router) HandleGreetings() {
+	r.mbusClient.RespondToChannel("router.greet", func (_ []byte) []byte {
+		response, _ := r.greetMessage()
+		return response
+	})
+}
+
 func (r *Router) flushApps(t time.Time) {
 	x := r.registry.ActiveSince(t)
 
@@ -157,13 +164,7 @@ func (r *Router) ScheduleFlushApps() {
 }
 
 func (r *Router) SendStartMessage() {
-	host, err := vcap.LocalIP()
-	if err != nil {
-		panic(err)
-	}
-	d := vcap.RouterStart{vcap.GenerateUUID(), []string{host}, r.config.StartResponseDelayIntervalInSeconds}
-
-	b, err := json.Marshal(d)
+	b, err := r.greetMessage()
 	if err != nil {
 		panic(err)
 	}
@@ -172,27 +173,42 @@ func (r *Router) SendStartMessage() {
 	r.mbusClient.Publish("router.start", b)
 }
 
+func (r *Router) greetMessage() ([]byte, error) {
+	host, err := vcap.LocalIP()
+	if err != nil {
+		return nil, err
+	}
+
+	d := vcap.RouterStart{
+		vcap.GenerateUUID(),
+		[]string{host},
+		r.config.StartResponseDelayIntervalInSeconds,
+	}
+
+	return json.Marshal(d)
+}
+
 func (router *Router) Run() {
 	var err error
-	go func() {
-		for {
-			err = router.mbusClient.Connect()
-			if err == nil {
-				break
-			}
-			log.Errorf("Could not connect to NATS: ", err.Error())
-			time.Sleep(500 * time.Millisecond)
+
+	for {
+		err = router.mbusClient.Connect()
+		if err == nil {
+			break
 		}
-	}()
+		log.Errorf("Could not connect to NATS: ", err.Error())
+		time.Sleep(500 * time.Millisecond)
+	}
 
 	router.RegisterComponent()
 
-	// Kickstart sending start messages
-	router.SendStartMessage()
-
 	// Subscribe register/unregister router
 	router.SubscribeRegister()
+	router.HandleGreetings()
 	router.SubscribeUnregister()
+
+	// Kickstart sending start messages
+	router.SendStartMessage()
 
 	// Schedule flushing active app's app_id
 	router.ScheduleFlushApps()

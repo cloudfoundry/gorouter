@@ -50,6 +50,21 @@ func (s *RouterSuite) TearDownSuite(c *C) {
 	mbus.StopNats(s.natsServerCmd)
 }
 
+func (s *RouterSuite) TestRouterGreets(c *C) {
+	response := make(chan []byte)
+
+	s.mbusClient.Request("router.greet", []byte{}, func(payload []byte) {
+		response <- payload
+	})
+
+	select {
+	case msg := <-response:
+		c.Assert(string(msg), Matches, ".*\"minimumRegisterIntervalInSeconds\":5.*")
+	case <-time.After(500 * time.Millisecond):
+		c.Error("Did not see a response to router.greet!")
+	}
+}
+
 func (s *RouterSuite) TestDiscover(c *C) {
 	// Test if router responses to discover message
 	sig := make(chan common.VcapComponent)
