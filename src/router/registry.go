@@ -3,8 +3,8 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	steno "github.com/cloudfoundry/gosteno"
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	steno "github.com/cloudfoundry/gosteno"
 	"math/rand"
 	"router/config"
 	"router/stats"

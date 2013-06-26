@@ -1,9 +1,9 @@
 package test
 
 import (
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"io"
 	"net/http"
-  mbus "github.com/cloudfoundry/go_cfmessagebus"
 )
 
 func NewGreetApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {

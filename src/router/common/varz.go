@@ -13,7 +13,7 @@ type GenericVarz struct {
 	MemStat int64   `json:"mem"`
 	Cpu     float64 `json:"cpu"`
 
-	Uptime Duration `json:"uptime"`
+	Uptime    Duration    `json:"uptime"`
 	LogCounts *LogCounter `json:"log_counts"`
 }
 

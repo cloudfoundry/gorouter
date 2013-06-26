@@ -1,14 +1,14 @@
 package router
 
 import (
+	"code.google.com/p/gomock/gomock"
 	"encoding/json"
 	"fmt"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"router/config"
-	"time"
-	"code.google.com/p/gomock/gomock"
 	"router/test"
+	"time"
 )
 
 type VarzSuite struct {
@@ -103,7 +103,7 @@ func (s *VarzSuite) TestUrlsInVarz(c *C) {
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
 		Tags: map[string]string{},
-		App: "12345",
+		App:  "12345",
 	}
 	// Add a route
 	s.Registry.Register(fooReg)

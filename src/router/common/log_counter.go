@@ -2,8 +2,8 @@ package common
 
 import (
 	"encoding/json"
-	"sync"
 	steno "github.com/cloudfoundry/gosteno"
+	"sync"
 )
 
 type LogCounter struct {
@@ -18,24 +18,24 @@ func NewLogCounter() *LogCounter {
 	return lc
 }
 
-func(lc *LogCounter) AddRecord(record *steno.Record){
+func (lc *LogCounter) AddRecord(record *steno.Record) {
 	lc.Lock()
 	defer lc.Unlock()
 
 	lc.counts[record.Level.Name] += 1
 }
 
-func(lc *LogCounter) GetCount(key string) int {
+func (lc *LogCounter) GetCount(key string) int {
 	lc.Lock()
 	defer lc.Unlock()
 
 	return lc.counts[key]
 }
 
-func(lc * LogCounter) Flush() {}
-func(lc *LogCounter) SetCodec(codec steno.Codec) {}
+func (lc *LogCounter) Flush()                     {}
+func (lc *LogCounter) SetCodec(codec steno.Codec) {}
 
-func(lc *LogCounter) GetCodec() steno.	Codec {
+func (lc *LogCounter) GetCodec() steno.Codec {
 	return nil
 }
 

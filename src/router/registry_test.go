@@ -1,17 +1,17 @@
 package router
 
 import (
+	"code.google.com/p/gomock/gomock"
 	"encoding/json"
 	. "launchpad.net/gocheck"
 	"router/config"
-	"time"
-	"code.google.com/p/gomock/gomock"
 	"router/test"
+	"time"
 )
 
 type RegistrySuite struct {
 	*Registry
-	messageBus *test.MockCFMessageBus
+	messageBus      *test.MockCFMessageBus
 	mocksController *gomock.Controller
 }
 

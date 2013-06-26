@@ -3,10 +3,10 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"router/common"
-	mbus "github.com/cloudfoundry/go_cfmessagebus"
 )
 
 type TestApp struct {

@@ -116,7 +116,7 @@ func (r *Router) SubscribeUnregister() {
 }
 
 func (r *Router) HandleGreetings() {
-	r.mbusClient.RespondToChannel("router.greet", func (_ []byte) []byte {
+	r.mbusClient.RespondToChannel("router.greet", func(_ []byte) []byte {
 		response, _ := r.greetMessage()
 		return response
 	})

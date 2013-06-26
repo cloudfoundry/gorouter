@@ -62,10 +62,10 @@ type Config struct {
 	StartResponseDelayIntervalInSeconds  int "start_response_delay_interval"
 
 	// These fields are populated by the `Process` function.
-	PruneStaleDropletsInterval  time.Duration
-	DropletStaleThreshold       time.Duration
-	PublishActiveAppsInterval   time.Duration
-	StartResponseDelayInterval  time.Duration
+	PruneStaleDropletsInterval time.Duration
+	DropletStaleThreshold      time.Duration
+	PublishActiveAppsInterval  time.Duration
+	StartResponseDelayInterval time.Duration
 
 	Ip string
 }

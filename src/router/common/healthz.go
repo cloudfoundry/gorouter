@@ -1,14 +1,14 @@
 package common
 
 type Lockable interface {
-  Lock()
-  Unlock()
+	Lock()
+	Unlock()
 }
 
 type Healthz struct {
-  LockableObject Lockable
+	LockableObject Lockable
 }
 
-func (v *Healthz) Value() (string) {
-  return "ok"
+func (v *Healthz) Value() string {
+	return "ok"
 }

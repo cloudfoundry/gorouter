@@ -2,6 +2,7 @@ package router
 
 import (
 	"bufio"
+	"code.google.com/p/gomock/gomock"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -9,11 +10,10 @@ import (
 	"net"
 	"net/http"
 	"router/config"
+	"router/test"
 	"strconv"
 	"strings"
 	"time"
-	"code.google.com/p/gomock/gomock"
-	"router/test"
 )
 
 type connHandler func(*conn)

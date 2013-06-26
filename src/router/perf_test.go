@@ -1,11 +1,11 @@
 package router
 
 import (
+	"code.google.com/p/gomock/gomock"
 	"router/config"
+	"router/test"
 	"strconv"
 	"testing"
-	"code.google.com/p/gomock/gomock"
-	"router/test"
 )
 
 const (
