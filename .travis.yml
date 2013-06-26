@@ -3,6 +3,10 @@ go:
   - 1.1
   - tip
 
+matrix:
+  allow_failures:
+    - go: tip
+
 install:
   - gem install nats
   - export GOPATH=$TRAVIS_BUILD_DIR
