@@ -102,11 +102,12 @@ func (p *Proxy) Lookup(req *http.Request) (*Backend, bool) {
 	h := hostWithoutPort(req)
 
 	// Try choosing a backend using sticky session
-	sticky, err := req.Cookie(VcapCookieId)
-	if err == nil {
-		b, ok := p.Registry.LookupByPrivateInstanceId(h, sticky.Value)
-		if ok {
-			return b, ok
+	if _, err := req.Cookie(StickyCookieKey); err == nil {
+		if sticky, err := req.Cookie(VcapCookieId); err == nil {
+			b, ok := p.Registry.LookupByPrivateInstanceId(h, sticky.Value)
+			if ok {
+				return b, ok
+			}
 		}
 	}
 

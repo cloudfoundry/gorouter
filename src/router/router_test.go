@@ -202,11 +202,11 @@ func (s *RouterSuite) TestStickySession(c *C) {
 	for _, app := range apps {
 		c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	}
-	session, port1, path := getSessionAndAppPort("sticky.vcap.me", s.Config.Port, c)
-	port2 := getAppPortWithSticky("sticky.vcap.me", s.Config.Port, session, c)
+	sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", s.Config.Port, c)
+	port2 := getAppPortWithSticky("sticky.vcap.me", s.Config.Port, sessionCookie, vcapCookie, c)
 
 	c.Check(port1, Equals, port2)
-	c.Check(path, Equals, "/")
+	c.Check(vcapCookie.Path, Equals, "/")
 
 	for _, app := range apps {
 		app.Unregister()
@@ -396,7 +396,7 @@ func sendRequests(c *C, url string, rPort uint16, times int) {
 	}
 }
 
-func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string, string) {
+func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.Cookie, string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -411,19 +411,19 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (string, string, strin
 
 	port, err = ioutil.ReadAll(resp.Body)
 
-	var session string
-	var path string
+	var sessionCookie, vcapCookie *http.Cookie
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "__VCAP_ID__" {
-			session = cookie.Value
-			path = cookie.Path
+		if cookie.Name == StickyCookieKey {
+			sessionCookie = cookie
+		} else if cookie.Name == VcapCookieId {
+			vcapCookie = cookie
 		}
 	}
 
-	return session, string(port), path
+	return sessionCookie, vcapCookie, string(port)
 }
 
-func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string {
+func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *http.Cookie, c *C) string {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -433,11 +433,8 @@ func getAppPortWithSticky(url string, rPort uint16, session string, c *C) string
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
 	req, err = http.NewRequest("GET", uri, nil)
 
-	cookie := &http.Cookie{
-		Name:  "__VCAP_ID__",
-		Value: session,
-	}
-	req.AddCookie(cookie)
+	req.AddCookie(sessionCookie)
+	req.AddCookie(vcapCookie)
 
 	resp, err = client.Do(req)
 	c.Assert(err, IsNil)
