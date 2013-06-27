@@ -17,7 +17,7 @@ func NewStickyApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tag
 func stickyHandler(port uint16) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie := &http.Cookie{
-			Name:  "JSESSIONID",
+			Name:  StickyCookieKey,
 			Value: "xxx",
 		}
 		http.SetCookie(w, cookie)
