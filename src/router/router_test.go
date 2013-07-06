@@ -25,19 +25,20 @@ type RouterSuite struct {
 	natsServerCmd *exec.Cmd
 	mbusClient    mbus.CFMessageBus
 	router        *Router
+	natsPort uint16
 }
 
 var _ = Suite(&RouterSuite{})
 
 func (s *RouterSuite) SetUpSuite(c *C) {
-	natsPort := nextAvailPort()
+	s.natsPort = nextAvailPort()
 
-	s.natsServerCmd = mbus.StartNats(int(natsPort))
+	s.natsServerCmd = mbus.StartNats(int(s.natsPort))
 
 	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
 
-	s.Config = spec.SpecConfig(natsPort, statusPort, proxyPort)
+	s.Config = spec.SpecConfig(s.natsPort, statusPort, proxyPort)
 
 	s.router = NewRouter(s.Config)
 	go s.router.Run()
@@ -327,6 +328,24 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 	c.Assert(rr.Method, Equals, "PUT")
 	c.Assert(rr.Proto, Equals, "HTTP/1.1")
 	c.Assert(msg, Equals, "foobar")
+}
+
+func (s *RouterSuite) TestRouterSendsStartOnConnect(c *C) {
+	started := make(chan bool)
+
+	s.router.mbusClient.Subscribe("router.start", func([]byte) {
+		started <- true
+	})
+
+	mbus.StopNats(s.natsServerCmd)
+	s.natsServerCmd = mbus.StartNats(int(s.natsPort))
+	<-s.WaitUntilNatsIsUp()
+
+	select {
+	case <-started:
+	case <-time.After(500 * time.Millisecond):
+		c.Error("Did not receive router.start!")
+	}
 }
 
 func (s *RouterSuite) WaitUntilNatsIsUp() chan bool {

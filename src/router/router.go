@@ -200,6 +200,10 @@ func (router *Router) Run() {
 		time.Sleep(500 * time.Millisecond)
 	}
 
+	router.mbusClient.OnConnect(func() {
+		router.SendStartMessage()
+	})
+
 	router.RegisterComponent()
 
 	// Subscribe register/unregister router
