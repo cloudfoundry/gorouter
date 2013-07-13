@@ -253,4 +253,5 @@ func (r *Router) establishMBus() {
 	port := r.config.Nats.Port
 
 	r.mbusClient.Configure(host, int(port), user, pass)
+	r.mbusClient.SetLogger(log)
 }
