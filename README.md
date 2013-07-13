@@ -30,22 +30,31 @@ standalone environment.
 
 ### Setup
 
-```
-git clone https://github.com/cloudfoundry/gorouter.git
-cd gorouter
-git submodule update --init
-./bin/go install router/router
+```bash
+export GOPATH=~/go # or wherever
+export PATH=$GOPATH/bin:$PATH
+
+cd $GOPATH
+
+mkdir -p src/github.com/cloudfoundry
+(
+  cd src/github.com/cloudfoundry
+  git clone https://github.com/cloudfoundry/gorouter.git
+)
+
+go get -v ./src/github.com/cloudfoundry/gorouter/...
+
 gem install nats
 ```
 
 ### Start
 
-```
+```bash
 # Start NATS server in daemon mode
 nats-server -d
 
 # Start gorouter
-./bin/router
+router
 ```
 
 ### Usage
