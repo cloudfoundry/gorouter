@@ -179,6 +179,8 @@ type Registry struct {
 	dropletStaleThreshold      time.Duration
 
 	messageBus mbus.CFMessageBus
+
+	timeOfLastUpdate time.Time
 }
 
 func NewRegistry(c *Config, messageBusClient mbus.CFMessageBus) *Registry {
@@ -256,6 +258,7 @@ func (registry *Registry) Register(message *registryMessage) {
 	backend.updated_at = time.Now()
 
 	registry.staleTracker.PushBack(backend)
+	registry.timeOfLastUpdate = time.Now()
 }
 
 func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
