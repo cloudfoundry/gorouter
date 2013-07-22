@@ -135,6 +135,19 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 	app.VerifyAppStatus(404, c)
 }
 
+func (s *RouterSuite) TestRegistryLastUpdatedVarz(c *C) {
+	initialUpdateTime := f(s.readVarz(), "seconds_since_last_registry_update").(float64)
+
+	app1 := test.NewGreetApp([]string{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app1.Listen()
+	c.Assert(s.waitAppRegistered(app1, time.Second*5), Equals, true)
+
+	// varz time should be different
+	updateTime := f(s.readVarz(), "seconds_since_last_registry_update").(float64)
+
+	c.Assert(updateTime < initialUpdateTime, Equals, true)
+}
+
 func (s *RouterSuite) readVarz() map[string]interface{} {
 	x, err := s.router.varz.MarshalJSON()
 	if err != nil {

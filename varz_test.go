@@ -78,6 +78,7 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 		"bad_requests",
 		"requests_per_sec",
 		"top10_app_requests",
+		"seconds_since_last_registry_update",
 	}
 
 	b, e := json.Marshal(v)
@@ -92,6 +93,13 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 			c.Fatalf(`member "%s" not found`, k)
 		}
 	}
+}
+
+func (s *VarzSuite) TestSecondsSinceLastRegistryUpdate(c *C) {
+	testTime := time.Now()
+	s.Registry.timeOfLastUpdate = testTime
+	timeSince := s.findValue("seconds_since_last_registry_update").(float64)
+  c.Assert(timeSince < 1, Equals, true)
 }
 
 func (s *VarzSuite) TestUrlsInVarz(c *C) {

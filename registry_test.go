@@ -68,11 +68,14 @@ func (s *RegistrySuite) TearDownTest(c *C) {
 func (s *RegistrySuite) TestRegister(c *C) {
 	s.Register(fooReg)
 	c.Check(s.NumUris(), Equals, 2)
+	firstUpdateTime := s.timeOfLastUpdate
 
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
+	secondUpdateTime := s.timeOfLastUpdate
 
 	c.Assert(s.staleTracker.Len(), Equals, 2)
+	c.Assert(secondUpdateTime.After(firstUpdateTime), Equals, true)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
