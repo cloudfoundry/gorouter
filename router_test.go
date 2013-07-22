@@ -136,24 +136,16 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestRegistryLastUpdatedVarz(c *C) {
+	initialUpdateTime := f(s.readVarz(), "seconds_since_last_registry_update").(float64)
+
 	app1 := test.NewGreetApp([]string{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	app1.Listen()
 	c.Assert(s.waitAppRegistered(app1, time.Second*5), Equals, true)
 
-	// take time from first varz
-	firstUpdateTimeString := string(f(s.readVarz(), "time_of_last_registry_update").(string))
-	firstUpdateTime, _ := time.Parse(time.RFC3339Nano, firstUpdateTimeString)
-
-	// register another app
-	app2 := test.NewGreetApp([]string{"test2.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-	app2.Listen()
-	c.Assert(s.waitAppRegistered(app2, time.Second*5), Equals, true)
-
 	// varz time should be different
-	secondUpdateTimeString := string(f(s.readVarz(), "time_of_last_registry_update").(string))
-	secondUpdateTime, _ := time.Parse(time.RFC3339Nano, secondUpdateTimeString)
+	updateTime := f(s.readVarz(), "seconds_since_last_registry_update").(float64)
 
-	c.Assert(secondUpdateTime.After(firstUpdateTime), Equals, true)
+	c.Assert(updateTime < initialUpdateTime, Equals, true)
 }
 
 func (s *RouterSuite) readVarz() map[string]interface{} {
