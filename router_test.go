@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	"github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/test"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
 	"os/exec"
 	"regexp"
-	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/test"
 	"strings"
 	"time"
 )
@@ -23,7 +23,7 @@ type RouterSuite struct {
 	natsServerCmd *exec.Cmd
 	mbusClient    mbus.CFMessageBus
 	router        *Router
-	natsPort uint16
+	natsPort      uint16
 }
 
 var _ = Suite(&RouterSuite{})

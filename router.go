@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	steno "github.com/cloudfoundry/gosteno"
-	"net"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/util"
+	steno "github.com/cloudfoundry/gosteno"
+	"net"
 	"runtime"
 	"time"
 )

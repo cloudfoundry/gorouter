@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"code.google.com/p/gomock/gomock"
 	"encoding/json"
+	"github.com/cloudfoundry/gorouter/test"
 	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
-	"github.com/cloudfoundry/gorouter/test"
 	"strconv"
 	"strings"
 	"time"
@@ -30,21 +30,21 @@ type conn struct {
 
 	c *C
 
-	br *bufio.Reader
-	bw *bufio.Writer
+	reader *bufio.Reader
+	writer *bufio.Writer
 }
 
 func newConn(x net.Conn, c *C) *conn {
 	return &conn{
-		Conn: x,
-		c:    c,
-		br:   bufio.NewReader(x),
-		bw:   bufio.NewWriter(x),
+		Conn:   x,
+		c:      c,
+		reader: bufio.NewReader(x),
+		writer: bufio.NewWriter(x),
 	}
 }
 
 func (x *conn) ReadRequest() (*http.Request, string) {
-	req, err := http.ReadRequest(x.br)
+	req, err := http.ReadRequest(x.reader)
 	x.c.Assert(err, IsNil)
 
 	b, err := ioutil.ReadAll(req.Body)
@@ -60,13 +60,13 @@ func (x *conn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
 }
 
 func (x *conn) WriteRequest(req *http.Request) {
-	err := req.Write(x.bw)
+	err := req.Write(x.writer)
 	x.c.Assert(err, IsNil)
-	x.bw.Flush()
+	x.writer.Flush()
 }
 
 func (x *conn) ReadResponse() (*http.Response, string) {
-	resp, err := http.ReadResponse(x.br, &http.Request{})
+	resp, err := http.ReadResponse(x.reader, &http.Request{})
 	x.c.Assert(err, IsNil)
 
 	b, err := ioutil.ReadAll(resp.Body)
@@ -85,13 +85,13 @@ func newResponse(status int) *http.Response {
 }
 
 func (x *conn) WriteResponse(resp *http.Response) {
-	err := resp.Write(x.bw)
+	err := resp.Write(x.writer)
 	x.c.Assert(err, IsNil)
-	x.bw.Flush()
+	x.writer.Flush()
 }
 
 func (x *conn) CheckLine(expected string) {
-	l, err := x.br.ReadString('\n')
+	l, err := x.reader.ReadString('\n')
 	x.c.Check(err, IsNil)
 	x.c.Check(strings.TrimRight(l, "\r\n"), Equals, expected)
 }
@@ -105,9 +105,9 @@ func (x *conn) CheckLines(expected []string) {
 }
 
 func (x *conn) WriteLine(line string) {
-	x.bw.WriteString(line)
-	x.bw.WriteString("\r\n")
-	x.bw.Flush()
+	x.writer.WriteString(line)
+	x.writer.WriteString("\r\n")
+	x.writer.Flush()
 }
 
 func (x *conn) WriteLines(lines []string) {
@@ -444,6 +444,29 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 	x.CheckLine("hello from server")
 }
 
+func (s *ProxySuite) TestTcpUpgrade(c *C) {
+	s.C = c
+
+	s.RegisterHandler("tcp-handler", func(x *conn) {
+		x.WriteLine("hello")
+		x.CheckLine("hello from client")
+		x.WriteLine("hello from server")
+	})
+
+	x := s.DialProxy()
+
+	req := x.NewRequest("GET", "/chat", nil)
+	req.Host = "tcp-handler"
+	req.Header.Set("Upgrade", "tcp")
+	req.Header.Set("Connection", "Upgrade")
+
+	x.WriteRequest(req)
+
+	x.CheckLine("hello")
+	x.WriteLine("hello from client")
+	x.CheckLine("hello from server")
+}
+
 func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 	s.C = c
 
@@ -475,7 +498,7 @@ func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 	req.Host = "chunk"
 	req.Write(x)
 
-	resp, err := http.ReadResponse(x.br, &http.Request{})
+	resp, err := http.ReadResponse(x.reader, &http.Request{})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusOK)
 	c.Assert(resp.TransferEncoding, DeepEquals, []string{"chunked"})

@@ -180,9 +180,15 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 		req.Header.Set("X-Forwarded-For", strings.Join(xff, ", "))
 	}
 
+	// Check if the connection is going to be upgraded to a raw TCP connection
+	if checkTcpUpgrade(rw, req) {
+		serveTcp(rw, req)
+		return
+	}
+
 	// Check if the connection is going to be upgraded to a WebSocket connection
-	if p.CheckWebSocket(rw, req) {
-		p.ServeWebSocket(rw, req)
+	if checkWebSocketUpgrade(rw, req) {
+		serveWebSocket(rw, req)
 		return
 	}
 
@@ -246,11 +252,63 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *Proxy) CheckWebSocket(rw http.ResponseWriter, req *http.Request) bool {
-	return req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket"
+func checkWebSocketUpgrade(rw http.ResponseWriter, req *http.Request) bool {
+	return connectionUpgrade(rw, req) == "websocket"
 }
 
-func (p *Proxy) ServeWebSocket(rw responseWriter, req *http.Request) {
+func checkTcpUpgrade(rw http.ResponseWriter, req *http.Request) bool {
+	return connectionUpgrade(rw, req) == "tcp"
+}
+
+func connectionUpgrade(rw http.ResponseWriter, req *http.Request) string {
+	if req.Header.Get("Connection") == "Upgrade" {
+		return req.Header.Get("Upgrade")
+	} else {
+		return ""
+	}
+}
+
+func serveTcp(rw responseWriter, req *http.Request) {
+	var err error
+
+	rw.Set("Upgrade", "tcp")
+
+	dc, _, err := rw.Hijack()
+	if err != nil {
+		rw.Warnf("hj.Hijack: %s", err)
+		rw.WriteStatus(http.StatusBadRequest)
+		return
+	}
+
+	defer dc.Close()
+
+	// Dial backend
+	uc, err := net.Dial("tcp", req.URL.Host)
+	if err != nil {
+		rw.Warnf("net.Dial: %s", err)
+		rw.WriteStatus(http.StatusBadRequest)
+		return
+	}
+
+	defer uc.Close()
+
+	errch := make(chan error, 2)
+
+	copy := func(dst io.Writer, src io.Reader) {
+		_, err := io.Copy(dst, src)
+		if err != nil {
+			errch <- err
+		}
+	}
+
+	go copy(uc, dc)
+	go copy(dc, uc)
+
+	// Don't care about error, both connections will be closed if necessary
+	<-errch
+}
+
+func serveWebSocket(rw responseWriter, req *http.Request) {
 	var err error
 
 	rw.Set("Upgrade", "websocket")
