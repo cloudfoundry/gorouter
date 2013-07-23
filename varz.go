@@ -30,7 +30,7 @@ type varz struct {
 
 	TopApps []topAppsEntry `json:"top10_app_requests"`
 
-	SecondsSinceLastRegistryUpdate float64 `json:"seconds_since_last_registry_update"`
+	MillisSinceLastRegistryUpdate int64 `json:"ms_since_last_registry_update"`
 }
 
 type httpMetric struct {
@@ -184,7 +184,8 @@ func (x *RealVarz) MarshalJSON() ([]byte, error) {
 	x.varz.Droplets = x.r.NumBackends()
 
 	x.varz.RequestsPerSec = x.varz.All.Rate.Rate1()
-	x.varz.SecondsSinceLastRegistryUpdate = time.Since(x.r.timeOfLastUpdate).Seconds()
+	millis_per_nano := int64(1000000)
+	x.varz.MillisSinceLastRegistryUpdate = time.Since(x.r.timeOfLastUpdate).Nanoseconds() / millis_per_nano
 
 	x.updateTop()
 
