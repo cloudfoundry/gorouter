@@ -18,7 +18,7 @@ import (
 type Router struct {
 	config     *Config
 	proxy      *Proxy
-	mbusClient mbus.CFMessageBus
+	mbusClient mbus.MessageBus
 	registry   *Registry
 	varz       Varz
 	component  *vcap.VcapComponent
@@ -241,7 +241,7 @@ func (router *Router) Run() {
 }
 
 func (r *Router) establishMBus() {
-	mbusClient, err := mbus.NewCFMessageBus("NATS")
+	mbusClient, err := mbus.NewMessageBus("NATS")
 	r.mbusClient = mbusClient
 	if err != nil {
 		panic("Could not connect to NATS")

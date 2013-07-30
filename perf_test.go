@@ -1,8 +1,7 @@
 package router
 
 import (
-	"code.google.com/p/gomock/gomock"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	"strconv"
 	"testing"
 )
@@ -14,8 +13,8 @@ const (
 
 func BenchmarkRegister(b *testing.B) {
 	c := DefaultConfig()
-	mocksController := gomock.NewController(b)
-	r := NewRegistry(c, test.NewMockCFMessageBus(mocksController))
+	mbus := mock_cfmessagebus.NewMockMessageBus()
+	r := NewRegistry(c, mbus)
 	p := NewProxy(c, r, NewVarz(r))
 
 	for i := 0; i < b.N; i++ {

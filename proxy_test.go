@@ -2,9 +2,8 @@ package router
 
 import (
 	"bufio"
-	"code.google.com/p/gomock/gomock"
 	"encoding/json"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	"io"
 	"io/ioutil"
 	. "launchpad.net/gocheck"
@@ -134,8 +133,8 @@ func (s *ProxySuite) SetUpTest(c *C) {
 	x := DefaultConfig()
 	x.TraceKey = "my_trace_key"
 
-	mocksController := gomock.NewController(c)
-	s.r = NewRegistry(x, test.NewMockCFMessageBus(mocksController))
+	mbus := mock_cfmessagebus.NewMockMessageBus()
+	s.r = NewRegistry(x, mbus)
 	s.p = NewProxy(x, s.r, nullVarz{})
 
 	s.done = make(chan bool)

@@ -178,12 +178,12 @@ type Registry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	messageBus mbus.CFMessageBus
+	messageBus mbus.MessageBus
 
 	timeOfLastUpdate time.Time
 }
 
-func NewRegistry(c *Config, messageBusClient mbus.CFMessageBus) *Registry {
+func NewRegistry(c *Config, messageBusClient mbus.MessageBus) *Registry {
 	r := &Registry{
 		messageBus: messageBusClient,
 	}

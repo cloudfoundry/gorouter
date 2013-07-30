@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func NewGreetApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
+func NewGreetApp(urls []string, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/", greetHandler)
 

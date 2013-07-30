@@ -13,12 +13,12 @@ type TestApp struct {
 	port       uint16   // app listening port
 	rPort      uint16   // router listening port
 	urls       []string // host registered host name
-	mbusClient mbus.CFMessageBus
+	mbusClient mbus.MessageBus
 	tags       map[string]string
 	mux        *http.ServeMux
 }
 
-func NewTestApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
+func NewTestApp(urls []string, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()

@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func NewStickyApp(urls []string, rPort uint16, mbusClient mbus.CFMessageBus, tags map[string]string) *TestApp {
+func NewStickyApp(urls []string, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/sticky", stickyHandler(app.port))
 

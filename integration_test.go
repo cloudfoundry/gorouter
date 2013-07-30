@@ -9,7 +9,7 @@ import (
 
 type IntegrationSuite struct {
 	Config     *Config
-	mbusClient mbus.CFMessageBus
+	mbusClient mbus.MessageBus
 	router     *Router
 }
 

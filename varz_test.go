@@ -1,12 +1,11 @@
 package router
 
 import (
-	"code.google.com/p/gomock/gomock"
 	"encoding/json"
 	"fmt"
 	. "launchpad.net/gocheck"
 	"net/http"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	"time"
 )
 
@@ -18,8 +17,8 @@ type VarzSuite struct {
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
-	mocksController := gomock.NewController(c)
-	r := NewRegistry(DefaultConfig(), test.NewMockCFMessageBus(mocksController))
+	mbus := mock_cfmessagebus.NewMockMessageBus()
+	r := NewRegistry(DefaultConfig(), mbus)
 	s.Registry = r
 	s.Varz = NewVarz(r)
 }

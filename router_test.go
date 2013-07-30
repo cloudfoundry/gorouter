@@ -21,7 +21,7 @@ import (
 type RouterSuite struct {
 	Config        *Config
 	natsServerCmd *exec.Cmd
-	mbusClient    mbus.CFMessageBus
+	mbusClient    mbus.MessageBus
 	router        *Router
 	natsPort      uint16
 }

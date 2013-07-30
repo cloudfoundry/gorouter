@@ -1,17 +1,15 @@
 package router
 
 import (
-	"code.google.com/p/gomock/gomock"
 	"encoding/json"
 	. "launchpad.net/gocheck"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	"time"
 )
 
 type RegistrySuite struct {
 	*Registry
-	messageBus      *test.MockCFMessageBus
-	mocksController *gomock.Controller
+	messageBus      *mock_cfmessagebus.MockMessageBus
 }
 
 var _ = Suite(&RegistrySuite{})
@@ -55,14 +53,8 @@ func (s *RegistrySuite) SetUpTest(c *C) {
 	configObj = DefaultConfig()
 	configObj.DropletStaleThreshold = 1
 
-	s.mocksController = gomock.NewController(c)
-	s.messageBus = test.NewMockCFMessageBus(s.mocksController)
-
+	s.messageBus = mock_cfmessagebus.NewMockMessageBus()
 	s.Registry = NewRegistry(configObj, s.messageBus)
-}
-
-func (s *RegistrySuite) TearDownTest(c *C) {
-	s.mocksController.Finish()
 }
 
 func (s *RegistrySuite) TestRegister(c *C) {
@@ -285,7 +277,9 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
-	s.messageBus.EXPECT().Ping().Return(false)
+
+	s.messageBus.OnPing(func() bool { return false })
+
 	s.PruneStaleDroplets()
 
 	c.Check(s.NumUris(), Equals, 4)
@@ -303,10 +297,11 @@ func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
 
 	completeSequence := make(chan string)
 
-	s.messageBus.EXPECT().Ping().Do(func() {
+	s.messageBus.OnPing(func() bool {
 		time.Sleep(5 * time.Second)
 		completeSequence <- "stale"
-	}).Return(false)
+		return false
+	})
 
 	go s.PruneStaleDroplets()
 
