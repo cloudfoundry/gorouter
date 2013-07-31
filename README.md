@@ -47,6 +47,17 @@ go get -v ./src/github.com/cloudfoundry/gorouter/...
 gem install nats
 ```
 
+### Running Tests
+
+We are using Gocheck, to run tests
+
+```
+go env
+go get -v ./...
+go build -v ./...
+go test -gocheck.v;
+```
+
 ### Start
 
 ```bash
