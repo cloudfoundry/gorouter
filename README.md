@@ -176,3 +176,7 @@ to prune routes for stale droplets.
 
 * 1/25/13: While this implementation can easily support WebSocket
   connections it does not yet.
+
+## Contributing
+
+Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
