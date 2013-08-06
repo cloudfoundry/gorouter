@@ -273,39 +273,17 @@ func serveTcp(rw responseWriter, req *http.Request) {
 
 	rw.Set("Upgrade", "tcp")
 
-	dc, _, err := rw.Hijack()
+	client, backend, err := hijackRequest(rw, req.URL.Host)
 	if err != nil {
-		rw.Warnf("hj.Hijack: %s", err)
+		rw.Warnf("Request hijack failed: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
-	defer dc.Close()
+	defer client.Close()
+	defer backend.Close()
 
-	// Dial backend
-	uc, err := net.Dial("tcp", req.URL.Host)
-	if err != nil {
-		rw.Warnf("net.Dial: %s", err)
-		rw.WriteStatus(http.StatusBadRequest)
-		return
-	}
-
-	defer uc.Close()
-
-	errch := make(chan error, 2)
-
-	copy := func(dst io.Writer, src io.Reader) {
-		_, err := io.Copy(dst, src)
-		if err != nil {
-			errch <- err
-		}
-	}
-
-	go copy(uc, dc)
-	go copy(dc, uc)
-
-	// Don't care about error, both connections will be closed if necessary
-	<-errch
+	forwardIO(client, backend)
 }
 
 func serveWebSocket(rw responseWriter, req *http.Request) {
@@ -313,45 +291,52 @@ func serveWebSocket(rw responseWriter, req *http.Request) {
 
 	rw.Set("Upgrade", "websocket")
 
-	dc, _, err := rw.Hijack()
+	client, backend, err := hijackRequest(rw, req.URL.Host)
 	if err != nil {
-		rw.Warnf("hj.Hijack: %s", err)
+		rw.Warnf("Request hijack failed: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
-	defer dc.Close()
-
-	// Dial backend
-	uc, err := net.Dial("tcp", req.URL.Host)
-	if err != nil {
-		rw.Warnf("net.Dial: %s", err)
-		rw.WriteStatus(http.StatusBadRequest)
-		return
-	}
-
-	defer uc.Close()
+	defer client.Close()
+	defer backend.Close()
 
 	// Write request
-	err = req.Write(uc)
+	err = req.Write(backend)
 	if err != nil {
 		rw.Warnf("Writing request: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
-	errch := make(chan error, 2)
+	forwardIO(client, backend)
+}
 
-	copy := func(dst io.Writer, src io.Reader) {
-		_, err := io.Copy(dst, src)
-		if err != nil {
-			errch <- err
-		}
+func hijackRequest(rw responseWriter, addr string) (client, backend net.Conn, err error) {
+	client, _, err = rw.Hijack()
+	if err != nil {
+		return
 	}
 
-	go copy(uc, dc)
-	go copy(dc, uc)
+	backend, err = net.Dial("tcp", addr)
+	if err != nil {
+		return
+	}
 
-	// Don't care about error, both connections will be closed if necessary
-	<-errch
+	return
+}
+
+func forwardIO(a, b net.Conn) {
+	done := make(chan bool, 2)
+
+	copy := func(dst io.Writer, src io.Reader) {
+		// don't care about errors here
+		io.Copy(dst, src)
+		done <- true
+	}
+
+	go copy(a, b)
+	go copy(b, a)
+
+	<-done
 }
