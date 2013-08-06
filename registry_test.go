@@ -2,14 +2,14 @@ package router
 
 import (
 	"encoding/json"
-	. "launchpad.net/gocheck"
 	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
+	. "launchpad.net/gocheck"
 	"time"
 )
 
 type RegistrySuite struct {
 	*Registry
-	messageBus      *mock_cfmessagebus.MockMessageBus
+	messageBus *mock_cfmessagebus.MockMessageBus
 }
 
 var _ = Suite(&RegistrySuite{})

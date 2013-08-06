@@ -2,8 +2,8 @@ package router
 
 import (
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	. "launchpad.net/gocheck"
 	"github.com/cloudfoundry/gorouter/test"
+	. "launchpad.net/gocheck"
 	"time"
 )
 

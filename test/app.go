@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	"github.com/cloudfoundry/gorouter/common"
 	. "launchpad.net/gocheck"
 	"net/http"
-	"github.com/cloudfoundry/gorouter/common"
 )
 
 type TestApp struct {

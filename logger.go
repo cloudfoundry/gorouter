@@ -1,9 +1,9 @@
 package router
 
 import (
+	"github.com/cloudfoundry/gorouter/common"
 	steno "github.com/cloudfoundry/gosteno"
 	"os"
-	"github.com/cloudfoundry/gorouter/common"
 )
 
 var log *steno.Logger

@@ -3,9 +3,9 @@ package router
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	. "launchpad.net/gocheck"
 	"net/http"
-	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	"time"
 )
 

@@ -3,9 +3,9 @@ package router
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cloudfoundry/gorouter/stats"
 	metrics "github.com/rcrowley/go-metrics"
 	"net/http"
-	"github.com/cloudfoundry/gorouter/stats"
 	"sync"
 	"time"
 )

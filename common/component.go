@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	. "github.com/cloudfoundry/gorouter/common/http"
 	steno "github.com/cloudfoundry/gosteno"
 	"net/http"
-	. "github.com/cloudfoundry/gorouter/common/http"
 	"runtime"
 	"time"
 )

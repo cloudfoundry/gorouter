@@ -1,9 +1,9 @@
 package router
 
 import (
+	vcap "github.com/cloudfoundry/gorouter/common"
 	"io/ioutil"
 	"launchpad.net/goyaml"
-	vcap "github.com/cloudfoundry/gorouter/common"
 	"time"
 )
 
