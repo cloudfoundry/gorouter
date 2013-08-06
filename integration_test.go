@@ -17,7 +17,7 @@ var _ = Suite(&IntegrationSuite{})
 
 func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	natsPort := nextAvailPort()
-	cmd := mbus.StartNats(int(natsPort))
+	cmd := StartNats(int(natsPort))
 
 	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
@@ -66,7 +66,7 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 
 	app.VerifyAppStatus(200, c)
 
-	mbus.StopNats(cmd)
+	StopNats(cmd)
 
 	time.Sleep(staleCheckInterval + staleThreshold + 1*time.Second)
 

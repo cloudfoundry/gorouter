@@ -1,8 +1,11 @@
 package router
 
 import (
+	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
 	. "launchpad.net/gocheck"
+	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -55,4 +58,19 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *Config {
 	}
 
 	return c
+}
+
+func StartNats(port int) *exec.Cmd {
+	cmd := exec.Command("nats-server", "-p", strconv.Itoa(port), "--user", "nats", "--pass", "nats")
+	err := cmd.Start()
+	if err != nil {
+		panic(fmt.Sprintf("NATS failed to start: %v\n", err))
+	}
+
+	return cmd
+}
+
+func StopNats(cmd *exec.Cmd) {
+	cmd.Process.Kill()
+	cmd.Wait()
 }

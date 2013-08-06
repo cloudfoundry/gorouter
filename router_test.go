@@ -31,7 +31,7 @@ var _ = Suite(&RouterSuite{})
 func (s *RouterSuite) SetUpSuite(c *C) {
 	s.natsPort = nextAvailPort()
 
-	s.natsServerCmd = mbus.StartNats(int(s.natsPort))
+	s.natsServerCmd = StartNats(int(s.natsPort))
 
 	proxyPort := nextAvailPort()
 	statusPort := nextAvailPort()
@@ -46,7 +46,7 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 }
 
 func (s *RouterSuite) TearDownSuite(c *C) {
-	mbus.StopNats(s.natsServerCmd)
+	StopNats(s.natsServerCmd)
 }
 
 func (s *RouterSuite) TestRouterGreets(c *C) {
@@ -348,8 +348,8 @@ func (s *RouterSuite) TestRouterSendsStartOnConnect(c *C) {
 		started <- true
 	})
 
-	mbus.StopNats(s.natsServerCmd)
-	s.natsServerCmd = mbus.StartNats(int(s.natsPort))
+	StopNats(s.natsServerCmd)
+	s.natsServerCmd = StartNats(int(s.natsPort))
 	<-s.WaitUntilNatsIsUp()
 
 	select {
