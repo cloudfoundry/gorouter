@@ -290,22 +290,22 @@ func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
 	}
 }
 
-func (r *Registry) Unregister(m *registryMessage) {
-	i, ok := m.BackendId()
+func (registry *Registry) Unregister(message *registryMessage) {
+	id, ok := message.BackendId()
 	if !ok {
 		return
 	}
 
-	r.Lock()
-	defer r.Unlock()
+	registry.Lock()
+	defer registry.Unlock()
 
-	b, ok := r.byBackendId[i]
+	registryForId, ok := registry.byBackendId[id]
 	if !ok {
 		return
 	}
 
-	for _, u := range m.Uris {
-		r.unregisterUri(b, u)
+	for _, uri := range message.Uris {
+		registry.unregisterUri(registryForId, uri)
 	}
 }
 
