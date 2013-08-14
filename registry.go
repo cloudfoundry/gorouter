@@ -204,19 +204,19 @@ func NewRegistry(c *Config, messageBusClient mbus.MessageBus) *Registry {
 	return r
 }
 
-func (r *Registry) StartPruningCycle() {
-	go r.checkAndPrune()
+func (registry *Registry) StartPruningCycle() {
+	go registry.checkAndPrune()
 }
 
-func (r *Registry) isStateStale() bool {
-	return !r.messageBus.Ping()
+func (registry *Registry) isStateStale() bool {
+	return !registry.messageBus.Ping()
 }
 
-func (r *Registry) NumUris() int {
-	r.RLock()
-	defer r.RUnlock()
+func (registry *Registry) NumUris() int {
+	registry.RLock()
+	defer registry.RUnlock()
 
-	return len(r.byUri)
+	return len(registry.byUri)
 }
 
 func (r *Registry) NumBackends() int {
@@ -261,12 +261,12 @@ func (registry *Registry) Register(message *registryMessage) {
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
+func (registry *Registry) unregisterUri(backend *Backend, uri Uri) {
 	uri = uri.ToLower()
 
 	ok := backend.unregister(uri)
 	if ok {
-		backends := r.byUri[uri]
+		backends := registry.byUri[uri]
 		for i, b := range backends {
 			if b == backend {
 				// Remove b from list of backends
@@ -277,16 +277,16 @@ func (r *Registry) unregisterUri(backend *Backend, uri Uri) {
 		}
 
 		if len(backends) == 0 {
-			delete(r.byUri, uri)
+			delete(registry.byUri, uri)
 		} else {
-			r.byUri[uri] = backends
+			registry.byUri[uri] = backends
 		}
 	}
 
 	// Remove backend if it no longer has uris
 	if len(backend.U) == 0 {
-		delete(r.byBackendId, backend.BackendId)
-		r.staleTracker.Delete(backend)
+		delete(registry.byBackendId, backend.BackendId)
+		registry.staleTracker.Delete(backend)
 	}
 }
 
