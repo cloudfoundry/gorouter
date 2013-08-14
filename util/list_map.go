@@ -30,6 +30,11 @@ func (x *ListMap) Front() interface{} {
 	return e.Value
 }
 
+func (x *ListMap) FrontElement() *list.Element {
+	e := x.l.Front()
+	return e
+}
+
 func (x *ListMap) PushBack(v interface{}) {
 	x.Delete(v)
 	e := x.l.PushBack(v)

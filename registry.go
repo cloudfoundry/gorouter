@@ -312,7 +312,7 @@ func (registry *Registry) Unregister(message *registryMessage) {
 func (registry *Registry) pruneStaleDroplets() {
 	for registry.staleTracker.Len() > 0 {
 		backend := registry.staleTracker.Front().(*Backend)
-		if backend.updated_at.Add(registry.dropletStaleThreshold).After(time.Now()) {
+		if !registry.IsStale(backend) {
 			log.Infof("Droplet is not stale; NOT pruning: %v", backend.BackendId)
 			break
 		}
@@ -325,16 +325,20 @@ func (registry *Registry) pruneStaleDroplets() {
 	}
 }
 
-func (registry *Registry) resetTracker() {
-	for registry.staleTracker.Len() > 0 {
-		registry.staleTracker.Delete(registry.staleTracker.Front().(*Backend))
+func (registry *Registry) IsStale(backend *Backend) (bool) {
+	return backend.updated_at.Add(registry.dropletStaleThreshold).Before(time.Now())
+}
+
+func (registry *Registry) pauseStaleTracker() {
+	for routeElement := registry.staleTracker.FrontElement(); routeElement != nil; routeElement = routeElement.Next() {
+		routeElement.Value.(*Backend).updated_at = time.Now()
 	}
 }
 
 func (registry *Registry) PruneStaleDroplets() {
 	if registry.isStateStale() {
 		log.Info("State is stale; NOT pruning")
-		registry.resetTracker()
+		registry.pauseStaleTracker()
 		return
 	}
 

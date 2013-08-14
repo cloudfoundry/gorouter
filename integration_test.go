@@ -23,7 +23,7 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	statusPort := nextAvailPort()
 
 	s.Config = SpecConfig(natsPort, statusPort, proxyPort)
-	s.Config.PruneStaleDropletsInterval = 5 * time.Second
+	s.Config.PruneStaleDropletsInterval = 1 * time.Second
 
 	s.router = NewRouter(s.Config)
 	go s.router.Run()
@@ -42,35 +42,60 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	<-natsConnected
 	s.mbusClient = s.router.mbusClient
 
-	heartbeatInterval := 1 * time.Second
-	staleThreshold := 5 * time.Second
+	heartbeatInterval := 200 * time.Millisecond
+	staleThreshold := 1 * time.Second
 	staleCheckInterval := s.router.registry.pruneStaleDropletsInterval
 
 	s.router.registry.dropletStaleThreshold = staleThreshold
 
-	app := test.NewGreetApp([]string{"test.nats.dying.vcap.me"}, proxyPort, s.mbusClient, nil)
-	app.Listen()
+	zombieApp := test.NewGreetApp([]string{"test.nats.dying.and.app.dies.while.nats.is.down.vcap.me"}, proxyPort, s.mbusClient, nil)
+	zombieApp.Listen()
 
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+	runningApp := test.NewGreetApp([]string{"test.nats.dying.and.app.stays.alive.vcap.me"}, proxyPort, s.mbusClient, nil)
+	runningApp.Listen()
+
+	c.Assert(s.waitAppRegistered(zombieApp, time.Second*2), Equals, true)
+	c.Assert(s.waitAppRegistered(runningApp, time.Second*2), Equals, true)
+
+	zombieTicker := time.NewTicker(heartbeatInterval)
+	runningTicker := time.NewTicker(heartbeatInterval)
 
 	go func() {
-		tick := time.Tick(heartbeatInterval)
-
 		for {
 			select {
-			case <-tick:
-				app.Register()
+			case <-zombieTicker.C:
+				zombieApp.Register()
+			case <-runningTicker.C:
+				runningApp.Register()
 			}
 		}
 	}()
 
-	app.VerifyAppStatus(200, c)
+	zombieApp.VerifyAppStatus(200, c)
+
+	// kill registration ticker => kill app (must be before stopping NATS since app.Register is fake and queues messages in memory)
+	zombieTicker.Stop()
 
 	StopNats(cmd)
 
-	time.Sleep(staleCheckInterval + staleThreshold + 1*time.Second)
+	time.Sleep(staleCheckInterval + staleThreshold + 250*time.Millisecond)
 
-	app.VerifyAppStatus(200, c)
+	// While NATS is down no routes should go down
+	zombieApp.VerifyAppStatus(200, c)
+	runningApp.VerifyAppStatus(200, c)
+
+	cmd = StartNats(int(natsPort))
+
+	// Right after NATS starts up all routes should stay up
+	zombieApp.VerifyAppStatus(200, c)
+	runningApp.VerifyAppStatus(200, c)
+
+	// Wait the regular stale timeout
+	time.Sleep(staleCheckInterval + staleThreshold + 250*time.Millisecond)
+
+	// Finally the zombie is cleaned up. Maybe proactively enqueue Unregister events in DEA's.
+	zombieApp.VerifyAppStatus(404, c)
+	runningApp.VerifyAppStatus(200, c)
 }
 
 func (s *IntegrationSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) bool {

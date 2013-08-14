@@ -51,7 +51,7 @@ func (s *RegistrySuite) SetUpTest(c *C) {
 	var configObj *Config
 
 	configObj = DefaultConfig()
-	configObj.DropletStaleThreshold = 1
+	configObj.DropletStaleThreshold = 10 * time.Millisecond
 
 	s.messageBus = mock_cfmessagebus.NewMockMessageBus()
 	s.Registry = NewRegistry(configObj, s.messageBus)
@@ -280,11 +280,19 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 
 	s.messageBus.OnPing(func() bool { return false })
 
+	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
+
 	s.PruneStaleDroplets()
 
 	c.Check(s.NumUris(), Equals, 4)
 	c.Check(s.NumBackends(), Equals, 2)
-	c.Assert(s.staleTracker.Len(), Equals, 0)
+	c.Assert(s.staleTracker.Len(), Equals, 2)
+
+	backend, _ := s.Lookup("foo.vcap.me")
+	c.Assert(s.IsStale(backend), Equals, false)
+
+	backend, _ = s.Lookup("bar.vcap.me")
+	c.Assert(s.IsStale(backend), Equals, false)
 }
 
 func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
@@ -326,4 +334,15 @@ func (s *RegistrySuite) TestInfoMarshalling(c *C) {
 	marshalled, err := json.Marshal(s)
 	c.Check(err, IsNil)
 	c.Check(string(marshalled), Equals, "{\"foo.vcap.me\":[\"192.168.1.1:1234\"]}")
+}
+
+func (s *RegistrySuite) TestIsStale(c *C) {
+	s.Register(fooReg)
+
+	backend, _ := s.Lookup("foo.vcap.me")
+	c.Assert(s.IsStale(backend), Equals, false)
+
+	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
+
+	c.Assert(s.IsStale(backend), Equals, true)
 }
