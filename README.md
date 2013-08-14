@@ -55,7 +55,10 @@ We are using Gocheck, to run tests
 go env
 go get -v ./...
 go build -v ./...
-go test -gocheck.v;
+go test -gocheck.v
+
+# just run tests whose names match Registry
+go test -gocheck.v -gocheck.f=Registry
 ```
 
 ### Start
