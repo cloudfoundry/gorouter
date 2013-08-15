@@ -35,7 +35,7 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 		StatusCode: http.StatusOK,
 	}
 
-	b := &Backend{
+	b := &RouteEndpoint{
 		ApplicationId: "my_awesome_id",
 		Host:          "127.0.0.1",
 		Port:          4567,
@@ -44,7 +44,7 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 	r := AccessLogRecord{
 		Request:       req,
 		Response:      res,
-		Backend:       b,
+		RouteEndpoint: b,
 		StartedAt:     time.Unix(10, 100000000),
 		FirstByteAt:   time.Unix(10, 200000000),
 		FinishedAt:    time.Unix(10, 300000000),

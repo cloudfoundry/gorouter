@@ -206,7 +206,7 @@ func (s *RegistrySuite) TestLookup(c *C) {
 
 	s.Register(m)
 
-	var b *Backend
+	var b *RouteEndpoint
 	var ok bool
 
 	b, ok = s.Lookup("foo.vcap.me")

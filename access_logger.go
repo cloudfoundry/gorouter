@@ -12,7 +12,7 @@ import (
 type AccessLogRecord struct {
 	Request       *http.Request
 	Response      *http.Response
-	Backend       *Backend
+	RouteEndpoint *RouteEndpoint
 	StartedAt     time.Time
 	FirstByteAt   time.Time
 	FinishedAt    time.Time
@@ -46,7 +46,7 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("User-Agent"))
 	fmt.Fprintf(b, `%s `, r.Request.RemoteAddr)
 	fmt.Fprintf(b, `response_time:%.9f `, r.ResponseTime())
-	fmt.Fprintf(b, `app_id:%s`, r.Backend.ApplicationId)
+	fmt.Fprintf(b, `app_id:%s`, r.RouteEndpoint.ApplicationId)
 	fmt.Fprint(b, "\n")
 	return b.WriteTo(w)
 }

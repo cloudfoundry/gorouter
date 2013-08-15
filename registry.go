@@ -40,8 +40,8 @@ type Registry struct {
 	*stats.ActiveApps
 	*stats.TopApps
 
-	byUri       map[Uri][]*Backend
-	byBackendId map[BackendId]*Backend
+	byUri       map[Uri][]*RouteEndpoint
+	byBackendId map[BackendId]*RouteEndpoint
 
 	staleTracker *util.ListMap
 
@@ -63,8 +63,8 @@ func NewRegistry(c *Config, messageBusClient mbus.MessageBus) *Registry {
 	r.ActiveApps = stats.NewActiveApps()
 	r.TopApps = stats.NewTopApps()
 
-	r.byUri = make(map[Uri][]*Backend)
-	r.byBackendId = make(map[BackendId]*Backend)
+	r.byUri = make(map[Uri][]*RouteEndpoint)
+	r.byBackendId = make(map[BackendId]*RouteEndpoint)
 
 	r.staleTracker = util.NewListMap()
 
@@ -96,7 +96,7 @@ func (r *Registry) NumBackends() int {
 	return len(r.byBackendId)
 }
 
-func (r *Registry) registerUri(b *Backend, u Uri) {
+func (r *Registry) registerUri(b *RouteEndpoint, u Uri) {
 	u = u.ToLower()
 
 	ok := b.register(u)
@@ -131,7 +131,7 @@ func (registry *Registry) Register(message *registryMessage) {
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (registry *Registry) unregisterUri(backend *Backend, uri Uri) {
+func (registry *Registry) unregisterUri(backend *RouteEndpoint, uri Uri) {
 	uri = uri.ToLower()
 
 	ok := backend.unregister(uri)
@@ -181,7 +181,7 @@ func (registry *Registry) Unregister(message *registryMessage) {
 
 func (registry *Registry) pruneStaleDroplets() {
 	for registry.staleTracker.Len() > 0 {
-		backend := registry.staleTracker.Front().(*Backend)
+		backend := registry.staleTracker.Front().(*RouteEndpoint)
 		if !registry.IsStale(backend) {
 			log.Infof("Droplet is not stale; NOT pruning: %v", backend.BackendId)
 			break
@@ -195,13 +195,13 @@ func (registry *Registry) pruneStaleDroplets() {
 	}
 }
 
-func (registry *Registry) IsStale(backend *Backend) (bool) {
+func (registry *Registry) IsStale(backend *RouteEndpoint) bool {
 	return backend.updated_at.Add(registry.dropletStaleThreshold).Before(time.Now())
 }
 
 func (registry *Registry) pauseStaleTracker() {
 	for routeElement := registry.staleTracker.FrontElement(); routeElement != nil; routeElement = routeElement.Next() {
-		routeElement.Value.(*Backend).updated_at = time.Now()
+		routeElement.Value.(*RouteEndpoint).updated_at = time.Now()
 	}
 }
 
@@ -233,7 +233,7 @@ func (r *Registry) checkAndPrune() {
 	}
 }
 
-func (r *Registry) Lookup(host string) (*Backend, bool) {
+func (r *Registry) Lookup(host string) (*RouteEndpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -246,7 +246,7 @@ func (r *Registry) Lookup(host string) (*Backend, bool) {
 	return x[rand.Intn(len(x))], true
 }
 
-func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*Backend, bool) {
+func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*RouteEndpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -264,7 +264,7 @@ func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*Backend, b
 	return nil, false
 }
 
-func (r *Registry) CaptureBackendRequest(x *Backend, t time.Time) {
+func (r *Registry) CaptureRoutingRequest(x *RouteEndpoint, t time.Time) {
 	if x.ApplicationId != "" {
 		r.ActiveApps.Mark(x.ApplicationId, t)
 		r.TopApps.Mark(x.ApplicationId, t)

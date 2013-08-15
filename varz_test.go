@@ -130,24 +130,24 @@ func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {
-	b := &Backend{}
+	b := &RouteEndpoint{}
 	r := http.Request{}
 
-	s.Varz.CaptureBackendRequest(b, &r)
+	s.Varz.CaptureRoutingRequest(b, &r)
 	c.Check(s.findValue("requests"), Equals, float64(1))
 
-	s.Varz.CaptureBackendRequest(b, &r)
+	s.Varz.CaptureRoutingRequest(b, &r)
 	c.Check(s.findValue("requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
-	b1 := &Backend{
+	b1 := &RouteEndpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
 	}
 
-	b2 := &Backend{
+	b2 := &RouteEndpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
@@ -156,14 +156,14 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 	r1 := http.Request{}
 	r2 := http.Request{}
 
-	s.Varz.CaptureBackendRequest(b1, &r1)
-	s.Varz.CaptureBackendRequest(b2, &r2)
+	s.Varz.CaptureRoutingRequest(b1, &r1)
+	s.Varz.CaptureRoutingRequest(b2, &r2)
 
 	c.Check(s.findValue("tags", "component", "cc", "requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
-	var b *Backend = &Backend{}
+	var b *RouteEndpoint = &RouteEndpoint{}
 	var d time.Duration
 
 	r1 := &http.Response{
@@ -174,9 +174,9 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 		StatusCode: http.StatusNotFound,
 	}
 
-	s.CaptureBackendResponse(b, r1, d)
-	s.CaptureBackendResponse(b, r2, d)
-	s.CaptureBackendResponse(b, r2, d)
+	s.CaptureRoutingResponse(b, r1, d)
+	s.CaptureRoutingResponse(b, r2, d)
+	s.CaptureRoutingResponse(b, r2, d)
 
 	c.Check(s.findValue("responses_2xx"), Equals, float64(1))
 	c.Check(s.findValue("responses_4xx"), Equals, float64(2))
@@ -185,13 +185,13 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	var d time.Duration
 
-	b1 := &Backend{
+	b1 := &RouteEndpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
 	}
 
-	b2 := &Backend{
+	b2 := &RouteEndpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
@@ -205,23 +205,23 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 		StatusCode: http.StatusNotFound,
 	}
 
-	s.CaptureBackendResponse(b1, r1, d)
-	s.CaptureBackendResponse(b2, r2, d)
-	s.CaptureBackendResponse(b2, r2, d)
+	s.CaptureRoutingResponse(b1, r1, d)
+	s.CaptureRoutingResponse(b2, r2, d)
+	s.CaptureRoutingResponse(b2, r2, d)
 
 	c.Check(s.findValue("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
 	c.Check(s.findValue("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
-	var backend *Backend = &Backend{}
+	var backend *RouteEndpoint = &RouteEndpoint{}
 	var duration = 1 * time.Millisecond
 
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 	}
 
-	s.CaptureBackendResponse(backend, response, duration)
+	s.CaptureRoutingResponse(backend, response, duration)
 
 	c.Check(s.findValue("latency", "50").(float64), Equals, float64(duration)/float64(time.Second))
 	c.Check(s.findValue("latency", "75").(float64), Equals, float64(duration)/float64(time.Second))

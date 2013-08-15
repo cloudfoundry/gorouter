@@ -97,41 +97,41 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (p *Proxy) Lookup(req *http.Request) (*Backend, bool) {
-	h := hostWithoutPort(req)
+func (proxy *Proxy) Lookup(request *http.Request) (*RouteEndpoint, bool) {
+	host := hostWithoutPort(request)
 
 	// Try choosing a backend using sticky session
-	if _, err := req.Cookie(StickyCookieKey); err == nil {
-		if sticky, err := req.Cookie(VcapCookieId); err == nil {
-			b, ok := p.Registry.LookupByPrivateInstanceId(h, sticky.Value)
+	if _, err := request.Cookie(StickyCookieKey); err == nil {
+		if sticky, err := request.Cookie(VcapCookieId); err == nil {
+			routeEndpoint, ok := proxy.Registry.LookupByPrivateInstanceId(host, sticky.Value)
 			if ok {
-				return b, ok
+				return routeEndpoint, ok
 			}
 		}
 	}
 
 	// Choose backend using host alone
-	return p.Registry.Lookup(h)
+	return proxy.Registry.Lookup(host)
 }
 
-func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
-	rw := responseWriter{
-		ResponseWriter: hrw,
-		Logger:         p.Logger.Copy(),
+func (proxy *Proxy) ServeHTTP(httpResponseWriter http.ResponseWriter, request *http.Request) {
+	responseWriter := responseWriter{
+		ResponseWriter: httpResponseWriter,
+		Logger:         proxy.Logger.Copy(),
 	}
 
-	rw.Set("RemoteAddr", req.RemoteAddr)
-	rw.Set("Host", req.Host)
-	rw.Set("X-Forwarded-For", req.Header["X-Forwarded-For"])
-	rw.Set("X-Forwarded-Proto", req.Header["X-Forwarded-Proto"])
+	responseWriter.Set("RemoteAddr", request.RemoteAddr)
+	responseWriter.Set("Host", request.Host)
+	responseWriter.Set("X-Forwarded-For", request.Header["X-Forwarded-For"])
+	responseWriter.Set("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"])
 
-	a := AccessLogRecord{
-		Request:   req,
+	accessLog := AccessLogRecord{
+		Request:   request,
 		StartedAt: time.Now(),
 	}
 
-	if req.ProtoMajor != 1 && (req.ProtoMinor != 0 || req.ProtoMinor != 1) {
-		c, brw, err := rw.Hijack()
+	if request.ProtoMajor != 1 && (request.ProtoMinor != 0 || request.ProtoMinor != 1) {
+		c, brw, err := responseWriter.Hijack()
 		if err != nil {
 			panic(err)
 		}
@@ -145,110 +145,111 @@ func (p *Proxy) ServeHTTP(hrw http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 
 	// Return 200 OK for heartbeats from LB
-	if req.UserAgent() == "HTTP-Monitor/1.1" {
-		rw.WriteHeader(http.StatusOK)
-		fmt.Fprintln(rw, "ok")
+	if request.UserAgent() == "HTTP-Monitor/1.1" {
+		responseWriter.WriteHeader(http.StatusOK)
+		fmt.Fprintln(responseWriter, "ok")
 		return
 	}
 
-	x, ok := p.Lookup(req)
+	routeEndpoint, ok := proxy.Lookup(request)
 	if !ok {
-		p.Varz.CaptureBadRequest(req)
-		rw.WriteStatus(http.StatusNotFound)
+		proxy.Varz.CaptureBadRequest(request)
+		responseWriter.WriteStatus(http.StatusNotFound)
 		return
 	}
 
-	rw.Set("Backend", x.ToLogData())
+	responseWriter.Set("RouteEndpoint", routeEndpoint.ToLogData())
+	responseWriter.Set("Backend", routeEndpoint.ToLogData()) // Deprecated: Use RouteEndpoint
 
-	a.Backend = x
+	accessLog.RouteEndpoint = routeEndpoint
 
-	p.Registry.CaptureBackendRequest(x, start)
-	p.Varz.CaptureBackendRequest(x, req)
+	proxy.Registry.CaptureRoutingRequest(routeEndpoint, start)
+	proxy.Varz.CaptureRoutingRequest(routeEndpoint, request)
 
-	req.URL.Scheme = "http"
-	req.URL.Host = x.CanonicalAddr()
+	request.URL.Scheme = "http"
+	request.URL.Host = routeEndpoint.CanonicalAddr()
 
 	// Add X-Forwarded-For
-	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+	if host, _, err := net.SplitHostPort(request.RemoteAddr); err == nil {
 		// We assume there is a trusted upstream (L7 LB) that properly
 		// strips client's XFF header
 
 		// This is sloppy but fine since we don't share this request or
 		// headers. Otherwise we should copy the underlying header and
 		// append
-		xff := append(req.Header["X-Forwarded-For"], host)
-		req.Header.Set("X-Forwarded-For", strings.Join(xff, ", "))
+		xForwardFor := append(request.Header["X-Forwarded-For"], host)
+		request.Header.Set("X-Forwarded-For", strings.Join(xForwardFor, ", "))
 	}
 
 	// Check if the connection is going to be upgraded to a raw TCP connection
-	if checkTcpUpgrade(rw, req) {
-		serveTcp(rw, req)
+	if checkTcpUpgrade(responseWriter, request) {
+		serveTcp(responseWriter, request)
 		return
 	}
 
 	// Check if the connection is going to be upgraded to a WebSocket connection
-	if checkWebSocketUpgrade(rw, req) {
-		serveWebSocket(rw, req)
+	if checkWebSocketUpgrade(responseWriter, request) {
+		serveWebSocket(responseWriter, request)
 		return
 	}
 
 	// Use a new connection for every request
 	// Keep-alive can be bolted on later, if we want to
-	req.Close = true
-	req.Header.Del("Connection")
+	request.Close = true
+	request.Header.Del("Connection")
 
-	res, err := http.DefaultTransport.RoundTrip(req)
+	roundTripResponse, err := http.DefaultTransport.RoundTrip(request)
 
 	latency := time.Since(start)
 
-	a.FirstByteAt = time.Now()
-	a.Response = res
+	accessLog.FirstByteAt = time.Now()
+	accessLog.Response = roundTripResponse
 
 	if err != nil {
-		p.Varz.CaptureBackendResponse(x, res, latency)
-		rw.Warnf("Error reading from upstream: %s", err)
-		rw.WriteStatus(http.StatusBadGateway)
+		proxy.Varz.CaptureRoutingResponse(routeEndpoint, roundTripResponse, latency)
+		responseWriter.Warnf("Error reading from upstream: %s", err)
+		responseWriter.WriteStatus(http.StatusBadGateway)
 		return
 	}
 
-	p.Varz.CaptureBackendResponse(x, res, latency)
+	proxy.Varz.CaptureRoutingResponse(routeEndpoint, roundTripResponse, latency)
 
-	for k, vv := range res.Header {
+	for k, vv := range roundTripResponse.Header {
 		for _, v := range vv {
-			rw.Header().Add(k, v)
+			responseWriter.Header().Add(k, v)
 		}
 	}
 
-	if p.Config.TraceKey != "" && req.Header.Get(VcapTraceHeader) == p.Config.TraceKey {
-		rw.Header().Set(VcapRouterHeader, p.Config.Ip)
-		rw.Header().Set(VcapBackendHeader, x.CanonicalAddr())
+	if proxy.Config.TraceKey != "" && request.Header.Get(VcapTraceHeader) == proxy.Config.TraceKey {
+		responseWriter.Header().Set(VcapRouterHeader, proxy.Config.Ip)
+		responseWriter.Header().Set(VcapBackendHeader, routeEndpoint.CanonicalAddr())
 	}
 
 	needSticky := false
-	for _, v := range res.Cookies() {
+	for _, v := range roundTripResponse.Cookies() {
 		if v.Name == StickyCookieKey {
 			needSticky = true
 			break
 		}
 	}
 
-	if needSticky && x.PrivateInstanceId != "" {
+	if needSticky && routeEndpoint.PrivateInstanceId != "" {
 		cookie := &http.Cookie{
 			Name:  VcapCookieId,
-			Value: x.PrivateInstanceId,
+			Value: routeEndpoint.PrivateInstanceId,
 			Path:  "/",
 		}
-		http.SetCookie(rw, cookie)
+		http.SetCookie(responseWriter, cookie)
 	}
 
-	rw.WriteHeader(res.StatusCode)
-	n, _ := rw.CopyFrom(res.Body)
+	responseWriter.WriteHeader(roundTripResponse.StatusCode)
+	bytesSent, _ := responseWriter.CopyFrom(roundTripResponse.Body)
 
-	a.FinishedAt = time.Now()
-	a.BodyBytesSent = n
+	accessLog.FinishedAt = time.Now()
+	accessLog.BodyBytesSent = bytesSent
 
-	if p.AccessLogger != nil {
-		p.AccessLogger.Log(a)
+	if proxy.AccessLogger != nil {
+		proxy.AccessLogger.Log(accessLog)
 	}
 }
 
