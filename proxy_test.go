@@ -342,6 +342,7 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 
 	resp, _ := x.ReadResponse()
 	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, ln.Addr().String())
+	c.Check(resp.Header.Get("X-Cf-RouteEndpoint"), Equals, ln.Addr().String())
 	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, s.p.Config.Ip)
 }
 
@@ -363,6 +364,7 @@ func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
 
 	resp, _ := x.ReadResponse()
 	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, "")
+	c.Check(resp.Header.Get("X-Cf-RouteEndpoint"), Equals, "")
 	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, "")
 }
 

@@ -15,6 +15,7 @@ import (
 
 const (
 	VcapBackendHeader = "X-Vcap-Backend"
+	CfRouteEndpointHeader = "X-Cf-RouteEndpoint"
 	VcapRouterHeader  = "X-Vcap-Router"
 	VcapTraceHeader   = "X-Vcap-Trace"
 
@@ -223,6 +224,7 @@ func (proxy *Proxy) ServeHTTP(httpResponseWriter http.ResponseWriter, request *h
 	if proxy.Config.TraceKey != "" && request.Header.Get(VcapTraceHeader) == proxy.Config.TraceKey {
 		responseWriter.Header().Set(VcapRouterHeader, proxy.Config.Ip)
 		responseWriter.Header().Set(VcapBackendHeader, routeEndpoint.CanonicalAddr())
+		responseWriter.Header().Set(CfRouteEndpointHeader, routeEndpoint.CanonicalAddr())
 	}
 
 	needSticky := false
