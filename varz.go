@@ -181,7 +181,7 @@ func (x *RealVarz) MarshalJSON() ([]byte, error) {
 	defer x.Unlock()
 
 	x.varz.Urls = x.r.NumUris()
-	x.varz.Droplets = x.r.NumBackends()
+	x.varz.Droplets = x.r.NumRouteEndpoints()
 
 	x.varz.RequestsPerSec = x.varz.All.Rate.Rate1()
 	millis_per_nano := int64(1000000)
@@ -233,14 +233,14 @@ func (x *RealVarz) CaptureRoutingRequest(b *RouteEndpoint, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *RealVarz) CaptureRoutingResponse(backend *RouteEndpoint, response *http.Response, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponse(routeEndpoint *RouteEndpoint, response *http.Response, duration time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 
 	var tags string
 	var ok bool
 
-	tags, ok = backend.Tags["component"]
+	tags, ok = routeEndpoint.Tags["component"]
 	if ok {
 		x.varz.Tags.Component.CaptureResponse(tags, response, duration)
 	}

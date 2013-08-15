@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-type BackendId string
+type RouteEndpointId string
 
 type RouteEndpoint struct {
 	sync.Mutex
 
 	*steno.Logger
 
-	BackendId BackendId
+	RouteEndpointId RouteEndpointId
 
 	ApplicationId     string
 	Host              string
@@ -31,11 +31,11 @@ func (routeEndpoint *RouteEndpoint) MarshalJSON() ([]byte, error) {
 	return json.Marshal(routeEndpoint.CanonicalAddr())
 }
 
-func newBackend(routeEndpointId BackendId, message *registryMessage, logger *steno.Logger) *RouteEndpoint {
+func newRouteEndpoint(routeEndpointId RouteEndpointId, message *registryMessage, logger *steno.Logger) *RouteEndpoint {
 	b := &RouteEndpoint{
 		Logger: logger,
 
-		BackendId: routeEndpointId,
+		RouteEndpointId: routeEndpointId,
 
 		ApplicationId:     message.App,
 		Host:              message.Host,
@@ -70,7 +70,7 @@ func (routeEndpoint *RouteEndpoint) ToLogData() interface{} {
 
 func (routeEndpoint *RouteEndpoint) register(uri Uri) bool {
 	if !routeEndpoint.U.Has(uri) {
-		routeEndpoint.Infof("Register %s (%s)", uri, routeEndpoint.BackendId)
+		routeEndpoint.Infof("Register %s (%s)", uri, routeEndpoint.RouteEndpointId)
 		routeEndpoint.U = append(routeEndpoint.U, uri)
 		return true
 	}
@@ -81,7 +81,7 @@ func (routeEndpoint *RouteEndpoint) register(uri Uri) bool {
 func (routeEndpoint *RouteEndpoint) unregister(uri Uri) bool {
 	remainingUris, ok := routeEndpoint.U.Remove(uri)
 	if ok {
-		routeEndpoint.Infof("Unregister %s (%s)", uri, routeEndpoint.BackendId)
+		routeEndpoint.Infof("Unregister %s (%s)", uri, routeEndpoint.RouteEndpointId)
 		routeEndpoint.U = remainingUris
 	}
 

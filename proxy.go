@@ -276,7 +276,7 @@ func serveTcp(rw responseWriter, req *http.Request) {
 
 	rw.Set("Upgrade", "tcp")
 
-	client, backend, err := hijackRequest(rw, req.URL.Host)
+	client, connection, err := hijackRequest(rw, req.URL.Host)
 	if err != nil {
 		rw.Warnf("Request hijack failed: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
@@ -284,9 +284,9 @@ func serveTcp(rw responseWriter, req *http.Request) {
 	}
 
 	defer client.Close()
-	defer backend.Close()
+	defer connection.Close()
 
-	forwardIO(client, backend)
+	forwardIO(client, connection)
 }
 
 func serveWebSocket(rw responseWriter, req *http.Request) {
@@ -294,7 +294,7 @@ func serveWebSocket(rw responseWriter, req *http.Request) {
 
 	rw.Set("Upgrade", "websocket")
 
-	client, backend, err := hijackRequest(rw, req.URL.Host)
+	client, connection, err := hijackRequest(rw, req.URL.Host)
 	if err != nil {
 		rw.Warnf("Request hijack failed: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
@@ -302,26 +302,26 @@ func serveWebSocket(rw responseWriter, req *http.Request) {
 	}
 
 	defer client.Close()
-	defer backend.Close()
+	defer connection.Close()
 
 	// Write request
-	err = req.Write(backend)
+	err = req.Write(connection)
 	if err != nil {
 		rw.Warnf("Writing request: %s", err)
 		rw.WriteStatus(http.StatusBadRequest)
 		return
 	}
 
-	forwardIO(client, backend)
+	forwardIO(client, connection)
 }
 
-func hijackRequest(rw responseWriter, addr string) (client, backend net.Conn, err error) {
+func hijackRequest(rw responseWriter, addr string) (client, connection net.Conn, err error) {
 	client, _, err = rw.Hijack()
 	if err != nil {
 		return
 	}
 
-	backend, err = net.Dial("tcp", addr)
+	connection, err = net.Dial("tcp", addr)
 	if err != nil {
 		return
 	}

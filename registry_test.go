@@ -73,21 +73,21 @@ func (s *RegistrySuite) TestRegister(c *C) {
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
 	s.Register(&registryMessage{})
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumBackends(), Equals, 0)
+	c.Check(s.NumRouteEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreDuplicates(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 1)
+	c.Check(s.NumRouteEndpoints(), Equals, 1)
 
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 1)
+	c.Check(s.NumRouteEndpoints(), Equals, 1)
 
 	s.Unregister(barReg)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumBackends(), Equals, 0)
+	c.Check(s.NumRouteEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterUppercase(c *C) {
@@ -138,25 +138,25 @@ func (s *RegistrySuite) TestRegisterWithoutUris(c *C) {
 	s.Register(m)
 
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumBackends(), Equals, 0)
+	c.Check(s.NumRouteEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestUnregister(c *C) {
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 1)
+	c.Check(s.NumRouteEndpoints(), Equals, 1)
 
 	s.Register(bar2Reg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 2)
+	c.Check(s.NumRouteEndpoints(), Equals, 2)
 
 	s.Unregister(barReg)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 1)
+	c.Check(s.NumRouteEndpoints(), Equals, 1)
 
 	s.Unregister(bar2Reg)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumBackends(), Equals, 0)
+	c.Check(s.NumRouteEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
@@ -211,11 +211,11 @@ func (s *RegistrySuite) TestLookup(c *C) {
 
 	b, ok = s.Lookup("foo.vcap.me")
 	c.Assert(ok, Equals, true)
-	c.Check(b.BackendId, Equals, BackendId("192.168.1.1:1234"))
+	c.Check(b.RouteEndpointId, Equals, RouteEndpointId("192.168.1.1:1234"))
 
 	b, ok = s.Lookup("FOO.VCAP.ME")
 	c.Assert(ok, Equals, true)
-	c.Check(b.BackendId, Equals, BackendId("192.168.1.1:1234"))
+	c.Check(b.RouteEndpointId, Equals, RouteEndpointId("192.168.1.1:1234"))
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
@@ -235,7 +235,7 @@ func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
 	s.Register(m2)
 
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 2)
+	c.Check(s.NumRouteEndpoints(), Equals, 2)
 }
 
 func (s *RegistrySuite) TestTracker(c *C) {
@@ -256,7 +256,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(fooReg)
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumBackends(), Equals, 2)
+	c.Check(s.NumRouteEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
@@ -265,7 +265,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(bar2Reg)
 
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumBackends(), Equals, 1)
+	c.Check(s.NumRouteEndpoints(), Equals, 1)
 	c.Assert(s.staleTracker.Len(), Equals, 1)
 }
 
@@ -273,7 +273,7 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	s.Register(fooReg)
 	s.Register(barReg)
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumBackends(), Equals, 2)
+	c.Check(s.NumRouteEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
@@ -285,14 +285,14 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	s.PruneStaleDroplets()
 
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumBackends(), Equals, 2)
+	c.Check(s.NumRouteEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
-	backend, _ := s.Lookup("foo.vcap.me")
-	c.Assert(s.IsStale(backend), Equals, false)
+	routeEndpoint, _ := s.Lookup("foo.vcap.me")
+	c.Assert(s.IsStale(routeEndpoint), Equals, false)
 
-	backend, _ = s.Lookup("bar.vcap.me")
-	c.Assert(s.IsStale(backend), Equals, false)
+	routeEndpoint, _ = s.Lookup("bar.vcap.me")
+	c.Assert(s.IsStale(routeEndpoint), Equals, false)
 }
 
 func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
@@ -339,10 +339,10 @@ func (s *RegistrySuite) TestInfoMarshalling(c *C) {
 func (s *RegistrySuite) TestIsStale(c *C) {
 	s.Register(fooReg)
 
-	backend, _ := s.Lookup("foo.vcap.me")
-	c.Assert(s.IsStale(backend), Equals, false)
+	routeEndpoint, _ := s.Lookup("foo.vcap.me")
+	c.Assert(s.IsStale(routeEndpoint), Equals, false)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
 
-	c.Assert(s.IsStale(backend), Equals, true)
+	c.Assert(s.IsStale(routeEndpoint), Equals, true)
 }

@@ -214,14 +214,14 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
-	var backend *RouteEndpoint = &RouteEndpoint{}
+	var routeEndpoint *RouteEndpoint = &RouteEndpoint{}
 	var duration = 1 * time.Millisecond
 
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 	}
 
-	s.CaptureRoutingResponse(backend, response, duration)
+	s.CaptureRoutingResponse(routeEndpoint, response, duration)
 
 	c.Check(s.findValue("latency", "50").(float64), Equals, float64(duration)/float64(time.Second))
 	c.Check(s.findValue("latency", "75").(float64), Equals, float64(duration)/float64(time.Second))

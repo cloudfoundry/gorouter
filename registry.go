@@ -23,9 +23,9 @@ type registryMessage struct {
 	PrivateInstanceId string `json:"private_instance_id"`
 }
 
-func (m registryMessage) BackendId() (b BackendId, ok bool) {
+func (m registryMessage) RouteEndpointId() (b RouteEndpointId, ok bool) {
 	if m.Host != "" && m.Port != 0 {
-		b = BackendId(fmt.Sprintf("%s:%d", m.Host, m.Port))
+		b = RouteEndpointId(fmt.Sprintf("%s:%d", m.Host, m.Port))
 		ok = true
 	}
 
@@ -41,7 +41,7 @@ type Registry struct {
 	*stats.TopApps
 
 	byUri       map[Uri][]*RouteEndpoint
-	byBackendId map[BackendId]*RouteEndpoint
+	byRouteEndpointId map[RouteEndpointId]*RouteEndpoint
 
 	staleTracker *util.ListMap
 
@@ -64,7 +64,7 @@ func NewRegistry(c *Config, messageBusClient mbus.MessageBus) *Registry {
 	r.TopApps = stats.NewTopApps()
 
 	r.byUri = make(map[Uri][]*RouteEndpoint)
-	r.byBackendId = make(map[BackendId]*RouteEndpoint)
+	r.byRouteEndpointId = make(map[RouteEndpointId]*RouteEndpoint)
 
 	r.staleTracker = util.NewListMap()
 
@@ -89,11 +89,11 @@ func (registry *Registry) NumUris() int {
 	return len(registry.byUri)
 }
 
-func (r *Registry) NumBackends() int {
+func (r *Registry) NumRouteEndpoints() int {
 	r.RLock()
 	defer r.RUnlock()
 
-	return len(r.byBackendId)
+	return len(r.byRouteEndpointId)
 }
 
 func (r *Registry) registerUri(b *RouteEndpoint, u Uri) {
@@ -107,7 +107,7 @@ func (r *Registry) registerUri(b *RouteEndpoint, u Uri) {
 }
 
 func (registry *Registry) Register(message *registryMessage) {
-	i, ok := message.BackendId()
+	i, ok := message.RouteEndpointId()
 	if !ok || len(message.Uris) == 0 {
 		return
 	}
@@ -115,53 +115,53 @@ func (registry *Registry) Register(message *registryMessage) {
 	registry.Lock()
 	defer registry.Unlock()
 
-	backend, ok := registry.byBackendId[i]
+	routeEndpoint, ok := registry.byRouteEndpointId[i]
 	if !ok {
-		backend = newBackend(i, message, registry.Logger)
-		registry.byBackendId[i] = backend
+		routeEndpoint = newRouteEndpoint(i, message, registry.Logger)
+		registry.byRouteEndpointId[i] = routeEndpoint
 	}
 
 	for _, uri := range message.Uris {
-		registry.registerUri(backend, uri)
+		registry.registerUri(routeEndpoint, uri)
 	}
 
-	backend.updated_at = time.Now()
+	routeEndpoint.updated_at = time.Now()
 
-	registry.staleTracker.PushBack(backend)
+	registry.staleTracker.PushBack(routeEndpoint)
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (registry *Registry) unregisterUri(backend *RouteEndpoint, uri Uri) {
+func (registry *Registry) unregisterUri(routeEndpoint *RouteEndpoint, uri Uri) {
 	uri = uri.ToLower()
 
-	ok := backend.unregister(uri)
+	ok := routeEndpoint.unregister(uri)
 	if ok {
-		backends := registry.byUri[uri]
-		for i, b := range backends {
-			if b == backend {
+		routeEndpoints := registry.byUri[uri]
+		for i, b := range routeEndpoints {
+			if b == routeEndpoint {
 				// Remove b from list of backends
-				backends[i] = backends[len(backends)-1]
-				backends = backends[:len(backends)-1]
+				routeEndpoints[i] = routeEndpoints[len(routeEndpoints)-1]
+				routeEndpoints = routeEndpoints[:len(routeEndpoints)-1]
 				break
 			}
 		}
 
-		if len(backends) == 0 {
+		if len(routeEndpoints) == 0 {
 			delete(registry.byUri, uri)
 		} else {
-			registry.byUri[uri] = backends
+			registry.byUri[uri] = routeEndpoints
 		}
 	}
 
 	// Remove backend if it no longer has uris
-	if len(backend.U) == 0 {
-		delete(registry.byBackendId, backend.BackendId)
-		registry.staleTracker.Delete(backend)
+	if len(routeEndpoint.U) == 0 {
+		delete(registry.byRouteEndpointId, routeEndpoint.RouteEndpointId)
+		registry.staleTracker.Delete(routeEndpoint)
 	}
 }
 
 func (registry *Registry) Unregister(message *registryMessage) {
-	id, ok := message.BackendId()
+	id, ok := message.RouteEndpointId()
 	if !ok {
 		return
 	}
@@ -169,7 +169,7 @@ func (registry *Registry) Unregister(message *registryMessage) {
 	registry.Lock()
 	defer registry.Unlock()
 
-	registryForId, ok := registry.byBackendId[id]
+	registryForId, ok := registry.byRouteEndpointId[id]
 	if !ok {
 		return
 	}
@@ -181,22 +181,22 @@ func (registry *Registry) Unregister(message *registryMessage) {
 
 func (registry *Registry) pruneStaleDroplets() {
 	for registry.staleTracker.Len() > 0 {
-		backend := registry.staleTracker.Front().(*RouteEndpoint)
-		if !registry.IsStale(backend) {
-			log.Infof("Droplet is not stale; NOT pruning: %v", backend.BackendId)
+		routeEndpoint := registry.staleTracker.Front().(*RouteEndpoint)
+		if !registry.IsStale(routeEndpoint) {
+			log.Infof("Droplet is not stale; NOT pruning: %v", routeEndpoint.RouteEndpointId)
 			break
 		}
 
-		log.Infof("Pruning stale droplet: %v ", backend.BackendId)
+		log.Infof("Pruning stale droplet: %v ", routeEndpoint.RouteEndpointId)
 
-		for _, uri := range backend.U {
-			registry.unregisterUri(backend, uri)
+		for _, uri := range routeEndpoint.U {
+			registry.unregisterUri(routeEndpoint, uri)
 		}
 	}
 }
 
-func (registry *Registry) IsStale(backend *RouteEndpoint) bool {
-	return backend.updated_at.Add(registry.dropletStaleThreshold).Before(time.Now())
+func (registry *Registry) IsStale(routeEndpoint *RouteEndpoint) bool {
+	return routeEndpoint.updated_at.Add(registry.dropletStaleThreshold).Before(time.Now())
 }
 
 func (registry *Registry) pauseStaleTracker() {
