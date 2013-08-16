@@ -186,9 +186,10 @@ func (registry *Registry) pruneStaleDroplets() {
 			break
 		}
 
-		log.Infof("Pruning stale droplet: %v ", routeEndpoint.CanonicalAddr())
+		log.Infof("Pruning stale droplet: %v", routeEndpoint.CanonicalAddr())
 
 		for _, uri := range routeEndpoint.Uris {
+			log.Infof("Pruning stale droplet: %v, uri: %s", routeEndpoint.CanonicalAddr(), uri)
 			registry.unregisterUri(routeEndpoint, uri)
 		}
 	}
