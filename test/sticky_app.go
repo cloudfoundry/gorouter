@@ -5,9 +5,11 @@ import (
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"io"
 	"net/http"
+
+	"github.com/cloudfoundry/gorouter/route"
 )
 
-func NewStickyApp(urls []string, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
+func NewStickyApp(urls []route.Uri, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/sticky", stickyHandler(app.port))
 

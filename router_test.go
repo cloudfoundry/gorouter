@@ -19,6 +19,7 @@ import (
 	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
 )
 
@@ -128,7 +129,7 @@ func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Durati
 }
 
 func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := test.NewGreetApp([]string{"test.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	app.Listen()
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
@@ -142,7 +143,7 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 func (s *RouterSuite) TestRegistryLastUpdatedVarz(c *C) {
 	initialUpdateTime := f(s.readVarz(), "ms_since_last_registry_update").(float64)
 
-	app1 := test.NewGreetApp([]string{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	app1.Listen()
 	c.Assert(s.waitAppRegistered(app1, time.Second*5), Equals, true)
 
@@ -182,7 +183,7 @@ func f(x interface{}, s ...string) interface{} {
 }
 
 func (s *RouterSuite) TestVarz(c *C) {
-	app := test.NewGreetApp([]string{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
+	app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
 	app.Listen()
 
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
@@ -211,7 +212,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*test.TestApp, 10)
 	for i := range apps {
-		apps[i] = test.NewStickyApp([]string{"sticky.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+		apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 		apps[i].Listen()
 	}
 
@@ -313,7 +314,7 @@ func (s *RouterSuite) TestRouterRunErrors(c *C) {
 }
 
 func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := test.NewTestApp([]string{"greet.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 
 	var rr *http.Request
 	var msg string
@@ -378,7 +379,7 @@ func (s *RouterSuite) WaitUntilNatsIsUp() chan bool {
 }
 
 func (s *RouterSuite) Test100ContinueRequest(c *C) {
-	app := test.NewTestApp([]string{"foo.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	rCh := make(chan *http.Request)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := ioutil.ReadAll(r.Body)

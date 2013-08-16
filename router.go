@@ -85,7 +85,7 @@ func (r *Router) RegisterComponent() {
 type registryMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
-	Uris route.Uris        `json:"uris"`
+	Uris []route.Uri       `json:"uris"`
 	Tags map[string]string `json:"tags"`
 	App  string            `json:"app"`
 
@@ -113,35 +113,44 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 	}
 }
 
-func (router *Router) SubscribeRegister() {
-	router.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
+func (r *Router) SubscribeRegister() {
+	r.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
 		log.Infof("Got router.register: %v", registryMessage)
-		router.registry.Register(&route.Endpoint{
-			Host: registryMessage.Host,
-			Port: registryMessage.Port,
-			Uris: registryMessage.Uris,
 
-			ApplicationId: registryMessage.App,
-			Tags:          registryMessage.Tags,
+		for _, uri := range registryMessage.Uris {
+			r.registry.Register(
+				uri,
+				&route.Endpoint{
+					Host: registryMessage.Host,
+					Port: registryMessage.Port,
 
-			PrivateInstanceId: registryMessage.PrivateInstanceId,
-		})
+					ApplicationId: registryMessage.App,
+					Tags:          registryMessage.Tags,
+
+					PrivateInstanceId: registryMessage.PrivateInstanceId,
+				},
+			)
+		}
 	})
 }
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
 		log.Infof("Got router.unregister: %v", registryMessage)
-		r.registry.Unregister(&route.Endpoint{
-			Host: registryMessage.Host,
-			Port: registryMessage.Port,
-			Uris: registryMessage.Uris,
+		for _, uri := range registryMessage.Uris {
+			r.registry.Unregister(
+				uri,
+				&route.Endpoint{
+					Host: registryMessage.Host,
+					Port: registryMessage.Port,
 
-			ApplicationId: registryMessage.App,
-			Tags:          registryMessage.Tags,
+					ApplicationId: registryMessage.App,
+					Tags:          registryMessage.Tags,
 
-			PrivateInstanceId: registryMessage.PrivateInstanceId,
-		})
+					PrivateInstanceId: registryMessage.PrivateInstanceId,
+				},
+			)
+		}
 	})
 }
 

@@ -99,7 +99,7 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 }
 
 func (s *VarzSuite) TestSecondsSinceLastRegistryUpdate(c *C) {
-	s.Registry.Register(&route.Endpoint{Uris: []route.Uri{route.Uri("foo")}})
+	s.Registry.Register("foo", &route.Endpoint{})
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -114,14 +114,14 @@ func (s *VarzSuite) TestUrlsInVarz(c *C) {
 	var fooReg = &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []route.Uri{"foo.vcap.me", "fooo.vcap.me"},
 		Tags: map[string]string{},
 
 		ApplicationId: "12345",
 	}
 
 	// Add a route
-	s.Registry.Register(fooReg)
+	s.Registry.Register("foo.vcap.me", fooReg)
+	s.Registry.Register("fooo.vcap.me", fooReg)
 
 	c.Check(s.findValue("urls"), Equals, float64(2))
 }

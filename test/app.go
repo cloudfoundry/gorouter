@@ -9,18 +9,20 @@ import (
 
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"github.com/cloudfoundry/gorouter/common"
+
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type TestApp struct {
-	port       uint16   // app listening port
-	rPort      uint16   // router listening port
-	urls       []string // host registered host name
+	port       uint16      // app listening port
+	rPort      uint16      // router listening port
+	urls       []route.Uri // host registered host name
 	mbusClient mbus.MessageBus
 	tags       map[string]string
 	mux        *http.ServeMux
 }
 
-func NewTestApp(urls []string, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
+func NewTestApp(urls []route.Uri, rPort uint16, mbusClient mbus.MessageBus, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()
@@ -40,7 +42,7 @@ func (a *TestApp) AddHandler(path string, handler func(http.ResponseWriter, *htt
 	a.mux.HandleFunc(path, handler)
 }
 
-func (a *TestApp) Urls() []string {
+func (a *TestApp) Urls() []route.Uri {
 	return a.urls
 }
 
@@ -123,7 +125,7 @@ const (
 type registerMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
-	Uris []string          `json:"uris"`
+	Uris []route.Uri       `json:"uris"`
 	Tags map[string]string `json:"tags"`
 	Dea  string            `json:"dea"`
 	App  string            `json:"app"`

@@ -2,12 +2,12 @@ package registry
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"github.com/cloudfoundry/gorouter/stats"
-	"github.com/cloudfoundry/gorouter/util"
 	steno "github.com/cloudfoundry/gosteno"
 
 	"github.com/cloudfoundry/gorouter/config"
@@ -23,10 +23,9 @@ type Registry struct {
 	*stats.ActiveApps
 	*stats.TopApps
 
-	byUri  map[route.Uri]*route.Pool
-	byAddr map[string]*route.Endpoint
+	byUri map[route.Uri]*route.Pool
 
-	staleTracker *util.ListMap
+	table map[tableKey]*tableEntry
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
@@ -34,6 +33,16 @@ type Registry struct {
 	messageBus mbus.MessageBus
 
 	timeOfLastUpdate time.Time
+}
+
+type tableKey struct {
+	addr string
+	uri  route.Uri
+}
+
+type tableEntry struct {
+	endpoint  *route.Endpoint
+	updatedAt time.Time
 }
 
 func NewRegistry(c *config.Config, mbus mbus.MessageBus) *Registry {
@@ -45,9 +54,8 @@ func NewRegistry(c *config.Config, mbus mbus.MessageBus) *Registry {
 	r.TopApps = stats.NewTopApps()
 
 	r.byUri = make(map[route.Uri]*route.Pool)
-	r.byAddr = make(map[string]*route.Endpoint)
 
-	r.staleTracker = util.NewListMap()
+	r.table = make(map[tableKey]*tableEntry)
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
@@ -57,76 +65,88 @@ func NewRegistry(c *config.Config, mbus mbus.MessageBus) *Registry {
 	return r
 }
 
-func (registry *Registry) Register(endpoint *route.Endpoint) {
-	if len(endpoint.Uris) == 0 {
-		return
-	}
-
+func (registry *Registry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	registry.Lock()
 	defer registry.Unlock()
 
-	addr := endpoint.CanonicalAddr()
+	uri = uri.ToLower()
 
-	endpointToRegister, found := registry.byAddr[addr]
+	key := tableKey{
+		addr: endpoint.CanonicalAddr(),
+		uri:  uri,
+	}
+
+	var endpointToRegister *route.Endpoint
+
+	entry, found := registry.table[key]
 	if found {
-		for _, uri := range endpoint.Uris {
-			endpointToRegister.Register(uri)
-		}
+		endpointToRegister = entry.endpoint
 	} else {
-		registry.byAddr[addr] = endpoint
 		endpointToRegister = endpoint
+		entry = &tableEntry{endpoint: endpoint}
+
+		registry.table[key] = entry
 	}
 
-	for _, uri := range endpointToRegister.Uris {
-		pool, found := registry.byUri[uri.ToLower()]
-		if !found {
-			pool = route.NewPool()
-			registry.byUri[uri.ToLower()] = pool
-		}
-
-		pool.Add(endpointToRegister)
+	pool, found := registry.byUri[uri]
+	if !found {
+		pool = route.NewPool()
+		registry.byUri[uri] = pool
 	}
 
-	endpointToRegister.UpdatedAtFORNOW = time.Now()
+	pool.Add(endpointToRegister)
 
-	registry.staleTracker.PushBack(endpointToRegister)
+	entry.updatedAt = time.Now()
+
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (registry *Registry) Unregister(endpoint *route.Endpoint) {
+func (registry *Registry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	registry.Lock()
 	defer registry.Unlock()
 
-	addr := endpoint.CanonicalAddr()
+	uri = uri.ToLower()
 
-	registryForId, ok := registry.byAddr[addr]
-	if !ok {
-		return
+	key := tableKey{
+		addr: endpoint.CanonicalAddr(),
+		uri:  uri,
 	}
 
-	for _, uri := range endpoint.Uris {
-		registry.unregisterUri(registryForId, uri)
-	}
+	registry.unregisterUri(key)
 }
 
-func (r *Registry) Lookup(host string) (*route.Endpoint, bool) {
+func (r *Registry) Lookup(uri route.Uri) (*route.Endpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	x, ok := r.byUri[route.Uri(host).ToLower()]
+	pool, ok := r.lookupByUri(uri)
 	if !ok {
 		return nil, false
 	}
 
-	return x.Sample()
+	return pool.Sample()
+}
+
+func (r *Registry) LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool) {
+	r.RLock()
+	defer r.RUnlock()
+
+	pool, ok := r.lookupByUri(uri)
+	if !ok {
+		return nil, false
+	}
+
+	return pool.FindByPrivateInstanceId(p)
+}
+
+func (r *Registry) lookupByUri(uri route.Uri) (*route.Pool, bool) {
+	uri = uri.ToLower()
+	pool, ok := r.byUri[uri]
+	return pool, ok
 }
 
 func (registry *Registry) StartPruningCycle() {
 	go registry.checkAndPrune()
-}
-
-func (registry *Registry) IsStale(endpoint *route.Endpoint) bool {
-	return endpoint.UpdatedAtFORNOW.Add(registry.dropletStaleThreshold).Before(time.Now())
 }
 
 func (registry *Registry) PruneStaleDroplets() {
@@ -140,18 +160,6 @@ func (registry *Registry) PruneStaleDroplets() {
 	defer registry.Unlock()
 
 	registry.pruneStaleDroplets()
-}
-
-func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*route.Endpoint, bool) {
-	r.RLock()
-	defer r.RUnlock()
-
-	x, ok := r.byUri[route.Uri(host).ToLower()]
-	if !ok {
-		return nil, false
-	}
-
-	return x.FindByPrivateInstanceId(p)
 }
 
 func (r *Registry) CaptureRoutingRequest(x *route.Endpoint, t time.Time) {
@@ -176,7 +184,12 @@ func (r *Registry) NumEndpoints() int {
 	r.RLock()
 	defer r.RUnlock()
 
-	return len(r.byAddr)
+	mapForSize := make(map[string]bool)
+	for _, entry := range r.table {
+		mapForSize[entry.endpoint.CanonicalAddr()] = true
+	}
+
+	return len(mapForSize)
 }
 
 func (r *Registry) MarshalJSON() ([]byte, error) {
@@ -191,25 +204,25 @@ func (registry *Registry) isStateStale() bool {
 }
 
 func (registry *Registry) pruneStaleDroplets() {
-	for registry.staleTracker.Len() > 0 {
-		endpoint := registry.staleTracker.Front().(*route.Endpoint)
-		if !registry.IsStale(endpoint) {
-			log.Infof("Droplet is not stale; NOT pruning: %v", endpoint.CanonicalAddr())
-			break
+	for key, entry := range registry.table {
+		fmt.Printf("stale? %v, %v\n", key, entry)
+
+		if !registry.isEntryStale(entry) {
+			continue
 		}
 
-		log.Infof("Pruning stale droplet: %v", endpoint.CanonicalAddr())
-
-		for _, uri := range endpoint.Uris {
-			log.Infof("Pruning stale droplet: %v, uri: %s", endpoint.CanonicalAddr(), uri)
-			registry.unregisterUri(endpoint, uri)
-		}
+		log.Infof("Pruning stale droplet: %v, uri: %s", entry, key.uri)
+		registry.unregisterUri(key)
 	}
 }
 
+func (r *Registry) isEntryStale(entry *tableEntry) bool {
+	return entry.updatedAt.Add(r.dropletStaleThreshold).Before(time.Now())
+}
+
 func (registry *Registry) pauseStaleTracker() {
-	for routeElement := registry.staleTracker.FrontElement(); routeElement != nil; routeElement = routeElement.Next() {
-		routeElement.Value.(*route.Endpoint).UpdatedAtFORNOW = time.Now()
+	for _, entry := range registry.table {
+		entry.updatedAt = time.Now()
 	}
 }
 
@@ -228,23 +241,20 @@ func (r *Registry) checkAndPrune() {
 	}
 }
 
-func (registry *Registry) unregisterUri(endpoint *route.Endpoint, uri route.Uri) {
-	uri = uri.ToLower()
+func (registry *Registry) unregisterUri(key tableKey) {
+	entry, found := registry.table[key]
+	if !found {
+		return
+	}
 
-	ok := endpoint.Unregister(uri)
-	if ok {
-		endpoints := registry.byUri[uri]
-
-		endpoints.Remove(endpoint)
+	endpoints, found := registry.byUri[key.uri]
+	if found {
+		endpoints.Remove(entry.endpoint)
 
 		if endpoints.IsEmpty() {
-			delete(registry.byUri, uri)
+			delete(registry.byUri, key.uri)
 		}
 	}
 
-	// Remove backend if it no longer has uris
-	if len(endpoint.Uris) == 0 {
-		delete(registry.byAddr, endpoint.CanonicalAddr())
-		registry.staleTracker.Delete(endpoint)
-	}
+	delete(registry.table, key)
 }

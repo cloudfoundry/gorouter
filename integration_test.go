@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
 )
 
@@ -60,10 +61,10 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 
 	s.Config.DropletStaleThreshold = staleThreshold
 
-	zombieApp := test.NewGreetApp([]string{"zombie.vcap.me"}, proxyPort, s.mbusClient, nil)
+	zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, s.mbusClient, nil)
 	zombieApp.Listen()
 
-	runningApp := test.NewGreetApp([]string{"innocent.bystander.vcap.me"}, proxyPort, s.mbusClient, nil)
+	runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, s.mbusClient, nil)
 	runningApp.Listen()
 
 	c.Assert(s.waitAppRegistered(zombieApp, 2*time.Second), Equals, true)

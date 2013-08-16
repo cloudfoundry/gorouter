@@ -104,12 +104,12 @@ func hostWithoutPort(req *http.Request) string {
 }
 
 func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
-	host := hostWithoutPort(request)
+	uri := route.Uri(hostWithoutPort(request))
 
 	// Try choosing a backend using sticky session
 	if _, err := request.Cookie(StickyCookieKey); err == nil {
 		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			routeEndpoint, ok := proxy.Registry.LookupByPrivateInstanceId(host, sticky.Value)
+			routeEndpoint, ok := proxy.Registry.LookupByPrivateInstanceId(uri, sticky.Value)
 			if ok {
 				return routeEndpoint, ok
 			}
@@ -117,7 +117,7 @@ func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
 	}
 
 	// Choose backend using host alone
-	return proxy.Registry.Lookup(host)
+	return proxy.Registry.Lookup(uri)
 }
 
 func (proxy *Proxy) ServeHTTP(httpResponseWriter http.ResponseWriter, request *http.Request) {

@@ -23,10 +23,13 @@ func BenchmarkRegister(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)
-		p.Register(&route.Endpoint{
-			Host: "localhost",
-			Port: uint16(i),
-			Uris: []route.Uri{route.Uri("bench.vcap.me." + str)},
-		})
+
+		p.Register(
+			route.Uri("bench.vcap.me."+str),
+			&route.Endpoint{
+				Host: "localhost",
+				Port: uint16(i),
+			},
+		)
 	}
 }
