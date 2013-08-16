@@ -1,4 +1,4 @@
-package router
+package varz
 
 import (
 	"encoding/json"

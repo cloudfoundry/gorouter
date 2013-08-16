@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/varz"
 )
 
 const (
@@ -19,7 +21,7 @@ func BenchmarkRegister(b *testing.B) {
 	c := config.DefaultConfig()
 	mbus := mock_cfmessagebus.NewMockMessageBus()
 	r := registry.NewRegistry(c, mbus)
-	p := NewProxy(c, r, NewVarz(r))
+	p := proxy.NewProxy(c, r, varz.NewVarz(r))
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)

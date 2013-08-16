@@ -1,4 +1,4 @@
-package router
+package proxy
 
 import (
 	"bufio"
@@ -19,7 +19,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 )
 
-type connHandler func(*conn)
+type connHandler func(*httpConn)
 
 type nullVarz struct{}
 
@@ -29,7 +29,7 @@ func (_ nullVarz) CaptureBadRequest(req *http.Request)                          
 func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                    {}
 func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration) {}
 
-type conn struct {
+type httpConn struct {
 	net.Conn
 
 	c *C
@@ -38,8 +38,8 @@ type conn struct {
 	writer *bufio.Writer
 }
 
-func newConn(x net.Conn, c *C) *conn {
-	return &conn{
+func newConn(x net.Conn, c *C) *httpConn {
+	return &httpConn{
 		Conn:   x,
 		c:      c,
 		reader: bufio.NewReader(x),
@@ -47,7 +47,7 @@ func newConn(x net.Conn, c *C) *conn {
 	}
 }
 
-func (x *conn) ReadRequest() (*http.Request, string) {
+func (x *httpConn) ReadRequest() (*http.Request, string) {
 	req, err := http.ReadRequest(x.reader)
 	x.c.Assert(err, IsNil)
 
@@ -57,19 +57,19 @@ func (x *conn) ReadRequest() (*http.Request, string) {
 	return req, string(b)
 }
 
-func (x *conn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
+func (x *httpConn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, urlStr, body)
 	x.c.Assert(err, IsNil)
 	return req
 }
 
-func (x *conn) WriteRequest(req *http.Request) {
+func (x *httpConn) WriteRequest(req *http.Request) {
 	err := req.Write(x.writer)
 	x.c.Assert(err, IsNil)
 	x.writer.Flush()
 }
 
-func (x *conn) ReadResponse() (*http.Response, string) {
+func (x *httpConn) ReadResponse() (*http.Response, string) {
 	resp, err := http.ReadResponse(x.reader, &http.Request{})
 	x.c.Assert(err, IsNil)
 
@@ -88,19 +88,19 @@ func newResponse(status int) *http.Response {
 	}
 }
 
-func (x *conn) WriteResponse(resp *http.Response) {
+func (x *httpConn) WriteResponse(resp *http.Response) {
 	err := resp.Write(x.writer)
 	x.c.Assert(err, IsNil)
 	x.writer.Flush()
 }
 
-func (x *conn) CheckLine(expected string) {
+func (x *httpConn) CheckLine(expected string) {
 	l, err := x.reader.ReadString('\n')
 	x.c.Check(err, IsNil)
 	x.c.Check(strings.TrimRight(l, "\r\n"), Equals, expected)
 }
 
-func (x *conn) CheckLines(expected []string) {
+func (x *httpConn) CheckLines(expected []string) {
 	for _, e := range expected {
 		x.CheckLine(e)
 	}
@@ -108,13 +108,13 @@ func (x *conn) CheckLines(expected []string) {
 	x.CheckLine("")
 }
 
-func (x *conn) WriteLine(line string) {
+func (x *httpConn) WriteLine(line string) {
 	x.writer.WriteString(line)
 	x.writer.WriteString("\r\n")
 	x.writer.Flush()
 }
 
-func (x *conn) WriteLines(lines []string) {
+func (x *httpConn) WriteLines(lines []string) {
 	for _, e := range lines {
 		x.WriteLine(e)
 	}
@@ -202,7 +202,7 @@ func (s *ProxySuite) RegisterHandler(c *C, u string, h connHandler) net.Listener
 	return ln
 }
 
-func (s *ProxySuite) DialProxy(c *C) *conn {
+func (s *ProxySuite) DialProxy(c *C) *httpConn {
 	x, err := net.Dial("tcp", s.proxyServer.Addr().String())
 	if err != nil {
 		panic(err)
@@ -212,7 +212,7 @@ func (s *ProxySuite) DialProxy(c *C) *conn {
 }
 
 func (s *ProxySuite) TestRespondsToHttp10(c *C) {
-	s.RegisterHandler(c, "test", func(x *conn) {
+	s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		x.WriteLines([]string{
@@ -232,7 +232,7 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 }
 
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {
-	s.RegisterHandler(c, "test", func(x *conn) {
+	s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		x.WriteLines([]string{
@@ -286,7 +286,7 @@ func (s *ProxySuite) TestRespondsToUnknownHostWith404(c *C) {
 }
 
 func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
-	s.RegisterHandler(c, "enfant-terrible", func(x *conn) {
+	s.RegisterHandler(c, "enfant-terrible", func(x *httpConn) {
 		x.Close()
 	})
 
@@ -302,7 +302,7 @@ func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
 }
 
 func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
-	ln := s.RegisterHandler(c, "trace-test", func(x *conn) {
+	ln := s.RegisterHandler(c, "trace-test", func(x *httpConn) {
 		resp := newResponse(http.StatusOK)
 		x.WriteResponse(resp)
 		x.Close()
@@ -322,7 +322,7 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 }
 
 func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
-	s.RegisterHandler(c, "trace-test", func(x *conn) {
+	s.RegisterHandler(c, "trace-test", func(x *httpConn) {
 		resp := newResponse(http.StatusOK)
 		x.WriteResponse(resp)
 		x.Close()
@@ -344,7 +344,7 @@ func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
 func (s *ProxySuite) TestXFFIsAdded(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *conn) {
+	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "127.0.0.1")
 		done <- true
@@ -362,7 +362,7 @@ func (s *ProxySuite) TestXFFIsAdded(c *C) {
 func (s *ProxySuite) TestXFFIsAppended(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *conn) {
+	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "1.2.3.4, 127.0.0.1")
 		done <- true
@@ -379,7 +379,7 @@ func (s *ProxySuite) TestXFFIsAppended(c *C) {
 }
 
 func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
-	s.RegisterHandler(c, "ws", func(x *conn) {
+	s.RegisterHandler(c, "ws", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("Upgrade"), Equals, "websocket")
 		c.Check(req.Header.Get("Connection"), Equals, "Upgrade")
@@ -413,7 +413,7 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 }
 
 func (s *ProxySuite) TestTcpUpgrade(c *C) {
-	s.RegisterHandler(c, "tcp-handler", func(x *conn) {
+	s.RegisterHandler(c, "tcp-handler", func(x *httpConn) {
 		x.WriteLine("hello")
 		x.CheckLine("hello from client")
 		x.WriteLine("hello from server")
@@ -434,7 +434,7 @@ func (s *ProxySuite) TestTcpUpgrade(c *C) {
 }
 
 func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
-	s.RegisterHandler(c, "chunk", func(responseDestination *conn) {
+	s.RegisterHandler(c, "chunk", func(responseDestination *httpConn) {
 		r, w := io.Pipe()
 
 		// Write 3 times on a 100ms interval

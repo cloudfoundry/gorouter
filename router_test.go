@@ -18,6 +18,7 @@ import (
 
 	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
@@ -451,9 +452,9 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.C
 
 	var sessionCookie, vcapCookie *http.Cookie
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == StickyCookieKey {
+		if cookie.Name == proxy.StickyCookieKey {
 			sessionCookie = cookie
-		} else if cookie.Name == VcapCookieId {
+		} else if cookie.Name == proxy.VcapCookieId {
 			vcapCookie = cookie
 		}
 	}

@@ -17,14 +17,15 @@ import (
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/util"
+	"github.com/cloudfoundry/gorouter/varz"
 )
 
 type Router struct {
 	config     *config.Config
-	proxy      *Proxy
+	proxy      *proxy.Proxy
 	mbusClient mbus.MessageBus
 	registry   *registry.Registry
-	varz       Varz
+	varz       varz.Varz
 	component  *vcap.VcapComponent
 }
 
@@ -43,8 +44,8 @@ func NewRouter(c *config.Config) *Router {
 	router.registry = registry.NewRegistry(router.config, router.mbusClient)
 	router.registry.StartPruningCycle()
 
-	router.varz = NewVarz(router.registry)
-	router.proxy = NewProxy(router.config, router.registry, router.varz)
+	router.varz = varz.NewVarz(router.registry)
+	router.proxy = proxy.NewProxy(router.config, router.registry, router.varz)
 
 	var host string
 	if router.config.Status.Port != 0 {

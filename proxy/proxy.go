@@ -1,4 +1,4 @@
-package router
+package proxy
 
 import (
 	"bufio"
@@ -16,6 +16,7 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/varz"
 )
 
 const (
@@ -33,7 +34,7 @@ type Proxy struct {
 	*steno.Logger
 	*config.Config
 	*registry.Registry
-	Varz
+	varz.Varz
 	*AccessLogger
 }
 
@@ -70,7 +71,7 @@ func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
 	return io.Copy(dst, src)
 }
 
-func NewProxy(c *config.Config, r *registry.Registry, v Varz) *Proxy {
+func NewProxy(c *config.Config, r *registry.Registry, v varz.Varz) *Proxy {
 	p := &Proxy{
 		Config:   c,
 		Logger:   steno.NewLogger("router.proxy"),
