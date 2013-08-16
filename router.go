@@ -79,6 +79,16 @@ func (r *Router) RegisterComponent() {
 	vcap.Register(r.component, r.mbusClient)
 }
 
+type registryMessage struct {
+	Host string            `json:"host"`
+	Port uint16            `json:"port"`
+	Uris Uris              `json:"uris"`
+	Tags map[string]string `json:"tags"`
+	App  string            `json:"app"`
+
+	PrivateInstanceId string `json:"private_instance_id"`
+}
+
 func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
 	callback := func(payload []byte) {
 		var msg registryMessage
@@ -103,14 +113,32 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 func (router *Router) SubscribeRegister() {
 	router.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
 		log.Infof("Got router.register: %v", registryMessage)
-		router.registry.Register(registryMessage)
+		router.registry.Register(&RouteEndpoint{
+			Host: registryMessage.Host,
+			Port: registryMessage.Port,
+			Uris: registryMessage.Uris,
+
+			ApplicationId: registryMessage.App,
+			Tags:          registryMessage.Tags,
+
+			PrivateInstanceId: registryMessage.PrivateInstanceId,
+		})
 	})
 }
 
 func (r *Router) SubscribeUnregister() {
-	r.subscribeRegistry("router.unregister", func(rm *registryMessage) {
-		log.Infof("Got router.unregister: %v", rm)
-		r.registry.Unregister(rm)
+	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
+		log.Infof("Got router.unregister: %v", registryMessage)
+		r.registry.Unregister(&RouteEndpoint{
+			Host: registryMessage.Host,
+			Port: registryMessage.Port,
+			Uris: registryMessage.Uris,
+
+			ApplicationId: registryMessage.App,
+			Tags:          registryMessage.Tags,
+
+			PrivateInstanceId: registryMessage.PrivateInstanceId,
+		})
 	})
 }
 
@@ -199,10 +227,6 @@ func (router *Router) Run() {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	router.mbusClient.OnConnect(func() {
-		router.SendStartMessage()
-	})
-
 	router.RegisterComponent()
 
 	// Subscribe register/unregister router
@@ -212,6 +236,11 @@ func (router *Router) Run() {
 
 	// Kickstart sending start messages
 	router.SendStartMessage()
+
+	// Send start again on reconnect
+	router.mbusClient.OnConnect(func() {
+		router.SendStartMessage()
+	})
 
 	// Schedule flushing active app's app_id
 	router.ScheduleFlushApps()

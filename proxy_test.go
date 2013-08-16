@@ -155,13 +155,11 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 		panic(err)
 	}
 
-	m := registryMessage{
+	s.r.Register(&RouteEndpoint{
 		Host: h,
 		Port: uint16(x),
 		Uris: []Uri{Uri(u)},
-	}
-
-	s.r.Register(&m)
+	})
 }
 
 func (s *ProxySuite) RegisterHandler(u string, h connHandler) net.Listener {

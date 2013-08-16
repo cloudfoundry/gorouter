@@ -2,11 +2,13 @@ package test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	"github.com/cloudfoundry/gorouter/common"
 	. "launchpad.net/gocheck"
 	"net/http"
+
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	"github.com/cloudfoundry/gorouter/common"
 )
 
 type TestApp struct {
@@ -88,12 +90,24 @@ func (a *TestApp) Unregister() {
 }
 
 func (a *TestApp) VerifyAppStatus(status int, c *C) {
+	check := a.CheckAppStatus(status)
+	c.Assert(check, IsNil)
+}
+
+func (a *TestApp) CheckAppStatus(status int) error {
 	for _, url := range a.urls {
 		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
 		resp, err := http.Get(uri)
-		c.Assert(err, IsNil)
-		c.Check(resp.StatusCode, Equals, status)
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != status {
+			return errors.New(fmt.Sprintf("expected status code %d, got %d", status, resp.StatusCode))
+		}
 	}
+
+	return nil
 }
 
 // Types imported from router

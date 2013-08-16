@@ -434,12 +434,15 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.C
 	var port []byte
 
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
+
 	req, err = http.NewRequest("GET", uri, nil)
+	c.Assert(err, IsNil)
 
 	resp, err = client.Do(req)
 	c.Assert(err, IsNil)
 
 	port, err = ioutil.ReadAll(resp.Body)
+	c.Assert(err, IsNil)
 
 	var sessionCookie, vcapCookie *http.Cookie
 	for _, cookie := range resp.Cookies() {
@@ -461,7 +464,9 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	var port []byte
 
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
+
 	req, err = http.NewRequest("GET", uri, nil)
+	c.Assert(err, IsNil)
 
 	req.AddCookie(sessionCookie)
 	req.AddCookie(vcapCookie)

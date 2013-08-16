@@ -106,13 +106,15 @@ func (s *VarzSuite) TestSecondsSinceLastRegistryUpdate(c *C) {
 func (s *VarzSuite) TestUrlsInVarz(c *C) {
 	c.Check(s.findValue("urls"), Equals, float64(0))
 
-	var fooReg = &registryMessage{
+	var fooReg = &RouteEndpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
 		Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
 		Tags: map[string]string{},
-		App:  "12345",
+
+		ApplicationId: "12345",
 	}
+
 	// Add a route
 	s.Registry.Register(fooReg)
 

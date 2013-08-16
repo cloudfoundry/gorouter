@@ -3,19 +3,12 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	steno "github.com/cloudfoundry/gosteno"
 	"sync"
 	"time"
 )
 
-type RouteEndpointId string
-
 type RouteEndpoint struct {
 	sync.Mutex
-
-	*steno.Logger
-
-	RouteEndpointId RouteEndpointId
 
 	ApplicationId     string
 	Host              string
@@ -23,7 +16,7 @@ type RouteEndpoint struct {
 	Tags              map[string]string
 	PrivateInstanceId string
 
-	U          Uris
+	Uris       Uris
 	updated_at time.Time
 }
 
@@ -31,19 +24,15 @@ func (routeEndpoint *RouteEndpoint) MarshalJSON() ([]byte, error) {
 	return json.Marshal(routeEndpoint.CanonicalAddr())
 }
 
-func newRouteEndpoint(routeEndpointId RouteEndpointId, message *registryMessage, logger *steno.Logger) *RouteEndpoint {
+func newRouteEndpoint(message *registryMessage) *RouteEndpoint {
 	b := &RouteEndpoint{
-		Logger: logger,
-
-		RouteEndpointId: routeEndpointId,
-
 		ApplicationId:     message.App,
 		Host:              message.Host,
 		Port:              message.Port,
 		Tags:              message.Tags,
 		PrivateInstanceId: message.PrivateInstanceId,
 
-		U:          make([]Uri, 0),
+		Uris:       make([]Uri, 0),
 		updated_at: time.Now(),
 	}
 
@@ -69,9 +58,8 @@ func (routeEndpoint *RouteEndpoint) ToLogData() interface{} {
 }
 
 func (routeEndpoint *RouteEndpoint) register(uri Uri) bool {
-	if !routeEndpoint.U.Has(uri) {
-		routeEndpoint.Infof("Register %s (%s)", uri, routeEndpoint.RouteEndpointId)
-		routeEndpoint.U = append(routeEndpoint.U, uri)
+	if !routeEndpoint.Uris.Has(uri) {
+		routeEndpoint.Uris = append(routeEndpoint.Uris, uri)
 		return true
 	}
 
@@ -79,10 +67,9 @@ func (routeEndpoint *RouteEndpoint) register(uri Uri) bool {
 }
 
 func (routeEndpoint *RouteEndpoint) unregister(uri Uri) bool {
-	remainingUris, ok := routeEndpoint.U.Remove(uri)
+	remainingUris, ok := routeEndpoint.Uris.Remove(uri)
 	if ok {
-		routeEndpoint.Infof("Unregister %s (%s)", uri, routeEndpoint.RouteEndpointId)
-		routeEndpoint.U = remainingUris
+		routeEndpoint.Uris = remainingUris
 	}
 
 	return ok
