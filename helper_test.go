@@ -1,9 +1,11 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	steno "github.com/cloudfoundry/gosteno"
 	. "launchpad.net/gocheck"
+	"net"
 	"os/exec"
 	"strconv"
 	"testing"
@@ -73,4 +75,51 @@ func StartNats(port int) *exec.Cmd {
 func StopNats(cmd *exec.Cmd) {
 	cmd.Process.Kill()
 	cmd.Wait()
+}
+
+func nextAvailPort() uint16 {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(err)
+	}
+
+	defer listener.Close()
+
+	_, portStr, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		panic(err)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		panic(err)
+	}
+
+	return uint16(port)
+}
+
+func waitUntilNatsUp(port uint16) error {
+	maxWait := 10
+	for i := 0; i < maxWait; i++ {
+		time.Sleep(500 * time.Millisecond)
+		_, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("Waited too long for NATS to start")
+}
+
+func waitUntilNatsDown(port uint16) error {
+	maxWait := 10
+	for i := 0; i < maxWait; i++ {
+		time.Sleep(500 * time.Millisecond)
+		_, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err != nil {
+			return nil
+		}
+	}
+
+	return errors.New("Waited too long for NATS to stop")
 }

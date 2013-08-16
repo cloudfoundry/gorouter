@@ -6,21 +6,21 @@ import (
 )
 
 type EndpointPool struct {
-	endpoints map[*RouteEndpoint]bool
+	endpoints map[string]*RouteEndpoint
 }
 
 func NewEndpointPool() *EndpointPool {
 	return &EndpointPool{
-		endpoints: make(map[*RouteEndpoint]bool),
+		endpoints: make(map[string]*RouteEndpoint),
 	}
 }
 
 func (p *EndpointPool) Add(endpoint *RouteEndpoint) {
-	p.endpoints[endpoint] = true
+	p.endpoints[endpoint.CanonicalAddr()] = endpoint
 }
 
 func (p *EndpointPool) Remove(endpoint *RouteEndpoint) {
-	delete(p.endpoints, endpoint)
+	delete(p.endpoints, endpoint.CanonicalAddr())
 }
 
 func (p *EndpointPool) Sample() (*RouteEndpoint, bool) {
@@ -31,7 +31,7 @@ func (p *EndpointPool) Sample() (*RouteEndpoint, bool) {
 	index := rand.Intn(len(p.endpoints))
 
 	ticker := 0
-	for endpoint, _ := range p.endpoints {
+	for _, endpoint := range p.endpoints {
 		if ticker == index {
 			return endpoint, true
 		}
@@ -43,7 +43,7 @@ func (p *EndpointPool) Sample() (*RouteEndpoint, bool) {
 }
 
 func (p *EndpointPool) FindByPrivateInstanceId(id string) (*RouteEndpoint, bool) {
-	for endpoint, _ := range p.endpoints {
+	for _, endpoint := range p.endpoints {
 		if endpoint.PrivateInstanceId == id {
 			return endpoint, true
 		}
@@ -59,8 +59,8 @@ func (p *EndpointPool) IsEmpty() bool {
 func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	addresses := []string{}
 
-	for endpoint, _ := range p.endpoints {
-		addresses = append(addresses, endpoint.CanonicalAddr())
+	for addr, _ := range p.endpoints {
+		addresses = append(addresses, addr)
 	}
 
 	return json.Marshal(addresses)

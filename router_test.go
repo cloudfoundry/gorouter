@@ -479,14 +479,6 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	return string(port)
 }
 
-func nextAvailPort() uint16 {
-	p, e := common.GrabEphemeralPort()
-	if e != nil {
-		panic(e)
-	}
-	return p
-}
-
 func (s *RouterSuite) TestInfoApi(c *C) {
 	var client http.Client
 	var req *http.Request

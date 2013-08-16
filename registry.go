@@ -2,12 +2,13 @@ package router
 
 import (
 	"encoding/json"
+	"sync"
+	"time"
+
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
 	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/util"
 	steno "github.com/cloudfoundry/gosteno"
-	"sync"
-	"time"
 )
 
 type Registry struct {

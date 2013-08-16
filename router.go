@@ -263,10 +263,12 @@ func (router *Router) Run() {
 
 	server := proxy.Server{Handler: router.proxy}
 
-	err = server.Serve(listen)
-	if err != nil {
-		log.Fatalf("proxy.Serve: %s", err)
-	}
+	go func() {
+		err := server.Serve(listen)
+		if err != nil {
+			log.Fatalf("proxy.Serve: %s", err)
+		}
+	}()
 }
 
 func (r *Router) establishMBus() {

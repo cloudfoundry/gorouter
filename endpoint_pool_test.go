@@ -46,6 +46,24 @@ func (s *EPSuite) TestEndpointPoolAddingDoesNotDuplicate(c *C) {
 	c.Assert(found, Equals, false)
 }
 
+func (s *EPSuite) TestEndpointPoolAddingEquivalentEndpointsDoesNotDuplicate(c *C) {
+	pool := NewEndpointPool()
+
+	endpoint1 := &RouteEndpoint{Host: "1.2.3.4", Port: 5678}
+	endpoint2 := &RouteEndpoint{Host: "1.2.3.4", Port: 5678}
+
+	pool.Add(endpoint1)
+	pool.Add(endpoint2)
+
+	_, found := pool.Sample()
+	c.Assert(found, Equals, true)
+
+	pool.Remove(endpoint1)
+
+	_, found = pool.Sample()
+	c.Assert(found, Equals, false)
+}
+
 func (s *EPSuite) TestEndpointPoolIsEmptyInitially(c *C) {
 	c.Assert(NewEndpointPool().IsEmpty(), Equals, true)
 }
@@ -67,8 +85,8 @@ func (s *EPSuite) TestEndpointPoolIsEmptyAfterRemovingEverything(c *C) {
 func (s *EPSuite) TestEndpointPoolFindByPrivateInstanceId(c *C) {
 	pool := NewEndpointPool()
 
-	endpointFoo := &RouteEndpoint{PrivateInstanceId: "foo"}
-	endpointBar := &RouteEndpoint{PrivateInstanceId: "bar"}
+	endpointFoo := &RouteEndpoint{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"}
+	endpointBar := &RouteEndpoint{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"}
 
 	pool.Add(endpointFoo)
 	pool.Add(endpointBar)
@@ -88,8 +106,8 @@ func (s *EPSuite) TestEndpointPoolFindByPrivateInstanceId(c *C) {
 func (s *EPSuite) TestEndpointPoolSamplingIsRandomIsh(c *C) {
 	pool := NewEndpointPool()
 
-	endpoint1 := &RouteEndpoint{}
-	endpoint2 := &RouteEndpoint{}
+	endpoint1 := &RouteEndpoint{Host: "1.2.3.4", Port: 5678}
+	endpoint2 := &RouteEndpoint{Host: "5.6.7.8", Port: 1234}
 
 	pool.Add(endpoint1)
 	pool.Add(endpoint2)
@@ -116,11 +134,9 @@ func (s *EPSuite) TestEndpointPoolMarshalsAsJSON(c *C) {
 	pool := NewEndpointPool()
 
 	pool.Add(&RouteEndpoint{Host: "1.2.3.4", Port: 5678})
-	pool.Add(&RouteEndpoint{Host: "1.2.3.4", Port: 5678})
 
 	json, err := pool.MarshalJSON()
 	c.Assert(err, IsNil)
 
-	// just to test without caring about order
-	c.Assert(string(json), Equals, `["1.2.3.4:5678","1.2.3.4:5678"]`)
+	c.Assert(string(json), Equals, `["1.2.3.4:5678"]`)
 }
