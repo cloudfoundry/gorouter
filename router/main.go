@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+
 	"github.com/cloudfoundry/gorouter"
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/log"
 )
 
 var configFile string
@@ -14,12 +17,12 @@ func init() {
 }
 
 func main() {
-	c := router.DefaultConfig()
+	c := config.DefaultConfig()
 	if configFile != "" {
-		c = router.InitConfigFromFile(configFile)
+		c = config.InitConfigFromFile(configFile)
 	}
 
-	router.SetupLoggerFromConfig(c)
+	log.SetupLoggerFromConfig(c)
 
 	router.NewRouter(c).Run()
 }
