@@ -55,7 +55,7 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *Config {
 	}
 
 	c.Logging = LoggingConfig{
-		File:  "/dev/null",
+		File:  "/dev/stderr",
 		Level: "info",
 	}
 
