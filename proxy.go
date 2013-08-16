@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	VcapBackendHeader = "X-Vcap-Backend"
+	VcapBackendHeader     = "X-Vcap-Backend"
 	CfRouteEndpointHeader = "X-Cf-RouteEndpoint"
-	VcapRouterHeader  = "X-Vcap-Router"
-	VcapTraceHeader   = "X-Vcap-Trace"
+	VcapRouterHeader      = "X-Vcap-Router"
+	VcapTraceHeader       = "X-Vcap-Trace"
 
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
