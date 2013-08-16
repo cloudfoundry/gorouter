@@ -3,22 +3,26 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
-	. "launchpad.net/gocheck"
 	"net/http"
 	"time"
+
+	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
+	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type VarzSuite struct {
 	Varz
-	*Registry
+	*registry.Registry
 }
 
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
-	mbus := mock_cfmessagebus.NewMockMessageBus()
-	r := NewRegistry(DefaultConfig(), mbus)
+	r := registry.NewRegistry(config.DefaultConfig(), mock_cfmessagebus.NewMockMessageBus())
 	s.Registry = r
 	s.Varz = NewVarz(r)
 }
@@ -95,9 +99,10 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 }
 
 func (s *VarzSuite) TestSecondsSinceLastRegistryUpdate(c *C) {
-	testTime := time.Now()
+	s.Registry.Register(&route.Endpoint{Uris: []route.Uri{route.Uri("foo")}})
+
 	time.Sleep(10 * time.Millisecond)
-	s.Registry.timeOfLastUpdate = testTime
+
 	timeSince := s.findValue("ms_since_last_registry_update").(float64)
 	c.Assert(timeSince < 1000, Equals, true)
 	c.Assert(timeSince >= 10, Equals, true)
@@ -106,10 +111,10 @@ func (s *VarzSuite) TestSecondsSinceLastRegistryUpdate(c *C) {
 func (s *VarzSuite) TestUrlsInVarz(c *C) {
 	c.Check(s.findValue("urls"), Equals, float64(0))
 
-	var fooReg = &RouteEndpoint{
+	var fooReg = &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me", "fooo.vcap.me"},
 		Tags: map[string]string{},
 
 		ApplicationId: "12345",
@@ -132,7 +137,7 @@ func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {
-	b := &RouteEndpoint{}
+	b := &route.Endpoint{}
 	r := http.Request{}
 
 	s.Varz.CaptureRoutingRequest(b, &r)
@@ -143,13 +148,13 @@ func (s *VarzSuite) TestUpdateRequests(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
-	b1 := &RouteEndpoint{
+	b1 := &route.Endpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
 	}
 
-	b2 := &RouteEndpoint{
+	b2 := &route.Endpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
@@ -165,7 +170,7 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
-	var b *RouteEndpoint = &RouteEndpoint{}
+	var b *route.Endpoint = &route.Endpoint{}
 	var d time.Duration
 
 	r1 := &http.Response{
@@ -187,13 +192,13 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 	var d time.Duration
 
-	b1 := &RouteEndpoint{
+	b1 := &route.Endpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
 	}
 
-	b2 := &RouteEndpoint{
+	b2 := &route.Endpoint{
 		Tags: map[string]string{
 			"component": "cc",
 		},
@@ -216,7 +221,7 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 }
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
-	var routeEndpoint *RouteEndpoint = &RouteEndpoint{}
+	var routeEndpoint *route.Endpoint = &route.Endpoint{}
 	var duration = 1 * time.Millisecond
 
 	response := &http.Response{

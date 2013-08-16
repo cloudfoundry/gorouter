@@ -13,6 +13,10 @@ import (
 
 	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type connHandler func(*conn)
@@ -21,9 +25,9 @@ type nullVarz struct{}
 
 func (_ nullVarz) MarshalJSON() ([]byte, error) { return json.Marshal(nil) }
 
-func (_ nullVarz) CaptureBadRequest(req *http.Request)                                          {}
-func (_ nullVarz) CaptureRoutingRequest(b *RouteEndpoint, req *http.Request)                    {}
-func (_ nullVarz) CaptureRoutingResponse(b *RouteEndpoint, res *http.Response, d time.Duration) {}
+func (_ nullVarz) CaptureBadRequest(req *http.Request)                                           {}
+func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                    {}
+func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration) {}
 
 type conn struct {
 	net.Conn
@@ -119,7 +123,7 @@ func (x *conn) WriteLines(lines []string) {
 }
 
 type ProxySuite struct {
-	r *Registry
+	r *registry.Registry
 	p *Proxy
 
 	proxyServer net.Listener
@@ -131,11 +135,11 @@ type ProxySuite struct {
 var _ = Suite(&ProxySuite{})
 
 func (s *ProxySuite) SetUpTest(c *C) {
-	x := DefaultConfig()
+	x := config.DefaultConfig()
 	x.TraceKey = "my_trace_key"
 
 	mbus := mock_cfmessagebus.NewMockMessageBus()
-	s.r = NewRegistry(x, mbus)
+	s.r = registry.NewRegistry(x, mbus)
 	s.p = NewProxy(x, s.r, nullVarz{})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -163,10 +167,10 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 		panic(err)
 	}
 
-	s.r.Register(&RouteEndpoint{
+	s.r.Register(&route.Endpoint{
 		Host: h,
 		Port: uint16(x),
-		Uris: []Uri{Uri(u)},
+		Uris: []route.Uri{route.Uri(u)},
 	})
 }
 

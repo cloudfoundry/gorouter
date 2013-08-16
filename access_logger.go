@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type AccessLogRecord struct {
 	Request       *http.Request
 	Response      *http.Response
-	RouteEndpoint *RouteEndpoint
+	RouteEndpoint *route.Endpoint
 	StartedAt     time.Time
 	FirstByteAt   time.Time
 	FinishedAt    time.Time

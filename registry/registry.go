@@ -1,4 +1,4 @@
-package router
+package registry
 
 import (
 	"encoding/json"
@@ -9,6 +9,10 @@ import (
 	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/util"
 	steno "github.com/cloudfoundry/gosteno"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type Registry struct {
@@ -19,8 +23,8 @@ type Registry struct {
 	*stats.ActiveApps
 	*stats.TopApps
 
-	byUri  map[Uri]*EndpointPool
-	byAddr map[string]*RouteEndpoint
+	byUri  map[route.Uri]*route.Pool
+	byAddr map[string]*route.Endpoint
 
 	staleTracker *util.ListMap
 
@@ -32,28 +36,28 @@ type Registry struct {
 	timeOfLastUpdate time.Time
 }
 
-func NewRegistry(c *Config, messageBusClient mbus.MessageBus) *Registry {
-	r := &Registry{
-		messageBus: messageBusClient,
-	}
+func NewRegistry(c *config.Config, mbus mbus.MessageBus) *Registry {
+	r := &Registry{}
 
 	r.Logger = steno.NewLogger("router.registry")
 
 	r.ActiveApps = stats.NewActiveApps()
 	r.TopApps = stats.NewTopApps()
 
-	r.byUri = make(map[Uri]*EndpointPool)
-	r.byAddr = make(map[string]*RouteEndpoint)
+	r.byUri = make(map[route.Uri]*route.Pool)
+	r.byAddr = make(map[string]*route.Endpoint)
 
 	r.staleTracker = util.NewListMap()
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
 
+	r.messageBus = mbus
+
 	return r
 }
 
-func (registry *Registry) Register(endpoint *RouteEndpoint) {
+func (registry *Registry) Register(endpoint *route.Endpoint) {
 	if len(endpoint.Uris) == 0 {
 		return
 	}
@@ -63,29 +67,33 @@ func (registry *Registry) Register(endpoint *RouteEndpoint) {
 
 	addr := endpoint.CanonicalAddr()
 
-	routeEndpoint, found := registry.byAddr[addr]
-	if !found {
+	endpointToRegister, found := registry.byAddr[addr]
+	if found {
+		for _, uri := range endpoint.Uris {
+			endpointToRegister.Register(uri)
+		}
+	} else {
 		registry.byAddr[addr] = endpoint
-		routeEndpoint = endpoint
+		endpointToRegister = endpoint
 	}
 
-	for _, uri := range endpoint.Uris {
+	for _, uri := range endpointToRegister.Uris {
 		pool, found := registry.byUri[uri.ToLower()]
 		if !found {
-			pool = NewEndpointPool()
+			pool = route.NewPool()
 			registry.byUri[uri.ToLower()] = pool
 		}
 
-		pool.Add(endpoint)
+		pool.Add(endpointToRegister)
 	}
 
-	routeEndpoint.updated_at = time.Now()
+	endpointToRegister.UpdatedAtFORNOW = time.Now()
 
-	registry.staleTracker.PushBack(routeEndpoint)
+	registry.staleTracker.PushBack(endpointToRegister)
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (registry *Registry) Unregister(endpoint *RouteEndpoint) {
+func (registry *Registry) Unregister(endpoint *route.Endpoint) {
 	registry.Lock()
 	defer registry.Unlock()
 
@@ -101,11 +109,11 @@ func (registry *Registry) Unregister(endpoint *RouteEndpoint) {
 	}
 }
 
-func (r *Registry) Lookup(host string) (*RouteEndpoint, bool) {
+func (r *Registry) Lookup(host string) (*route.Endpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	x, ok := r.byUri[Uri(host).ToLower()]
+	x, ok := r.byUri[route.Uri(host).ToLower()]
 	if !ok {
 		return nil, false
 	}
@@ -117,8 +125,8 @@ func (registry *Registry) StartPruningCycle() {
 	go registry.checkAndPrune()
 }
 
-func (registry *Registry) IsStale(routeEndpoint *RouteEndpoint) bool {
-	return routeEndpoint.updated_at.Add(registry.dropletStaleThreshold).Before(time.Now())
+func (registry *Registry) IsStale(endpoint *route.Endpoint) bool {
+	return endpoint.UpdatedAtFORNOW.Add(registry.dropletStaleThreshold).Before(time.Now())
 }
 
 func (registry *Registry) PruneStaleDroplets() {
@@ -134,11 +142,11 @@ func (registry *Registry) PruneStaleDroplets() {
 	registry.pruneStaleDroplets()
 }
 
-func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*RouteEndpoint, bool) {
+func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*route.Endpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
-	x, ok := r.byUri[Uri(host).ToLower()]
+	x, ok := r.byUri[route.Uri(host).ToLower()]
 	if !ok {
 		return nil, false
 	}
@@ -146,7 +154,7 @@ func (r *Registry) LookupByPrivateInstanceId(host string, p string) (*RouteEndpo
 	return x.FindByPrivateInstanceId(p)
 }
 
-func (r *Registry) CaptureRoutingRequest(x *RouteEndpoint, t time.Time) {
+func (r *Registry) CaptureRoutingRequest(x *route.Endpoint, t time.Time) {
 	if x.ApplicationId != "" {
 		r.ActiveApps.Mark(x.ApplicationId, t)
 		r.TopApps.Mark(x.ApplicationId, t)
@@ -160,7 +168,11 @@ func (registry *Registry) NumUris() int {
 	return len(registry.byUri)
 }
 
-func (r *Registry) NumRouteEndpoints() int {
+func (r *Registry) TimeOfLastUpdate() time.Time {
+	return r.timeOfLastUpdate
+}
+
+func (r *Registry) NumEndpoints() int {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -180,24 +192,24 @@ func (registry *Registry) isStateStale() bool {
 
 func (registry *Registry) pruneStaleDroplets() {
 	for registry.staleTracker.Len() > 0 {
-		routeEndpoint := registry.staleTracker.Front().(*RouteEndpoint)
-		if !registry.IsStale(routeEndpoint) {
-			log.Infof("Droplet is not stale; NOT pruning: %v", routeEndpoint.CanonicalAddr())
+		endpoint := registry.staleTracker.Front().(*route.Endpoint)
+		if !registry.IsStale(endpoint) {
+			log.Infof("Droplet is not stale; NOT pruning: %v", endpoint.CanonicalAddr())
 			break
 		}
 
-		log.Infof("Pruning stale droplet: %v", routeEndpoint.CanonicalAddr())
+		log.Infof("Pruning stale droplet: %v", endpoint.CanonicalAddr())
 
-		for _, uri := range routeEndpoint.Uris {
-			log.Infof("Pruning stale droplet: %v, uri: %s", routeEndpoint.CanonicalAddr(), uri)
-			registry.unregisterUri(routeEndpoint, uri)
+		for _, uri := range endpoint.Uris {
+			log.Infof("Pruning stale droplet: %v, uri: %s", endpoint.CanonicalAddr(), uri)
+			registry.unregisterUri(endpoint, uri)
 		}
 	}
 }
 
 func (registry *Registry) pauseStaleTracker() {
 	for routeElement := registry.staleTracker.FrontElement(); routeElement != nil; routeElement = routeElement.Next() {
-		routeElement.Value.(*RouteEndpoint).updated_at = time.Now()
+		routeElement.Value.(*route.Endpoint).UpdatedAtFORNOW = time.Now()
 	}
 }
 
@@ -216,23 +228,23 @@ func (r *Registry) checkAndPrune() {
 	}
 }
 
-func (registry *Registry) unregisterUri(routeEndpoint *RouteEndpoint, uri Uri) {
+func (registry *Registry) unregisterUri(endpoint *route.Endpoint, uri route.Uri) {
 	uri = uri.ToLower()
 
-	ok := routeEndpoint.unregister(uri)
+	ok := endpoint.Unregister(uri)
 	if ok {
-		routeEndpoints := registry.byUri[uri]
+		endpoints := registry.byUri[uri]
 
-		routeEndpoints.Remove(routeEndpoint)
+		endpoints.Remove(endpoint)
 
-		if routeEndpoints.IsEmpty() {
+		if endpoints.IsEmpty() {
 			delete(registry.byUri, uri)
 		}
 	}
 
 	// Remove backend if it no longer has uris
-	if len(routeEndpoint.Uris) == 0 {
-		delete(registry.byAddr, routeEndpoint.CanonicalAddr())
-		registry.staleTracker.Delete(routeEndpoint)
+	if len(endpoint.Uris) == 0 {
+		delete(registry.byAddr, endpoint.CanonicalAddr())
+		registry.staleTracker.Delete(endpoint)
 	}
 }

@@ -1,4 +1,4 @@
-package router
+package config
 
 import (
 	vcap "github.com/cloudfoundry/gorouter/common"

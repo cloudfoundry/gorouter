@@ -1,8 +1,10 @@
-package router
+package log
 
 import (
 	steno "github.com/cloudfoundry/gosteno"
 	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
 )
 
 type LoggerSuite struct{}
@@ -10,13 +12,13 @@ type LoggerSuite struct{}
 var _ = Suite(&LoggerSuite{})
 
 func (s *LoggerSuite) TestSetupLoggerFromConfig(c *C) {
-	cfg := DefaultConfig()
+	cfg := config.DefaultConfig()
 	cfg.Logging.File = "/tmp/gorouter.log"
 
 	SetupLoggerFromConfig(cfg)
 
-	count := logCounter.GetCount("info")
+	count := Counter.GetCount("info")
 	logger := steno.NewLogger("test")
 	logger.Info("Hello")
-	c.Assert(logCounter.GetCount("info"), Equals, count+1)
+	c.Assert(Counter.GetCount("info"), Equals, count+1)
 }

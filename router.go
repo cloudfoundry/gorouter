@@ -5,26 +5,30 @@ import (
 	"compress/zlib"
 	"encoding/json"
 	"fmt"
-	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	vcap "github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/proxy"
-	"github.com/cloudfoundry/gorouter/util"
-	steno "github.com/cloudfoundry/gosteno"
 	"net"
 	"runtime"
 	"time"
+
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/gorouter/proxy"
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/util"
 )
 
 type Router struct {
-	config     *Config
+	config     *config.Config
 	proxy      *Proxy
 	mbusClient mbus.MessageBus
-	registry   *Registry
+	registry   *registry.Registry
 	varz       Varz
 	component  *vcap.VcapComponent
 }
 
-func NewRouter(c *Config) *Router {
+func NewRouter(c *config.Config) *Router {
 	router := &Router{
 		config: c,
 	}
@@ -36,7 +40,7 @@ func NewRouter(c *Config) *Router {
 
 	router.establishMBus()
 
-	router.registry = NewRegistry(router.config, router.mbusClient)
+	router.registry = registry.NewRegistry(router.config, router.mbusClient)
 	router.registry.StartPruningCycle()
 
 	router.varz = NewVarz(router.registry)
@@ -50,7 +54,7 @@ func NewRouter(c *Config) *Router {
 	varz := &vcap.Varz{
 		UniqueVarz: router.varz,
 	}
-	varz.LogCounts = logCounter
+	varz.LogCounts = log.Counter
 
 	healthz := &vcap.Healthz{
 		LockableObject: router.registry,
@@ -62,7 +66,6 @@ func NewRouter(c *Config) *Router {
 		Host:        host,
 		Credentials: []string{router.config.Status.User, router.config.Status.Pass},
 		Config:      router.config,
-		Logger:      log,
 		Varz:        varz,
 		Healthz:     healthz,
 		InfoRoutes: map[string]json.Marshaler{
@@ -82,7 +85,7 @@ func (r *Router) RegisterComponent() {
 type registryMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`
-	Uris Uris              `json:"uris"`
+	Uris route.Uris        `json:"uris"`
 	Tags map[string]string `json:"tags"`
 	App  string            `json:"app"`
 
@@ -96,11 +99,11 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 		err := json.Unmarshal(payload, &msg)
 		if err != nil {
 			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
-			log.Log(steno.LOG_WARN, logMessage, map[string]interface{}{"payload": string(payload)})
+			log.Warnd(map[string]interface{}{"payload": string(payload)}, logMessage)
 		}
 
 		logMessage := fmt.Sprintf("%s: Received message", subject)
-		log.Log(steno.LOG_DEBUG, logMessage, map[string]interface{}{"message": msg})
+		log.Debugd(map[string]interface{}{"message": msg}, logMessage)
 
 		successCallback(&msg)
 	}
@@ -113,7 +116,7 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 func (router *Router) SubscribeRegister() {
 	router.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
 		log.Infof("Got router.register: %v", registryMessage)
-		router.registry.Register(&RouteEndpoint{
+		router.registry.Register(&route.Endpoint{
 			Host: registryMessage.Host,
 			Port: registryMessage.Port,
 			Uris: registryMessage.Uris,
@@ -129,7 +132,7 @@ func (router *Router) SubscribeRegister() {
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
 		log.Infof("Got router.unregister: %v", registryMessage)
-		r.registry.Unregister(&RouteEndpoint{
+		r.registry.Unregister(&route.Endpoint{
 			Host: registryMessage.Host,
 			Port: registryMessage.Port,
 			Uris: registryMessage.Uris,
@@ -284,5 +287,4 @@ func (r *Router) establishMBus() {
 	port := r.config.Nats.Port
 
 	r.mbusClient.Configure(host, int(port), user, pass)
-	r.mbusClient.SetLogger(log)
 }

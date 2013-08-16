@@ -1,29 +1,29 @@
-package router
+package route
 
 import (
 	"encoding/json"
 	"math/rand"
 )
 
-type EndpointPool struct {
-	endpoints map[string]*RouteEndpoint
+type Pool struct {
+	endpoints map[string]*Endpoint
 }
 
-func NewEndpointPool() *EndpointPool {
-	return &EndpointPool{
-		endpoints: make(map[string]*RouteEndpoint),
+func NewPool() *Pool {
+	return &Pool{
+		endpoints: make(map[string]*Endpoint),
 	}
 }
 
-func (p *EndpointPool) Add(endpoint *RouteEndpoint) {
+func (p *Pool) Add(endpoint *Endpoint) {
 	p.endpoints[endpoint.CanonicalAddr()] = endpoint
 }
 
-func (p *EndpointPool) Remove(endpoint *RouteEndpoint) {
+func (p *Pool) Remove(endpoint *Endpoint) {
 	delete(p.endpoints, endpoint.CanonicalAddr())
 }
 
-func (p *EndpointPool) Sample() (*RouteEndpoint, bool) {
+func (p *Pool) Sample() (*Endpoint, bool) {
 	if len(p.endpoints) == 0 {
 		return nil, false
 	}
@@ -42,7 +42,7 @@ func (p *EndpointPool) Sample() (*RouteEndpoint, bool) {
 	panic("unreachable")
 }
 
-func (p *EndpointPool) FindByPrivateInstanceId(id string) (*RouteEndpoint, bool) {
+func (p *Pool) FindByPrivateInstanceId(id string) (*Endpoint, bool) {
 	for _, endpoint := range p.endpoints {
 		if endpoint.PrivateInstanceId == id {
 			return endpoint, true
@@ -52,11 +52,11 @@ func (p *EndpointPool) FindByPrivateInstanceId(id string) (*RouteEndpoint, bool)
 	return nil, false
 }
 
-func (p *EndpointPool) IsEmpty() bool {
+func (p *Pool) IsEmpty() bool {
 	return len(p.endpoints) == 0
 }
 
-func (p *EndpointPool) MarshalJSON() ([]byte, error) {
+func (p *Pool) MarshalJSON() ([]byte, error) {
 	addresses := []string{}
 
 	for addr, _ := range p.endpoints {

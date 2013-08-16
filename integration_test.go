@@ -5,12 +5,15 @@ import (
 	"time"
 
 	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	"github.com/cloudfoundry/gorouter/test"
 	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/gorouter/test"
 )
 
 type IntegrationSuite struct {
-	Config     *Config
+	Config     *config.Config
 	mbusClient mbus.MessageBus
 	router     *Router
 
@@ -37,9 +40,14 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 	statusPort := nextAvailPort()
 
 	s.Config = SpecConfig(s.natsPort, statusPort, proxyPort)
-	s.Config.PruneStaleDropletsInterval = 1 * time.Second
 
-	SetupLoggerFromConfig(s.Config)
+	// ensure the threshold is longer than the interval that we check,
+	// because we set the route's timestamp to time.Now() on the interval
+	// as part of pausing
+	s.Config.PruneStaleDropletsInterval = 1 * time.Second
+	s.Config.DropletStaleThreshold = 2 * s.Config.PruneStaleDropletsInterval
+
+	log.SetupLoggerFromConfig(s.Config)
 
 	s.router = NewRouter(s.Config)
 
@@ -47,13 +55,10 @@ func (s *IntegrationSuite) TestNatsConnectivity(c *C) {
 
 	s.mbusClient = s.router.mbusClient
 
-	// ensure the threshold is longer than the interval that we check,
-	// because we set the route's timestamp to time.Now() on the interval
-	// as part of pausing
-	staleCheckInterval := s.router.registry.pruneStaleDropletsInterval
-	staleThreshold := 2 * staleCheckInterval
+	staleCheckInterval := s.Config.PruneStaleDropletsInterval
+	staleThreshold := s.Config.DropletStaleThreshold
 
-	s.router.registry.dropletStaleThreshold = staleThreshold
+	s.Config.DropletStaleThreshold = staleThreshold
 
 	zombieApp := test.NewGreetApp([]string{"zombie.vcap.me"}, proxyPort, s.mbusClient, nil)
 	zombieApp.Listen()

@@ -3,7 +3,6 @@ package router
 import (
 	"bufio"
 	"fmt"
-	steno "github.com/cloudfoundry/gosteno"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +10,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	steno "github.com/cloudfoundry/gosteno"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 const (
@@ -26,8 +31,8 @@ const (
 type Proxy struct {
 	sync.RWMutex
 	*steno.Logger
-	*Config
-	*Registry
+	*config.Config
+	*registry.Registry
 	Varz
 	*AccessLogger
 }
@@ -65,7 +70,7 @@ func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
 	return io.Copy(dst, src)
 }
 
-func NewProxy(c *Config, r *Registry, v Varz) *Proxy {
+func NewProxy(c *config.Config, r *registry.Registry, v Varz) *Proxy {
 	p := &Proxy{
 		Config:   c,
 		Logger:   steno.NewLogger("router.proxy"),
@@ -98,7 +103,7 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (proxy *Proxy) Lookup(request *http.Request) (*RouteEndpoint, bool) {
+func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
 	host := hostWithoutPort(request)
 
 	// Try choosing a backend using sticky session

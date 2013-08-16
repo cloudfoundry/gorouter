@@ -3,13 +3,16 @@ package router
 import (
 	"errors"
 	"fmt"
-	steno "github.com/cloudfoundry/gosteno"
-	. "launchpad.net/gocheck"
 	"net"
 	"os/exec"
 	"strconv"
 	"testing"
 	"time"
+
+	steno "github.com/cloudfoundry/gosteno"
+	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
 )
 
 func Test(t *testing.T) {
@@ -21,13 +24,14 @@ func Test(t *testing.T) {
 
 	steno.Init(config)
 
-	log = steno.NewLogger("test")
+	// log = steno.NewLogger("test")
 
 	TestingT(t)
 }
 
-func SpecConfig(natsPort, statusPort, proxyPort uint16) *Config {
-	c := DefaultConfig()
+func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
+	c := config.DefaultConfig()
+
 	c.Port = proxyPort
 	c.Index = 2
 	c.TraceKey = "my_trace_key"
@@ -41,20 +45,20 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *Config {
 	c.DropletStaleThreshold = 0
 	c.PublishActiveAppsInterval = 0
 
-	c.Status = StatusConfig{
+	c.Status = config.StatusConfig{
 		Port: statusPort,
 		User: "user",
 		Pass: "pass",
 	}
 
-	c.Nats = NatsConfig{
+	c.Nats = config.NatsConfig{
 		Host: "localhost",
 		Port: natsPort,
 		User: "nats",
 		Pass: "nats",
 	}
 
-	c.Logging = LoggingConfig{
+	c.Logging = config.LoggingConfig{
 		File:  "/dev/stderr",
 		Level: "info",
 	}

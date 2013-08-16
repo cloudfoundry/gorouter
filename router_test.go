@@ -5,21 +5,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	mbus "github.com/cloudfoundry/go_cfmessagebus"
-	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/test"
 	"io/ioutil"
-	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	mbus "github.com/cloudfoundry/go_cfmessagebus"
+	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/test"
 )
 
 type RouterSuite struct {
-	Config        *Config
+	Config        *config.Config
 	natsServerCmd *exec.Cmd
 	mbusClient    mbus.MessageBus
 	router        *Router
@@ -233,7 +237,7 @@ func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
 	}
 }
 
-func verify_health_z(host string, registry *Registry, c *C) {
+func verify_health_z(host string, registry *registry.Registry, c *C) {
 	var req *http.Request
 	var resp *http.Response
 	var err error

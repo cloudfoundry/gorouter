@@ -1,11 +1,14 @@
-package router
+package registry
 
 import (
+	"encoding/json"
 	"time"
 
-	"encoding/json"
 	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
 	. "launchpad.net/gocheck"
+
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type RegistrySuite struct {
@@ -16,21 +19,21 @@ type RegistrySuite struct {
 
 var _ = Suite(&RegistrySuite{})
 
-var fooEndpoint, barEndpoint, bar2Endpoint *RouteEndpoint
+var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 
 func (s *RegistrySuite) SetUpTest(c *C) {
-	var configObj *Config
+	var configObj *config.Config
 
-	configObj = DefaultConfig()
+	configObj = config.DefaultConfig()
 	configObj.DropletStaleThreshold = 10 * time.Millisecond
 
 	s.messageBus = mock_cfmessagebus.NewMockMessageBus()
 	s.Registry = NewRegistry(configObj, s.messageBus)
 
-	fooEndpoint = &RouteEndpoint{
+	fooEndpoint = &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me", "fooo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me", "fooo.vcap.me"},
 
 		ApplicationId: "12345",
 		Tags: map[string]string{
@@ -39,10 +42,10 @@ func (s *RegistrySuite) SetUpTest(c *C) {
 		},
 	}
 
-	barEndpoint = &RouteEndpoint{
+	barEndpoint = &route.Endpoint{
 		Host: "192.168.1.2",
 		Port: 4321,
-		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
+		Uris: []route.Uri{"bar.vcap.me", "barr.vcap.me"},
 
 		ApplicationId: "54321",
 		Tags: map[string]string{
@@ -51,10 +54,10 @@ func (s *RegistrySuite) SetUpTest(c *C) {
 		},
 	}
 
-	bar2Endpoint = &RouteEndpoint{
+	bar2Endpoint = &route.Endpoint{
 		Host: "192.168.1.3",
 		Port: 1234,
-		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
+		Uris: []route.Uri{"bar.vcap.me", "barr.vcap.me"},
 
 		ApplicationId: "54321",
 		Tags: map[string]string{
@@ -78,36 +81,36 @@ func (s *RegistrySuite) TestRegister(c *C) {
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreEmpty(c *C) {
-	s.Register(&RouteEndpoint{})
+	s.Register(&route.Endpoint{})
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumRouteEndpoints(), Equals, 0)
+	c.Check(s.NumEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterIgnoreDuplicates(c *C) {
 	s.Register(barEndpoint)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 1)
+	c.Check(s.NumEndpoints(), Equals, 1)
 
 	s.Register(barEndpoint)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 1)
+	c.Check(s.NumEndpoints(), Equals, 1)
 
 	s.Unregister(barEndpoint)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumRouteEndpoints(), Equals, 0)
+	c.Check(s.NumEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestRegisterUppercase(c *C) {
-	m1 := &RouteEndpoint{
+	m1 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
-	m2 := &RouteEndpoint{
+	m2 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1235,
-		Uris: []Uri{"FOO.VCAP.ME"},
+		Uris: []route.Uri{"FOO.VCAP.ME"},
 	}
 
 	s.Register(m1)
@@ -117,66 +120,67 @@ func (s *RegistrySuite) TestRegisterUppercase(c *C) {
 }
 
 func (s *RegistrySuite) TestRegisterDoesntReplace(c *C) {
-	m1 := &RouteEndpoint{
+	m1 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
-	m2 := &RouteEndpoint{
+	m2 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"bar.vcap.me"},
+		Uris: []route.Uri{"bar.vcap.me"},
 	}
 
 	s.Register(m1)
 	s.Register(m2)
 
 	c.Check(s.NumUris(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 1)
 }
 
 func (s *RegistrySuite) TestRegisterWithoutUris(c *C) {
-	m := &RouteEndpoint{
+	m := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{},
+		Uris: []route.Uri{},
 	}
 
 	s.Register(m)
 
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumRouteEndpoints(), Equals, 0)
+	c.Check(s.NumEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestUnregister(c *C) {
 	s.Register(barEndpoint)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 1)
+	c.Check(s.NumEndpoints(), Equals, 1)
 
 	s.Register(bar2Endpoint)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 2)
 
 	s.Unregister(barEndpoint)
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 1)
+	c.Check(s.NumEndpoints(), Equals, 1)
 
 	s.Unregister(bar2Endpoint)
 	c.Check(s.NumUris(), Equals, 0)
-	c.Check(s.NumRouteEndpoints(), Equals, 0)
+	c.Check(s.NumEndpoints(), Equals, 0)
 }
 
 func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
-	m1 := &RouteEndpoint{
+	m1 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
-	m2 := &RouteEndpoint{
+	m2 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"FOO.VCAP.ME"},
+		Uris: []route.Uri{"FOO.VCAP.ME"},
 	}
 
 	s.Register(m1)
@@ -186,16 +190,16 @@ func (s *RegistrySuite) TestUnregisterUppercase(c *C) {
 }
 
 func (s *RegistrySuite) TestUnregisterDoesntDemolish(c *C) {
-	m1 := &RouteEndpoint{
+	m1 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me", "bar.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me", "bar.vcap.me"},
 	}
 
-	m2 := &RouteEndpoint{
+	m2 := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
 	s.Register(m1)
@@ -205,15 +209,15 @@ func (s *RegistrySuite) TestUnregisterDoesntDemolish(c *C) {
 }
 
 func (s *RegistrySuite) TestLookup(c *C) {
-	m := &RouteEndpoint{
+	m := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
 	s.Register(m)
 
-	var b *RouteEndpoint
+	var b *route.Endpoint
 	var ok bool
 
 	b, ok = s.Lookup("foo.vcap.me")
@@ -226,23 +230,23 @@ func (s *RegistrySuite) TestLookup(c *C) {
 }
 
 func (s *RegistrySuite) TestLookupDoubleRegister(c *C) {
-	m1 := &RouteEndpoint{
+	m1 := &route.Endpoint{
 		Host: "192.168.1.2",
 		Port: 1234,
-		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
+		Uris: []route.Uri{"bar.vcap.me", "barr.vcap.me"},
 	}
 
-	m2 := &RouteEndpoint{
+	m2 := &route.Endpoint{
 		Host: "192.168.1.2",
 		Port: 1235,
-		Uris: []Uri{"bar.vcap.me", "barr.vcap.me"},
+		Uris: []route.Uri{"bar.vcap.me", "barr.vcap.me"},
 	}
 
 	s.Register(m1)
 	s.Register(m2)
 
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 2)
 }
 
 func (s *RegistrySuite) TestTracker(c *C) {
@@ -263,7 +267,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(fooEndpoint)
 	s.Register(barEndpoint)
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumRouteEndpoints(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
@@ -272,7 +276,7 @@ func (s *RegistrySuite) TestPruneStaleApps(c *C) {
 	s.Register(bar2Endpoint)
 
 	c.Check(s.NumUris(), Equals, 2)
-	c.Check(s.NumRouteEndpoints(), Equals, 1)
+	c.Check(s.NumEndpoints(), Equals, 1)
 	c.Assert(s.staleTracker.Len(), Equals, 1)
 }
 
@@ -280,7 +284,7 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	s.Register(fooEndpoint)
 	s.Register(barEndpoint)
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumRouteEndpoints(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	time.Sleep(s.dropletStaleThreshold + 1*time.Millisecond)
@@ -292,7 +296,7 @@ func (s *RegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 	s.PruneStaleDroplets()
 
 	c.Check(s.NumUris(), Equals, 4)
-	c.Check(s.NumRouteEndpoints(), Equals, 2)
+	c.Check(s.NumEndpoints(), Equals, 2)
 	c.Assert(s.staleTracker.Len(), Equals, 2)
 
 	routeEndpoint, _ := s.Lookup("foo.vcap.me")
@@ -331,10 +335,10 @@ func (s *RegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
 }
 
 func (s *RegistrySuite) TestInfoMarshalling(c *C) {
-	m := &RouteEndpoint{
+	m := &route.Endpoint{
 		Host: "192.168.1.1",
 		Port: 1234,
-		Uris: []Uri{"foo.vcap.me"},
+		Uris: []route.Uri{"foo.vcap.me"},
 	}
 
 	s.Register(m)

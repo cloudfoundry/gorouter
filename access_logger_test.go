@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"regexp"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type AccessLoggerSuite struct{}
@@ -35,7 +37,7 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 		StatusCode: http.StatusOK,
 	}
 
-	b := &RouteEndpoint{
+	b := &route.Endpoint{
 		ApplicationId: "my_awesome_id",
 		Host:          "127.0.0.1",
 		Port:          4567,

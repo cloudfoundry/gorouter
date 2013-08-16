@@ -3,11 +3,14 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cloudfoundry/gorouter/stats"
-	metrics "github.com/rcrowley/go-metrics"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/stats"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 type topAppsEntry struct {
@@ -157,17 +160,17 @@ type Varz interface {
 	json.Marshaler
 
 	CaptureBadRequest(req *http.Request)
-	CaptureRoutingRequest(b *RouteEndpoint, req *http.Request)
-	CaptureRoutingResponse(b *RouteEndpoint, res *http.Response, d time.Duration)
+	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
+	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration)
 }
 
 type RealVarz struct {
 	sync.Mutex
-	r *Registry
+	r *registry.Registry
 	varz
 }
 
-func NewVarz(r *Registry) Varz {
+func NewVarz(r *registry.Registry) Varz {
 	x := &RealVarz{r: r}
 
 	x.All = NewHttpMetric()
@@ -181,11 +184,11 @@ func (x *RealVarz) MarshalJSON() ([]byte, error) {
 	defer x.Unlock()
 
 	x.varz.Urls = x.r.NumUris()
-	x.varz.Droplets = x.r.NumRouteEndpoints()
+	x.varz.Droplets = x.r.NumEndpoints()
 
 	x.varz.RequestsPerSec = x.varz.All.Rate.Rate1()
 	millis_per_nano := int64(1000000)
-	x.varz.MillisSinceLastRegistryUpdate = time.Since(x.r.timeOfLastUpdate).Nanoseconds() / millis_per_nano
+	x.varz.MillisSinceLastRegistryUpdate = time.Since(x.r.TimeOfLastUpdate()).Nanoseconds() / millis_per_nano
 
 	x.updateTop()
 
@@ -218,7 +221,7 @@ func (x *RealVarz) CaptureBadRequest(req *http.Request) {
 	x.BadRequests++
 }
 
-func (x *RealVarz) CaptureRoutingRequest(b *RouteEndpoint, req *http.Request) {
+func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 	x.Lock()
 	defer x.Unlock()
 
@@ -233,14 +236,14 @@ func (x *RealVarz) CaptureRoutingRequest(b *RouteEndpoint, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *RealVarz) CaptureRoutingResponse(routeEndpoint *RouteEndpoint, response *http.Response, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, duration time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 
 	var tags string
 	var ok bool
 
-	tags, ok = routeEndpoint.Tags["component"]
+	tags, ok = endpoint.Tags["component"]
 	if ok {
 		x.varz.Tags.Component.CaptureResponse(tags, response, duration)
 	}
