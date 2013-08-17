@@ -110,7 +110,7 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 	}
 	err := r.mbusClient.Subscribe(subject, callback)
 	if err != nil {
-		log.Errorf("Error subscribing to %s: %s", subject, err.Error())
+		log.Errorf("Error subscribing to %s: %s", subject, err)
 	}
 }
 
@@ -236,7 +236,7 @@ func (router *Router) Run() {
 		if err == nil {
 			break
 		}
-		log.Errorf("Could not connect to NATS: ", err.Error())
+		log.Errorf("Could not connect to NATS: %s", err)
 		time.Sleep(500 * time.Millisecond)
 	}
 
