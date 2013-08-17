@@ -55,10 +55,13 @@ We are using Gocheck, to run tests
 go env
 go get -v ./...
 go build -v ./...
-go test -gocheck.v
+go test -v ./...
 
 # just run tests whose names match Registry
-go test -gocheck.v -gocheck.f=Registry
+go test -v ./... -gocheck.f=Registry
+
+# run the tests for only the registry package
+go test -v ./registry
 ```
 
 ### Start
@@ -170,15 +173,6 @@ Examples: the router can't bind to its TCP port, a CF component has published in
 * `warn` - An unexpected state has occurred. Examples: the router tried to publish data that could not be encoded as JSON
 * `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
 to prune routes for stale droplets.
-
-## Notes
-
-* 03/05/13: Code is now used on CloudFoundry.com.
-
-* 1/25/13: The code in this repository has not yet been used on CloudFoundry.com.
-
-* 1/25/13: While this implementation can easily support WebSocket
-  connections it does not yet.
 
 ## Contributing
 
