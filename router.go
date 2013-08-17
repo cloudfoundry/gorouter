@@ -121,15 +121,7 @@ func (r *Router) SubscribeRegister() {
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
 				uri,
-				&route.Endpoint{
-					Host: registryMessage.Host,
-					Port: registryMessage.Port,
-
-					ApplicationId: registryMessage.App,
-					Tags:          registryMessage.Tags,
-
-					PrivateInstanceId: registryMessage.PrivateInstanceId,
-				},
+				makeRouteEndpoint(registryMessage),
 			)
 		}
 	})
@@ -138,18 +130,11 @@ func (r *Router) SubscribeRegister() {
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
 		log.Infof("Got router.unregister: %v", registryMessage)
+
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(
 				uri,
-				&route.Endpoint{
-					Host: registryMessage.Host,
-					Port: registryMessage.Port,
-
-					ApplicationId: registryMessage.App,
-					Tags:          registryMessage.Tags,
-
-					PrivateInstanceId: registryMessage.PrivateInstanceId,
-				},
+				makeRouteEndpoint(registryMessage),
 			)
 		}
 	})
@@ -297,4 +282,16 @@ func (r *Router) establishMBus() {
 	port := r.config.Nats.Port
 
 	r.mbusClient.Configure(host, int(port), user, pass)
+}
+
+func makeRouteEndpoint(registryMessage *registryMessage) *route.Endpoint {
+	return &route.Endpoint{
+		Host: registryMessage.Host,
+		Port: registryMessage.Port,
+
+		ApplicationId: registryMessage.App,
+		Tags:          registryMessage.Tags,
+
+		PrivateInstanceId: registryMessage.PrivateInstanceId,
+	}
 }
