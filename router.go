@@ -79,140 +79,6 @@ func NewRouter(c *config.Config) *Router {
 	return router
 }
 
-func (r *Router) RegisterComponent() {
-	vcap.Register(r.component, r.mbusClient)
-}
-
-type registryMessage struct {
-	Host string            `json:"host"`
-	Port uint16            `json:"port"`
-	Uris []route.Uri       `json:"uris"`
-	Tags map[string]string `json:"tags"`
-	App  string            `json:"app"`
-
-	PrivateInstanceId string `json:"private_instance_id"`
-}
-
-func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
-	callback := func(payload []byte) {
-		var msg registryMessage
-
-		err := json.Unmarshal(payload, &msg)
-		if err != nil {
-			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
-			log.Warnd(map[string]interface{}{"payload": string(payload)}, logMessage)
-		}
-
-		logMessage := fmt.Sprintf("%s: Received message", subject)
-		log.Debugd(map[string]interface{}{"message": msg}, logMessage)
-
-		successCallback(&msg)
-	}
-	err := r.mbusClient.Subscribe(subject, callback)
-	if err != nil {
-		log.Errorf("Error subscribing to %s: %s", subject, err)
-	}
-}
-
-func (r *Router) SubscribeRegister() {
-	r.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
-		log.Infof("Got router.register: %v", registryMessage)
-
-		for _, uri := range registryMessage.Uris {
-			r.registry.Register(
-				uri,
-				makeRouteEndpoint(registryMessage),
-			)
-		}
-	})
-}
-
-func (r *Router) SubscribeUnregister() {
-	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
-		log.Infof("Got router.unregister: %v", registryMessage)
-
-		for _, uri := range registryMessage.Uris {
-			r.registry.Unregister(
-				uri,
-				makeRouteEndpoint(registryMessage),
-			)
-		}
-	})
-}
-
-func (r *Router) HandleGreetings() {
-	r.mbusClient.RespondToChannel("router.greet", func(_ []byte) []byte {
-		response, _ := r.greetMessage()
-		return response
-	})
-}
-
-func (r *Router) flushApps(t time.Time) {
-	x := r.registry.ActiveSince(t)
-
-	y, err := json.Marshal(x)
-	if err != nil {
-		log.Warnf("flushApps: Error marshalling JSON: %s", err)
-		return
-	}
-
-	b := bytes.Buffer{}
-	w := zlib.NewWriter(&b)
-	w.Write(y)
-	w.Close()
-
-	z := b.Bytes()
-
-	log.Debugf("Active apps: %d, message size: %d", len(x), len(z))
-
-	r.mbusClient.Publish("router.active_apps", z)
-}
-
-func (r *Router) ScheduleFlushApps() {
-	if r.config.PublishActiveAppsInterval == 0 {
-		return
-	}
-
-	go func() {
-		t := time.NewTicker(r.config.PublishActiveAppsInterval)
-		x := time.Now()
-
-		for {
-			select {
-			case <-t.C:
-				y := time.Now()
-				r.flushApps(x)
-				x = y
-			}
-		}
-	}()
-}
-
-func (r *Router) SendStartMessage() {
-	b, err := r.greetMessage()
-	if err != nil {
-		panic(err)
-	}
-
-	// Send start message once at start
-	r.mbusClient.Publish("router.start", b)
-}
-
-func (r *Router) greetMessage() ([]byte, error) {
-	host, err := vcap.LocalIP()
-	if err != nil {
-		return nil, err
-	}
-
-	d := vcap.RouterStart{
-		vcap.GenerateUUID(),
-		[]string{host},
-		r.config.StartResponseDelayIntervalInSeconds,
-	}
-
-	return json.Marshal(d)
-}
-
 func (router *Router) Run() {
 	var err error
 
@@ -267,6 +133,140 @@ func (router *Router) Run() {
 			log.Fatalf("proxy.Serve: %s", err)
 		}
 	}()
+}
+
+func (r *Router) RegisterComponent() {
+	vcap.Register(r.component, r.mbusClient)
+}
+
+type registryMessage struct {
+	Host string            `json:"host"`
+	Port uint16            `json:"port"`
+	Uris []route.Uri       `json:"uris"`
+	Tags map[string]string `json:"tags"`
+	App  string            `json:"app"`
+
+	PrivateInstanceId string `json:"private_instance_id"`
+}
+
+func (r *Router) SubscribeRegister() {
+	r.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
+		log.Infof("Got router.register: %v", registryMessage)
+
+		for _, uri := range registryMessage.Uris {
+			r.registry.Register(
+				uri,
+				makeRouteEndpoint(registryMessage),
+			)
+		}
+	})
+}
+
+func (r *Router) SubscribeUnregister() {
+	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
+		log.Infof("Got router.unregister: %v", registryMessage)
+
+		for _, uri := range registryMessage.Uris {
+			r.registry.Unregister(
+				uri,
+				makeRouteEndpoint(registryMessage),
+			)
+		}
+	})
+}
+
+func (r *Router) HandleGreetings() {
+	r.mbusClient.RespondToChannel("router.greet", func(_ []byte) []byte {
+		response, _ := r.greetMessage()
+		return response
+	})
+}
+
+func (r *Router) SendStartMessage() {
+	b, err := r.greetMessage()
+	if err != nil {
+		panic(err)
+	}
+
+	// Send start message once at start
+	r.mbusClient.Publish("router.start", b)
+}
+
+func (r *Router) ScheduleFlushApps() {
+	if r.config.PublishActiveAppsInterval == 0 {
+		return
+	}
+
+	go func() {
+		t := time.NewTicker(r.config.PublishActiveAppsInterval)
+		x := time.Now()
+
+		for {
+			select {
+			case <-t.C:
+				y := time.Now()
+				r.flushApps(x)
+				x = y
+			}
+		}
+	}()
+}
+
+func (r *Router) flushApps(t time.Time) {
+	x := r.registry.ActiveSince(t)
+
+	y, err := json.Marshal(x)
+	if err != nil {
+		log.Warnf("flushApps: Error marshalling JSON: %s", err)
+		return
+	}
+
+	b := bytes.Buffer{}
+	w := zlib.NewWriter(&b)
+	w.Write(y)
+	w.Close()
+
+	z := b.Bytes()
+
+	log.Debugf("Active apps: %d, message size: %d", len(x), len(z))
+
+	r.mbusClient.Publish("router.active_apps", z)
+}
+
+func (r *Router) greetMessage() ([]byte, error) {
+	host, err := vcap.LocalIP()
+	if err != nil {
+		return nil, err
+	}
+
+	d := vcap.RouterStart{
+		vcap.GenerateUUID(),
+		[]string{host},
+		r.config.StartResponseDelayIntervalInSeconds,
+	}
+
+	return json.Marshal(d)
+}
+
+func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
+	callback := func(payload []byte) {
+		var msg registryMessage
+
+		err := json.Unmarshal(payload, &msg)
+		if err != nil {
+			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
+			log.Warnd(map[string]interface{}{"payload": string(payload)}, logMessage)
+		}
+
+		logMessage := fmt.Sprintf("%s: Received message", subject)
+		log.Debugd(map[string]interface{}{"message": msg}, logMessage)
+
+		successCallback(&msg)
+	}
+	err := r.mbusClient.Subscribe(subject, callback)
+	if err != nil {
+		log.Errorf("Error subscribing to %s: %s", subject, err)
+	}
 }
 
 func (r *Router) establishMBus() {
