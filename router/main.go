@@ -25,4 +25,6 @@ func main() {
 	log.SetupLoggerFromConfig(c)
 
 	router.NewRouter(c).Run()
+
+	select {}
 }
