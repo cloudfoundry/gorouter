@@ -176,6 +176,43 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 	)
 }
 
+func (s *ProxySuite) TestProxyHasNoAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
+	x := config.DefaultConfig()
+	proxy := NewProxy(x, nil, nil)
+	c.Assert(proxy.AccessLogger, IsNil)
+}
+
+func (s *ProxySuite) TestProxyHasAccessLoggerIfNoAccesLogButLoggregatorUrl(c *C) {
+	x := config.DefaultConfig()
+	x.LoggregatorConfig.Url = "10.10.3.13:4325"
+	x.AccessLog = ""
+	proxy := NewProxy(x, nil, nil)
+	c.Assert(proxy.AccessLogger, NotNil)
+}
+
+func (s *ProxySuite) TestProxyHasAccessLoggerIfAccesLogButNoLoggregatorUrl(c *C) {
+	x := config.DefaultConfig()
+	x.AccessLog = "/dev/null"
+	proxy := NewProxy(x, nil, nil)
+	c.Assert(proxy.AccessLogger, NotNil)
+}
+
+func (s *ProxySuite) TestProxyHasAccessLoggerIfBothAccesLogAndLoggregatorUrl(c *C) {
+	x := config.DefaultConfig()
+	x.LoggregatorConfig.Url = "10.10.3.13:4325"
+	x.AccessLog = "/dev/null"
+	proxy := NewProxy(x, nil, nil)
+	c.Assert(proxy.AccessLogger, NotNil)
+}
+
+func (s *ProxySuite) TestProxyPanicsIfInvalidAccessLogLocation(c *C) {
+	x := config.DefaultConfig()
+	x.AccessLog = "/this\\should/panic"
+	c.Assert(func() {
+		NewProxy(x, nil, nil)
+	},PanicMatches,"open /this\\\\should/panic: no such file or directory")
+}
+
 func (s *ProxySuite) RegisterHandler(c *C, u string, h connHandler) net.Listener {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
