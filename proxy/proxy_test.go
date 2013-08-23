@@ -210,7 +210,7 @@ func (s *ProxySuite) TestProxyPanicsIfInvalidAccessLogLocation(c *C) {
 	x.AccessLog = "/this\\should/panic"
 	c.Assert(func() {
 		NewProxy(x, nil, nil)
-	},PanicMatches,"open /this\\\\should/panic: no such file or directory")
+	}, PanicMatches, "open /this\\\\should/panic: no such file or directory")
 }
 
 func (s *ProxySuite) RegisterHandler(c *C, u string, h connHandler) net.Listener {

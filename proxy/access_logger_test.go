@@ -2,13 +2,13 @@ package proxy
 
 import (
 	"bytes"
+	"github.com/cloudfoundry/gorouter/route"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"net/url"
 	"regexp"
-	"time"
-	"github.com/cloudfoundry/gorouter/route"
 	"runtime"
+	"time"
 )
 
 type AccessLoggerSuite struct{}
@@ -88,9 +88,9 @@ func (f *fakeFile) Write(data []byte) (int, error) {
 	return 12, nil
 }
 
-type mockEmitter struct{
+type mockEmitter struct {
 	emitted bool
-	appId string
+	appId   string
 	message string
 }
 

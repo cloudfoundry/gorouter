@@ -3,14 +3,14 @@ package proxy
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
-	"github.com/cloudfoundry/loggregatorlib/emitter"
+	"github.com/cloudfoundry/gorouter/log"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/loggregatorlib/emitter"
+	"io"
+	"net/http"
 	"regexp"
+	"time"
 )
 
 type AccessLogRecord struct {
@@ -42,7 +42,7 @@ func (r *AccessLogRecord) ResponseTime() float64 {
 	return float64(r.FinishedAt.UnixNano()-r.StartedAt.UnixNano()) / float64(time.Second)
 }
 
-func (r *AccessLogRecord) makeRecord() (*bytes.Buffer) {
+func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 	b := &bytes.Buffer{}
 	fmt.Fprintf(b, `%s - `, r.Request.Host)
 	fmt.Fprintf(b, `[%s] `, r.FormatStartedAt())
@@ -67,7 +67,7 @@ func (r *AccessLogRecord) Emit(e emitter.Emitter) {
 	b := r.makeRecord()
 	message := b.String()
 	log.Debugf("Logging to the loggregator: %s", message)
-	e.Emit(r.RouteEndpoint.ApplicationId,message)
+	e.Emit(r.RouteEndpoint.ApplicationId, message)
 }
 
 type AccessLogger struct {
@@ -87,7 +87,6 @@ func NewAccessLogger(f io.Writer, loggregatorUrl string) *AccessLogger {
 	} else {
 		log.Errorf("Invalid loggregator url %s", loggregatorUrl)
 	}
-
 
 	return a
 }
@@ -111,7 +110,7 @@ func (x *AccessLogger) Log(r AccessLogRecord) {
 	x.c <- r
 }
 
-func isValidUrl(url string) (bool) {
+func isValidUrl(url string) bool {
 	if ipAddressRegex.MatchString(url) || hostnameRegex.MatchString(url) {
 		return true
 	}

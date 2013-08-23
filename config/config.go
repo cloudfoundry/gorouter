@@ -52,9 +52,9 @@ var defaultLoggregatorConfig = LoggregatorConfig{
 }
 
 type Config struct {
-	Status  StatusConfig  "status"
-	Nats    NatsConfig    "nats"
-	Logging LoggingConfig "logging"
+	Status            StatusConfig      "status"
+	Nats              NatsConfig        "nats"
+	Logging           LoggingConfig     "logging"
 	LoggregatorConfig LoggregatorConfig "loggregatorConfig"
 
 	Port       uint16 "port"
@@ -82,7 +82,7 @@ type Config struct {
 var defaultConfig = Config{
 	Status:            defaultStatusConfig,
 	Nats:              defaultNatsConfig,
-	Logging: 		   defaultLoggingConfig,
+	Logging:           defaultLoggingConfig,
 	LoggregatorConfig: defaultLoggregatorConfig,
 
 	Port:       8081,
