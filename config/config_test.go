@@ -76,6 +76,19 @@ logging:
 	c.Check(s.Logging.Level, Equals, "debug2")
 }
 
+func (s *ConfigSuite) TestLoggregator(c *C) {
+	var b = []byte(`
+loggregatorConfig:
+  url: 10.10.16.14:3456
+`)
+
+	c.Check(s.LoggregatorConfig.Url, Equals, "")
+
+	goyaml.Unmarshal(b, &s.Config)
+
+	c.Check(s.LoggregatorConfig.Url, Equals, "10.10.16.14:3456")
+}
+
 func (s *ConfigSuite) TestConfig(c *C) {
 	var b = []byte(`
 port: 8082

@@ -79,13 +79,14 @@ func NewProxy(c *config.Config, r *registry.Registry, v varz.Varz) *Proxy {
 		Varz:     v,
 	}
 
-	if c.AccessLog != "" {
+	loggregatorUrl := c.LoggregatorConfig.Url
+	if c.AccessLog != "" || loggregatorUrl != "" {
 		f, err := os.OpenFile(c.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-		if err != nil {
+		if err != nil && c.AccessLog != "" {
 			panic(err)
 		}
 
-		p.AccessLogger = NewAccessLogger(f)
+		p.AccessLogger = NewAccessLogger(f, loggregatorUrl)
 		go p.AccessLogger.Run()
 	}
 
