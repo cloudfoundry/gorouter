@@ -36,6 +36,7 @@ type Proxy struct {
 	*registry.Registry
 	varz.Varz
 	*AccessLogger
+	*http.Transport
 }
 
 type responseWriter struct {
@@ -73,10 +74,11 @@ func (rw *responseWriter) CopyFrom(src io.Reader) (int64, error) {
 
 func NewProxy(c *config.Config, r *registry.Registry, v varz.Varz) *Proxy {
 	p := &Proxy{
-		Config:   c,
-		Logger:   steno.NewLogger("router.proxy"),
-		Registry: r,
-		Varz:     v,
+		Config:    c,
+		Logger:    steno.NewLogger("router.proxy"),
+		Registry:  r,
+		Varz:      v,
+		Transport: &http.Transport{ResponseHeaderTimeout: c.EndpointTimeout},
 	}
 
 	loggregatorUrl := c.LoggregatorConfig.Url
@@ -206,7 +208,7 @@ func (proxy *Proxy) ServeHTTP(httpResponseWriter http.ResponseWriter, request *h
 	request.Close = true
 	request.Header.Del("Connection")
 
-	roundTripResponse, err := http.DefaultTransport.RoundTrip(request)
+	roundTripResponse, err := proxy.Transport.RoundTrip(request)
 
 	latency := time.Since(start)
 

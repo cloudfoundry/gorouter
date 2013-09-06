@@ -69,12 +69,14 @@ type Config struct {
 	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
 	PublishActiveAppsIntervalInSeconds   int "publish_active_apps_interval"
 	StartResponseDelayIntervalInSeconds  int "start_response_delay_interval"
+	EndpointTimeoutInSeconds             int "endpoint_timeout"
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration
 	DropletStaleThreshold      time.Duration
 	PublishActiveAppsInterval  time.Duration
 	StartResponseDelayInterval time.Duration
+	EndpointTimeout            time.Duration
 
 	Ip string
 }
@@ -89,6 +91,8 @@ var defaultConfig = Config{
 	Index:      0,
 	Pidfile:    "",
 	GoMaxProcs: 8,
+
+	EndpointTimeoutInSeconds: 60,
 
 	PublishStartMessageIntervalInSeconds: 30,
 	PruneStaleDropletsIntervalInSeconds:  30,
@@ -112,6 +116,7 @@ func (c *Config) Process() {
 	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
 	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
+	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
 
 	c.Ip, err = vcap.LocalIP()
 	if err != nil {

@@ -35,6 +35,18 @@ status:
 	c.Check(s.Status.Pass, Equals, "pass")
 }
 
+func (s *ConfigSuite) TestEndpointTimeout(c *C) {
+	var b = []byte(`
+endpoint_timeout: 10
+`)
+
+	c.Check(s.EndpointTimeoutInSeconds, Equals, 60)
+
+	goyaml.Unmarshal(b, &s.Config)
+
+	c.Check(s.EndpointTimeoutInSeconds, Equals, 10)
+}
+
 func (s *ConfigSuite) TestNats(c *C) {
 	var b = []byte(`
 nats:

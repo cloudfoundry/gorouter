@@ -45,6 +45,8 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	c.DropletStaleThreshold = 0
 	c.PublishActiveAppsInterval = 0
 
+	c.EndpointTimeout = 500 * time.Millisecond
+
 	c.Status = config.StatusConfig{
 		Port: statusPort,
 		User: "user",

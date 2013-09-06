@@ -135,12 +135,13 @@ type ProxySuite struct {
 var _ = Suite(&ProxySuite{})
 
 func (s *ProxySuite) SetUpTest(c *C) {
-	x := config.DefaultConfig()
-	x.TraceKey = "my_trace_key"
+	config := config.DefaultConfig()
+	config.TraceKey = "my_trace_key"
+	config.EndpointTimeout = 500 * time.Millisecond
 
 	mbus := mock_cfmessagebus.NewMockMessageBus()
-	s.r = registry.NewRegistry(x, mbus)
-	s.p = NewProxy(x, s.r, nullVarz{})
+	s.r = registry.NewRegistry(config, mbus)
+	s.p = NewProxy(config, s.r, nullVarz{})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -516,4 +517,25 @@ func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 		c.Check(n, Equals, 5)
 		c.Check(string(b[0:n]), Equals, "hello")
 	}
+}
+
+func (s *ProxySuite) TestRequestTerminatesWhenResponseTakesTooLong(c *C) {
+	started := time.Now()
+	s.RegisterHandler(c, "slow-app", func(x *httpConn) {
+		time.Sleep(1 * time.Second)
+		resp := newResponse(http.StatusOK)
+		x.WriteResponse(resp)
+		x.Close()
+	})
+
+	x := s.DialProxy(c)
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "slow-app"
+	x.WriteRequest(req)
+
+	resp, body := x.ReadResponse()
+	c.Check(resp.StatusCode, Equals, http.StatusBadGateway)
+	c.Check(body, Equals, "502 Bad Gateway\n")
+	c.Check(time.Since(started) < time.Duration(800*time.Millisecond), Equals, true)
 }

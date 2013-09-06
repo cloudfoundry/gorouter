@@ -510,3 +510,19 @@ func (s *RouterSuite) TestInfoApi(c *C) {
 	c.Assert(err, IsNil)
 	c.Check(string(body), Matches, ".*1\\.2\\.3\\.4:1234.*\n")
 }
+
+func (s *RouterSuite) TestRouterTerminatesLongRequests(c *C) {
+	app := test.NewSlowApp(
+		[]route.Uri{"slow-app.vcap.me"},
+		s.Config.Port,
+		s.mbusClient,
+		10*time.Second,
+	)
+
+	app.Listen()
+
+	uri := fmt.Sprintf("http://slow-app.vcap.me:%d", s.Config.Port)
+	resp, err := http.Get(uri)
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusCode, Equals, 502)
+}
