@@ -29,6 +29,7 @@ type varz struct {
 	Droplets int `json:"droplets"`
 
 	BadRequests    int     `json:"bad_requests"`
+	BadGateways    int     `json:"bad_gateways"`
 	RequestsPerSec float64 `json:"requests_per_sec"`
 
 	TopApps []topAppsEntry `json:"top10_app_requests"`
@@ -160,6 +161,7 @@ type Varz interface {
 	json.Marshaler
 
 	CaptureBadRequest(req *http.Request)
+	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration)
 }
@@ -219,6 +221,13 @@ func (x *RealVarz) CaptureBadRequest(req *http.Request) {
 	defer x.Unlock()
 
 	x.BadRequests++
+}
+
+func (x *RealVarz) CaptureBadGateway(req *http.Request) {
+	x.Lock()
+	defer x.Unlock()
+
+	x.BadGateways++
 }
 
 func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {

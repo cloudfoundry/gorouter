@@ -79,6 +79,7 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 		"droplets",
 		"requests",
 		"bad_requests",
+		"bad_gateways",
 		"requests_per_sec",
 		"top10_app_requests",
 		"ms_since_last_registry_update",
@@ -134,6 +135,16 @@ func (s *VarzSuite) TestUpdateBadRequests(c *C) {
 
 	s.CaptureBadRequest(&r)
 	c.Check(s.findValue("bad_requests"), Equals, float64(2))
+}
+
+func (s *VarzSuite) TestUpdateBadGateways(c *C) {
+	r := &http.Request{}
+
+	s.CaptureBadGateway(r)
+	c.Check(s.findValue("bad_gateways"), Equals, float64(1))
+
+	s.CaptureBadGateway(r)
+	c.Check(s.findValue("bad_gateways"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {

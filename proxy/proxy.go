@@ -215,14 +215,14 @@ func (proxy *Proxy) ServeHTTP(httpResponseWriter http.ResponseWriter, request *h
 	accessLog.FirstByteAt = time.Now()
 	accessLog.Response = roundTripResponse
 
+	proxy.Varz.CaptureRoutingResponse(routeEndpoint, roundTripResponse, latency)
+
 	if err != nil {
-		proxy.Varz.CaptureRoutingResponse(routeEndpoint, roundTripResponse, latency)
+		proxy.Varz.CaptureBadGateway(request)
 		responseWriter.Warnf("Error reading from upstream: %s", err)
 		responseWriter.WriteStatus(http.StatusBadGateway)
 		return
 	}
-
-	proxy.Varz.CaptureRoutingResponse(routeEndpoint, roundTripResponse, latency)
 
 	for k, vv := range roundTripResponse.Header {
 		for _, v := range vv {
