@@ -316,13 +316,13 @@ func (s *ProxySuite) TestRespondsToUnknownHostWith404(c *C) {
 	x := s.DialProxy(c)
 
 	req := x.NewRequest("GET", "/", nil)
-	req.Header.Set("Host", "unknown")
+	req.Host = "unknown"
 	x.WriteRequest(req)
 
 	resp, body := x.ReadResponse()
 	c.Check(resp.StatusCode, Equals, http.StatusNotFound)
 	c.Check(resp.Header.Get("X-Cf-RouterError"), Equals, "unknown_route")
-	c.Check(body, Equals, "404 Not Found\n")
+	c.Check(body, Equals, "404 Not Found: Requested route ('unknown') does not exist.\n")
 }
 
 func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
@@ -339,7 +339,7 @@ func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
 	resp, body := x.ReadResponse()
 	c.Check(resp.StatusCode, Equals, http.StatusBadGateway)
 	c.Check(resp.Header.Get("X-Cf-RouterError"), Equals, "endpoint_failure")
-	c.Check(body, Equals, "502 Bad Gateway\n")
+	c.Check(body, Equals, "502 Bad Gateway: Registered endpoint failed to handle the request.\n")
 }
 
 func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
@@ -537,8 +537,7 @@ func (s *ProxySuite) TestRequestTerminatesWhenResponseTakesTooLong(c *C) {
 	req.Host = "slow-app"
 	x.WriteRequest(req)
 
-	resp, body := x.ReadResponse()
+	resp, _ := x.ReadResponse()
 	c.Check(resp.StatusCode, Equals, http.StatusBadGateway)
-	c.Check(body, Equals, "502 Bad Gateway\n")
 	c.Check(time.Since(started) < time.Duration(800*time.Millisecond), Equals, true)
 }

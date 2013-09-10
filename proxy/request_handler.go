@@ -50,7 +50,7 @@ func (h *RequestHandler) HandleHeartbeat() {
 func (h *RequestHandler) HandleUnsupportedProtocol() {
 	client, connection, err := h.hijack()
 	if err != nil {
-		h.writeStatus(http.StatusBadRequest)
+		h.writeStatus(http.StatusBadRequest, "Unsupported protocol.")
 		return
 	}
 
@@ -62,14 +62,15 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 func (h *RequestHandler) HandleMissingRoute() {
 	h.logger.Warnf("proxy.endpoint.not-found")
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
-	h.writeStatus(http.StatusNotFound)
+	message := fmt.Sprintf("Requested route ('%s') does not exist.", h.request.Host)
+	h.writeStatus(http.StatusNotFound, message)
 }
 
 func (h *RequestHandler) HandleBadGateway(err error) {
 	h.logger.Set("Error", err.Error())
 	h.logger.Warnf("proxy.endpoint.failed")
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
-	h.writeStatus(http.StatusBadGateway)
+	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
 }
 
 func (h *RequestHandler) HandleTcpRequest(endpoint *route.Endpoint) {
@@ -79,7 +80,7 @@ func (h *RequestHandler) HandleTcpRequest(endpoint *route.Endpoint) {
 	if err != nil {
 		h.logger.Set("Error", err.Error())
 		h.logger.Warn("proxy.tcp.failed")
-		h.writeStatus(http.StatusBadRequest)
+		h.writeStatus(http.StatusBadRequest, "TCP forwarding to endpoint failed.")
 	}
 }
 
@@ -92,7 +93,7 @@ func (h *RequestHandler) HandleWebSocketRequest(endpoint *route.Endpoint) {
 	if err != nil {
 		h.logger.Set("Error", err.Error())
 		h.logger.Warn("proxy.websocket.failed")
-		h.writeStatus(http.StatusBadRequest)
+		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
 	}
 }
 
@@ -252,8 +253,8 @@ func (h *RequestHandler) setupStickySession(endpointResponse *http.Response, end
 	}
 }
 
-func (h *RequestHandler) writeStatus(code int) {
-	body := fmt.Sprintf("%d %s", code, http.StatusText(code))
+func (h *RequestHandler) writeStatus(code int, message string) {
+	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
 	h.logger.Warn(body)
 
