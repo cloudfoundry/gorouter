@@ -2,7 +2,6 @@ package registry
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -205,8 +204,6 @@ func (registry *Registry) isStateStale() bool {
 
 func (registry *Registry) pruneStaleDroplets() {
 	for key, entry := range registry.table {
-		fmt.Printf("stale? %v, %v\n", key, entry)
-
 		if !registry.isEntryStale(entry) {
 			continue
 		}
