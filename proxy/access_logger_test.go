@@ -115,6 +115,27 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 	accessLogger.Stop()
 }
 
+func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
+	accessLogger := NewAccessLogger(nil, "localhost:9843")
+	testEmitter := &mockEmitter{emitted: false}
+	accessLogger.e = testEmitter
+
+	routeEndpoint := &route.Endpoint{
+		ApplicationId: "",
+		Host:          "127.0.0.1",
+		Port:          4567,
+	}
+
+	accessLogRecord := s.CreateAccessLogRecord()
+	accessLogRecord.RouteEndpoint = routeEndpoint
+	accessLogger.Log(*accessLogRecord)
+	go accessLogger.Run()
+	runtime.Gosched()
+
+	c.Check(testEmitter.emitted, Equals, false)
+	accessLogger.Stop()
+}
+
 func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 	var fakeFile = new(fakeFile)
 
