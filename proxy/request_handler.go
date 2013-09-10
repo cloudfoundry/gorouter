@@ -61,12 +61,14 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 
 func (h *RequestHandler) HandleMissingRoute() {
 	h.logger.Warnf("proxy.endpoint.not-found")
+	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
 	h.writeStatus(http.StatusNotFound)
 }
 
 func (h *RequestHandler) HandleBadGateway(err error) {
 	h.logger.Set("Error", err.Error())
 	h.logger.Warnf("proxy.endpoint.failed")
+	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway)
 }
 
