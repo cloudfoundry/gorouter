@@ -64,10 +64,12 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (r *AccessLogRecord) Emit(e emitter.Emitter) {
-	b := r.makeRecord()
-	message := b.String()
-	log.Debugf("Logging to the loggregator: %s", message)
-	e.Emit(r.RouteEndpoint.ApplicationId, message)
+	if r.RouteEndpoint.ApplicationId != "" {
+		b := r.makeRecord()
+		message := b.String()
+		log.Debugf("Logging to the loggregator: %s", message)
+		e.Emit(r.RouteEndpoint.ApplicationId, message)
+	}
 }
 
 type AccessLogger struct {
