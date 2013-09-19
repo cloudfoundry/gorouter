@@ -48,7 +48,7 @@ func NewProxy(c *config.Config, registry *registry.Registry, v varz.Varz) *Proxy
 			panic(err)
 		}
 
-		p.AccessLogger = NewAccessLogger(f, loggregatorUrl)
+		p.AccessLogger = NewAccessLogger(f, loggregatorUrl, c.Index)
 		go p.AccessLogger.Run()
 	}
 

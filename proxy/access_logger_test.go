@@ -101,7 +101,7 @@ func (m *mockEmitter) Emit(appid, message string) {
 }
 
 func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
-	accessLogger := NewAccessLogger(nil, "localhost:9843")
+	accessLogger := NewAccessLogger(nil, "localhost:9843", 42)
 	testEmitter := &mockEmitter{emitted: false}
 	accessLogger.e = testEmitter
 
@@ -116,7 +116,7 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 }
 
 func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
-	accessLogger := NewAccessLogger(nil, "localhost:9843")
+	accessLogger := NewAccessLogger(nil, "localhost:9843", 42)
 	testEmitter := &mockEmitter{emitted: false}
 	accessLogger.e = testEmitter
 
@@ -139,7 +139,7 @@ func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
 func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 	var fakeFile = new(fakeFile)
 
-	accessLogger := NewAccessLogger(fakeFile, "localhost:9843")
+	accessLogger := NewAccessLogger(fakeFile, "localhost:9843", 42)
 
 	accessLogger.Log(*s.CreateAccessLogRecord())
 	go accessLogger.Run()
@@ -150,32 +150,32 @@ func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 }
 
 func (s *AccessLoggerSuite) TestNotCreatingEmitterWhenNoValidUrlIsGiven(c *C) {
-	accessLogger := NewAccessLogger(nil, "this_is_not_a_url")
+	accessLogger := NewAccessLogger(nil, "this_is_not_a_url", 42)
 	c.Assert(accessLogger.e, IsNil)
 	accessLogger.Stop()
 
-	accessLogger = NewAccessLogger(nil, "localhost")
+	accessLogger = NewAccessLogger(nil, "localhost", 42)
 	c.Assert(accessLogger.e, IsNil)
 	accessLogger.Stop()
 
-	accessLogger = NewAccessLogger(nil, "10.10.16.14")
+	accessLogger = NewAccessLogger(nil, "10.10.16.14", 42)
 	c.Assert(accessLogger.e, IsNil)
 	accessLogger.Stop()
 
-	accessLogger = NewAccessLogger(nil, "")
+	accessLogger = NewAccessLogger(nil, "", 42)
 	c.Assert(accessLogger.e, IsNil)
 	accessLogger.Stop()
 }
 
 func (s *AccessLoggerSuite) TestCreatingEmitterWithIPAddressAndPort(c *C) {
-	accessLogger := NewAccessLogger(nil, "10.10.16.14:5432")
+	accessLogger := NewAccessLogger(nil, "10.10.16.14:5432", 42)
 
 	c.Assert(accessLogger.e, NotNil)
 	accessLogger.Stop()
 }
 
 func (s *AccessLoggerSuite) TestCreatingEmitterWithLocalhostt(c *C) {
-	accessLogger := NewAccessLogger(nil, "localhost:123")
+	accessLogger := NewAccessLogger(nil, "localhost:123", 42)
 
 	c.Assert(accessLogger.e, NotNil)
 	accessLogger.Stop()
