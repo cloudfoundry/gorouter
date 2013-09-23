@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"regexp"
 	"time"
+	"strconv"
 )
 
 type AccessLogRecord struct {
@@ -76,16 +77,18 @@ type AccessLogger struct {
 	e emitter.Emitter
 	c chan AccessLogRecord
 	w io.Writer
+	index uint
 }
 
-func NewAccessLogger(f io.Writer, loggregatorUrl string) *AccessLogger {
+func NewAccessLogger(f io.Writer, loggregatorUrl string, index uint) *AccessLogger {
 	a := &AccessLogger{
 		w: f,
 		c: make(chan AccessLogRecord, 128),
+		index: index,
 	}
 
 	if isValidUrl(loggregatorUrl) {
-		a.e, _ = emitter.NewEmitter(loggregatorUrl, "ROUTER", steno.NewLogger("router.loggregator"))
+		a.e, _ = emitter.NewEmitter(loggregatorUrl, "ROUTER", strconv.FormatUint(uint64(index), 10), steno.NewLogger("router.loggregator"))
 	} else {
 		log.Errorf("Invalid loggregator url %s", loggregatorUrl)
 	}
