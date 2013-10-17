@@ -31,6 +31,7 @@ func NewRequestHandler(request *http.Request, response http.ResponseWriter) Requ
 
 	logger.Set("RemoteAddr", request.RemoteAddr)
 	logger.Set("Host", request.Host)
+	logger.Set("Path", request.URL.Path)
 	logger.Set("X-Forwarded-For", request.Header["X-Forwarded-For"])
 	logger.Set("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"])
 
