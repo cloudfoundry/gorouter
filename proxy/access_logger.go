@@ -10,8 +10,8 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"time"
 	"strconv"
+	"time"
 )
 
 type AccessLogRecord struct {
@@ -74,16 +74,16 @@ func (r *AccessLogRecord) Emit(e emitter.Emitter) {
 }
 
 type AccessLogger struct {
-	e emitter.Emitter
-	c chan AccessLogRecord
-	w io.Writer
+	e     emitter.Emitter
+	c     chan AccessLogRecord
+	w     io.Writer
 	index uint
 }
 
 func NewAccessLogger(f io.Writer, loggregatorUrl string, index uint) *AccessLogger {
 	a := &AccessLogger{
-		w: f,
-		c: make(chan AccessLogRecord, 128),
+		w:     f,
+		c:     make(chan AccessLogRecord, 128),
 		index: index,
 	}
 
