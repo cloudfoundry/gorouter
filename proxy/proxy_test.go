@@ -422,12 +422,12 @@ func (s *ProxySuite) TestXFFIsAppended(c *C) {
 func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 	s.RegisterHandler(c, "ws", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get("Upgrade"), Equals, "websocket")
-		c.Check(req.Header.Get("Connection"), Equals, "Upgrade")
+		c.Check(req.Header.Get("Upgrade"), Equals, "WebsockeT")
+		c.Check(req.Header.Get("Connection"), Equals, "UpgradE")
 
 		resp := newResponse(http.StatusSwitchingProtocols)
-		resp.Header.Set("Upgrade", "websocket")
-		resp.Header.Set("Connection", "Upgrade")
+		resp.Header.Set("Upgrade", "WebsockeT")
+		resp.Header.Set("Connection", "UpgradE")
 
 		x.WriteResponse(resp)
 
@@ -439,15 +439,15 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 
 	req := x.NewRequest("GET", "/chat", nil)
 	req.Host = "ws"
-	req.Header.Set("Upgrade", "websocket")
-	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "WebsockeT")
+	req.Header.Set("Connection", "UpgradE")
 
 	x.WriteRequest(req)
 
 	resp, _ := x.ReadResponse()
 	c.Check(resp.StatusCode, Equals, http.StatusSwitchingProtocols)
-	c.Check(resp.Header.Get("Upgrade"), Equals, "websocket")
-	c.Check(resp.Header.Get("Connection"), Equals, "Upgrade")
+	c.Check(resp.Header.Get("Upgrade"), Equals, "WebsockeT")
+	c.Check(resp.Header.Get("Connection"), Equals, "UpgradE")
 
 	x.WriteLine("hello from client")
 	x.CheckLine("hello from server")
@@ -465,7 +465,8 @@ func (s *ProxySuite) TestTcpUpgrade(c *C) {
 	req := x.NewRequest("GET", "/chat", nil)
 	req.Host = "tcp-handler"
 	req.Header.Set("Upgrade", "tcp")
-	req.Header.Set("Connection", "Upgrade")
+
+	req.Header.Set("Connection", "UpgradE")
 
 	x.WriteRequest(req)
 

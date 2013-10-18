@@ -166,7 +166,8 @@ func isLoadBalancerHeartbeat(request *http.Request) bool {
 }
 
 func isWebSocketUpgrade(request *http.Request) bool {
-	return upgradeHeader(request) == "websocket"
+	// websocket should be case insensitive per RFC6455 4.2.1
+	return strings.ToLower(upgradeHeader(request)) == "websocket"
 }
 
 func isTcpUpgrade(request *http.Request) bool {
@@ -174,7 +175,8 @@ func isTcpUpgrade(request *http.Request) bool {
 }
 
 func upgradeHeader(request *http.Request) string {
-	if request.Header.Get("Connection") == "Upgrade" {
+	// upgrade should be case insensitive per RFC6455 4.2.1
+	if strings.ToLower(request.Header.Get("Connection")) == "upgrade" {
 		return request.Header.Get("Upgrade")
 	} else {
 		return ""
