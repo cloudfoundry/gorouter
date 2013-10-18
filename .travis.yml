@@ -8,7 +8,7 @@ matrix:
     - go: tip
 
 install:
-  - gem install nats
+  - gem install nats --pre
   - go get -v ./...
   - go build -v ./...
 
