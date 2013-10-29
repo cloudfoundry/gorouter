@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"time"
+	"github.com/cloudfoundry/loggregatorlib/logmessage"
 )
 
 type AccessLoggerSuite struct{}
@@ -98,6 +99,10 @@ func (m *mockEmitter) Emit(appid, message string) {
 	m.emitted = true
 	m.appId = appid
 	m.message = message
+}
+
+func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
+
 }
 
 func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
