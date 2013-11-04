@@ -88,7 +88,7 @@ func NewAccessLogger(f io.Writer, loggregatorUrl string, index uint) *AccessLogg
 	}
 
 	if isValidUrl(loggregatorUrl) {
-		a.e, _ = emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), steno.NewLogger("router.loggregator"))
+		a.e, _ = emitter.NewEmitter(loggregatorUrl, "ROUTER", strconv.FormatUint(uint64(index), 10), steno.NewLogger("router.loggregator"))
 	} else {
 		log.Errorf("Invalid loggregator url %s", loggregatorUrl)
 	}

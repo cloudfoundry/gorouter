@@ -3,13 +3,13 @@ package proxy
 import (
 	"bytes"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/loggregatorlib/logmessage"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"net/url"
 	"regexp"
 	"runtime"
 	"time"
-	"github.com/cloudfoundry/loggregatorlib/logmessage"
 )
 
 type AccessLoggerSuite struct{}
@@ -152,6 +152,12 @@ func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 
 	c.Check(string(fakeFile.payload), Matches, "^"+logMessageRegex+"\n")
 	accessLogger.Stop()
+}
+
+func (s *AccessLoggerSuite) TestRealEmitterIsNotNil(c *C) {
+	accessLogger := NewAccessLogger(nil, "localhost:9843", 42)
+
+	c.Assert(accessLogger.e, Not(IsNil))
 }
 
 func (s *AccessLoggerSuite) TestNotCreatingEmitterWhenNoValidUrlIsGiven(c *C) {
