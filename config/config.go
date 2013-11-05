@@ -45,6 +45,7 @@ var defaultLoggingConfig = LoggingConfig{
 
 type LoggregatorConfig struct {
 	Url string
+	SharedSecret string "shared_secret"
 }
 
 var defaultLoggregatorConfig = LoggregatorConfig{
