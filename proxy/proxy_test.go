@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/go_cfmessagebus/mock_cfmessagebus"
+	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	. "launchpad.net/gocheck"
 
 	"github.com/cloudfoundry/gorouter/config"
@@ -141,7 +141,7 @@ func (s *ProxySuite) SetUpTest(c *C) {
 	config.TraceKey = "my_trace_key"
 	config.EndpointTimeout = 500 * time.Millisecond
 
-	mbus := mock_cfmessagebus.NewMockMessageBus()
+	mbus := fakeyagnats.New()
 	s.r = registry.NewRegistry(config, mbus)
 	s.p = NewProxy(config, s.r, nullVarz{})
 
