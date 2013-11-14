@@ -82,11 +82,17 @@ func NewRouter(c *config.Config) *Router {
 func (r *Router) Run() {
 	var err error
 
-	natsInfo := &yagnats.ConnectionInfo{
-		Addr:     fmt.Sprintf("%s:%d", r.config.Nats.Host, r.config.Nats.Port),
-		Username: r.config.Nats.User,
-		Password: r.config.Nats.Pass,
+	natsMembers := []yagnats.ConnectionProvider{}
+
+	for _, info := range r.config.Nats {
+		natsMembers = append(natsMembers, &yagnats.ConnectionInfo{
+			Addr:     fmt.Sprintf("%s:%d", info.Host, info.Port),
+			Username: info.User,
+			Password: info.Pass,
+		})
 	}
+
+	natsInfo := &yagnats.ConnectionCluster{natsMembers}
 
 	for {
 		err = r.mbusClient.Connect(natsInfo)

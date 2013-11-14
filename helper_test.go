@@ -53,11 +53,13 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 		Pass: "pass",
 	}
 
-	c.Nats = config.NatsConfig{
-		Host: "localhost",
-		Port: natsPort,
-		User: "nats",
-		Pass: "nats",
+	c.Nats = []config.NatsConfig{
+		{
+			Host: "localhost",
+			Port: natsPort,
+			User: "nats",
+			Pass: "nats",
+		},
 	}
 
 	c.Logging = config.LoggingConfig{
