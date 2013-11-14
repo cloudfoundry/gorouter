@@ -68,7 +68,8 @@ go test -v ./registry
 
 ```bash
 # Start NATS server in daemon mode
-nats-server -d
+go get github.com/apcera/gnatsd
+gnatsd &
 
 # Start gorouter
 router
