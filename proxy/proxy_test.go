@@ -150,7 +150,8 @@ func (s *ProxySuite) SetUpTest(c *C) {
 		panic(err)
 	}
 
-	go http.Serve(ln, s.p)
+	server := Server{Handler: s.p}
+	go server.Serve(ln)
 
 	s.proxyServer = ln
 }
@@ -522,6 +523,27 @@ func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 		c.Check(n, Equals, 5)
 		c.Check(string(b[0:n]), Equals, "hello")
 	}
+}
+
+func (s *ProxySuite) TestStatusNoContentHasNoTransferEncodingInResponse(c *C) {
+	s.RegisterHandler(c, "not-modified", func(x *httpConn) {
+		resp := newResponse(http.StatusNoContent)
+		resp.Header.Set("Connection", "close")
+		x.WriteResponse(resp)
+		x.Close()
+	})
+
+	x := s.DialProxy(c)
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Header.Set("Connection", "close")
+	req.Host = "not-modified"
+	x.WriteRequest(req)
+
+	resp, _ := x.ReadResponse()
+	fmt.Printf("response: %#v\n", resp)
+	c.Check(resp.StatusCode, Equals, http.StatusNoContent)
+	c.Check(resp.TransferEncoding, IsNil)
 }
 
 func (s *ProxySuite) TestRequestTerminatesWhenResponseTakesTooLong(c *C) {

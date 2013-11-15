@@ -366,14 +366,14 @@ func (w *response) WriteHeader(code int) {
 		//}
 	}
 
-	if code == http.StatusNotModified {
+	if code == http.StatusNotModified || code == http.StatusNoContent {
 		// Must not have body.
 		for _, header := range []string{"Content-Type", "Content-Length", "Transfer-Encoding"} {
 			if w.header.Get(header) != "" {
 				// TODO: return an error if WriteHeader gets a return parameter
 				// or set a flag on w to make future Writes() write an error page?
 				// for now just log and drop the header.
-				log.Printf("http: StatusNotModified response with header %q defined", header)
+				log.Printf("http: Response code %d must not have body but header %q defined", code, header)
 				w.header.Del(header)
 			}
 		}
@@ -396,6 +396,8 @@ func (w *response) WriteHeader(code int) {
 
 	if w.reqMethod == "HEAD" || code == http.StatusNotModified {
 		// do nothing
+	} else if code == http.StatusNoContent {
+		w.header.Del("Transfer-Encoding")
 	} else if hasCL {
 		w.contentLength = contentLength
 		w.header.Del("Transfer-Encoding")
@@ -447,7 +449,7 @@ func (w *response) bodyAllowed() bool {
 	if !w.wroteHeader {
 		panic("")
 	}
-	return w.status != http.StatusNotModified && w.reqMethod != "HEAD"
+	return w.status != http.StatusNotModified && w.status != http.StatusNoContent && w.reqMethod != "HEAD"
 }
 
 func (w *response) Write(data []byte) (n int, err error) {
