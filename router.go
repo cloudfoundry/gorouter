@@ -179,7 +179,7 @@ func (r *Router) SubscribeRegister() {
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
-		log.Infof("Got router.unregister: %v", registryMessage)
+		log.Debugf("Got router.unregister: %v", registryMessage)
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(
