@@ -87,7 +87,7 @@ func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
 
 func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
-
+	request.URL.Opaque = request.RequestURI
 	handler := NewRequestHandler(request, responseWriter)
 
 	accessLog := AccessLogRecord{
