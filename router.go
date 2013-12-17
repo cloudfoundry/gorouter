@@ -99,6 +99,7 @@ func (r *Router) Run() {
 		err = r.mbusClient.Connect(natsInfo)
 
 		if err == nil {
+			log.Infof("Connected to NATS")
 			break
 		}
 

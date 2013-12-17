@@ -107,15 +107,15 @@ func (s *RouterSuite) TestDiscover(c *C) {
 	verify_health_z(cc.Host, s.router.registry, c)
 }
 
-func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) bool {
-	i := time.Millisecond * 50
-	m := int(t / i)
+func (s *RouterSuite) waitMsgReceived(app *test.TestApp, expectedToBeFound bool, timeout time.Duration) bool {
+	interval := time.Millisecond * 50
+	repetitions := int(timeout / interval)
 
-	for j := 0; j < m; j++ {
+	for j := 0; j < repetitions; j++ {
 		received := true
-		for _, v := range a.Urls() {
-			_, ok := s.router.registry.Lookup(v)
-			if ok != r {
+		for _, url := range app.Urls() {
+			_, ok := s.router.registry.Lookup(url)
+			if ok != expectedToBeFound {
 				received = false
 				break
 			}
@@ -123,7 +123,7 @@ func (s *RouterSuite) waitMsgReceived(a *test.TestApp, r bool, t time.Duration) 
 		if received {
 			return true
 		}
-		time.Sleep(i)
+		time.Sleep(interval)
 	}
 
 	return false
@@ -358,10 +358,10 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 func (s *RouterSuite) TestRouterSendsStartOnConnect(c *C) {
 	started := make(chan bool)
 
+
 	s.router.mbusClient.Subscribe("router.start", func(*yagnats.Message) {
 		started <- true
 	})
-
 	StopNats(s.natsServerCmd)
 	s.natsServerCmd = StartNats(int(s.natsPort))
 	<-s.WaitUntilNatsIsUp()
@@ -401,6 +401,8 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	<-s.WaitUntilNatsIsUp()
 
 	app.Listen()
+	go app.RegisterRepeatedly(1 * time.Second)
+
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
 	host := fmt.Sprintf("foo.vcap.me:%d", s.Config.Port)
