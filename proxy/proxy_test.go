@@ -152,7 +152,7 @@ func (s *ProxySuite) SetUpTest(c *C) {
 		panic(err)
 	}
 
-	server := http.Server{Handler: s.p}
+	server := Server{Handler: s.p}
 	go server.Serve(ln)
 
 	s.proxyServer = ln

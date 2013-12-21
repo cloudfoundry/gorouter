@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"runtime"
 	"time"
 
@@ -141,7 +140,7 @@ func (r *Router) Run() {
 
 	log.Infof("Listening on %s", listen.Addr())
 
-	server := http.Server{Handler: r.proxy}
+	server := proxy.Server{Handler: r.proxy}
 
 	go func() {
 		err := server.Serve(listen)
