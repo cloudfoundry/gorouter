@@ -15,6 +15,7 @@ import (
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/server"
 	"github.com/cloudfoundry/gorouter/util"
 	"github.com/cloudfoundry/gorouter/varz"
 	"github.com/cloudfoundry/yagnats"
@@ -140,7 +141,7 @@ func (r *Router) Run() {
 
 	log.Infof("Listening on %s", listen.Addr())
 
-	server := proxy.Server{Handler: r.proxy}
+	server := server.Server{Handler: r.proxy}
 
 	go func() {
 		err := server.Serve(listen)

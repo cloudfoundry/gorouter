@@ -31,7 +31,9 @@
 // TODO(rsc):
 //	logging
 
-package proxy
+// foo...
+
+package server
 
 import (
 	"bufio"

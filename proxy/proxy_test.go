@@ -17,6 +17,7 @@ import (
 	. "launchpad.net/gocheck"
 
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/server"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 )
@@ -152,7 +153,7 @@ func (s *ProxySuite) SetUpTest(c *C) {
 		panic(err)
 	}
 
-	server := Server{Handler: s.p}
+	server := server.Server{Handler: s.p}
 	go server.Serve(ln)
 
 	s.proxyServer = ln
