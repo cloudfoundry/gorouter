@@ -16,7 +16,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-    . "github.com/cloudfoundry/gorouter/proxy"
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
@@ -99,7 +98,7 @@ func (c *testConn) SetWriteDeadline(t time.Time) error {
 }
 
 type timeoutWriter struct {
-	w ResponseWriter
+	w http.ResponseWriter
 
 	mu          sync.Mutex
 	timedOut    bool
@@ -322,7 +321,7 @@ func TestServerTimeouts(t *testing.T) {
 		fmt.Fprintf(res, "req=%d", reqNum)
 	})
 
-	server := &Server{Handler: handler, ReadTimeout: 250 * time.Millisecond, WriteTimeout: 250 * time.Millisecond}
+	server := &http.Server{Handler: handler, ReadTimeout: 250 * time.Millisecond, WriteTimeout: 250 * time.Millisecond}
 	go server.Serve(l)
 
 	url := fmt.Sprintf("http://%s/", addr)
@@ -381,7 +380,7 @@ func TestIdentityResponse(t *testing.T) {
 		switch {
 		case req.FormValue("overwrite") == "1":
 			_, err := rw.Write([]byte("foo TOO LONG"))
-			if err != ErrContentLength {
+			if err != http.ErrContentLength {
 				t.Errorf("expected ErrContentLength; got %v", err)
 			}
 		case req.FormValue("underwrite") == "1":
@@ -562,7 +561,7 @@ func Test304Responses(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		_, err := w.Write([]byte("illegal body"))
-		if err != ErrBodyNotAllowed {
+		if err != http.ErrBodyNotAllowed {
 			t.Errorf("on Write, expected ErrBodyNotAllowed, got %v", err)
 		}
 	}))
@@ -590,13 +589,13 @@ func Test304Responses(t *testing.T) {
 func TestHeadResponses(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("Ignored body"))
-		if err != ErrBodyNotAllowed {
+		if err != http.ErrBodyNotAllowed {
 			t.Errorf("on Write, expected ErrBodyNotAllowed, got %v", err)
 		}
 
 		// Also exercise the ReaderFrom path
 		_, err = io.Copy(w, strings.NewReader("Ignored body"))
-		if err != ErrBodyNotAllowed {
+		if err != http.ErrBodyNotAllowed {
 			t.Errorf("on Copy, expected ErrBodyNotAllowed, got %v", err)
 		}
 	}))
@@ -980,7 +979,7 @@ func testHandlerPanic(t *testing.T, withHijack bool) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if withHijack {
-			rwc, _, err := w.(Hijacker).Hijack()
+			rwc, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
 				t.Logf("unexpected error: %v", err)
 			}
@@ -1063,7 +1062,7 @@ func TestRequestLimit(t *testing.T) {
 	defer ts.Close()
 	req, _ := http.NewRequest("GET", ts.URL, nil)
 	var bytesPerHeader = len("header12345: val12345\r\n")
-	for i := 0; i < ((DefaultMaxHeaderBytes+4096)/bytesPerHeader)+1; i++ {
+	for i := 0; i < ((http.DefaultMaxHeaderBytes+4096)/bytesPerHeader)+1; i++ {
 		req.Header.Set(fmt.Sprintf("header%05d", i), fmt.Sprintf("val%05d", i))
 	}
 	res, err := http.DefaultClient.Do(req)
