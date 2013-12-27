@@ -56,52 +56,6 @@ var (
 	ErrContentLength   = errors.New("Conn.Write wrote more than the declared Content-Length")
 )
 
-// A ResponseWriter interface is used by an HTTP handler to
-// construct an HTTP response.
-type ResponseWriter interface {
-	// Header returns the header map that will be sent by WriteHeader.
-	// Changing the header after a call to WriteHeader (or Write) has
-	// no effect.
-	Header() http.Header
-
-	// Write writes the data to the connection as part of an HTTP reply.
-	// If WriteHeader has not yet been called, Write calls WriteHeader(http.StatusOK)
-	// before writing the data.  If the Header does not contain a
-	// Content-Type line, Write adds a Content-Type set to the result of passing
-	// the initial 512 bytes of written data to DetectContentType.
-	Write([]byte) (int, error)
-
-	// WriteHeader sends an HTTP response header with status code.
-	// If WriteHeader is not called explicitly, the first call to Write
-	// will trigger an implicit WriteHeader(http.StatusOK).
-	// Thus explicit calls to WriteHeader are mainly used to
-	// send error codes.
-	WriteHeader(int)
-}
-
-// The Flusher interface is implemented by ResponseWriters that allow
-// an HTTP handler to flush buffered data to the client.
-//
-// Note that even for ResponseWriters that support Flush,
-// if the client is connected through an HTTP proxy,
-// the buffered data may not reach the client until the response
-// completes.
-type Flusher interface {
-	// Flush sends any buffered data to the client.
-	Flush()
-}
-
-// The Hijacker interface is implemented by ResponseWriters that allow
-// an HTTP handler to take over the connection.
-type Hijacker interface {
-	// Hijack lets the caller take over the connection.
-	// After a call to Hijack(), the HTTP server library
-	// will not do anything else with the connection.
-	// It becomes the caller's responsibility to manage
-	// and close the connection.
-	Hijack() (net.Conn, *bufio.ReadWriter, error)
-}
-
 // A conn represents the server side of an HTTP connection.
 type conn struct {
 	remoteAddr string            // network address of remote side
