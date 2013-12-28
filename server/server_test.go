@@ -16,7 +16,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httptest"
+	standardhttptest "net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
@@ -26,6 +26,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/server"
+	"github.com/cloudfoundry/gorouter/server/httptest"
 )
 
 type dummyAddr string
@@ -291,7 +294,7 @@ func TestMuxRedirectLeadingSlashes(t *testing.T) {
 			t.Errorf("%s", err)
 		}
 		mux := http.NewServeMux()
-		resp := httptest.NewRecorder()
+		resp := standardhttptest.NewRecorder()
 
 		mux.ServeHTTP(resp, req)
 
@@ -321,7 +324,7 @@ func TestServerTimeouts(t *testing.T) {
 		fmt.Fprintf(res, "req=%d", reqNum)
 	})
 
-	server := &http.Server{Handler: handler, ReadTimeout: 250 * time.Millisecond, WriteTimeout: 250 * time.Millisecond}
+	server := &server.Server{Handler: handler, ReadTimeout: 250 * time.Millisecond, WriteTimeout: 250 * time.Millisecond}
 	go server.Serve(l)
 
 	url := fmt.Sprintf("http://%s/", addr)
@@ -891,13 +894,13 @@ func TestTimeoutHandler(t *testing.T) {
 func TestRedirectMunging(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.com/", nil)
 
-	resp := httptest.NewRecorder()
+	resp := standardhttptest.NewRecorder()
 	http.Redirect(resp, req, "/foo?next=http://bar.com/", 302)
 	if g, e := resp.Header().Get("Location"), "/foo?next=http://bar.com/"; g != e {
 		t.Errorf("Location header was %q; want %q", g, e)
 	}
 
-	resp = httptest.NewRecorder()
+	resp = standardhttptest.NewRecorder()
 	http.Redirect(resp, req, "http://localhost:8080/_ah/login?continue=http://localhost:8080/", 302)
 	if g, e := resp.Header().Get("Location"), "http://localhost:8080/_ah/login?continue=http://localhost:8080/"; g != e {
 		t.Errorf("Location header was %q; want %q", g, e)
