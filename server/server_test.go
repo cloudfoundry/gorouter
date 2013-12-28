@@ -4,7 +4,7 @@
 
 // End-to-end serving tests
 
-package proxy_test
+package server_test
 
 import (
 	"bufio"
