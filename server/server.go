@@ -50,14 +50,6 @@ import (
 	"time"
 )
 
-// Errors introduced by the HTTP server.
-var (
-	ErrWriteAfterFlush = errors.New("Conn.Write called after Flush")
-	ErrBodyNotAllowed  = errors.New("http: request method or response status code does not allow body")
-	ErrHijacked        = errors.New("Conn has been hijacked")
-	ErrContentLength   = errors.New("Conn.Write wrote more than the declared Content-Length")
-)
-
 // A conn represents the server side of an HTTP connection.
 type conn struct {
 	remoteAddr string            // network address of remote side
@@ -216,7 +208,7 @@ var errTooLarge = errors.New("http: request too large")
 // Read next request from connection.
 func (c *conn) readRequest() (r *request, w *response, err error) {
 	if c.hijacked {
-		return nil, nil, ErrHijacked
+		return nil, nil, http.ErrHijacked
 	}
 	c.lr.N = int64(c.server.maxHeaderBytes()) + 4096 /* bufio slop */
 	var req *http.Request
@@ -302,24 +294,6 @@ func (w *response) WriteHeader(code int) {
 
 	if w.header.Get("Connection") == "close" {
 		w.closeAfterReply = true
-	}
-
-	// Per RFC 2616, we should consume the request body before
-	// replying, if the handler hasn't already done so.  But we
-	// don't want to do an unbounded amount of reading here for
-	// DoS reasons, so we only try up to a threshold.
-	if w.reqContentLength != 0 && !w.closeAfterReply {
-		// TODO: fix
-		//ecr, isExpecter := w.req.Body.(*expectContinueReader)
-		//if !isExpecter || ecr.resp.wroteContinue {
-		//  n, _ := io.CopyN(ioutil.Discard, w.req.Body, maxPostHandlerReadBytes+1)
-		//  if n >= maxPostHandlerReadBytes {
-		//    w.requestTooLarge()
-		//    w.header.Set("Connection", "close")
-		//  } else {
-		//    w.req.Body.Close()
-		//  }
-		//}
 	}
 
 	if code == http.StatusNotModified || code == http.StatusNoContent {
@@ -411,7 +385,7 @@ func (w *response) bodyAllowed() bool {
 func (w *response) Write(data []byte) (n int, err error) {
 	if w.conn.hijacked {
 		log.Print("http: response.Write on hijacked connection")
-		return 0, ErrHijacked
+		return 0, http.ErrHijacked
 	}
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
@@ -420,12 +394,12 @@ func (w *response) Write(data []byte) (n int, err error) {
 		return 0, nil
 	}
 	if !w.bodyAllowed() {
-		return 0, ErrBodyNotAllowed
+		return 0, http.ErrBodyNotAllowed
 	}
 
 	w.written += int64(len(data)) // ignoring errors, for errorKludge
 	if w.contentLength != -1 && w.written > w.contentLength {
-		return 0, ErrContentLength
+		return 0, http.ErrContentLength
 	}
 
 	// TODO(rsc): if chunking happened after the buffering,
@@ -605,7 +579,7 @@ func (c *conn) serve() {
 // and a Hijacker.
 func (w *response) Hijack() (rwc net.Conn, buf *bufio.ReadWriter, err error) {
 	if w.conn.hijacked {
-		return nil, nil, ErrHijacked
+		return nil, nil, http.ErrHijacked
 	}
 	w.conn.hijacked = true
 	rwc = w.conn.rwc

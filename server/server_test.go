@@ -9,7 +9,6 @@ package server_test
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,8 +21,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"syscall"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -173,7 +172,6 @@ func NewTestTimeoutHandler(handler http.Handler, ch <-chan time.Time) http.Handl
 	}
 	return &timeoutHandler{handler, f, ""}
 }
-
 
 func TestConsumingBodyOnNextConn(t *testing.T) {
 	conn := new(testConn)
@@ -375,7 +373,7 @@ func TestServerTimeouts(t *testing.T) {
 	l.Close()
 }
 
-// TestIdentityResponse verifies that a handler can unset 
+// TestIdentityResponse verifies that a handler can unset
 func TestIdentityResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Content-Length", "3")
@@ -642,58 +640,6 @@ func TestTLSHandshakeTimeout(t *testing.T) {
 	})
 }
 
-func TestTLSServer(t *testing.T) {
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.TLS != nil {
-			w.Header().Set("X-TLS-Set", "true")
-			if r.TLS.HandshakeComplete {
-				w.Header().Set("X-TLS-HandshakeComplete", "true")
-			}
-		}
-	}))
-	defer ts.Close()
-
-	// Connect an idle TCP connection to this server before we run
-	// our real tests.  This idle connection used to block forever
-	// in the TLS handshake, preventing future connections from
-	// being accepted. It may prevent future accidental blocking
-	// in newConn.
-	idleConn, err := net.Dial("tcp", ts.Listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Dial: %v", err)
-	}
-	defer idleConn.Close()
-	goTimeout(t, 10*time.Second, func() {
-		if !strings.HasPrefix(ts.URL, "https://") {
-			t.Errorf("expected test TLS server to start with https://, got %q", ts.URL)
-			return
-		}
-		noVerifyTransport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
-		client := &http.Client{Transport: noVerifyTransport}
-		res, err := client.Get(ts.URL)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		if res == nil {
-			t.Errorf("got nil Response")
-			return
-		}
-		defer res.Body.Close()
-		if res.Header.Get("X-TLS-Set") != "true" {
-			t.Errorf("expected X-TLS-Set response header")
-			return
-		}
-		if res.Header.Get("X-TLS-HandshakeComplete") != "true" {
-			t.Errorf("expected X-TLS-HandshakeComplete header")
-		}
-	})
-}
-
 type serverExpectTest struct {
 	contentLength    int    // of request body
 	expectation      string // e.g. "100-continue"
@@ -774,69 +720,6 @@ func TestServerExpect(t *testing.T) {
 	for _, test := range serverExpectTests {
 		runTest(test)
 	}
-}
-
-// Under a ~256KB (maxPostHandlerReadBytes) threshold, the server
-// should consume client request bodies that a handler didn't read.
-func TestServerUnreadRequestBodyLittle(t *testing.T) {
-	conn := new(testConn)
-	body := strings.Repeat("x", 100<<10)
-	conn.readBuf.Write([]byte(fmt.Sprintf(
-		"POST / HTTP/1.1\r\n"+
-			"Host: test\r\n"+
-			"Content-Length: %d\r\n"+
-			"\r\n", len(body))))
-	conn.readBuf.Write([]byte(body))
-
-	done := make(chan bool)
-
-	ls := &oneConnListener{conn}
-	go http.Serve(ls, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		defer close(done)
-		if conn.readBuf.Len() < len(body)/2 {
-			t.Errorf("on request, read buffer length is %d; expected about 100 KB", conn.readBuf.Len())
-		}
-		rw.WriteHeader(200)
-		if g, e := conn.readBuf.Len(), 0; g != e {
-			t.Errorf("after WriteHeader, read buffer length is %d; want %d", g, e)
-		}
-		if c := rw.Header().Get("Connection"); c != "" {
-			t.Errorf(`Connection header = %q; want ""`, c)
-		}
-	}))
-	<-done
-}
-
-// Over a ~256KB (maxPostHandlerReadBytes) threshold, the server
-// should ignore client request bodies that a handler didn't read
-// and close the connection.
-func TestServerUnreadRequestBodyLarge(t *testing.T) {
-	conn := new(testConn)
-	body := strings.Repeat("x", 1<<20)
-	conn.readBuf.Write([]byte(fmt.Sprintf(
-		"POST / HTTP/1.1\r\n"+
-			"Host: test\r\n"+
-			"Content-Length: %d\r\n"+
-			"\r\n", len(body))))
-	conn.readBuf.Write([]byte(body))
-
-	done := make(chan bool)
-
-	ls := &oneConnListener{conn}
-	go http.Serve(ls, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		defer close(done)
-		if conn.readBuf.Len() < len(body)/2 {
-			t.Errorf("on request, read buffer length is %d; expected about 1MB", conn.readBuf.Len())
-		}
-		rw.WriteHeader(200)
-		if conn.readBuf.Len() < len(body)/2 {
-			t.Errorf("post-WriteHeader, read buffer length is %d; expected about 1MB", conn.readBuf.Len())
-		}
-		if c := rw.Header().Get("Connection"); c != "close" {
-			t.Errorf(`Connection header = %q; want "close"`, c)
-		}
-	}))
-	<-done
 }
 
 func TestTimeoutHandler(t *testing.T) {
