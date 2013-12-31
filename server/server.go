@@ -28,11 +28,6 @@
 
 // HTTP server.  See RFC 2616.
 
-// TODO(rsc):
-//	logging
-
-// foo...
-
 package server
 
 import (
@@ -300,9 +295,6 @@ func (w *response) WriteHeader(code int) {
 		// Must not have body.
 		for _, header := range []string{"Content-Type", "Content-Length", "Transfer-Encoding"} {
 			if w.header.Get(header) != "" {
-				// TODO: return an error if WriteHeader gets a return parameter
-				// or set a flag on w to make future Writes() write an error page?
-				// for now just log and drop the header.
 				log.Printf("http: Response code %d must not have body but header %q defined", code, header)
 				w.header.Del(header)
 			}
@@ -316,8 +308,6 @@ func (w *response) WriteHeader(code int) {
 	te := w.header.Get("Transfer-Encoding")
 	hasTE := te != ""
 	if hasCL && hasTE && te != "identity" {
-		// TODO: return an error if WriteHeader gets a return parameter
-		// For now just ignore the Content-Length.
 		log.Printf("http: WriteHeader called with both Transfer-Encoding of %q and a Content-Length of %d",
 			te, contentLength)
 		w.header.Del("Content-Length")
@@ -334,9 +324,6 @@ func (w *response) WriteHeader(code int) {
 	} else if w.reqProtoAtLeast11 {
 		// HTTP/1.1 or greater: use chunked transfer encoding
 		// to avoid closing the connection at EOF.
-		// TODO: this blows away any custom or stacked Transfer-Encoding they
-		// might have set.  Deal with that as need arises once we have a valid
-		// use case.
 		w.chunking = true
 		w.header.Set("Transfer-Encoding", "chunked")
 	} else {
@@ -402,11 +389,8 @@ func (w *response) Write(data []byte) (n int, err error) {
 		return 0, http.ErrContentLength
 	}
 
-	// TODO(rsc): if chunking happened after the buffering,
-	// then there would be fewer chunk headers.
-	// On the other hand, it would make hijacking more difficult.
 	if w.chunking {
-		fmt.Fprintf(w.conn.buf, "%x\r\n", len(data)) // TODO(rsc): use strconv not fmt
+		fmt.Fprintf(w.conn.buf, "%x\r\n", len(data))
 	}
 	n, err = w.conn.buf.Write(data)
 	if err == nil && w.chunking {
@@ -535,18 +519,6 @@ func (c *conn) serve() {
 			}
 			req.Header.Del("Expect")
 		} else if req.Header.Get("Expect") != "" {
-			// TODO(bradfitz): let ServeHTTP handlers handle
-			// requests with non-standard expectation[s]? Seems
-			// theoretical at best, and doesn't fit into the
-			// current ServeHTTP model anyway.  We'd need to
-			// make the ResponseWriter an optional
-			// "ExpectReplier" interface or something.
-			//
-			// For now we'll just obey RFC 2616 14.20 which says
-			// "If a server receives a request containing an
-			// Expect field that includes an expectation-
-			// extension that it does not support, it MUST
-			// respond with a 417 (Expectation Failed) status."
 			w.Header().Set("Connection", "close")
 			w.WriteHeader(http.StatusExpectationFailed)
 			req.finishRequest()
