@@ -29,7 +29,7 @@ type Proxy struct {
 	*config.Config
 	*registry.Registry
 	varz.Varz
-	*AccessLogger
+	AccessLogger
 	*http.Transport
 }
 
@@ -50,7 +50,7 @@ func NewProxy(c *config.Config, registry *registry.Registry, v varz.Varz) *Proxy
 			panic(err)
 		}
 
-		p.AccessLogger = NewAccessLogger(f, loggregatorUrl, loggregatorSharedSecret, c.Index)
+		p.AccessLogger = NewFileAndLoggregatorAccessLogger(f, loggregatorUrl, loggregatorSharedSecret, c.Index)
 		go p.AccessLogger.Run()
 	}
 
