@@ -34,28 +34,29 @@ type Proxy struct {
 	*http.Transport
 }
 
-func NewProxy(c *config.Config, registry *registry.Registry, v varz.Varz) *Proxy {
-	p := &Proxy{
-		Config:    c,
+func NewProxy(config *config.Config, registry *registry.Registry, varz varz.Varz) *Proxy {
+	proxy := &Proxy{
+		Config:    config,
 		Logger:    steno.NewLogger("router.proxy"),
 		Registry:  registry,
-		Varz:      v,
-		Transport: &http.Transport{ResponseHeaderTimeout: c.EndpointTimeout},
+		Varz:      varz,
+		Transport: &http.Transport{ResponseHeaderTimeout: config.EndpointTimeout},
 	}
 
-	loggregatorUrl := c.LoggregatorConfig.Url
-	loggregatorSharedSecret := c.LoggregatorConfig.SharedSecret
-	if c.AccessLog != "" || loggregatorUrl != "" {
-		f, err := os.OpenFile(c.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-		if err != nil && c.AccessLog != "" {
+	loggregatorUrl := config.LoggregatorConfig.Url
+	loggregatorSharedSecret := config.LoggregatorConfig.SharedSecret
+	if config.AccessLog != "" || loggregatorUrl != "" {
+		file, err := os.OpenFile(config.AccessLog, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0666)
+		if err != nil && config.AccessLog != "" {
 			panic(err)
 		}
 
-		p.AccessLogger = access_log.NewFileAndLoggregatorAccessLogger(f, loggregatorUrl, loggregatorSharedSecret, c.Index)
-		go p.AccessLogger.Run()
+		proxy.AccessLogger = access_log.NewFileAndLoggregatorAccessLogger(
+			file, loggregatorUrl, loggregatorSharedSecret, config.Index)
+		go proxy.AccessLogger.Run()
 	}
 
-	return p
+	return proxy
 }
 
 func hostWithoutPort(req *http.Request) string {
@@ -91,7 +92,7 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 	startedAt := time.Now()
 	originalURL := request.URL
 	request.URL = &url.URL{Host: originalURL.Host, Opaque: request.RequestURI}
-  	handler := NewRequestHandler(request, responseWriter)
+	handler := NewRequestHandler(request, responseWriter)
 
 	accessLog := access_log.AccessLogRecord{
 		Request:   request,
