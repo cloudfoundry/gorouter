@@ -1,4 +1,4 @@
-package proxy
+package access_log
 
 import (
 	"bytes"

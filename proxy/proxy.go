@@ -10,6 +10,7 @@ import (
 
 	steno "github.com/cloudfoundry/gosteno"
 
+	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -29,7 +30,7 @@ type Proxy struct {
 	*config.Config
 	*registry.Registry
 	varz.Varz
-	AccessLogger
+	access_log.AccessLogger
 	*http.Transport
 }
 
@@ -50,7 +51,7 @@ func NewProxy(c *config.Config, registry *registry.Registry, v varz.Varz) *Proxy
 			panic(err)
 		}
 
-		p.AccessLogger = NewFileAndLoggregatorAccessLogger(f, loggregatorUrl, loggregatorSharedSecret, c.Index)
+		p.AccessLogger = access_log.NewFileAndLoggregatorAccessLogger(f, loggregatorUrl, loggregatorSharedSecret, c.Index)
 		go p.AccessLogger.Run()
 	}
 
@@ -92,7 +93,7 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 	request.URL = &url.URL{Host: originalURL.Host, Opaque: request.RequestURI}
   	handler := NewRequestHandler(request, responseWriter)
 
-	accessLog := AccessLogRecord{
+	accessLog := access_log.AccessLogRecord{
 		Request:   request,
 		StartedAt: startedAt,
 	}

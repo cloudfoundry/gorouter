@@ -1,4 +1,4 @@
-package proxy
+package access_log
 
 import (
 	"github.com/cloudfoundry/gorouter/route"
