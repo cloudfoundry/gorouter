@@ -8,29 +8,29 @@ import (
 type CreateRunningAccessLoggerSuite struct{}
 var _ = Suite(&CreateRunningAccessLoggerSuite{})
 
-func (s *CreateRunningAccessLoggerSuite) TestDoesNotCreateAnAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreateNullAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
-	c.Assert(CreateRunningAccessLogger(config), IsNil)
+	c.Assert(CreateRunningAccessLogger(config), FitsTypeOf, &NullAccessLogger{})
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfNoAccesLogButLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesRealAccessLoggerIfNoAccesLogButLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.LoggregatorConfig.Url = "10.10.3.13:4325"
 	config.AccessLog = ""
-	c.Assert(CreateRunningAccessLogger(config), NotNil)
+	c.Assert(CreateRunningAccessLogger(config), FitsTypeOf, &FileAndLoggregatorAccessLogger{})
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfAccesLogButNoLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesRealAccessLoggerIfAccesLogButNoLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.AccessLog = "/dev/null"
-	c.Assert(CreateRunningAccessLogger(config), NotNil)
+	c.Assert(CreateRunningAccessLogger(config), FitsTypeOf, &FileAndLoggregatorAccessLogger{})
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfBothAccesLogAndLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesRealAccessLoggerIfBothAccesLogAndLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.LoggregatorConfig.Url = "10.10.3.13:4325"
 	config.AccessLog = "/dev/null"
-	c.Assert(CreateRunningAccessLogger(config), NotNil)
+	c.Assert(CreateRunningAccessLogger(config), FitsTypeOf, &FileAndLoggregatorAccessLogger{})
 }
 
 func (s *CreateRunningAccessLoggerSuite) TestPanicsIfInvalidAccessLogLocation(c *C) {

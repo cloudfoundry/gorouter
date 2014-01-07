@@ -142,9 +142,7 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = bytesSent
 
-	if proxy.AccessLogger != nil {
-		proxy.AccessLogger.Log(accessLog)
-	}
+	proxy.AccessLogger.Log(accessLog)
 }
 
 func isProtocolSupported(request *http.Request) bool {

@@ -18,6 +18,8 @@ func CreateRunningAccessLogger(config *config.Config) (accessLogger AccessLogger
 
 		accessLogger = NewFileAndLoggregatorAccessLogger(file, loggregatorUrl, loggregatorSharedSecret, config.Index)
 		go accessLogger.Run()
+	} else {
+		accessLogger = &NullAccessLogger{}
 	}
 
 	return
