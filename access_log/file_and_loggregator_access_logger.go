@@ -12,21 +12,21 @@ import (
 )
 
 type FileAndLoggregatorAccessLogger struct {
-	e     emitter.Emitter
-	c     chan AccessLogRecord
-	w     io.Writer
-	index uint
+	emitter  emitter.Emitter
+	channel  chan AccessLogRecord
+	writer   io.Writer
+	index    uint
 }
 
 func NewFileAndLoggregatorAccessLogger(f io.Writer, loggregatorUrl, loggregatorSharedSecret string, index uint) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
-		w:     f,
-		c:     make(chan AccessLogRecord, 128),
+		writer:     f,
+		channel:     make(chan AccessLogRecord, 128),
 		index: index,
 	}
 
 	if isValidUrl(loggregatorUrl) {
-		a.e, _ = emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), loggregatorSharedSecret, steno.NewLogger("router.loggregator"))
+		a.emitter, _ = emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), loggregatorSharedSecret, steno.NewLogger("router.loggregator"))
 	} else {
 		log.Errorf("Invalid loggregator url %s", loggregatorUrl)
 	}
@@ -35,22 +35,22 @@ func NewFileAndLoggregatorAccessLogger(f io.Writer, loggregatorUrl, loggregatorS
 }
 
 func (x *FileAndLoggregatorAccessLogger) Run() {
-	for r := range x.c {
-		if x.w != nil {
-			r.WriteTo(x.w)
+	for access_record := range x.channel {
+		if x.writer != nil {
+			access_record.WriteTo(x.writer)
 		}
-		if x.e != nil {
-			r.Emit(x.e)
+		if x.emitter != nil {
+			access_record.Emit(x.emitter)
 		}
 	}
 }
 
 func (x *FileAndLoggregatorAccessLogger) Stop() {
-	close(x.c)
+	close(x.channel)
 }
 
 func (x *FileAndLoggregatorAccessLogger) Log(r AccessLogRecord) {
-	x.c <- r
+	x.channel <- r
 }
 
 var ipAddressRegex, _ = regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(:[0-9]{1,5}){1}$`)

@@ -112,7 +112,7 @@ func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
 func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
 	testEmitter := &mockEmitter{emitted: false}
-	accessLogger.e = testEmitter
+	accessLogger.emitter = testEmitter
 
 	accessLogger.Log(*s.CreateAccessLogRecord())
 	go accessLogger.Run()
@@ -127,7 +127,7 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
 	testEmitter := &mockEmitter{emitted: false}
-	accessLogger.e = testEmitter
+	accessLogger.emitter = testEmitter
 
 	routeEndpoint := &route.Endpoint{
 		ApplicationId: "",
@@ -161,38 +161,38 @@ func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 func (s *AccessLoggerSuite) TestRealEmitterIsNotNil(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
 
-	c.Assert(accessLogger.e, Not(IsNil))
+	c.Assert(accessLogger.emitter, Not(IsNil))
 }
 
 func (s *AccessLoggerSuite) TestNotCreatingEmitterWhenNoValidUrlIsGiven(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "this_is_not_a_url", "secret", 42)
-	c.Assert(accessLogger.e, IsNil)
+	c.Assert(accessLogger.emitter, IsNil)
 	accessLogger.Stop()
 
 	accessLogger = NewFileAndLoggregatorAccessLogger(nil, "localhost", "secret", 42)
-	c.Assert(accessLogger.e, IsNil)
+	c.Assert(accessLogger.emitter, IsNil)
 	accessLogger.Stop()
 
 	accessLogger = NewFileAndLoggregatorAccessLogger(nil, "10.10.16.14", "secret", 42)
-	c.Assert(accessLogger.e, IsNil)
+	c.Assert(accessLogger.emitter, IsNil)
 	accessLogger.Stop()
 
 	accessLogger = NewFileAndLoggregatorAccessLogger(nil, "", "secret", 42)
-	c.Assert(accessLogger.e, IsNil)
+	c.Assert(accessLogger.emitter, IsNil)
 	accessLogger.Stop()
 }
 
 func (s *AccessLoggerSuite) TestCreatingEmitterWithIPAddressAndPort(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "10.10.16.14:5432", "secret", 42)
 
-	c.Assert(accessLogger.e, NotNil)
+	c.Assert(accessLogger.emitter, NotNil)
 	accessLogger.Stop()
 }
 
 func (s *AccessLoggerSuite) TestCreatingEmitterWithLocalhostt(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:123", "secret", 42)
 
-	c.Assert(accessLogger.e, NotNil)
+	c.Assert(accessLogger.emitter, NotNil)
 	accessLogger.Stop()
 }
 
