@@ -1,13 +1,11 @@
 package access_log
 
 import (
-	"bytes"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
 	. "launchpad.net/gocheck"
 	"net/http"
 	"net/url"
-	"regexp"
 	"runtime"
 	"time"
 )
@@ -15,19 +13,6 @@ import (
 type AccessLoggerSuite struct{}
 
 var _ = Suite(&AccessLoggerSuite{})
-
-var logMessageRegex = `` +
-	regexp.QuoteMeta(`foo.bar `) +
-	regexp.QuoteMeta(`- `) +
-	`\[\d{2}/\d{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\] ` +
-	regexp.QuoteMeta(`"GET /quz?wat HTTP/1.1" `) +
-	regexp.QuoteMeta(`200 `) +
-	regexp.QuoteMeta(`42 `) +
-	regexp.QuoteMeta(`"referer" `) +
-	regexp.QuoteMeta(`"user-agent" `) +
-	regexp.QuoteMeta(`1.2.3.4:5678 `) +
-	regexp.QuoteMeta(`response_time:0.200000000 `) +
-	regexp.QuoteMeta(`app_id:my_awesome_id`)
 
 func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 	u, err := url.Parse("http://foo.bar:1234/quz?wat")
@@ -70,16 +55,6 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 	return &r
 }
 
-func (s *AccessLoggerSuite) TestAccessLogRecordEncode(c *C) {
-	r := s.CreateAccessLogRecord()
-
-	b := &bytes.Buffer{}
-	_, err := r.WriteTo(b)
-	c.Assert(err, IsNil)
-
-	c.Check(b.String(), Matches, "^"+logMessageRegex+"\n")
-}
-
 type fakeFile struct {
 	payload []byte
 }
@@ -120,7 +95,7 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 
 	c.Check(testEmitter.emitted, Equals, true)
 	c.Check(testEmitter.appId, Equals, "my_awesome_id")
-	c.Check(testEmitter.message, Matches, "^"+logMessageRegex+"\n")
+	c.Check(testEmitter.message, Matches, "^.*foo.bar.*\n")
 	accessLogger.Stop()
 }
 
@@ -154,7 +129,7 @@ func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 	go accessLogger.Run()
 	runtime.Gosched()
 
-	c.Check(string(fakeFile.payload), Matches, "^"+logMessageRegex+"\n")
+	c.Check(string(fakeFile.payload), Matches, "^.*foo.bar.*\n")
 	accessLogger.Stop()
 }
 
