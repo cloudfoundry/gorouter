@@ -8,32 +8,32 @@ import (
 type CreateRunningAccessLoggerSuite struct{}
 var _ = Suite(&CreateRunningAccessLoggerSuite{})
 
-func (s *CreateRunningAccessLoggerSuite) TestProxyHasNoAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestDoesNotCreateAnAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	c.Assert(CreateRunningAccessLogger(config), IsNil)
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestProxyHasAccessLoggerIfNoAccesLogButLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfNoAccesLogButLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.LoggregatorConfig.Url = "10.10.3.13:4325"
 	config.AccessLog = ""
 	c.Assert(CreateRunningAccessLogger(config), NotNil)
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestProxyHasAccessLoggerIfAccesLogButNoLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfAccesLogButNoLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.AccessLog = "/dev/null"
 	c.Assert(CreateRunningAccessLogger(config), NotNil)
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestProxyHasAccessLoggerIfBothAccesLogAndLoggregatorUrl(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestCreatesAnAccessLoggerIfBothAccesLogAndLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
 	config.LoggregatorConfig.Url = "10.10.3.13:4325"
 	config.AccessLog = "/dev/null"
 	c.Assert(CreateRunningAccessLogger(config), NotNil)
 }
 
-func (s *CreateRunningAccessLoggerSuite) TestProxyPanicsIfInvalidAccessLogLocation(c *C) {
+func (s *CreateRunningAccessLoggerSuite) TestPanicsIfInvalidAccessLogLocation(c *C) {
 	config := config.DefaultConfig()
 	config.AccessLog = "/this\\should/panic"
 	c.Assert(func() {
