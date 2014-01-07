@@ -6,6 +6,7 @@ import (
 )
 
 type CreateRunningAccessLoggerSuite struct{}
+var _ = Suite(&CreateRunningAccessLoggerSuite{})
 
 func (s *CreateRunningAccessLoggerSuite) TestProxyHasNoAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
 	config := config.DefaultConfig()
