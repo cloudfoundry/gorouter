@@ -249,6 +249,42 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 	x.CheckLine("HTTP/1.0 200 OK")
 }
 
+type fakeFile struct {
+	payload []byte
+}
+
+func (f *fakeFile) Write(data []byte) (int, error) {
+	f.payload = data
+	return 12, nil
+}
+
+func (s *ProxySuite) TestLogsRequest(c *C) {
+	var fakeFile = new(fakeFile)
+	accessLog := access_log.NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
+	s.p.AccessLogger = accessLog
+	go accessLog.Run()
+
+	s.RegisterHandler(c, "test", func(x *httpConn) {
+			x.CheckLine("GET / HTTP/1.1")
+
+			x.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				"Content-Length: 0",
+			})
+		})
+
+	x := s.DialProxy(c)
+
+	x.WriteLines([]string{
+		"GET / HTTP/1.0",
+		"Host: test",
+	})
+
+	x.CheckLine("HTTP/1.0 200 OK")
+
+	c.Assert(string(fakeFile.payload), Matches, "^test.*\n")
+}
+
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {
 	s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
