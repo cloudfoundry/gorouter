@@ -79,10 +79,16 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (r *AccessLogRecord) Emit(e emitter.Emitter) {
-	if r.RouteEndpoint.ApplicationId != "" {
-		recordBuffer := r.makeRecord()
-		message := recordBuffer.String()
-		log.Debugf("Logging to the loggregator: %s", message)
-		e.Emit(r.RouteEndpoint.ApplicationId, message)
+	if r.RouteEndpoint == nil {
+		return
 	}
+
+	if r.RouteEndpoint.ApplicationId == "" {
+		return
+	}
+	recordBuffer := r.makeRecord()
+	message := recordBuffer.String()
+	log.Debugf("Logging to the loggregator: %s", message)
+	e.Emit(r.RouteEndpoint.ApplicationId, message)
+
 }

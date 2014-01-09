@@ -40,6 +40,7 @@ func CompleteAccessLogRecord() AccessLogRecord {
 	}
 }
 
+
 func (s *AccessLogRecordSuite) TestMakeRecordWithAllValues(c *C) {
 	record := CompleteAccessLogRecord()
 
@@ -98,4 +99,13 @@ func (s *AccessLogRecordSuite) TestEmit(c *C) {
 
 	record.Emit(emit)
 	c.Assert(emit.message, Equals, recordString)
+}
+
+func (s *AccessLogRecordSuite) TestEmitWithRouteEndpointMissing(c *C) {
+	record := AccessLogRecord{	}
+
+	emit := NewMockEmitter()
+
+	record.Emit(emit)
+	c.Assert(emit.emitted, Equals, false)
 }
