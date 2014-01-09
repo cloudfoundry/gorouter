@@ -58,45 +58,56 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 	return &r
 }
 
-
 type mockEmitter struct {
 	emitted bool
 	appId   string
 	message string
+	done    chan bool
 }
 
 func (m *mockEmitter) Emit(appid, message string) {
 	m.emitted = true
 	m.appId = appid
 	m.message = message
+	m.done <- true
 }
 
 func (m *mockEmitter) EmitError(appid, message string) {
-	
 }
 
 func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
-
 }
 
 func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
-	testEmitter := &mockEmitter{emitted: false}
+	testEmitter := &mockEmitter{emitted: false, done: make(chan bool)}
 	accessLogger.emitter = testEmitter
 
 	accessLogger.Log(*s.CreateAccessLogRecord())
 	go accessLogger.Run()
 	runtime.Gosched()
 
-	c.Check(testEmitter.emitted, Equals, true)
-	c.Check(testEmitter.appId, Equals, "my_awesome_id")
-	c.Check(testEmitter.message, Matches, "^.*foo.bar.*\n")
+	timeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(1*time.Second)
+		timeout <- true
+	}()
+
+	select {
+	case <-testEmitter.done:
+			c.Check(testEmitter.emitted, Equals, true)
+			c.Check(testEmitter.appId, Equals, "my_awesome_id")
+			c.Check(testEmitter.message, Matches, "^.*foo.bar.*\n")
+	case <-timeout:
+			c.FailNow()
+	}
+
 	accessLogger.Stop()
 }
 
 func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
-	testEmitter := &mockEmitter{emitted: false}
+	testEmitter := &mockEmitter{emitted: false, done: make(chan bool)}
 	accessLogger.emitter = testEmitter
 
 	routeEndpoint := &route.Endpoint{
