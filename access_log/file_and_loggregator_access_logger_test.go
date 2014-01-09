@@ -78,9 +78,16 @@ func (m *mockEmitter) EmitError(appid, message string) {
 func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
 }
 
+func NewMockEmitter() *mockEmitter {
+	return &mockEmitter{
+		emitted: false,
+		done: make(chan bool, 1),
+	}
+}
+
 func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
-	testEmitter := &mockEmitter{emitted: false, done: make(chan bool)}
+	testEmitter := NewMockEmitter()
 	accessLogger.emitter = testEmitter
 
 	accessLogger.Log(*s.CreateAccessLogRecord())
@@ -107,7 +114,7 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 
 func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
 	accessLogger := NewFileAndLoggregatorAccessLogger(nil, "localhost:9843", "secret", 42)
-	testEmitter := &mockEmitter{emitted: false, done: make(chan bool)}
+	testEmitter := NewMockEmitter()
 	accessLogger.emitter = testEmitter
 
 	routeEndpoint := &route.Endpoint{
