@@ -275,6 +275,27 @@ func (s *ProxySuite) TestLogsRequest(c *C) {
 	x.CheckLine("HTTP/1.0 200 OK")
 
 	c.Assert(string(fakeFile.Payload), Matches, "^test.*\n")
+	//make sure the record includes all the data
+	//since the building of the log record happens throughout the life of the request
+	c.Assert(string(fakeFile.Payload), Matches, ".*200.*\n")
+}
+
+func (s *ProxySuite) TestLogsRequestWhenExitsEarly(c *C) {
+	var fakeFile = new(test_util.FakeFile)
+	accessLog := access_log.NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
+	s.p.AccessLogger = accessLog
+	go accessLog.Run()
+
+	x := s.DialProxy(c)
+
+	x.WriteLines([]string{
+		"GET / HTTP/0.9",
+		"Host: test",
+	})
+
+	x.CheckLine("HTTP/1.0 400 Bad Request")
+
+	c.Assert(string(fakeFile.Payload), Matches, "^test.*\n")
 }
 
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {

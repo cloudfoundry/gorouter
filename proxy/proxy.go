@@ -84,6 +84,10 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 		StartedAt: startedAt,
 	}
 
+	defer func() {
+		proxy.AccessLogger.Log(accessLog)
+	}()
+
 	if !isProtocolSupported(request) {
 		handler.HandleUnsupportedProtocol()
 		return
@@ -141,8 +145,6 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = bytesSent
-
-	proxy.AccessLogger.Log(accessLog)
 }
 
 func isProtocolSupported(request *http.Request) bool {
