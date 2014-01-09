@@ -13,8 +13,8 @@ type AccessLogRecordSuite struct{}
 
 var _ = Suite(&AccessLogRecordSuite{})
 
-func (s *AccessLogRecordSuite) TestMakeRecordWithAllValues(c *C) {
-	record := AccessLogRecord{
+func CompleteAccessLogRecord() AccessLogRecord {
+    return AccessLogRecord{
 		Request: &http.Request{
 			Host: "FakeRequestHost",
 			Method: "FakeRequestMethod",
@@ -38,6 +38,10 @@ func (s *AccessLogRecordSuite) TestMakeRecordWithAllValues(c *C) {
 		StartedAt: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 		FinishedAt: time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
 	}
+}
+
+func (s *AccessLogRecordSuite) TestMakeRecordWithAllValues(c *C) {
+	record := CompleteAccessLogRecord()
 
 	recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00 +0000] " +
@@ -86,41 +90,9 @@ func (s *AccessLogRecordSuite) TestMakeRecordWithValuesMissing(c *C) {
 }
 
 func (s *AccessLogRecordSuite) TestEmit(c *C) {
-	record := AccessLogRecord{
-		Request: &http.Request{
-			Host: "FakeRequestHost",
-			Method: "FakeRequestMethod",
-			Proto: "FakeRequestProto",
-			URL: &url.URL{
-				Opaque: "http://example.com/request",
-			},
-			Header: http.Header{
-				"Referer": []string {"FakeReferer"},
-				"User-Agent": []string {"FakeUserAgent"},
-			},
-			RemoteAddr: "FakeRemoteAddr",
-		},
-		BodyBytesSent: 23,
-		Response: &http.Response{
-			StatusCode: 200,
-		},
-		RouteEndpoint: &route.Endpoint{
-			ApplicationId: "FakeApplicationId",
-		},
-		StartedAt: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-		FinishedAt: time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
-	}
+	record := CompleteAccessLogRecord()
 
-	recordString := "FakeRequestHost - " +
-			"[01/01/2000:00:00:00 +0000] " +
-			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
-			"200 " +
-			"23 " +
-			"\"FakeReferer\" " +
-			"\"FakeUserAgent\" " +
-			"FakeRemoteAddr " +
-			"response_time:60.000000000 " +
-			"app_id:FakeApplicationId\n"
+	recordString := record.makeRecord().String()
 
 	emit := NewMockEmitter()
 
