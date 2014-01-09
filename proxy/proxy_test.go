@@ -21,6 +21,7 @@ import (
 	"github.com/cloudfoundry/gorouter/server"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/test_util"
 )
 
 type connHandler func(*httpConn)
@@ -249,17 +250,8 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 	x.CheckLine("HTTP/1.0 200 OK")
 }
 
-type fakeFile struct {
-	payload []byte
-}
-
-func (f *fakeFile) Write(data []byte) (int, error) {
-	f.payload = data
-	return 12, nil
-}
-
 func (s *ProxySuite) TestLogsRequest(c *C) {
-	var fakeFile = new(fakeFile)
+	var fakeFile = new(test_util.FakeFile)
 	accessLog := access_log.NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
 	s.p.AccessLogger = accessLog
 	go accessLog.Run()
@@ -282,7 +274,7 @@ func (s *ProxySuite) TestLogsRequest(c *C) {
 
 	x.CheckLine("HTTP/1.0 200 OK")
 
-	c.Assert(string(fakeFile.payload), Matches, "^test.*\n")
+	c.Assert(string(fakeFile.Payload), Matches, "^test.*\n")
 }
 
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {

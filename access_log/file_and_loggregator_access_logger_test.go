@@ -2,8 +2,11 @@ package access_log
 
 import (
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
+
 	. "launchpad.net/gocheck"
+
 	"net/http"
 	"net/url"
 	"runtime"
@@ -55,14 +58,6 @@ func (s *AccessLoggerSuite) CreateAccessLogRecord() *AccessLogRecord {
 	return &r
 }
 
-type fakeFile struct {
-	payload []byte
-}
-
-func (f *fakeFile) Write(data []byte) (int, error) {
-	f.payload = data
-	return 12, nil
-}
 
 type mockEmitter struct {
 	emitted bool
@@ -121,7 +116,7 @@ func (s *AccessLoggerSuite) TestNotEmittingLogRecordsWithNoAppId(c *C) {
 }
 
 func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
-	var fakeFile = new(fakeFile)
+	var fakeFile = new(test_util.FakeFile)
 
 	accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
 
@@ -129,7 +124,7 @@ func (s *AccessLoggerSuite) TestWritingOfLogRecordsToTheFile(c *C) {
 	go accessLogger.Run()
 	runtime.Gosched()
 
-	c.Check(string(fakeFile.payload), Matches, "^.*foo.bar.*\n")
+	c.Check(string(fakeFile.Payload), Matches, "^.*foo.bar.*\n")
 	accessLogger.Stop()
 }
 
