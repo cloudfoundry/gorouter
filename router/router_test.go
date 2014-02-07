@@ -219,7 +219,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 	app.Unregister()
 }
 
-func (s *RouterSuite) TestRequestsReceivedVsRequests(c *C) {
+func (s *RouterSuite) TestReceivedRequestsVsRequests(c *C) {
 	app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
 	app.Listen()
 	go app.RegisterRepeatedly(100 *time.Millisecond)
@@ -241,10 +241,10 @@ func (s *RouterSuite) TestRequestsReceivedVsRequests(c *C) {
 	requestCount := int(updatedRequestCount - initialRequestCount)
 	c.Check(requestCount, Equals, 0)
 
-	initialRequestsReceivedCount := fetchRecursively(initial_varz, "requests_received").(float64)
-	updatedRequestsReceivedCount := fetchRecursively(updated_varz, "requests_received").(float64)
-	requestsReceivedCount := int(updatedRequestsReceivedCount - initialRequestsReceivedCount)
-	c.Check(requestsReceivedCount, Equals, 1)
+	initialReceivedRequestsCount := fetchRecursively(initial_varz, "received_requests").(float64)
+	updatedReceivedRequestsCount := fetchRecursively(updated_varz, "received_requests").(float64)
+	receivedRequestsCount := int(updatedReceivedRequestsCount - initialReceivedRequestsCount)
+	c.Check(receivedRequestsCount, Equals, 1)
 
 	app.Unregister()
 }

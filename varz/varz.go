@@ -28,7 +28,7 @@ type varz struct {
 	Urls     int `json:"urls"`
 	Droplets int `json:"droplets"`
 
-	RequestsReceived    int     `json:"requests_received"`
+	ReceivedRequests    int     `json:"received_requests"`
 	BadRequests    int     `json:"bad_requests"`
 	BadGateways    int     `json:"bad_gateways"`
 	RequestsPerSec float64 `json:"requests_per_sec"`
@@ -160,7 +160,7 @@ func (x TaggedHttpMetric) CaptureResponse(t string, y *http.Response, z time.Dur
 
 type Varz interface {
 	json.Marshaler
-	CaptureRequestReceived()
+	CaptureReceivedRequest()
 	CaptureBadRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
@@ -261,11 +261,11 @@ func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *ht
 	x.varz.All.CaptureResponse(response, duration)
 }
 
-func (x *RealVarz) CaptureRequestReceived() {
+func (x *RealVarz) CaptureReceivedRequest() {
 	x.Lock()
 	defer x.Unlock()
 
-	x.RequestsReceived++
+	x.ReceivedRequests++
 }
 
 func transform(x interface{}, y map[string]interface{}) error {

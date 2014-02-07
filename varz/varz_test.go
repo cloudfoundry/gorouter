@@ -147,12 +147,12 @@ func (s *VarzSuite) TestUpdateBadGateways(c *C) {
 	c.Check(s.findValue("bad_gateways"), Equals, float64(2))
 }
 
-func (s *VarzSuite) TestUpdateRequestReceived(c *C) {
-	c.Check(s.findValue("requests_received"), Equals, float64(0))
-	s.Varz.CaptureRequestReceived()
-	c.Check(s.findValue("requests_received"), Equals, float64(1))
-	s.Varz.CaptureRequestReceived()
-	c.Check(s.findValue("requests_received"), Equals, float64(2))
+func (s *VarzSuite) TestUpdateReceivedRequest(c *C) {
+	c.Check(s.findValue("received_requests"), Equals, float64(0))
+	s.Varz.CaptureReceivedRequest()
+	c.Check(s.findValue("received_requests"), Equals, float64(1))
+	s.Varz.CaptureReceivedRequest()
+	c.Check(s.findValue("received_requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateRequests(c *C) {

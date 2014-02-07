@@ -34,7 +34,7 @@ func (_ nullVarz) CaptureBadRequest(req *http.Request)                          
 func (_ nullVarz) CaptureBadGateway(req *http.Request)                                           {}
 func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                    {}
 func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration) {}
-func (_ nullVarz) CaptureRequestReceived() {}
+func (_ nullVarz) CaptureReceivedRequest() {}
 
 type httpConn struct {
 	net.Conn
