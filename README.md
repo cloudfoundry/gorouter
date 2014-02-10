@@ -130,9 +130,9 @@ Gorouter provides `/varz` and `/healthz` http endpoints for monitoring.
 
 The `/routes` endpoint returns the entire routing table as JSON. Each route has an associated array of host:port entries.
 
-All of the endpoints require http basic authentication, credentials for which
-can be acquired through NATS. The `port`, `user` and password (`pass` is the config attribute) can be explicitly set in the gorouter.yml config
-file's `status` section.
+Aside from the two monitoring http endpoints (which are only reachable via the status port), specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` also returns the current health of the router. This is particularly useful when performing healthchecks from a Load Balancer.
+
+Because of the nature of the data present in `/varz` and `/routes`, they require http basic authentication credentials which can be acquired through NATS. The `port`, `user` and password (`pass` is the config attribute) can be explicitly set in the gorouter.yml config file's `status` section.
 
 ```
 status:
@@ -144,6 +144,22 @@ status:
 Example interaction with curl:
 
 ```
+curl -vvv -A "HTTP-Monitor/1.1" http://127.0.0.1/
+* About to connect() to 127.0.0.1 port 80 (#0)
+*   Trying 127.0.0.1... connected
+> GET / HTTP/1.1
+> User-Agent: HTTP-Monitor/1.1
+> Host: 127.0.0.1
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Date: Mon, 10 Feb 2014 00:55:25 GMT
+< Transfer-Encoding: chunked
+<
+ok
+* Connection #0 to host 127.0.0.1 left intact
+* Closing connection #0
+
 curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
 * About to connect() to 127.0.0.1 port 8080 (#0)
 *   Trying 127.0.0.1...
