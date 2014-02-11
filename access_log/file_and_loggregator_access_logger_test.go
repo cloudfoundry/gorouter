@@ -81,7 +81,7 @@ func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
 func NewMockEmitter() *mockEmitter {
 	return &mockEmitter{
 		emitted: false,
-		done: make(chan bool, 1),
+		done:    make(chan bool, 1),
 	}
 }
 
@@ -96,17 +96,17 @@ func (s *AccessLoggerSuite) TestEmittingOfLogRecords(c *C) {
 
 	timeout := make(chan bool, 1)
 	go func() {
-		time.Sleep(1*time.Second)
+		time.Sleep(1 * time.Second)
 		timeout <- true
 	}()
 
 	select {
 	case <-testEmitter.done:
-			c.Check(testEmitter.emitted, Equals, true)
-			c.Check(testEmitter.appId, Equals, "my_awesome_id")
-			c.Check(testEmitter.message, Matches, "^.*foo.bar.*\n")
+		c.Check(testEmitter.emitted, Equals, true)
+		c.Check(testEmitter.appId, Equals, "my_awesome_id")
+		c.Check(testEmitter.message, Matches, "^.*foo.bar.*\n")
 	case <-timeout:
-			c.FailNow()
+		c.FailNow()
 	}
 
 	accessLogger.Stop()

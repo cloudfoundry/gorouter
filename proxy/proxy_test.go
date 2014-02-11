@@ -21,6 +21,8 @@ import (
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/server"
+
+	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/test_util"
 )
 
@@ -28,12 +30,13 @@ type connHandler func(*httpConn)
 
 type nullVarz struct{}
 
-func (_ nullVarz) MarshalJSON() ([]byte, error) { return json.Marshal(nil) }
-
-func (_ nullVarz) CaptureBadRequest(req *http.Request)                                           {}
-func (_ nullVarz) CaptureBadGateway(req *http.Request)                                           {}
-func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                    {}
-func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration) {}
+func (_ nullVarz) MarshalJSON() ([]byte, error)                               { return json.Marshal(nil) }
+func (_ nullVarz) ActiveApps() *stats.ActiveApps                              { return stats.NewActiveApps() }
+func (_ nullVarz) CaptureBadRequest(req *http.Request)                        {}
+func (_ nullVarz) CaptureBadGateway(req *http.Request)                        {}
+func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {}
+func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+}
 
 type httpConn struct {
 	net.Conn
@@ -130,11 +133,11 @@ func (x *httpConn) WriteLines(lines []string) {
 }
 
 type ProxySuite struct {
-	r *registry.Registry
-	p *Proxy
-
-	proxyServer net.Listener
-
+	r             *registry.CFRegistry
+	p             Proxy
+	conf          *config.Config
+	proxyServer   net.Listener
+	accessLogFile *test_util.FakeFile
 	// This channel is closed when the test is done
 	done chan bool
 }
@@ -142,13 +145,27 @@ type ProxySuite struct {
 var _ = Suite(&ProxySuite{})
 
 func (s *ProxySuite) SetUpTest(c *C) {
-	config := config.DefaultConfig()
-	config.TraceKey = "my_trace_key"
-	config.EndpointTimeout = 500 * time.Millisecond
+	s.conf = config.DefaultConfig()
+	s.conf.TraceKey = "my_trace_key"
+	s.conf.EndpointTimeout = 500 * time.Millisecond
 
 	mbus := fakeyagnats.New()
-	s.r = registry.NewRegistry(config, mbus)
-	s.p = NewProxy(config, s.r, nullVarz{})
+
+	s.r = registry.NewCFRegistry(s.conf, mbus)
+	fmt.Printf("Config: %#v", s.conf)
+
+	s.accessLogFile = new(test_util.FakeFile)
+	accessLog := access_log.NewFileAndLoggregatorAccessLogger(s.accessLogFile, "localhost:9843", "secret", 42)
+	go accessLog.Run()
+
+	s.p = NewProxy(ProxyArgs{
+		EndpointTimeout: s.conf.EndpointTimeout,
+		Ip:              s.conf.Ip,
+		TraceKey:        s.conf.TraceKey,
+		Registry:        s.r,
+		Reporter:        nullVarz{},
+		Logger:          accessLog,
+	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -183,16 +200,6 @@ func (s *ProxySuite) registerAddr(u string, a net.Addr) {
 			Port: uint16(x),
 		},
 	)
-}
-
-func (s *ProxySuite) TestProxyCreatesAnAccessLogger(c *C) {
-	x := config.DefaultConfig()
-	x.LoggregatorConfig.Url = "10.10.3.13:4325"
-	x.AccessLog = ""
-
-	proxy := NewProxy(x, nil, nil)
-	var accessLoggerInterface access_log.AccessLogger
-	c.Assert(proxy.AccessLogger, Implements, &accessLoggerInterface)
 }
 
 func (s *ProxySuite) RegisterHandler(c *C, u string, h connHandler) net.Listener {
@@ -251,11 +258,6 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 }
 
 func (s *ProxySuite) TestLogsRequest(c *C) {
-	var fakeFile = new(test_util.FakeFile)
-	accessLog := access_log.NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
-	s.p.AccessLogger = accessLog
-	go accessLog.Run()
-
 	s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
@@ -274,18 +276,13 @@ func (s *ProxySuite) TestLogsRequest(c *C) {
 
 	x.CheckLine("HTTP/1.0 200 OK")
 
-	c.Assert(string(fakeFile.Payload), Matches, "^test.*\n")
+	c.Assert(string(s.accessLogFile.Payload), Matches, "^test.*\n")
 	//make sure the record includes all the data
 	//since the building of the log record happens throughout the life of the request
-	c.Assert(string(fakeFile.Payload), Matches, ".*200.*\n")
+	c.Assert(string(s.accessLogFile.Payload), Matches, ".*200.*\n")
 }
 
 func (s *ProxySuite) TestLogsRequestWhenExitsEarly(c *C) {
-	var fakeFile = new(test_util.FakeFile)
-	accessLog := access_log.NewFileAndLoggregatorAccessLogger(fakeFile, "localhost:9843", "secret", 42)
-	s.p.AccessLogger = accessLog
-	go accessLog.Run()
-
 	x := s.DialProxy(c)
 
 	x.WriteLines([]string{
@@ -295,7 +292,7 @@ func (s *ProxySuite) TestLogsRequestWhenExitsEarly(c *C) {
 
 	x.CheckLine("HTTP/1.0 400 Bad Request")
 
-	c.Assert(string(fakeFile.Payload), Matches, "^test.*\n")
+	c.Assert(string(s.accessLogFile.Payload), Matches, "^test.*\n")
 }
 
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {
@@ -387,7 +384,7 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 	resp, _ := x.ReadResponse()
 	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, ln.Addr().String())
 	c.Check(resp.Header.Get("X-Cf-RouteEndpoint"), Equals, ln.Addr().String())
-	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, s.p.Config.Ip)
+	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, s.conf.Ip)
 }
 
 func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {

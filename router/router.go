@@ -18,13 +18,15 @@ import (
 	"github.com/cloudfoundry/gorouter/util"
 	"github.com/cloudfoundry/gorouter/varz"
 	"github.com/cloudfoundry/yagnats"
+
+	"github.com/cloudfoundry/gorouter/access_log"
 )
 
 type Router struct {
 	config     *config.Config
-	proxy      *proxy.Proxy
+	proxy      proxy.Proxy
 	mbusClient *yagnats.Client
-	registry   *registry.Registry
+	registry   *registry.CFRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
 }
@@ -41,11 +43,19 @@ func NewRouter(c *config.Config) *Router {
 
 	router.mbusClient = yagnats.NewClient()
 
-	router.registry = registry.NewRegistry(router.config, router.mbusClient)
+	router.registry = registry.NewCFRegistry(router.config, router.mbusClient)
 	router.registry.StartPruningCycle()
 
 	router.varz = varz.NewVarz(router.registry)
-	router.proxy = proxy.NewProxy(router.config, router.registry, router.varz)
+	args := proxy.ProxyArgs{
+		EndpointTimeout: router.config.EndpointTimeout,
+		Ip:              router.config.Ip,
+		TraceKey:        router.config.TraceKey,
+		Registry:        router.registry,
+		Reporter:        router.varz,
+		Logger:          access_log.CreateRunningAccessLogger(router.config),
+	}
+	router.proxy = proxy.NewProxy(args)
 
 	var host string
 	if router.config.Status.Port != 0 {
@@ -218,7 +228,7 @@ func (r *Router) ScheduleFlushApps() {
 }
 
 func (r *Router) flushApps(t time.Time) {
-	x := r.registry.ActiveSince(t)
+	x := r.varz.ActiveApps().ActiveSince(t)
 
 	y, err := json.Marshal(x)
 	if err != nil {
@@ -276,4 +286,3 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 		log.Errorf("Error subscribing to %s: %s", subject, err)
 	}
 }
-

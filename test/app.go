@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/yagnats"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/yagnats"
 )
 
 type TestApp struct {
@@ -20,7 +20,7 @@ type TestApp struct {
 	mbusClient yagnats.NATSClient
 	tags       map[string]string
 	mux        *http.ServeMux
-	stopped	   bool
+	stopped    bool
 }
 
 func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSClient, tags map[string]string) *TestApp {
@@ -60,7 +60,7 @@ func (a *TestApp) Listen() {
 	go server.ListenAndServe()
 }
 
-func (a *TestApp) RegisterRepeatedly(duration time.Duration){
+func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
 	a.stopped = false
 	for {
 		if a.stopped {

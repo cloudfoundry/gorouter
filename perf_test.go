@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
@@ -20,13 +21,21 @@ const (
 func BenchmarkRegister(b *testing.B) {
 	c := config.DefaultConfig()
 	mbus := fakeyagnats.New()
-	r := registry.NewRegistry(c, mbus)
-	p := proxy.NewProxy(c, r, varz.NewVarz(r))
+	r := registry.NewCFRegistry(c, mbus)
+
+	proxy.NewProxy(proxy.ProxyArgs{
+		EndpointTimeout: c.EndpointTimeout,
+		Ip:              c.Ip,
+		TraceKey:        c.TraceKey,
+		Registry:        r,
+		Reporter:        varz.NewVarz(r),
+		Logger:          access_log.CreateRunningAccessLogger(c),
+	})
 
 	for i := 0; i < b.N; i++ {
 		str := strconv.Itoa(i)
 
-		p.Register(
+		r.Register(
 			route.Uri("bench.vcap.me."+str),
 			&route.Endpoint{
 				Host: "localhost",

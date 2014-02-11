@@ -7,22 +7,22 @@ import (
 
 	"github.com/cloudfoundry/gorouter/log"
 
-	"github.com/cloudfoundry/loggregatorlib/emitter"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/loggregatorlib/emitter"
 )
 
 type FileAndLoggregatorAccessLogger struct {
-	emitter  emitter.Emitter
-	channel  chan AccessLogRecord
-	writer   io.Writer
-	index    uint
+	emitter emitter.Emitter
+	channel chan AccessLogRecord
+	writer  io.Writer
+	index   uint
 }
 
 func NewFileAndLoggregatorAccessLogger(f io.Writer, loggregatorUrl, loggregatorSharedSecret string, index uint) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
-		writer:     f,
-		channel:     make(chan AccessLogRecord, 128),
-		index: index,
+		writer:  f,
+		channel: make(chan AccessLogRecord, 128),
+		index:   index,
 	}
 
 	if isValidUrl(loggregatorUrl) {
@@ -39,8 +39,8 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 		if x.writer != nil {
 			access_record.WriteTo(x.writer)
 		}
-		if x.emitter != nil {
-			access_record.Emit(x.emitter)
+		if x.emitter != nil && access_record.ApplicationId() != "" {
+			x.emitter.Emit(access_record.ApplicationId(), access_record.LogMessage())
 		}
 	}
 }

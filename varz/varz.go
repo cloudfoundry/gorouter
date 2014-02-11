@@ -160,20 +160,27 @@ func (x TaggedHttpMetric) CaptureResponse(t string, y *http.Response, z time.Dur
 type Varz interface {
 	json.Marshaler
 
+	ActiveApps() *stats.ActiveApps
+
 	CaptureBadRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
-	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, d time.Duration)
+	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
 }
 
 type RealVarz struct {
 	sync.Mutex
-	r *registry.Registry
+	r          *registry.CFRegistry
+	activeApps *stats.ActiveApps
+	topApps    *stats.TopApps
 	varz
 }
 
-func NewVarz(r *registry.Registry) Varz {
+func NewVarz(r *registry.CFRegistry) Varz {
 	x := &RealVarz{r: r}
+
+	x.activeApps = stats.NewActiveApps()
+	x.topApps = stats.NewTopApps()
 
 	x.All = NewHttpMetric()
 	x.Tags.Component = make(map[string]*HttpMetric)
@@ -204,7 +211,7 @@ func (x *RealVarz) MarshalJSON() ([]byte, error) {
 
 func (x *RealVarz) updateTop() {
 	t := time.Now().Add(-1 * time.Minute)
-	y := x.r.TopApps.TopSince(t, 10)
+	y := x.topApps.TopSince(t, 10)
 
 	x.varz.TopApps = make([]topAppsEntry, 0)
 	for _, z := range y {
@@ -214,6 +221,10 @@ func (x *RealVarz) updateTop() {
 			RequestsPerMinute: z.Requests,
 		})
 	}
+}
+
+func (x *RealVarz) ActiveApps() *stats.ActiveApps {
+	return x.activeApps
 }
 
 func (x *RealVarz) CaptureBadRequest(req *http.Request) {
@@ -228,6 +239,13 @@ func (x *RealVarz) CaptureBadGateway(req *http.Request) {
 	defer x.Unlock()
 
 	x.BadGateways++
+}
+
+func (x *RealVarz) CaptureAppStats(b *route.Endpoint, t time.Time) {
+	if b.ApplicationId != "" {
+		x.activeApps.Mark(b.ApplicationId, t)
+		x.topApps.Mark(b.ApplicationId, t)
+	}
 }
 
 func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
@@ -245,7 +263,7 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 	x.varz.All.CaptureRequest()
 }
 
-func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
 	x.Lock()
 	defer x.Unlock()
 
@@ -257,6 +275,7 @@ func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *ht
 		x.varz.Tags.Component.CaptureResponse(tags, response, duration)
 	}
 
+	x.CaptureAppStats(endpoint, startedAt)
 	x.varz.All.CaptureResponse(response, duration)
 }
 

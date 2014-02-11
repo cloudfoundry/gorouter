@@ -11,7 +11,7 @@ func CreateRunningAccessLogger(config *config.Config) (accessLogger AccessLogger
 	loggregatorSharedSecret := config.LoggregatorConfig.SharedSecret
 
 	if config.AccessLog != "" || loggregatorUrl != "" {
-		file, err := os.OpenFile(config.AccessLog, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0666)
+		file, err := os.OpenFile(config.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil && config.AccessLog != "" {
 			panic(err)
 		}

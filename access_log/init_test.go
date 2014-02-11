@@ -1,8 +1,8 @@
 package access_log
 
 import (
-	"testing"
 	. "launchpad.net/gocheck"
+	"testing"
 )
 
 func Test(t *testing.T) { TestingT(t) }

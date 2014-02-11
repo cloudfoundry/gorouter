@@ -7,10 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/log"
 	"github.com/cloudfoundry/gorouter/route"
-
-	"github.com/cloudfoundry/loggregatorlib/emitter"
 )
 
 type AccessLogRecord struct {
@@ -36,7 +33,7 @@ func (r *AccessLogRecord) FormatRequestHeader(k string) (v string) {
 }
 
 func (r *AccessLogRecord) ResponseTime() float64 {
-	return float64(r.FinishedAt.UnixNano() - r.StartedAt.UnixNano())/float64(time.Second)
+	return float64(r.FinishedAt.UnixNano()-r.StartedAt.UnixNano()) / float64(time.Second)
 }
 
 func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
@@ -50,7 +47,6 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 	} else {
 		fmt.Fprintf(b, `%d `, r.Response.StatusCode)
 	}
-
 
 	fmt.Fprintf(b, `%d `, r.BodyBytesSent)
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("Referer"))
@@ -78,17 +74,23 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 	return recordBuffer.WriteTo(w)
 }
 
-func (r *AccessLogRecord) Emit(e emitter.Emitter) {
+func (r *AccessLogRecord) ApplicationId() string {
 	if r.RouteEndpoint == nil {
-		return
+		return ""
 	}
 
 	if r.RouteEndpoint.ApplicationId == "" {
-		return
+		return ""
 	}
-	recordBuffer := r.makeRecord()
-	message := recordBuffer.String()
-	log.Debugf("Logging to the loggregator: %s", message)
-	e.Emit(r.RouteEndpoint.ApplicationId, message)
 
+	return r.RouteEndpoint.ApplicationId
+}
+
+func (r *AccessLogRecord) LogMessage() string {
+	if r.ApplicationId() == "" {
+		return ""
+	}
+
+	recordBuffer := r.makeRecord()
+	return recordBuffer.String()
 }

@@ -16,10 +16,10 @@ type registryMessage struct {
 
 func (registryMessage *registryMessage) makeEndpoint() *route.Endpoint {
 	return &route.Endpoint{
-		Host: registryMessage.Host,
-		Port: registryMessage.Port,
-		ApplicationId: registryMessage.App,
-		Tags:          registryMessage.Tags,
+		Host:              registryMessage.Host,
+		Port:              registryMessage.Port,
+		ApplicationId:     registryMessage.App,
+		Tags:              registryMessage.Tags,
 		PrivateInstanceId: registryMessage.PrivateInstanceId,
 	}
 }

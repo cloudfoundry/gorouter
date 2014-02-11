@@ -195,7 +195,7 @@ func (s *RouterSuite) TestVarz(c *C) {
 	app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
 	app.Listen()
 	additionalRequests := 100
-	go app.RegisterRepeatedly(100 *time.Millisecond)
+	go app.RegisterRepeatedly(100 * time.Millisecond)
 	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
 	// Send seed request
 	sendRequests(c, "count.vcap.me", s.Config.Port, 1)
@@ -248,7 +248,7 @@ func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
 	}
 }
 
-func verify_health_z(host string, registry *registry.Registry, c *C) {
+func verify_health_z(host string, r *registry.CFRegistry, c *C) {
 	var req *http.Request
 	var resp *http.Response
 	var err error
@@ -260,8 +260,8 @@ func verify_health_z(host string, registry *registry.Registry, c *C) {
 	c.Check(string(bytes), Equals, "ok")
 
 	// Check that healthz does not reply during deadlock
-	registry.Lock()
-	defer registry.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	httpClient := http.Client{
 		Transport: &http.Transport{
@@ -358,7 +358,6 @@ func (s *RouterSuite) TestProxyPutRequest(c *C) {
 
 func (s *RouterSuite) TestRouterSendsStartOnConnect(c *C) {
 	started := make(chan bool)
-
 
 	s.router.mbusClient.Subscribe("router.start", func(*yagnats.Message) {
 		started <- true

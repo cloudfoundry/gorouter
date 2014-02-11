@@ -1,11 +1,12 @@
 package access_log
 
 import (
-	. "launchpad.net/gocheck"
 	"github.com/cloudfoundry/gorouter/config"
+	. "launchpad.net/gocheck"
 )
 
 type CreateRunningAccessLoggerSuite struct{}
+
 var _ = Suite(&CreateRunningAccessLoggerSuite{})
 
 func (s *CreateRunningAccessLoggerSuite) TestCreateNullAccessLoggerIfNoAccesLogAndNoLoggregatorUrl(c *C) {
@@ -37,6 +38,6 @@ func (s *CreateRunningAccessLoggerSuite) TestPanicsIfInvalidAccessLogLocation(c 
 	config := config.DefaultConfig()
 	config.AccessLog = "/this\\should/panic"
 	c.Assert(func() {
-			CreateRunningAccessLogger(config)
-		}, PanicMatches, "open /this\\\\should/panic: no such file or directory")
+		CreateRunningAccessLogger(config)
+	}, PanicMatches, "open /this\\\\should/panic: no such file or directory")
 }

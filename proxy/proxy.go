@@ -4,43 +4,64 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	steno "github.com/cloudfoundry/gosteno"
 
 	"github.com/cloudfoundry/gorouter/access_log"
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/varz"
 )
 
 const (
 	VcapTraceHeader = "X-Vcap-Trace"
-
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
 )
 
-type Proxy struct {
-	sync.RWMutex
-	*steno.Logger
-	*config.Config
-	*registry.Registry
-	varz.Varz
-	access_log.AccessLogger
-	*http.Transport
+type LookupRegistry interface {
+	Lookup(uri route.Uri) (*route.Endpoint, bool)
+	LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool)
 }
 
-func NewProxy(config *config.Config, registry *registry.Registry, varz varz.Varz) *Proxy {
-	return &Proxy{
-		AccessLogger: access_log.CreateRunningAccessLogger(config),
-		Config:    config,
-		Logger:    steno.NewLogger("router.proxy"),
-		Registry:  registry,
-		Varz:      varz,
-		Transport: &http.Transport{ResponseHeaderTimeout: config.EndpointTimeout},
+type Reporter interface {
+	CaptureBadRequest(req *http.Request)
+	CaptureBadGateway(req *http.Request)
+	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
+	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
+}
+
+type Proxy interface {
+	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
+}
+
+type ProxyArgs struct {
+	EndpointTimeout time.Duration
+	Ip              string
+	TraceKey        string
+	Registry        LookupRegistry
+	Reporter        Reporter
+	Logger          access_log.AccessLogger
+}
+
+type proxy struct {
+	ip           string
+	traceKey     string
+	logger       *steno.Logger
+	registry     LookupRegistry
+	reporter     Reporter
+	accessLogger access_log.AccessLogger
+	transport    *http.Transport
+}
+
+func NewProxy(args ProxyArgs) Proxy {
+	return &proxy{
+		accessLogger: args.Logger,
+		traceKey:     args.TraceKey,
+		ip:           args.Ip,
+		logger:       steno.NewLogger("router.proxy"),
+		registry:     args.Registry,
+		reporter:     args.Reporter,
+		transport:    &http.Transport{ResponseHeaderTimeout: args.EndpointTimeout},
 	}
 }
 
@@ -56,13 +77,13 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
+func (p *proxy) lookup(request *http.Request) (*route.Endpoint, bool) {
 	uri := route.Uri(hostWithoutPort(request))
 
 	// Try choosing a backend using sticky session
 	if _, err := request.Cookie(StickyCookieKey); err == nil {
 		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			routeEndpoint, ok := proxy.Registry.LookupByPrivateInstanceId(uri, sticky.Value)
+			routeEndpoint, ok := p.registry.LookupByPrivateInstanceId(uri, sticky.Value)
 			if ok {
 				return routeEndpoint, ok
 			}
@@ -70,10 +91,10 @@ func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
 	}
 
 	// Choose backend using host alone
-	return proxy.Registry.Lookup(uri)
+	return p.registry.Lookup(uri)
 }
 
-func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
 	originalURL := request.URL
 	request.URL = &url.URL{Host: originalURL.Host, Opaque: request.RequestURI}
@@ -85,7 +106,7 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 	}
 
 	defer func() {
-		proxy.AccessLogger.Log(accessLog)
+		p.accessLogger.Log(accessLog)
 	}()
 
 	if !isProtocolSupported(request) {
@@ -98,9 +119,9 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 		return
 	}
 
-	routeEndpoint, found := proxy.Lookup(request)
+	routeEndpoint, found := p.lookup(request)
 	if !found {
-		proxy.Varz.CaptureBadRequest(request)
+		p.reporter.CaptureBadRequest(request)
 		handler.HandleMissingRoute()
 		return
 	}
@@ -109,7 +130,7 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 
 	accessLog.RouteEndpoint = routeEndpoint
 
-	proxy.Varz.CaptureRoutingRequest(routeEndpoint, handler.request)
+	p.reporter.CaptureRoutingRequest(routeEndpoint, handler.request)
 
 	if isTcpUpgrade(request) {
 		handler.HandleTcpRequest(routeEndpoint)
@@ -121,15 +142,14 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 		return
 	}
 
-	endpointResponse, err := handler.HandleHttpRequest(proxy.Transport, routeEndpoint)
+	endpointResponse, err := handler.HandleHttpRequest(p.transport, routeEndpoint)
 
 	latency := time.Since(startedAt)
 
-	proxy.Registry.CaptureRoutingRequest(routeEndpoint, startedAt)
-	proxy.Varz.CaptureRoutingResponse(routeEndpoint, endpointResponse, latency)
+	p.reporter.CaptureRoutingResponse(routeEndpoint, endpointResponse, startedAt, latency)
 
 	if err != nil {
-		proxy.Varz.CaptureBadGateway(request)
+		p.reporter.CaptureBadGateway(request)
 		handler.HandleBadGateway(err)
 		return
 	}
@@ -137,8 +157,8 @@ func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.
 	accessLog.FirstByteAt = time.Now()
 	accessLog.Response = endpointResponse
 
-	if proxy.Config.TraceKey != "" && request.Header.Get(VcapTraceHeader) == proxy.Config.TraceKey {
-		handler.SetTraceHeaders(proxy.Config.Ip, routeEndpoint.CanonicalAddr())
+	if p.traceKey != "" && request.Header.Get(VcapTraceHeader) == p.traceKey {
+		handler.SetTraceHeaders(p.ip, routeEndpoint.CanonicalAddr())
 	}
 
 	bytesSent := handler.WriteResponse(endpointResponse)

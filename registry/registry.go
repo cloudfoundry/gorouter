@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/stats"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
 
@@ -14,13 +13,10 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 )
 
-type Registry struct {
+type CFRegistry struct {
 	sync.RWMutex
 
-	*steno.Logger
-
-	*stats.ActiveApps
-	*stats.TopApps
+	logger *steno.Logger
 
 	byUri map[route.Uri]*route.Pool
 
@@ -44,13 +40,10 @@ type tableEntry struct {
 	updatedAt time.Time
 }
 
-func NewRegistry(c *config.Config, mbus yagnats.NATSClient) *Registry {
-	r := &Registry{}
+func NewCFRegistry(c *config.Config, mbus yagnats.NATSClient) *CFRegistry {
+	r := &CFRegistry{}
 
-	r.Logger = steno.NewLogger("router.registry")
-
-	r.ActiveApps = stats.NewActiveApps()
-	r.TopApps = stats.NewTopApps()
+	r.logger = steno.NewLogger("router.registry")
 
 	r.byUri = make(map[route.Uri]*route.Pool)
 
@@ -64,7 +57,7 @@ func NewRegistry(c *config.Config, mbus yagnats.NATSClient) *Registry {
 	return r
 }
 
-func (registry *Registry) Register(uri route.Uri, endpoint *route.Endpoint) {
+func (registry *CFRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	registry.Lock()
 	defer registry.Unlock()
 
@@ -100,7 +93,7 @@ func (registry *Registry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	registry.timeOfLastUpdate = time.Now()
 }
 
-func (registry *Registry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+func (registry *CFRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	registry.Lock()
 	defer registry.Unlock()
 
@@ -114,7 +107,7 @@ func (registry *Registry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	registry.unregisterUri(key)
 }
 
-func (r *Registry) Lookup(uri route.Uri) (*route.Endpoint, bool) {
+func (r *CFRegistry) Lookup(uri route.Uri) (*route.Endpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -126,7 +119,7 @@ func (r *Registry) Lookup(uri route.Uri) (*route.Endpoint, bool) {
 	return pool.Sample()
 }
 
-func (r *Registry) LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool) {
+func (r *CFRegistry) LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -138,17 +131,17 @@ func (r *Registry) LookupByPrivateInstanceId(uri route.Uri, p string) (*route.En
 	return pool.FindByPrivateInstanceId(p)
 }
 
-func (r *Registry) lookupByUri(uri route.Uri) (*route.Pool, bool) {
+func (r *CFRegistry) lookupByUri(uri route.Uri) (*route.Pool, bool) {
 	uri = uri.ToLower()
 	pool, ok := r.byUri[uri]
 	return pool, ok
 }
 
-func (registry *Registry) StartPruningCycle() {
+func (registry *CFRegistry) StartPruningCycle() {
 	go registry.checkAndPrune()
 }
 
-func (registry *Registry) PruneStaleDroplets() {
+func (registry *CFRegistry) PruneStaleDroplets() {
 	if registry.isStateStale() {
 		log.Info("State is stale; NOT pruning")
 		registry.pauseStaleTracker()
@@ -161,25 +154,18 @@ func (registry *Registry) PruneStaleDroplets() {
 	registry.pruneStaleDroplets()
 }
 
-func (r *Registry) CaptureRoutingRequest(x *route.Endpoint, t time.Time) {
-	if x.ApplicationId != "" {
-		r.ActiveApps.Mark(x.ApplicationId, t)
-		r.TopApps.Mark(x.ApplicationId, t)
-	}
-}
-
-func (registry *Registry) NumUris() int {
+func (registry *CFRegistry) NumUris() int {
 	registry.RLock()
 	defer registry.RUnlock()
 
 	return len(registry.byUri)
 }
 
-func (r *Registry) TimeOfLastUpdate() time.Time {
+func (r *CFRegistry) TimeOfLastUpdate() time.Time {
 	return r.timeOfLastUpdate
 }
 
-func (r *Registry) NumEndpoints() int {
+func (r *CFRegistry) NumEndpoints() int {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -191,18 +177,18 @@ func (r *Registry) NumEndpoints() int {
 	return len(mapForSize)
 }
 
-func (r *Registry) MarshalJSON() ([]byte, error) {
+func (r *CFRegistry) MarshalJSON() ([]byte, error) {
 	r.RLock()
 	defer r.RUnlock()
 
 	return json.Marshal(r.byUri)
 }
 
-func (registry *Registry) isStateStale() bool {
+func (registry *CFRegistry) isStateStale() bool {
 	return !registry.messageBus.Ping()
 }
 
-func (registry *Registry) pruneStaleDroplets() {
+func (registry *CFRegistry) pruneStaleDroplets() {
 	for key, entry := range registry.table {
 		if !registry.isEntryStale(entry) {
 			continue
@@ -213,17 +199,17 @@ func (registry *Registry) pruneStaleDroplets() {
 	}
 }
 
-func (r *Registry) isEntryStale(entry *tableEntry) bool {
+func (r *CFRegistry) isEntryStale(entry *tableEntry) bool {
 	return entry.updatedAt.Add(r.dropletStaleThreshold).Before(time.Now())
 }
 
-func (registry *Registry) pauseStaleTracker() {
+func (registry *CFRegistry) pauseStaleTracker() {
 	for _, entry := range registry.table {
 		entry.updatedAt = time.Now()
 	}
 }
 
-func (r *Registry) checkAndPrune() {
+func (r *CFRegistry) checkAndPrune() {
 	if r.pruneStaleDropletsInterval == 0 {
 		return
 	}
@@ -238,7 +224,7 @@ func (r *Registry) checkAndPrune() {
 	}
 }
 
-func (registry *Registry) unregisterUri(key tableKey) {
+func (registry *CFRegistry) unregisterUri(key tableKey) {
 	entry, found := registry.table[key]
 	if !found {
 		return

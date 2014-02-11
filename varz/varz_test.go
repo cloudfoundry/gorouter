@@ -16,13 +16,13 @@ import (
 
 type VarzSuite struct {
 	Varz
-	*registry.Registry
+	Registry *registry.CFRegistry
 }
 
 var _ = Suite(&VarzSuite{})
 
 func (s *VarzSuite) SetUpTest(c *C) {
-	r := registry.NewRegistry(config.DefaultConfig(), fakeyagnats.New())
+	r := registry.NewCFRegistry(config.DefaultConfig(), fakeyagnats.New())
 	s.Registry = r
 	s.Varz = NewVarz(r)
 }
@@ -182,6 +182,7 @@ func (s *VarzSuite) TestUpdateRequestsWithTags(c *C) {
 
 func (s *VarzSuite) TestUpdateResponse(c *C) {
 	var b *route.Endpoint = &route.Endpoint{}
+	var t time.Time
 	var d time.Duration
 
 	r1 := &http.Response{
@@ -192,15 +193,16 @@ func (s *VarzSuite) TestUpdateResponse(c *C) {
 		StatusCode: http.StatusNotFound,
 	}
 
-	s.CaptureRoutingResponse(b, r1, d)
-	s.CaptureRoutingResponse(b, r2, d)
-	s.CaptureRoutingResponse(b, r2, d)
+	s.CaptureRoutingResponse(b, r1, t, d)
+	s.CaptureRoutingResponse(b, r2, t, d)
+	s.CaptureRoutingResponse(b, r2, t, d)
 
 	c.Check(s.findValue("responses_2xx"), Equals, float64(1))
 	c.Check(s.findValue("responses_4xx"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
+	var t time.Time
 	var d time.Duration
 
 	b1 := &route.Endpoint{
@@ -223,9 +225,9 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 		StatusCode: http.StatusNotFound,
 	}
 
-	s.CaptureRoutingResponse(b1, r1, d)
-	s.CaptureRoutingResponse(b2, r2, d)
-	s.CaptureRoutingResponse(b2, r2, d)
+	s.CaptureRoutingResponse(b1, r1, t, d)
+	s.CaptureRoutingResponse(b2, r2, t, d)
+	s.CaptureRoutingResponse(b2, r2, t, d)
 
 	c.Check(s.findValue("tags", "component", "cc", "responses_2xx"), Equals, float64(1))
 	c.Check(s.findValue("tags", "component", "cc", "responses_4xx"), Equals, float64(2))
@@ -233,13 +235,14 @@ func (s *VarzSuite) TestUpdateResponseWithTags(c *C) {
 
 func (s *VarzSuite) TestUpdateResponseLatency(c *C) {
 	var routeEndpoint *route.Endpoint = &route.Endpoint{}
+	var startedAt = time.Now()
 	var duration = 1 * time.Millisecond
 
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 	}
 
-	s.CaptureRoutingResponse(routeEndpoint, response, duration)
+	s.CaptureRoutingResponse(routeEndpoint, response, startedAt, duration)
 
 	c.Check(s.findValue("latency", "50").(float64), Equals, float64(duration)/float64(time.Second))
 	c.Check(s.findValue("latency", "75").(float64), Equals, float64(duration)/float64(time.Second))
