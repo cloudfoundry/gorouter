@@ -23,7 +23,7 @@ type VcapComponent struct {
 	Index       uint                      `json:"index"`
 	Host        string                    `json:"host"`
 	Credentials []string                  `json:"credentials"`
-	Config      interface{}               `json:"config"`
+	Config      interface{}               `json:"-"`
 	Varz        *Varz                     `json:"-"`
 	Healthz     *Healthz                  `json:"-"`
 	InfoRoutes  map[string]json.Marshaler `json:"-"`
