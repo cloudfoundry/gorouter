@@ -2,13 +2,13 @@ package proxy
 
 import (
 	"bufio"
-	"net/url"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -18,9 +18,9 @@ import (
 
 	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/server"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/server"
 	"github.com/cloudfoundry/gorouter/test_util"
 )
 
@@ -257,13 +257,13 @@ func (s *ProxySuite) TestLogsRequest(c *C) {
 	go accessLog.Run()
 
 	s.RegisterHandler(c, "test", func(x *httpConn) {
-			x.CheckLine("GET / HTTP/1.1")
+		x.CheckLine("GET / HTTP/1.1")
 
-			x.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+		x.WriteLines([]string{
+			"HTTP/1.1 200 OK",
+			"Content-Length: 0",
 		})
+	})
 
 	x := s.DialProxy(c)
 
