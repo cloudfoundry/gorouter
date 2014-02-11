@@ -219,6 +219,36 @@ func (s *RouterSuite) TestVarz(c *C) {
 	app.Unregister()
 }
 
+func (s *RouterSuite) TestReceivedRequestsVsRequests(c *C) {
+	app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
+	app.Listen()
+	go app.RegisterRepeatedly(100 *time.Millisecond)
+	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
+
+	// Send seed request
+	uri := fmt.Sprintf("http://%s:%d", "notmapped.vcap.me",  s.Config.Port)
+
+	r, _ := http.Get(uri)
+	c.Check(r.StatusCode, Equals, http.StatusNotFound)
+	initial_varz := s.readVarz()
+
+	r, _ = http.Get(uri)
+	c.Check(r.StatusCode, Equals, http.StatusNotFound)
+	updated_varz := s.readVarz()
+
+	initialRequestCount := fetchRecursively(initial_varz, "requests").(float64)
+	updatedRequestCount := fetchRecursively(updated_varz, "requests").(float64)
+	requestCount := int(updatedRequestCount - initialRequestCount)
+	c.Check(requestCount, Equals, 0)
+
+	initialReceivedRequestsCount := fetchRecursively(initial_varz, "received_requests").(float64)
+	updatedReceivedRequestsCount := fetchRecursively(updated_varz, "received_requests").(float64)
+	receivedRequestsCount := int(updatedReceivedRequestsCount - initialReceivedRequestsCount)
+	c.Check(receivedRequestsCount, Equals, 1)
+
+	app.Unregister()
+}
+
 func (s *RouterSuite) TestStickySession(c *C) {
 	apps := make([]*test.TestApp, 10)
 	for i := range apps {

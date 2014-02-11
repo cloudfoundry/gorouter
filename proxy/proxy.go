@@ -74,6 +74,7 @@ func (proxy *Proxy) Lookup(request *http.Request) (*route.Endpoint, bool) {
 }
 
 func (proxy *Proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+	proxy.Varz.CaptureReceivedRequest()
 	startedAt := time.Now()
 	originalURL := request.URL
 	request.URL = &url.URL{Host: originalURL.Host, Opaque: request.RequestURI}
