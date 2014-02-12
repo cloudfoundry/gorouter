@@ -78,7 +78,7 @@ func (s *VarzSuite) TestMembersOfUniqueVarz(c *C) {
 		"urls",
 		"droplets",
 		"requests",
-		"bad_requests",
+		"rejected_requests",
 		"bad_gateways",
 		"requests_per_sec",
 		"top10_app_requests",
@@ -127,14 +127,14 @@ func (s *VarzSuite) TestUrlsInVarz(c *C) {
 	c.Check(s.findValue("urls"), Equals, float64(2))
 }
 
-func (s *VarzSuite) TestUpdateBadRequests(c *C) {
+func (s *VarzSuite) TestUpdateRejectedRequests(c *C) {
 	r := http.Request{}
 
-	s.CaptureBadRequest(&r)
-	c.Check(s.findValue("bad_requests"), Equals, float64(1))
+	s.CaptureRejectedRequest(&r)
+	c.Check(s.findValue("rejected_requests"), Equals, float64(1))
 
-	s.CaptureBadRequest(&r)
-	c.Check(s.findValue("bad_requests"), Equals, float64(2))
+	s.CaptureRejectedRequest(&r)
+	c.Check(s.findValue("rejected_requests"), Equals, float64(2))
 }
 
 func (s *VarzSuite) TestUpdateBadGateways(c *C) {

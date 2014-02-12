@@ -28,9 +28,9 @@ type varz struct {
 	Urls     int `json:"urls"`
 	Droplets int `json:"droplets"`
 
-	BadRequests    int     `json:"bad_requests"`
-	BadGateways    int     `json:"bad_gateways"`
-	RequestsPerSec float64 `json:"requests_per_sec"`
+	RejectedRequests int     `json:"rejected_requests"`
+	BadGateways      int     `json:"bad_gateways"`
+	RequestsPerSec   float64 `json:"requests_per_sec"`
 
 	TopApps []topAppsEntry `json:"top10_app_requests"`
 
@@ -162,7 +162,7 @@ type Varz interface {
 
 	ActiveApps() *stats.ActiveApps
 
-	CaptureBadRequest(req *http.Request)
+	CaptureRejectedRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
@@ -227,11 +227,11 @@ func (x *RealVarz) ActiveApps() *stats.ActiveApps {
 	return x.activeApps
 }
 
-func (x *RealVarz) CaptureBadRequest(req *http.Request) {
+func (x *RealVarz) CaptureRejectedRequest(req *http.Request) {
 	x.Lock()
 	defer x.Unlock()
 
-	x.BadRequests++
+	x.RejectedRequests++
 }
 
 func (x *RealVarz) CaptureBadGateway(req *http.Request) {

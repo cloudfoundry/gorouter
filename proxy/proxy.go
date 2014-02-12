@@ -24,7 +24,7 @@ type LookupRegistry interface {
 }
 
 type Reporter interface {
-	CaptureBadRequest(req *http.Request)
+	CaptureRejectedRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
@@ -121,7 +121,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	routeEndpoint, found := p.lookup(request)
 	if !found {
-		p.reporter.CaptureBadRequest(request)
+		p.reporter.CaptureRejectedRequest(request)
 		handler.HandleMissingRoute()
 		return
 	}
