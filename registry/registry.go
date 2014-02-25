@@ -162,6 +162,8 @@ func (registry *CFRegistry) NumUris() int {
 }
 
 func (r *CFRegistry) TimeOfLastUpdate() time.Time {
+	r.RLock()
+	defer r.RUnlock()
 	return r.timeOfLastUpdate
 }
 
@@ -204,6 +206,8 @@ func (r *CFRegistry) isEntryStale(entry *tableEntry) bool {
 }
 
 func (registry *CFRegistry) pauseStaleTracker() {
+	registry.Lock()
+	defer registry.Unlock()
 	for _, entry := range registry.table {
 		entry.updatedAt = time.Now()
 	}

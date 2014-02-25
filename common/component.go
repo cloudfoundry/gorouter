@@ -52,8 +52,10 @@ func UpdateVarz() *Varz {
 	varz.Lock()
 	defer varz.Unlock()
 
+	procStat.RLock()
 	varz.MemStat = procStat.MemRss
 	varz.Cpu = procStat.CpuUsage
+	procStat.RUnlock()
 	varz.Uptime = Component.Start.Elapsed()
 
 	return varz
