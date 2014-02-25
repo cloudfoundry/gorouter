@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
 )
@@ -157,13 +158,13 @@ func (h *RequestHandler) copyToResponse(src io.ReadCloser) (int64, error) {
 	}
 
 	return copied, err
-
 }
 
 func (h *RequestHandler) setupRequest(endpoint *route.Endpoint) {
 	h.setRequestURL(endpoint.CanonicalAddr())
 	h.setRequestXForwardedFor()
 	h.setRequestXRequestStart()
+	h.setRequestXVcapRequestId()
 }
 
 func (h *RequestHandler) setRequestURL(addr string) {
@@ -188,6 +189,12 @@ func (h *RequestHandler) setRequestXRequestStart() {
 	if _, ok := h.request.Header[http.CanonicalHeaderKey("X-Request-Start")]; !ok {
 		h.request.Header.Set("X-Request-Start", strconv.FormatInt(time.Now().UnixNano()/1e6, 10))
 	}
+}
+
+func (h *RequestHandler) setRequestXVcapRequestId() {
+	uuid := common.GenerateUUID()
+        h.request.Header.Set("X-Vcap-Request-Id", uuid)
+        h.logger.Set("X-Vcap-Request-Id", uuid)
 }
 
 func (h *RequestHandler) setupConnection() {

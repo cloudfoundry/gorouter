@@ -482,6 +482,43 @@ func (s *ProxySuite) TestXRequestStartIsNotOverwritten(c *C) {
 	<-done
 }
 
+func (s *ProxySuite) TestXVcapRequestIdIsAdded(c *C) {
+	done := make(chan bool)
+
+	s.RegisterHandler(c, "app", func(x *httpConn) {
+		req, _ := x.ReadRequest()
+		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		done <- true
+	})
+
+	x := s.DialProxy(c)
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "app"
+	x.WriteRequest(req)
+
+	<-done
+}
+
+func (s *ProxySuite) TestXVcapRequestIdIsOverwritten(c *C) {
+	done := make(chan bool)
+
+	s.RegisterHandler(c, "app", func(x *httpConn) {
+		req, _ := x.ReadRequest()
+		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		done <- true
+	})
+
+	x := s.DialProxy(c)
+
+	req := x.NewRequest("GET", "/", nil)
+	req.Host = "app"
+	req.Header.Add("X-Vcap-Request-Id", "A-BOGUS-REQUEST-ID")
+	x.WriteRequest(req)
+
+	<- done
+}
+
 func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 	s.RegisterHandler(c, "ws", func(x *httpConn) {
 		req, _ := x.ReadRequest()
