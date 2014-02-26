@@ -44,7 +44,7 @@ mkdir -p src/github.com/cloudfoundry
 
 go get -v ./src/github.com/cloudfoundry/gorouter/...
 
-gem install nats
+go get github.com/apcera/gnatsd
 ```
 
 ### Running Tests
