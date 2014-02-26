@@ -150,15 +150,20 @@ func (s *RouterSuite) TestRegisterUnregister(c *C) {
 }
 
 func (s *RouterSuite) TestRegistryLastUpdatedVarz(c *C) {
-	initialUpdateTime := fetchRecursively(s.readVarz(), "ms_since_last_registry_update").(float64)
-
 	app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
 	app1.Listen()
-	c.Assert(s.waitAppRegistered(app1, time.Second*5), Equals, true)
+	c.Assert(s.waitAppRegistered(app1, time.Second*1), Equals, true)
 
-	// varz time should be different
+	time.Sleep(2 * time.Second)
+	initialUpdateTime := fetchRecursively(s.readVarz(), "ms_since_last_registry_update").(float64)
+	// initialUpdateTime should be roughly 2 seconds.
+
+	app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, s.Config.Port, s.mbusClient, nil)
+	app2.Listen()
+	c.Assert(s.waitAppRegistered(app2, time.Second*1), Equals, true)
+
+	// updateTime should be roughly 0 seconds
 	updateTime := fetchRecursively(s.readVarz(), "ms_since_last_registry_update").(float64)
-
 	c.Assert(updateTime < initialUpdateTime, Equals, true)
 }
 
