@@ -38,7 +38,6 @@ func (s *VarzSuite) TestEmptyVarz(c *C) {
 		"index",
 		"host",
 		"credentials",
-		"config",
 		"start",
 		"uuid",
 		"uptime",
@@ -52,6 +51,10 @@ func (s *VarzSuite) TestEmptyVarz(c *C) {
 		if _, ok := data[key]; !ok {
 			c.Fatalf(`member "%s" not found`, key)
 		}
+	}
+
+	if _, ok := data["config"]; ok {
+		c.Fatalf(`config should be omitted from /varz`)
 	}
 }
 
