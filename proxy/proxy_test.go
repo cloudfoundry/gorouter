@@ -32,7 +32,7 @@ type nullVarz struct{}
 
 func (_ nullVarz) MarshalJSON() ([]byte, error)                               { return json.Marshal(nil) }
 func (_ nullVarz) ActiveApps() *stats.ActiveApps                              { return stats.NewActiveApps() }
-func (_ nullVarz) CaptureBadRequest(req *http.Request)                        {}
+func (_ nullVarz) CaptureRejectedRequest(req *http.Request)                   {}
 func (_ nullVarz) CaptureBadGateway(req *http.Request)                        {}
 func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {}
 func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
