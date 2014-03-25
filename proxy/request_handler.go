@@ -193,8 +193,8 @@ func (h *RequestHandler) setRequestXRequestStart() {
 
 func (h *RequestHandler) setRequestXVcapRequestId() {
 	uuid := common.GenerateUUID()
-        h.request.Header.Set("X-Vcap-Request-Id", uuid)
-        h.logger.Set("X-Vcap-Request-Id", uuid)
+	h.request.Header.Set("X-Request-Id", uuid)
+	h.logger.Set("X-Request-Id", uuid)
 }
 
 func (h *RequestHandler) setupConnection() {
