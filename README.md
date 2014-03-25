@@ -30,38 +30,36 @@ standalone environment.
 
 ### Setup
 
+You should have a `GOPATH` configured as described in http://golang.org/doc/code.html
+
+
+To install exactly the dependecies vendored with gorouter, use [godep](https://github.com/tools/godep)
+
 ```bash
-export GOPATH=~/go # or wherever
-export PATH=$GOPATH/bin:$PATH
+go get -v github.com/tools/godep
+go get -v github.com/cloudfoundry/gorouter
 
-cd $GOPATH
+cd $GOPATH/src/github.com/cloudfoundry/gorouter
 
-mkdir -p src/github.com/cloudfoundry
-(
-  cd src/github.com/cloudfoundry
-  git clone https://github.com/cloudfoundry/gorouter.git
-)
-
-go get -v ./src/github.com/cloudfoundry/gorouter/...
-
-go get github.com/apcera/gnatsd
+godep restore ./...
 ```
 
 ### Running Tests
 
 We are using Gocheck, to run tests
 
+
+`scripts/test` uses `go test ./...` internally. Any flags passed the `scripts/test` 
+will be passed to `go test ./...`
+
 ```
-go env
-go get -v ./...
-go build -v ./...
-go test -v ./...
+./scripts/test
 
 # just run tests whose names match Registry
-go test -v ./... -gocheck.f=Registry
+./scripts/test -gocheck.f=Registry
 
 # run the tests for only the registry package
-go test -v ./registry
+./scripts/test ./registry
 ```
 
 ### Start

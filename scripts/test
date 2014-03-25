@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e -x
+
+export GOPATH=$PWD/Godeps/_workspace:$GOPATH
+
+FIRST_GOPATH=`echo $GOPATH | cut -d':' -f1`
+
+mkdir -p $FIRST_GOPATH/bin
+export PATH=$FIRST_GOPATH/bin:$PATH
+
+go get -v github.com/apcera/gnatsd
+
+go test -v ./... "$@"

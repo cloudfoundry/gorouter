@@ -1,0 +1,60 @@
+{
+	"ImportPath": "github.com/cloudfoundry/gorouter",
+	"GoVersion": "go1.2.1",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/gogoprotobuf/proto",
+			"Rev": "2395ecf872ff63554aca750519f302cba92261d8"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gosteno",
+			"Comment": "scotty_09012012-40-g5eb8c6e",
+			"Rev": "5eb8c6e554f0dfc39d6468813b8ac19ec28fe74f"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/localip",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/emitter",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/loggregatorclient",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/logmessage",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/loggregatorlib/signature",
+			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/yagnats",
+			"Rev": "e039737afcd17e94e2f411a9d9f2056fd4d99fe7"
+		},
+		{
+			"ImportPath": "github.com/rcrowley/go-metrics",
+			"Rev": "281b9e0f99be54b1cfc813fe9014c31f6a58b369"
+		},
+		{
+			"ImportPath": "launchpad.net/gocheck",
+			"Comment": "87",
+			"Rev": "gustavo@niemeyer.net-20140225173054-xu9zlkf9kxhvow02"
+		},
+		{
+			"ImportPath": "launchpad.net/goyaml",
+			"Comment": "51",
+			"Rev": "gustavo@niemeyer.net-20140305200416-7gh64vkcckre5mob"
+		}
+	]
+}
