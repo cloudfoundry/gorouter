@@ -25,6 +25,7 @@ func CompleteAccessLogRecord() AccessLogRecord {
 			Header: http.Header{
 				"Referer":    []string{"FakeReferer"},
 				"User-Agent": []string{"FakeUserAgent"},
+				"X-Vcap-Request-Id": []string{"abc-123-xyz-pdq"},
 			},
 			RemoteAddr: "FakeRemoteAddr",
 		},
@@ -51,6 +52,7 @@ func (s *AccessLogRecordSuite) TestMakeRecordWithAllValues(c *C) {
 		"\"FakeReferer\" " +
 		"\"FakeUserAgent\" " +
 		"FakeRemoteAddr " +
+		"vcap_request:abc-123-xyz-pdq " +
 		"response_time:60.000000000 " +
 		"app_id:FakeApplicationId\n"
 
@@ -83,6 +85,7 @@ func (s *AccessLogRecordSuite) TestMakeRecordWithValuesMissing(c *C) {
 		"\"FakeReferer\" " +
 		"\"FakeUserAgent\" " +
 		"FakeRemoteAddr " +
+		"vcap_request:- " +
 		"response_time:MissingFinishedAt " +
 		"app_id:MissingRouteEndpointApplicationId\n"
 
