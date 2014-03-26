@@ -487,7 +487,7 @@ func (s *ProxySuite) TestXVcapRequestIdIsAdded(c *C) {
 
 	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get("X-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
 
@@ -505,7 +505,7 @@ func (s *ProxySuite) TestXVcapRequestIdIsOverwritten(c *C) {
 
 	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get("X-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
 
@@ -513,7 +513,7 @@ func (s *ProxySuite) TestXVcapRequestIdIsOverwritten(c *C) {
 
 	req := x.NewRequest("GET", "/", nil)
 	req.Host = "app"
-	req.Header.Add("X-Request-Id", "A-BOGUS-REQUEST-ID")
+	req.Header.Add("X-Vcap-Request-Id", "A-BOGUS-REQUEST-ID")
 	x.WriteRequest(req)
 
 	<-done
