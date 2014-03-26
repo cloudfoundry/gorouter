@@ -11,14 +11,9 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/common"
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
-)
-
-const (
-	VcapBackendHeader     = "X-Vcap-Backend"
-	CfRouteEndpointHeader = "X-Cf-RouteEndpoint"
-	VcapRouterHeader      = "X-Vcap-Router"
 )
 
 type RequestHandler struct {
@@ -121,9 +116,9 @@ func (h *RequestHandler) HandleHttpRequest(transport *http.Transport, endpoint *
 }
 
 func (h *RequestHandler) SetTraceHeaders(routerIp, addr string) {
-	h.response.Header().Set(VcapRouterHeader, routerIp)
-	h.response.Header().Set(VcapBackendHeader, addr)
-	h.response.Header().Set(CfRouteEndpointHeader, addr)
+	h.response.Header().Set(router_http.VcapRouterHeader, routerIp)
+	h.response.Header().Set(router_http.VcapBackendHeader, addr)
+	h.response.Header().Set(router_http.CfRouteEndpointHeader, addr)
 }
 
 func (h *RequestHandler) WriteResponse(endpointResponse *http.Response) int64 {
@@ -193,8 +188,8 @@ func (h *RequestHandler) setRequestXRequestStart() {
 
 func (h *RequestHandler) setRequestXVcapRequestId() {
 	uuid := common.GenerateUUID()
-	h.request.Header.Set("X-Vcap-Request-Id", uuid)
-	h.logger.Set("X-Vcap-Request-Id", uuid)
+	h.request.Header.Set(router_http.VcapRequestIdHeader, uuid)
+	h.logger.Set(router_http.VcapRequestIdHeader, uuid)
 }
 
 func (h *RequestHandler) setupConnection() {

@@ -123,16 +123,6 @@ func (a *TestApp) CheckAppStatus(status int) error {
 	return nil
 }
 
-// Types imported from router
-const (
-	VcapBackendHeader = "X-Vcap-Backend"
-	VcapRouterHeader  = "X-Vcap-Router"
-	VcapTraceHeader   = "X-Vcap-Trace"
-
-	VcapCookieId    = "__VCAP_ID__"
-	StickyCookieKey = "JSESSIONID"
-)
-
 type registerMessage struct {
 	Host string            `json:"host"`
 	Port uint16            `json:"port"`

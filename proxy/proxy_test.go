@@ -17,6 +17,7 @@ import (
 	. "launchpad.net/gocheck"
 
 	"github.com/cloudfoundry/gorouter/access_log"
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -378,13 +379,13 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 
 	req := x.NewRequest("GET", "/", nil)
 	req.Host = "trace-test"
-	req.Header.Set("X-Vcap-Trace", "my_trace_key")
+	req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
 	x.WriteRequest(req)
 
 	resp, _ := x.ReadResponse()
-	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, ln.Addr().String())
-	c.Check(resp.Header.Get("X-Cf-RouteEndpoint"), Equals, ln.Addr().String())
-	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, s.conf.Ip)
+	c.Check(resp.Header.Get(router_http.VcapBackendHeader), Equals, ln.Addr().String())
+	c.Check(resp.Header.Get(router_http.CfRouteEndpointHeader), Equals, ln.Addr().String())
+	c.Check(resp.Header.Get(router_http.VcapRouterHeader), Equals, s.conf.Ip)
 }
 
 func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
@@ -398,13 +399,13 @@ func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
 
 	req := x.NewRequest("GET", "/", nil)
 	req.Host = "trace-test"
-	req.Header.Set("X-Vcap-Trace", "a_bad_trace_key")
+	req.Header.Set(router_http.VcapTraceHeader, "a_bad_trace_key")
 	x.WriteRequest(req)
 
 	resp, _ := x.ReadResponse()
-	c.Check(resp.Header.Get("X-Vcap-Backend"), Equals, "")
-	c.Check(resp.Header.Get("X-Cf-RouteEndpoint"), Equals, "")
-	c.Check(resp.Header.Get("X-Vcap-Router"), Equals, "")
+	c.Check(resp.Header.Get(router_http.VcapBackendHeader), Equals, "")
+	c.Check(resp.Header.Get(router_http.CfRouteEndpointHeader), Equals, "")
+	c.Check(resp.Header.Get(router_http.VcapRouterHeader), Equals, "")
 }
 
 func (s *ProxySuite) TestXFFIsAdded(c *C) {
@@ -482,12 +483,12 @@ func (s *ProxySuite) TestXRequestStartIsNotOverwritten(c *C) {
 	<-done
 }
 
-func (s *ProxySuite) TestXVcapRequestIdIsAdded(c *C) {
+func (s *ProxySuite) TestXVcapRequestIdHeaderIsAdded(c *C) {
 	done := make(chan bool)
 
 	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
 
@@ -500,12 +501,12 @@ func (s *ProxySuite) TestXVcapRequestIdIsAdded(c *C) {
 	<-done
 }
 
-func (s *ProxySuite) TestXVcapRequestIdIsOverwritten(c *C) {
+func (s *ProxySuite) TestXVcapRequestIdHeaderIsOverwritten(c *C) {
 	done := make(chan bool)
 
 	s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get("X-Vcap-Request-Id"), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
 
@@ -513,7 +514,7 @@ func (s *ProxySuite) TestXVcapRequestIdIsOverwritten(c *C) {
 
 	req := x.NewRequest("GET", "/", nil)
 	req.Host = "app"
-	req.Header.Add("X-Vcap-Request-Id", "A-BOGUS-REQUEST-ID")
+	req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
 	x.WriteRequest(req)
 
 	<-done

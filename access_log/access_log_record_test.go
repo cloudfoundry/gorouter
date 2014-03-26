@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 )
 
@@ -23,9 +24,9 @@ func CompleteAccessLogRecord() AccessLogRecord {
 				Opaque: "http://example.com/request",
 			},
 			Header: http.Header{
-				"Referer":           []string{"FakeReferer"},
-				"User-Agent":        []string{"FakeUserAgent"},
-				"X-Vcap-Request-Id": []string{"abc-123-xyz-pdq"},
+				"Referer":                       []string{"FakeReferer"},
+				"User-Agent":                    []string{"FakeUserAgent"},
+				router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
 			},
 			RemoteAddr: "FakeRemoteAddr",
 		},

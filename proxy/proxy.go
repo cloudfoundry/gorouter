@@ -9,11 +9,11 @@ import (
 	steno "github.com/cloudfoundry/gosteno"
 
 	"github.com/cloudfoundry/gorouter/access_log"
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 )
 
 const (
-	VcapTraceHeader = "X-Vcap-Trace"
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
 )
@@ -157,7 +157,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	accessLog.FirstByteAt = time.Now()
 	accessLog.Response = endpointResponse
 
-	if p.traceKey != "" && request.Header.Get(VcapTraceHeader) == p.traceKey {
+	if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
 		handler.SetTraceHeaders(p.ip, routeEndpoint.CanonicalAddr())
 	}
 
