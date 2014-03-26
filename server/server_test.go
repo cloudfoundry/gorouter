@@ -977,7 +977,7 @@ type countReader struct {
 	n *int64
 }
 
-var countReaderLock  = sync.RWMutex{}
+var countReaderLock = sync.RWMutex{}
 
 func (cr countReader) Read(p []byte) (n int, err error) {
 	n, err = cr.r.Read(p)

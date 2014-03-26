@@ -56,6 +56,12 @@ func (f *FakeYagnats) Reset() {
 	f.nextSubscriptionID = 0
 }
 
+func (f *FakeYagnats) OnPing(onPingCallback func() bool) {
+	f.Lock()
+	f.onPing = onPingCallback
+	f.Unlock()
+}
+
 func (f *FakeYagnats) Ping() bool {
 	f.RLock()
 	onPing := f.onPing

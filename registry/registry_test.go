@@ -299,7 +299,7 @@ func (s *CFRegistrySuite) TestPruneStaleAppsWhenStateStale(c *C) {
 
 	time.Sleep(configObj.DropletStaleThreshold + 1*time.Millisecond)
 
-	s.messageBus.PingResponse = false
+	s.messageBus.OnPing(func() bool { return false })
 
 	time.Sleep(configObj.DropletStaleThreshold + 1*time.Millisecond)
 
@@ -320,11 +320,11 @@ func (s *CFRegistrySuite) TestPruneStaleDropletsDoesNotDeadlock(c *C) {
 
 	completeSequence := make(chan string)
 
-	s.messageBus.OnPing = func() bool {
+	s.messageBus.OnPing(func() bool {
 		time.Sleep(5 * time.Second)
 		completeSequence <- "stale"
 		return false
-	}
+	})
 
 	go s.r.PruneStaleDroplets()
 
