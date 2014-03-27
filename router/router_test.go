@@ -247,7 +247,7 @@ func (s *RouterSuite) TestStickySession(c *C) {
 
 func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
 	return func(netw, addr string) (net.Conn, error) {
-		c, err := net.Dial(netw, addr)
+		c, err := net.DialTimeout(netw, addr, 10*time.Second)
 		c.SetDeadline(time.Now().Add(2 * time.Second))
 		return c, err
 	}
@@ -411,7 +411,7 @@ func (s *RouterSuite) Test100ContinueRequest(c *C) {
 	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
 
 	host := fmt.Sprintf("foo.vcap.me:%d", s.Config.Port)
-	conn, err := net.Dial("tcp", host)
+	conn, err := net.DialTimeout("tcp", host, 10*time.Second)
 	c.Assert(err, IsNil)
 	defer conn.Close()
 

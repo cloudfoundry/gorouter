@@ -254,7 +254,7 @@ func TestHostHandlers(t *testing.T) {
 	ts := httptest.NewServer(nil)
 	defer ts.Close()
 
-	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestServerTimeouts(t *testing.T) {
 
 	// Slow client that should timeout.
 	t1 := time.Now()
-	conn, err := net.Dial("tcp", addr.String())
+	conn, err := net.DialTimeout("tcp", addr.String(), 10*time.Second)
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestIdentityResponse(t *testing.T) {
 	}
 	// Verify that the connection is closed when the declared Content-Length
 	// is larger than what the handler wrote.
-	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 	if err != nil {
 		t.Fatalf("error dialing: %v", err)
 	}
@@ -451,7 +451,7 @@ func testTcpConnectionCloses(t *testing.T, req string, h http.Handler) {
 	s := httptest.NewServer(h)
 	defer s.Close()
 
-	conn, err := net.Dial("tcp", s.Listener.Addr().String())
+	conn, err := net.DialTimeout("tcp", s.Listener.Addr().String(), 10*time.Second)
 	if err != nil {
 		t.Fatal("dial error:", err)
 	}
@@ -626,7 +626,7 @@ func TestTLSHandshakeTimeout(t *testing.T) {
 	ts.Config.ReadTimeout = 250 * time.Millisecond
 	ts.StartTLS()
 	defer ts.Close()
-	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
@@ -685,7 +685,7 @@ func TestServerExpect(t *testing.T) {
 	defer ts.Close()
 
 	runTest := func(test serverExpectTest) {
-		conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+		conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 		if err != nil {
 			t.Fatalf("Dial: %v", err)
 		}
@@ -1028,7 +1028,7 @@ func TestRequestBodyLimit(t *testing.T) {
 func TestClientWriteShutdown(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer ts.Close()
-	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
@@ -1089,7 +1089,7 @@ func TestContentLengthZero(t *testing.T) {
 	defer ts.Close()
 
 	for _, version := range []string{"HTTP/1.0", "HTTP/1.1"} {
-		conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+		conn, err := net.DialTimeout("tcp", ts.Listener.Addr().String(), 10*time.Second)
 		if err != nil {
 			t.Fatalf("error dialing: %v", err)
 		}

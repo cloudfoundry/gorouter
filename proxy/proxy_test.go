@@ -239,7 +239,7 @@ func (s *ProxySuite) DialProxy(c *C) *httpConn {
 }
 
 func (s *ProxySuite) TestRespondsToHttp10(c *C) {
-	s.RegisterHandler(c, "test", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		x.WriteLines([]string{
@@ -247,6 +247,7 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 			"Content-Length: 0",
 		})
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -259,7 +260,7 @@ func (s *ProxySuite) TestRespondsToHttp10(c *C) {
 }
 
 func (s *ProxySuite) TestLogsRequest(c *C) {
-	s.RegisterHandler(c, "test", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		x.WriteLines([]string{
@@ -267,6 +268,7 @@ func (s *ProxySuite) TestLogsRequest(c *C) {
 			"Content-Length: 0",
 		})
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -297,7 +299,7 @@ func (s *ProxySuite) TestLogsRequestWhenExitsEarly(c *C) {
 }
 
 func (s *ProxySuite) TestRespondsToHttp11(c *C) {
-	s.RegisterHandler(c, "test", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "test", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		x.WriteLines([]string{
@@ -305,6 +307,7 @@ func (s *ProxySuite) TestRespondsToHttp11(c *C) {
 			"Content-Length: 0",
 		})
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -352,9 +355,10 @@ func (s *ProxySuite) TestRespondsToUnknownHostWith404(c *C) {
 }
 
 func (s *ProxySuite) TestRespondsToMisbehavingHostWith502(c *C) {
-	s.RegisterHandler(c, "enfant-terrible", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "enfant-terrible", func(x *httpConn) {
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -374,6 +378,7 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 		x.WriteResponse(resp)
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -389,11 +394,12 @@ func (s *ProxySuite) TestTraceHeadersAddedOnCorrectTraceKey(c *C) {
 }
 
 func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
-	s.RegisterHandler(c, "trace-test", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "trace-test", func(x *httpConn) {
 		resp := newResponse(http.StatusOK)
 		x.WriteResponse(resp)
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -411,11 +417,12 @@ func (s *ProxySuite) TestTraceHeadersNotAddedOnIncorrectTraceKey(c *C) {
 func (s *ProxySuite) TestXFFIsAdded(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "127.0.0.1")
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -429,11 +436,12 @@ func (s *ProxySuite) TestXFFIsAdded(c *C) {
 func (s *ProxySuite) TestXFFIsAppended(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("X-Forwarded-For"), Equals, "1.2.3.4, 127.0.0.1")
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -448,11 +456,12 @@ func (s *ProxySuite) TestXFFIsAppended(c *C) {
 func (s *ProxySuite) TestXRequestStartIsAppended(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("X-Request-Start"), Matches, "^\\d{10}\\d{3}$") // unix timestamp millis
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -466,11 +475,12 @@ func (s *ProxySuite) TestXRequestStartIsAppended(c *C) {
 func (s *ProxySuite) TestXRequestStartIsNotOverwritten(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header[http.CanonicalHeaderKey("X-Request-Start")], DeepEquals, []string{"", "user-set2"})
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -486,11 +496,12 @@ func (s *ProxySuite) TestXRequestStartIsNotOverwritten(c *C) {
 func (s *ProxySuite) TestXVcapRequestIdHeaderIsAdded(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -504,11 +515,12 @@ func (s *ProxySuite) TestXVcapRequestIdHeaderIsAdded(c *C) {
 func (s *ProxySuite) TestXVcapRequestIdHeaderIsOverwritten(c *C) {
 	done := make(chan bool)
 
-	s.RegisterHandler(c, "app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
 		done <- true
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -521,7 +533,7 @@ func (s *ProxySuite) TestXVcapRequestIdHeaderIsOverwritten(c *C) {
 }
 
 func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
-	s.RegisterHandler(c, "ws", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "ws", func(x *httpConn) {
 		req, _ := x.ReadRequest()
 		c.Check(req.Header.Get("Upgrade"), Equals, "WebsockeT")
 		c.Check(req.Header.Get("Connection"), Equals, "UpgradE")
@@ -535,6 +547,7 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 		x.CheckLine("hello from client")
 		x.WriteLine("hello from server")
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -555,11 +568,12 @@ func (s *ProxySuite) TestWebSocketUpgrade(c *C) {
 }
 
 func (s *ProxySuite) TestTcpUpgrade(c *C) {
-	s.RegisterHandler(c, "tcp-handler", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "tcp-handler", func(x *httpConn) {
 		x.WriteLine("hello")
 		x.CheckLine("hello from client")
 		x.WriteLine("hello from server")
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -577,7 +591,7 @@ func (s *ProxySuite) TestTcpUpgrade(c *C) {
 }
 
 func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
-	s.RegisterHandler(c, "chunk", func(responseDestination *httpConn) {
+	ln := s.RegisterHandler(c, "chunk", func(responseDestination *httpConn) {
 		r, w := io.Pipe()
 
 		// Write 3 times on a 100ms interval
@@ -598,6 +612,7 @@ func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 		resp.Body = r
 		resp.Write(responseDestination)
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -625,12 +640,13 @@ func (s *ProxySuite) TestTransferEncodingChunked(c *C) {
 }
 
 func (s *ProxySuite) TestStatusNoContentHasNoTransferEncodingInResponse(c *C) {
-	s.RegisterHandler(c, "not-modified", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "not-modified", func(x *httpConn) {
 		resp := newResponse(http.StatusNoContent)
 		resp.Header.Set("Connection", "close")
 		x.WriteResponse(resp)
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -647,12 +663,13 @@ func (s *ProxySuite) TestStatusNoContentHasNoTransferEncodingInResponse(c *C) {
 }
 
 func (s *ProxySuite) TestRequestIsOkWithEncodedString(c *C) {
-	s.RegisterHandler(c, "encoding", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "encoding", func(x *httpConn) {
 		x.CheckLine("GET /hello%2Bworld?inline-depth=1 HTTP/1.1")
 		resp := newResponse(http.StatusOK)
 		x.WriteResponse(resp)
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -666,12 +683,13 @@ func (s *ProxySuite) TestRequestIsOkWithEncodedString(c *C) {
 
 func (s *ProxySuite) TestRequestTerminatesWhenResponseTakesTooLong(c *C) {
 	started := time.Now()
-	s.RegisterHandler(c, "slow-app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "slow-app", func(x *httpConn) {
 		time.Sleep(1 * time.Second)
 		resp := newResponse(http.StatusOK)
 		x.WriteResponse(resp)
 		x.Close()
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 
@@ -686,7 +704,7 @@ func (s *ProxySuite) TestRequestTerminatesWhenResponseTakesTooLong(c *C) {
 
 func (s *ProxySuite) TestRequestTerminatedWhenClientClosesConnection(c *C) {
 	serverResult := make(chan error)
-	s.RegisterHandler(c, "slow-app", func(x *httpConn) {
+	ln := s.RegisterHandler(c, "slow-app", func(x *httpConn) {
 		x.CheckLine("GET / HTTP/1.1")
 
 		timesToTick := 10
@@ -708,6 +726,7 @@ func (s *ProxySuite) TestRequestTerminatedWhenClientClosesConnection(c *C) {
 
 		serverResult <- nil
 	})
+	defer ln.Close()
 
 	x := s.DialProxy(c)
 

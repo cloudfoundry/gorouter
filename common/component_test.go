@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	. "launchpad.net/gocheck"
 	"net"
 	"net/http"
 	"runtime"
+	"time"
+
+	. "launchpad.net/gocheck"
 )
 
 type ComponentSuite struct {
@@ -93,7 +95,7 @@ func (s *ComponentSuite) serveComponent(c *C) {
 		// Yield to component's server listen goroutine
 		runtime.Gosched()
 
-		conn, err := net.Dial("tcp", s.Component.Host)
+		conn, err := net.DialTimeout("tcp", s.Component.Host, 10*time.Second)
 		if err == nil {
 			conn.Close()
 			return
