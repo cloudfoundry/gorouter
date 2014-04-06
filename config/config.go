@@ -3,7 +3,7 @@ package config
 import (
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"io/ioutil"
-	"launchpad.net/goyaml"
+	goyaml "github.com/go-yaml/yaml"
 	"time"
 )
 
