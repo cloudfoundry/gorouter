@@ -14,6 +14,7 @@ import (
 var Component VcapComponent
 var healthz *Healthz
 var varz *Varz
+var versionz *Versionz
 
 var procStat *ProcessStatus
 
@@ -26,6 +27,7 @@ type VcapComponent struct {
 	Config      interface{}               `json:"-"`
 	Varz        *Varz                     `json:"-"`
 	Healthz     *Healthz                  `json:"-"`
+	Versionz    *Versionz                 `json:"-"`
 	InfoRoutes  map[string]json.Marshaler `json:"-"`
 	Logger      *steno.Logger             `json:"-"`
 
@@ -105,6 +107,8 @@ func StartComponent(c *VcapComponent) {
 
 	healthz = Component.Healthz
 
+	versionz = Component.Versionz
+
 	go c.ListenAndServe()
 }
 
@@ -147,6 +151,13 @@ func (c *VcapComponent) ListenAndServe() {
 
 		enc := json.NewEncoder(w)
 		enc.Encode(UpdateVarz())
+	})
+
+	hs.HandleFunc("/versionz", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+
+		fmt.Fprintf(w, c.Versionz.Value())
 	})
 
 	for path, marshaler := range c.InfoRoutes {
