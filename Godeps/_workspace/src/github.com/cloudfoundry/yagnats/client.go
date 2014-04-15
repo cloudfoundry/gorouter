@@ -1,6 +1,7 @@
 package yagnats
 
 import (
+	"sync"
 	"time"
 )
 
@@ -25,7 +26,8 @@ type Client struct {
 
 	ConnectedCallback func()
 
-	Logger Logger
+	logger      Logger
+	loggerMutex *sync.RWMutex
 }
 
 type Message struct {
@@ -45,7 +47,9 @@ func NewClient() *Client {
 	return &Client{
 		connection:    make(chan *Connection),
 		subscriptions: make(map[int]*Subscription),
-		Logger:        &DefaultLogger{},
+
+		logger:      &DefaultLogger{},
+		loggerMutex: &sync.RWMutex{},
 	}
 }
 
@@ -136,6 +140,18 @@ func (c *Client) UnsubscribeAll(subject string) {
 	}
 }
 
+func (c *Client) SetLogger(logger Logger) {
+	c.loggerMutex.Lock()
+	c.logger = logger
+	c.loggerMutex.Unlock()
+}
+
+func (c *Client) Logger() Logger {
+	c.loggerMutex.RLock()
+	defer c.loggerMutex.RUnlock()
+	return c.logger
+}
+
 func (c *Client) subscribe(subject, queue string, callback Callback) (int, error) {
 	conn := <-c.connection
 
@@ -172,7 +188,7 @@ func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 
 	conn.OnMessage(c.dispatchMessage)
 
-	conn.Logger = c.Logger
+	conn.SetLogger(c.Logger())
 
 	return
 }
@@ -184,30 +200,30 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 	for stop := false; !stop; {
 		select {
 		case <-conn.Disconnected:
-			c.Logger.Warn("client.connection.disconnected")
+			c.Logger().Warn("client.connection.disconnected")
 			stop = true
 
 		case c.connection <- conn:
-			c.Logger.Debug("client.connection.served")
+			c.Logger().Debug("client.connection.served")
 		}
 	}
 
 	// stop if client was told to disconnect
 	if c.disconnecting {
-		c.Logger.Info("client.disconnecting")
+		c.Logger().Info("client.disconnecting")
 		return
 	}
 
 	// acquire new connection
 	for {
-		c.Logger.Debug("client.reconnect.starting")
+		c.Logger().Debug("client.reconnect.starting")
 
 		conn, err = c.connect(cp)
 		if err == nil {
 			go c.serveConnections(conn, cp)
-			c.Logger.Debug("client.connection.resubscribing")
+			c.Logger().Debug("client.connection.resubscribing")
 			c.resubscribe(conn)
-			c.Logger.Debug("client.connection.resubscribed")
+			c.Logger().Debug("client.connection.resubscribed")
 
 			if c.ConnectedCallback != nil {
 				go c.ConnectedCallback()
@@ -215,7 +231,7 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 			break
 		}
 
-		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "client.reconnect.failed")
+		c.Logger().Warnd(map[string]interface{}{"error": err.Error()}, "client.reconnect.failed")
 
 		time.Sleep(500 * time.Millisecond)
 	}

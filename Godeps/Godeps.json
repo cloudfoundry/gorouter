@@ -7,7 +7,11 @@
 	"Deps": [
 		{
 			"ImportPath": "code.google.com/p/gogoprotobuf/proto",
-			"Rev": "2395ecf872ff63554aca750519f302cba92261d8"
+			"Rev": "dc9b8350fb4568b6562900df872672f378242552"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
+			"Rev": "e493791d041a7c736105f369603f61e28a1586ae"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -16,45 +20,40 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/localip",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/emitter",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/loggregatorclient",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/logmessage",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/signature",
-			"Rev": "feb1e919de2e2a2b3855400e667655e4a39ca804"
+			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "333bc02013f26f06aaec4af0bdd8277270d30545"
+			"Rev": "8bf15e48f3abf6db1765ff908ee678a6f347ce0a"
 		},
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
-			"Rev": "281b9e0f99be54b1cfc813fe9014c31f6a58b369"
+			"Rev": "d1774362a14f30b8eb31af8867bfb15142263644"
 		},
 		{
 			"ImportPath": "launchpad.net/gocheck",
 			"Comment": "87",
 			"Rev": "gustavo@niemeyer.net-20140225173054-xu9zlkf9kxhvow02"
-		},
-		{
-			"ImportPath": "launchpad.net/goyaml",
-			"Comment": "51",
-			"Rev": "gustavo@niemeyer.net-20140305200416-7gh64vkcckre5mob"
 		}
 	]
 }

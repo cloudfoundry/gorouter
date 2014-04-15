@@ -420,15 +420,15 @@ func (s *YSuite) TestClientMessageWithoutSubscription(c *C) {
 
 func (s *YSuite) TestClientLogging(c *C) {
 	logger := &DefaultLogger{}
-	s.Client.Logger = logger
-	c.Assert(s.Client.Logger, Equals, logger)
+	s.Client.SetLogger(logger)
+	c.Assert(s.Client.Logger(), Equals, logger)
 }
 
 func (s *YSuite) TestClientPassesLoggerToConnection(c *C) {
 	logger := &DefaultLogger{}
 
 	client := NewClient()
-	client.Logger = logger
+	client.SetLogger(logger)
 
 	conn, err := client.connect(&ConnectionInfo{
 		Addr:     "127.0.0.1:4223",
@@ -438,7 +438,7 @@ func (s *YSuite) TestClientPassesLoggerToConnection(c *C) {
 
 	c.Assert(err, IsNil)
 
-	c.Assert(conn.Logger, Equals, logger)
+	c.Assert(conn.Logger(), Equals, logger)
 }
 
 func (s *YSuite) TestClientMessageWhileResubscribing(c *C) {
