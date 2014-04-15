@@ -1,16 +1,17 @@
 package config
 
 import (
+	"github.com/cloudfoundry-incubator/candiedyaml"
 	vcap "github.com/cloudfoundry/gorouter/common"
+
 	"io/ioutil"
-	"launchpad.net/goyaml"
 	"time"
 )
 
 type StatusConfig struct {
-	Port uint16 "port"
-	User string "user"
-	Pass string "pass"
+	Port uint16 `yaml:"port"`
+	User string `yaml:"user"`
+	Pass string `yaml:"pass"`
 }
 
 var defaultStatusConfig = StatusConfig{
@@ -20,10 +21,10 @@ var defaultStatusConfig = StatusConfig{
 }
 
 type NatsConfig struct {
-	Host string "host"
-	Port uint16 "port"
-	User string "user"
-	Pass string "pass"
+	Host string `yaml:"host"`
+	Port uint16 `yaml:"port"`
+	User string `yaml:"user"`
+	Pass string `yaml:"pass"`
 }
 
 var defaultNatsConfig = NatsConfig{
@@ -34,9 +35,9 @@ var defaultNatsConfig = NatsConfig{
 }
 
 type LoggingConfig struct {
-	File   string "file"
-	Syslog string "syslog"
-	Level  string "level"
+	File   string `yaml:"file"`
+	Syslog string `yaml:"syslog"`
+	Level  string `yaml:"level"`
 }
 
 var defaultLoggingConfig = LoggingConfig{
@@ -44,8 +45,8 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type LoggregatorConfig struct {
-	Url          string
-	SharedSecret string "shared_secret"
+	Url          string `yaml:"url"`
+	SharedSecret string `yaml:"shared_secret"`
 }
 
 var defaultLoggregatorConfig = LoggregatorConfig{
@@ -53,24 +54,24 @@ var defaultLoggregatorConfig = LoggregatorConfig{
 }
 
 type Config struct {
-	Status            StatusConfig      "status"
-	Nats              []NatsConfig      "nats"
-	Logging           LoggingConfig     "logging"
-	LoggregatorConfig LoggregatorConfig "loggregatorConfig"
+	Status            StatusConfig      `yaml:"status"`
+	Nats              []NatsConfig      `yaml:"nats"`
+	Logging           LoggingConfig     `yaml:"logging"`
+	LoggregatorConfig LoggregatorConfig `yaml:"loggregatorConfig"`
 
-	Port       uint16 "port"
-	Index      uint   "index"
-	Pidfile    string "pidfile"
-	GoMaxProcs int    "go_max_procs,omitempty"
-	TraceKey   string "trace_key"
-	AccessLog  string "access_log"
+	Port       uint16 `yaml:"port"`
+	Index      uint   `yaml:"index"`
+	Pidfile    string `yaml:"pidfile"`
+	GoMaxProcs int    `yaml:"go_max_procs,omitempty"`
+	TraceKey   string `yaml:"trace_key"`
+	AccessLog  string `yaml:"access_log"`
 
-	PublishStartMessageIntervalInSeconds int "publish_start_message_interval"
-	PruneStaleDropletsIntervalInSeconds  int "prune_stale_droplets_interval"
-	DropletStaleThresholdInSeconds       int "droplet_stale_threshold"
-	PublishActiveAppsIntervalInSeconds   int "publish_active_apps_interval"
-	StartResponseDelayIntervalInSeconds  int "start_response_delay_interval"
-	EndpointTimeoutInSeconds             int "endpoint_timeout"
+	PublishStartMessageIntervalInSeconds int `yaml:"publish_start_message_interval"`
+	PruneStaleDropletsIntervalInSeconds  int `yaml:"prune_stale_droplets_interval"`
+	DropletStaleThresholdInSeconds       int `yaml:"droplet_stale_threshold"`
+	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
+	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
+	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration
@@ -127,7 +128,7 @@ func (c *Config) Process() {
 
 func (c *Config) Initialize(configYAML []byte) error {
 	c.Nats = []NatsConfig{}
-	return goyaml.Unmarshal(configYAML, &c)
+	return candiedyaml.Unmarshal(configYAML, &c)
 }
 
 func InitConfigFromFile(path string) *Config {

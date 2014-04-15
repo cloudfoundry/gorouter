@@ -12,3 +12,5 @@ export PATH=$FIRST_GOPATH/bin:$PATH
 go get -v github.com/apcera/gnatsd
 
 go test -v ./... "$@"
+
+echo "PASSED"
