@@ -9,7 +9,8 @@ type CommonSuite struct{}
 var _ = Suite(&CommonSuite{})
 
 func (s *CommonSuite) TestUUID(c *C) {
-	uuid := GenerateUUID()
+	uuid, err := GenerateUUID()
 
-	c.Check(len(uuid), Equals, 32)
+	c.Assert(err, IsNil)
+	c.Check(len(uuid), Equals, 36)
 }

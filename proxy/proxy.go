@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
@@ -61,7 +62,10 @@ func NewProxy(args ProxyArgs) Proxy {
 		logger:       steno.NewLogger("router.proxy"),
 		registry:     args.Registry,
 		reporter:     args.Reporter,
-		transport:    &http.Transport{ResponseHeaderTimeout: args.EndpointTimeout},
+		transport: &http.Transport{
+			DisableKeepAlives:     true,
+			ResponseHeaderTimeout: args.EndpointTimeout,
+		},
 	}
 }
 
@@ -142,29 +146,139 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	endpointResponse, err := handler.HandleHttpRequest(p.transport, routeEndpoint)
+	proxyTransport := &proxyRoundTripper{
+		transport: p.transport,
+		after: func(rsp *http.Response, err error) {
+			accessLog.FirstByteAt = time.Now()
+			accessLog.Response = rsp
 
-	latency := time.Since(startedAt)
+			if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
+				setTraceHeaders(responseWriter, p.ip, routeEndpoint.CanonicalAddr())
+			}
 
-	p.reporter.CaptureRoutingResponse(routeEndpoint, endpointResponse, startedAt, latency)
+			latency := time.Since(startedAt)
 
-	if err != nil {
-		p.reporter.CaptureBadGateway(request)
-		handler.HandleBadGateway(err)
-		return
+			p.reporter.CaptureRoutingResponse(routeEndpoint, rsp, startedAt, latency)
+
+			if err != nil {
+				p.reporter.CaptureBadGateway(request)
+				handler.HandleBadGateway(err)
+				return
+			}
+
+			if routeEndpoint.PrivateInstanceId != "" {
+				setupStickySession(responseWriter, rsp, routeEndpoint)
+			}
+		},
 	}
 
-	accessLog.FirstByteAt = time.Now()
-	accessLog.Response = endpointResponse
-
-	if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
-		handler.SetTraceHeaders(p.ip, routeEndpoint.CanonicalAddr())
-	}
-
-	bytesSent := handler.WriteResponse(endpointResponse)
+	proxyWriter := newProxyResponseWriter(responseWriter)
+	p.newReverseProxy(proxyTransport, routeEndpoint).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
-	accessLog.BodyBytesSent = bytesSent
+	accessLog.BodyBytesSent = int64(proxyWriter.Size())
+}
+
+func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, endpoint *route.Endpoint) http.Handler {
+	u := url.URL{
+		Scheme: "http",
+		Host:   endpoint.CanonicalAddr(),
+	}
+
+	rproxy := httputil.NewSingleHostReverseProxy(&u)
+	oldDirector := rproxy.Director
+	rproxy.Director = func(req *http.Request) {
+		oldDirector(req)
+		setRequestXRequestStart(req)
+		setRequestXVcapRequestId(req, nil)
+	}
+
+	rproxy.Transport = proxyTransport
+	rproxy.FlushInterval = 50 * time.Millisecond
+
+	return rproxy
+}
+
+func setupStickySession(responseWriter http.ResponseWriter, response *http.Response, endpoint *route.Endpoint) {
+	for _, v := range response.Cookies() {
+		if v.Name == StickyCookieKey {
+			cookie := &http.Cookie{
+				Name:  VcapCookieId,
+				Value: endpoint.PrivateInstanceId,
+				Path:  "/",
+			}
+
+			http.SetCookie(responseWriter, cookie)
+			return
+		}
+	}
+}
+
+type proxyRoundTripper struct {
+	transport http.RoundTripper
+	after     func(response *http.Response, err error)
+	response  *http.Response
+	err       error
+}
+
+func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	p.response, p.err = p.transport.RoundTrip(request)
+	if p.after != nil {
+		p.after(p.response, p.err)
+	}
+
+	return p.response, p.err
+}
+
+type proxyResponseWriter struct {
+	w      http.ResponseWriter
+	status int
+	size   int
+
+	flusher http.Flusher
+}
+
+func newProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
+	proxyWriter := &proxyResponseWriter{
+		w:       w,
+		flusher: w.(http.Flusher),
+	}
+
+	return proxyWriter
+}
+
+func (p *proxyResponseWriter) Header() http.Header {
+	return p.w.Header()
+}
+
+func (p *proxyResponseWriter) Write(b []byte) (int, error) {
+	if p.status == 0 {
+		p.WriteHeader(http.StatusOK)
+	}
+	size, err := p.w.Write(b)
+	p.size += size
+	return size, err
+}
+
+func (p *proxyResponseWriter) WriteHeader(s int) {
+	p.w.WriteHeader(s)
+
+	if p.status == 0 {
+		p.status = s
+	}
+}
+func (p *proxyResponseWriter) Flush() {
+	if p.flusher != nil {
+		p.flusher.Flush()
+	}
+}
+
+func (p *proxyResponseWriter) Status() int {
+	return p.status
+}
+
+func (p *proxyResponseWriter) Size() int {
+	return p.size
 }
 
 func isProtocolSupported(request *http.Request) bool {
@@ -191,4 +305,10 @@ func upgradeHeader(request *http.Request) string {
 	} else {
 		return ""
 	}
+}
+
+func setTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) {
+	responseWriter.Header().Set(router_http.VcapRouterHeader, routerIp)
+	responseWriter.Header().Set(router_http.VcapBackendHeader, addr)
+	responseWriter.Header().Set(router_http.CfRouteEndpointHeader, addr)
 }

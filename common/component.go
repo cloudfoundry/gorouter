@@ -61,7 +61,7 @@ func UpdateVarz() *Varz {
 	return varz
 }
 
-func StartComponent(c *VcapComponent) {
+func StartComponent(c *VcapComponent) error {
 	Component = *c
 	if Component.Type == "" {
 		log.Fatal("Component type is required")
@@ -69,7 +69,11 @@ func StartComponent(c *VcapComponent) {
 	}
 
 	Component.Start = Time(time.Now())
-	Component.UUID = fmt.Sprintf("%d-%s", Component.Index, GenerateUUID())
+	uuid, err := GenerateUUID()
+	if err != nil {
+		return err
+	}
+	Component.UUID = fmt.Sprintf("%d-%s", Component.Index, uuid)
 
 	if Component.Host == "" {
 		host, err := LocalIP()
@@ -88,8 +92,14 @@ func StartComponent(c *VcapComponent) {
 	}
 
 	if Component.Credentials == nil || len(Component.Credentials) != 2 {
-		user := GenerateUUID()
-		password := GenerateUUID()
+		user, err := GenerateUUID()
+		if err != nil {
+			return err
+		}
+		password, err := GenerateUUID()
+		if err != nil {
+			return err
+		}
 
 		Component.Credentials = []string{user, password}
 	}
@@ -106,6 +116,7 @@ func StartComponent(c *VcapComponent) {
 	healthz = Component.Healthz
 
 	go c.ListenAndServe()
+	return nil
 }
 
 func Register(c *VcapComponent, mbusClient yagnats.NATSClient) {

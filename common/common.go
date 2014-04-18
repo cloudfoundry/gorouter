@@ -1,10 +1,10 @@
 package common
 
 import (
-	"fmt"
 	"net"
-	"os"
 	"strconv"
+
+	"github.com/nu7hatch/gouuid"
 )
 
 func LocalIP() (string, error) {
@@ -50,12 +50,10 @@ func GrabEphemeralPort() (port uint16, err error) {
 	return
 }
 
-func GenerateUUID() string {
-	file, _ := os.Open("/dev/urandom")
-	b := make([]byte, 16)
-	file.Read(b)
-	file.Close()
-
-	uuid := fmt.Sprintf("%x", b)
-	return uuid
+func GenerateUUID() (string, error) {
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	return uuid.String(), nil
 }

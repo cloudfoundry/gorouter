@@ -21,11 +21,12 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/server"
 
 	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/test_util"
 )
+
+const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
 type connHandler func(*httpConn)
 
@@ -173,7 +174,7 @@ func (s *ProxySuite) SetUpTest(c *C) {
 		panic(err)
 	}
 
-	server := server.Server{Handler: s.p}
+	server := http.Server{Handler: s.p}
 	go server.Serve(ln)
 
 	s.proxyServer = ln
@@ -498,7 +499,7 @@ func (s *ProxySuite) TestXVcapRequestIdHeaderIsAdded(c *C) {
 
 	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, uuid_regex)
 		done <- true
 	})
 	defer ln.Close()
@@ -517,7 +518,7 @@ func (s *ProxySuite) TestXVcapRequestIdHeaderIsOverwritten(c *C) {
 
 	ln := s.RegisterHandler(c, "app", func(x *httpConn) {
 		req, _ := x.ReadRequest()
-		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, "^[0-9a-f]{32}$")
+		c.Check(req.Header.Get(router_http.VcapRequestIdHeader), Matches, uuid_regex)
 		done <- true
 	})
 	defer ln.Close()

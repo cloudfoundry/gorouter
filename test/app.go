@@ -72,6 +72,7 @@ func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
 }
 
 func (a *TestApp) Register() {
+	uuid, _ := common.GenerateUUID()
 	rm := registerMessage{
 		Host: "localhost",
 		Port: a.port,
@@ -80,7 +81,7 @@ func (a *TestApp) Register() {
 		Dea:  "dea",
 		App:  "0",
 
-		PrivateInstanceId: common.GenerateUUID(),
+		PrivateInstanceId: uuid,
 	}
 
 	b, _ := json.Marshal(rm)

@@ -45,7 +45,7 @@ func (s *RouterSuite) SetUpSuite(c *C) {
 	s.Config = SpecConfig(s.natsPort, statusPort, proxyPort)
 
 	s.router = NewRouter(s.Config)
-	go s.router.Run()
+	s.router.Run()
 
 	<-s.WaitUntilNatsIsUp()
 	s.mbusClient = s.router.mbusClient

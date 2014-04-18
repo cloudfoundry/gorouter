@@ -47,6 +47,10 @@
 			"Rev": "8bf15e48f3abf6db1765ff908ee678a6f347ce0a"
 		},
 		{
+			"ImportPath": "github.com/nu7hatch/gouuid",
+			"Rev": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
+		},
+		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "d1774362a14f30b8eb31af8867bfb15142263644"
 		},
