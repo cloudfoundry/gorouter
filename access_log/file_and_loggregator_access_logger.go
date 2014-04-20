@@ -13,6 +13,7 @@ import (
 type FileAndLoggregatorAccessLogger struct {
 	emitter emitter.Emitter
 	channel chan AccessLogRecord
+	stopCh  chan struct{}
 	writer  io.Writer
 }
 
@@ -29,24 +30,30 @@ func NewFileAndLoggregatorAccessLogger(f io.Writer, e emitter.Emitter) *FileAndL
 		emitter: e,
 		writer:  f,
 		channel: make(chan AccessLogRecord, 128),
+		stopCh:  make(chan struct{}),
 	}
 
 	return a
 }
 
 func (x *FileAndLoggregatorAccessLogger) Run() {
-	for access_record := range x.channel {
-		if x.writer != nil {
-			access_record.WriteTo(x.writer)
-		}
-		if x.emitter != nil && access_record.ApplicationId() != "" {
-			x.emitter.Emit(access_record.ApplicationId(), access_record.LogMessage())
+	for {
+		select {
+		case record := <-x.channel:
+			if x.writer != nil {
+				record.WriteTo(x.writer)
+			}
+			if x.emitter != nil && record.ApplicationId() != "" {
+				x.emitter.Emit(record.ApplicationId(), record.LogMessage())
+			}
+		case <-x.stopCh:
+			return
 		}
 	}
 }
 
 func (x *FileAndLoggregatorAccessLogger) Stop() {
-	close(x.channel)
+	close(x.stopCh)
 }
 
 func (x *FileAndLoggregatorAccessLogger) Log(r AccessLogRecord) {

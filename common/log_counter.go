@@ -40,5 +40,7 @@ func (lc *LogCounter) GetCodec() steno.Codec {
 }
 
 func (lc *LogCounter) MarshalJSON() ([]byte, error) {
+	lc.Lock()
+	defer lc.Unlock()
 	return json.Marshal(lc.counts)
 }

@@ -10,10 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
 type TestApp struct {
+	mutex sync.Mutex
+
 	port       uint16      // app listening port
 	rPort      uint16      // router listening port
 	urls       []route.Uri // host registered host name
@@ -61,14 +64,18 @@ func (a *TestApp) Listen() {
 }
 
 func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
+	a.mutex.Lock()
 	a.stopped = false
 	for {
 		if a.stopped {
 			break
 		}
+		a.mutex.Unlock()
 		a.Register()
 		time.Sleep(duration)
+		a.mutex.Lock()
 	}
+	a.mutex.Unlock()
 }
 
 func (a *TestApp) Register() {
@@ -100,7 +107,10 @@ func (a *TestApp) Unregister() {
 
 	b, _ := json.Marshal(rm)
 	a.mbusClient.Publish("router.unregister", b)
+
+	a.mutex.Lock()
 	a.stopped = true
+	a.mutex.Unlock()
 }
 
 func (a *TestApp) VerifyAppStatus(status int) {

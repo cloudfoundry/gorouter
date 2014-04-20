@@ -47,13 +47,15 @@ var _ = Describe("AccessLog", func() {
 		It("a record is written", func() {
 			testEmitter := NewMockEmitter()
 			accessLogger := NewFileAndLoggregatorAccessLogger(nil, testEmitter)
-			accessLogger.Log(*CreateAccessLogRecord())
-			accessLogger.Stop()
+			go accessLogger.Run()
 
-			accessLogger.Run()
-			Ω(testEmitter.emitted).To(BeTrue())
+			accessLogger.Log(*CreateAccessLogRecord())
+			Eventually(testEmitter.done).Should(Receive())
+			Ω(testEmitter.emitted).Should(BeTrue())
 			Ω(testEmitter.appId).To(Equal("my_awesome_id"))
 			Ω(testEmitter.message).To(MatchRegexp("^.*foo.bar.*\n"))
+
+			accessLogger.Stop()
 		})
 
 		It("a record with no app id is not written", func() {
@@ -69,10 +71,11 @@ var _ = Describe("AccessLog", func() {
 			accessLogRecord := CreateAccessLogRecord()
 			accessLogRecord.RouteEndpoint = routeEndpoint
 			accessLogger.Log(*accessLogRecord)
-			accessLogger.Stop()
+			go accessLogger.Run()
 
-			accessLogger.Run()
-			Ω(testEmitter.emitted).To(BeFalse())
+			Consistently(testEmitter.done).ShouldNot(Receive())
+
+			accessLogger.Stop()
 		})
 
 	})
@@ -82,12 +85,17 @@ var _ = Describe("AccessLog", func() {
 			var fakeFile = new(test_util.FakeFile)
 
 			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, nil)
-
+			go accessLogger.Run()
 			accessLogger.Log(*CreateAccessLogRecord())
-			accessLogger.Stop()
-			accessLogger.Run()
 
-			Ω(string(fakeFile.Payload)).To(MatchRegexp("^.*foo.bar.*\n"))
+			var payload []byte
+			Eventually(func() int {
+				n, _ := fakeFile.Read(&payload)
+				return n
+			}).ShouldNot(Equal(0))
+			Ω(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
+
+			accessLogger.Stop()
 		})
 	})
 

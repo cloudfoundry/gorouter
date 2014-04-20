@@ -124,10 +124,14 @@ var _ = Describe("Proxy", func() {
 
 		x.CheckLine("HTTP/1.0 200 OK")
 
-		Ω(string(accessLogFile.Payload)).To(MatchRegexp("^test.*\n"))
+		var payload []byte
+		n, e := accessLogFile.Read(&payload)
+		Ω(e).ShouldNot(HaveOccurred())
+		Ω(n).ShouldNot(BeZero())
+		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
 		//make sure the record includes all the data
 		//since the building of the log record happens throughout the life of the request
-		Ω(string(accessLogFile.Payload)).To(MatchRegexp(".*200.*\n"))
+		Ω(string(payload)).To(MatchRegexp(".*200.*\n"))
 	})
 
 	It("Logs a request when it exits early", func() {
@@ -140,7 +144,11 @@ var _ = Describe("Proxy", func() {
 
 		x.CheckLine("HTTP/1.0 400 Bad Request")
 
-		Ω(string(accessLogFile.Payload)).To(MatchRegexp("^test.*\n"))
+		var payload []byte
+		n, e := accessLogFile.Read(&payload)
+		Ω(e).ShouldNot(HaveOccurred())
+		Ω(n).ShouldNot(BeZero())
+		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
 	})
 
 	It("responds to HTTP/1.1", func() {
@@ -219,7 +227,9 @@ var _ = Describe("Proxy", func() {
 
 	It("trace headers added on correct TraceKey", func() {
 		ln := registerHandler(r, "trace-test", func(x *test_util.HttpConn) {
-			x.ReadRequest()
+			_, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -242,7 +252,9 @@ var _ = Describe("Proxy", func() {
 
 	It("trace headers not added on incorrect TraceKey", func() {
 		ln := registerHandler(r, "trace-test", func(x *test_util.HttpConn) {
-			x.ReadRequest()
+			_, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -266,7 +278,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan bool)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -291,7 +305,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan bool)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -318,7 +334,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan string)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -344,7 +362,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan []string)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -372,7 +392,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan string)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -398,7 +420,9 @@ var _ = Describe("Proxy", func() {
 		done := make(chan string)
 
 		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
 			x.Close()
@@ -426,7 +450,8 @@ var _ = Describe("Proxy", func() {
 		done := make(chan bool)
 
 		ln := registerHandler(r, "ws", func(x *test_util.HttpConn) {
-			req, _ := x.ReadRequest()
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
 
 			done <- req.Header.Get("Upgrade") == "WebsockeT" &&
 				req.Header.Get("Connection") == "UpgradE"
@@ -510,7 +535,9 @@ var _ = Describe("Proxy", func() {
 				}
 			}()
 
-			x.ReadRequest()
+			_, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusOK)
 			resp.TransferEncoding = []string{"chunked"}
 			resp.Body = r
@@ -546,7 +573,9 @@ var _ = Describe("Proxy", func() {
 
 	It("status no content was no Transfer Encoding response header", func() {
 		ln := registerHandler(r, "not-modified", func(x *test_util.HttpConn) {
-			x.ReadRequest()
+			_, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			resp := test_util.NewResponse(http.StatusNoContent)
 			resp.Header.Set("Connection", "close")
 			x.WriteResponse(resp)
@@ -609,7 +638,9 @@ var _ = Describe("Proxy", func() {
 
 	It("request terminates with slow response", func() {
 		ln := registerHandler(r, "slow-app", func(x *test_util.HttpConn) {
-			x.ReadRequest()
+			_, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
 			time.Sleep(1 * time.Second)
 			resp := test_util.NewResponse(http.StatusOK)
 			x.WriteResponse(resp)
