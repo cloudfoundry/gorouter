@@ -92,6 +92,8 @@ func NewRouter(c *config.Config) *Router {
 func (r *Router) Run() {
 	var err error
 
+	util.WritePidFile(r.config.Pidfile)
+
 	natsMembers := []yagnats.ConnectionProvider{}
 
 	for _, info := range r.config.Nats {
@@ -145,8 +147,6 @@ func (r *Router) Run() {
 	if err != nil {
 		log.Fatalf("net.Listen: %s", err)
 	}
-
-	util.WritePidFile(r.config.Pidfile)
 
 	log.Infof("Listening on %s", listen.Addr())
 
