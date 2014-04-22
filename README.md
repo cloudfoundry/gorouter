@@ -11,7 +11,7 @@ This router is now used on CloudFoundry.com, replacing the old implementation.
 
 The original router can be found at cloudfoundry/router. The original router is
 backed by nginx, that uses Lua code to connect to a Ruby server that -- based
-on the headers of a client's request -- will tell nginx whick backend it should
+on the headers of a client's request -- will tell nginx which backend it should
 use. The main limitations in this architecture are that nginx does not support
 non-HTTP (e.g. traffic to services) and non-request/response type traffic (e.g.
 to support WebSockets), and that it requires a round trip to a Ruby server for
