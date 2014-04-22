@@ -29,6 +29,7 @@ type Router struct {
 	registry   *registry.CFRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
+	Versionz   *vcap.Versionz
 }
 
 func NewRouter(c *config.Config) *Router {
@@ -71,6 +72,10 @@ func NewRouter(c *config.Config) *Router {
 		LockableObject: router.registry,
 	}
 
+	versionz := &vcap.Versionz{
+		VersionRoute: "0",
+	}
+
 	router.component = &vcap.VcapComponent{
 		Type:        "Router",
 		Index:       router.config.Index,
@@ -79,6 +84,7 @@ func NewRouter(c *config.Config) *Router {
 		Config:      router.config,
 		Varz:        varz,
 		Healthz:     healthz,
+		Versionz:    versionz,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": router.registry,
 		},
@@ -167,6 +173,15 @@ func (r *Router) RegisterComponent() {
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
 		log.Debugf("Got router.register: %v", registryMessage)
+		if r.Versionz == nil {
+			r.Versionz = vcap.NewVersionz()
+			r.component.Versionz = r.Versionz
+		}
+		v, v_ok := registryMessage.Tags["version"]
+		if v_ok {
+			r.Versionz.VersionRoute = v
+		}
+		log.Debugf("version route: %s", r.Versionz.VersionRoute)
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
@@ -180,6 +195,15 @@ func (r *Router) SubscribeRegister() {
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
 		log.Debugf("Got router.unregister: %v", registryMessage)
+		if r.Versionz == nil {
+			r.Versionz = vcap.NewVersionz()
+			r.component.Versionz = r.Versionz
+		}
+		v, v_ok := registryMessage.Tags["version"]
+		if v_ok {
+			r.Versionz.VersionRoute = v
+		}
+		log.Debugf("version route: %s", r.Versionz.VersionRoute)
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(

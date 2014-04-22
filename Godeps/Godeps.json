@@ -52,9 +52,9 @@
 			"Rev": "gustavo@niemeyer.net-20140225173054-xu9zlkf9kxhvow02"
 		},
 		{
-			"ImportPath": "launchpad.net/goyaml",
+			"ImportPath": "github.com/go-yaml/yaml",
 			"Comment": "51",
-			"Rev": "gustavo@niemeyer.net-20140305200416-7gh64vkcckre5mob"
+			"Rev": "v1"
 		}
 	]
 }
