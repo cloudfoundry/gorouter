@@ -42,9 +42,6 @@ type RouterStart struct {
 }
 
 func UpdateHealthz() *Healthz {
-	// lock and unlock immediately to determine if we are in deadlock state
-	healthz.LockableObject.Lock()
-	healthz.LockableObject.Unlock()
 	return healthz
 }
 

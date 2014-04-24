@@ -1,8 +1,9 @@
 package router_test
 
 import (
-	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/access_log"
+	vcap "github.com/cloudfoundry/gorouter/common"
+	cfg "github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -10,6 +11,7 @@ import (
 	"github.com/cloudfoundry/gorouter/test"
 	"github.com/cloudfoundry/gorouter/test_util"
 	vvarz "github.com/cloudfoundry/gorouter/varz"
+	"github.com/cloudfoundry/gunk/natsrunner"
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -26,34 +28,45 @@ import (
 )
 
 var _ = Describe("Router", func() {
-	var Config *config.Config
+
+	var natsRunner *natsrunner.NATSRunner
+	var config *cfg.Config
+
 	var mbusClient *yagnats.Client
 	var registry *rregistry.CFRegistry
 	var varz vvarz.Varz
 	var router *Router
 
-	var nats *test_util.Nats
-
 	BeforeEach(func() {
-		nats = test_util.NewNatsOnRandomPort()
-		nats.Start()
+		natsPort := test_util.NextAvailPort()
+		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
+		natsRunner.Start()
 
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
 
-		Config = SpecConfig(nats.Port(), statusPort, proxyPort)
+		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 
-		mbusClient = yagnats.NewClient()
-		registry = rregistry.NewCFRegistry(Config, mbusClient)
+		mbusClient = natsRunner.MessageBus.(*yagnats.Client)
+		registry = rregistry.NewCFRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
-		router, err := NewRouter(Config, mbusClient, registry, varz)
+		logcounter := vcap.NewLogCounter()
+		proxy := proxy.NewProxy(proxy.ProxyArgs{
+			EndpointTimeout: config.EndpointTimeout,
+			Ip:              config.Ip,
+			TraceKey:        config.TraceKey,
+			Registry:        registry,
+			Reporter:        varz,
+			AccessLogger:    &access_log.NullAccessLogger{},
+		})
+		router, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
 		Ω(err).ShouldNot(HaveOccurred())
 		router.Run()
 	})
 
 	AfterEach(func() {
-		if nats != nil {
-			nats.Stop()
+		if natsRunner != nil {
+			natsRunner.Stop()
 		}
 	})
 
@@ -73,14 +86,14 @@ var _ = Describe("Router", func() {
 
 	It("discovers", func() {
 		// Test if router responses to discover message
-		sig := make(chan common.VcapComponent)
+		sig := make(chan vcap.VcapComponent)
 
 		// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
 		// sure that router has run at least for one second
 		time.Sleep(time.Second)
 
 		mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
-			var component common.VcapComponent
+			var component vcap.VcapComponent
 			_ = json.Unmarshal(msg.Payload, &component)
 			sig <- component
 		})
@@ -91,11 +104,11 @@ var _ = Describe("Router", func() {
 			[]byte{},
 		)
 
-		var cc common.VcapComponent
+		var cc vcap.VcapComponent
 		Eventually(sig).Should(Receive(&cc))
 
 		var emptyTime time.Time
-		var emptyDuration common.Duration
+		var emptyDuration vcap.Duration
 
 		Ω(cc.Type).To(Equal("Router"))
 		Ω(cc.Index).To(Equal(uint(2)))
@@ -108,7 +121,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("registers and unregisters", func() {
-		app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, Config.Port, mbusClient, nil)
+		app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 		app.Listen()
 		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
@@ -120,7 +133,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("registry contains last updated varz", func() {
-		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, Config.Port, mbusClient, nil)
+		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, config.Port, mbusClient, nil)
 		app1.Listen()
 		Ω(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
 
@@ -128,7 +141,7 @@ var _ = Describe("Router", func() {
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 		// initialUpdateTime should be roughly 2 seconds.
 
-		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, Config.Port, mbusClient, nil)
+		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
 		app2.Listen()
 		Ω(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
 
@@ -138,17 +151,17 @@ var _ = Describe("Router", func() {
 	})
 
 	It("varz", func() {
-		app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, Config.Port, mbusClient, map[string]string{"framework": "rails"})
+		app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, config.Port, mbusClient, map[string]string{"framework": "rails"})
 		app.Listen()
 		additionalRequests := 100
 		go app.RegisterRepeatedly(100 * time.Millisecond)
 		Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
 		// Send seed request
-		sendRequests("count.vcap.me", Config.Port, 1)
+		sendRequests("count.vcap.me", config.Port, 1)
 		initial_varz := readVarz(varz)
 
 		// Send requests
-		sendRequests("count.vcap.me", Config.Port, additionalRequests)
+		sendRequests("count.vcap.me", config.Port, additionalRequests)
 		updated_varz := readVarz(varz)
 
 		// Verify varz update
@@ -168,15 +181,15 @@ var _ = Describe("Router", func() {
 	It("sticky session", func() {
 		apps := make([]*test.TestApp, 10)
 		for i := range apps {
-			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, Config.Port, mbusClient, nil)
+			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, config.Port, mbusClient, nil)
 			apps[i].Listen()
 		}
 
 		for _, app := range apps {
 			Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
 		}
-		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", Config.Port)
-		port2 := getAppPortWithSticky("sticky.vcap.me", Config.Port, sessionCookie, vcapCookie)
+		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", config.Port)
+		port2 := getAppPortWithSticky("sticky.vcap.me", config.Port, sessionCookie, vcapCookie)
 
 		Ω(port1).To(Equal(port2))
 		Ω(vcapCookie.Path).To(Equal("/"))
@@ -193,7 +206,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("handles a PUT request", func() {
-		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, Config.Port, mbusClient, nil)
+		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
 
 		var rr *http.Request
 		var msg string
@@ -232,14 +245,14 @@ var _ = Describe("Router", func() {
 			started <- true
 		})
 
-		nats.Stop()
-		nats.Start()
+		natsRunner.Stop()
+		natsRunner.Start()
 
 		Eventually(started, 1).Should(Receive())
 	})
 
 	It("supports 100 Continue", func() {
-		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, Config.Port, mbusClient, nil)
+		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil)
 		rCh := make(chan *http.Request)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
@@ -254,7 +267,7 @@ var _ = Describe("Router", func() {
 
 		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
-		host := fmt.Sprintf("foo.vcap.me:%d", Config.Port)
+		host := fmt.Sprintf("foo.vcap.me:%d", config.Port)
 		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
 		Ω(err).ShouldNot(HaveOccurred())
 		defer conn.Close()
@@ -288,7 +301,7 @@ var _ = Describe("Router", func() {
 		mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
 		time.Sleep(250 * time.Millisecond)
 
-		host := fmt.Sprintf("http://%s:%d/routes", Config.Ip, Config.Status.Port)
+		host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
 
 		req, err = http.NewRequest("GET", host, nil)
 		req.SetBasicAuth("user", "pass")
@@ -307,14 +320,14 @@ var _ = Describe("Router", func() {
 	It("terminates long requests", func() {
 		app := test.NewSlowApp(
 			[]route.Uri{"slow-app.vcap.me"},
-			Config.Port,
+			config.Port,
 			mbusClient,
 			10*time.Second,
 		)
 
 		app.Listen()
 
-		uri := fmt.Sprintf("http://slow-app.vcap.me:%d", Config.Port)
+		uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
 		resp, err := http.Get(uri)
 		Ω(err).ShouldNot(HaveOccurred())
 		Ω(resp.StatusCode).To(Equal(502))
@@ -346,29 +359,11 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 
 func verify_health_z(host string, r *rregistry.CFRegistry) {
 	var req *http.Request
-	var resp *http.Response
-	var err error
 	path := "/healthz"
 
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
 	bytes := verify_success(req)
 	Ω(string(bytes)).To(Equal("ok"))
-
-	// Check that healthz does not reply during deadlock
-	r.Lock()
-	defer r.Unlock()
-
-	httpClient := http.Client{
-		Transport: &http.Transport{
-			Dial: timeoutDialler(),
-		},
-	}
-
-	req, err = http.NewRequest("GET", "http://"+host+path, nil)
-	resp, err = httpClient.Do(req)
-	Ω(err).Should(HaveOccurred())
-	Ω(resp).Should(BeNil())
-	Ω(err.Error()).Should(MatchRegexp("i/o timeout"))
 }
 
 func verify_var_z(host, user, pass string) {

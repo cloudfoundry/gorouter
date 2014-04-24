@@ -11,12 +11,20 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
-			"Rev": "07694762d4bce6cf00c2007182ccff5305d09f49"
+			"Rev": "dfcb028513f33935d16a9c278a9b38c39dae6343"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
 			"Comment": "scotty_09012012-40-g5eb8c6e",
 			"Rev": "5eb8c6e554f0dfc39d6468813b8ac19ec28fe74f"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
+			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gunk/runner_support",
+			"Rev": "21adc866d245fff747352415cc036b5ec3c3d4f5"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
@@ -61,6 +69,10 @@
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "6ffbdf30ba7072d9f9e2afe57ad651a75a544a83"
+		},
+		{
+			"ImportPath": "github.com/vito/cmdtest",
+			"Rev": "7949d8f2b06890d93ca31d3056de240b9d7c3bd5"
 		}
 	]
 }

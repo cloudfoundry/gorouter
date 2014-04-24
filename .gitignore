@@ -8,3 +8,4 @@ bin/*
 *.iml
 .idea/
 tags
+.DS_Store

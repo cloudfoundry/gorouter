@@ -9,7 +9,6 @@ import (
 	"github.com/cloudfoundry/yagnats"
 
 	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/log"
 	"github.com/cloudfoundry/gorouter/route"
 )
 
@@ -137,21 +136,18 @@ func (r *CFRegistry) lookupByUri(uri route.Uri) (*route.Pool, bool) {
 	return pool, ok
 }
 
-func (registry *CFRegistry) StartPruningCycle() {
-	go registry.checkAndPrune()
+func (r *CFRegistry) StartPruningCycle() {
+	go r.checkAndPrune()
 }
 
-func (registry *CFRegistry) PruneStaleDroplets() {
-	if registry.isStateStale() {
-		log.Info("State is stale; NOT pruning")
-		registry.pauseStaleTracker()
+func (r *CFRegistry) PruneStaleDroplets() {
+	if r.isStateStale() {
+		r.logger.Info("State is stale; NOT pruning")
+		r.pauseStaleTracker()
 		return
 	}
 
-	registry.Lock()
-	defer registry.Unlock()
-
-	registry.pruneStaleDroplets()
+	r.pruneStaleDroplets()
 }
 
 func (registry *CFRegistry) NumUris() int {
@@ -186,18 +182,21 @@ func (r *CFRegistry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.byUri)
 }
 
-func (registry *CFRegistry) isStateStale() bool {
-	return !registry.messageBus.Ping()
+func (r *CFRegistry) isStateStale() bool {
+	return !r.messageBus.Ping()
 }
 
-func (registry *CFRegistry) pruneStaleDroplets() {
-	for key, entry := range registry.table {
-		if !registry.isEntryStale(entry) {
+func (r *CFRegistry) pruneStaleDroplets() {
+	r.Lock()
+	defer r.Unlock()
+
+	for key, entry := range r.table {
+		if !r.isEntryStale(entry) {
 			continue
 		}
 
-		log.Infof("Pruning stale droplet: %v, uri: %s", entry, key.uri)
-		registry.unregisterUri(key)
+		r.logger.Infof("Pruning stale droplet: %v, uri: %s", entry, key.uri)
+		r.unregisterUri(key)
 	}
 }
 
@@ -205,10 +204,11 @@ func (r *CFRegistry) isEntryStale(entry *tableEntry) bool {
 	return entry.updatedAt.Add(r.dropletStaleThreshold).Before(time.Now())
 }
 
-func (registry *CFRegistry) pauseStaleTracker() {
-	registry.Lock()
-	defer registry.Unlock()
-	for _, entry := range registry.table {
+func (r *CFRegistry) pauseStaleTracker() {
+	r.Lock()
+	defer r.Unlock()
+
+	for _, entry := range r.table {
 		entry.updatedAt = time.Now()
 	}
 }
@@ -222,26 +222,26 @@ func (r *CFRegistry) checkAndPrune() {
 	for {
 		select {
 		case <-tick:
-			log.Debug("Start to check and prune stale droplets")
+			r.logger.Debug("Start to check and prune stale droplets")
 			r.PruneStaleDroplets()
 		}
 	}
 }
 
-func (registry *CFRegistry) unregisterUri(key tableKey) {
-	entry, found := registry.table[key]
+func (r *CFRegistry) unregisterUri(key tableKey) {
+	entry, found := r.table[key]
 	if !found {
 		return
 	}
 
-	endpoints, found := registry.byUri[key.uri]
+	endpoints, found := r.byUri[key.uri]
 	if found {
 		endpoints.Remove(entry.endpoint)
 
 		if endpoints.IsEmpty() {
-			delete(registry.byUri, key.uri)
+			delete(r.byUri, key.uri)
 		}
 	}
 
-	delete(registry.table, key)
+	delete(r.table, key)
 }

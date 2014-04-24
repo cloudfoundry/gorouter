@@ -2,7 +2,7 @@ package access_log
 
 import (
 	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/log"
+	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/loggregatorlib/emitter"
 
 	"os"
@@ -15,12 +15,14 @@ func CreateRunningAccessLogger(config *config.Config) (AccessLogger, error) {
 		return &NullAccessLogger{}, nil
 	}
 
+	logger := steno.NewLogger("access_log")
+
 	var err error
 	var file *os.File
 	if config.AccessLog != "" {
 		file, err = os.OpenFile(config.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			log.Errorf("Error creating accesslog file, %s: (%s)", config.AccessLog, err.Error())
+			logger.Errorf("Error creating accesslog file, %s: (%s)", config.AccessLog, err.Error())
 			return nil, err
 		}
 	}
@@ -30,7 +32,7 @@ func CreateRunningAccessLogger(config *config.Config) (AccessLogger, error) {
 		loggregatorSharedSecret := config.LoggregatorConfig.SharedSecret
 		e, err = NewEmitter(loggregatorUrl, loggregatorSharedSecret, config.Index)
 		if err != nil {
-			log.Errorf("Error creating loggregator emitter: (%s)", err.Error())
+			logger.Errorf("Error creating loggregator emitter: (%s)", err.Error())
 			return nil, err
 		}
 	}

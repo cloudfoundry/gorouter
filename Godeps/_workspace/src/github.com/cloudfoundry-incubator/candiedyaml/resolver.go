@@ -54,7 +54,6 @@ func init() {
 	null_values["null"] = true
 	null_values["Null"] = true
 	null_values["NULL"] = true
-	null_values[""] = true
 
 	timestamp_regexp = regexp.MustCompile("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:(?:[Tt]|[ \t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \t]*(?:Z|([-+][0-9][0-9]?)(?::([0-9][0-9])?)?))?)?$")
 	ymd_regexp = regexp.MustCompile("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)$")
@@ -396,13 +395,13 @@ func resolve_time(val string, v reflect.Value) (string, error) {
 }
 
 func resolveInterface(event yaml_event_t, useNumber bool) (string, interface{}) {
-	if len(event.value) == 0 {
-		return "", nil
-	}
-
 	val := string(event.value)
 	if len(event.tag) == 0 && !event.implicit {
 		return "", val
+	}
+
+	if len(val) == 0 {
+		return "!!null", nil
 	}
 
 	var result interface{}

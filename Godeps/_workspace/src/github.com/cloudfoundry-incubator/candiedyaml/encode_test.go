@@ -433,6 +433,7 @@ name:
 				Ω(buf.String()).Should(Equal(`a: b
 `))
 			})
+
 			It("skips the Marshaler when its a value", func() {
 				err := enc.Encode(hasPtrMarshaler{Value: map[string]string{"a": "b"}})
 				Ω(err).ShouldNot(HaveOccurred())

@@ -34,6 +34,35 @@ var _ = Describe("Decode", func() {
 		Ω(err).ShouldNot(HaveOccurred())
 	})
 
+	Context("strings", func() {
+		It("Decodes an empty string", func() {
+			d := NewDecoder(strings.NewReader(`""
+`))
+			var v string
+			err := d.Decode(&v)
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(v).Should(Equal(""))
+		})
+
+		It("Decodes an empty string to an interface", func() {
+			d := NewDecoder(strings.NewReader(`""
+`))
+			var v interface{}
+			err := d.Decode(&v)
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(v).Should(Equal(""))
+		})
+
+		It("Decodes a map containing empty strings to an interface", func() {
+			d := NewDecoder(strings.NewReader(`"" : ""
+`))
+			var v interface{}
+			err := d.Decode(&v)
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(v).Should(Equal(map[interface{}]interface{}{"": ""}))
+		})
+	})
+
 	Context("Sequence", func() {
 		It("Decodes to interface{}s", func() {
 			f, _ := os.Open("fixtures/specification/example2_1.yaml")
@@ -183,7 +212,6 @@ var _ = Describe("Decode", func() {
 			Ω(err).ShouldNot(HaveOccurred())
 			Ω(v).To(Equal(map[string][]string{"hr": []string{"Mark McGwire", "Sammy Sosa"}, "rbi": []string{"Sammy Sosa", "Ken Griffey"}}))
 		})
-
 	})
 
 	Context("Sequence of Maps", func() {

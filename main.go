@@ -1,14 +1,18 @@
 package main
 
 import (
+	"github.com/cloudfoundry/gorouter/access_log"
+	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/log"
+	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/router"
 	rvarz "github.com/cloudfoundry/gorouter/varz"
+	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
 
 	"flag"
+	"fmt"
 	"os"
 )
 
@@ -26,24 +30,92 @@ func main() {
 		c = config.InitConfigFromFile(configFile)
 	}
 
-	log.SetupLoggerFromConfig(c)
+	logCounter := vcap.NewLogCounter()
 
-	mbus := yagnats.NewClient()
-	registry := rregistry.NewCFRegistry(c, mbus)
-	varz := rvarz.NewVarz(registry)
-	router, err := router.NewRouter(c, mbus, registry, varz)
+	InitLoggerFromConfig(c, logCounter)
+	logger := steno.NewLogger("router.main")
+
+	natsClient := yagnats.NewClient()
+	natsMembers := []yagnats.ConnectionProvider{}
+
+	for _, info := range c.Nats {
+		natsMembers = append(natsMembers, &yagnats.ConnectionInfo{
+			Addr:     fmt.Sprintf("%s:%d", info.Host, info.Port),
+			Username: info.User,
+			Password: info.Pass,
+		})
+	}
+
+	err := natsClient.Connect(&yagnats.ConnectionCluster{
+		Members: natsMembers,
+	})
+
 	if err != nil {
-		log.Errorf("An error occurred: %s", err.Error())
+		logger.Fatalf("Error connecting to NATS: %s\n", err)
+	}
+
+	registry := rregistry.NewCFRegistry(c, natsClient)
+
+	varz := rvarz.NewVarz(registry)
+
+	accessLogger, err := access_log.CreateRunningAccessLogger(c)
+	if err != nil {
+		logger.Fatalf("Error creating access logger: %s\n", err)
+	}
+
+	args := proxy.ProxyArgs{
+		EndpointTimeout: c.EndpointTimeout,
+		Ip:              c.Ip,
+		TraceKey:        c.TraceKey,
+		Registry:        registry,
+		Reporter:        varz,
+		AccessLogger:    accessLogger,
+	}
+	p := proxy.NewProxy(args)
+
+	router, err := router.NewRouter(c, p, natsClient, registry, varz, logCounter)
+	if err != nil {
+		logger.Errorf("An error occurred: %s", err.Error())
 		os.Exit(1)
 	}
 
 	errChan := router.Run()
 
+	logger.Info("gorouter.started")
+
 	err = <-errChan
 	if err != nil {
-		log.Errorf("Error occurred:", err.Error())
+		logger.Errorf("Error occurred:", err.Error())
 		os.Exit(1)
 	}
 
 	os.Exit(0)
+}
+
+func InitLoggerFromConfig(c *config.Config, logCounter *vcap.LogCounter) {
+	l, err := steno.GetLogLevel(c.Logging.Level)
+	if err != nil {
+		panic(err)
+	}
+
+	s := make([]steno.Sink, 0, 3)
+	if c.Logging.File != "" {
+		s = append(s, steno.NewFileSink(c.Logging.File))
+	} else {
+		s = append(s, steno.NewIOSink(os.Stdout))
+	}
+
+	if c.Logging.Syslog != "" {
+		s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
+	}
+
+	s = append(s, logCounter)
+
+	stenoConfig := &steno.Config{
+		Sinks: s,
+		Codec: steno.NewJsonCodec(),
+		Level: l,
+	}
+
+	steno.Init(stenoConfig)
 }
