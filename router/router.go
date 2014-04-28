@@ -12,12 +12,14 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"runtime"
 	"time"
 )
+
+var DrainTimeout = errors.New("router: Drain timeout")
 
 type Router struct {
 	config     *config.Config
@@ -27,16 +29,13 @@ type Router struct {
 	varz       varz.Varz
 	component  *vcap.VcapComponent
 
+	listener net.Listener
+
 	logger *steno.Logger
 }
 
 func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient *yagnats.Client, r *registry.CFRegistry, v varz.Varz,
 	logCounter *vcap.LogCounter) (*Router, error) {
-
-	// setup number of procs
-	if cfg.GoMaxProcs != 0 {
-		runtime.GOMAXPROCS(cfg.GoMaxProcs)
-	}
 
 	var host string
 	if cfg.Status.Port != 0 {
@@ -75,8 +74,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient *yagnats.Client, r 
 		logger:     steno.NewLogger("router"),
 	}
 
-	err := vcap.StartComponent(router.component)
-	if err != nil {
+	if err := router.component.Start(); err != nil {
 		return nil, err
 	}
 
@@ -111,26 +109,59 @@ func (r *Router) Run() <-chan error {
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
-	server := http.Server{Handler: r.proxy}
-
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
-	if err != nil {
-		r.logger.Fatalf("net.Listen: %s", err)
+	// timeout all requests through the server but must be longer than the request
+	server_timeout := r.config.EndpointTimeout + 1*time.Second
+	server := http.Server{
+		ReadTimeout:  server_timeout,
+		WriteTimeout: server_timeout,
+		Handler:      r.proxy,
 	}
 
-	r.logger.Infof("Listening on %s", listen.Addr())
-
 	errChan := make(chan error, 1)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	if err != nil {
+		r.logger.Fatalf("net.Listen: %s", err)
+		errChan <- err
+		return errChan
+	}
+
+	r.listener = listener
+	r.logger.Infof("Listening on %s", listener.Addr())
+
 	go func() {
-		err := server.Serve(listen)
+		err := server.Serve(listener)
 		errChan <- err
 	}()
 
 	return errChan
 }
 
+func (r *Router) Drain(drainTimeout time.Duration) error {
+	r.listener.Close()
+
+	drained := make(chan struct{})
+	go func() {
+		r.proxy.Wait()
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+	case <-time.After(drainTimeout):
+		r.logger.Warn("router.drain.timed-out")
+		return DrainTimeout
+	}
+	return nil
+}
+
+func (r *Router) Stop() {
+	r.listener.Close()
+	r.component.Stop()
+}
+
 func (r *Router) RegisterComponent() {
-	vcap.Register(r.component, r.mbusClient)
+	r.component.Register(r.mbusClient)
 }
 
 func (r *Router) SubscribeRegister() {

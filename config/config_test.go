@@ -91,7 +91,6 @@ loggregatorConfig:
 			var b = []byte(`
 port: 8082
 index: 1
-pidfile: /tmp/pidfile
 go_max_procs: 2
 trace_key: "foo"
 access_log: "/tmp/access_log"
@@ -101,7 +100,6 @@ access_log: "/tmp/access_log"
 
 			Ω(config.Port).To(Equal(uint16(8082)))
 			Ω(config.Index).To(Equal(uint(1)))
-			Ω(config.Pidfile).To(Equal("/tmp/pidfile"))
 			Ω(config.GoMaxProcs).To(Equal(2))
 			Ω(config.TraceKey).To(Equal("foo"))
 			Ω(config.AccessLog).To(Equal("/tmp/access_log"))

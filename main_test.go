@@ -1,8 +1,6 @@
 package main_test
 
 import (
-	"syscall"
-
 	"github.com/cloudfoundry-incubator/candiedyaml"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
@@ -15,6 +13,10 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
+
+	"io"
+	"net/url"
+	"syscall"
 
 	"encoding/json"
 	"fmt"
@@ -34,6 +36,24 @@ var _ = Describe("Router Integration", func() {
 
 	var gorouterSession *Session
 
+	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
+		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
+
+		// ensure the threshold is longer than the interval that we check,
+		// because we set the route's timestamp to time.Now() on the interval
+		// as part of pausing
+		config.PruneStaleDropletsIntervalInSeconds = 1
+		config.DropletStaleThresholdInSeconds = 2
+		config.StartResponseDelayIntervalInSeconds = 1
+		config.EndpointTimeoutInSeconds = 1
+
+		cfgBytes, err := candiedyaml.Marshal(config)
+
+		Ω(err).ShouldNot(HaveOccurred())
+		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
+		return config
+	}
+
 	startGorouterSession := func(cfgFile string) *Session {
 		gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
@@ -47,7 +67,7 @@ var _ = Describe("Router Integration", func() {
 	stopGorouter := func(gorouterSession *Session) {
 		err := gorouterSession.Command.Process.Signal(syscall.SIGTERM)
 		Ω(err).ShouldNot(HaveOccurred())
-		gorouterSession.Wait(5 * time.Second)
+		Expect(gorouterSession.Wait(5 * time.Second)).Should(Exit(0))
 	}
 
 	BeforeEach(func() {
@@ -72,30 +92,106 @@ var _ = Describe("Router Integration", func() {
 		}
 	})
 
+	Context("Drain", func() {
+		It("waits for all requests to finish", func() {
+			localip, err := vcap.LocalIP()
+			Ω(err).ShouldNot(HaveOccurred())
+
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			config := createConfig(cfgFile, statusPort, proxyPort)
+
+			gorouterSession = startGorouterSession(cfgFile)
+
+			mbusClient, err := newMessageBus(config)
+
+			blocker := make(chan bool)
+			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil)
+			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				blocker <- true
+				_, err := ioutil.ReadAll(r.Body)
+				defer r.Body.Close()
+				Ω(err).ShouldNot(HaveOccurred())
+				w.WriteHeader(http.StatusNoContent)
+			})
+			longApp.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			Ω(waitAppRegistered(routesUri, longApp, 2*time.Second)).To(BeTrue())
+
+			go func() {
+				resp, err := http.Get(longApp.Endpoint())
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(resp.StatusCode).Should(Equal(http.StatusNoContent))
+				ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
+			}()
+
+			<-blocker
+
+			grouter := gorouterSession
+			gorouterSession = nil
+			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
+			Ω(err).ShouldNot(HaveOccurred())
+			Eventually(grouter, 5).Should(Exit(0))
+		})
+
+		It("will timeout if requests take too long", func() {
+			localip, err := vcap.LocalIP()
+			Ω(err).ShouldNot(HaveOccurred())
+
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			config := createConfig(cfgFile, statusPort, proxyPort)
+
+			gorouterSession = startGorouterSession(cfgFile)
+
+			mbusClient, err := newMessageBus(config)
+
+			blocker := make(chan bool)
+			resultCh := make(chan error, 1)
+			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil)
+			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				blocker <- true
+				time.Sleep(3 * time.Second)
+			})
+			timeoutApp.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
+
+			go func() {
+				_, err := http.Get(timeoutApp.Endpoint())
+				resultCh <- err
+			}()
+
+			<-blocker
+
+			grouter := gorouterSession
+			gorouterSession = nil
+			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
+			Ω(err).ShouldNot(HaveOccurred())
+			Eventually(grouter, 5).Should(Exit(0))
+
+			var result error
+			Eventually(resultCh).Should(Receive(&result))
+			Ω(result).Should(BeAssignableToTypeOf(&url.Error{}))
+			urlErr := result.(*url.Error)
+			Ω(urlErr.Err).Should(Equal(io.EOF))
+		})
+	})
+
 	It("has Nats connectivity", func() {
 		localip, err := vcap.LocalIP()
 		Ω(err).ShouldNot(HaveOccurred())
 
-		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
-
-		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
-
-		// ensure the threshold is longer than the interval that we check,
-		// because we set the route's timestamp to time.Now() on the interval
-		// as part of pausing
-		config.PruneStaleDropletsIntervalInSeconds = 1
-		config.PruneStaleDropletsInterval = 1 * time.Second
-		config.DropletStaleThresholdInSeconds = 2 * config.PruneStaleDropletsIntervalInSeconds
-		config.DropletStaleThreshold = 2 * config.PruneStaleDropletsInterval
-
-		config.StartResponseDelayIntervalInSeconds = 1
+		proxyPort := test_util.NextAvailPort()
 
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		cfgBytes, err := candiedyaml.Marshal(config)
-
-		Ω(err).ShouldNot(HaveOccurred())
-		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
+		config := createConfig(cfgFile, statusPort, proxyPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 

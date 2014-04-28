@@ -39,23 +39,23 @@ func (x *HttpConn) ReadRequest() (*http.Request, string) {
 
 func (x *HttpConn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, urlStr, body)
-	Ω(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	req.URL = &url.URL{Host: req.URL.Host, Opaque: urlStr}
 	return req
 }
 
 func (x *HttpConn) WriteRequest(req *http.Request) {
 	err := req.Write(x.Writer)
-	Ω(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	x.Writer.Flush()
 }
 
 func (x *HttpConn) ReadResponse() (*http.Response, string) {
 	resp, err := http.ReadResponse(x.Reader, &http.Request{})
-	Ω(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	b, err := ioutil.ReadAll(resp.Body)
-	Ω(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	return resp, string(b)
 }
@@ -71,7 +71,7 @@ func NewResponse(status int) *http.Response {
 
 func (x *HttpConn) WriteResponse(resp *http.Response) {
 	err := resp.Write(x.Writer)
-	Ω(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	x.Writer.Flush()
 }
 

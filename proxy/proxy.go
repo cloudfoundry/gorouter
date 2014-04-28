@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync"
 	"time"
-
-	steno "github.com/cloudfoundry/gosteno"
 
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
+	steno "github.com/cloudfoundry/gosteno"
 )
 
 const (
@@ -32,6 +32,7 @@ type ProxyReporter interface {
 
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
+	Wait()
 }
 
 type ProxyArgs struct {
@@ -51,6 +52,8 @@ type proxy struct {
 	reporter     ProxyReporter
 	accessLogger access_log.AccessLogger
 	transport    *http.Transport
+
+	waitgroup *sync.WaitGroup
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -65,6 +68,7 @@ func NewProxy(args ProxyArgs) Proxy {
 			DisableKeepAlives:     true,
 			ResponseHeaderTimeout: args.EndpointTimeout,
 		},
+		waitgroup: &sync.WaitGroup{},
 	}
 }
 
@@ -78,6 +82,10 @@ func hostWithoutPort(req *http.Request) string {
 	}
 
 	return host
+}
+
+func (p *proxy) Wait() {
+	p.waitgroup.Wait()
 }
 
 func (p *proxy) lookup(request *http.Request) (*route.Endpoint, bool) {
@@ -106,8 +114,11 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		StartedAt: startedAt,
 	}
 
+	p.waitgroup.Add(1)
+
 	defer func() {
 		p.accessLogger.Log(accessLog)
+		p.waitgroup.Done()
 	}()
 
 	if !isProtocolSupported(request) {
@@ -148,6 +159,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		after: func(rsp *http.Response, err error) {
 			accessLog.FirstByteAt = time.Now()
 			accessLog.Response = rsp
+
+			// disable keep-alives -- not needed with Go 1.3
+			responseWriter.Header().Set("Connection", "close")
 
 			if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
 				setTraceHeaders(responseWriter, p.ip, routeEndpoint.CanonicalAddr())

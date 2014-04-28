@@ -87,7 +87,7 @@ var _ = Describe("Component", func() {
 })
 
 func serveComponent(component *VcapComponent) {
-	go component.ListenAndServe()
+	component.ListenAndServe()
 
 	for i := 0; i < 5; i++ {
 		conn, err := net.DialTimeout("tcp", component.Host, 1*time.Second)

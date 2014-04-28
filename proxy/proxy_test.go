@@ -700,6 +700,67 @@ var _ = Describe("Proxy", func() {
 		Ω(err).NotTo(BeNil())
 	})
 
+	It("disables keepalives from clients -- force connection close", func() {
+		ln := registerHandler(r, "remote", func(x *test_util.HttpConn) {
+			http.ReadRequest(x.Reader)
+			resp := test_util.NewResponse(http.StatusOK)
+			resp.Header.Set("Connection", "keep-alive")
+			x.WriteResponse(resp)
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := x.NewRequest("GET", "/", nil)
+		req.Host = "remote"
+		x.WriteRequest(req)
+		resp, _ := x.ReadResponse()
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+		x.WriteRequest(req)
+		_, err := http.ReadResponse(x.Reader, &http.Request{})
+		Ω(err).Should(HaveOccurred())
+	})
+
+	Context("Wait", func() {
+		It("waits for requests to finish", func() {
+			blocker := make(chan bool)
+			ln := registerHandler(r, "waitforme", func(x *test_util.HttpConn) {
+				x.CheckLine("GET /whatever HTTP/1.1")
+
+				blocker <- true
+				<-blocker
+
+				resp := test_util.NewResponse(http.StatusOK)
+				x.WriteResponse(resp)
+				x.Close()
+			})
+			defer ln.Close()
+
+			x := dialProxy(proxyServer)
+			req := x.NewRequest("GET", "/whatever", nil)
+			req.Host = "waitforme"
+			x.WriteRequest(req)
+
+			<-blocker
+
+			doneWaiting := make(chan struct{})
+			go func() {
+				p.Wait()
+				close(doneWaiting)
+			}()
+
+			Consistently(doneWaiting).ShouldNot(BeClosed())
+
+			close(blocker)
+
+			resp, _ := x.ReadResponse()
+
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Eventually(doneWaiting).Should(BeClosed())
+		})
+	})
 })
 
 func registerAddr(r *registry.CFRegistry, u string, a net.Addr) {

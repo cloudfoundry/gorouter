@@ -59,77 +59,97 @@ var _ = Describe("Router", func() {
 			Reporter:        varz,
 			AccessLogger:    &access_log.NullAccessLogger{},
 		})
-		router, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
+		r, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
 		Ω(err).ShouldNot(HaveOccurred())
-		router.Run()
+		router = r
+		r.Run()
 	})
 
 	AfterEach(func() {
 		if natsRunner != nil {
 			natsRunner.Stop()
 		}
+
+		if router != nil {
+			router.Stop()
+		}
 	})
 
-	It("RouterGreets", func() {
-		response := make(chan []byte)
+	Context("NATS", func() {
+		It("RouterGreets", func() {
+			response := make(chan []byte)
 
-		mbusClient.Subscribe("router.greet.test.response", func(msg *yagnats.Message) {
-			response <- msg.Payload
+			mbusClient.Subscribe("router.greet.test.response", func(msg *yagnats.Message) {
+				response <- msg.Payload
+			})
+
+			mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
+
+			var msg []byte
+			Eventually(response, 1).Should(Receive(&msg))
+			Ω(string(msg)).To(MatchRegexp(".*\"minimumRegisterIntervalInSeconds\":5.*"))
 		})
 
-		mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
+		It("discovers", func() {
+			// Test if router responses to discover message
+			sig := make(chan vcap.VcapComponent)
 
-		var msg []byte
-		Eventually(response, 1).Should(Receive(&msg))
-		Ω(string(msg)).To(MatchRegexp(".*\"minimumRegisterIntervalInSeconds\":5.*"))
-	})
+			// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
+			// sure that router has run at least for one second
+			time.Sleep(time.Second)
 
-	It("discovers", func() {
-		// Test if router responses to discover message
-		sig := make(chan vcap.VcapComponent)
+			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
+				var component vcap.VcapComponent
+				_ = json.Unmarshal(msg.Payload, &component)
+				sig <- component
+			})
 
-		// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
-		// sure that router has run at least for one second
-		time.Sleep(time.Second)
+			mbusClient.PublishWithReplyTo(
+				"vcap.component.discover",
+				"vcap.component.discover.test.response",
+				[]byte{},
+			)
 
-		mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
-			var component vcap.VcapComponent
-			_ = json.Unmarshal(msg.Payload, &component)
-			sig <- component
+			var cc vcap.VcapComponent
+			Eventually(sig).Should(Receive(&cc))
+
+			var emptyTime time.Time
+			var emptyDuration vcap.Duration
+
+			Ω(cc.Type).To(Equal("Router"))
+			Ω(cc.Index).To(Equal(uint(2)))
+			Ω(cc.UUID).ToNot(Equal(""))
+			Ω(cc.Start).ToNot(Equal(emptyTime))
+			Ω(cc.Uptime).ToNot(Equal(emptyDuration))
+
+			verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1])
+			verify_health_z(cc.Host, registry)
 		})
 
-		mbusClient.PublishWithReplyTo(
-			"vcap.component.discover",
-			"vcap.component.discover.test.response",
-			[]byte{},
-		)
+		It("registers and unregisters", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
-		var cc vcap.VcapComponent
-		Eventually(sig).Should(Receive(&cc))
+			app.VerifyAppStatus(200)
 
-		var emptyTime time.Time
-		var emptyDuration vcap.Duration
+			app.Unregister()
+			Ω(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
+			app.VerifyAppStatus(404)
+		})
 
-		Ω(cc.Type).To(Equal("Router"))
-		Ω(cc.Index).To(Equal(uint(2)))
-		Ω(cc.UUID).ToNot(Equal(""))
-		Ω(cc.Start).ToNot(Equal(emptyTime))
-		Ω(cc.Uptime).ToNot(Equal(emptyDuration))
+		It("sends start on a nats connect", func() {
+			started := make(chan bool)
 
-		verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1])
-		verify_health_z(cc.Host, registry)
-	})
+			mbusClient.Subscribe("router.start", func(*yagnats.Message) {
+				started <- true
+			})
 
-	It("registers and unregisters", func() {
-		app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-		app.Listen()
-		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			natsRunner.Stop()
+			natsRunner.Start()
 
-		app.VerifyAppStatus(200)
-
-		app.Unregister()
-		Ω(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
-		app.VerifyAppStatus(404)
+			Eventually(started, 1).Should(Receive())
+		})
 	})
 
 	It("registry contains last updated varz", func() {
@@ -200,8 +220,58 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("Run", func() {
-		It("fails", func() {
-			Ω(func() { router.Run() }).To(Panic())
+		It("reports an error when run twice (address in use)", func() {
+			errCh := router.Run()
+			var err error
+			Eventually(errCh).Should(Receive(&err))
+			Ω(err).ShouldNot(BeNil())
+		})
+	})
+
+	Context("Stop", func() {
+		It("no longer responds to component requests", func() {
+			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
+
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				_, err := ioutil.ReadAll(r.Body)
+				defer r.Body.Close()
+				Ω(err).ShouldNot(HaveOccurred())
+				w.WriteHeader(http.StatusNoContent)
+			})
+			app.Listen()
+			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+			req, err := http.NewRequest("GET", app.Endpoint(), nil)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			sendAndReceive(req, http.StatusNoContent)
+
+			router.Stop()
+			router = nil
+
+			req, err = http.NewRequest("GET", app.Endpoint(), nil)
+			Ω(err).ShouldNot(HaveOccurred())
+			client := http.Client{}
+			_, err = client.Do(req)
+			Ω(err).Should(HaveOccurred())
+		})
+
+		It("no longer proxies", func() {
+			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+
+			req, err := http.NewRequest("GET", host, nil)
+			Ω(err).ShouldNot(HaveOccurred())
+			req.SetBasicAuth("user", "pass")
+
+			sendAndReceive(req, http.StatusOK)
+
+			router.Stop()
+			router = nil
+
+			req, err = http.NewRequest("GET", host, nil)
+
+			_, err = http.DefaultClient.Do(req)
+			Ω(err).Should(HaveOccurred())
 		})
 	})
 
@@ -228,7 +298,8 @@ var _ = Describe("Router", func() {
 		r, err := http.NewRequest("PUT", url, buf)
 		Ω(err).ShouldNot(HaveOccurred())
 
-		resp, err := http.DefaultClient.Do(r)
+		client := http.Client{}
+		resp, err := client.Do(r)
 		Ω(err).ShouldNot(HaveOccurred())
 		Ω(resp.StatusCode).To(Equal(http.StatusOK))
 
@@ -236,19 +307,6 @@ var _ = Describe("Router", func() {
 		Ω(rr.Method).To(Equal("PUT"))
 		Ω(rr.Proto).To(Equal("HTTP/1.1"))
 		Ω(msg).To(Equal("foobar"))
-	})
-
-	It("sends start on a nats connect", func() {
-		started := make(chan bool)
-
-		mbusClient.Subscribe("router.start", func(*yagnats.Message) {
-			started <- true
-		})
-
-		natsRunner.Stop()
-		natsRunner.Start()
-
-		Eventually(started, 1).Should(Receive())
 	})
 
 	It("supports 100 Continue", func() {
@@ -322,15 +380,22 @@ var _ = Describe("Router", func() {
 			[]route.Uri{"slow-app.vcap.me"},
 			config.Port,
 			mbusClient,
-			10*time.Second,
+			1*time.Second,
 		)
 
 		app.Listen()
 
 		uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
-		resp, err := http.Get(uri)
+		req, _ := http.NewRequest("GET", uri, nil)
+		client := http.Client{}
+		resp, err := client.Do(req)
 		Ω(err).ShouldNot(HaveOccurred())
-		Ω(resp.StatusCode).To(Equal(502))
+		Ω(resp).ShouldNot(BeNil())
+		Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+		defer resp.Body.Close()
+
+		_, err = ioutil.ReadAll(resp.Body)
+		Ω(err).ShouldNot(HaveOccurred())
 	})
 })
 
@@ -392,13 +457,16 @@ func verify_var_z(host, user, pass string) {
 }
 
 func verify_success(req *http.Request) []byte {
+	return sendAndReceive(req, http.StatusOK)
+}
+
+func sendAndReceive(req *http.Request, statusCode int) []byte {
 	var client http.Client
 	resp, err := client.Do(req)
-	defer resp.Body.Close()
-
 	Ω(err).ShouldNot(HaveOccurred())
 	Ω(resp).ShouldNot(BeNil())
-	Ω(resp.StatusCode).To(Equal(200))
+	Ω(resp.StatusCode).To(Equal(statusCode))
+	defer resp.Body.Close()
 
 	bytes, err := ioutil.ReadAll(resp.Body)
 	Ω(err).ShouldNot(HaveOccurred())
