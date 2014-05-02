@@ -2,6 +2,16 @@
 
 set -e -x -u
 
+function printStatus {
+      if [ $? -eq 0 ]; then
+          echo -e "\nSWEET SUITE SUCCESS"
+      else
+          echo -e "\nSUITE FAILURE"
+      fi
+  }
+
+trap printStatus EXIT
+
 . $(dirname $0)/gorequired
 
 #Download & Install gnatsd into GOPATH (or use pre-installed version)

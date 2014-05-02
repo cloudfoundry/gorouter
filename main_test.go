@@ -115,6 +115,7 @@ var _ = Describe("Router Integration", func() {
 
 		It("waits for all requests to finish", func() {
 			mbusClient, err := newMessageBus(config)
+			Ω(err).ShouldNot(HaveOccurred())
 
 			blocker := make(chan bool)
 			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil)
@@ -148,6 +149,7 @@ var _ = Describe("Router Integration", func() {
 
 		It("will timeout if requests take too long", func() {
 			mbusClient, err := newMessageBus(config)
+			Ω(err).ShouldNot(HaveOccurred())
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 1)

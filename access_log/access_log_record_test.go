@@ -92,9 +92,7 @@ func CompleteAccessLogRecord() AccessLogRecord {
 			RemoteAddr: "FakeRemoteAddr",
 		},
 		BodyBytesSent: 23,
-		Response: &http.Response{
-			StatusCode: 200,
-		},
+		StatusCode:    200,
 		RouteEndpoint: &route.Endpoint{
 			ApplicationId: "FakeApplicationId",
 		},

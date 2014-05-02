@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "github.com/cloudfoundry/gorouter/common/http"
-	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/yagnats"
 	"net"
 	"net/http"
 	"runtime"
 	"time"
+	. "github.com/cloudfoundry/gorouter/common/http"
+	steno "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/yagnats"
 )
 
 var procStat *ProcessStatus
@@ -81,7 +81,7 @@ func (c *VcapComponent) Start() error {
 			return err
 		}
 
-		c.Host = fmt.Sprintf("%s:%s", host, port)
+		c.Host = fmt.Sprintf("%s:%d", host, port)
 	}
 
 	if c.Credentials == nil || len(c.Credentials) != 2 {

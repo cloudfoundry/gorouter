@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -16,12 +18,16 @@ import (
 const (
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
+	retries         = 3
 )
 
+var noEndpointsAvailable = errors.New("No endpoints available")
+
 type LookupRegistry interface {
-	Lookup(uri route.Uri) (*route.Endpoint, bool)
-	LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool)
+	Lookup(uri route.Uri) *route.Pool
 }
+
+type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
 type ProxyReporter interface {
 	CaptureBadRequest(req *http.Request)
@@ -88,31 +94,31 @@ func (p *proxy) Wait() {
 	p.waitgroup.Wait()
 }
 
-func (p *proxy) lookup(request *http.Request) (*route.Endpoint, bool) {
-	uri := route.Uri(hostWithoutPort(request))
-
+func (p *proxy) getStickySession(request *http.Request) string {
 	// Try choosing a backend using sticky session
 	if _, err := request.Cookie(StickyCookieKey); err == nil {
 		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			routeEndpoint, ok := p.registry.LookupByPrivateInstanceId(uri, sticky.Value)
-			if ok {
-				return routeEndpoint, ok
-			}
+			return sticky.Value
 		}
 	}
+	return ""
+}
 
+func (p *proxy) lookup(request *http.Request) *route.Pool {
+	uri := route.Uri(hostWithoutPort(request))
 	// Choose backend using host alone
 	return p.registry.Lookup(uri)
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
-	handler := NewRequestHandler(request, responseWriter)
 
 	accessLog := access_log.AccessLogRecord{
 		Request:   request,
 		StartedAt: startedAt,
 	}
+
+	handler := NewRequestHandler(request, responseWriter, p.reporter, &accessLog)
 
 	p.waitgroup.Add(1)
 
@@ -131,82 +137,167 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	routeEndpoint, found := p.lookup(request)
-	if !found {
+	routePool := p.lookup(request)
+	if routePool == nil {
 		p.reporter.CaptureBadRequest(request)
 		handler.HandleMissingRoute()
 		return
 	}
 
-	handler.logger.Set("RouteEndpoint", routeEndpoint.ToLogData())
+	stickyEndpointId := p.getStickySession(request)
+	iter := &wrappedIterator{
+		nested: routePool.Endpoints(stickyEndpointId),
 
-	accessLog.RouteEndpoint = routeEndpoint
-
-	p.reporter.CaptureRoutingRequest(routeEndpoint, handler.request)
+		afterNext: func(endpoint *route.Endpoint) {
+			if endpoint != nil {
+				handler.logger.Set("RouteEndpoint", endpoint.ToLogData())
+				accessLog.RouteEndpoint = endpoint
+				p.reporter.CaptureRoutingRequest(endpoint, request)
+			}
+		},
+	}
 
 	if isTcpUpgrade(request) {
-		handler.HandleTcpRequest(routeEndpoint)
+		handler.HandleTcpRequest(iter)
 		return
 	}
 
 	if isWebSocketUpgrade(request) {
-		handler.HandleWebSocketRequest(routeEndpoint)
+		handler.HandleWebSocketRequest(iter)
 		return
 	}
 
+	proxyWriter := newProxyResponseWriter(responseWriter)
 	proxyTransport := &proxyRoundTripper{
 		transport: p.transport,
-		after: func(rsp *http.Response, err error) {
+		iter:      iter,
+		handler:   &handler,
+
+		after: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 			accessLog.FirstByteAt = time.Now()
-			accessLog.Response = rsp
+			if rsp != nil {
+				accessLog.StatusCode = rsp.StatusCode
+			}
 
 			// disable keep-alives -- not needed with Go 1.3
 			responseWriter.Header().Set("Connection", "close")
 
 			if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
-				setTraceHeaders(responseWriter, p.ip, routeEndpoint.CanonicalAddr())
+				setTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
 			}
 
 			latency := time.Since(startedAt)
 
-			p.reporter.CaptureRoutingResponse(routeEndpoint, rsp, startedAt, latency)
+			p.reporter.CaptureRoutingResponse(endpoint, rsp, startedAt, latency)
 
 			if err != nil {
 				p.reporter.CaptureBadGateway(request)
 				handler.HandleBadGateway(err)
+				proxyWriter.Done()
 				return
 			}
 
-			if routeEndpoint.PrivateInstanceId != "" {
-				setupStickySession(responseWriter, rsp, routeEndpoint)
+			if endpoint.PrivateInstanceId != "" {
+				setupStickySession(responseWriter, rsp, endpoint)
 			}
 		},
 	}
 
-	proxyWriter := newProxyResponseWriter(responseWriter)
-	p.newReverseProxy(proxyTransport, routeEndpoint, request).ServeHTTP(proxyWriter, request)
+	p.newReverseProxy(proxyTransport, request).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = int64(proxyWriter.Size())
 }
 
-func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, endpoint *route.Endpoint, req *http.Request) http.Handler {
+func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
 			request.URL.Scheme = "http"
-			request.URL.Host = endpoint.CanonicalAddr()
+			request.URL.Host = req.Host
 			request.URL.Opaque = req.URL.Opaque
 			request.URL.RawQuery = req.URL.RawQuery
 
 			setRequestXRequestStart(req)
 			setRequestXVcapRequestId(req, nil)
 		},
+		Transport:     proxyTransport,
+		FlushInterval: 50 * time.Millisecond,
 	}
 
-	rproxy.Transport = proxyTransport
-	rproxy.FlushInterval = 50 * time.Millisecond
-
 	return rproxy
+}
+
+type proxyRoundTripper struct {
+	transport http.RoundTripper
+	after     AfterRoundTrip
+	iter      route.EndpointIterator
+	handler   *RequestHandler
+
+	response *http.Response
+	err      error
+}
+
+func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	var err error
+	var res *http.Response
+	var endpoint *route.Endpoint
+	retry := 0
+	for {
+		endpoint = p.iter.Next()
+
+		if endpoint == nil {
+			p.handler.reporter.CaptureBadGateway(request)
+			err = noEndpointsAvailable
+			p.handler.HandleBadGateway(err)
+			return nil, err
+		}
+
+		request.URL.Host = endpoint.CanonicalAddr()
+		res, err = p.transport.RoundTrip(request)
+		if err == nil {
+			break
+		}
+
+		if ne, netErr := err.(*net.OpError); !netErr || ne.Op != "dial" {
+			break
+		}
+
+		p.iter.EndpointFailed()
+
+		p.handler.Logger().Set("Error", err.Error())
+		p.handler.Logger().Warnf("proxy.endpoint.failed")
+
+		retry++
+		if retry == retries {
+			break
+		}
+	}
+
+	if p.after != nil {
+		p.after(res, endpoint, err)
+	}
+
+	p.response = res
+	p.err = err
+
+	return res, err
+}
+
+type wrappedIterator struct {
+	nested    route.EndpointIterator
+	afterNext func(*route.Endpoint)
+}
+
+func (i *wrappedIterator) Next() *route.Endpoint {
+	e := i.nested.Next()
+	if i.afterNext != nil {
+		i.afterNext(e)
+	}
+	return e
+}
+
+func (i *wrappedIterator) EndpointFailed() {
+	i.nested.EndpointFailed()
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response, endpoint *route.Endpoint) {
@@ -216,79 +307,14 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 				Name:  VcapCookieId,
 				Value: endpoint.PrivateInstanceId,
 				Path:  "/",
+
+				HttpOnly: true,
 			}
 
 			http.SetCookie(responseWriter, cookie)
 			return
 		}
 	}
-}
-
-type proxyRoundTripper struct {
-	transport http.RoundTripper
-	after     func(response *http.Response, err error)
-	response  *http.Response
-	err       error
-}
-
-func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	p.response, p.err = p.transport.RoundTrip(request)
-	if p.after != nil {
-		p.after(p.response, p.err)
-	}
-
-	return p.response, p.err
-}
-
-type proxyResponseWriter struct {
-	w      http.ResponseWriter
-	status int
-	size   int
-
-	flusher http.Flusher
-}
-
-func newProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
-	proxyWriter := &proxyResponseWriter{
-		w:       w,
-		flusher: w.(http.Flusher),
-	}
-
-	return proxyWriter
-}
-
-func (p *proxyResponseWriter) Header() http.Header {
-	return p.w.Header()
-}
-
-func (p *proxyResponseWriter) Write(b []byte) (int, error) {
-	if p.status == 0 {
-		p.WriteHeader(http.StatusOK)
-	}
-	size, err := p.w.Write(b)
-	p.size += size
-	return size, err
-}
-
-func (p *proxyResponseWriter) WriteHeader(s int) {
-	p.w.WriteHeader(s)
-
-	if p.status == 0 {
-		p.status = s
-	}
-}
-func (p *proxyResponseWriter) Flush() {
-	if p.flusher != nil {
-		p.flusher.Flush()
-	}
-}
-
-func (p *proxyResponseWriter) Status() int {
-	return p.status
-}
-
-func (p *proxyResponseWriter) Size() int {
-	return p.size
 }
 
 func isProtocolSupported(request *http.Request) bool {

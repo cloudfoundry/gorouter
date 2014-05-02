@@ -62,11 +62,7 @@ var _ = Describe("AccessLog", func() {
 			testEmitter := NewMockEmitter()
 			accessLogger := NewFileAndLoggregatorAccessLogger(nil, testEmitter)
 
-			routeEndpoint := &route.Endpoint{
-				ApplicationId: "",
-				Host:          "127.0.0.1",
-				Port:          4567,
-			}
+			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil)
 
 			accessLogRecord := CreateAccessLogRecord()
 			accessLogRecord.RouteEndpoint = routeEndpoint
@@ -165,15 +161,11 @@ func CreateAccessLogRecord() *AccessLogRecord {
 		StatusCode: http.StatusOK,
 	}
 
-	b := &route.Endpoint{
-		ApplicationId: "my_awesome_id",
-		Host:          "127.0.0.1",
-		Port:          4567,
-	}
+	b := route.NewEndpoint("my_awesome_id", "127.0.0.1", 4567, "", nil)
 
 	r := AccessLogRecord{
 		Request:       req,
-		Response:      res,
+		StatusCode:    res.StatusCode,
 		RouteEndpoint: b,
 		StartedAt:     time.Unix(10, 100000000),
 		FirstByteAt:   time.Unix(10, 200000000),

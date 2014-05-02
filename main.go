@@ -63,7 +63,7 @@ func main() {
 		logger.Fatalf("Error connecting to NATS: %s\n", err)
 	}
 
-	registry := rregistry.NewCFRegistry(c, natsClient)
+	registry := rregistry.NewRouteRegistry(c, natsClient)
 
 	varz := rvarz.NewVarz(registry)
 
