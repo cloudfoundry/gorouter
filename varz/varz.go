@@ -170,13 +170,13 @@ type Varz interface {
 
 type RealVarz struct {
 	sync.Mutex
-	r          *registry.CFRegistry
+	r          *registry.RouteRegistry
 	activeApps *stats.ActiveApps
 	topApps    *stats.TopApps
 	varz
 }
 
-func NewVarz(r *registry.CFRegistry) Varz {
+func NewVarz(r *registry.RouteRegistry) Varz {
 	x := &RealVarz{r: r}
 
 	x.activeApps = stats.NewActiveApps()
@@ -227,18 +227,16 @@ func (x *RealVarz) ActiveApps() *stats.ActiveApps {
 	return x.activeApps
 }
 
-func (x *RealVarz) CaptureBadRequest(req *http.Request) {
+func (x *RealVarz) CaptureBadRequest(*http.Request) {
 	x.Lock()
-	defer x.Unlock()
-
 	x.BadRequests++
+	x.Unlock()
 }
 
-func (x *RealVarz) CaptureBadGateway(req *http.Request) {
+func (x *RealVarz) CaptureBadGateway(*http.Request) {
 	x.Lock()
-	defer x.Unlock()
-
 	x.BadGateways++
+	x.Unlock()
 }
 
 func (x *RealVarz) CaptureAppStats(b *route.Endpoint, t time.Time) {
@@ -250,7 +248,6 @@ func (x *RealVarz) CaptureAppStats(b *route.Endpoint, t time.Time) {
 
 func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 	x.Lock()
-	defer x.Unlock()
 
 	var t string
 	var ok bool
@@ -261,11 +258,12 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 	}
 
 	x.varz.All.CaptureRequest()
+
+	x.Unlock()
 }
 
 func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
 	x.Lock()
-	defer x.Unlock()
 
 	var tags string
 	var ok bool
@@ -277,6 +275,8 @@ func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *ht
 
 	x.CaptureAppStats(endpoint, startedAt)
 	x.varz.All.CaptureResponse(response, duration)
+
+	x.Unlock()
 }
 
 func transform(x interface{}, y map[string]interface{}) error {

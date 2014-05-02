@@ -26,7 +26,7 @@ type Router struct {
 	config     *config.Config
 	proxy      proxy.Proxy
 	mbusClient *yagnats.Client
-	registry   *registry.CFRegistry
+	registry   *registry.RouteRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
 
@@ -35,7 +35,7 @@ type Router struct {
 	logger *steno.Logger
 }
 
-func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient *yagnats.Client, r *registry.CFRegistry, v varz.Varz,
+func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient *yagnats.Client, r *registry.RouteRegistry, v varz.Varz,
 	logCounter *vcap.LogCounter) (*Router, error) {
 
 	var host string
@@ -257,9 +257,9 @@ func (r *Router) greetMessage() ([]byte, error) {
 	}
 
 	d := vcap.RouterStart{
-		uuid,
-		[]string{host},
-		r.config.StartResponseDelayIntervalInSeconds,
+		Id:    uuid,
+		Hosts: []string{host},
+		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,
 	}
 
 	return json.Marshal(d)

@@ -33,7 +33,7 @@ var _ = Describe("Router", func() {
 	var config *cfg.Config
 
 	var mbusClient *yagnats.Client
-	var registry *rregistry.CFRegistry
+	var registry *rregistry.RouteRegistry
 	var varz vvarz.Varz
 	var router *Router
 
@@ -48,7 +48,7 @@ var _ = Describe("Router", func() {
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 
 		mbusClient = natsRunner.MessageBus.(*yagnats.Client)
-		registry = rregistry.NewCFRegistry(config, mbusClient)
+		registry = rregistry.NewRouteRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
@@ -157,15 +157,14 @@ var _ = Describe("Router", func() {
 		app1.Listen()
 		Ω(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
-		// initialUpdateTime should be roughly 2 seconds.
 
 		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
 		app2.Listen()
 		Ω(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
 
-		// updateTime should be roughly 0 seconds
+		// updateTime should be after initial update time
 		updateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 		Ω(updateTime).To(BeNumerically("<", initialUpdateTime))
 	})
@@ -473,7 +472,7 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	return x
 }
 
-func verify_health_z(host string, r *rregistry.CFRegistry) {
+func verify_health_z(host string, r *rregistry.RouteRegistry) {
 	var req *http.Request
 	path := "/healthz"
 

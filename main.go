@@ -63,7 +63,7 @@ func main() {
 		logger.Fatalf("Error connecting to NATS: %s\n", err)
 	}
 
-	registry := rregistry.NewCFRegistry(c, natsClient)
+	registry := rregistry.NewRouteRegistry(c, natsClient)
 
 	varz := rvarz.NewVarz(registry)
 
@@ -98,7 +98,7 @@ func main() {
 	select {
 	case err := <-errChan:
 		if err != nil {
-			logger.Errorf("Error occurred:", err.Error())
+			logger.Errorf("Error occurred: %s", err.Error())
 			os.Exit(1)
 		}
 	case sig := <-signals:

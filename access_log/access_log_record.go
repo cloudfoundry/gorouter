@@ -12,7 +12,7 @@ import (
 
 type AccessLogRecord struct {
 	Request       *http.Request
-	Response      *http.Response
+	StatusCode    int
 	RouteEndpoint *route.Endpoint
 	StartedAt     time.Time
 	FirstByteAt   time.Time
@@ -42,10 +42,10 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 	fmt.Fprintf(b, `[%s] `, r.FormatStartedAt())
 	fmt.Fprintf(b, `"%s %s %s" `, r.Request.Method, r.Request.URL.RequestURI(), r.Request.Proto)
 
-	if r.Response == nil {
+	if r.StatusCode == 0 {
 		fmt.Fprintf(b, "MissingResponseStatusCode ")
 	} else {
-		fmt.Fprintf(b, `%d `, r.Response.StatusCode)
+		fmt.Fprintf(b, `%d `, r.StatusCode)
 	}
 
 	fmt.Fprintf(b, `%d `, r.BodyBytesSent)

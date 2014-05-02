@@ -41,21 +41,19 @@ func splitMessage(message string) []string {
 }
 
 func (e *LoggregatorEmitter) Emit(appid, message string) {
-	if isEmpty(appid) || isEmpty(message) {
-		return
-	}
-	logMessage := e.newLogMessage(appid, message, logmessage.LogMessage_OUT)
-	e.logger.Debugf("Logging message from %s of type %s with appid %s and with data %s", logMessage.SourceName, logMessage.MessageType, logMessage.AppId, string(logMessage.Message))
-
-	e.EmitLogMessage(logMessage)
+	e.emit(appid, message, logmessage.LogMessage_OUT)
 }
 
 func (e *LoggregatorEmitter) EmitError(appid, message string) {
+	e.emit(appid, message, logmessage.LogMessage_ERR)
+}
+
+func (e *LoggregatorEmitter) emit(appid, message string, messageType logmessage.LogMessage_MessageType) {
 	if isEmpty(appid) || isEmpty(message) {
 		return
 	}
-	logMessage := e.newLogMessage(appid, message, logmessage.LogMessage_ERR)
-	e.logger.Debugf("Logging message from %s of type %s with appid %s and with data %s", logMessage.SourceName, logMessage.MessageType, logMessage.AppId, string(logMessage.Message))
+	logMessage := e.newLogMessage(appid, message, messageType)
+	e.logger.Debugf("Logging message from %s of type %s with appid %s and with data %s", *logMessage.SourceName, logMessage.MessageType, *logMessage.AppId, string(logMessage.Message))
 
 	e.EmitLogMessage(logMessage)
 }
