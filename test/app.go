@@ -64,18 +64,14 @@ func (a *TestApp) Listen() {
 }
 
 func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
-	a.mutex.Lock()
-	a.stopped = false
+	a.start()
 	for {
-		if a.stopped {
+		if a.isStopped() {
 			break
 		}
-		a.mutex.Unlock()
 		a.Register()
 		time.Sleep(duration)
-		a.mutex.Lock()
 	}
-	a.mutex.Unlock()
 }
 
 func (a *TestApp) Register() {
@@ -108,9 +104,7 @@ func (a *TestApp) Unregister() {
 	b, _ := json.Marshal(rm)
 	a.mbusClient.Publish("router.unregister", b)
 
-	a.mutex.Lock()
-	a.stopped = true
-	a.mutex.Unlock()
+	a.stop()
 }
 
 func (a *TestApp) VerifyAppStatus(status int) {
@@ -132,6 +126,24 @@ func (a *TestApp) CheckAppStatus(status int) error {
 	}
 
 	return nil
+}
+
+func (a *TestApp) start() {
+	a.mutex.Lock()
+	a.stopped = false
+	a.mutex.Unlock()
+}
+
+func (a *TestApp) stop() {
+	a.mutex.Lock()
+	a.stopped = true
+	a.mutex.Unlock()
+}
+
+func (a *TestApp) isStopped() bool {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	return a.stopped
 }
 
 type registerMessage struct {
