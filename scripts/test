@@ -1,16 +1,16 @@
 #!/bin/bash
 
-set -e -x
+set -e -x -u
 
+. $(dirname $0)/gorequired
+
+#Download & Install gnatsd into GOPATH (or use pre-installed version)
 go get -v github.com/apcera/gnatsd
 
-export GOPATH=$PWD/Godeps/_workspace:$GOPATH
+. $(dirname $0)/godep-env
 
-FIRST_GOPATH=`echo $GOPATH | cut -d':' -f1`
+#Install ginkgo from Godeps into Godeps workspace
+go install -v github.com/onsi/ginkgo/ginkgo
 
-mkdir -p $FIRST_GOPATH/bin
-export PATH=$FIRST_GOPATH/bin:$PATH
-
+#Run all tests
 ginkgo -r -failOnPending -randomizeAllSpecs -skipMeasurements=true "$@"
-
-echo "PASSED"
