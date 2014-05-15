@@ -28,38 +28,70 @@ removing unnecessary latency.
 The following instructions may help you get started with gorouter in a
 standalone environment.
 
-### Setup
+### External Dependencies
 
-You should have a `GOPATH` configured as described in http://golang.org/doc/code.html
+- Go should be installed and in the PATH
+- GOPATH should be set as described in http://golang.org/doc/code.html
+- [gnatsd](https://github.com/apcera/gnatsd) installed and in the PATH
 
+### Development Setup
 
-To install exactly the dependecies vendored with gorouter, use [godep](https://github.com/tools/godep)
+Download gorouter:
+```bash
+go get -v github.com/cloudfoundry/gorouter
+cd $GOPATH/src/github.com/cloudfoundry/gorouter
+```
+
+To install exactly the dependecies vendored with gorouter, use [godep](https://github.com/tools/godep):
 
 ```bash
 go get -v github.com/tools/godep
-go get -v github.com/cloudfoundry/gorouter
-
-cd $GOPATH/src/github.com/cloudfoundry/gorouter
-
 godep restore ./...
 ```
 
 ### Running Tests
 
-We are using Gocheck, to run tests
+We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
 
+Running `scripts/test` will:
+- Check for Go
+- Check that GOPATH is set
+- Download & Install gnatsd (or use the one already downloaded into the GOPATH)
+- Update the PATH to prepend the godep workspace
+- Install ginkgo (from the godep vendored sources into the godep workspace bin)
+- Run all the tests with ginkgo (in random order, without benchmarks, using the vendored godep dependencies)
 
-`scripts/test` uses `go test ./...` internally. Any flags passed the `scripts/test` 
-will be passed to `go test ./...`
+Any flags passed into `scripts/test` will be passed into ginkgo.
 
+```bash
+# run all the tests
+scripts/test
+
+# run only tests whose names match Registry
+scripts/test -focus=Registry
+
+# run only the tests in the registry package
+scripts/test registry
 ```
-./scripts/test
 
-# just run tests whose names match Registry
-./scripts/test -gocheck.f=Registry
+To run the tests using GOPATH dependency sources (bypassing vendored dependencies):
 
-# run the tests for only the registry package
-./scripts/test ./registry
+```bash
+ginkgo -r
+```
+
+### Building
+Building creates an executable in the gorouter/ dir:
+
+```bash
+go build
+```
+
+### Installing
+Installing creates an executable in the $GOPATH/bin dir:
+
+```bash
+go install
 ```
 
 ### Start
@@ -70,7 +102,7 @@ go get github.com/apcera/gnatsd
 gnatsd &
 
 # Start gorouter
-router
+gorouter
 ```
 
 ### Usage
@@ -169,12 +201,12 @@ curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
 > User-Agent: curl/7.24.0 (x86_64-apple-darwin12.0) libcurl/7.24.0 OpenSSL/0.9.8r zlib/1.2.5
 > Host: 127.0.0.1:8080
 > Accept: */*
-> 
+>
 < HTTP/1.1 200 OK
 < Content-Type: application/json
 < Date: Mon, 25 Mar 2013 20:31:27 GMT
 < Transfer-Encoding: chunked
-< 
+<
 {"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
 ```
 
