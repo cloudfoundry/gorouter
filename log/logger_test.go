@@ -1,24 +1,24 @@
-package log
+package log_test
 
 import (
-	steno "github.com/cloudfoundry/gosteno"
-	. "launchpad.net/gocheck"
-
 	"github.com/cloudfoundry/gorouter/config"
+	. "github.com/cloudfoundry/gorouter/log"
+	steno "github.com/cloudfoundry/gosteno"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-type LoggerSuite struct{}
+var _ = Describe("Log", func() {
+	It("Setup logger from config", func() {
+		cfg := config.DefaultConfig()
+		cfg.Logging.File = "/tmp/gorouter.log"
 
-var _ = Suite(&LoggerSuite{})
+		SetupLoggerFromConfig(cfg)
 
-func (s *LoggerSuite) TestSetupLoggerFromConfig(c *C) {
-	cfg := config.DefaultConfig()
-	cfg.Logging.File = "/tmp/gorouter.log"
-
-	SetupLoggerFromConfig(cfg)
-
-	count := Counter.GetCount("info")
-	logger := steno.NewLogger("test")
-	logger.Info("Hello")
-	c.Assert(Counter.GetCount("info"), Equals, count+1)
-}
+		count := Counter.GetCount("info")
+		logger := steno.NewLogger("test")
+		logger.Info("Hello")
+		Ω(Counter.GetCount("info")).To(Equal(count + 1))
+	})
+})

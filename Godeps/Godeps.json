@@ -11,7 +11,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
-			"Rev": "e493791d041a7c736105f369603f61e28a1586ae"
+			"Rev": "07694762d4bce6cf00c2007182ccff5305d09f49"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -20,44 +20,47 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/localip",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/emitter",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/loggregatorclient",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/logmessage",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/signature",
-			"Rev": "1ff4fff71d4839f6c429289a1169e38de205d14e"
+			"Rev": "b2f1c6577e09b5727076c72f4096e3cc5cfd737d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "8bf15e48f3abf6db1765ff908ee678a6f347ce0a"
+			"Rev": "2c197cfdcd587274614ab63fef96bbaaa1c01f10"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",
 			"Rev": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
 		},
 		{
-			"ImportPath": "github.com/rcrowley/go-metrics",
-			"Rev": "d1774362a14f30b8eb31af8867bfb15142263644"
+			"ImportPath": "github.com/onsi/ginkgo",
+			"Rev": "51ddbbc2ace9f9ad4cf06ba63442ea2ef2019837"
 		},
 		{
-			"ImportPath": "launchpad.net/gocheck",
-			"Comment": "87",
-			"Rev": "gustavo@niemeyer.net-20140225173054-xu9zlkf9kxhvow02"
+			"ImportPath": "github.com/onsi/gomega",
+			"Rev": "f5533d435ebfcf4fa0463202dc0e966b983618b8"
+		},
+		{
+			"ImportPath": "github.com/rcrowley/go-metrics",
+			"Rev": "6ffbdf30ba7072d9f9e2afe57ad651a75a544a83"
 		}
 	]
 }

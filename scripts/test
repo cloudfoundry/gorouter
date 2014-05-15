@@ -11,6 +11,6 @@ FIRST_GOPATH=`echo $GOPATH | cut -d':' -f1`
 mkdir -p $FIRST_GOPATH/bin
 export PATH=$FIRST_GOPATH/bin:$PATH
 
-go test -v ./... "$@"
+ginkgo -r -failOnPending -randomizeAllSpecs -skipMeasurements=true "$@"
 
 echo "PASSED"

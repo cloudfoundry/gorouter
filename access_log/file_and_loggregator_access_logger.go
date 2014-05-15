@@ -1,11 +1,10 @@
 package access_log
 
 import (
+	"fmt"
 	"io"
 	"regexp"
 	"strconv"
-
-	"github.com/cloudfoundry/gorouter/log"
 
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/loggregatorlib/emitter"
@@ -15,20 +14,21 @@ type FileAndLoggregatorAccessLogger struct {
 	emitter emitter.Emitter
 	channel chan AccessLogRecord
 	writer  io.Writer
-	index   uint
 }
 
-func NewFileAndLoggregatorAccessLogger(f io.Writer, loggregatorUrl, loggregatorSharedSecret string, index uint) *FileAndLoggregatorAccessLogger {
+func NewEmitter(loggregatorUrl, loggregatorSharedSecret string, index uint) (emitter.Emitter, error) {
+	if !isValidUrl(loggregatorUrl) {
+		return nil, fmt.Errorf("Invalid loggregator url %s", loggregatorUrl)
+	}
+	return emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), loggregatorSharedSecret,
+		steno.NewLogger("router.loggregator"))
+}
+
+func NewFileAndLoggregatorAccessLogger(f io.Writer, e emitter.Emitter) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
+		emitter: e,
 		writer:  f,
 		channel: make(chan AccessLogRecord, 128),
-		index:   index,
-	}
-
-	if isValidUrl(loggregatorUrl) {
-		a.emitter, _ = emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), loggregatorSharedSecret, steno.NewLogger("router.loggregator"))
-	} else {
-		log.Errorf("Invalid loggregator url %s", loggregatorUrl)
 	}
 
 	return a

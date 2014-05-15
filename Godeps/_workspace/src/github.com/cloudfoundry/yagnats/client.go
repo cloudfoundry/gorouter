@@ -23,6 +23,7 @@ type Client struct {
 	connection    chan *Connection
 	subscriptions map[int]*Subscription
 	disconnecting bool
+	lock          *sync.Mutex
 
 	ConnectedCallback func()
 
@@ -47,6 +48,7 @@ func NewClient() *Client {
 	return &Client{
 		connection:    make(chan *Connection),
 		subscriptions: make(map[int]*Subscription),
+		lock:          &sync.Mutex{},
 
 		logger:      &DefaultLogger{},
 		loggerMutex: &sync.RWMutex{},
@@ -127,16 +129,25 @@ func (c *Client) Unsubscribe(sid int) error {
 
 	conn.Send(&UnsubPacket{ID: sid})
 
+	c.lock.Lock()
 	delete(c.subscriptions, sid)
+	c.lock.Unlock()
 
 	return conn.ErrOrOK()
 }
 
 func (c *Client) UnsubscribeAll(subject string) {
+	idsToUnsubscribe := []int{}
+	c.lock.Lock()
 	for id, sub := range c.subscriptions {
 		if sub.Subject == subject {
-			c.Unsubscribe(id)
+			idsToUnsubscribe = append(idsToUnsubscribe, id)
 		}
+	}
+	c.lock.Unlock()
+
+	for _, id := range idsToUnsubscribe {
+		c.Unsubscribe(id)
 	}
 }
 
@@ -155,6 +166,7 @@ func (c *Client) Logger() Logger {
 func (c *Client) subscribe(subject, queue string, callback Callback) (int, error) {
 	conn := <-c.connection
 
+	c.lock.Lock()
 	id := len(c.subscriptions) + 1
 
 	c.subscriptions[id] = &Subscription{
@@ -163,6 +175,7 @@ func (c *Client) subscribe(subject, queue string, callback Callback) (int, error
 		Callback: callback,
 		ID:       id,
 	}
+	c.lock.Unlock()
 
 	conn.Send(
 		&SubPacket{
@@ -238,14 +251,21 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 }
 
 func (c *Client) resubscribe(conn *Connection) error {
+	packetsToSend := []*SubPacket{}
+
+	c.lock.Lock()
 	for id, sub := range c.subscriptions {
-		conn.Send(
-			&SubPacket{
-				Subject: sub.Subject,
-				Queue:   sub.Queue,
-				ID:      id,
-			},
+		packetsToSend = append(packetsToSend, &SubPacket{
+			Subject: sub.Subject,
+			Queue:   sub.Queue,
+			ID:      id,
+		},
 		)
+	}
+	c.lock.Unlock()
+
+	for _, packet := range packetsToSend {
+		conn.Send(packet)
 
 		err := conn.ErrOrOK()
 		if err != nil {
@@ -257,10 +277,13 @@ func (c *Client) resubscribe(conn *Connection) error {
 }
 
 func (c *Client) dispatchMessage(msg *MsgPacket) {
+	c.lock.Lock()
 	sub := c.subscriptions[msg.SubID]
 	if sub == nil {
+		c.lock.Unlock()
 		return
 	}
+	c.lock.Unlock()
 
 	go sub.Callback(
 		&Message{

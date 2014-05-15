@@ -1,63 +1,66 @@
-package util
+package util_test
 
 import (
+	. "github.com/cloudfoundry/gorouter/util"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"io/ioutil"
-	. "launchpad.net/gocheck"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 )
 
-type PidfileSuite struct {
-	path    string
-	pidfile string
-}
+var _ = Describe("Pidfile", func() {
+	var path string
+	var pidfile string
 
-var _ = Suite(&PidfileSuite{})
+	BeforeEach(func() {
+		x, err := ioutil.TempDir("", "PidFileSuite")
+		Ω(err).ShouldNot(HaveOccurred())
 
-func (s *PidfileSuite) SetUpTest(c *C) {
-	x, err := ioutil.TempDir("", "PidFileSuite")
-	c.Assert(err, IsNil)
+		path = x
+		pidfile = filepath.Join(path, "pidfile")
+	})
 
-	s.path = x
-	s.pidfile = path.Join(s.path, "pidfile")
-}
+	AfterEach(func() {
+		err := os.RemoveAll(path)
+		Ω(err).ShouldNot(HaveOccurred())
+	})
 
-func (s *PidfileSuite) TearDownTest(c *C) {
-	err := os.RemoveAll(s.path)
-	c.Assert(err, IsNil)
-}
+	assertPidfileNonzero := func() {
+		x, err := ioutil.ReadFile(pidfile)
+		Ω(err).ShouldNot(HaveOccurred())
 
-func (s *PidfileSuite) assertPidfileNonzero(c *C) {
-	x, err := ioutil.ReadFile(s.pidfile)
-	c.Assert(err, IsNil)
+		y, err := strconv.Atoi(string(x))
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(y).ShouldNot(Equal(0))
+	}
 
-	y, err := strconv.Atoi(string(x))
-	c.Assert(err, IsNil)
-	c.Assert(y, Not(Equals), 0)
-}
+	It("writes a pid file", func() {
+		err := WritePidFile(pidfile)
+		Ω(err).ShouldNot(HaveOccurred())
 
-func (s *PidfileSuite) TestWritePidfile(c *C) {
-	err := WritePidFile(s.pidfile)
-	c.Assert(err, IsNil)
+		assertPidfileNonzero()
+	})
 
-	s.assertPidfileNonzero(c)
-}
+	It("overwrites the pid file", func() {
+		err := ioutil.WriteFile(pidfile, []byte("0"), 0644)
+		Ω(err).ShouldNot(HaveOccurred())
 
-func (s *PidfileSuite) TestWritePidfileOverwrites(c *C) {
-	err := ioutil.WriteFile(s.pidfile, []byte("0"), 0644)
-	c.Assert(err, IsNil)
+		err = WritePidFile(pidfile)
+		Ω(err).ShouldNot(HaveOccurred())
 
-	err = WritePidFile(s.pidfile)
-	c.Assert(err, IsNil)
+		assertPidfileNonzero()
+	})
 
-	s.assertPidfileNonzero(c)
-}
+	Context("when path dows not exist", func() {
+		It("returns an error", func() {
+			err := os.RemoveAll(path)
+			Ω(err).ShouldNot(HaveOccurred())
 
-func (s *PidfileSuite) TestWritePidfileReturnsError(c *C) {
-	err := os.RemoveAll(s.path)
-	c.Assert(err, IsNil)
-
-	err = WritePidFile(s.pidfile)
-	c.Assert(err, Not(IsNil))
-}
+			err = WritePidFile(pidfile)
+			Ω(err).Should(HaveOccurred())
+		})
+	})
+})

@@ -1,12 +1,15 @@
 package main
 
 import (
-	"flag"
-	"os"
-
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/log"
+	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/router"
+	rvarz "github.com/cloudfoundry/gorouter/varz"
+	"github.com/cloudfoundry/yagnats"
+
+	"flag"
+	"os"
 )
 
 var configFile string
@@ -25,11 +28,22 @@ func main() {
 
 	log.SetupLoggerFromConfig(c)
 
-	errChan := router.NewRouter(c).Run()
+	mbus := yagnats.NewClient()
+	registry := rregistry.NewCFRegistry(c, mbus)
+	varz := rvarz.NewVarz(registry)
+	router, err := router.NewRouter(c, mbus, registry, varz)
+	if err != nil {
+		log.Errorf("An error occurred: %s", err.Error())
+		os.Exit(1)
+	}
 
-	select {
-	case err := <-errChan:
+	errChan := router.Run()
+
+	err = <-errChan
+	if err != nil {
 		log.Errorf("Error occurred:", err.Error())
 		os.Exit(1)
 	}
+
+	os.Exit(0)
 }

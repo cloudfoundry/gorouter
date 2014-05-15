@@ -31,35 +31,39 @@ type Router struct {
 	component  *vcap.VcapComponent
 }
 
-func NewRouter(c *config.Config) *Router {
+func NewRouter(cfg *config.Config, mbusClient *yagnats.Client, r *registry.CFRegistry, v varz.Varz) (*Router, error) {
 	router := &Router{
-		config: c,
+		config:     cfg,
+		mbusClient: mbusClient,
+		registry:   r,
+		varz:       v,
 	}
 
 	// setup number of procs
-	if router.config.GoMaxProcs != 0 {
-		runtime.GOMAXPROCS(router.config.GoMaxProcs)
+	if cfg.GoMaxProcs != 0 {
+		runtime.GOMAXPROCS(cfg.GoMaxProcs)
 	}
 
-	router.mbusClient = yagnats.NewClient()
-
-	router.registry = registry.NewCFRegistry(router.config, router.mbusClient)
 	router.registry.StartPruningCycle()
 
-	router.varz = varz.NewVarz(router.registry)
+	accesslog, err := access_log.CreateRunningAccessLogger(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	args := proxy.ProxyArgs{
-		EndpointTimeout: router.config.EndpointTimeout,
-		Ip:              router.config.Ip,
-		TraceKey:        router.config.TraceKey,
+		EndpointTimeout: cfg.EndpointTimeout,
+		Ip:              cfg.Ip,
+		TraceKey:        cfg.TraceKey,
 		Registry:        router.registry,
 		Reporter:        router.varz,
-		Logger:          access_log.CreateRunningAccessLogger(router.config),
+		AccessLogger:    accesslog,
 	}
 	router.proxy = proxy.NewProxy(args)
 
 	var host string
-	if router.config.Status.Port != 0 {
-		host = fmt.Sprintf("%s:%d", router.config.Ip, router.config.Status.Port)
+	if cfg.Status.Port != 0 {
+		host = fmt.Sprintf("%s:%d", cfg.Ip, cfg.Status.Port)
 	}
 
 	varz := &vcap.Varz{
@@ -75,8 +79,8 @@ func NewRouter(c *config.Config) *Router {
 		Type:        "Router",
 		Index:       router.config.Index,
 		Host:        host,
-		Credentials: []string{router.config.Status.User, router.config.Status.Pass},
-		Config:      router.config,
+		Credentials: []string{cfg.Status.User, cfg.Status.Pass},
+		Config:      cfg,
 		Varz:        varz,
 		Healthz:     healthz,
 		InfoRoutes: map[string]json.Marshaler{
@@ -84,9 +88,12 @@ func NewRouter(c *config.Config) *Router {
 		},
 	}
 
-	vcap.StartComponent(router.component)
+	err = vcap.StartComponent(router.component)
+	if err != nil {
+		return nil, err
+	}
 
-	return router
+	return router, nil
 }
 
 func (r *Router) Run() <-chan error {

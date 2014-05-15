@@ -3,7 +3,6 @@ package proxy
 import (
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"strings"
 	"time"
 
@@ -24,7 +23,7 @@ type LookupRegistry interface {
 	LookupByPrivateInstanceId(uri route.Uri, p string) (*route.Endpoint, bool)
 }
 
-type Reporter interface {
+type ProxyReporter interface {
 	CaptureBadRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
@@ -40,8 +39,8 @@ type ProxyArgs struct {
 	Ip              string
 	TraceKey        string
 	Registry        LookupRegistry
-	Reporter        Reporter
-	Logger          access_log.AccessLogger
+	Reporter        ProxyReporter
+	AccessLogger    access_log.AccessLogger
 }
 
 type proxy struct {
@@ -49,14 +48,14 @@ type proxy struct {
 	traceKey     string
 	logger       *steno.Logger
 	registry     LookupRegistry
-	reporter     Reporter
+	reporter     ProxyReporter
 	accessLogger access_log.AccessLogger
 	transport    *http.Transport
 }
 
 func NewProxy(args ProxyArgs) Proxy {
 	return &proxy{
-		accessLogger: args.Logger,
+		accessLogger: args.AccessLogger,
 		traceKey:     args.TraceKey,
 		ip:           args.Ip,
 		logger:       steno.NewLogger("router.proxy"),
@@ -100,8 +99,6 @@ func (p *proxy) lookup(request *http.Request) (*route.Endpoint, bool) {
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
-	originalURL := request.URL
-	request.URL = &url.URL{Host: originalURL.Host, Opaque: request.RequestURI}
 	handler := NewRequestHandler(request, responseWriter)
 
 	accessLog := access_log.AccessLogRecord{
@@ -173,24 +170,23 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	proxyWriter := newProxyResponseWriter(responseWriter)
-	p.newReverseProxy(proxyTransport, routeEndpoint).ServeHTTP(proxyWriter, request)
+	p.newReverseProxy(proxyTransport, routeEndpoint, request).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = int64(proxyWriter.Size())
 }
 
-func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, endpoint *route.Endpoint) http.Handler {
-	u := url.URL{
-		Scheme: "http",
-		Host:   endpoint.CanonicalAddr(),
-	}
+func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, endpoint *route.Endpoint, req *http.Request) http.Handler {
+	rproxy := &httputil.ReverseProxy{
+		Director: func(request *http.Request) {
+			request.URL.Scheme = "http"
+			request.URL.Host = endpoint.CanonicalAddr()
+			request.URL.Opaque = req.URL.Opaque
+			request.URL.RawQuery = req.URL.RawQuery
 
-	rproxy := httputil.NewSingleHostReverseProxy(&u)
-	oldDirector := rproxy.Director
-	rproxy.Director = func(req *http.Request) {
-		oldDirector(req)
-		setRequestXRequestStart(req)
-		setRequestXVcapRequestId(req, nil)
+			setRequestXRequestStart(req)
+			setRequestXVcapRequestId(req, nil)
+		},
 	}
 
 	rproxy.Transport = proxyTransport

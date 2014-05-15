@@ -1,6 +1,19 @@
-package router
+package router_test
 
 import (
+	"github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/proxy"
+	rregistry "github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
+	. "github.com/cloudfoundry/gorouter/router"
+	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/gorouter/test_util"
+	vvarz "github.com/cloudfoundry/gorouter/varz"
+	"github.com/cloudfoundry/yagnats"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -8,176 +21,313 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os/exec"
-	"regexp"
 	"strings"
 	"time"
-
-	"github.com/cloudfoundry/yagnats"
-	. "launchpad.net/gocheck"
-
-	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/proxy"
-	"github.com/cloudfoundry/gorouter/registry"
-	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/test"
 )
 
-type RouterSuite struct {
-	Config        *config.Config
-	natsServerCmd *exec.Cmd
-	mbusClient    *yagnats.Client
-	router        *Router
-	natsPort      uint16
-}
+var _ = Describe("Router", func() {
+	var Config *config.Config
+	var mbusClient *yagnats.Client
+	var registry *rregistry.CFRegistry
+	var varz vvarz.Varz
+	var router *Router
 
-var _ = Suite(&RouterSuite{})
+	var nats *test_util.Nats
 
-func (s *RouterSuite) SetUpSuite(c *C) {
-	s.natsPort = nextAvailPort()
+	BeforeEach(func() {
+		nats = test_util.NewNatsOnRandomPort()
+		nats.Start()
 
-	s.natsServerCmd = StartNats(int(s.natsPort))
+		proxyPort := test_util.NextAvailPort()
+		statusPort := test_util.NextAvailPort()
 
-	proxyPort := nextAvailPort()
-	statusPort := nextAvailPort()
+		Config = SpecConfig(nats.Port(), statusPort, proxyPort)
 
-	s.Config = SpecConfig(s.natsPort, statusPort, proxyPort)
-
-	s.router = NewRouter(s.Config)
-	s.router.Run()
-
-	<-s.WaitUntilNatsIsUp()
-	s.mbusClient = s.router.mbusClient
-}
-
-func (s *RouterSuite) TearDownSuite(c *C) {
-	StopNats(s.natsServerCmd)
-}
-
-func (s *RouterSuite) TestRouterGreets(c *C) {
-	response := make(chan []byte)
-
-	s.mbusClient.Subscribe("router.greet.test.response", func(msg *yagnats.Message) {
-		response <- msg.Payload
+		mbusClient = yagnats.NewClient()
+		registry = rregistry.NewCFRegistry(Config, mbusClient)
+		varz = vvarz.NewVarz(registry)
+		router, err := NewRouter(Config, mbusClient, registry, varz)
+		Ω(err).ShouldNot(HaveOccurred())
+		router.Run()
 	})
 
-	s.mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
-
-	select {
-	case msg := <-response:
-		c.Assert(string(msg), Matches, ".*\"minimumRegisterIntervalInSeconds\":5.*")
-	case <-time.After(500 * time.Millisecond):
-		c.Error("Did not see a response to router.greet!")
-	}
-}
-
-func (s *RouterSuite) TestDiscover(c *C) {
-	// Test if router responses to discover message
-	sig := make(chan common.VcapComponent)
-
-	// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
-	// sure that router has run at least for one second
-	time.Sleep(time.Second)
-
-	s.mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
-		var component common.VcapComponent
-		_ = json.Unmarshal(msg.Payload, &component)
-		sig <- component
+	AfterEach(func() {
+		if nats != nil {
+			nats.Stop()
+		}
 	})
 
-	s.mbusClient.PublishWithReplyTo(
-		"vcap.component.discover",
-		"vcap.component.discover.test.response",
-		[]byte{},
-	)
+	It("RouterGreets", func() {
+		response := make(chan []byte)
 
-	cc := <-sig
+		mbusClient.Subscribe("router.greet.test.response", func(msg *yagnats.Message) {
+			response <- msg.Payload
+		})
 
-	var emptyTime time.Time
-	var emptyDuration common.Duration
+		mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
 
-	c.Check(cc.Type, Equals, "Router")
-	c.Check(cc.Index, Equals, uint(2))
-	c.Check(cc.UUID, Not(Equals), "")
-	c.Check(cc.Start, Not(Equals), emptyTime)
-	c.Check(cc.Uptime, Not(Equals), emptyDuration)
+		var msg []byte
+		Eventually(response, 1).Should(Receive(&msg))
+		Ω(string(msg)).To(MatchRegexp(".*\"minimumRegisterIntervalInSeconds\":5.*"))
+	})
 
-	verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1], c)
-	verify_health_z(cc.Host, s.router.registry, c)
-}
+	It("discovers", func() {
+		// Test if router responses to discover message
+		sig := make(chan common.VcapComponent)
 
-func (s *RouterSuite) waitMsgReceived(app *test.TestApp, expectedToBeFound bool, timeout time.Duration) bool {
-	interval := time.Millisecond * 50
-	repetitions := int(timeout / interval)
+		// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
+		// sure that router has run at least for one second
+		time.Sleep(time.Second)
 
-	for j := 0; j < repetitions; j++ {
-		received := true
-		for _, url := range app.Urls() {
-			_, ok := s.router.registry.Lookup(url)
-			if ok != expectedToBeFound {
-				received = false
-				break
+		mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
+			var component common.VcapComponent
+			_ = json.Unmarshal(msg.Payload, &component)
+			sig <- component
+		})
+
+		mbusClient.PublishWithReplyTo(
+			"vcap.component.discover",
+			"vcap.component.discover.test.response",
+			[]byte{},
+		)
+
+		var cc common.VcapComponent
+		Eventually(sig).Should(Receive(&cc))
+
+		var emptyTime time.Time
+		var emptyDuration common.Duration
+
+		Ω(cc.Type).To(Equal("Router"))
+		Ω(cc.Index).To(Equal(uint(2)))
+		Ω(cc.UUID).ToNot(Equal(""))
+		Ω(cc.Start).ToNot(Equal(emptyTime))
+		Ω(cc.Uptime).ToNot(Equal(emptyDuration))
+
+		verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1])
+		verify_health_z(cc.Host, registry)
+	})
+
+	It("registers and unregisters", func() {
+		app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, Config.Port, mbusClient, nil)
+		app.Listen()
+		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+		app.VerifyAppStatus(200)
+
+		app.Unregister()
+		Ω(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
+		app.VerifyAppStatus(404)
+	})
+
+	It("registry contains last updated varz", func() {
+		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, Config.Port, mbusClient, nil)
+		app1.Listen()
+		Ω(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
+
+		time.Sleep(2 * time.Second)
+		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
+		// initialUpdateTime should be roughly 2 seconds.
+
+		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, Config.Port, mbusClient, nil)
+		app2.Listen()
+		Ω(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
+
+		// updateTime should be roughly 0 seconds
+		updateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
+		Ω(updateTime).To(BeNumerically("<", initialUpdateTime))
+	})
+
+	It("varz", func() {
+		app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, Config.Port, mbusClient, map[string]string{"framework": "rails"})
+		app.Listen()
+		additionalRequests := 100
+		go app.RegisterRepeatedly(100 * time.Millisecond)
+		Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+		// Send seed request
+		sendRequests("count.vcap.me", Config.Port, 1)
+		initial_varz := readVarz(varz)
+
+		// Send requests
+		sendRequests("count.vcap.me", Config.Port, additionalRequests)
+		updated_varz := readVarz(varz)
+
+		// Verify varz update
+		initialRequestCount := fetchRecursively(initial_varz, "requests").(float64)
+		updatedRequestCount := fetchRecursively(updated_varz, "requests").(float64)
+		requestCount := int(updatedRequestCount - initialRequestCount)
+		Ω(requestCount).To(Equal(additionalRequests))
+
+		initialResponse2xxCount := fetchRecursively(initial_varz, "responses_2xx").(float64)
+		updatedResponse2xxCount := fetchRecursively(updated_varz, "responses_2xx").(float64)
+		response2xxCount := int(updatedResponse2xxCount - initialResponse2xxCount)
+		Ω(response2xxCount).To(Equal(additionalRequests))
+
+		app.Unregister()
+	})
+
+	It("sticky session", func() {
+		apps := make([]*test.TestApp, 10)
+		for i := range apps {
+			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, Config.Port, mbusClient, nil)
+			apps[i].Listen()
+		}
+
+		for _, app := range apps {
+			Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+		}
+		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", Config.Port)
+		port2 := getAppPortWithSticky("sticky.vcap.me", Config.Port, sessionCookie, vcapCookie)
+
+		Ω(port1).To(Equal(port2))
+		Ω(vcapCookie.Path).To(Equal("/"))
+
+		for _, app := range apps {
+			app.Unregister()
+		}
+	})
+
+	Context("Run", func() {
+		It("fails", func() {
+			Ω(func() { router.Run() }).To(Panic())
+		})
+	})
+
+	It("handles a PUT request", func() {
+		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, Config.Port, mbusClient, nil)
+
+		var rr *http.Request
+		var msg string
+		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+			rr = r
+			b, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
 			}
-		}
-		if received {
-			return true
-		}
-		time.Sleep(interval)
-	}
+			msg = string(b)
+		})
+		app.Listen()
+		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
-	return false
-}
+		url := app.Endpoint()
 
-func (s *RouterSuite) waitAppRegistered(app *test.TestApp, timeout time.Duration) bool {
-	return s.waitMsgReceived(app, true, timeout)
-}
+		buf := bytes.NewBufferString("foobar")
+		r, err := http.NewRequest("PUT", url, buf)
+		Ω(err).ShouldNot(HaveOccurred())
 
-func (s *RouterSuite) waitAppUnregistered(app *test.TestApp, timeout time.Duration) bool {
-	return s.waitMsgReceived(app, false, timeout)
-}
+		resp, err := http.DefaultClient.Do(r)
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
 
-func (s *RouterSuite) TestRegisterUnregister(c *C) {
-	app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-	app.Listen()
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
+		Ω(rr).ShouldNot(BeNil())
+		Ω(rr.Method).To(Equal("PUT"))
+		Ω(rr.Proto).To(Equal("HTTP/1.1"))
+		Ω(msg).To(Equal("foobar"))
+	})
 
-	app.VerifyAppStatus(200, c)
+	It("sends start on a nats connect", func() {
+		started := make(chan bool)
 
-	app.Unregister()
-	c.Assert(s.waitAppUnregistered(app, time.Second*5), Equals, true)
-	app.VerifyAppStatus(404, c)
-}
+		mbusClient.Subscribe("router.start", func(*yagnats.Message) {
+			started <- true
+		})
 
-func (s *RouterSuite) TestRegistryLastUpdatedVarz(c *C) {
-	app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-	app1.Listen()
-	c.Assert(s.waitAppRegistered(app1, time.Second*1), Equals, true)
+		nats.Stop()
+		nats.Start()
 
-	time.Sleep(2 * time.Second)
-	initialUpdateTime := fetchRecursively(s.readVarz(), "ms_since_last_registry_update").(float64)
-	// initialUpdateTime should be roughly 2 seconds.
+		Eventually(started, 1).Should(Receive())
+	})
 
-	app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-	app2.Listen()
-	c.Assert(s.waitAppRegistered(app2, time.Second*1), Equals, true)
+	It("supports 100 Continue", func() {
+		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, Config.Port, mbusClient, nil)
+		rCh := make(chan *http.Request)
+		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+			_, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			rCh <- r
+		})
 
-	// updateTime should be roughly 0 seconds
-	updateTime := fetchRecursively(s.readVarz(), "ms_since_last_registry_update").(float64)
-	c.Assert(updateTime < initialUpdateTime, Equals, true)
-}
+		app.Listen()
+		go app.RegisterRepeatedly(1 * time.Second)
 
-func (s *RouterSuite) readVarz() map[string]interface{} {
-	varz_byte, err := s.router.varz.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
+		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+		host := fmt.Sprintf("foo.vcap.me:%d", Config.Port)
+		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
+		Ω(err).ShouldNot(HaveOccurred())
+		defer conn.Close()
+
+		fmt.Fprintf(conn, "POST / HTTP/1.1\r\n"+
+			"Host: %s\r\n"+
+			"Connection: close\r\n"+
+			"Content-Length: 1\r\n"+
+			"Expect: 100-continue\r\n"+
+			"\r\n", host)
+
+		fmt.Fprintf(conn, "a")
+
+		buf := bufio.NewReader(conn)
+		line, err := buf.ReadString('\n')
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(strings.Contains(line, "100 Continue")).To(BeTrue())
+
+		var rr *http.Request
+		Eventually(rCh).Should(Receive(&rr))
+		Ω(rr).ShouldNot(BeNil())
+		Ω(rr.Header.Get("Expect")).To(Equal(""))
+	})
+
+	It("handles a /routes request", func() {
+		var client http.Client
+		var req *http.Request
+		var resp *http.Response
+		var err error
+
+		mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
+		time.Sleep(250 * time.Millisecond)
+
+		host := fmt.Sprintf("http://%s:%d/routes", Config.Ip, Config.Status.Port)
+
+		req, err = http.NewRequest("GET", host, nil)
+		req.SetBasicAuth("user", "pass")
+
+		resp, err = client.Do(req)
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(resp).ShouldNot(BeNil())
+		Ω(resp.StatusCode).To(Equal(200))
+
+		body, err := ioutil.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(string(body)).Should(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
+	})
+
+	It("terminates long requests", func() {
+		app := test.NewSlowApp(
+			[]route.Uri{"slow-app.vcap.me"},
+			Config.Port,
+			mbusClient,
+			10*time.Second,
+		)
+
+		app.Listen()
+
+		uri := fmt.Sprintf("http://slow-app.vcap.me:%d", Config.Port)
+		resp, err := http.Get(uri)
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(resp.StatusCode).To(Equal(502))
+	})
+})
+
+func readVarz(v vvarz.Varz) map[string]interface{} {
+	varz_byte, err := v.MarshalJSON()
+	Ω(err).ShouldNot(HaveOccurred())
 
 	varz_data := make(map[string]interface{})
 	err = json.Unmarshal(varz_byte, &varz_data)
-	if err != nil {
-		panic(err)
-	}
+	Ω(err).ShouldNot(HaveOccurred())
 
 	return varz_data
 }
@@ -188,81 +338,21 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	for _, y := range s {
 		z := x.(map[string]interface{})
 		x, ok = z[y]
-		if !ok {
-			panic(fmt.Sprintf("no key: %s", s))
-		}
+		Ω(ok).Should(BeTrue(), fmt.Sprintf("no key: %s", s))
 	}
 
 	return x
 }
 
-func (s *RouterSuite) TestVarz(c *C) {
-	app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, s.Config.Port, s.mbusClient, map[string]string{"framework": "rails"})
-	app.Listen()
-	additionalRequests := 100
-	go app.RegisterRepeatedly(100 * time.Millisecond)
-	c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
-	// Send seed request
-	sendRequests(c, "count.vcap.me", s.Config.Port, 1)
-	initial_varz := s.readVarz()
-
-	// Send requests
-	sendRequests(c, "count.vcap.me", s.Config.Port, additionalRequests)
-	updated_varz := s.readVarz()
-
-	// Verify varz update
-	initialRequestCount := fetchRecursively(initial_varz, "requests").(float64)
-	updatedRequestCount := fetchRecursively(updated_varz, "requests").(float64)
-	requestCount := int(updatedRequestCount - initialRequestCount)
-	c.Check(requestCount, Equals, additionalRequests)
-
-	initialResponse2xxCount := fetchRecursively(initial_varz, "responses_2xx").(float64)
-	updatedResponse2xxCount := fetchRecursively(updated_varz, "responses_2xx").(float64)
-	response2xxCount := int(updatedResponse2xxCount - initialResponse2xxCount)
-	c.Check(response2xxCount, Equals, additionalRequests)
-
-	app.Unregister()
-}
-
-func (s *RouterSuite) TestStickySession(c *C) {
-	apps := make([]*test.TestApp, 10)
-	for i := range apps {
-		apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-		apps[i].Listen()
-	}
-
-	for _, app := range apps {
-		c.Assert(s.waitAppRegistered(app, time.Millisecond*500), Equals, true)
-	}
-	sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", s.Config.Port, c)
-	port2 := getAppPortWithSticky("sticky.vcap.me", s.Config.Port, sessionCookie, vcapCookie, c)
-
-	c.Check(port1, Equals, port2)
-	c.Check(vcapCookie.Path, Equals, "/")
-
-	for _, app := range apps {
-		app.Unregister()
-	}
-}
-
-func timeoutDialler() func(net, addr string) (c net.Conn, err error) {
-	return func(netw, addr string) (net.Conn, error) {
-		c, err := net.DialTimeout(netw, addr, 10*time.Second)
-		c.SetDeadline(time.Now().Add(2 * time.Second))
-		return c, err
-	}
-}
-
-func verify_health_z(host string, r *registry.CFRegistry, c *C) {
+func verify_health_z(host string, r *rregistry.CFRegistry) {
 	var req *http.Request
 	var resp *http.Response
 	var err error
 	path := "/healthz"
 
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
-	bytes := verify_success(req, c)
-	c.Check(err, IsNil)
-	c.Check(string(bytes), Equals, "ok")
+	bytes := verify_success(req)
+	Ω(string(bytes)).To(Equal("ok"))
 
 	// Check that healthz does not reply during deadlock
 	r.Lock()
@@ -276,15 +366,12 @@ func verify_health_z(host string, r *registry.CFRegistry, c *C) {
 
 	req, err = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = httpClient.Do(req)
-
-	c.Assert(err, Not(IsNil))
-	match, _ := regexp.Match("i/o timeout", []byte(err.Error()))
-	c.Assert(match, Equals, true)
-	c.Check(resp, IsNil)
-
+	Ω(err).Should(HaveOccurred())
+	Ω(resp).Should(BeNil())
+	Ω(err.Error()).Should(MatchRegexp("i/o timeout"))
 }
 
-func verify_var_z(host, user, pass string, c *C) {
+func verify_var_z(host, user, pass string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -294,162 +381,50 @@ func verify_var_z(host, user, pass string, c *C) {
 	// Request without username:password should be rejected
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = client.Do(req)
-	c.Check(err, IsNil)
-	c.Assert(resp, Not(IsNil))
-	c.Check(resp.StatusCode, Equals, 401)
+	Ω(err).ShouldNot(HaveOccurred())
+	Ω(resp).ShouldNot(BeNil())
+	Ω(resp.StatusCode).To(Equal(401))
 
 	// varz Basic auth
 	req.SetBasicAuth(user, pass)
-	bytes := verify_success(req, c)
+	bytes := verify_success(req)
 	varz := make(map[string]interface{})
 	json.Unmarshal(bytes, &varz)
 
-	c.Assert(varz["num_cores"], Not(Equals), 0)
-	c.Assert(varz["type"], Equals, "Router")
-	c.Assert(varz["uuid"], Not(Equals), "")
+	Ω(varz["num_cores"]).ToNot(Equal(0))
+	Ω(varz["type"]).To(Equal("Router"))
+	Ω(varz["uuid"]).ToNot(Equal(""))
 }
 
-func verify_success(req *http.Request, c *C) []byte {
+func verify_success(req *http.Request) []byte {
 	var client http.Client
 	resp, err := client.Do(req)
 	defer resp.Body.Close()
 
-	c.Check(err, IsNil)
-	c.Assert(resp, Not(IsNil))
-	c.Check(resp.StatusCode, Equals, 200)
+	Ω(err).ShouldNot(HaveOccurred())
+	Ω(resp).ShouldNot(BeNil())
+	Ω(resp.StatusCode).To(Equal(200))
 
 	bytes, err := ioutil.ReadAll(resp.Body)
-	c.Check(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	return bytes
 }
 
-func (s *RouterSuite) TestRouterRunErrors(c *C) {
-	c.Assert(func() { s.router.Run() }, PanicMatches, "net.Listen.*")
-}
-
-func (s *RouterSuite) TestProxyPutRequest(c *C) {
-	app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-
-	var rr *http.Request
-	var msg string
-	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		rr = r
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		msg = string(b)
-	})
-	app.Listen()
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
-
-	url := app.Endpoint()
-
-	buf := bytes.NewBufferString("foobar")
-	r, err := http.NewRequest("PUT", url, buf)
-	c.Assert(err, IsNil)
-
-	resp, err := http.DefaultClient.Do(r)
-	c.Assert(err, IsNil)
-	c.Assert(resp.StatusCode, Equals, http.StatusOK)
-
-	c.Assert(rr, NotNil)
-	c.Assert(rr.Method, Equals, "PUT")
-	c.Assert(rr.Proto, Equals, "HTTP/1.1")
-	c.Assert(msg, Equals, "foobar")
-}
-
-func (s *RouterSuite) TestRouterSendsStartOnConnect(c *C) {
-	started := make(chan bool)
-
-	s.router.mbusClient.Subscribe("router.start", func(*yagnats.Message) {
-		started <- true
-	})
-	StopNats(s.natsServerCmd)
-	s.natsServerCmd = StartNats(int(s.natsPort))
-	<-s.WaitUntilNatsIsUp()
-
-	select {
-	case <-started:
-	case <-time.After(500 * time.Millisecond):
-		c.Error("Did not receive router.start!")
-	}
-}
-
-func (s *RouterSuite) WaitUntilNatsIsUp() chan bool {
-	natsConnected := make(chan bool, 1)
-	go func() {
-		for {
-			if s.router.mbusClient.Publish("asdf", []byte("data")) == nil {
-				break
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
-		natsConnected <- true
-	}()
-	return natsConnected
-}
-
-func (s *RouterSuite) Test100ContinueRequest(c *C) {
-	app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, s.Config.Port, s.mbusClient, nil)
-	rCh := make(chan *http.Request)
-	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		_, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		rCh <- r
-	})
-
-	<-s.WaitUntilNatsIsUp()
-
-	app.Listen()
-	go app.RegisterRepeatedly(1 * time.Second)
-
-	c.Assert(s.waitAppRegistered(app, time.Second*5), Equals, true)
-
-	host := fmt.Sprintf("foo.vcap.me:%d", s.Config.Port)
-	conn, err := net.DialTimeout("tcp", host, 10*time.Second)
-	c.Assert(err, IsNil)
-	defer conn.Close()
-
-	fmt.Fprintf(conn, "POST / HTTP/1.1\r\n"+
-		"Host: %s\r\n"+
-		"Connection: close\r\n"+
-		"Content-Length: 1\r\n"+
-		"Expect: 100-continue\r\n"+
-		"\r\n", host)
-
-	fmt.Fprintf(conn, "a")
-
-	buf := bufio.NewReader(conn)
-	line, err := buf.ReadString('\n')
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(line, "100 Continue"), Equals, true)
-
-	rr := <-rCh
-	c.Assert(rr, NotNil)
-	c.Assert(rr.Header.Get("Expect"), Equals, "")
-}
-
-func sendRequests(c *C, url string, rPort uint16, times int) {
+func sendRequests(url string, rPort uint16, times int) {
 	uri := fmt.Sprintf("http://%s:%d", url, rPort)
 
 	for i := 0; i < times; i++ {
 		r, err := http.Get(uri)
-		if err != nil {
-			panic(err)
-		}
+		Ω(err).ShouldNot(HaveOccurred())
 
-		c.Check(r.StatusCode, Equals, http.StatusOK)
+		Ω(r.StatusCode).To(Equal(http.StatusOK))
 		// Close the body to avoid open files limit error
 		r.Body.Close()
 	}
 }
 
-func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.Cookie, string) {
+func getSessionAndAppPort(url string, rPort uint16) (*http.Cookie, *http.Cookie, string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -459,13 +434,13 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.C
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
 
 	req, err = http.NewRequest("GET", uri, nil)
-	c.Assert(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	resp, err = client.Do(req)
-	c.Assert(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	port, err = ioutil.ReadAll(resp.Body)
-	c.Assert(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	var sessionCookie, vcapCookie *http.Cookie
 	for _, cookie := range resp.Cookies() {
@@ -479,7 +454,7 @@ func getSessionAndAppPort(url string, rPort uint16, c *C) (*http.Cookie, *http.C
 	return sessionCookie, vcapCookie, string(port)
 }
 
-func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *http.Cookie, c *C) string {
+func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *http.Cookie) string {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -489,57 +464,15 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
 
 	req, err = http.NewRequest("GET", uri, nil)
-	c.Assert(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	req.AddCookie(sessionCookie)
 	req.AddCookie(vcapCookie)
 
 	resp, err = client.Do(req)
-	c.Assert(err, IsNil)
+	Ω(err).ShouldNot(HaveOccurred())
 
 	port, err = ioutil.ReadAll(resp.Body)
 
 	return string(port)
-}
-
-func (s *RouterSuite) TestInfoApi(c *C) {
-	var client http.Client
-	var req *http.Request
-	var resp *http.Response
-	var err error
-
-	<-s.WaitUntilNatsIsUp()
-	s.mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
-	time.Sleep(250 * time.Millisecond)
-
-	host := fmt.Sprintf("http://%s:%d/routes", s.Config.Ip, s.Config.Status.Port)
-
-	req, err = http.NewRequest("GET", host, nil)
-	req.SetBasicAuth("user", "pass")
-
-	resp, err = client.Do(req)
-	c.Assert(err, IsNil)
-	c.Assert(resp, Not(IsNil))
-	c.Check(resp.StatusCode, Equals, 200)
-
-	body, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	c.Assert(err, IsNil)
-	c.Check(string(body), Matches, ".*1\\.2\\.3\\.4:1234.*\n")
-}
-
-func (s *RouterSuite) TestRouterTerminatesLongRequests(c *C) {
-	app := test.NewSlowApp(
-		[]route.Uri{"slow-app.vcap.me"},
-		s.Config.Port,
-		s.mbusClient,
-		10*time.Second,
-	)
-
-	app.Listen()
-
-	uri := fmt.Sprintf("http://slow-app.vcap.me:%d", s.Config.Port)
-	resp, err := http.Get(uri)
-	c.Assert(err, IsNil)
-	c.Assert(resp.StatusCode, Equals, 502)
 }

@@ -1,142 +1,154 @@
-package route
+package route_test
 
 import (
-	. "launchpad.net/gocheck"
-	"math"
+	. "github.com/cloudfoundry/gorouter/route"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-type PSuite struct{}
+var _ = Describe("Route", func() {
+	Context("Add", func() {
+		It("adds endpoints", func() {
+			pool := NewPool()
+			endpoint := &Endpoint{}
 
-func init() {
-	Suite(&PSuite{})
-}
+			pool.Add(endpoint)
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
+		})
 
-func (s *PSuite) TestPoolAddingAndRemoving(c *C) {
-	pool := NewPool()
+		It("handles duplicate endpoints", func() {
+			pool := NewPool()
 
-	endpoint := &Endpoint{}
+			endpoint := &Endpoint{}
 
-	pool.Add(endpoint)
+			pool.Add(endpoint)
+			pool.Add(endpoint)
 
-	foundEndpoint, found := pool.Sample()
-	c.Assert(found, Equals, true)
-	c.Assert(foundEndpoint, Equals, endpoint)
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
 
-	pool.Remove(endpoint)
+			pool.Remove(endpoint)
 
-	_, found = pool.Sample()
-	c.Assert(found, Equals, false)
-}
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
+		})
 
-func (s *PSuite) TestPoolAddingDoesNotDuplicate(c *C) {
-	pool := NewPool()
+		It("handles equivalent (duplicate) endpoints", func() {
+			pool := NewPool()
 
-	endpoint := &Endpoint{}
+			endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+			endpoint2 := &Endpoint{Host: "1.2.3.4", Port: 5678}
 
-	pool.Add(endpoint)
-	pool.Add(endpoint)
+			pool.Add(endpoint1)
+			pool.Add(endpoint2)
 
-	foundEndpoint, found := pool.Sample()
-	c.Assert(found, Equals, true)
-	c.Assert(foundEndpoint, Equals, endpoint)
+			_, found := pool.Sample()
+			Ω(found).To(BeTrue())
 
-	pool.Remove(endpoint)
+			pool.Remove(endpoint1)
 
-	_, found = pool.Sample()
-	c.Assert(found, Equals, false)
-}
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
+		})
+	})
+	Context("Remove", func() {
+		It("removes endpoints", func() {
+			pool := NewPool()
 
-func (s *PSuite) TestPoolAddingEquivalentEndpointsDoesNotDuplicate(c *C) {
-	pool := NewPool()
+			endpoint := &Endpoint{}
 
-	endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
-	endpoint2 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+			pool.Add(endpoint)
 
-	pool.Add(endpoint1)
-	pool.Add(endpoint2)
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
 
-	_, found := pool.Sample()
-	c.Assert(found, Equals, true)
+			pool.Remove(endpoint)
 
-	pool.Remove(endpoint1)
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
+		})
 
-	_, found = pool.Sample()
-	c.Assert(found, Equals, false)
-}
+	})
+	Context("IsEmpty", func() {
+		It("starts empty", func() {
+			Ω(NewPool().IsEmpty()).To(BeTrue())
+		})
 
-func (s *PSuite) TestPoolIsEmptyInitially(c *C) {
-	c.Assert(NewPool().IsEmpty(), Equals, true)
-}
+		It("empty after removing everything", func() {
+			pool := NewPool()
 
-func (s *PSuite) TestPoolIsEmptyAfterRemovingEverything(c *C) {
-	pool := NewPool()
+			endpoint := &Endpoint{}
 
-	endpoint := &Endpoint{}
+			pool.Add(endpoint)
 
-	pool.Add(endpoint)
+			Ω(pool.IsEmpty()).To(BeFalse())
 
-	c.Assert(pool.IsEmpty(), Equals, false)
+			pool.Remove(endpoint)
 
-	pool.Remove(endpoint)
+			Ω(pool.IsEmpty()).To(BeTrue())
+		})
+	})
 
-	c.Assert(pool.IsEmpty(), Equals, true)
-}
+	It("finds by private instance id", func() {
+		pool := NewPool()
 
-func (s *PSuite) TestPoolFindByPrivateInstanceId(c *C) {
-	pool := NewPool()
+		endpointFoo := &Endpoint{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"}
+		endpointBar := &Endpoint{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"}
 
-	endpointFoo := &Endpoint{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"}
-	endpointBar := &Endpoint{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"}
+		pool.Add(endpointFoo)
+		pool.Add(endpointBar)
 
-	pool.Add(endpointFoo)
-	pool.Add(endpointBar)
+		foundEndpoint, found := pool.FindByPrivateInstanceId("foo")
+		Ω(found).To(BeTrue())
+		Ω(foundEndpoint).To(Equal(endpointFoo))
 
-	foundEndpoint, found := pool.FindByPrivateInstanceId("foo")
-	c.Assert(found, Equals, true)
-	c.Assert(foundEndpoint, Equals, endpointFoo)
+		foundEndpoint, found = pool.FindByPrivateInstanceId("bar")
+		Ω(found).To(BeTrue())
+		Ω(foundEndpoint).To(Equal(endpointBar))
 
-	foundEndpoint, found = pool.FindByPrivateInstanceId("bar")
-	c.Assert(found, Equals, true)
-	c.Assert(foundEndpoint, Equals, endpointBar)
+		_, found = pool.FindByPrivateInstanceId("quux")
+		Ω(found).To(BeFalse())
+	})
 
-	_, found = pool.FindByPrivateInstanceId("quux")
-	c.Assert(found, Equals, false)
-}
+	It("Sample is randomish", func() {
+		pool := NewPool()
 
-func (s *PSuite) TestPoolSamplingIsRandomish(c *C) {
-	pool := NewPool()
+		endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+		endpoint2 := &Endpoint{Host: "5.6.7.8", Port: 1234}
 
-	endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
-	endpoint2 := &Endpoint{Host: "5.6.7.8", Port: 1234}
+		pool.Add(endpoint1)
+		pool.Add(endpoint2)
 
-	pool.Add(endpoint1)
-	pool.Add(endpoint2)
+		var occurrences1, occurrences2 int
 
-	var occurrences1, occurrences2 int
-
-	for i := 0; i < 200; i += 1 {
-		foundEndpoint, _ := pool.Sample()
-		if foundEndpoint == endpoint1 {
-			occurrences1 += 1
-		} else {
-			occurrences2 += 1
+		for i := 0; i < 200; i += 1 {
+			foundEndpoint, _ := pool.Sample()
+			if foundEndpoint == endpoint1 {
+				occurrences1 += 1
+			} else {
+				occurrences2 += 1
+			}
 		}
-	}
 
-	c.Assert(occurrences1, Not(Equals), 0)
-	c.Assert(occurrences2, Not(Equals), 0)
+		Ω(occurrences1).ToNot(BeZero())
+		Ω(occurrences2).ToNot(BeZero())
 
-	// they should be arbitrarily close
-	c.Assert(math.Abs(float64(occurrences1-occurrences2)) < 50, Equals, true)
-}
+		// they should be arbitrarily close
+		Ω(occurrences1 - occurrences2).To(BeNumerically("~", 0, 50))
+	})
 
-func (s *PSuite) TestPoolMarshalsAsJSON(c *C) {
-	pool := NewPool()
+	It("marshals json", func() {
+		pool := NewPool()
 
-	pool.Add(&Endpoint{Host: "1.2.3.4", Port: 5678})
+		pool.Add(&Endpoint{Host: "1.2.3.4", Port: 5678})
 
-	json, err := pool.MarshalJSON()
-	c.Assert(err, IsNil)
+		json, err := pool.MarshalJSON()
+		Ω(err).ToNot(HaveOccurred())
 
-	c.Assert(string(json), Equals, `["1.2.3.4:5678"]`)
-}
+		Ω(string(json)).To(Equal(`["1.2.3.4:5678"]`))
+	})
+})

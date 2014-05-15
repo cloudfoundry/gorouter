@@ -1,16 +1,16 @@
 package test
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	. "launchpad.net/gocheck"
-	"net/http"
-	"time"
-
 	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/yagnats"
+	. "github.com/onsi/gomega"
+
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
 )
 
 type TestApp struct {
@@ -103,9 +103,9 @@ func (a *TestApp) Unregister() {
 	a.stopped = true
 }
 
-func (a *TestApp) VerifyAppStatus(status int, c *C) {
+func (a *TestApp) VerifyAppStatus(status int) {
 	check := a.CheckAppStatus(status)
-	c.Assert(check, IsNil)
+	Ω(check).ShouldNot(HaveOccurred())
 }
 
 func (a *TestApp) CheckAppStatus(status int) error {

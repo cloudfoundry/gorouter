@@ -76,11 +76,7 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (r *AccessLogRecord) ApplicationId() string {
-	if r.RouteEndpoint == nil {
-		return ""
-	}
-
-	if r.RouteEndpoint.ApplicationId == "" {
+	if r.RouteEndpoint == nil || r.RouteEndpoint.ApplicationId == "" {
 		return ""
 	}
 

@@ -49,6 +49,14 @@ func NewLogMessage(messageString, appId string) *logmessage.LogMessage {
 	return generateLogMessage(messageString, appId, messageType, sourceName, "")
 }
 
+func NewMessageWithError(messageString, appId string) (*logmessage.Message, error) {
+	logMessage := generateLogMessage(messageString, appId, logmessage.LogMessage_OUT, "App", "")
+
+	marshalledLogMessage, err := proto.Marshal(logMessage)
+
+	return logmessage.NewMessage(logMessage, marshalledLogMessage), err
+}
+
 func NewMessage(t *testing.T, messageString, appId string) *logmessage.Message {
 	logMessage := generateLogMessage(messageString, appId, logmessage.LogMessage_OUT, "App", "")
 
