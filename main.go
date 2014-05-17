@@ -118,7 +118,7 @@ func main() {
 				map[string]interface{}{
 					"timeout": (c.EndpointTimeout).String(),
 				},
-				"executor.draining",
+				"gorouter.draining",
 			)
 
 			router.Drain(c.EndpointTimeout)
