@@ -180,7 +180,7 @@ var _ = Describe("Router Integration", func() {
 			Ω(result).Should(BeAssignableToTypeOf(&url.Error{}))
 			urlErr := result.(*url.Error)
 			Ω(urlErr.Err).Should(Equal(io.EOF))
-		})
+		}, 10.0)
 	})
 
 	It("has Nats connectivity", func() {
