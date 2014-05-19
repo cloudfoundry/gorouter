@@ -176,7 +176,7 @@ var _ = Describe("Router Integration", func() {
 			Eventually(grouter, 5).Should(Exit(0))
 
 			var result error
-			Eventually(resultCh).Should(Receive(&result))
+			Eventually(resultCh, 5).Should(Receive(&result))
 			Ω(result).Should(BeAssignableToTypeOf(&url.Error{}))
 			urlErr := result.(*url.Error)
 			Ω(urlErr.Err).Should(Equal(io.EOF))
