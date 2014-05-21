@@ -10,14 +10,14 @@ import (
 	rvarz "github.com/cloudfoundry/gorouter/varz"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
-	"os/signal"
-	"runtime"
-	"syscall"
-	"time"
 
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
 )
 
 var configFile string
@@ -116,12 +116,12 @@ func main() {
 		if sig == syscall.SIGUSR1 {
 			logger.Infod(
 				map[string]interface{}{
-					"timeout": (c.EndpointTimeout).String(),
+					"timeout": (c.DrainTimeout).String(),
 				},
 				"gorouter.draining",
 			)
 
-			router.Drain(c.EndpointTimeout)
+			router.Drain(c.DrainTimeout)
 		}
 
 		stoppingAt := time.Now()

@@ -46,11 +46,10 @@ var _ = Describe("Router Integration", func() {
 		config.PruneStaleDropletsIntervalInSeconds = 1
 		config.DropletStaleThresholdInSeconds = 2
 		config.StartResponseDelayIntervalInSeconds = 1
-		config.EndpointTimeoutInSeconds = 1
-		config.DrainTimeoutInSeconds = 3
+		config.EndpointTimeoutInSeconds = 5
+		config.DrainTimeoutInSeconds = 1
 
 		cfgBytes, err := candiedyaml.Marshal(config)
-
 		Ω(err).ShouldNot(HaveOccurred())
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 		return config

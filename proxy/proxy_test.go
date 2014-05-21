@@ -145,9 +145,12 @@ var _ = Describe("Proxy", func() {
 		x.CheckLine("HTTP/1.0 400 Bad Request")
 
 		var payload []byte
-		n, e := accessLogFile.Read(&payload)
-		Ω(e).ShouldNot(HaveOccurred())
-		Ω(n).ShouldNot(BeZero())
+		Eventually(func() int {
+			n, e := accessLogFile.Read(&payload)
+			Ω(e).ShouldNot(HaveOccurred())
+			return n
+		}).ShouldNot(BeZero())
+
 		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
 	})
 
