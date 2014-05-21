@@ -44,6 +44,16 @@ endpoint_timeout: 10
 			Ω(config.EndpointTimeoutInSeconds).To(Equal(10))
 		})
 
+		It("sets drain timeout", func() {
+			var b = []byte(`
+drain_timeout: 10
+`)
+
+			config.Initialize(b)
+
+			Ω(config.DrainTimeoutInSeconds).To(Equal(10))
+		})
+
 		It("sets nats config", func() {
 			var b = []byte(`
 nats:
@@ -127,5 +137,31 @@ start_response_delay_interval: 15
 			Ω(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
 		})
 
+		Describe("Timeout", func() {
+			It("converts timeouts to a duration", func() {
+				var b = []byte(`
+endpoint_timeout: 10
+drain_timeout: 15
+`)
+
+				config.Initialize(b)
+				config.Process()
+
+				Ω(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Ω(config.DrainTimeout).To(Equal(15 * time.Second))
+			})
+
+			It("defaults to the EndpointTimeout when not set", func() {
+				var b = []byte(`
+endpoint_timeout: 10
+`)
+
+				config.Initialize(b)
+				config.Process()
+
+				Ω(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Ω(config.DrainTimeout).To(Equal(10 * time.Second))
+			})
+		})
 	})
 })

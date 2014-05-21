@@ -71,6 +71,7 @@ type Config struct {
 	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
 	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
 	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
+	DrainTimeoutInSeconds                int `yaml:"drain_timeout,omitempty"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`
@@ -78,6 +79,7 @@ type Config struct {
 	PublishActiveAppsInterval  time.Duration `yaml:"-"`
 	StartResponseDelayInterval time.Duration `yaml:"-"`
 	EndpointTimeout            time.Duration `yaml:"-"`
+	DrainTimeout               time.Duration `yaml:"-"`
 
 	Ip string `yaml:"-"`
 }
@@ -117,6 +119,12 @@ func (c *Config) Process() {
 	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
+
+	drain := c.DrainTimeoutInSeconds
+	if drain == 0 {
+		drain = c.EndpointTimeoutInSeconds
+	}
+	c.DrainTimeout = time.Duration(drain) * time.Second
 
 	c.Ip, err = vcap.LocalIP()
 	if err != nil {

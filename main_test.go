@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/gomega/gexec"
 
 	"io"
+	"net"
 	"net/url"
 	"syscall"
 
@@ -46,6 +47,7 @@ var _ = Describe("Router Integration", func() {
 		config.DropletStaleThresholdInSeconds = 2
 		config.StartResponseDelayIntervalInSeconds = 1
 		config.EndpointTimeoutInSeconds = 1
+		config.DrainTimeoutInSeconds = 3
 
 		cfgBytes, err := candiedyaml.Marshal(config)
 
@@ -93,18 +95,26 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("Drain", func() {
-		It("waits for all requests to finish", func() {
-			localip, err := vcap.LocalIP()
+		var config *config.Config
+		var localip string
+		var statusPort uint16
+		var proxyPort uint16
+
+		BeforeEach(func() {
+			var err error
+			localip, err = vcap.LocalIP()
 			Ω(err).ShouldNot(HaveOccurred())
 
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort)
+			config = createConfig(cfgFile, statusPort, proxyPort)
 
 			gorouterSession = startGorouterSession(cfgFile)
+		})
 
+		It("waits for all requests to finish", func() {
 			mbusClient, err := newMessageBus(config)
 
 			blocker := make(chan bool)
@@ -138,17 +148,6 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("will timeout if requests take too long", func() {
-			localip, err := vcap.LocalIP()
-			Ω(err).ShouldNot(HaveOccurred())
-
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort)
-
-			gorouterSession = startGorouterSession(cfgFile)
-
 			mbusClient, err := newMessageBus(config)
 
 			blocker := make(chan bool)
@@ -156,7 +155,7 @@ var _ = Describe("Router Integration", func() {
 			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil)
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
-				time.Sleep(3 * time.Second)
+				<-blocker
 			})
 			timeoutApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
@@ -168,6 +167,9 @@ var _ = Describe("Router Integration", func() {
 			}()
 
 			<-blocker
+			defer func() {
+				blocker <- true
+			}()
 
 			grouter := gorouterSession
 			gorouterSession = nil
@@ -180,7 +182,42 @@ var _ = Describe("Router Integration", func() {
 			Ω(result).Should(BeAssignableToTypeOf(&url.Error{}))
 			urlErr := result.(*url.Error)
 			Ω(urlErr.Err).Should(Equal(io.EOF))
-		}, 10.0)
+		})
+
+		It("prevents new connections", func() {
+			mbusClient, err := newMessageBus(config)
+
+			blocker := make(chan bool)
+			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil)
+			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				blocker <- true
+				<-blocker
+			})
+			timeoutApp.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
+
+			go func() {
+				http.Get(timeoutApp.Endpoint())
+			}()
+
+			<-blocker
+			defer func() {
+				blocker <- true
+			}()
+
+			grouter := gorouterSession
+			gorouterSession = nil
+			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
+			Ω(err).ShouldNot(HaveOccurred())
+			Eventually(grouter, 5).Should(Exit(0))
+
+			_, err = http.Get(timeoutApp.Endpoint())
+			Ω(err).Should(HaveOccurred())
+			urlErr := err.(*url.Error)
+			opErr := urlErr.Err.(*net.OpError)
+			Ω(opErr.Op).Should(Equal("dial"))
+		})
 	})
 
 	It("has Nats connectivity", func() {
