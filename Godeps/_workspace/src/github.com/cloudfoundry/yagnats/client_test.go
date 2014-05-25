@@ -2,11 +2,11 @@ package yagnats
 
 import (
 	"fmt"
-	. "launchpad.net/gocheck"
 	"net"
 	"os/exec"
 	"testing"
 	"time"
+	. "launchpad.net/gocheck"
 )
 
 func Test(t *testing.T) { TestingT(t) }
@@ -108,10 +108,10 @@ func (s *YSuite) TestClientPingWhenResponseIsTooSlow(c *C) {
 
 func (s *YSuite) TestClientSubscribe(c *C) {
 	sub, _ := s.Client.Subscribe("some.subject", func(msg *Message) {})
-	c.Assert(sub, Equals, 1)
+	c.Assert(sub, Equals, int64(1))
 
 	sub2, _ := s.Client.Subscribe("some.subject", func(msg *Message) {})
-	c.Assert(sub2, Equals, 2)
+	c.Assert(sub2, Equals, int64(2))
 }
 
 func (s *YSuite) TestClientUnsubscribe(c *C) {
@@ -297,7 +297,7 @@ func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {
 
 	c.Assert(err, Not(Equals), nil)
 	c.Assert(err.Error(), Equals, "Invalid Subject")
-	c.Assert(sid, Equals, -1)
+	c.Assert(sid, Equals, int64(-1))
 }
 
 func (s *YSuite) TestClientUnsubscribeAll(c *C) {
