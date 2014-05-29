@@ -8,22 +8,15 @@ import (
 	"time"
 )
 
-func waitMsgReceived(registry *registry.RouteRegistry, app *test.TestApp, expectedToBeFound bool, timeout time.Duration) bool {
+func waitMsgReceived(registry *registry.CFRegistry, app *test.TestApp, expectedToBeFound bool, timeout time.Duration) bool {
 	interval := time.Millisecond * 50
 	repetitions := int(timeout / interval)
 
 	for j := 0; j < repetitions; j++ {
-		if j > 0 {
-			time.Sleep(interval)
-		}
-
 		received := true
 		for _, url := range app.Urls() {
-			pool := registry.Lookup(url)
-			if expectedToBeFound && pool == nil {
-				received = false
-				break
-			} else if !expectedToBeFound && pool != nil {
+			_, ok := registry.Lookup(url)
+			if ok != expectedToBeFound {
 				received = false
 				break
 			}
@@ -31,16 +24,17 @@ func waitMsgReceived(registry *registry.RouteRegistry, app *test.TestApp, expect
 		if received {
 			return true
 		}
+		time.Sleep(interval)
 	}
 
 	return false
 }
 
-func waitAppRegistered(registry *registry.RouteRegistry, app *test.TestApp, timeout time.Duration) bool {
+func waitAppRegistered(registry *registry.CFRegistry, app *test.TestApp, timeout time.Duration) bool {
 	return waitMsgReceived(registry, app, true, timeout)
 }
 
-func waitAppUnregistered(registry *registry.RouteRegistry, app *test.TestApp, timeout time.Duration) bool {
+func waitAppUnregistered(registry *registry.CFRegistry, app *test.TestApp, timeout time.Duration) bool {
 	return waitMsgReceived(registry, app, false, timeout)
 }
 

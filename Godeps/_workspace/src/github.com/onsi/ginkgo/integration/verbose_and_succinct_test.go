@@ -3,7 +3,6 @@ package integration_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gexec"
 )
 
 var _ = Describe("Verbose And Succinct Mode", func() {
@@ -17,10 +16,8 @@ var _ = Describe("Verbose And Succinct Mode", func() {
 		})
 
 		It("should default to non-succinct mode", func() {
-			session := startGinkgo(pathToTest, "--noColor")
-			Eventually(session).Should(gexec.Exit(0))
-			output := session.Out.Contents()
-
+			output, err := runGinkgo(pathToTest, "--noColor")
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 		})
 	})
@@ -35,10 +32,8 @@ var _ = Describe("Verbose And Succinct Mode", func() {
 
 		Context("with no flags set", func() {
 			It("should default to succinct mode", func() {
-				session := startGinkgo(pathToTest, "--noColor", pathToTest, otherPathToTest)
-				Eventually(session).Should(gexec.Exit(0))
-				output := session.Out.Contents()
-
+				output, err := runGinkgo(pathToTest, "--noColor", pathToTest, otherPathToTest)
+				Ω(err).ShouldNot(HaveOccurred())
 				Ω(output).Should(ContainSubstring("] Passing_ginkgo_tests Suite - 3/3 specs ••• SUCCESS!"))
 				Ω(output).Should(ContainSubstring("] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS!"))
 			})
@@ -46,10 +41,8 @@ var _ = Describe("Verbose And Succinct Mode", func() {
 
 		Context("with --succinct=false", func() {
 			It("should not be in succinct mode", func() {
-				session := startGinkgo(pathToTest, "--noColor", "--succinct=false", pathToTest, otherPathToTest)
-				Eventually(session).Should(gexec.Exit(0))
-				output := session.Out.Contents()
-
+				output, err := runGinkgo(pathToTest, "--noColor", "--succinct=false", pathToTest, otherPathToTest)
+				Ω(err).ShouldNot(HaveOccurred())
 				Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 				Ω(output).Should(ContainSubstring("Running Suite: More_ginkgo_tests Suite"))
 			})
@@ -57,10 +50,8 @@ var _ = Describe("Verbose And Succinct Mode", func() {
 
 		Context("with -v", func() {
 			It("should not be in succinct mode, but should be verbose", func() {
-				session := startGinkgo(pathToTest, "--noColor", "-v", pathToTest, otherPathToTest)
-				Eventually(session).Should(gexec.Exit(0))
-				output := session.Out.Contents()
-
+				output, err := runGinkgo(pathToTest, "--noColor", "-v", pathToTest, otherPathToTest)
+				Ω(err).ShouldNot(HaveOccurred())
 				Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 				Ω(output).Should(ContainSubstring("Running Suite: More_ginkgo_tests Suite"))
 				Ω(output).Should(ContainSubstring("should proxy strings"))

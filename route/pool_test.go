@@ -4,148 +4,147 @@ import (
 	. "github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
-var _ = Describe("Pool", func() {
-	var pool *Pool
-
-	BeforeEach(func() {
-		pool = NewPool(2 * time.Minute)
-	})
-
-	Context("Put", func() {
+var _ = Describe("Route", func() {
+	Context("Add", func() {
 		It("adds endpoints", func() {
+			pool := NewPool()
 			endpoint := &Endpoint{}
 
-			b := pool.Put(endpoint)
-			Ω(b).Should(BeTrue())
+			pool.Add(endpoint)
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
 		})
 
 		It("handles duplicate endpoints", func() {
+			pool := NewPool()
+
 			endpoint := &Endpoint{}
 
-			pool.Put(endpoint)
-			b := pool.Put(endpoint)
-			Ω(b).Should(BeFalse())
+			pool.Add(endpoint)
+			pool.Add(endpoint)
+
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
+
+			pool.Remove(endpoint)
+
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
-			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
+			pool := NewPool()
 
-			pool.Put(endpoint1)
-			Ω(pool.Put(endpoint2)).Should(BeFalse())
+			endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+			endpoint2 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+
+			pool.Add(endpoint1)
+			pool.Add(endpoint2)
+
+			_, found := pool.Sample()
+			Ω(found).To(BeTrue())
+
+			pool.Remove(endpoint1)
+
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
 		})
 	})
-
 	Context("Remove", func() {
 		It("removes endpoints", func() {
-			endpoint := &Endpoint{}
-			pool.Put(endpoint)
+			pool := NewPool()
 
-			b := pool.Remove(endpoint)
-			Ω(b).Should(BeTrue())
-			Ω(pool.IsEmpty()).Should(BeTrue())
-		})
-
-		It("fails to remove an endpoint that doesn't exist", func() {
 			endpoint := &Endpoint{}
 
-			b := pool.Remove(endpoint)
-			Ω(b).Should(BeFalse())
+			pool.Add(endpoint)
+
+			foundEndpoint, found := pool.Sample()
+			Ω(found).To(BeTrue())
+			Ω(foundEndpoint).To(Equal(endpoint))
+
+			pool.Remove(endpoint)
+
+			_, found = pool.Sample()
+			Ω(found).To(BeFalse())
 		})
+
 	})
-
 	Context("IsEmpty", func() {
 		It("starts empty", func() {
-			Ω(pool.IsEmpty()).To(BeTrue())
+			Ω(NewPool().IsEmpty()).To(BeTrue())
 		})
 
-		It("not empty after adding an endpoint", func() {
-			endpoint := &Endpoint{}
-			pool.Put(endpoint)
+		It("empty after removing everything", func() {
+			pool := NewPool()
 
-			Ω(pool.IsEmpty()).Should(BeFalse())
-		})
-
-		It("is empty after removing everything", func() {
 			endpoint := &Endpoint{}
-			pool.Put(endpoint)
+
+			pool.Add(endpoint)
+
+			Ω(pool.IsEmpty()).To(BeFalse())
+
 			pool.Remove(endpoint)
 
 			Ω(pool.IsEmpty()).To(BeTrue())
 		})
 	})
 
-	Context("PruneBefore", func() {
-		It("prunes endpoints that haven't been updated", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
-			pool.Put(e1)
-			pool.Put(e2)
+	It("finds by private instance id", func() {
+		pool := NewPool()
 
-			t := time.Now().Add(1 * time.Second)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeTrue())
-		})
+		endpointFoo := &Endpoint{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"}
+		endpointBar := &Endpoint{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"}
 
-		It("does not prune updated endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
-			pool.Put(e1)
-			pool.Put(e2)
+		pool.Add(endpointFoo)
+		pool.Add(endpointBar)
 
-			t := time.Now().Add(-1 * time.Second)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeFalse())
+		foundEndpoint, found := pool.FindByPrivateInstanceId("foo")
+		Ω(found).To(BeTrue())
+		Ω(foundEndpoint).To(Equal(endpointFoo))
 
-			iter := pool.Endpoints("")
-			n1 := iter.Next()
-			n2 := iter.Next()
-			Ω(n1).ShouldNot(Equal(n2))
-		})
+		foundEndpoint, found = pool.FindByPrivateInstanceId("bar")
+		Ω(found).To(BeTrue())
+		Ω(foundEndpoint).To(Equal(endpointBar))
+
+		_, found = pool.FindByPrivateInstanceId("quux")
+		Ω(found).To(BeFalse())
 	})
 
-	Context("MarkUpdated", func() {
-		It("updates all endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
+	It("Sample is randomish", func() {
+		pool := NewPool()
 
-			pool.Put(e1)
+		endpoint1 := &Endpoint{Host: "1.2.3.4", Port: 5678}
+		endpoint2 := &Endpoint{Host: "5.6.7.8", Port: 1234}
 
-			t := time.Time{}.Add(1 * time.Second)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeFalse())
+		pool.Add(endpoint1)
+		pool.Add(endpoint2)
 
-			pool.MarkUpdated(t)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeFalse())
+		var occurrences1, occurrences2 int
 
-			pool.PruneBefore(t.Add(1 * time.Microsecond))
-			Ω(pool.IsEmpty()).Should(BeTrue())
-		})
-	})
+		for i := 0; i < 200; i += 1 {
+			foundEndpoint, _ := pool.Sample()
+			if foundEndpoint == endpoint1 {
+				occurrences1 += 1
+			} else {
+				occurrences2 += 1
+			}
+		}
 
-	Context("Each", func() {
-		It("applies a function to each endpoint", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
-			pool.Put(e1)
-			pool.Put(e2)
+		Ω(occurrences1).ToNot(BeZero())
+		Ω(occurrences2).ToNot(BeZero())
 
-			endpoints := make(map[string]*Endpoint)
-			pool.Each(func(e *Endpoint) {
-				endpoints[e.CanonicalAddr()] = e
-			})
-			Ω(endpoints).Should(HaveLen(2))
-			Ω(endpoints[e1.CanonicalAddr()]).Should(Equal(e1))
-			Ω(endpoints[e2.CanonicalAddr()]).Should(Equal(e2))
-		})
+		// they should be arbitrarily close
+		Ω(occurrences1 - occurrences2).To(BeNumerically("~", 0, 50))
 	})
 
 	It("marshals json", func() {
-		e := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-		pool.Put(e)
+		pool := NewPool()
+
+		pool.Add(&Endpoint{Host: "1.2.3.4", Port: 5678})
 
 		json, err := pool.MarshalJSON()
 		Ω(err).ToNot(HaveOccurred())

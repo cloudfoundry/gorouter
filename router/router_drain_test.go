@@ -25,7 +25,7 @@ var _ = Describe("Router", func() {
 	var config *cfg.Config
 
 	var mbusClient *yagnats.Client
-	var registry *rregistry.RouteRegistry
+	var registry *rregistry.CFRegistry
 	var varz vvarz.Varz
 	var router *Router
 	var natsPort uint16
@@ -42,7 +42,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus.(*yagnats.Client)
-		registry = rregistry.NewRouteRegistry(config, mbusClient)
+		registry = rregistry.NewCFRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{

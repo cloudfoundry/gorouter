@@ -3,41 +3,37 @@ package route
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 )
 
-func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
-	tags map[string]string) *Endpoint {
-	return &Endpoint{
-		ApplicationId:     appId,
-		addr:              fmt.Sprintf("%s:%d", host, port),
-		Tags:              tags,
-		PrivateInstanceId: privateInstanceId,
-	}
-}
-
 type Endpoint struct {
+	sync.Mutex
+
 	ApplicationId     string
-	addr              string
+	Host              string
+	Port              uint16
 	Tags              map[string]string
 	PrivateInstanceId string
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
-	return json.Marshal(e.addr)
+	return json.Marshal(e.CanonicalAddr())
 }
 
 func (e *Endpoint) CanonicalAddr() string {
-	return e.addr
+	return fmt.Sprintf("%s:%d", e.Host, e.Port)
 }
 
 func (e *Endpoint) ToLogData() interface{} {
 	return struct {
 		ApplicationId string
-		Addr          string
+		Host          string
+		Port          uint16
 		Tags          map[string]string
 	}{
 		e.ApplicationId,
-		e.addr,
+		e.Host,
+		e.Port,
 		e.Tags,
 	}
 }

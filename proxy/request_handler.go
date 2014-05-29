@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
@@ -19,20 +18,15 @@ import (
 )
 
 type RequestHandler struct {
-	logger    *steno.Logger
-	reporter  ProxyReporter
-	logrecord *access_log.AccessLogRecord
+	logger *steno.Logger
 
 	request  *http.Request
 	response http.ResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response http.ResponseWriter, r ProxyReporter,
-	alr *access_log.AccessLogRecord) RequestHandler {
+func NewRequestHandler(request *http.Request, response http.ResponseWriter) RequestHandler {
 	return RequestHandler{
-		logger:    createLogger(request),
-		reporter:  r,
-		logrecord: alr,
+		logger: createLogger(request),
 
 		request:  request,
 		response: response,
@@ -51,12 +45,7 @@ func createLogger(request *http.Request) *steno.Logger {
 	return logger
 }
 
-func (h *RequestHandler) Logger() *steno.Logger {
-	return h.logger
-}
-
 func (h *RequestHandler) HandleHeartbeat() {
-	h.logrecord.StatusCode = http.StatusOK
 	h.response.WriteHeader(http.StatusOK)
 	h.response.Write([]byte("ok\n"))
 	h.request.Close = true
@@ -70,7 +59,6 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 		return
 	}
 
-	h.logrecord.StatusCode = http.StatusBadRequest
 	fmt.Fprintf(buf, "HTTP/1.0 400 Bad Request\r\n\r\n")
 	buf.Flush()
 	conn.Close()
@@ -92,20 +80,28 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
 }
 
-func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
+func (h *RequestHandler) HandleTcpRequest(endpoint *route.Endpoint) {
 	h.logger.Set("Upgrade", "tcp")
 
-	err := h.serveTcp(iter)
+	err := h.serveTcp(endpoint)
 	if err != nil {
+		h.logger.Set("Error", err.Error())
+		h.logger.Warn("proxy.tcp.failed")
+
 		h.writeStatus(http.StatusBadRequest, "TCP forwarding to endpoint failed.")
 	}
 }
 
-func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
+func (h *RequestHandler) HandleWebSocketRequest(endpoint *route.Endpoint) {
+	h.setupRequest(endpoint)
+
 	h.logger.Set("Upgrade", "websocket")
 
-	err := h.serveWebSocket(iter)
+	err := h.serveWebSocket(endpoint)
 	if err != nil {
+		h.logger.Set("Error", err.Error())
+		h.logger.Warn("proxy.websocket.failed")
+
 		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
 	}
 }
@@ -114,7 +110,6 @@ func (h *RequestHandler) writeStatus(code int, message string) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
 	h.logger.Warn(body)
-	h.logrecord.StatusCode = code
 
 	http.Error(h.response, body, code)
 	if code > 299 {
@@ -122,104 +117,54 @@ func (h *RequestHandler) writeStatus(code int, message string) {
 	}
 }
 
-func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
+func (h *RequestHandler) serveTcp(endpoint *route.Endpoint) error {
 	var err error
-	var connection net.Conn
 
 	client, _, err := h.hijack()
 	if err != nil {
 		return err
 	}
+
+	connection, err := net.Dial("tcp", endpoint.CanonicalAddr())
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		client.Close()
-		if connection != nil {
-			connection.Close()
-		}
+		connection.Close()
 	}()
 
-	retry := 0
-	for {
-		endpoint := iter.Next()
-		if endpoint == nil {
-			h.reporter.CaptureBadGateway(h.request)
-			err = noEndpointsAvailable
-			h.HandleBadGateway(err)
-			return err
-		}
-
-		connection, err = net.Dial("tcp", endpoint.CanonicalAddr())
-		if err == nil {
-			break
-		}
-
-		iter.EndpointFailed()
-
-		h.logger.Set("Error", err.Error())
-		h.logger.Warn("proxy.tcp.failed")
-
-		retry++
-		if retry == retries {
-			return err
-		}
-	}
-
-	if connection != nil {
-		forwardIO(client, connection)
-	}
+	forwardIO(client, connection)
 
 	return nil
 }
 
-func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
+func (h *RequestHandler) serveWebSocket(endpoint *route.Endpoint) error {
 	var err error
-	var connection net.Conn
 
 	client, _, err := h.hijack()
 	if err != nil {
 		return err
 	}
+
+	connection, err := net.Dial("tcp", endpoint.CanonicalAddr())
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		client.Close()
-		if connection != nil {
-			connection.Close()
-		}
+		connection.Close()
 	}()
 
-	retry := 0
-	for {
-		endpoint := iter.Next()
-		if endpoint == nil {
-			h.reporter.CaptureBadGateway(h.request)
-			err = noEndpointsAvailable
-			h.HandleBadGateway(err)
-			return err
-		}
-
-		connection, err = net.Dial("tcp", endpoint.CanonicalAddr())
-		if err == nil {
-			h.setupRequest(endpoint)
-			break
-		}
-
-		iter.EndpointFailed()
-
-		h.logger.Set("Error", err.Error())
-		h.logger.Warn("proxy.websocket.failed")
-
-		retry++
-		if retry == retries {
-			return err
-		}
+	err = h.request.Write(connection)
+	if err != nil {
+		return err
 	}
 
-	if connection != nil {
-		err = h.request.Write(connection)
-		if err != nil {
-			return err
-		}
+	forwardIO(client, connection)
 
-		forwardIO(client, connection)
-	}
 	return nil
 }
 

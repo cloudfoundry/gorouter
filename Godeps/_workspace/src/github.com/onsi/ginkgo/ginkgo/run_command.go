@@ -3,13 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"runtime"
-	"time"
-
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/ginkgo/testrunner"
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
+	"os"
+	"runtime"
+	"time"
 )
 
 func BuildRunCommand() *Command {
@@ -47,13 +46,11 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 
 	t := time.Now()
 
-	numSuites := 0
 	passed := true
 	if r.commandFlags.UntilItFails {
 		iteration := 0
 		for {
-			r.UpdateSeed()
-			passed, numSuites = r.RunSuites(suites, additionalArgs)
+			passed = r.RunSuites(suites, additionalArgs)
 			iteration++
 
 			if r.interruptHandler.WasInterrupted() {
@@ -61,22 +58,17 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 			}
 
 			if passed {
-				fmt.Printf("\nAll tests passed...\nWill keep running them until they fail.\nThis was attempt #%d\n%s\n", iteration, orcMessage(iteration))
+				fmt.Printf("\nAll tests passed...\nWill keep running them until they fail.\nThis was attempt #%d\n\n", iteration)
 			} else {
 				fmt.Printf("\nTests failed on attempt #%d\n\n", iteration)
 				break
 			}
 		}
 	} else {
-		passed, numSuites = r.RunSuites(suites, additionalArgs)
+		passed = r.RunSuites(suites, additionalArgs)
 	}
 
-	noun := "suites"
-	if numSuites == 1 {
-		noun = "suite"
-	}
-
-	fmt.Printf("\nGinkgo ran %d %s in %s\n", numSuites, noun, time.Since(t))
+	fmt.Printf("\nGinkgo ran in %s\n", time.Since(t))
 
 	if passed {
 		fmt.Printf("Test Suite Passed\n")
@@ -97,14 +89,15 @@ func (r *SpecRunner) ComputeSuccinctMode(numSuites int) {
 		return
 	}
 
-	if numSuites > 1 && !r.commandFlags.wasSet("succinct") {
-		config.DefaultReporterConfig.Succinct = true
-	}
-}
+	didSetSuccinct := false
+	r.commandFlags.FlagSet.Visit(func(f *flag.Flag) {
+		if f.Name == "succinct" {
+			didSetSuccinct = true
+		}
+	})
 
-func (r *SpecRunner) UpdateSeed() {
-	if !r.commandFlags.wasSet("seed") {
-		config.GinkgoConfig.RandomSeed = time.Now().Unix()
+	if numSuites > 1 && !didSetSuccinct {
+		config.DefaultReporterConfig.Succinct = true
 	}
 }
 
@@ -125,7 +118,7 @@ func (c *compiler) compile() {
 	c.compilationError <- err
 }
 
-func (r *SpecRunner) RunSuites(suites []*testsuite.TestSuite, additionalArgs []string) (bool, int) {
+func (r *SpecRunner) RunSuites(suites []*testsuite.TestSuite, additionalArgs []string) bool {
 	passed := true
 
 	suiteCompilers := make([]*compiler, len(suites))
@@ -153,7 +146,6 @@ func (r *SpecRunner) RunSuites(suites []*testsuite.TestSuite, additionalArgs []s
 		close(compilerChannel)
 	}()
 
-	numSuitesThatRan := 0
 	suitesThatFailed := []*testsuite.TestSuite{}
 	for i, suite := range suites {
 		if r.interruptHandler.WasInterrupted() {
@@ -164,7 +156,6 @@ func (r *SpecRunner) RunSuites(suites []*testsuite.TestSuite, additionalArgs []s
 		if compilationError != nil {
 			fmt.Print(compilationError.Error())
 		}
-		numSuitesThatRan++
 		suitePassed := (compilationError == nil) && suiteCompilers[i].runner.Run()
 		r.notifier.SendSuiteCompletionNotification(suite, suitePassed)
 
@@ -185,65 +176,11 @@ func (r *SpecRunner) RunSuites(suites []*testsuite.TestSuite, additionalArgs []s
 	}
 
 	if r.commandFlags.KeepGoing && !passed {
-		r.listFailedSuites(suitesThatFailed)
-	}
-
-	return passed, numSuitesThatRan
-}
-
-func (r *SpecRunner) listFailedSuites(suitesThatFailed []*testsuite.TestSuite) {
-	fmt.Println("")
-	fmt.Println("There were failures detected in the following suites:")
-
-	redColor := "\x1b[91m"
-	defaultStyle := "\x1b[0m"
-	lightGrayColor := "\x1b[37m"
-
-	maxPackageNameLength := 0
-	for _, suite := range suitesThatFailed {
-		if len(suite.PackageName) > maxPackageNameLength {
-			maxPackageNameLength = len(suite.PackageName)
+		fmt.Println("There were failures detected in the following suites:")
+		for _, suite := range suitesThatFailed {
+			fmt.Printf("\t%s\n", suite.PackageName)
 		}
 	}
 
-	packageNameFormatter := fmt.Sprintf("%%%ds", maxPackageNameLength)
-
-	for _, suite := range suitesThatFailed {
-		if config.DefaultReporterConfig.NoColor {
-			fmt.Printf("\t"+packageNameFormatter+" %s\n", suite.PackageName, suite.Path)
-		} else {
-			fmt.Printf("\t%s"+packageNameFormatter+"%s %s%s%s\n", redColor, suite.PackageName, defaultStyle, lightGrayColor, suite.Path, defaultStyle)
-		}
-	}
-}
-
-func orcMessage(iteration int) string {
-	if iteration < 10 {
-		return ""
-	} else if iteration < 30 {
-		return []string{
-			"If at first you succeed...",
-			"...try, try again.",
-			"Looking good!",
-			"Still good...",
-			"I think your tests are fine....",
-			"Yep, still passing",
-			"Here we go again...",
-			"Even the gophers are getting bored",
-			"Did you try -race?",
-			"Maybe you should stop now?",
-			"I'm getting tired...",
-			"What if I just made you a sandwich?",
-			"Hit ^C, hit ^C, please hit ^C",
-			"Make it stop. Please!",
-			"Come on!  Enough is enough!",
-			"Dave, this conversation can serve no purpose anymore. Goodbye.",
-			"Just what do you think you're doing, Dave? ",
-			"I, Sisyphus",
-			"Insanity: doing the same thing over and over again and expecting different results. -Einstein",
-			"I guess Einstein never tried to churn butter",
-		}[iteration-10]
-	} else {
-		return "No, seriously... you can probably stop now."
-	}
+	return passed
 }

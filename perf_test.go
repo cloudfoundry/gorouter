@@ -19,7 +19,7 @@ var _ = Describe("AccessLogRecord", func() {
 	Measure("Register", func(b Benchmarker) {
 		c := config.DefaultConfig()
 		mbus := fakeyagnats.New()
-		r := registry.NewRouteRegistry(c, mbus)
+		r := registry.NewCFRegistry(c, mbus)
 
 		accesslog, err := access_log.CreateRunningAccessLogger(c)
 		Ω(err).ToNot(HaveOccurred())
@@ -38,7 +38,10 @@ var _ = Describe("AccessLogRecord", func() {
 				str := strconv.Itoa(i)
 				r.Register(
 					route.Uri("bench.vcap.me."+str),
-					route.NewEndpoint("", "localhost", uint16(i), "", nil),
+					&route.Endpoint{
+						Host: "localhost",
+						Port: uint16(i),
+					},
 				)
 			}
 		})

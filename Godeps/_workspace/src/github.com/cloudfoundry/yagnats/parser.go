@@ -67,7 +67,7 @@ var PARSERS = map[string]Parser{
 			return nil, errors.New("Malformed MSG message")
 		}
 
-		subID, _ := strconv.ParseInt(matches[2], 10, 64)
+		subID, _ := strconv.Atoi(matches[2])
 		payloadLen, _ := strconv.Atoi(matches[5])
 
 		payload, err := readNBytes(payloadLen, io)

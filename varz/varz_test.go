@@ -17,10 +17,10 @@ import (
 
 var _ = Describe("Varz", func() {
 	var Varz Varz
-	var Registry *registry.RouteRegistry
+	var Registry *registry.CFRegistry
 
 	BeforeEach(func() {
-		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.New())
+		Registry = registry.NewCFRegistry(config.DefaultConfig(), fakeyagnats.New())
 		Varz = NewVarz(Registry)
 	})
 
@@ -72,7 +72,13 @@ var _ = Describe("Varz", func() {
 	It("has urls", func() {
 		Ω(findValue(Varz, "urls")).To(Equal(float64(0)))
 
-		var fooReg = route.NewEndpoint("12345", "192.168.1.1", 1234, "", map[string]string{})
+		var fooReg = &route.Endpoint{
+			Host: "192.168.1.1",
+			Port: 1234,
+			Tags: map[string]string{},
+
+			ApplicationId: "12345",
+		}
 
 		// Add a route
 		Registry.Register("foo.vcap.me", fooReg)

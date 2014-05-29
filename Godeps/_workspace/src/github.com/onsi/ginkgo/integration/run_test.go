@@ -1,11 +1,9 @@
 package integration_test
 
 import (
-	"strings"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/onsi/gomega/gexec"
+	"strings"
 )
 
 var _ = Describe("Running Specs", func() {
@@ -18,10 +16,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should run the tests in the working directory", func() {
-			session := startGinkgo(pathToTest, "--noColor")
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(pathToTest, "--noColor")
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 			Ω(output).Should(ContainSubstring("•••"))
 			Ω(output).Should(ContainSubstring("SUCCESS! -- 3 Passed"))
@@ -36,10 +33,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should run the ginkgo style tests", func() {
-			session := startGinkgo(tmpDir, "--noColor", pathToTest)
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(tmpDir, "--noColor", pathToTest)
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 			Ω(output).Should(ContainSubstring("•••"))
 			Ω(output).Should(ContainSubstring("SUCCESS! -- 3 Passed"))
@@ -56,10 +52,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should run the ginkgo style tests", func() {
-			session := startGinkgo(tmpDir, "--noColor", "--succinct=false", "ginkgo", "./other")
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(tmpDir, "--noColor", "--succinct=false", "ginkgo", "./other")
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Running Suite: Passing_ginkgo_tests Suite"))
 			Ω(output).Should(ContainSubstring("Running Suite: More_ginkgo_tests Suite"))
 			Ω(output).Should(ContainSubstring("Test Suite Passed"))
@@ -75,10 +70,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should skip packages that match the regexp", func() {
-			session := startGinkgo(tmpDir, "--noColor", "--skipPackage=other", "-r")
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(tmpDir, "--noColor", "--skipPackage=other", "-r")
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Passing_ginkgo_tests Suite"))
 			Ω(output).ShouldNot(ContainSubstring("More_ginkgo_tests Suite"))
 			Ω(output).Should(ContainSubstring("Test Suite Passed"))
@@ -92,10 +86,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should run the xunit style tests", func() {
-			session := startGinkgo(pathToTest)
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(pathToTest)
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring("--- PASS: TestAlwaysTrue"))
 			Ω(output).Should(ContainSubstring("Test Suite Passed"))
 		})
@@ -108,10 +101,10 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should fail", func() {
-			session := startGinkgo(pathToTest, "--noColor")
-			Eventually(session).Should(gexec.Exit(1))
+			output, err := runGinkgo(pathToTest, "--noColor")
 
-			Ω(session.Err.Contents()).Should(ContainSubstring("Found no test suites"))
+			Ω(err).Should(HaveOccurred())
+			Ω(output).Should(ContainSubstring("Found no test suites"))
 		})
 	})
 
@@ -122,10 +115,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should fail", func() {
-			session := startGinkgo(pathToTest, "--noColor")
-			Eventually(session).Should(gexec.Exit(1))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(pathToTest, "--noColor")
 
+			Ω(err).Should(HaveOccurred())
 			Ω(output).Should(ContainSubstring("Failed to compile"))
 		})
 	})
@@ -137,10 +129,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should aggregate output", func() {
-			session := startGinkgo(pathToTest, "--noColor", "-succinct", "-nodes=2")
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(pathToTest, "--noColor", "-succinct", "-nodes=2")
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 3/3 specs - 2 nodes ••• SUCCESS! [\d.mus]+`))
 			Ω(output).Should(ContainSubstring("Test Suite Passed"))
 		})
@@ -153,10 +144,9 @@ var _ = Describe("Running Specs", func() {
 		})
 
 		It("should print output in realtime", func() {
-			session := startGinkgo(pathToTest, "--noColor", "-stream", "-nodes=2")
-			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
+			output, err := runGinkgo(pathToTest, "--noColor", "-stream", "-nodes=2")
 
+			Ω(err).ShouldNot(HaveOccurred())
 			Ω(output).Should(ContainSubstring(`[1] Parallel test node 1/2.`))
 			Ω(output).Should(ContainSubstring(`[2] Parallel test node 2/2.`))
 			Ω(output).Should(ContainSubstring(`[1] SUCCESS!`))
@@ -175,10 +165,9 @@ var _ = Describe("Running Specs", func() {
 
 		Context("when all the tests pass", func() {
 			It("should run all the tests (in succinct mode) and succeed", func() {
-				session := startGinkgo(tmpDir, "--noColor", "-r")
-				Eventually(session).Should(gexec.Exit(0))
-				output := string(session.Out.Contents())
+				output, err := runGinkgo(tmpDir, "--noColor", "-r")
 
+				Ω(err).ShouldNot(HaveOccurred())
 				outputLines := strings.Split(output, "\n")
 				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 3/3 specs ••• SUCCESS! [\d.mus]+ PASS`))
 				Ω(outputLines[1]).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! [\d.mus]+ PASS`))
@@ -193,10 +182,9 @@ var _ = Describe("Running Specs", func() {
 			})
 
 			It("should fail and stop running tests", func() {
-				session := startGinkgo(tmpDir, "--noColor", "-r")
-				Eventually(session).Should(gexec.Exit(1))
-				output := string(session.Out.Contents())
+				output, err := runGinkgo(tmpDir, "--noColor", "-r")
 
+				Ω(err).Should(HaveOccurred())
 				outputLines := strings.Split(output, "\n")
 				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 3/3 specs ••• SUCCESS! [\d.mus]+ PASS`))
 				Ω(outputLines[1]).Should(MatchRegexp(`\[\d+\] Failing_ginkgo_tests Suite - 2/2 specs`))
@@ -213,10 +201,9 @@ var _ = Describe("Running Specs", func() {
 			})
 
 			It("should fail and stop running tests", func() {
-				session := startGinkgo(tmpDir, "--noColor", "-r")
-				Eventually(session).Should(gexec.Exit(1))
-				output := string(session.Out.Contents())
+				output, err := runGinkgo(tmpDir, "--noColor", "-r")
 
+				Ω(err).Should(HaveOccurred())
 				outputLines := strings.Split(output, "\n")
 				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 3/3 specs ••• SUCCESS! [\d.mus]+ PASS`))
 				Ω(outputLines[1]).Should(ContainSubstring("Failed to compile C:"))
@@ -235,10 +222,9 @@ var _ = Describe("Running Specs", func() {
 			})
 
 			It("should soldier on", func() {
-				session := startGinkgo(tmpDir, "--noColor", "-r", "-keepGoing")
-				Eventually(session).Should(gexec.Exit(1))
-				output := string(session.Out.Contents())
+				output, err := runGinkgo(tmpDir, "--noColor", "-r", "-keepGoing")
 
+				Ω(err).Should(HaveOccurred())
 				outputLines := strings.Split(output, "\n")
 				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 3/3 specs ••• SUCCESS! [\d.mus]+ PASS`))
 				Ω(outputLines[1]).Should(ContainSubstring("Failed to compile B:"))
@@ -247,32 +233,6 @@ var _ = Describe("Running Specs", func() {
 				Ω(output).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! [\d.mus]+ PASS`))
 				Ω(output).Should(ContainSubstring("Test Suite Failed"))
 			})
-		})
-	})
-
-	Context("when told to keep going --untilItFails", func() {
-		BeforeEach(func() {
-			copyIn("eventually_failing", tmpDir)
-		})
-
-		It("should keep rerunning the tests, until a failure occurs", func() {
-			session := startGinkgo(tmpDir, "--untilItFails", "--noColor")
-			Eventually(session).Should(gexec.Exit(1))
-			Ω(session).Should(gbytes.Say("This was attempt #1"))
-			Ω(session).Should(gbytes.Say("This was attempt #2"))
-			Ω(session).Should(gbytes.Say("Tests failed on attempt #3"))
-
-			//it should change the random seed between each test
-			lines := strings.Split(string(session.Out.Contents()), "\n")
-			randomSeeds := []string{}
-			for _, line := range lines {
-				if strings.Contains(line, "Random Seed:") {
-					randomSeeds = append(randomSeeds, strings.Split(line, ": ")[1])
-				}
-			}
-			Ω(randomSeeds[0]).ShouldNot(Equal(randomSeeds[1]))
-			Ω(randomSeeds[1]).ShouldNot(Equal(randomSeeds[2]))
-			Ω(randomSeeds[0]).ShouldNot(Equal(randomSeeds[2]))
 		})
 	})
 })

@@ -14,6 +14,12 @@ type registryMessage struct {
 	PrivateInstanceId string `json:"private_instance_id"`
 }
 
-func (rm *registryMessage) makeEndpoint() *route.Endpoint {
-	return route.NewEndpoint(rm.App, rm.Host, rm.Port, rm.PrivateInstanceId, rm.Tags)
+func (registryMessage *registryMessage) makeEndpoint() *route.Endpoint {
+	return &route.Endpoint{
+		Host:              registryMessage.Host,
+		Port:              registryMessage.Port,
+		ApplicationId:     registryMessage.App,
+		Tags:              registryMessage.Tags,
+		PrivateInstanceId: registryMessage.PrivateInstanceId,
+	}
 }

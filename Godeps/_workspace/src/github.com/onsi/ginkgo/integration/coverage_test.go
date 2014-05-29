@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gexec"
 )
 
 var _ = Describe("Coverage Specs", func() {
@@ -14,9 +13,8 @@ var _ = Describe("Coverage Specs", func() {
 	})
 
 	It("runs coverage analysis in series and in parallel", func() {
-		session := startGinkgo("./_fixtures/coverage_fixture", "-cover")
-		Eventually(session).Should(gexec.Exit(0))
-		output := session.Out.Contents()
+		output, err := runGinkgo("./_fixtures/coverage_fixture", "-cover")
+		Ω(err).ShouldNot(HaveOccurred())
 		Ω(output).Should(ContainSubstring("coverage: 80.0% of statements"))
 
 		serialCoverProfileOutput, err := exec.Command("go", "tool", "cover", "-func=./_fixtures/coverage_fixture/coverage_fixture.coverprofile").CombinedOutput()
@@ -24,7 +22,8 @@ var _ = Describe("Coverage Specs", func() {
 
 		os.RemoveAll("./_fixtures/coverage_fixture/coverage_fixture.coverprofile")
 
-		Eventually(startGinkgo("./_fixtures/coverage_fixture", "-cover", "-nodes=4")).Should(gexec.Exit(0))
+		output, err = runGinkgo("./_fixtures/coverage_fixture", "-cover", "-nodes=4")
+		Ω(err).ShouldNot(HaveOccurred())
 
 		parallelCoverProfileOutput, err := exec.Command("go", "tool", "cover", "-func=./_fixtures/coverage_fixture/coverage_fixture.coverprofile").CombinedOutput()
 		Ω(err).ShouldNot(HaveOccurred())

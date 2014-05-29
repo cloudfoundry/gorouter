@@ -33,14 +33,14 @@ type nullVarz struct{}
 
 func (_ nullVarz) MarshalJSON() ([]byte, error)                               { return json.Marshal(nil) }
 func (_ nullVarz) ActiveApps() *stats.ActiveApps                              { return stats.NewActiveApps() }
-func (_ nullVarz) CaptureBadRequest(*http.Request)                            {}
-func (_ nullVarz) CaptureBadGateway(*http.Request)                            {}
+func (_ nullVarz) CaptureBadRequest(req *http.Request)                        {}
+func (_ nullVarz) CaptureBadGateway(req *http.Request)                        {}
 func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {}
 func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
 }
 
 var _ = Describe("Proxy", func() {
-	var r *registry.RouteRegistry
+	var r *registry.CFRegistry
 	var p Proxy
 	var conf *config.Config
 	var proxyServer net.Listener
@@ -54,7 +54,7 @@ var _ = Describe("Proxy", func() {
 
 		mbus := fakeyagnats.New()
 
-		r = registry.NewRouteRegistry(conf, mbus)
+		r = registry.NewCFRegistry(conf, mbus)
 
 		accessLogFile = new(test_util.FakeFile)
 		accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, nil)
@@ -112,7 +112,6 @@ var _ = Describe("Proxy", func() {
 				"HTTP/1.1 200 OK",
 				"Content-Length: 0",
 			})
-
 		})
 		defer ln.Close()
 
@@ -126,10 +125,9 @@ var _ = Describe("Proxy", func() {
 		x.CheckLine("HTTP/1.0 200 OK")
 
 		var payload []byte
-		Eventually(func() int {
-			accessLogFile.Read(&payload)
-			return len(payload)
-		}).ShouldNot(BeZero())
+		n, e := accessLogFile.Read(&payload)
+		Ω(e).ShouldNot(HaveOccurred())
+		Ω(n).ShouldNot(BeZero())
 		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
 		//make sure the record includes all the data
 		//since the building of the log record happens throughout the life of the request
@@ -728,31 +726,6 @@ var _ = Describe("Proxy", func() {
 		Ω(err).Should(HaveOccurred())
 	})
 
-	It("retries when failed endpoints exist", func() {
-		ln := registerHandler(r, "retries", func(x *test_util.HttpConn) {
-			x.CheckLine("GET / HTTP/1.1")
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.Close()
-		})
-		defer ln.Close()
-
-		ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
-		Ω(err).Should(BeNil())
-		registerAddr(r, "retries", ip)
-
-		for i := 0; i < 5; i++ {
-			x := dialProxy(proxyServer)
-
-			req := x.NewRequest("GET", "/", nil)
-			req.Host = "retries"
-			x.WriteRequest(req)
-			resp, _ := x.ReadResponse()
-
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
-		}
-	})
-
 	Context("Wait", func() {
 		It("waits for requests to finish", func() {
 			blocker := make(chan bool)
@@ -793,7 +766,7 @@ var _ = Describe("Proxy", func() {
 	})
 })
 
-func registerAddr(r *registry.RouteRegistry, u string, a net.Addr) {
+func registerAddr(r *registry.CFRegistry, u string, a net.Addr) {
 	h, p, err := net.SplitHostPort(a.String())
 	Ω(err).NotTo(HaveOccurred())
 
@@ -802,11 +775,14 @@ func registerAddr(r *registry.RouteRegistry, u string, a net.Addr) {
 
 	r.Register(
 		route.Uri(u),
-		route.NewEndpoint("", h, uint16(x), "", nil),
+		&route.Endpoint{
+			Host: h,
+			Port: uint16(x),
+		},
 	)
 }
 
-func registerHandler(r *registry.RouteRegistry, u string, h connHandler) net.Listener {
+func registerHandler(r *registry.CFRegistry, u string, h connHandler) net.Listener {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	Ω(err).NotTo(HaveOccurred())
 
@@ -824,7 +800,7 @@ func registerHandler(r *registry.RouteRegistry, u string, h connHandler) net.Lis
 					if max := 1 * time.Second; tempDelay > max {
 						tempDelay = max
 					}
-					fmt.Printf("http: Accept error: %v; retrying in %v\n", err, tempDelay)
+					println("http: Accept error: %v; retrying in %v", err, tempDelay)
 					time.Sleep(tempDelay)
 					continue
 				}

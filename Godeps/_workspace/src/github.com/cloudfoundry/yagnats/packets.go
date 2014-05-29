@@ -74,7 +74,7 @@ func (p *ERRPacket) Encode() []byte {
 type SubPacket struct {
 	Subject string
 	Queue   string
-	ID      int64
+	ID      int
 }
 
 func (p *SubPacket) Encode() []byte {
@@ -86,7 +86,7 @@ func (p *SubPacket) Encode() []byte {
 }
 
 type UnsubPacket struct {
-	ID int64
+	ID int
 }
 
 func (p *UnsubPacket) Encode() []byte {
@@ -119,7 +119,7 @@ func (p *PubPacket) Encode() []byte {
 
 type MsgPacket struct {
 	Subject string
-	SubID   int64
+	SubID   int
 	ReplyTo string
 	Payload []byte
 }

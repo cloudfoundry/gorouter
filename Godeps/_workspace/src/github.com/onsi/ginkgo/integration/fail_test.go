@@ -3,7 +3,6 @@ package integration_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gexec"
 )
 
 var _ = Describe("Failing Specs", func() {
@@ -15,10 +14,9 @@ var _ = Describe("Failing Specs", func() {
 	})
 
 	It("should fail in all the possible ways", func() {
-		session := startGinkgo(pathToTest, "--noColor")
-		Eventually(session).Should(gexec.Exit(1))
-		output := string(session.Out.Contents())
+		output, err := runGinkgo(pathToTest, "--noColor")
 
+		Ω(err).Should(HaveOccurred())
 		Ω(output).ShouldNot(ContainSubstring("NEVER SEE THIS"))
 
 		Ω(output).Should(ContainSubstring("a top level failure on line 9"))
