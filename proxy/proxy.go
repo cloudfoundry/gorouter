@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -65,6 +66,16 @@ func NewProxy(args ProxyArgs) Proxy {
 		registry:     args.Registry,
 		reporter:     args.Reporter,
 		transport: &http.Transport{
+			Dial: func(network, addr string) (net.Conn, error) {
+				conn, err := net.DialTimeout(network, addr, 5*time.Second)
+				if err != nil {
+					return conn, err
+				}
+				if args.EndpointTimeout > 0 {
+					err = conn.SetDeadline(time.Now().Add(args.EndpointTimeout))
+				}
+				return conn, err
+			},
 			DisableKeepAlives:     true,
 			ResponseHeaderTimeout: args.EndpointTimeout,
 		},

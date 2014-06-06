@@ -375,27 +375,78 @@ var _ = Describe("Router", func() {
 		Ω(string(body)).Should(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
 	})
 
-	It("terminates long requests", func() {
-		app := test.NewSlowApp(
-			[]route.Uri{"slow-app.vcap.me"},
-			config.Port,
-			mbusClient,
-			1*time.Second,
-		)
+	Context("long requests", func() {
+		Context("http", func() {
+			BeforeEach(func() {
+				app := test.NewSlowApp(
+					[]route.Uri{"slow-app.vcap.me"},
+					config.Port,
+					mbusClient,
+					1*time.Second,
+				)
 
-		app.Listen()
+				app.Listen()
+			})
 
-		uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
-		req, _ := http.NewRequest("GET", uri, nil)
-		client := http.Client{}
-		resp, err := client.Do(req)
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(resp).ShouldNot(BeNil())
-		Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		defer resp.Body.Close()
+			It("terminates before receiving headers", func() {
+				uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
+				req, _ := http.NewRequest("GET", uri, nil)
+				client := http.Client{}
+				resp, err := client.Do(req)
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(resp).ShouldNot(BeNil())
+				Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+				defer resp.Body.Close()
 
-		_, err = ioutil.ReadAll(resp.Body)
-		Ω(err).ShouldNot(HaveOccurred())
+				_, err = ioutil.ReadAll(resp.Body)
+				Ω(err).ShouldNot(HaveOccurred())
+			})
+
+			It("terminates before receiving the body", func() {
+				uri := fmt.Sprintf("http://slow-app.vcap.me:%d/hello", config.Port)
+				req, _ := http.NewRequest("GET", uri, nil)
+				client := http.Client{}
+				resp, err := client.Do(req)
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(resp).ShouldNot(BeNil())
+				Ω(resp.StatusCode).To(Equal(http.StatusOK))
+				defer resp.Body.Close()
+
+				body, err := ioutil.ReadAll(resp.Body)
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(body).Should(HaveLen(0))
+			})
+		})
+
+		It("websockets do not terminate", func() {
+			app := test.NewWebSocketApp(
+				[]route.Uri{"ws-app.vcap.me"},
+				config.Port,
+				mbusClient,
+				1*time.Second,
+			)
+			app.Listen()
+
+			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
+			Ω(err).NotTo(HaveOccurred())
+
+			x := test_util.NewHttpConn(conn)
+
+			req := x.NewRequest("GET", "/chat", nil)
+			req.Host = "ws-app.vcap.me"
+			req.Header.Set("Upgrade", "websocket")
+			req.Header.Set("Connection", "upgrade")
+
+			x.WriteRequest(req)
+
+			resp, _ := x.ReadResponse()
+			Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+
+			x.WriteLine("hello from client")
+			x.CheckLine("hello from server")
+
+			x.Close()
+		})
 	})
 })
 

@@ -109,12 +109,8 @@ func (r *Router) Run() <-chan error {
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
-	// timeout all requests through the server but must be longer than the request
-	server_timeout := r.config.EndpointTimeout + 1*time.Second
 	server := http.Server{
-		ReadTimeout:  server_timeout,
-		WriteTimeout: server_timeout,
-		Handler:      r.proxy,
+		Handler: r.proxy,
 	}
 
 	errChan := make(chan error, 1)

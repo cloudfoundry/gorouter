@@ -125,7 +125,7 @@ func (h *RequestHandler) serveTcp(endpoint *route.Endpoint) error {
 		return err
 	}
 
-	connection, err := net.Dial("tcp", endpoint.CanonicalAddr())
+	connection, err := net.DialTimeout("tcp", endpoint.CanonicalAddr(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (h *RequestHandler) serveWebSocket(endpoint *route.Endpoint) error {
 		return err
 	}
 
-	connection, err := net.Dial("tcp", endpoint.CanonicalAddr())
+	connection, err := net.DialTimeout("tcp", endpoint.CanonicalAddr(), 5*time.Second)
 	if err != nil {
 		return err
 	}
