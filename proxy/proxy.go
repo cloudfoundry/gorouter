@@ -309,12 +309,15 @@ func isTcpUpgrade(request *http.Request) bool {
 }
 
 func upgradeHeader(request *http.Request) string {
-	// upgrade should be case insensitive per RFC6455 4.2.1
-	if strings.ToLower(request.Header.Get("Connection")) == "upgrade" {
-		return request.Header.Get("Upgrade")
-	} else {
-		return ""
+	// handle multiple Connection field-values, either in a comma-separated string or multiple field-headers
+	for _, v := range request.Header[http.CanonicalHeaderKey("Connection")] {
+		// upgrade should be case insensitive per RFC6455 4.2.1
+		if strings.Contains(strings.ToLower(v), "upgrade") {
+			return request.Header.Get("Upgrade")
+		}
 	}
+
+	return ""
 }
 
 func setTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) {
