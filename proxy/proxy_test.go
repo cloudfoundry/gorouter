@@ -495,6 +495,102 @@ var _ = Describe("Proxy", func() {
 		x.Close()
 	})
 
+	It("upgrades for a WebSocket request with comma-separated Connection header", func() {
+		done := make(chan bool)
+
+		ln := registerHandler(r, "ws-cs-header", func(x *test_util.HttpConn) {
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
+			done <- req.Header.Get("Upgrade") == "Websocket" &&
+				req.Header.Get("Connection") == "keep-alive, Upgrade"
+
+			resp := test_util.NewResponse(http.StatusSwitchingProtocols)
+			resp.Header.Set("Upgrade", "Websocket")
+			resp.Header.Set("Connection", "Upgrade")
+
+			x.WriteResponse(resp)
+
+			x.CheckLine("hello from client")
+			x.WriteLine("hello from server")
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := x.NewRequest("GET", "/chat", nil)
+		req.Host = "ws-cs-header"
+		req.Header.Add("Upgrade", "Websocket")
+		req.Header.Add("Connection", "keep-alive, Upgrade")
+
+		x.WriteRequest(req)
+
+		var answer bool
+		Eventually(done).Should(Receive(&answer))
+		Ω(answer).To(BeTrue())
+
+		resp, _ := x.ReadResponse()
+		Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+
+		Ω(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+		Ω(resp.Header.Get("Connection")).To(Equal("Upgrade"))
+
+		x.WriteLine("hello from client")
+		x.CheckLine("hello from server")
+
+		x.Close()
+	})
+
+It("upgrades for a WebSocket request with multiple Connection headers", func() {
+		done := make(chan bool)
+
+		ln := registerHandler(r, "ws-cs-header", func(x *test_util.HttpConn) {
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
+			done <- req.Header.Get("Upgrade") == "Websocket" &&
+				req.Header[http.CanonicalHeaderKey("Connection")][0] == "keep-alive" &&
+				req.Header[http.CanonicalHeaderKey("Connection")][1] == "Upgrade"
+
+			resp := test_util.NewResponse(http.StatusSwitchingProtocols)
+			resp.Header.Set("Upgrade", "Websocket")
+			resp.Header.Set("Connection", "Upgrade")
+
+			x.WriteResponse(resp)
+
+			x.CheckLine("hello from client")
+			x.WriteLine("hello from server")
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := x.NewRequest("GET", "/chat", nil)
+		req.Host = "ws-cs-header"
+		req.Header.Add("Upgrade", "Websocket")
+		req.Header.Add("Connection", "keep-alive")
+		req.Header.Add("Connection", "Upgrade")
+
+		x.WriteRequest(req)
+
+		var answer bool
+		Eventually(done).Should(Receive(&answer))
+		Ω(answer).To(BeTrue())
+
+		resp, _ := x.ReadResponse()
+		Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+
+		Ω(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+		Ω(resp.Header.Get("Connection")).To(Equal("Upgrade"))
+
+		x.WriteLine("hello from client")
+		x.CheckLine("hello from server")
+
+		x.Close()
+	})
+
 	It("upgrades a Tcp request", func() {
 		ln := registerHandler(r, "tcp-handler", func(x *test_util.HttpConn) {
 			x.WriteLine("hello")
