@@ -449,6 +449,62 @@ var _ = Describe("Proxy", func() {
 		x.ReadResponse()
 	})
 
+	It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
+		done := make(chan string)
+
+		ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusOK)
+			x.WriteResponse(resp)
+			x.Close()
+
+			done <- req.Header.Get(router_http.CfInstanceIdHeader)
+		}, "fake-instance-id")
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := x.NewRequest("GET", "/", nil)
+		req.Host = "app"
+		x.WriteRequest(req)
+
+		var answer string
+		Eventually(done).Should(Receive(&answer))
+		Ω(answer).To(Equal("fake-instance-id"))
+
+		x.ReadResponse()
+	})
+
+	It("X-CF-InstanceID header is added with host:port information if NOT present in the routing endpoint", func() {
+		done := make(chan string)
+
+		ln := registerHandler(r, "app", func(x *test_util.HttpConn) {
+			req, err := http.ReadRequest(x.Reader)
+			Ω(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusOK)
+			x.WriteResponse(resp)
+			x.Close()
+
+			done <- req.Header.Get(router_http.CfInstanceIdHeader)
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := x.NewRequest("GET", "/", nil)
+		req.Host = "app"
+		x.WriteRequest(req)
+
+		var answer string
+		Eventually(done).Should(Receive(&answer))
+		Ω(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
+
+		x.ReadResponse()
+	})
+
 	It("upgrades for a WebSocket request", func() {
 		done := make(chan bool)
 
@@ -542,7 +598,7 @@ var _ = Describe("Proxy", func() {
 		x.Close()
 	})
 
-It("upgrades for a WebSocket request with multiple Connection headers", func() {
+	It("upgrades for a WebSocket request with multiple Connection headers", func() {
 		done := make(chan bool)
 
 		ln := registerHandler(r, "ws-cs-header", func(x *test_util.HttpConn) {
@@ -862,7 +918,7 @@ It("upgrades for a WebSocket request with multiple Connection headers", func() {
 	})
 })
 
-func registerAddr(r *registry.CFRegistry, u string, a net.Addr) {
+func registerAddr(r *registry.CFRegistry, u string, a net.Addr, instanceId string) {
 	h, p, err := net.SplitHostPort(a.String())
 	Ω(err).NotTo(HaveOccurred())
 
@@ -872,13 +928,18 @@ func registerAddr(r *registry.CFRegistry, u string, a net.Addr) {
 	r.Register(
 		route.Uri(u),
 		&route.Endpoint{
-			Host: h,
-			Port: uint16(x),
+			Host:              h,
+			Port:              uint16(x),
+			PrivateInstanceId: instanceId,
 		},
 	)
 }
 
 func registerHandler(r *registry.CFRegistry, u string, h connHandler) net.Listener {
+	return registerHandlerWithInstanceId(r, u, h, "")
+}
+
+func registerHandlerWithInstanceId(r *registry.CFRegistry, u string, h connHandler, instanceId string) net.Listener {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	Ω(err).NotTo(HaveOccurred())
 
@@ -909,7 +970,7 @@ func registerHandler(r *registry.CFRegistry, u string, h connHandler) net.Listen
 		}
 	}()
 
-	registerAddr(r, u, ln.Addr())
+	registerAddr(r, u, ln.Addr(), instanceId)
 
 	return ln
 }

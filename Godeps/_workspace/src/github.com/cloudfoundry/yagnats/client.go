@@ -11,19 +11,20 @@ type NATSClient interface {
 	Disconnect()
 	Publish(subject string, payload []byte) error
 	PublishWithReplyTo(subject, reply string, payload []byte) error
-	Subscribe(subject string, callback Callback) (int, error)
-	SubscribeWithQueue(subject, queue string, callback Callback) (int, error)
-	Unsubscribe(subscription int) error
+	Subscribe(subject string, callback Callback) (int64, error)
+	SubscribeWithQueue(subject, queue string, callback Callback) (int64, error)
+	Unsubscribe(subscription int64) error
 	UnsubscribeAll(subject string)
 }
 
 type Callback func(*Message)
 
 type Client struct {
-	connection    chan *Connection
-	subscriptions map[int]*Subscription
-	disconnecting bool
-	lock          *sync.Mutex
+	connection          chan *Connection
+	subscriptions       map[int64]*Subscription
+	subscriptionCounter int64
+	disconnecting       bool
+	lock                *sync.Mutex
 
 	ConnectedCallback func()
 
@@ -41,13 +42,13 @@ type Subscription struct {
 	Subject  string
 	Queue    string
 	Callback Callback
-	ID       int
+	ID       int64
 }
 
 func NewClient() *Client {
 	return &Client{
 		connection:    make(chan *Connection),
-		subscriptions: make(map[int]*Subscription),
+		subscriptions: make(map[int64]*Subscription),
 		lock:          &sync.Mutex{},
 
 		logger:      &DefaultLogger{},
@@ -116,15 +117,15 @@ func (c *Client) PublishWithReplyTo(subject, reply string, payload []byte) error
 	return conn.ErrOrOK()
 }
 
-func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
+func (c *Client) Subscribe(subject string, callback Callback) (int64, error) {
 	return c.subscribe(subject, "", callback)
 }
 
-func (c *Client) SubscribeWithQueue(subject, queue string, callback Callback) (int, error) {
+func (c *Client) SubscribeWithQueue(subject, queue string, callback Callback) (int64, error) {
 	return c.subscribe(subject, queue, callback)
 }
 
-func (c *Client) Unsubscribe(sid int) error {
+func (c *Client) Unsubscribe(sid int64) error {
 	conn := <-c.connection
 
 	conn.Send(&UnsubPacket{ID: sid})
@@ -137,7 +138,7 @@ func (c *Client) Unsubscribe(sid int) error {
 }
 
 func (c *Client) UnsubscribeAll(subject string) {
-	idsToUnsubscribe := []int{}
+	idsToUnsubscribe := []int64{}
 	c.lock.Lock()
 	for id, sub := range c.subscriptions {
 		if sub.Subject == subject {
@@ -163,11 +164,12 @@ func (c *Client) Logger() Logger {
 	return c.logger
 }
 
-func (c *Client) subscribe(subject, queue string, callback Callback) (int, error) {
+func (c *Client) subscribe(subject, queue string, callback Callback) (int64, error) {
 	conn := <-c.connection
 
 	c.lock.Lock()
-	id := len(c.subscriptions) + 1
+	c.subscriptionCounter++
+	id := c.subscriptionCounter
 
 	c.subscriptions[id] = &Subscription{
 		Subject:  subject,

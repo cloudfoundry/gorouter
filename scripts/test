@@ -2,6 +2,8 @@
 
 set -e -x -u
 
+export DROPSONDE_ORIGIN="gorouter_test/0"
+
 . $(dirname $0)/gorequired
 
 #Download & Install gnatsd into GOPATH (or use pre-installed version)

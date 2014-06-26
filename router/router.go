@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/cloudfoundry-incubator/dropsonde/autowire"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
@@ -110,7 +111,7 @@ func (r *Router) Run() <-chan error {
 	}
 
 	server := http.Server{
-		Handler: r.proxy,
+		Handler: autowire.InstrumentedHandler(r.proxy),
 	}
 
 	errChan := make(chan error, 1)

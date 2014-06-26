@@ -9,3 +9,4 @@ bin/*
 .idea/
 tags
 .DS_Store
+*.coverprofile

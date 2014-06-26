@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudfoundry-incubator/dropsonde/autowire"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
@@ -165,7 +166,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	proxyTransport := &proxyRoundTripper{
+	roundTripper := &proxyRoundTripper{
 		transport: p.transport,
 		after: func(rsp *http.Response, err error) {
 			accessLog.FirstByteAt = time.Now()
@@ -193,6 +194,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 		},
 	}
+	proxyTransport := autowire.InstrumentedRoundTripper(roundTripper)
 
 	proxyWriter := newProxyResponseWriter(responseWriter)
 	p.newReverseProxy(proxyTransport, routeEndpoint, request).ServeHTTP(proxyWriter, request)
@@ -208,6 +210,8 @@ func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, endpoint *rout
 			request.URL.Host = endpoint.CanonicalAddr()
 			request.URL.Opaque = req.URL.Opaque
 			request.URL.RawQuery = req.URL.RawQuery
+			request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+			setRequestXCfInstanceId(req, endpoint)
 
 			setRequestXRequestStart(req)
 			setRequestXVcapRequestId(req, nil)

@@ -208,6 +208,15 @@ func setRequestXVcapRequestId(request *http.Request, logger *steno.Logger) {
 	}
 }
 
+func setRequestXCfInstanceId(request *http.Request, endpoint *route.Endpoint) {
+	value := endpoint.PrivateInstanceId
+	if value == "" {
+		value = endpoint.CanonicalAddr()
+	}
+
+	request.Header.Set(router_http.CfInstanceIdHeader, value)
+}
+
 func (h *RequestHandler) hijack() (client net.Conn, io *bufio.ReadWriter, err error) {
 	hijacker, ok := h.response.(http.Hijacker)
 	if !ok {
