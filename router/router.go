@@ -251,13 +251,8 @@ func (r *Router) greetMessage() ([]byte, error) {
 		return nil, err
 	}
 
-	uuid, err := vcap.GenerateUUID()
-	if err != nil {
-		return nil, err
-	}
-
 	d := vcap.RouterStart{
-		Id:    uuid,
+		Id:    r.component.UUID,
 		Hosts: []string{host},
 		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,
 	}
