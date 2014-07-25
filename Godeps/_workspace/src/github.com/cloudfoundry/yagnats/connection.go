@@ -16,6 +16,8 @@ type Connection struct {
 	user string
 	pass string
 
+	dial func(network, address string) (net.Conn, error)
+
 	writeLock *sync.Mutex
 
 	pongs chan *PongPacket
@@ -40,6 +42,10 @@ func NewConnection(addr, user, pass string) *Connection {
 		user: user,
 		pass: pass,
 
+		dial: func(network, address string) (net.Conn, error) {
+			return net.DialTimeout(network, address, 5*time.Second)
+		},
+
 		writeLock: &sync.Mutex{},
 
 		logger:      &DefaultLogger{},
@@ -61,10 +67,14 @@ type ConnectionInfo struct {
 	Addr     string
 	Username string
 	Password string
+	Dial     func(network, address string) (net.Conn, error)
 }
 
 func (c *ConnectionInfo) ProvideConnection() (*Connection, error) {
 	conn := NewConnection(c.Addr, c.Username, c.Password)
+	if c.Dial != nil {
+		conn.dial = c.Dial
+	}
 
 	var err error
 
@@ -90,7 +100,7 @@ func (c *ConnectionCluster) ProvideConnection() (*Connection, error) {
 }
 
 func (c *Connection) Dial() error {
-	conn, err := net.Dial("tcp", c.addr)
+	conn, err := c.dial("tcp", c.addr)
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
-			"Rev": "50e233a7fb31a32b174c1263c7b786eba1fa79d4"
+			"Rev": "9d6da703654a1d6897de218799c1ff4eccf49b85"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/dropsonde",
@@ -19,8 +19,8 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
-			"Comment": "scotty_09012012-40-g5eb8c6e",
-			"Rev": "5eb8c6e554f0dfc39d6468813b8ac19ec28fe74f"
+			"Comment": "scotty_09012012-41-g5c1406e",
+			"Rev": "5c1406e9ea0ab919f92e1b194169565def41147b"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
@@ -28,31 +28,31 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/localip",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/emitter",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/loggregatorclient",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/logmessage",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/signature",
-			"Rev": "da9f8b85c0175500cbb836bdb9c5488939e20c43"
+			"Rev": "ff012ab02e67290e1036fe236e8aa99668f6935e"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "196990d547253e2c2d14e188464ccd69b526e35d"
+			"Rev": "8e98f972ab3eabfb6d44065cd0b30f170d3db794"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",
@@ -60,12 +60,12 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.0.0-16-g12446bb",
-			"Rev": "12446bbcc74950944c897e32ea99cc8d058f9c92"
+			"Comment": "v1.0.0-26-g34294d5",
+			"Rev": "34294d53b098180c6e983307c0439a6b30a16b43"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Rev": "7ec350c6bff61a8e3f999e1164f11e5c133605d0"
+			"Rev": "28e5ce936abc528d8c6b5eb3dd5689e7e81e9272"
 		},
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",

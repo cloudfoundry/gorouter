@@ -29,5 +29,5 @@ func unixSyslog() (conn serverConn, err error) {
 			}
 		}
 	}
-	return nil, errors.New("Unix syslog delivery error")
+	return nil, errors.New("Could not connect to local syslog socket")
 }

@@ -144,7 +144,7 @@ func TestWriteTimesOut(t *testing.T) {
 		t.Fatalf("net.Listen() failed to listen on socket: %s", err)
 	}
 
-	l, err := Dial("unix", socketFile, LOG_INFO, "syslog_test")
+	w, err := Dial("unix", socketFile, LOG_INFO, "syslog_test")
 
 	if err != nil {
 		t.Fatalf("syslog.Dial() failed: %s", err)
@@ -154,7 +154,7 @@ func TestWriteTimesOut(t *testing.T) {
 
 	go func() {
 		for {
-			_, err = io.WriteString(l, "timing out")
+			_, err = io.WriteString(w, "timing out")
 			if err != nil {
 				firstFailure <- err
 				break

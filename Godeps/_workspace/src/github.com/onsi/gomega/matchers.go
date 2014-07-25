@@ -1,13 +1,16 @@
 package gomega
 
 import (
+	"time"
+
 	"github.com/onsi/gomega/matchers"
+	"github.com/onsi/gomega/types"
 )
 
 //Equal uses reflect.DeepEqual to compare actual with expected.  Equal is strict about
 //types when performing comparisons.
 //It is an error for both actual and expected to be nil.  Use BeNil() instead.
-func Equal(expected interface{}) OmegaMatcher {
+func Equal(expected interface{}) types.GomegaMatcher {
 	return &matchers.EqualMatcher{
 		Expected: expected,
 	}
@@ -17,24 +20,24 @@ func Equal(expected interface{}) OmegaMatcher {
 //This is done by converting actual to have the type of expected before
 //attempting equality with reflect.DeepEqual.
 //It is an error for actual and expected to be nil.  Use BeNil() instead.
-func BeEquivalentTo(expected interface{}) OmegaMatcher {
+func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
 	return &matchers.BeEquivalentToMatcher{
 		Expected: expected,
 	}
 }
 
 //BeNil succeeds if actual is nil
-func BeNil() OmegaMatcher {
+func BeNil() types.GomegaMatcher {
 	return &matchers.BeNilMatcher{}
 }
 
 //BeTrue succeeds if actual is true
-func BeTrue() OmegaMatcher {
+func BeTrue() types.GomegaMatcher {
 	return &matchers.BeTrueMatcher{}
 }
 
 //BeFalse succeeds if actual is false
-func BeFalse() OmegaMatcher {
+func BeFalse() types.GomegaMatcher {
 	return &matchers.BeFalseMatcher{}
 }
 
@@ -42,7 +45,7 @@ func BeFalse() OmegaMatcher {
 //The typical Go error checking pattern looks like:
 //    err := SomethingThatMightFail()
 //    Ω(err).ShouldNot(HaveOccurred())
-func HaveOccurred() OmegaMatcher {
+func HaveOccurred() types.GomegaMatcher {
 	return &matchers.HaveOccurredMatcher{}
 }
 
@@ -53,7 +56,7 @@ func HaveOccurred() OmegaMatcher {
 //  Ω(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
 //
 //It is an error for err to be nil or an object that does not implement the Error interface
-func MatchError(expected interface{}) OmegaMatcher {
+func MatchError(expected interface{}) types.GomegaMatcher {
 	return &matchers.MatchErrorMatcher{
 		Expected: expected,
 	}
@@ -70,11 +73,11 @@ func MatchError(expected interface{}) OmegaMatcher {
 //asserting that it is closed (it is not possible to detect that a buffered-channel has been closed until all its buffered values are read).
 //
 //Finally, as a corollary: it is an error to check whether or not a send-only channel is closed.
-func BeClosed() OmegaMatcher {
+func BeClosed() types.GomegaMatcher {
 	return &matchers.BeClosedMatcher{}
 }
 
-//Receive succeeds if there is a message to be received on actual.
+//Receive succeeds if there is a value to be received on actual.
 //Actual must be a channel (and cannot be a send-only channel) -- anything else is an error.
 //
 //Receive returns immediately and never blocks:
@@ -109,7 +112,7 @@ func BeClosed() OmegaMatcher {
 //    Eventually(thingChan).Should(Receive(&myThing))
 //    Ω(myThing.Sprocket).Should(Equal("foo"))
 //    Ω(myThing.IsValid()).Should(BeTrue())
-func Receive(args ...interface{}) OmegaMatcher {
+func Receive(args ...interface{}) types.GomegaMatcher {
 	var arg interface{}
 	if len(args) > 0 {
 		arg = args[0]
@@ -120,10 +123,28 @@ func Receive(args ...interface{}) OmegaMatcher {
 	}
 }
 
+//BeSent succeeds if a value can be sent to actual.
+//Actual must be a channel (and cannot be a receive-only channel) that can sent the type of the value passed into BeSent -- anything else is an error.
+//In addition, actual must not be closed.
+//
+//BeSent never blocks:
+//
+//- If the channel `c` is not ready to receive then Ω(c).Should(BeSent("foo")) will fail immediately
+//- If the channel `c` is eventually ready to receive then Eventually(c).Should(BeSent("foo")) will succeed.. presuming the channel becomes ready to receive  before Eventually's timeout
+//- If the channel `c` is closed then Ω(c).Should(BeSent("foo")) and Ω(c).ShouldNot(BeSent("foo")) will both fail immediately
+//
+//Of course, the value is actually sent to the channel.  The point of `BeSent` is less to make an assertion about the availability of the channel (which is typically an implementation detail that your test should not be concerned with).
+//Rather, the point of `BeSent` is to make it possible to easily and expressively write tests that can timeout on blocked channel sends.
+func BeSent(arg interface{}) types.GomegaMatcher {
+	return &matchers.BeSentMatcher{
+		Arg: arg,
+	}
+}
+
 //MatchRegexp succeeds if actual is a string or stringer that matches the
 //passed-in regexp.  Optional arguments can be provided to construct a regexp
 //via fmt.Sprintf().
-func MatchRegexp(regexp string, args ...interface{}) OmegaMatcher {
+func MatchRegexp(regexp string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.MatchRegexpMatcher{
 		Regexp: regexp,
 		Args:   args,
@@ -133,7 +154,7 @@ func MatchRegexp(regexp string, args ...interface{}) OmegaMatcher {
 //ContainSubstring succeeds if actual is a string or stringer that contains the
 //passed-in regexp.  Optional arguments can be provided to construct the substring
 //via fmt.Sprintf().
-func ContainSubstring(substr string, args ...interface{}) OmegaMatcher {
+func ContainSubstring(substr string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.ContainSubstringMatcher{
 		Substr: substr,
 		Args:   args,
@@ -143,26 +164,26 @@ func ContainSubstring(substr string, args ...interface{}) OmegaMatcher {
 //MatchJSON succeeds if actual is a string or stringer of JSON that matches
 //the expected JSON.  The JSONs are decoded and the resulting objects are compared via
 //reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
-func MatchJSON(json interface{}) OmegaMatcher {
+func MatchJSON(json interface{}) types.GomegaMatcher {
 	return &matchers.MatchJSONMatcher{
 		JSONToMatch: json,
 	}
 }
 
 //BeEmpty succeeds if actual is empty.  Actual must be of type string, array, map, chan, or slice.
-func BeEmpty() OmegaMatcher {
+func BeEmpty() types.GomegaMatcher {
 	return &matchers.BeEmptyMatcher{}
 }
 
 //HaveLen succeeds if actual has the passed-in length.  Actual must be of type string, array, map, chan, or slice.
-func HaveLen(count int) OmegaMatcher {
+func HaveLen(count int) types.GomegaMatcher {
 	return &matchers.HaveLenMatcher{
 		Count: count,
 	}
 }
 
 //BeZero succeeds if actual is the zero value for its type or if actual is nil.
-func BeZero() OmegaMatcher {
+func BeZero() types.GomegaMatcher {
 	return &matchers.BeZeroMatcher{}
 }
 
@@ -172,10 +193,32 @@ func BeZero() OmegaMatcher {
 //    Ω([]string{"Foo", "FooBar"}).Should(ContainElement(ContainSubstring("Bar")))
 //
 //Actual must be an array, slice or map.
-//For maps, containElement searches through the map's values.
-func ContainElement(element interface{}) OmegaMatcher {
+//For maps, ContainElement searches through the map's values.
+func ContainElement(element interface{}) types.GomegaMatcher {
 	return &matchers.ContainElementMatcher{
 		Element: element,
+	}
+}
+
+//ConsistOf succeeds if actual contains preciely the elements passed into the matcher.  The ordering of the elements does not matter.
+//By default ConsistOf() uses Equal() to match the elements, however custom matchers can be passed in instead.  Here are some examples:
+//
+//    Ω([]string{"Foo", "FooBar"}).Should(ConsistOf("FooBar", "Foo"))
+//    Ω([]string{"Foo", "FooBar"}).Should(ConsistOf(ContainSubstring("Bar"), "Foo"))
+//    Ω([]string{"Foo", "FooBar"}).Should(ConsistOf(ContainSubstring("Foo"), ContainSubstring("Foo")))
+//
+//Actual must be an array, slice or map.  For maps, ConsistOf matches against the map's values.
+//
+//You typically pass variadic arguments to ConsistOf (as in the examples above).  However, if you need to pass in a slice you can provided that it
+//is the only element passed in to ConsistOf:
+//
+//    Ω([]string{"Foo", "FooBar"}).Should(ConsistOf([]string{"FooBar", "Foo"}))
+//
+//Note that Go's type system does not allow you to write this as ConsistOf([]string{"FooBar", "Foo"}...) as []string and []interface{} are different types - hence the need for this special rule.
+
+func ConsistOf(elements ...interface{}) types.GomegaMatcher {
+	return &matchers.ConsistOfMatcher{
+		Elements: elements,
 	}
 }
 
@@ -183,9 +226,21 @@ func ContainElement(element interface{}) OmegaMatcher {
 //By default HaveKey uses Equal() to perform the match, however a
 //matcher can be passed in instead:
 //    Ω(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKey(MatchRegexp(`.+Foo$`)))
-func HaveKey(key interface{}) OmegaMatcher {
+func HaveKey(key interface{}) types.GomegaMatcher {
 	return &matchers.HaveKeyMatcher{
 		Key: key,
+	}
+}
+
+//HaveKeyWithValue succeeds if actual is a map with the passed in key and value.
+//By default HaveKeyWithValue uses Equal() to perform the match, however a
+//matcher can be passed in instead:
+//    Ω(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue("Foo", "Bar"))
+//    Ω(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue(MatchRegexp(`.+Foo$`), "Bar"))
+func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
+	return &matchers.HaveKeyWithValueMatcher{
+		Key:   key,
+		Value: value,
 	}
 }
 
@@ -200,10 +255,22 @@ func HaveKey(key interface{}) OmegaMatcher {
 //    Ω(1.0).Should(BeNumerically(">=", 1.0))
 //    Ω(1.0).Should(BeNumerically("<", 3))
 //    Ω(1.0).Should(BeNumerically("<=", 1.0))
-func BeNumerically(comparator string, compareTo ...interface{}) OmegaMatcher {
+func BeNumerically(comparator string, compareTo ...interface{}) types.GomegaMatcher {
 	return &matchers.BeNumericallyMatcher{
 		Comparator: comparator,
 		CompareTo:  compareTo,
+	}
+}
+
+//BeTemporally compares time.Time's like BeNumerically
+//Actual and expected must be time.Time. The comparators are the same as for BeNumerically
+//    Ω(time.Now()).Should(BeTemporally(">", time.Time{}))
+//    Ω(time.Now()).Should(BeTemporally("~", time.Now(), time.Second))
+func BeTemporally(comparator string, compareTo time.Time, threshold ...time.Duration) types.GomegaMatcher {
+	return &matchers.BeTemporallyMatcher{
+		Comparator: comparator,
+		CompareTo:  compareTo,
+		Threshold:  threshold,
 	}
 }
 
@@ -213,7 +280,7 @@ func BeNumerically(comparator string, compareTo ...interface{}) OmegaMatcher {
 //	  Ω(5).Should(BeAssignableToTypeOf(-1))        // different values same type
 //	  Ω("foo").Should(BeAssignableToTypeOf("bar")) // different values same type
 //    Ω(struct{ Foo string }{}).Should(BeAssignableToTypeOf(struct{ Foo string }{}))
-func BeAssignableToTypeOf(expected interface{}) OmegaMatcher {
+func BeAssignableToTypeOf(expected interface{}) types.GomegaMatcher {
 	return &matchers.AssignableToTypeOfMatcher{
 		Expected: expected,
 	}
@@ -221,6 +288,6 @@ func BeAssignableToTypeOf(expected interface{}) OmegaMatcher {
 
 //Panic succeeds if actual is a function that, when invoked, panics.
 //Actual must be a function that takes no arguments and returns no results.
-func Panic() OmegaMatcher {
+func Panic() types.GomegaMatcher {
 	return &matchers.PanicMatcher{}
 }

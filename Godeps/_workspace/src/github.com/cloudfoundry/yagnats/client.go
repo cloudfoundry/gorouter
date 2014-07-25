@@ -23,6 +23,7 @@ type Client struct {
 	connection          chan *Connection
 	subscriptions       map[int64]*Subscription
 	subscriptionCounter int64
+	connected           bool
 	disconnecting       bool
 	lock                *sync.Mutex
 
@@ -53,6 +54,7 @@ func NewClient() *Client {
 
 		logger:      &DefaultLogger{},
 		loggerMutex: &sync.RWMutex{},
+		connected:   false,
 	}
 }
 
@@ -81,13 +83,14 @@ func (c *Client) Connect(cp ConnectionProvider) error {
 }
 
 func (c *Client) Disconnect() {
-	if c.disconnecting {
+	if !c.connected || c.disconnecting {
 		return
 	}
 
 	conn := <-c.connection
 	c.disconnecting = true
 	conn.Disconnect()
+	c.connected = false
 }
 
 func (c *Client) Publish(subject string, payload []byte) error {
@@ -195,21 +198,8 @@ func (c *Client) subscribe(subject, queue string, callback Callback) (int64, err
 	return id, nil
 }
 
-func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
-	conn, err = cp.ProvideConnection()
-	if err != nil {
-		return
-	}
-
-	conn.OnMessage(c.dispatchMessage)
-
-	conn.SetLogger(c.Logger())
-
-	return
-}
-
 func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
-	var err error
+	c.connected = true
 
 	// serve connection until disconnected
 	for stop := false; !stop; {
@@ -229,11 +219,28 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 		return
 	}
 
+	c.reconnect(cp)
+}
+
+func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
+	conn, err = cp.ProvideConnection()
+	if err != nil {
+		return
+	}
+
+	conn.OnMessage(c.dispatchMessage)
+
+	conn.SetLogger(c.Logger())
+
+	return
+}
+
+func (c *Client) reconnect(cp ConnectionProvider) {
 	// acquire new connection
 	for {
 		c.Logger().Debug("client.reconnect.starting")
 
-		conn, err = c.connect(cp)
+		conn, err := c.connect(cp)
 		if err == nil {
 			go c.serveConnections(conn, cp)
 			c.Logger().Debug("client.connection.resubscribing")

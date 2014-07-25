@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"testing"
 	"time"
+
 	. "launchpad.net/gocheck"
 )
 
@@ -44,6 +45,11 @@ func (s *YSuite) TearDownTest(c *C) {
 	s.Client = nil
 }
 
+func (s *YSuite) TestDisconnectOnNewClient(c *C) {
+	client := NewClient()
+	client.Disconnect()
+}
+
 func (s *YSuite) TestConnectWithInvalidAddress(c *C) {
 	badClient := NewClient()
 
@@ -63,6 +69,30 @@ func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
 	})
 
 	c.Assert(err, Not(Equals), nil)
+}
+
+func (s *YSuite) TestConnectWithCustomDial(c *C) {
+	var dialTargetNetwork string
+	var dialTargetAddress string
+
+	client := NewClient()
+	defer client.Disconnect()
+
+	client.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:9999",
+		Username: "nats",
+		Password: "nats",
+		Dial: func(network, addr string) (net.Conn, error) {
+			dialTargetNetwork = network
+			dialTargetAddress = addr
+
+			return net.DialTimeout("tcp", "127.0.0.1:4223", 1*time.Second)
+		},
+	})
+
+	c.Assert(s.Client.Ping(), Equals, true)
+	c.Assert(dialTargetNetwork, Equals, "tcp")
+	c.Assert(dialTargetAddress, Equals, "127.0.0.1:9999")
 }
 
 func (s *YSuite) TestClientPing(c *C) {

@@ -2,8 +2,8 @@ package yagnats
 
 import (
 	"bytes"
-	"time"
 	. "launchpad.net/gocheck"
+	"time"
 )
 
 type CSuite struct {
