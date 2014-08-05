@@ -25,6 +25,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeReferer\" " +
 			"\"FakeUserAgent\" " +
 			"FakeRemoteAddr " +
+			"\"FakeProxy1, FakeProxy2\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60.000000000 " +
 			"app_id:FakeApplicationId\n"
@@ -42,8 +43,9 @@ var _ = Describe("AccessLogRecord", func() {
 					Opaque: "http://example.com/request",
 				},
 				Header: http.Header{
-					"Referer":    []string{"FakeReferer"},
-					"User-Agent": []string{"FakeUserAgent"},
+					"Referer":         []string{"FakeReferer"},
+					"User-Agent":      []string{"FakeUserAgent"},
+					"X-Forwarded-For": []string{"FakeProxy1, FakeProxy2"},
 				},
 				RemoteAddr: "FakeRemoteAddr",
 			},
@@ -61,6 +63,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeReferer\" " +
 			"\"FakeUserAgent\" " +
 			"FakeRemoteAddr " +
+			"\"FakeProxy1, FakeProxy2\" " +
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId\n"
@@ -87,6 +90,7 @@ func CompleteAccessLogRecord() AccessLogRecord {
 			Header: http.Header{
 				"Referer":                       []string{"FakeReferer"},
 				"User-Agent":                    []string{"FakeUserAgent"},
+				"X-Forwarded-For":               []string{"FakeProxy1, FakeProxy2"},
 				router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
 			},
 			RemoteAddr: "FakeRemoteAddr",
