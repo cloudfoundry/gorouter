@@ -3,7 +3,7 @@ package emitter
 import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"fmt"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/events"
 )
 
 type EventEmitter interface {

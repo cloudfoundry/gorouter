@@ -14,8 +14,8 @@
 			"Rev": "9d6da703654a1d6897de218799c1ff4eccf49b85"
 		},
 		{
-			"ImportPath": "github.com/cloudfoundry-incubator/dropsonde",
-			"Rev": "126e9de704ff62ec474be824c249d1ddb85a5cac"
+			"ImportPath": "github.com/cloudfoundry/dropsonde",
+			"Rev": "2243f400ca809b4134e6ae830752f97e98f19126"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",

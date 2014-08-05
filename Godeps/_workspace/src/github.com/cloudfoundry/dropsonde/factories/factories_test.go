@@ -6,8 +6,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"code.google.com/p/gogoprotobuf/proto"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
-	"github.com/cloudfoundry-incubator/dropsonde/factories"
+	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/factories"
 	"net/http"
 )
 

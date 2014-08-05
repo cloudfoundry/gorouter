@@ -2,7 +2,7 @@ package udp_listener_test
 
 import (
 	"fmt"
-	"github.com/cloudfoundry-incubator/dropsonde/udp_listener"
+	"github.com/cloudfoundry/dropsonde/udp_listener"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"net"

@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/cloudfoundry-incubator/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde/autowire"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"

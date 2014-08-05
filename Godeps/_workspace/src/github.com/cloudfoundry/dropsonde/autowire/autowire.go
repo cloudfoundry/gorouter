@@ -1,8 +1,8 @@
 package autowire
 
 import (
-	"github.com/cloudfoundry-incubator/dropsonde"
-	"github.com/cloudfoundry-incubator/dropsonde/emitter"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter"
 	"log"
 	"net/http"
 	"os"

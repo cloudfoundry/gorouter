@@ -3,7 +3,7 @@ package emitter
 import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"errors"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/events"
 )
 
 func Wrap(e events.Event, origin string) (*events.Envelope, error) {
