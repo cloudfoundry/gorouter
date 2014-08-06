@@ -1,7 +1,7 @@
 package autowire_test
 
 import (
-	"github.com/cloudfoundry-incubator/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde/autowire"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"net/http"

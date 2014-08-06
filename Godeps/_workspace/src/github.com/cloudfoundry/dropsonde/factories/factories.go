@@ -4,7 +4,7 @@ import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"encoding/binary"
 	"fmt"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/events"
 	uuid "github.com/nu7hatch/gouuid"
 	"net/http"
 	"strconv"

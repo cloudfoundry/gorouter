@@ -1,9 +1,9 @@
 package dropsonde
 
 import (
-	"github.com/cloudfoundry-incubator/dropsonde/emitter"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
-	"github.com/cloudfoundry-incubator/dropsonde/factories"
+	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/factories"
 	uuid "github.com/nu7hatch/gouuid"
 	"log"
 	"net/http"

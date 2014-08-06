@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry-incubator/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde/autowire"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"

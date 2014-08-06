@@ -2,9 +2,9 @@ package emitter_test
 
 import (
 	"code.google.com/p/gogoprotobuf/proto"
-	"github.com/cloudfoundry-incubator/dropsonde/emitter"
-	"github.com/cloudfoundry-incubator/dropsonde/events"
-	"github.com/cloudfoundry-incubator/dropsonde/factories"
+	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/dropsonde/factories"
 	uuid "github.com/nu7hatch/gouuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
