@@ -125,7 +125,7 @@ func (c *Config) Process() {
 
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
-		log.Warnf("DropletStaleThreshold(%s) is set equal to StartResponseDelayInterval(%s)", c.DropletStaleThreshold, c.StartResponseDelayInterval)
+		log.Warnf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval)
 	}
 
 	drain := c.DrainTimeoutInSeconds
