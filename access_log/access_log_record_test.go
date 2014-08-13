@@ -25,7 +25,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeReferer\" " +
 			"\"FakeUserAgent\" " +
 			"FakeRemoteAddr " +
-			"\"FakeProxy1, FakeProxy2\" " +
+			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60.000000000 " +
 			"app_id:FakeApplicationId\n"
@@ -42,11 +42,7 @@ var _ = Describe("AccessLogRecord", func() {
 				URL: &url.URL{
 					Opaque: "http://example.com/request",
 				},
-				Header: http.Header{
-					"Referer":         []string{"FakeReferer"},
-					"User-Agent":      []string{"FakeUserAgent"},
-					"X-Forwarded-For": []string{"FakeProxy1, FakeProxy2"},
-				},
+				Header:     http.Header{},
 				RemoteAddr: "FakeRemoteAddr",
 			},
 			RouteEndpoint: &route.Endpoint{
@@ -60,10 +56,10 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"MissingResponseStatusCode " +
 			"0 " +
-			"\"FakeReferer\" " +
-			"\"FakeUserAgent\" " +
+			"\"-\" " +
+			"\"-\" " +
 			"FakeRemoteAddr " +
-			"\"FakeProxy1, FakeProxy2\" " +
+			"x_forwarded_for:\"-\" " +
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId\n"

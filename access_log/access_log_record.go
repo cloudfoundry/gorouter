@@ -52,7 +52,7 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("Referer"))
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("User-Agent"))
 	fmt.Fprintf(b, `%s `, r.Request.RemoteAddr)
-	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("X-Forwarded-For"))
+	fmt.Fprintf(b, `x_forwarded_for:"%s" `, r.FormatRequestHeader("X-Forwarded-For"))
 	fmt.Fprintf(b, `vcap_request_id:%s `, r.FormatRequestHeader("X-Vcap-Request-Id"))
 
 	if r.ResponseTime() < 0 {
