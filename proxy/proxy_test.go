@@ -772,25 +772,6 @@ var _ = Describe("Proxy", func() {
 		Ω(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
-	It("conforms to the http spec by not encoding ! characters in path", func() {
-		ln := registerHandler(r, "encoding", func(x *test_util.HttpConn) {
-			x.CheckLine("GET /hello!world?inline-depth=1 HTTP/1.1")
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.Close()
-		})
-		defer ln.Close()
-
-		x := dialProxy(proxyServer)
-
-		req := x.NewRequest("GET", "/hello!world?inline-depth=1", nil)
-		req.Host = "encoding"
-		x.WriteRequest(req)
-		resp, _ := x.ReadResponse()
-
-		Ω(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
 	It("handles requests with encoded query strings", func() {
 		ln := registerHandler(r, "query", func(x *test_util.HttpConn) {
 			x.CheckLine("GET /test?a=b&b%3D+bc+&c%3Dd%26e HTTP/1.1")
