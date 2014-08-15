@@ -46,6 +46,7 @@ var _ = Describe("Proxy", func() {
 	var proxyServer net.Listener
 	var accessLog access_log.AccessLogger
 	var accessLogFile *test_util.FakeFile
+	var shouldEcho func(input string, expected string)
 
 	BeforeEach(func() {
 		conf = config.DefaultConfig()
@@ -76,6 +77,25 @@ var _ = Describe("Proxy", func() {
 		go server.Serve(ln)
 
 		proxyServer = ln
+
+		shouldEcho = func(input string, expected string) {
+			ln := registerHandler(r, "encoding", func(x *test_util.HttpConn) {
+				x.CheckLine("GET " + expected + " HTTP/1.1")
+				resp := test_util.NewResponse(http.StatusOK)
+				x.WriteResponse(resp)
+				x.Close()
+			})
+			defer ln.Close()
+
+			x := dialProxy(proxyServer)
+
+			req := x.NewRequest("GET", input, nil)
+			req.Host = "encoding"
+			x.WriteRequest(req)
+			resp, _ := x.ReadResponse()
+
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		}
 	})
 
 	AfterEach(func() {
@@ -753,44 +773,34 @@ var _ = Describe("Proxy", func() {
 		Ω(resp.TransferEncoding).To(BeNil())
 	})
 
-	It("handles encoded requests", func() {
-		ln := registerHandler(r, "encoding", func(x *test_util.HttpConn) {
-			x.CheckLine("GET /hello+world?inline-depth=1 HTTP/1.1")
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.Close()
-		})
-		defer ln.Close()
+	It("maintains most percent-encoded values in URLs", func() {
+		shouldEcho("/abc%25%20%2A%21%22%3F%5Edef", "/abc%25%20%2A%21%22%3F%5Edef") // %, <space>, *, !, ", £, ^
+	})
 
-		x := dialProxy(proxyServer)
+	It("decodes some percent encoded characters in URLs", func() {
+		shouldEcho("/abc%2b%2fdef", "/abc+/def")
+	})
 
-		req := x.NewRequest("GET", "/hello%2bworld?inline-depth=1", nil)
-		req.Host = "encoding"
-		x.WriteRequest(req)
-		resp, _ := x.ReadResponse()
+	It("encodes reserved characters in URLs", func() {
+		shouldEcho("/abc!*'()def", "/abc%21%2A%27%28%29def")
+	})
 
-		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+	It("fails to encode certain reserved characters in URLs", func() {
+		rfc3986_reserved_characters := "!*'();:@&=+$,/?#[]"
+		shouldEcho("/abc"+rfc3986_reserved_characters+"def", "/abc%21%2A%27%28%29;:@&=+$,/?#[]def")
+	})
+
+	It("does not encode unreserved characters in URLs", func() {
+		shouldEcho("/abc123_.~def", "/abc123_.~def")
+	})
+
+	It("percent-encodes special characters in URLs", func() {
+		shouldEcho("/abc*!\"£^def", "/abc%2A%21%22%C2%A3%5Edef")
 	})
 
 	It("handles requests with encoded query strings", func() {
-		ln := registerHandler(r, "query", func(x *test_util.HttpConn) {
-			x.CheckLine("GET /test?a=b&b%3D+bc+&c%3Dd%26e HTTP/1.1")
-
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.Close()
-		})
-		defer ln.Close()
-
-		x := dialProxy(proxyServer)
-
 		queryString := strings.Join([]string{"a=b", url.QueryEscape("b= bc "), url.QueryEscape("c=d&e")}, "&")
-		req := x.NewRequest("GET", "/test?"+queryString, nil)
-		req.Host = "query"
-		x.WriteRequest(req)
-		resp, _ := x.ReadResponse()
-
-		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		shouldEcho("/test?a=b&b%3D+bc+&c%3Dd%26e", "/test?"+queryString)
 	})
 
 	It("request terminates with slow response", func() {
