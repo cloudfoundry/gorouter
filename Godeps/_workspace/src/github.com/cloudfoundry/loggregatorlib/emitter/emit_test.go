@@ -2,12 +2,12 @@ package emitter_test
 
 import (
 	"code.google.com/p/gogoprotobuf/proto"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	. "github.com/cloudfoundry/loggregatorlib/emitter"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
 	"github.com/cloudfoundry/loggregatorlib/logmessage/testhelpers"
 	"strings"
 
+	"github.com/cloudfoundry/loggregatorlib/loggregatorclient/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -22,9 +22,9 @@ var _ = Describe("Testing with Ginkgo", func() {
 		var err error
 		received = make(chan *[]byte, 10)
 		emitter, err = NewEmitter("localhost:3456", "ROUTER", "42", "secret", nil)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		emitter.LoggregatorClient = &MockLoggregatorClient{received}
+		emitter.LoggregatorClient = &fake.FakeLoggregatorClient{Received: received}
 
 	})
 
@@ -32,20 +32,20 @@ var _ = Describe("Testing with Ginkgo", func() {
 		emitter.Emit("appid", "foo")
 		receivedMessage := extractLogMessage(<-received)
 
-		Ω(receivedMessage.GetMessage()).Should(Equal([]byte("foo")))
-		Ω(receivedMessage.GetAppId()).Should(Equal("appid"))
-		Ω(receivedMessage.GetSourceId()).Should(Equal("42"))
-		Ω(receivedMessage.GetMessageType()).Should(Equal(logmessage.LogMessage_OUT))
+		Expect(receivedMessage.GetMessage()).To(Equal([]byte("foo")))
+		Expect(receivedMessage.GetAppId()).To(Equal("appid"))
+		Expect(receivedMessage.GetSourceId()).To(Equal("42"))
+		Expect(receivedMessage.GetMessageType()).To(Equal(logmessage.LogMessage_OUT))
 	})
 
 	It("should emit stderr", func() {
 		emitter.EmitError("appid", "foo")
 		receivedMessage := extractLogMessage(<-received)
 
-		Ω(receivedMessage.GetMessage()).Should(Equal([]byte("foo")))
-		Ω(receivedMessage.GetAppId()).Should(Equal("appid"))
-		Ω(receivedMessage.GetSourceId()).Should(Equal("42"))
-		Ω(receivedMessage.GetMessageType()).Should(Equal(logmessage.LogMessage_ERR))
+		Expect(receivedMessage.GetMessage()).To(Equal([]byte("foo")))
+		Expect(receivedMessage.GetAppId()).To(Equal("appid"))
+		Expect(receivedMessage.GetSourceId()).To(Equal("42"))
+		Expect(receivedMessage.GetMessageType()).To(Equal(logmessage.LogMessage_ERR))
 	})
 
 	It("should emit fully formed log messages", func() {
@@ -55,9 +55,9 @@ var _ = Describe("Testing with Ginkgo", func() {
 		emitter.EmitLogMessage(logMessage)
 		receivedMessage := extractLogMessage(<-received)
 
-		Ω(receivedMessage.GetMessage()).Should(Equal([]byte("test_msg")))
-		Ω(receivedMessage.GetAppId()).Should(Equal("test_app_id"))
-		Ω(receivedMessage.GetSourceId()).Should(Equal("src_id"))
+		Expect(receivedMessage.GetMessage()).To(Equal([]byte("test_msg")))
+		Expect(receivedMessage.GetAppId()).To(Equal("test_app_id"))
+		Expect(receivedMessage.GetSourceId()).To(Equal("src_id"))
 	})
 
 	It("should truncate long messages", func() {
@@ -72,8 +72,8 @@ var _ = Describe("Testing with Ginkgo", func() {
 		truncatedOffset := len(receivedMessageText) - len(TRUNCATED_BYTES)
 		expectedBytes := append([]byte(receivedMessageText)[:truncatedOffset], TRUNCATED_BYTES...)
 
-		Ω(receivedMessageText).Should(Equal(expectedBytes))
-		Ω(receivedMessageText).Should(HaveLen(MAX_MESSAGE_BYTE_SIZE))
+		Expect(receivedMessageText).To(Equal(expectedBytes))
+		Expect(receivedMessageText).To(HaveLen(MAX_MESSAGE_BYTE_SIZE))
 	})
 
 	It("should split messages on new lines", func() {
@@ -81,11 +81,11 @@ var _ = Describe("Testing with Ginkgo", func() {
 		logMessage := testhelpers.NewLogMessage(message, "test_app_id")
 
 		emitter.EmitLogMessage(logMessage)
-		Ω(received).Should(HaveLen(4))
+		Expect(received).To(HaveLen(4))
 
 		for _, expectedMessage := range []string{"message1", "message2", "message3", "message4"} {
 			receivedMessage := extractLogMessage(<-received)
-			Ω(receivedMessage.GetMessage()).Should(Equal([]byte(expectedMessage)))
+			Expect(receivedMessage.GetMessage()).To(Equal([]byte(expectedMessage)))
 		}
 	})
 
@@ -93,57 +93,45 @@ var _ = Describe("Testing with Ginkgo", func() {
 		emitter.Emit("appid", "foo")
 		receivedEnvelope := extractLogEnvelope(<-received)
 
-		Ω(receivedEnvelope.GetLogMessage().GetMessage()).Should(Equal([]byte("foo")))
-		Ω(receivedEnvelope.GetLogMessage().GetAppId()).Should(Equal("appid"))
-		Ω(receivedEnvelope.GetRoutingKey()).Should(Equal("appid"))
-		Ω(receivedEnvelope.GetLogMessage().GetSourceId()).Should(Equal("42"))
+		Expect(receivedEnvelope.GetLogMessage().GetMessage()).To(Equal([]byte("foo")))
+		Expect(receivedEnvelope.GetLogMessage().GetAppId()).To(Equal("appid"))
+		Expect(receivedEnvelope.GetRoutingKey()).To(Equal("appid"))
+		Expect(receivedEnvelope.GetLogMessage().GetSourceId()).To(Equal("42"))
 	})
 
 	It("should sign the log message correctly", func() {
 		emitter.Emit("appid", "foo")
 		receivedEnvelope := extractLogEnvelope(<-received)
-		Ω(receivedEnvelope.VerifySignature("secret")).Should(BeTrue(), "Expected envelope to be signed with the correct secret key")
+		Expect(receivedEnvelope.VerifySignature("secret")).To(BeTrue(), "Expected envelope to be signed with the correct secret key")
 	})
 
 	It("source name is set if mapping is unknown", func() {
 		emitter, err := NewEmitter("localhost:3456", "XYZ", "42", "secret", nil)
-		Ω(err).ShouldNot(HaveOccurred())
-		emitter.LoggregatorClient = &MockLoggregatorClient{received}
+		Expect(err).ToNot(HaveOccurred())
+		emitter.LoggregatorClient = &fake.FakeLoggregatorClient{Received: received}
 
 		emitter.Emit("test_app_id", "test_msg")
 		receivedMessage := extractLogMessage(<-received)
 
-		Ω(receivedMessage.GetSourceName()).Should(Equal("XYZ"))
+		Expect(receivedMessage.GetSourceName()).To(Equal("XYZ"))
 	})
 
 	Context("when missing an app id", func() {
 		It("should not emit", func() {
 			emitter.Emit("", "foo")
-			Ω(received).ShouldNot(Receive(), "Message without app id should not have been emitted")
+			Expect(received).ToNot(Receive(), "Message without app id should not have been emitted")
 
 			emitter.Emit("    ", "foo")
-			Ω(received).ShouldNot(Receive(), "Message with an empty app id should not have been emitted")
+			Expect(received).ToNot(Receive(), "Message with an empty app id should not have been emitted")
 		})
 	})
 })
-
-type MockLoggregatorClient struct {
-	received chan *[]byte
-}
-
-func (m MockLoggregatorClient) Send(data []byte) {
-	m.received <- &data
-}
-
-func (m MockLoggregatorClient) Emit() instrumentation.Context {
-	return instrumentation.Context{}
-}
 
 func extractLogEnvelope(data *[]byte) *logmessage.LogEnvelope {
 	receivedEnvelope := &logmessage.LogEnvelope{}
 
 	err := proto.Unmarshal(*data, receivedEnvelope)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return receivedEnvelope
 }

@@ -1,6 +1,8 @@
 loggregatorlib/emitter
 ==================
 
+This library is now DEPRECATED. Please use github.com/cloudfoundry/dropsonde/emitter/logemitter for new code.
+
 This is a GO library to emit messages to the loggregator.
 
 Create an emitter with NewLogMessageEmitter with the loggregator trafficcontroller hostname and port, a source name, the loggregator shared secret, and a gosteno logger.
@@ -25,8 +27,4 @@ Call Emit on the emitter with the application GUID and message strings.
         emitter, err := emitter.NewLogMessageEmitter("10.10.10.16:38452", "RTR", "shared secret", gosteno.NewLogger("LoggregatorEmitter"))
         emitter.Emit(appGuid, message)
     }
-
-###TODO
-
-* All messages are annotated with a message type of OUT. At this time, we don't support emitting messages with a message type of ERR.
 

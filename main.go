@@ -30,6 +30,9 @@ func init() {
 
 func main() {
 	c := config.DefaultConfig()
+	logCounter := vcap.NewLogCounter()
+	InitLoggerFromConfig(c, logCounter)
+
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
 	}
@@ -38,8 +41,6 @@ func main() {
 	if c.GoMaxProcs != 0 {
 		runtime.GOMAXPROCS(c.GoMaxProcs)
 	}
-
-	logCounter := vcap.NewLogCounter()
 
 	InitLoggerFromConfig(c, logCounter)
 	logger := steno.NewLogger("router.main")

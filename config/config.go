@@ -104,8 +104,6 @@ var defaultConfig = Config{
 	StartResponseDelayIntervalInSeconds:  5,
 }
 
-var log = steno.NewLogger("config.logger")
-
 func DefaultConfig() *Config {
 	c := defaultConfig
 
@@ -125,6 +123,7 @@ func (c *Config) Process() {
 
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
+		log := steno.NewLogger("config.logger")
 		log.Warnf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval)
 	}
 

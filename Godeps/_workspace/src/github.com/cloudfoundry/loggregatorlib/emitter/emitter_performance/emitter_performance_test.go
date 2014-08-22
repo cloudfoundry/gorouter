@@ -1,8 +1,8 @@
 package emitter_performance
 
 import (
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"github.com/cloudfoundry/loggregatorlib/emitter"
+	"github.com/cloudfoundry/loggregatorlib/loggregatorclient/fake"
 	"strings"
 	"testing"
 	"time"
@@ -40,22 +40,10 @@ func messageWithNewlines() string {
 	return strings.Repeat(strings.Repeat("a", 6*1024)+"\n", 10)
 }
 
-type MockLoggregatorClient struct {
-	received chan *[]byte
-}
-
-func (m MockLoggregatorClient) Send(data []byte) {
-	m.received <- &data
-}
-
-func (m MockLoggregatorClient) Emit() instrumentation.Context {
-	return instrumentation.Context{}
-}
-
 func BenchmarkLogEnvelopeEmit(b *testing.B) {
 	received := make(chan *[]byte, 1)
 	e, _ := emitter.NewEmitter("localhost:3457", "ROUTER", "42", "secret", nil)
-	e.LoggregatorClient = &MockLoggregatorClient{received}
+	e.LoggregatorClient = &fake.FakeLoggregatorClient{Received: received}
 
 	testEmitHelper(b, e, received, true)
 }

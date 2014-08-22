@@ -1,78 +1,106 @@
-package loggregatorclient
+package loggregatorclient_test
 
 import (
+	"github.com/cloudfoundry/dropsonde/autowire/metrics"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/stretchr/testify/assert"
+	"github.com/cloudfoundry/loggregatorlib/loggregatorclient"
 	"net"
-	"testing"
+
+	"github.com/cloudfoundry/dropsonde/metric_sender/fake"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestSend(t *testing.T) {
-	expectedOutput := []byte("Important Testmessage")
-	loggregatorClient := NewLoggregatorClient("localhost:9875", gosteno.NewLogger("TestLogger"), 0)
+var _ = Describe("loggregatorclient", func() {
+	var (
+		fakeMetricSender  *fake.FakeMetricSender
+		loggregatorClient loggregatorclient.LoggregatorClient
+		udpListener       *net.UDPConn
+	)
 
-	udpAddr, err := net.ResolveUDPAddr("udp", "localhost:9875")
-	assert.NoError(t, err)
+	BeforeEach(func() {
+		fakeMetricSender = fake.NewFakeMetricSender()
+		metrics.Initialize(fakeMetricSender)
 
-	udpListener, err := net.ListenUDP("udp", udpAddr)
-	defer udpListener.Close()
-	assert.NoError(t, err)
+		loggregatorClient = loggregatorclient.NewLoggregatorClient("localhost:9875", gosteno.NewLogger("TestLogger"), 0)
 
-	loggregatorClient.Send(expectedOutput)
+		udpAddr, _ := net.ResolveUDPAddr("udp", "localhost:9875")
+		udpListener, _ = net.ListenUDP("udp", udpAddr)
+	})
 
-	buffer := make([]byte, 4096)
-	readCount, _, err := udpListener.ReadFromUDP(buffer)
-	assert.NoError(t, err)
+	AfterEach(func() {
+		loggregatorClient.Stop()
+		udpListener.Close()
+	})
 
-	received := string(buffer[:readCount])
-	assert.Equal(t, string(expectedOutput), received)
+	It("sends log messages to loggregator", func() {
+		expectedOutput := []byte("Important Testmessage")
 
-	metrics := loggregatorClient.Emit().Metrics
-	assert.Equal(t, len(metrics), 5) //make sure all expected metrics are present
-	for _, metric := range metrics {
-		switch metric.Name {
-		case "currentBufferCount":
-			assert.Equal(t, metric.Value, uint64(0))
-			assert.Equal(t, metric.Tags["loggregatorAddress"], "127.0.0.1")
-		case "sentMessageCount":
-			assert.Equal(t, metric.Value, uint64(1))
-			assert.Equal(t, metric.Tags["loggregatorAddress"], "127.0.0.1")
-		case "sentByteCount":
-			assert.Equal(t, metric.Value, uint64(21))
-			assert.Equal(t, metric.Tags["loggregatorAddress"], "127.0.0.1")
-		case "receivedMessageCount":
-			assert.Equal(t, metric.Value, uint64(1))
-			assert.Equal(t, metric.Tags["loggregatorAddress"], "127.0.0.1")
-		case "receivedByteCount":
-			assert.Equal(t, metric.Value, uint64(21))
-			assert.Equal(t, metric.Tags["loggregatorAddress"], "127.0.0.1")
-		default:
-			t.Error("Got an invalid metric name: ", metric.Name)
-		}
-	}
-}
+		loggregatorClient.Send(expectedOutput)
 
-func TestDontSendEmptyData(t *testing.T) {
-	bufferSize := 4096
-	firstMessage := []byte("")
-	secondMessage := []byte("hi")
-	loggregatorClient := NewLoggregatorClient("localhost:9875", gosteno.NewLogger("TestLogger"), bufferSize)
+		buffer := make([]byte, 4096)
+		readCount, _, _ := udpListener.ReadFromUDP(buffer)
 
-	udpAddr, err := net.ResolveUDPAddr("udp", "localhost:9875")
-	assert.NoError(t, err)
+		received := string(buffer[:readCount])
+		Expect(received).To(Equal(string(expectedOutput)))
 
-	udpListener, err := net.ListenUDP("udp", udpAddr)
-	defer udpListener.Close()
-	assert.NoError(t, err)
+	})
 
-	loggregatorClient.Send(firstMessage)
-	loggregatorClient.Send(secondMessage)
+	Context("Metrics", func() {
+		BeforeEach(func() {
+			expectedOutput := []byte("Important Testmessage")
 
-	buffer := make([]byte, bufferSize)
-	readCount, _, err := udpListener.ReadFromUDP(buffer)
+			loggregatorClient.Send(expectedOutput)
 
-	assert.NoError(t, err)
+			buffer := make([]byte, 4096)
+			udpListener.ReadFromUDP(buffer)
+		})
 
-	received := string(buffer[:readCount])
-	assert.Equal(t, string(secondMessage), received)
-}
+		It("emits over varz", func() {
+			metrics := loggregatorClient.Emit().Metrics
+			Expect(metrics).To(HaveLen(5))
+
+			for _, metric := range metrics {
+				Expect(metric.Tags).To(HaveKeyWithValue("loggregatorAddress", "127.0.0.1"))
+
+				switch metric.Name {
+				case "currentBufferCount":
+					Expect(metric.Value).To(Equal(uint64(0)))
+				case "sentMessageCount":
+					Expect(metric.Value).To(Equal(uint64(1)))
+				case "sentByteCount":
+					Expect(metric.Value).To(Equal(uint64(21)))
+				case "receivedMessageCount":
+					Expect(metric.Value).To(Equal(uint64(1)))
+				case "receivedByteCount":
+					Expect(metric.Value).To(Equal(uint64(21)))
+				default:
+					Fail("Got an invalid metric name: " + metric.Name)
+				}
+			}
+		})
+
+		It("sends metrics using dropsonde", func() {
+			Expect(fakeMetricSender.GetValue("currentBufferCount")).To(Equal(fake.Metric{Value: 0, Unit: "Msg"}))
+			Expect(fakeMetricSender.GetCounter("sentMessageCount")).To(BeEquivalentTo(1))
+			Expect(fakeMetricSender.GetCounter("sentByteCount")).To(BeEquivalentTo(21))
+			Expect(fakeMetricSender.GetCounter("receivedMessageCount")).To(BeEquivalentTo(1))
+			Expect(fakeMetricSender.GetCounter("receivedByteCount")).To(BeEquivalentTo(21))
+		})
+	})
+
+	It("doesn't send empty data", func() {
+		bufferSize := 4096
+		firstMessage := []byte("")
+		secondMessage := []byte("hi")
+
+		loggregatorClient.Send(firstMessage)
+		loggregatorClient.Send(secondMessage)
+
+		buffer := make([]byte, bufferSize)
+		readCount, _, _ := udpListener.ReadFromUDP(buffer)
+
+		received := string(buffer[:readCount])
+		Expect(received).To(Equal(string(secondMessage)))
+	})
+})
