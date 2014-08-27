@@ -226,8 +226,8 @@ func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, req *http.Requ
 		Director: func(request *http.Request) {
 			request.URL.Scheme = "http"
 			request.URL.Host = req.Host
-			request.URL.Opaque = req.URL.Opaque
-			request.URL.RawQuery = req.URL.RawQuery
+			request.URL.Opaque = req.RequestURI
+			request.URL.RawQuery = ""
 
 			setRequestXRequestStart(req)
 			setRequestXVcapRequestId(req, nil)
