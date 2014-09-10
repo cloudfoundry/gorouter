@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 type EndpointIterator interface {
 	Next() *Endpoint
 	EndpointFailed()
@@ -123,7 +125,7 @@ func (p *Pool) next() *Endpoint {
 	}
 
 	if p.nextIdx == -1 {
-		p.nextIdx = rand.Intn(last)
+		p.nextIdx = random.Intn(last)
 	} else if p.nextIdx >= last {
 		p.nextIdx = 0
 	}
