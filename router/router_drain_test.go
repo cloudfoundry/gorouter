@@ -1,6 +1,10 @@
 package router_test
 
 import (
+	"io/ioutil"
+	"net/http"
+	"time"
+
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	cfg "github.com/cloudfoundry/gorouter/config"
@@ -15,16 +19,13 @@ import (
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 var _ = Describe("Router", func() {
 	var natsRunner *natsrunner.NATSRunner
 	var config *cfg.Config
 
-	var mbusClient *yagnats.Client
+	var mbusClient yagnats.ApceraWrapperNATSClient
 	var registry *rregistry.RouteRegistry
 	var varz vvarz.Varz
 	var router *Router
@@ -41,7 +42,7 @@ var _ = Describe("Router", func() {
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 		config.EndpointTimeout = 5 * time.Second
 
-		mbusClient = natsRunner.MessageBus.(*yagnats.Client)
+		mbusClient = natsRunner.MessageBus.(*yagnats.ApceraWrapper)
 		registry = rregistry.NewRouteRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()

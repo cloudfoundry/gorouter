@@ -18,7 +18,7 @@ import (
 var _ = Describe("AccessLogRecord", func() {
 	Measure("Register", func(b Benchmarker) {
 		c := config.DefaultConfig()
-		mbus := fakeyagnats.New()
+		mbus := fakeyagnats.NewApceraClientWrapper()
 		r := registry.NewRouteRegistry(c, mbus)
 
 		accesslog, err := access_log.CreateRunningAccessLogger(c)

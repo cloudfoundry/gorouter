@@ -15,7 +15,7 @@ import (
 
 var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
-	var messageBus *fakeyagnats.FakeYagnats
+	var messageBus *fakeyagnats.FakeApceraWrapper
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
@@ -25,7 +25,7 @@ var _ = Describe("RouteRegistry", func() {
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
-		messageBus = fakeyagnats.New()
+		messageBus = fakeyagnats.NewApceraClientWrapper()
 		r = NewRouteRegistry(configObj, messageBus)
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", map[string]string{

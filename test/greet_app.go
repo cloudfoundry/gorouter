@@ -1,14 +1,15 @@
 package test
 
 import (
-	"github.com/cloudfoundry/yagnats"
 	"io"
 	"net/http"
+
+	"github.com/cloudfoundry/yagnats"
 
 	"github.com/cloudfoundry/gorouter/route"
 )
 
-func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSClient, tags map[string]string) *TestApp {
+func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient yagnats.ApceraWrapperNATSClient, tags map[string]string) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, tags)
 	app.AddHandler("/", greetHandler)
 

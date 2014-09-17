@@ -22,13 +22,13 @@ type RouteRegistry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	messageBus yagnats.NATSClient
+	messageBus yagnats.ApceraWrapperNATSClient
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(c *config.Config, mbus yagnats.NATSClient) *RouteRegistry {
+func NewRouteRegistry(c *config.Config, mbus yagnats.ApceraWrapperNATSClient) *RouteRegistry {
 	r := &RouteRegistry{}
 
 	r.logger = steno.NewLogger("router.registry")

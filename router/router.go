@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/apcera/nats"
 	"github.com/cloudfoundry-incubator/dropsonde/autowire"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
@@ -25,7 +26,7 @@ var DrainTimeout = errors.New("router: Drain timeout")
 type Router struct {
 	config     *config.Config
 	proxy      proxy.Proxy
-	mbusClient *yagnats.Client
+	mbusClient yagnats.ApceraWrapperNATSClient
 	registry   *registry.RouteRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
@@ -35,7 +36,7 @@ type Router struct {
 	logger *steno.Logger
 }
 
-func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient *yagnats.Client, r *registry.RouteRegistry, v varz.Varz,
+func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.ApceraWrapperNATSClient, r *registry.RouteRegistry, v varz.Varz,
 	logCounter *vcap.LogCounter) (*Router, error) {
 
 	var host string
@@ -96,9 +97,9 @@ func (r *Router) Run() <-chan error {
 	r.SendStartMessage()
 
 	// Send start again on reconnect
-	r.mbusClient.ConnectedCallback = func() {
+	r.mbusClient.AddReconnectedCB(func(_ yagnats.ApceraWrapperNATSClient) {
 		r.SendStartMessage()
-	}
+	})
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
@@ -188,9 +189,9 @@ func (r *Router) SubscribeUnregister() {
 }
 
 func (r *Router) HandleGreetings() {
-	r.mbusClient.Subscribe("router.greet", func(msg *yagnats.Message) {
+	r.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
 		response, _ := r.greetMessage()
-		r.mbusClient.Publish(msg.ReplyTo, response)
+		r.mbusClient.Publish(msg.Reply, response)
 	})
 }
 
@@ -201,7 +202,7 @@ func (r *Router) SendStartMessage() {
 	}
 
 	// Send start message once at start
-	r.mbusClient.Publish("router.start", b)
+	err = r.mbusClient.Publish("router.start", b)
 }
 
 func (r *Router) ScheduleFlushApps() {
@@ -261,8 +262,8 @@ func (r *Router) greetMessage() ([]byte, error) {
 }
 
 func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
-	callback := func(message *yagnats.Message) {
-		payload := message.Payload
+	callback := func(message *nats.Msg) {
+		payload := message.Data
 
 		var msg registryMessage
 

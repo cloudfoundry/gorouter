@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/apcera/nats"
 	. "github.com/cloudfoundry/gorouter/common/http"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
@@ -110,8 +112,8 @@ func (c *VcapComponent) Start() error {
 	return nil
 }
 
-func (c *VcapComponent) Register(mbusClient yagnats.NATSClient) error {
-	mbusClient.Subscribe("vcap.component.discover", func(msg *yagnats.Message) {
+func (c *VcapComponent) Register(mbusClient yagnats.ApceraWrapperNATSClient) error {
+	mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
 		c.Uptime = c.StartTime.Elapsed()
 		b, e := json.Marshal(c)
 		if e != nil {
@@ -119,7 +121,7 @@ func (c *VcapComponent) Register(mbusClient yagnats.NATSClient) error {
 			return
 		}
 
-		mbusClient.Publish(msg.ReplyTo, b)
+		mbusClient.Publish(msg.Reply, b)
 	})
 
 	b, e := json.Marshal(c)

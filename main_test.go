@@ -314,21 +314,19 @@ var _ = Describe("Router Integration", func() {
 	})
 })
 
-func newMessageBus(c *config.Config) (yagnats.NATSClient, error) {
-	natsClient := yagnats.NewClient()
-	natsMembers := []yagnats.ConnectionProvider{}
-
+func newMessageBus(c *config.Config) (yagnats.ApceraWrapperNATSClient, error) {
+	natsMembers := make([]string, len(c.Nats))
 	for _, info := range c.Nats {
-		natsMembers = append(natsMembers, &yagnats.ConnectionInfo{
-			Addr:     fmt.Sprintf("%s:%d", info.Host, info.Port),
-			Username: info.User,
-			Password: info.Pass,
-		})
+		uri := url.URL{
+			Scheme: "nats",
+			User:   url.UserPassword(info.User, info.Pass),
+			Host:   fmt.Sprintf("%s:%d", info.Host, info.Port),
+		}
+		natsMembers = append(natsMembers, uri.String())
 	}
+	natsClient := yagnats.NewApceraClientWrapper(natsMembers)
 
-	err := natsClient.Connect(&yagnats.ConnectionCluster{
-		Members: natsMembers,
-	})
+	err := natsClient.Connect()
 
 	return natsClient, err
 }

@@ -1,6 +1,7 @@
 package fake
 
 import (
+	"io"
 	"sync"
 )
 
@@ -50,6 +51,14 @@ func (fls *FakeLogSender) SendAppErrorLog(appId, message, sourceType, sourceInst
 
 	fls.logs = append(fls.logs, Log{AppId: appId, Message: message, SourceType: sourceType, SourceInstance: sourceInstance, MessageType: "ERR"})
 	return nil
+}
+
+func (fls *FakeLogSender) ScanLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	panic("Not implemented!")
+}
+
+func (fls *FakeLogSender) ScanErrorLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	panic("Not implemented!")
 }
 
 func (fls *FakeLogSender) GetLogs() []Log {

@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"github.com/apcera/nats"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	cfg "github.com/cloudfoundry/gorouter/config"
@@ -32,7 +33,7 @@ var _ = Describe("Router", func() {
 	var natsRunner *natsrunner.NATSRunner
 	var config *cfg.Config
 
-	var mbusClient *yagnats.Client
+	var mbusClient yagnats.ApceraWrapperNATSClient
 	var registry *rregistry.RouteRegistry
 	var varz vvarz.Varz
 	var router *Router
@@ -47,7 +48,7 @@ var _ = Describe("Router", func() {
 
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 
-		mbusClient = natsRunner.MessageBus.(*yagnats.Client)
+		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
@@ -79,8 +80,8 @@ var _ = Describe("Router", func() {
 		It("RouterGreets", func() {
 			response := make(chan []byte)
 
-			mbusClient.Subscribe("router.greet.test.response", func(msg *yagnats.Message) {
-				response <- msg.Payload
+			mbusClient.Subscribe("router.greet.test.response", func(msg *nats.Msg) {
+				response <- msg.Data
 			})
 
 			mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
@@ -98,9 +99,9 @@ var _ = Describe("Router", func() {
 			// sure that router has run at least for one second
 			time.Sleep(time.Second)
 
-			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *yagnats.Message) {
+			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *nats.Msg) {
 				var component vcap.VcapComponent
-				_ = json.Unmarshal(msg.Payload, &component)
+				_ = json.Unmarshal(msg.Data, &component)
 				sig <- component
 			})
 
@@ -141,14 +142,14 @@ var _ = Describe("Router", func() {
 		It("sends start on a nats connect", func() {
 			started := make(chan bool)
 
-			mbusClient.Subscribe("router.start", func(*yagnats.Message) {
+			mbusClient.Subscribe("router.start", func(*nats.Msg) {
 				started <- true
 			})
 
 			natsRunner.Stop()
 			natsRunner.Start()
 
-			Eventually(started, 1).Should(Receive())
+			Eventually(started, 4).Should(Receive())
 		})
 	})
 

@@ -20,13 +20,13 @@ type TestApp struct {
 	port       uint16      // app listening port
 	rPort      uint16      // router listening port
 	urls       []route.Uri // host registered host name
-	mbusClient yagnats.NATSClient
+	mbusClient yagnats.ApceraWrapperNATSClient
 	tags       map[string]string
 	mux        *http.ServeMux
 	stopped    bool
 }
 
-func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSClient, tags map[string]string) *TestApp {
+func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.ApceraWrapperNATSClient, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := common.GrabEphemeralPort()

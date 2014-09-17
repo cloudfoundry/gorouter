@@ -13,7 +13,7 @@ import (
 	"github.com/cloudfoundry/yagnats"
 )
 
-func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSClient, delay time.Duration) *TestApp {
+func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient yagnats.ApceraWrapperNATSClient, delay time.Duration) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, nil)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		defer ginkgo.GinkgoRecover()

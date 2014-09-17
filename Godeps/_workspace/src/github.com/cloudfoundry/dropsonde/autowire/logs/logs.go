@@ -19,12 +19,13 @@ package logs
 import (
 	"github.com/cloudfoundry/dropsonde/autowire"
 	"github.com/cloudfoundry/dropsonde/log_sender"
+	"github.com/cloudfoundry/gosteno"
 )
 
 var logSender log_sender.LogSender
 
 func init() {
-	Initialize(log_sender.NewLogSender(autowire.AutowiredEmitter()))
+	Initialize(log_sender.NewLogSender(autowire.AutowiredEmitter(), gosteno.NewLogger("autowire/logs")))
 }
 
 // Initialize prepares the logs package for use with the automatic Emitter
