@@ -15,13 +15,6 @@ func NewUUID(id *uuid.UUID) *events.UUID {
 	return &events.UUID{Low: proto.Uint64(binary.LittleEndian.Uint64(id[:8])), High: proto.Uint64(binary.LittleEndian.Uint64(id[8:]))}
 }
 
-func StringFromUUID(id *events.UUID) string {
-	var u [16]byte
-	binary.LittleEndian.PutUint64(u[:8], id.GetLow())
-	binary.LittleEndian.PutUint64(u[8:], id.GetHigh())
-	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:])
-}
-
 func NewHttpStart(req *http.Request, peerType events.PeerType, requestId *uuid.UUID) *events.HttpStart {
 	httpStart := &events.HttpStart{
 		Timestamp:     proto.Int64(time.Now().UnixNano()),
@@ -71,4 +64,18 @@ func NewHeartbeat(sentCount, receivedCount, errorCount uint64) *events.Heartbeat
 		ReceivedCount: proto.Uint64(receivedCount),
 		ErrorCount:    proto.Uint64(errorCount),
 	}
+}
+
+func NewLogMessage(messageType events.LogMessage_MessageType, messageString, appId, sourceType string) *events.LogMessage {
+	currentTime := time.Now()
+
+	logMessage := &events.LogMessage{
+		Message:     []byte(messageString),
+		AppId:       &appId,
+		MessageType: &messageType,
+		SourceType:  proto.String(sourceType),
+		Timestamp:   proto.Int64(currentTime.UnixNano()),
+	}
+
+	return logMessage
 }

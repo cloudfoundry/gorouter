@@ -1,4 +1,4 @@
-package udp_listener_test
+package events_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestUdpListener(t *testing.T) {
+func TestEvents(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "UdpListener Suite")
+	RunSpecs(t, "Events Suite")
 }

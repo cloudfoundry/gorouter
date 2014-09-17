@@ -18,7 +18,7 @@ var natsCommand *exec.Cmd
 type NATSRunner struct {
 	port        int
 	natsSession *gexec.Session
-	MessageBus  yagnats.NATSClient
+	MessageBus  yagnats.ApceraWrapperNATSClient
 }
 
 func NewNATSRunner(port int) *NATSRunner {
@@ -48,14 +48,10 @@ func (runner *NATSRunner) Start() {
 
 	runner.natsSession = sess
 
-	connectionInfo := &yagnats.ConnectionInfo{
-		Addr: fmt.Sprintf("127.0.0.1:%d", runner.port),
-	}
-
-	messageBus := yagnats.NewClient()
+	messageBus := yagnats.NewApceraClientWrapper([]string{fmt.Sprintf("nats://127.0.0.1:%d", runner.port)})
 
 	Eventually(func() error {
-		return messageBus.Connect(connectionInfo)
+		return messageBus.Connect()
 	}, 5, 0.1).ShouldNot(HaveOccurred())
 
 	runner.MessageBus = messageBus

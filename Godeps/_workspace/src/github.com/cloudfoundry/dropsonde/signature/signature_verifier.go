@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 )
 
+const SIGNATURE_LENGTH = 32
+
 // A SignatureVerifier is a self-instrumenting pipeline object that validates
 // and removes signatures.
 type SignatureVerifier interface {
@@ -46,13 +48,13 @@ type signatureVerifier struct {
 // function to continue consuming from inputChan.
 func (v *signatureVerifier) Run(inputChan <-chan []byte, outputChan chan<- []byte) {
 	for signedMessage := range inputChan {
-		if len(signedMessage) < 32 {
+		if len(signedMessage) < SIGNATURE_LENGTH {
 			v.logger.Warnf("signatureVerifier: missing signature for message %v", signedMessage)
 			incrementCount(&v.missingSignatureErrorCount)
 			continue
 		}
 
-		signature, message := signedMessage[:32], signedMessage[32:]
+		signature, message := signedMessage[:SIGNATURE_LENGTH], signedMessage[SIGNATURE_LENGTH:]
 		if v.verifyMessage(message, signature) {
 			outputChan <- message
 			incrementCount(&v.validSignatureCount)

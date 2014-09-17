@@ -13,8 +13,9 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type YSuite struct {
-	Client  *Client
-	NatsCmd *exec.Cmd
+	Client        *Client
+	ApceraWrapper *ApceraWrapper
+	NatsCmd       *exec.Cmd
 }
 
 var _ = Suite(&YSuite{})
@@ -38,11 +39,19 @@ func (s *YSuite) SetUpTest(c *C) {
 	})
 
 	s.Client = client
+
+	apcera_client := NewApceraClientWrapper([]string{"nats://nats:nats@127.0.0.1:4223"})
+	apcera_client.Connect()
+
+	s.ApceraWrapper = apcera_client
 }
 
 func (s *YSuite) TearDownTest(c *C) {
 	s.Client.Disconnect()
 	s.Client = nil
+
+	s.ApceraWrapper.Disconnect()
+	s.ApceraWrapper = nil
 }
 
 func (s *YSuite) TestDisconnectOnNewClient(c *C) {
