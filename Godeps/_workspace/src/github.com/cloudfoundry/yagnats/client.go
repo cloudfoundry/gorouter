@@ -69,7 +69,7 @@ func (c *Client) Ping() bool {
 
 func (c *Client) Connect(cp ConnectionProvider) error {
 
-	c.logger.Warn("WARNING: yagnats.NewClient() and fakeyagnats.New() are deprecated. You should use yagnats.NewApceraClient() and fakeyagnats.NewApceraClient() instead")
+	c.logger.Warn("WARNING: yagnats.NewClient() and fakeyagnats.New() are deprecated. You should use yagnats.NewApceraClientWrapper() and fakeyagnats.NewApceraClientWrapper() instead")
 
 	conn, err := c.connect(cp)
 	if err != nil {

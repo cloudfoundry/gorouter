@@ -32,6 +32,7 @@ func NewApceraClientWrapper(urls []string) *ApceraWrapper {
 	options := nats.DefaultOptions
 	options.Servers = urls
 	options.ReconnectWait = 500 * time.Millisecond
+	options.MaxReconnect = -1
 	c := &ApceraWrapper{
 		options:      options,
 		reconnectcbs: []func(ApceraWrapperNATSClient){},
