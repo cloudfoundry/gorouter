@@ -36,34 +36,6 @@
 			"Rev": "172cf35a1499df49e081c5ba7ff2e02a51d9dda6"
 		},
 		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/generic_logger",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/localip",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/emitter",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/loggregatorclient",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/logmessage",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/loggregatorlib/signature",
-			"Rev": "1b33526d943df5b67775db3440dd1397ca33f862"
-		},
-		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
 			"Rev": "1b7f38fb7d045bc3bfd54bca003e5835fef25f0c"
 		},
