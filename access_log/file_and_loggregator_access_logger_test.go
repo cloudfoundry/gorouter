@@ -1,10 +1,11 @@
 package access_log_test
 
 import (
+	"github.com/cloudfoundry/dropsonde/autowire/logs"
+	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	. "github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test_util"
-	"github.com/cloudfoundry/loggregatorlib/logmessage"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,53 +15,35 @@ import (
 	"time"
 )
 
-type mockEmitter struct {
-	emitted bool
-	appId   string
-	message string
-	done    chan bool
-}
-
-func (m *mockEmitter) Emit(appid, message string) {
-	m.emitted = true
-	m.appId = appid
-	m.message = message
-	m.done <- true
-}
-
-func (m *mockEmitter) EmitError(appid, message string) {
-}
-
-func (m *mockEmitter) EmitLogMessage(l *logmessage.LogMessage) {
-}
-
-func NewMockEmitter() *mockEmitter {
-	return &mockEmitter{
-		emitted: false,
-		done:    make(chan bool, 1),
-	}
-}
-
 var _ = Describe("AccessLog", func() {
 
-	Context("with an emitter", func() {
-		It("a record is written", func() {
-			testEmitter := NewMockEmitter()
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, testEmitter)
+	Context("with a dropsonde source instance", func() {
+		It("logs to dropsonde autowire", func() {
+
+			fakeLogSender := fake.NewFakeLogSender()
+			logs.Initialize(fakeLogSender)
+
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42")
 			go accessLogger.Run()
 
 			accessLogger.Log(*CreateAccessLogRecord())
-			Eventually(testEmitter.done).Should(Receive())
-			Ω(testEmitter.emitted).Should(BeTrue())
-			Ω(testEmitter.appId).To(Equal("my_awesome_id"))
-			Ω(testEmitter.message).To(MatchRegexp("^.*foo.bar.*\n"))
+
+			Eventually(fakeLogSender.GetLogs).Should(HaveLen(1))
+			Expect(fakeLogSender.GetLogs()[0].AppId).To(Equal("my_awesome_id"))
+			Expect(fakeLogSender.GetLogs()[0].Message).To(MatchRegexp("^.*foo.bar.*\n"))
+			Expect(fakeLogSender.GetLogs()[0].SourceType).To(Equal("RTR"))
+			Expect(fakeLogSender.GetLogs()[0].SourceInstance).To(Equal("42"))
+			Expect(fakeLogSender.GetLogs()[0].MessageType).To(Equal("OUT"))
 
 			accessLogger.Stop()
 		})
 
-		It("a record with no app id is not written", func() {
-			testEmitter := NewMockEmitter()
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, testEmitter)
+		It("a record with no app id is not logged to dropsonde", func() {
+
+			fakeLogSender := fake.NewFakeLogSender()
+			logs.Initialize(fakeLogSender)
+
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43")
 
 			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil)
 
@@ -69,7 +52,7 @@ var _ = Describe("AccessLog", func() {
 			accessLogger.Log(*accessLogRecord)
 			go accessLogger.Run()
 
-			Consistently(testEmitter.done).ShouldNot(Receive())
+			Consistently(fakeLogSender.GetLogs).Should(HaveLen(0))
 
 			accessLogger.Stop()
 		})
@@ -80,7 +63,7 @@ var _ = Describe("AccessLog", func() {
 		It("writes to the log file", func() {
 			var fakeFile = new(test_util.FakeFile)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, nil)
+			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "")
 			go accessLogger.Run()
 			accessLogger.Log(*CreateAccessLogRecord())
 
@@ -92,38 +75,6 @@ var _ = Describe("AccessLog", func() {
 			Ω(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
 
 			accessLogger.Stop()
-		})
-	})
-
-	Context("with valid hostnames", func() {
-		It("creates an emitter", func() {
-			e, err := NewEmitter("localhost:9843", "secret", 42)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(e).ToNot(BeNil())
-
-			e, err = NewEmitter("10.10.16.14:9843", "secret", 42)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(e).ToNot(BeNil())
-		})
-	})
-
-	Context("when invalid host:port pairs are provided", func() {
-		It("does not create an emitter", func() {
-			e, err := NewEmitter("this_is_not_a_url", "secret", 42)
-			Ω(err).To(HaveOccurred())
-			Ω(e).To(BeNil())
-
-			e, err = NewEmitter("localhost", "secret", 42)
-			Ω(err).To(HaveOccurred())
-			Ω(e).To(BeNil())
-
-			e, err = NewEmitter("10.10.16.14", "secret", 42)
-			Ω(err).To(HaveOccurred())
-			Ω(e).To(BeNil())
-
-			e, err = NewEmitter("", "secret", 42)
-			Ω(err).To(HaveOccurred())
-			Ω(e).To(BeNil())
 		})
 	})
 

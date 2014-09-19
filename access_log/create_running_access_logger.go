@@ -3,15 +3,14 @@ package access_log
 import (
 	"github.com/cloudfoundry/gorouter/config"
 	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/emitter"
+	"strconv"
 
 	"os"
 )
 
 func CreateRunningAccessLogger(config *config.Config) (AccessLogger, error) {
-	loggregatorUrl := config.LoggregatorConfig.Url
 
-	if config.AccessLog == "" && loggregatorUrl == "" {
+	if config.AccessLog == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
 
@@ -27,17 +26,12 @@ func CreateRunningAccessLogger(config *config.Config) (AccessLogger, error) {
 		}
 	}
 
-	var e emitter.Emitter
-	if loggregatorUrl != "" {
-		loggregatorSharedSecret := config.LoggregatorConfig.SharedSecret
-		e, err = NewEmitter(loggregatorUrl, loggregatorSharedSecret, config.Index)
-		if err != nil {
-			logger.Errorf("Error creating loggregator emitter: (%s)", err.Error())
-			return nil, err
-		}
+	var dropsondeSourceInstance string
+	if config.Logging.LoggregatorEnabled {
+		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
 	}
 
-	accessLogger := NewFileAndLoggregatorAccessLogger(file, e)
+	accessLogger := NewFileAndLoggregatorAccessLogger(file, dropsondeSourceInstance)
 	go accessLogger.Run()
 	return accessLogger, nil
 }

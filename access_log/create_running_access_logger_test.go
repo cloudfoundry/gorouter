@@ -10,32 +10,42 @@ import (
 
 var _ = Describe("AccessLog", func() {
 
-	It("creates null access loger if no access log and no loggregregator url", func() {
+	It("creates null access loger if no access log and loggregator is disabled", func() {
 		config := config.DefaultConfig()
+
 		Ω(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
 	})
 
-	It("creates an access log when loggegrator url specified", func() {
+	It("creates an access log when loggegrator is enabled", func() {
 		config := config.DefaultConfig()
-		config.LoggregatorConfig.Url = "10.10.3.13:4325"
+		config.Logging.LoggregatorEnabled = true
 		config.AccessLog = ""
 
-		Ω(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&FileAndLoggregatorAccessLogger{}))
+		accessLogger, _ := CreateRunningAccessLogger(config)
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).FileWriter()).To(BeNil())
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).To(Equal("0"))
+
 	})
 
 	It("creates an access log if an access log is specified", func() {
 		config := config.DefaultConfig()
 		config.AccessLog = "/dev/null"
 
-		Ω(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&FileAndLoggregatorAccessLogger{}))
+		accessLogger, _ := CreateRunningAccessLogger(config)
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).To(BeEmpty())
+
 	})
 
-	It("creates an AccessLogger if both access log and loggregator url are specififed", func() {
+	It("creates an AccessLogger if both access log and loggregator is enabled", func() {
 		config := config.DefaultConfig()
-		config.LoggregatorConfig.Url = "10.10.3.13:4325"
+		config.Logging.LoggregatorEnabled = true
 		config.AccessLog = "/dev/null"
 
-		Ω(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&FileAndLoggregatorAccessLogger{}))
+		accessLogger, _ := CreateRunningAccessLogger(config)
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).ToNot(BeEmpty())
+
 	})
 
 	It("reports an error if the access log location is invalid", func() {
