@@ -68,6 +68,11 @@ func (l *logSender) scanLogStream(appId, sourceType, sourceInstance string, send
 			}
 
 			line := scanner.Text()
+
+			if len(line) == 0 {
+				continue
+			}
+
 			send(appId, line, sourceType, sourceInstance)
 		}
 

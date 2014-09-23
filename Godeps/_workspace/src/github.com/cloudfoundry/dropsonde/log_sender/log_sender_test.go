@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"io"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -161,6 +162,32 @@ var _ = Describe("ScanLogStream", func() {
 		Eventually(done).Should(BeClosed())
 	})
 
+	It("drops over-length messages and resumes scanning", func(done Done) {
+		// Scanner can't handle tokens over 64K
+		bigReader := strings.NewReader(strings.Repeat("x", 64*1024+1) + "\nsmall message\n")
+		sender.ScanLogStream("someId", "app", "0", bigReader, nil)
+
+		Expect(emitter.GetMessages()).To(HaveLen(3))
+
+		messages := emitter.GetMessages()
+
+		Expect(getLogmessage(messages[0].Event)).To(ContainSubstring("Dropped log message due to read error:"))
+		Expect(getLogmessage(messages[1].Event)).To(Equal("x"))
+		Expect(getLogmessage(messages[2].Event)).To(Equal("small message"))
+		close(done)
+	})
+
+	It("ignores empty lines", func() {
+		reader := strings.NewReader("one\n\ntwo\n")
+
+		sender.ScanLogStream("someId", "app", "0", reader, nil)
+
+		Expect(emitter.GetMessages()).To(HaveLen(2))
+		messages := emitter.GetMessages()
+
+		Expect(getLogmessage(messages[0].Event)).To(Equal("one"))
+		Expect(getLogmessage(messages[1].Event)).To(Equal("two"))
+	})
 })
 
 var _ = Describe("ScanErrorLogStream", func() {
@@ -243,6 +270,33 @@ var _ = Describe("ScanErrorLogStream", func() {
 		close(stopChan)
 		Eventually(done).Should(BeClosed())
 	})
+
+	It("drops over-length messages and resumes scanning", func(done Done) {
+		// Scanner can't handle tokens over 64K
+		bigReader := strings.NewReader(strings.Repeat("x", 64*1024+1) + "\nsmall message\n")
+		sender.ScanErrorLogStream("someId", "app", "0", bigReader, nil)
+
+		Expect(emitter.GetMessages()).To(HaveLen(3))
+
+		messages := emitter.GetMessages()
+
+		Expect(getLogmessage(messages[0].Event)).To(ContainSubstring("Dropped log message due to read error:"))
+		Expect(getLogmessage(messages[1].Event)).To(Equal("x"))
+		Expect(getLogmessage(messages[2].Event)).To(Equal("small message"))
+		close(done)
+	})
+
+	It("ignores empty lines", func() {
+		reader := strings.NewReader("one\n\ntwo\n")
+
+		sender.ScanErrorLogStream("someId", "app", "0", reader, nil)
+
+		Expect(emitter.GetMessages()).To(HaveLen(2))
+		messages := emitter.GetMessages()
+
+		Expect(getLogmessage(messages[0].Event)).To(Equal("one"))
+		Expect(getLogmessage(messages[1].Event)).To(Equal("two"))
+	})
 })
 
 type fakeReader struct {
@@ -276,4 +330,12 @@ func (i infiniteReader) Read(p []byte) (int, error) {
 	}
 
 	return copy(p, "hello\n"), nil
+}
+
+func getLogmessage(e events.Event) string {
+	log, ok := e.(*events.LogMessage)
+	if !ok {
+		panic("Could not cast to events.LogMessage")
+	}
+	return string(log.GetMessage())
 }
