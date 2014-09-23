@@ -20,6 +20,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/autowire"
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/gosteno"
+	"io"
 )
 
 var logSender log_sender.LogSender
@@ -48,4 +49,16 @@ func SendAppLog(appId, message, sourceType, sourceInstance string) error {
 // Returns an error if one occurs while sending the event.
 func SendAppErrorLog(appId, message, sourceType, sourceInstance string) error {
 	return logSender.SendAppErrorLog(appId, message, sourceType, sourceInstance)
+}
+
+// ScanLogStream sends a log message with the given meta-data for each line from reader.
+// Restarts on read errors and continues until EOF (or stopChan is closed).
+func ScanLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	logSender.ScanLogStream(appId, sourceType, sourceInstance, reader, stopChan)
+}
+
+// ScanErrorLogStream sends a log error message with the given meta-data for each line from reader.
+// Restarts on read errors and continues until EOF (or stopChan is closed).
+func ScanErrorLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	logSender.ScanErrorLogStream(appId, sourceType, sourceInstance, reader, stopChan)
 }
