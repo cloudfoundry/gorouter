@@ -2,6 +2,7 @@ package autowire_test
 
 import (
 	"github.com/cloudfoundry/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde/emitter"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"net/http"
@@ -10,52 +11,66 @@ import (
 )
 
 var _ = Describe("Autowire", func() {
-	var oldEnv string
+	var oldDestination string
+	var oldOrigin string
 
 	BeforeEach(func() {
-		oldEnv = os.Getenv("DROPSONDE_DESTINATION")
+		oldDestination = os.Getenv("DROPSONDE_DESTINATION")
+		oldOrigin = os.Getenv("DROPSONDE_ORIGIN")
 	})
 
 	AfterEach(func() {
-		os.Setenv("DROPSONDE_DESTINATION", oldEnv)
+		os.Setenv("DROPSONDE_DESTINATION", oldDestination)
+		os.Setenv("DROPSONDE_ORIGIN", oldOrigin)
 	})
 
-	Context("with DROPSONDE_ORIGIN set", func() {
-		BeforeEach(func() {
-			os.Setenv("DROPSONDE_ORIGIN", "anything")
-		})
-		Context("with DROPSONDE_DESTINATION missing", func() {
-			It("defaults to localhost", func() {
-				os.Setenv("DROPSONDE_DESTINATION", "")
-				autowire.Initialize()
-
-				Expect(autowire.Destination()).To(Equal("localhost:3457"))
+	Describe("Initialize", func() {
+		Context("with a non-nil emitter", func() {
+			It("instruments the HTTP default transport", func() {
+				autowire.Initialize(emitter.NewEventEmitter(nil, ""))
+				Expect(reflect.TypeOf(http.DefaultTransport).Elem().Name()).ToNot(Equal("Transport"))
 			})
 		})
 
-		Context("with DROPSONDE_DESTINATION set", func() {
-			It("uses the configured destination", func() {
-				os.Setenv("DROPSONDE_DESTINATION", "test")
-				autowire.Initialize()
-
-				Expect(autowire.Destination()).To(Equal("test"))
+		Context("with a nil-emitter", func() {
+			It("resets the HTTP default transport to not be instrumented", func() {
+				autowire.Initialize(nil)
+				Expect(reflect.TypeOf(http.DefaultTransport).Elem().Name()).To(Equal("Transport"))
 			})
 		})
 	})
-	Context("with DROPSONDE_ORIGIN missing", func() {
-		BeforeEach(func() {
-			oldEnv = os.Getenv("DROPSONDE_ORIGIN")
+
+	Describe("CreateDefaultEmitter", func() {
+		Context("with DROPSONDE_ORIGIN set", func() {
+			BeforeEach(func() {
+				os.Setenv("DROPSONDE_ORIGIN", "anything")
+			})
+
+			Context("with DROPSONDE_DESTINATION missing", func() {
+				It("defaults to localhost", func() {
+					os.Setenv("DROPSONDE_DESTINATION", "")
+					_, destination := autowire.CreateDefaultEmitter()
+
+					Expect(destination).To(Equal("localhost:3457"))
+				})
+			})
+
+			Context("with DROPSONDE_DESTINATION set", func() {
+				It("uses the configured destination", func() {
+					os.Setenv("DROPSONDE_DESTINATION", "test")
+					_, destination := autowire.CreateDefaultEmitter()
+
+					Expect(destination).To(Equal("test"))
+				})
+			})
 		})
 
-		AfterEach(func() {
-			os.Setenv("DROPSONDE_ORIGIN", oldEnv)
-		})
-
-		It("sets http.DefaultTransport to the non-instrumented default", func() {
-			os.Setenv("DROPSONDE_ORIGIN", "")
-			autowire.Initialize()
-
-			Expect(reflect.TypeOf(http.DefaultTransport).Elem().Name()).To(Equal("Transport"))
+		Context("with DROPSONDE_ORIGIN missing", func() {
+			It("returns a nil-emitter", func() {
+				os.Setenv("DROPSONDE_ORIGIN", "")
+				emitter, _ := autowire.CreateDefaultEmitter()
+				Expect(emitter).To(BeNil())
+			})
 		})
 	})
 })

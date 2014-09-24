@@ -25,7 +25,8 @@ var _ = Describe("Autowire End-to-End", func() {
 		BeforeEach(func() {
 			oldEnv = os.Getenv("DROPSONDE_ORIGIN")
 			os.Setenv("DROPSONDE_ORIGIN", "test-origin")
-			autowire.Initialize()
+			emitter, _ := autowire.CreateDefaultEmitter()
+			autowire.Initialize(emitter)
 			metrics.Initialize(metric_sender.NewMetricSender(autowire.AutowiredEmitter()))
 		})
 
