@@ -112,7 +112,7 @@ func (c *VcapComponent) Start() error {
 	return nil
 }
 
-func (c *VcapComponent) Register(mbusClient yagnats.ApceraWrapperNATSClient) error {
+func (c *VcapComponent) Register(mbusClient yagnats.NATSConn) error {
 	mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
 		c.Uptime = c.StartTime.Elapsed()
 		b, e := json.Marshal(c)

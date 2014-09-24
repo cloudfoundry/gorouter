@@ -53,7 +53,7 @@ var _ = Describe("Proxy", func() {
 		conf.TraceKey = "my_trace_key"
 		conf.EndpointTimeout = 500 * time.Millisecond
 
-		mbus := fakeyagnats.NewApceraClientWrapper()
+		mbus := fakeyagnats.Connect()
 
 		r = registry.NewRouteRegistry(conf, mbus)
 

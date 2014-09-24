@@ -20,7 +20,7 @@ var _ = Describe("Varz", func() {
 	var Registry *registry.RouteRegistry
 
 	BeforeEach(func() {
-		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.NewApceraClientWrapper())
+		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.Connect())
 		Varz = NewVarz(Registry)
 	})
 

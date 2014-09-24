@@ -29,7 +29,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "3311962af44037c66cd868beec47e7735c4165b6"
+			"Rev": "bd07e7d4d8580e6b5bc37825c8f3276f9a324175"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/loggregatorlib/cfcomponent/generic_logger",
@@ -61,7 +61,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "c3b79231decc6c73c5d54a4d28a7ae9ba8d9ba7d"
+			"Rev": "ede9a4b51471c60a58c853c0f6652ce0c1fc8337"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",

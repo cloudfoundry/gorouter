@@ -314,7 +314,7 @@ var _ = Describe("Router Integration", func() {
 	})
 })
 
-func newMessageBus(c *config.Config) (yagnats.ApceraWrapperNATSClient, error) {
+func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {
 	natsMembers := make([]string, len(c.Nats))
 	for _, info := range c.Nats {
 		uri := url.URL{
@@ -324,11 +324,8 @@ func newMessageBus(c *config.Config) (yagnats.ApceraWrapperNATSClient, error) {
 		}
 		natsMembers = append(natsMembers, uri.String())
 	}
-	natsClient := yagnats.NewApceraClientWrapper(natsMembers)
 
-	err := natsClient.Connect()
-
-	return natsClient, err
+	return yagnats.Connect(natsMembers)
 }
 
 func waitAppRegistered(routesUri string, app *test.TestApp, timeout time.Duration) bool {

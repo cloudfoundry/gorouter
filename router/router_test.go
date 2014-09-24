@@ -33,7 +33,7 @@ var _ = Describe("Router", func() {
 	var natsRunner *natsrunner.NATSRunner
 	var config *cfg.Config
 
-	var mbusClient yagnats.ApceraWrapperNATSClient
+	var mbusClient yagnats.NATSConn
 	var registry *rregistry.RouteRegistry
 	var varz vvarz.Varz
 	var router *Router
@@ -84,7 +84,7 @@ var _ = Describe("Router", func() {
 				response <- msg.Data
 			})
 
-			mbusClient.PublishWithReplyTo("router.greet", "router.greet.test.response", []byte{})
+			mbusClient.PublishRequest("router.greet", "router.greet.test.response", []byte{})
 
 			var msg []byte
 			Eventually(response, 1).Should(Receive(&msg))
@@ -105,7 +105,7 @@ var _ = Describe("Router", func() {
 				sig <- component
 			})
 
-			mbusClient.PublishWithReplyTo(
+			mbusClient.PublishRequest(
 				"vcap.component.discover",
 				"vcap.component.discover.test.response",
 				[]byte{},

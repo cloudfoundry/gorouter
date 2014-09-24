@@ -9,7 +9,7 @@ import (
 	"github.com/cloudfoundry/yagnats"
 )
 
-func NewSlowApp(urls []route.Uri, rPort uint16, mbusClient yagnats.ApceraWrapperNATSClient, delay time.Duration) *TestApp {
+func NewSlowApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, delay time.Duration) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, nil)
 
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {

@@ -1,146 +1,68 @@
 package yagnats
 
 import (
-	"errors"
 	"sync"
 	"time"
 
 	"github.com/apcera/nats"
 )
 
-type ApceraWrapperNATSClient interface {
-	Ping() bool
-	Connect() error
-	Disconnect()
-	Publish(subject string, payload []byte) error
-	PublishWithReplyTo(subject, reply string, payload []byte) error
+type NATSConn interface {
+	Close() //Disconnect?
+	Publish(subject string, data []byte) error
+	PublishRequest(subj, reply string, data []byte) error
 	Subscribe(subject string, handler nats.MsgHandler) (*nats.Subscription, error)
-	SubscribeWithQueue(subject, queue string, handler nats.MsgHandler) (*nats.Subscription, error)
-	Unsubscribe(subscription *nats.Subscription) error
-
-	AddReconnectedCB(func(ApceraWrapperNATSClient))
+	QueueSubscribe(subject, queue string, handler nats.MsgHandler) (*nats.Subscription, error)
+	Unsubscribe(sub *nats.Subscription) error
+	Ping() bool // Not actually in nats.Conn, but quite useful
+	AddReconnectedCB(func(*nats.Conn))
 }
 
-type ApceraWrapper struct {
-	options      nats.Options
-	conn         *nats.Conn
-	reconnectcbs []func(ApceraWrapperNATSClient)
+type conn struct {
+	*nats.Conn
+	reconnectcbs *[]func(*nats.Conn)
 	*sync.Mutex
 }
 
-func NewApceraClientWrapper(urls []string) *ApceraWrapper {
+func Connect(urls []string) (NATSConn, error) {
 	options := nats.DefaultOptions
 	options.Servers = urls
 	options.ReconnectWait = 500 * time.Millisecond
 	options.MaxReconnect = -1
-	c := &ApceraWrapper{
-		options:      options,
-		reconnectcbs: []func(ApceraWrapperNATSClient){},
-		Mutex:        &sync.Mutex{},
+
+	callbacks := make([]func(*nats.Conn), 0)
+	s := &conn{nil, &callbacks, &sync.Mutex{}}
+
+	options.ReconnectedCB = func(conn *nats.Conn) {
+		s.Lock()
+		defer s.Unlock()
+		for _, cb := range *s.reconnectcbs {
+			cb(conn)
+		}
 	}
-	c.options.ReconnectedCB = c.reconnectcb
-	return c
-}
 
-func (c *ApceraWrapper) reconnectcb(conn *nats.Conn) {
-	c.Lock()
-	callbacks := make([]func(ApceraWrapperNATSClient), len(c.reconnectcbs))
-	copy(callbacks, c.reconnectcbs)
-	c.Unlock()
-
-	for _, cb := range callbacks {
-		cb(c)
+	conn, err := options.Connect()
+	if err != nil {
+		return nil, err
 	}
+
+	s.Conn = conn
+	return s, nil
 }
 
-func (c *ApceraWrapper) AddReconnectedCB(handler func(ApceraWrapperNATSClient)) {
-	c.Lock()
-	c.reconnectcbs = append(c.reconnectcbs, handler)
-	c.Unlock()
-}
-
-func (c *ApceraWrapper) connection() *nats.Conn {
-	c.Lock()
-	conn := c.conn
-	c.Unlock()
-	return conn
-}
-
-func (c *ApceraWrapper) Connect() error {
+func (c *conn) AddReconnectedCB(handler func(*nats.Conn)) {
 	c.Lock()
 	defer c.Unlock()
-
-	if c.conn != nil && !c.conn.IsClosed() {
-		return errors.New("already connected")
-	}
-
-	conn, err := c.options.Connect()
-	if err != nil {
-		return err
-	}
-
-	c.conn = conn
-
-	return nil
+	callbacks := *c.reconnectcbs
+	callbacks = append(callbacks, handler)
+	c.reconnectcbs = &callbacks
 }
 
-func (c *ApceraWrapper) Disconnect() {
-	conn := c.connection()
-
-	if conn != nil {
-		conn.Close()
-	}
+func (c *conn) Unsubscribe(sub *nats.Subscription) error {
+	return sub.Unsubscribe()
 }
 
-func (c *ApceraWrapper) Publish(subject string, payload []byte) error {
-	conn := c.connection()
-
-	if conn == nil {
-		return errors.New("not connected")
-	}
-
-	return conn.Publish(subject, payload)
-}
-
-func (c *ApceraWrapper) Ping() bool {
-	conn := c.connection()
-
-	if conn == nil {
-		return false
-	}
-
-	err := conn.FlushTimeout(500 * time.Millisecond)
+func (c *conn) Ping() bool {
+	err := c.FlushTimeout(500 * time.Millisecond)
 	return err == nil
-}
-
-func (c *ApceraWrapper) PublishWithReplyTo(subject, reply string, payload []byte) error {
-	conn := c.connection()
-
-	if conn == nil {
-		return errors.New("not connected")
-	}
-
-	return conn.PublishRequest(subject, reply, payload)
-}
-
-func (c *ApceraWrapper) Subscribe(subject string, handler nats.MsgHandler) (*nats.Subscription, error) {
-	conn := c.connection()
-	if conn == nil {
-		return nil, errors.New("not connected")
-	}
-
-	return conn.Subscribe(subject, handler)
-}
-
-func (c *ApceraWrapper) SubscribeWithQueue(subject, queue string, handler nats.MsgHandler) (*nats.Subscription, error) {
-	conn := c.connection()
-	if conn == nil {
-		return nil, errors.New("not connected")
-	}
-
-	return conn.QueueSubscribe(subject, queue, handler)
-}
-
-func (c *ApceraWrapper) Unsubscribe(subscription *nats.Subscription) error {
-	return subscription.Unsubscribe()
 }

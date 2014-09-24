@@ -56,10 +56,7 @@ func main() {
 		}
 		natsMembers = append(natsMembers, uri.String())
 	}
-	natsClient := yagnats.NewApceraClientWrapper(natsMembers)
-
-	err := natsClient.Connect()
-
+	natsClient, err := yagnats.Connect(natsMembers)
 	if err != nil {
 		logger.Fatalf("Error connecting to NATS: %s\n", err)
 	}

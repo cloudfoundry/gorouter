@@ -26,7 +26,7 @@ var DrainTimeout = errors.New("router: Drain timeout")
 type Router struct {
 	config     *config.Config
 	proxy      proxy.Proxy
-	mbusClient yagnats.ApceraWrapperNATSClient
+	mbusClient yagnats.NATSConn
 	registry   *registry.RouteRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
@@ -36,7 +36,7 @@ type Router struct {
 	logger *steno.Logger
 }
 
-func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.ApceraWrapperNATSClient, r *registry.RouteRegistry, v varz.Varz,
+func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry, v varz.Varz,
 	logCounter *vcap.LogCounter) (*Router, error) {
 
 	var host string
@@ -97,7 +97,7 @@ func (r *Router) Run() <-chan error {
 	r.SendStartMessage()
 
 	// Send start again on reconnect
-	r.mbusClient.AddReconnectedCB(func(_ yagnats.ApceraWrapperNATSClient) {
+	r.mbusClient.AddReconnectedCB(func(_ *nats.Conn) {
 		r.SendStartMessage()
 	})
 

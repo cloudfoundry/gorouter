@@ -33,7 +33,7 @@ type FakeYagnats struct {
 func New() *FakeYagnats {
 	fake := &FakeYagnats{}
 	fake.Reset()
-	fmt.Fprintln(os.Stderr, "WARNING: yagnats.NewClient() and fakeyagnats.New() are deprecated. You should use yagnats.NewApceraClientWrapper() and fakeyagnats.NewApceraClientWrapper() instead")
+	fmt.Fprintln(os.Stderr, "WARNING: yagnats.NewClient() and fakeyagnats.New() are deprecated. You should use yagnats.Connect() and fakeyagnats.Connect() instead")
 	return fake
 }
 

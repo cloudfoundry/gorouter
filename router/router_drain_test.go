@@ -25,7 +25,7 @@ var _ = Describe("Router", func() {
 	var natsRunner *natsrunner.NATSRunner
 	var config *cfg.Config
 
-	var mbusClient yagnats.ApceraWrapperNATSClient
+	var mbusClient yagnats.NATSConn
 	var registry *rregistry.RouteRegistry
 	var varz vvarz.Varz
 	var router *Router
@@ -42,7 +42,7 @@ var _ = Describe("Router", func() {
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 		config.EndpointTimeout = 5 * time.Second
 
-		mbusClient = natsRunner.MessageBus.(*yagnats.ApceraWrapper)
+		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(config, mbusClient)
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()

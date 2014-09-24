@@ -4,10 +4,9 @@ import (
 	"sync"
 
 	"github.com/apcera/nats"
-	"github.com/cloudfoundry/yagnats"
 )
 
-type FakeApceraWrapper struct {
+type FakeNATSConn struct {
 	subscriptions        map[string]map[*nats.Subscription]nats.MsgHandler
 	publishedMessages    map[string][]*nats.Msg
 	unsubscriptions      []*nats.Subscription
@@ -25,15 +24,15 @@ type FakeApceraWrapper struct {
 	sync.RWMutex
 }
 
-func NewApceraClientWrapper() *FakeApceraWrapper {
-	fake := &FakeApceraWrapper{}
+func Connect() *FakeNATSConn {
+	fake := &FakeNATSConn{}
 	fake.Reset()
 	return fake
 }
 
-func (f *FakeApceraWrapper) AddReconnectedCB(_ func(yagnats.ApceraWrapperNATSClient)) {}
+func (f *FakeNATSConn) AddReconnectedCB(_ func(*nats.Conn)) {}
 
-func (f *FakeApceraWrapper) Reset() {
+func (f *FakeNATSConn) Reset() {
 	f.Lock()
 	defer f.Unlock()
 
@@ -51,13 +50,13 @@ func (f *FakeApceraWrapper) Reset() {
 	f.pingResponse = true
 }
 
-func (f *FakeApceraWrapper) OnPing(onPingCallback func() bool) {
+func (f *FakeNATSConn) OnPing(onPingCallback func() bool) {
 	f.Lock()
 	f.onPing = onPingCallback
 	f.Unlock()
 }
 
-func (f *FakeApceraWrapper) Ping() bool {
+func (f *FakeNATSConn) Ping() bool {
 	f.RLock()
 	onPing := f.onPing
 	response := f.pingResponse
@@ -70,29 +69,18 @@ func (f *FakeApceraWrapper) Ping() bool {
 	return response
 }
 
-func (f *FakeApceraWrapper) Connect() error {
-	f.Lock()
-	defer f.Unlock()
-
-	if f.connectError != nil {
-		return f.connectError
-	}
-
-	return f.connectError
-}
-
-func (f *FakeApceraWrapper) Disconnect() {
+func (f *FakeNATSConn) Close() {
 	f.Lock()
 	defer f.Unlock()
 
 	return
 }
 
-func (f *FakeApceraWrapper) Publish(subject string, payload []byte) error {
-	return f.PublishWithReplyTo(subject, "", payload)
+func (f *FakeNATSConn) Publish(subject string, payload []byte) error {
+	return f.PublishRequest(subject, "", payload)
 }
 
-func (f *FakeApceraWrapper) PublishWithReplyTo(subject, reply string, payload []byte) error {
+func (f *FakeNATSConn) PublishRequest(subject, reply string, payload []byte) error {
 	f.RLock()
 
 	injectedCallback, injected := f.whenPublishing[subject]
@@ -132,11 +120,11 @@ func (f *FakeApceraWrapper) PublishWithReplyTo(subject, reply string, payload []
 	return nil
 }
 
-func (f *FakeApceraWrapper) Subscribe(subject string, callback nats.MsgHandler) (*nats.Subscription, error) {
-	return f.SubscribeWithQueue(subject, "", callback)
+func (f *FakeNATSConn) Subscribe(subject string, callback nats.MsgHandler) (*nats.Subscription, error) {
+	return f.QueueSubscribe(subject, "", callback)
 }
 
-func (f *FakeApceraWrapper) SubscribeWithQueue(subject, queue string, callback nats.MsgHandler) (*nats.Subscription, error) {
+func (f *FakeNATSConn) QueueSubscribe(subject, queue string, callback nats.MsgHandler) (*nats.Subscription, error) {
 	f.RLock()
 
 	injectedCallback, injected := f.whenSubscribing[subject]
@@ -160,7 +148,7 @@ func (f *FakeApceraWrapper) SubscribeWithQueue(subject, queue string, callback n
 	return subscription, nil
 }
 
-func (f *FakeApceraWrapper) Unsubscribe(subscription *nats.Subscription) error {
+func (f *FakeNATSConn) Unsubscribe(subscription *nats.Subscription) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -173,7 +161,7 @@ func (f *FakeApceraWrapper) Unsubscribe(subscription *nats.Subscription) error {
 	return nil
 }
 
-func (f *FakeApceraWrapper) addSubscriptionHandler(subscription *nats.Subscription, handler nats.MsgHandler) {
+func (f *FakeNATSConn) addSubscriptionHandler(subscription *nats.Subscription, handler nats.MsgHandler) {
 	f.Lock()
 	subs := f.subscriptions[subscription.Subject]
 	if subs == nil {
@@ -184,13 +172,13 @@ func (f *FakeApceraWrapper) addSubscriptionHandler(subscription *nats.Subscripti
 	f.Unlock()
 }
 
-func (f *FakeApceraWrapper) WhenSubscribing(subject string, callback func(nats.MsgHandler) error) {
+func (f *FakeNATSConn) WhenSubscribing(subject string, callback func(nats.MsgHandler) error) {
 	f.Lock()
 	f.whenSubscribing[subject] = callback
 	f.Unlock()
 }
 
-func (f *FakeApceraWrapper) SubjectCallbacks(subject string) []nats.MsgHandler {
+func (f *FakeNATSConn) SubjectCallbacks(subject string) []nats.MsgHandler {
 	f.RLock()
 	values := make([]nats.MsgHandler, 0)
 	for _, v := range f.subscriptions[subject] {
@@ -200,7 +188,7 @@ func (f *FakeApceraWrapper) SubjectCallbacks(subject string) []nats.MsgHandler {
 
 	return values
 }
-func (f *FakeApceraWrapper) Subscriptions(subject string) []*nats.Subscription {
+func (f *FakeNATSConn) Subscriptions(subject string) []*nats.Subscription {
 	f.RLock()
 
 	keys := make([]*nats.Subscription, 0)
@@ -212,7 +200,7 @@ func (f *FakeApceraWrapper) Subscriptions(subject string) []*nats.Subscription {
 	return keys
 }
 
-func (f *FakeApceraWrapper) SubscriptionCount() int {
+func (f *FakeNATSConn) SubscriptionCount() int {
 	cnt := 0
 	f.RLock()
 	for _, subs := range f.subscriptions {
@@ -223,21 +211,21 @@ func (f *FakeApceraWrapper) SubscriptionCount() int {
 	return cnt
 }
 
-func (f *FakeApceraWrapper) WhenPublishing(subject string, callback func(*nats.Msg) error) {
+func (f *FakeNATSConn) WhenPublishing(subject string, callback func(*nats.Msg) error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.whenPublishing[subject] = callback
 }
 
-func (f *FakeApceraWrapper) PublishedMessages(subject string) []*nats.Msg {
+func (f *FakeNATSConn) PublishedMessages(subject string) []*nats.Msg {
 	f.RLock()
 	defer f.RUnlock()
 
 	return f.publishedMessages[subject]
 }
 
-func (f *FakeApceraWrapper) PublishedMessageCount() int {
+func (f *FakeNATSConn) PublishedMessageCount() int {
 	f.RLock()
 	defer f.RUnlock()
 
