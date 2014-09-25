@@ -36,29 +36,20 @@ var defaultNatsConfig = NatsConfig{
 }
 
 type LoggingConfig struct {
-	File   string `yaml:"file"`
-	Syslog string `yaml:"syslog"`
-	Level  string `yaml:"level"`
+	File               string `yaml:"file"`
+	Syslog             string `yaml:"syslog"`
+	Level              string `yaml:"level"`
+	LoggregatorEnabled bool   `yaml:"loggregator_enabled"`
 }
 
 var defaultLoggingConfig = LoggingConfig{
 	Level: "debug",
 }
 
-type LoggregatorConfig struct {
-	Url          string `yaml:"url"`
-	SharedSecret string `yaml:"shared_secret"`
-}
-
-var defaultLoggregatorConfig = LoggregatorConfig{
-	Url: "",
-}
-
 type Config struct {
-	Status            StatusConfig      `yaml:"status"`
-	Nats              []NatsConfig      `yaml:"nats"`
-	Logging           LoggingConfig     `yaml:"logging"`
-	LoggregatorConfig LoggregatorConfig `yaml:"loggregatorConfig"`
+	Status  StatusConfig  `yaml:"status"`
+	Nats    []NatsConfig  `yaml:"nats"`
+	Logging LoggingConfig `yaml:"logging"`
 
 	Port       uint16 `yaml:"port"`
 	Index      uint   `yaml:"index"`
@@ -86,10 +77,9 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	Status:            defaultStatusConfig,
-	Nats:              []NatsConfig{defaultNatsConfig},
-	Logging:           defaultLoggingConfig,
-	LoggregatorConfig: defaultLoggregatorConfig,
+	Status:  defaultStatusConfig,
+	Nats:    []NatsConfig{defaultNatsConfig},
+	Logging: defaultLoggingConfig,
 
 	Port:       8081,
 	Index:      0,

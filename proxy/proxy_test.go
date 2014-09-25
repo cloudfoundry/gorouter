@@ -58,7 +58,7 @@ var _ = Describe("Proxy", func() {
 		r = registry.NewRouteRegistry(conf, mbus)
 
 		accessLogFile = new(test_util.FakeFile)
-		accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, nil)
+		accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "")
 		go accessLog.Run()
 
 		p = NewProxy(ProxyArgs{

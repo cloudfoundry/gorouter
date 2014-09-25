@@ -1,36 +1,25 @@
 package access_log
 
 import (
-	"fmt"
 	"io"
 	"regexp"
-	"strconv"
 
-	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/emitter"
+	"github.com/cloudfoundry/dropsonde/autowire/logs"
 )
 
 type FileAndLoggregatorAccessLogger struct {
-	emitter emitter.Emitter
-	channel chan AccessLogRecord
-	stopCh  chan struct{}
-	writer  io.Writer
+	dropsondeSourceInstance string
+	channel                 chan AccessLogRecord
+	stopCh                  chan struct{}
+	writer                  io.Writer
 }
 
-func NewEmitter(loggregatorUrl, loggregatorSharedSecret string, index uint) (emitter.Emitter, error) {
-	if !isValidUrl(loggregatorUrl) {
-		return nil, fmt.Errorf("Invalid loggregator url %s", loggregatorUrl)
-	}
-	return emitter.NewEmitter(loggregatorUrl, "RTR", strconv.FormatUint(uint64(index), 10), loggregatorSharedSecret,
-		steno.NewLogger("router.loggregator"))
-}
-
-func NewFileAndLoggregatorAccessLogger(f io.Writer, e emitter.Emitter) *FileAndLoggregatorAccessLogger {
+func NewFileAndLoggregatorAccessLogger(f io.Writer, dropsondeSourceInstance string) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
-		emitter: e,
-		writer:  f,
-		channel: make(chan AccessLogRecord, 128),
-		stopCh:  make(chan struct{}),
+		dropsondeSourceInstance: dropsondeSourceInstance,
+		writer:                  f,
+		channel:                 make(chan AccessLogRecord, 128),
+		stopCh:                  make(chan struct{}),
 	}
 
 	return a
@@ -43,13 +32,22 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 			if x.writer != nil {
 				record.WriteTo(x.writer)
 			}
-			if x.emitter != nil && record.ApplicationId() != "" {
-				x.emitter.Emit(record.ApplicationId(), record.LogMessage())
+
+			if x.dropsondeSourceInstance != "" && record.ApplicationId() != "" {
+				logs.SendAppLog(record.ApplicationId(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
 			}
 		case <-x.stopCh:
 			return
 		}
 	}
+}
+
+func (x *FileAndLoggregatorAccessLogger) FileWriter() io.Writer {
+	return x.writer
+}
+
+func (x *FileAndLoggregatorAccessLogger) DropsondeSourceInstance() string {
+	return x.dropsondeSourceInstance
 }
 
 func (x *FileAndLoggregatorAccessLogger) Stop() {
