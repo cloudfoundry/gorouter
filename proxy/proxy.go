@@ -180,7 +180,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	proxyWriter := newProxyResponseWriter(responseWriter)
 	roundTripper := &proxyRoundTripper{
-		transport: p.transport,
+		transport: autowire.InstrumentedRoundTripper(p.transport),
 		iter:      iter,
 		handler:   &handler,
 
@@ -213,9 +213,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 		},
 	}
-	proxyTransport := autowire.InstrumentedRoundTripper(roundTripper)
 
-	p.newReverseProxy(proxyTransport, request).ServeHTTP(proxyWriter, request)
+	p.newReverseProxy(roundTripper, request).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = int64(proxyWriter.Size())

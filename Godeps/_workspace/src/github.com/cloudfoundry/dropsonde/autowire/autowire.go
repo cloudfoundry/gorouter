@@ -33,12 +33,11 @@ var autowiredEmitter emitter.EventEmitter
 
 const runtimeStatsInterval = 10 * time.Second
 
-var destination string
-
 const DefaultDestination = "localhost:3457"
 
 func init() {
-	Initialize()
+	emitter, _ := CreateDefaultEmitter()
+	Initialize(emitter)
 }
 
 // InstrumentedHandler returns a Handler pre-configured to emit HTTP server
@@ -53,10 +52,6 @@ func InstrumentedRoundTripper(roundTripper http.RoundTripper) http.RoundTripper 
 	return dropsonde.InstrumentedRoundTripper(roundTripper, autowiredEmitter)
 }
 
-func Destination() string {
-	return destination
-}
-
 // Initialize creates default emitters and instruments the default HTTP
 // transport.
 //
@@ -66,17 +61,28 @@ func Destination() string {
 //
 // The DROPSONDE_DESTINATION environment variable sets the host and port to
 // which metrics are sent. It is optional, and defaults to DefaultDestination.
-func Initialize() {
+func Initialize(emitter emitter.EventEmitter) {
 	http.DefaultTransport = &http.Transport{Proxy: http.ProxyFromEnvironment}
-	autowiredEmitter = &nullEventEmitter{}
-
-	origin := os.Getenv("DROPSONDE_ORIGIN")
-	if len(origin) == 0 {
-		log.Println("Failed to auto-initialize dropsonde: DROPSONDE_ORIGIN environment variable not set")
+	if emitter == nil {
+		autowiredEmitter = &nullEventEmitter{}
 		return
 	}
 
-	destination = os.Getenv("DROPSONDE_DESTINATION")
+	autowiredEmitter = emitter
+
+	go runtime_stats.NewRuntimeStats(autowiredEmitter, runtimeStatsInterval).Run(nil)
+
+	http.DefaultTransport = InstrumentedRoundTripper(http.DefaultTransport)
+}
+
+func CreateDefaultEmitter() (emitter.EventEmitter, string) {
+	origin := os.Getenv("DROPSONDE_ORIGIN")
+	if len(origin) == 0 {
+		log.Println("Failed to auto-initialize dropsonde: DROPSONDE_ORIGIN environment variable not set")
+		return nil, ""
+	}
+
+	destination := os.Getenv("DROPSONDE_DESTINATION")
 	if len(destination) == 0 {
 		log.Println("DROPSONDE_DESTINATION not set. Using " + DefaultDestination)
 		destination = DefaultDestination
@@ -85,20 +91,16 @@ func Initialize() {
 	udpEmitter, err := emitter.NewUdpEmitter(destination)
 	if err != nil {
 		log.Printf("Failed to auto-initialize dropsonde: %v\n", err)
-		return
+		return nil, destination
 	}
 
 	hbEmitter, err := emitter.NewHeartbeatEmitter(udpEmitter, origin)
 	if err != nil {
 		log.Printf("Failed to auto-initialize dropsonde: %v\n", err)
-		return
+		return nil, destination
 	}
 
-	autowiredEmitter = emitter.NewEventEmitter(hbEmitter, origin)
-
-	go runtime_stats.NewRuntimeStats(autowiredEmitter, runtimeStatsInterval).Run(nil)
-
-	http.DefaultTransport = InstrumentedRoundTripper(http.DefaultTransport)
+	return emitter.NewEventEmitter(hbEmitter, origin), destination
 }
 
 func AutowiredEmitter() emitter.EventEmitter {

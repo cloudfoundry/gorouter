@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde/emitter/fake"
+	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/config"
@@ -495,6 +498,37 @@ var _ = Describe("Proxy", func() {
 		var answer string
 		Eventually(done).Should(Receive(&answer))
 		Ω(answer).To(Equal("fake-instance-id"))
+
+		x.ReadResponse()
+	})
+
+	It("emits HTTP start events", func() {
+		ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
+		}, "fake-instance-id")
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		fakeEmitter := fake.NewFakeEventEmitter("fake")
+		autowire.Initialize(fakeEmitter)
+
+		req := x.NewRequest("GET", "/", nil)
+		req.Host = "app"
+		x.WriteRequest(req)
+
+		findStartEvent := func() *events.HttpStart {
+			for _, event := range fakeEmitter.GetEvents() {
+				startEvent, ok := event.(*events.HttpStart)
+				if ok {
+					return startEvent
+				}
+			}
+
+			return nil
+		}
+
+		Eventually(findStartEvent).ShouldNot(BeNil())
+		Expect(findStartEvent().GetInstanceId()).To(Equal("fake-instance-id"))
 
 		x.ReadResponse()
 	})

@@ -131,6 +131,7 @@ var _ = Describe("Router Integration", func() {
 			Ω(waitAppRegistered(routesUri, longApp, 2*time.Second)).To(BeTrue())
 
 			go func() {
+				defer GinkgoRecover()
 				resp, err := http.Get(longApp.Endpoint())
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resp.StatusCode).Should(Equal(http.StatusNoContent))
