@@ -57,6 +57,35 @@ var _ = Describe("Component", func() {
 		Ω(code).Should(Equal(401))
 	})
 
+	It("allows multiple info routes", func() {
+		path1 := "/test1"
+		path2 := "/test2"
+
+		component.InfoRoutes = map[string]json.Marshaler{
+			path1: &MarshalableValue{Value: map[string]string{"key": "value1"}},
+			path2: &MarshalableValue{Value: map[string]string{"key": "value2"}},
+		}
+		serveComponent(component)
+
+		//access path1
+		req := buildGetRequest(component, path1)
+		req.SetBasicAuth("username", "password")
+
+		code, header, body := doGetRequest(req)
+		Ω(code).Should(Equal(200))
+		Ω(header.Get("Content-Type")).Should(Equal("application/json"))
+		Ω(body).Should(Equal(`{"key":"value1"}` + "\n"))
+
+		//access path2
+		req = buildGetRequest(component, path2)
+		req.SetBasicAuth("username", "password")
+
+		code, header, body = doGetRequest(req)
+		Ω(code).Should(Equal(200))
+		Ω(header.Get("Content-Type")).Should(Equal("application/json"))
+		Ω(body).Should(Equal(`{"key":"value2"}` + "\n"))
+	})
+
 	It("allows authorized access", func() {
 		path := "/test"
 

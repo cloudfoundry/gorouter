@@ -166,13 +166,14 @@ func (c *VcapComponent) ListenAndServe() {
 	})
 
 	for path, marshaler := range c.InfoRoutes {
+		m := marshaler
 		hs.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Connection", "close")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 
 			enc := json.NewEncoder(w)
-			enc.Encode(marshaler)
+			enc.Encode(m)
 		})
 	}
 
