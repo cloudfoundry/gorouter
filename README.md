@@ -110,7 +110,8 @@ gorouter
 When gorouter starts, it sends `router.start`. This message contains an
 interval that other components should then send `router.register` on. If they
 do not send a `router.register` for an amount of time considered "stale" by the
-router, the routes are pruned. The default "staleness" is 2 minutes.
+router, the routes are pruned. The default "staleness" is 2 minutes. The staleness
+field (minimumRegisterIntervalInSeconds) is guaranteed to be an integer value. 
 
 The format of this message is as follows:
 
