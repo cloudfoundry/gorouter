@@ -21,6 +21,7 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	c.PruneStaleDropletsInterval = 0
 	c.DropletStaleThreshold = 0
 	c.PublishActiveAppsInterval = 0
+	c.Zone = "z1"
 
 	c.EndpointTimeout = 500 * time.Millisecond
 
@@ -40,8 +41,10 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	}
 
 	c.Logging = config.LoggingConfig{
-		File:  "/dev/stdout",
-		Level: "info",
+		File:          "/dev/stdout",
+		Level:         "info",
+		MetronAddress: "localhost:3457",
+		JobName:       "router_test_z1_0",
 	}
 
 	return c

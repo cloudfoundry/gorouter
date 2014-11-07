@@ -1,10 +1,17 @@
 package emitter_test
 
 import (
+	"net"
+	"sync"
+
+	"code.google.com/p/gogoprotobuf/proto"
+	"github.com/cloudfoundry/dropsonde/control"
 	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/dropsonde/factories"
+	uuid "github.com/nu7hatch/gouuid"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"net"
 )
 
 var _ = Describe("UdpEmitter", func() {
@@ -105,4 +112,82 @@ var _ = Describe("UdpEmitter", func() {
 			})
 		})
 	})
+
+	Describe("ListenForHeartbeatRequest", func() {
+		var timesCalled int
+		var lastControlMessage *control.ControlMessage
+		var lock sync.Mutex
+
+		var fakeResponder = func(controlMessage *control.ControlMessage) {
+			lock.Lock()
+			defer lock.Unlock()
+			timesCalled++
+			lastControlMessage = controlMessage
+		}
+
+		var getTimesCalled = func() int {
+			lock.Lock()
+			defer lock.Unlock()
+			return timesCalled
+		}
+
+		var getReceivedHeartbeatRequest = func() *control.ControlMessage {
+			lock.Lock()
+			defer lock.Unlock()
+
+			return lastControlMessage
+		}
+
+		BeforeEach(func() {
+			lock = sync.Mutex{}
+			timesCalled = 0
+		})
+
+		It("calls responder with the correct heartbeat request when when heartbeat is requested", func() {
+			emitter, _ := emitter.NewUdpEmitter("localhost:123")
+			go emitter.ListenForHeartbeatRequest(fakeResponder)
+
+			Expect(timesCalled).To(BeZero())
+
+			heartbeatRequest := newHeartbeatRequest()
+
+			sendHeartbeatRequest(emitter.Address(), heartbeatRequest)
+			Eventually(getTimesCalled).Should(Equal(1))
+			Expect(getReceivedHeartbeatRequest()).To(Equal(heartbeatRequest))
+		})
+
+		It("responds to multiple heartbeat requests", func() {
+			emitter, _ := emitter.NewUdpEmitter("localhost:123")
+			go emitter.ListenForHeartbeatRequest(fakeResponder)
+			sendHeartbeatRequest(emitter.Address(), newHeartbeatRequest())
+			sendHeartbeatRequest(emitter.Address(), newHeartbeatRequest())
+
+			Eventually(getTimesCalled).Should(Equal(2))
+		})
+
+		It("returns an error if listening on the UDP port fails", func() {
+			emitter, _ := emitter.NewUdpEmitter("localhost:123")
+			emitter.Close()
+			err := emitter.ListenForHeartbeatRequest(fakeResponder)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("use of closed network connection"))
+		})
+	})
 })
+
+func sendHeartbeatRequest(addr net.Addr, message *control.ControlMessage) {
+	encodedMessage, _ := proto.Marshal(message)
+	conn, _ := net.ListenPacket("udp4", "")
+	conn.WriteTo(encodedMessage, addr)
+}
+
+func newHeartbeatRequest() *control.ControlMessage {
+	id, _ := uuid.NewV4()
+
+	return &control.ControlMessage{
+		Origin:      proto.String("test"),
+		Identifier:  factories.NewControlUUID(id),
+		Timestamp:   proto.Int64(0),
+		ControlType: control.ControlMessage_HeartbeatRequest.Enum(),
+	}
+}

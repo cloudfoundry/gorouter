@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"encoding/binary"
 	"fmt"
+	"github.com/cloudfoundry/dropsonde/control"
 	"github.com/cloudfoundry/dropsonde/events"
 	uuid "github.com/nu7hatch/gouuid"
 	"net/http"
@@ -13,6 +14,10 @@ import (
 
 func NewUUID(id *uuid.UUID) *events.UUID {
 	return &events.UUID{Low: proto.Uint64(binary.LittleEndian.Uint64(id[:8])), High: proto.Uint64(binary.LittleEndian.Uint64(id[8:]))}
+}
+
+func NewControlUUID(id *uuid.UUID) *control.UUID {
+	return &control.UUID{Low: proto.Uint64(binary.LittleEndian.Uint64(id[:8])), High: proto.Uint64(binary.LittleEndian.Uint64(id[8:]))}
 }
 
 func NewHttpStart(req *http.Request, peerType events.PeerType, requestId *uuid.UUID) *events.HttpStart {

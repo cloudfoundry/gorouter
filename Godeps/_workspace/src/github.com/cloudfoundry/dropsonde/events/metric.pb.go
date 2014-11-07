@@ -11,6 +11,7 @@ import math "math"
 var _ = proto.Marshal
 var _ = math.Inf
 
+// / A ValueMetric indicates the value of a metric at an instant in time.
 type ValueMetric struct {
 	Name             *string  `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	Value            *float64 `protobuf:"fixed64,2,req,name=value" json:"value,omitempty"`
@@ -43,6 +44,7 @@ func (m *ValueMetric) GetUnit() string {
 	return ""
 }
 
+// / A CounterEvent represents the increment of a counter. It contains only the change in the value; it is the responsibility of downstream consumers to maintain the value of the counter.
 type CounterEvent struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	Delta            *uint64 `protobuf:"varint,2,req,name=delta" json:"delta,omitempty"`

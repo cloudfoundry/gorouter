@@ -1,6 +1,8 @@
 package emitter
 
 import (
+	"code.google.com/p/gogoprotobuf/proto"
+	"github.com/cloudfoundry/dropsonde/control"
 	"net"
 )
 
@@ -31,4 +33,26 @@ func (e *udpEmitter) Emit(data []byte) error {
 
 func (e *udpEmitter) Close() {
 	e.udpConn.Close()
+}
+
+func (e *udpEmitter) Address() net.Addr {
+	return e.udpConn.LocalAddr()
+}
+
+func (e *udpEmitter) ListenForHeartbeatRequest(responder func(*control.ControlMessage)) error {
+	buf := make([]byte, 1024)
+	for {
+		n, _, err := e.udpConn.ReadFrom(buf)
+		if err != nil {
+			return err
+		}
+
+		controlMessage := &control.ControlMessage{}
+		err = proto.Unmarshal(buf[:n], controlMessage)
+		if err != nil {
+			return err
+		}
+
+		responder(controlMessage)
+	}
 }

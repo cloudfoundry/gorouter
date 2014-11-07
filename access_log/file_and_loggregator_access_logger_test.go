@@ -1,8 +1,8 @@
 package access_log_test
 
 import (
-	"github.com/cloudfoundry/dropsonde/autowire/logs"
 	"github.com/cloudfoundry/dropsonde/log_sender/fake"
+	"github.com/cloudfoundry/dropsonde/logs"
 	. "github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test_util"
@@ -18,7 +18,7 @@ import (
 var _ = Describe("AccessLog", func() {
 
 	Context("with a dropsonde source instance", func() {
-		It("logs to dropsonde autowire", func() {
+		It("logs to dropsonde", func() {
 
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)

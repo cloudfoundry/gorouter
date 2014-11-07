@@ -1,4 +1,4 @@
-package dropsonde
+package instrumented_round_tripper
 
 import (
 	"github.com/cloudfoundry/dropsonde/emitter"
@@ -64,3 +64,5 @@ func (irt *instrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 
 	return resp, roundTripErr
 }
+
+var GenerateUuid = uuid.NewV4

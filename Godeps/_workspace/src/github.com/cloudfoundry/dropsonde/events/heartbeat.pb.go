@@ -11,11 +11,13 @@ import math "math"
 var _ = proto.Marshal
 var _ = math.Inf
 
+// / A Heartbeat event both indicates liveness of the emitter, and communicates counts of events processed.
 type Heartbeat struct {
-	SentCount        *uint64 `protobuf:"varint,1,req,name=sentCount" json:"sentCount,omitempty"`
-	ReceivedCount    *uint64 `protobuf:"varint,2,req,name=receivedCount" json:"receivedCount,omitempty"`
-	ErrorCount       *uint64 `protobuf:"varint,3,req,name=errorCount" json:"errorCount,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	SentCount                *uint64 `protobuf:"varint,1,req,name=sentCount" json:"sentCount,omitempty"`
+	ReceivedCount            *uint64 `protobuf:"varint,2,req,name=receivedCount" json:"receivedCount,omitempty"`
+	ErrorCount               *uint64 `protobuf:"varint,3,req,name=errorCount" json:"errorCount,omitempty"`
+	ControlMessageIdentifier *UUID   `protobuf:"bytes,4,opt,name=controlMessageIdentifier" json:"controlMessageIdentifier,omitempty"`
+	XXX_unrecognized         []byte  `json:"-"`
 }
 
 func (m *Heartbeat) Reset()         { *m = Heartbeat{} }
@@ -41,6 +43,13 @@ func (m *Heartbeat) GetErrorCount() uint64 {
 		return *m.ErrorCount
 	}
 	return 0
+}
+
+func (m *Heartbeat) GetControlMessageIdentifier() *UUID {
+	if m != nil {
+		return m.ControlMessageIdentifier
+	}
+	return nil
 }
 
 func init() {

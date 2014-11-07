@@ -2,9 +2,11 @@ package emitter_test
 
 import (
 	"errors"
+
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

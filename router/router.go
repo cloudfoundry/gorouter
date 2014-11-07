@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/apcera/nats"
-	"github.com/cloudfoundry/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
@@ -112,7 +112,7 @@ func (r *Router) Run() <-chan error {
 	}
 
 	server := http.Server{
-		Handler: autowire.InstrumentedHandler(r.proxy),
+		Handler: dropsonde.InstrumentedHandler(r.proxy),
 	}
 
 	errChan := make(chan error, 1)

@@ -3,11 +3,10 @@
 //
 // Use
 //
-// See the documentation for package autowire for details on configuring through
-// environment variables.
+// See the documentation for package dropsonde for configuration details.
 //
-// Import the package (note that you do not need to additionally import
-// autowire). The package self-initializes; to send metrics use
+// Importing package dropsonde and initializing will initial this package.
+// To send metrics use
 //
 //		metrics.SendValue(name, value, unit)
 //
@@ -21,20 +20,12 @@
 package metrics
 
 import (
-	"github.com/cloudfoundry/dropsonde/autowire"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 )
 
 var metricSender metric_sender.MetricSender
 
-func init() {
-	Initialize(metric_sender.NewMetricSender(autowire.AutowiredEmitter()))
-}
-
-// Initialize prepares the metrics package for use with the automatic Emitter
-// from dropsonde/autowire. This function is called by the package's init
-// method, so should only be explicitly called to reset the default
-// MetricSender, e.g. in tests.
+// Initialize prepares the metrics package for use with the automatic Emitter.
 func Initialize(ms metric_sender.MetricSender) {
 	metricSender = ms
 }
@@ -42,6 +33,9 @@ func Initialize(ms metric_sender.MetricSender) {
 // SendValue sends a value event for the named metric. See
 // http://metrics20.org/spec/#units for the specifications on allowed units.
 func SendValue(name string, value float64, unit string) error {
+	if metricSender == nil {
+		return nil
+	}
 	return metricSender.SendValue(name, value, unit)
 }
 
@@ -49,6 +43,9 @@ func SendValue(name string, value float64, unit string) error {
 // Maintaining the value of the counter is the responsibility of the receiver of
 // the event, not the process that includes this package.
 func IncrementCounter(name string) error {
+	if metricSender == nil {
+		return nil
+	}
 	return metricSender.IncrementCounter(name)
 }
 
@@ -56,5 +53,8 @@ func IncrementCounter(name string) error {
 // (positive) delta. Maintaining the value of the counter is the responsibility
 // of the receiver, as with IncrementCounter.
 func AddToCounter(name string, delta uint64) error {
+	if metricSender == nil {
+		return nil
+	}
 	return metricSender.AddToCounter(name, delta)
 }

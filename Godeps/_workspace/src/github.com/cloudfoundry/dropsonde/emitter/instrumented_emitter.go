@@ -2,9 +2,10 @@ package emitter
 
 import (
 	"errors"
+	"sync"
+
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
-	"sync"
 )
 
 type InstrumentedEmitter interface {

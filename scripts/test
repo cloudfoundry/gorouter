@@ -2,9 +2,6 @@
 
 set -e -x -u
 
-
-export DROPSONDE_ORIGIN="gorouter_test/0"
-
 function printStatus {
       if [ $? -eq 0 ]; then
           echo -e "\nSWEET SUITE SUCCESS"

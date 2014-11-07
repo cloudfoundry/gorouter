@@ -1,4 +1,4 @@
-package dropsonde
+package instrumented_handler
 
 import (
 	"bufio"
