@@ -90,7 +90,7 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
 		e := p.endpoints[i]
 
 		staleTime := now.Add(-defaultThreshold)
-		if e.endpoint.staleThresholdInSeconds > 0 {
+		if e.endpoint.staleThresholdInSeconds > 0 && e.endpoint.staleThresholdInSeconds < int(defaultThreshold.Seconds()) {
 			staleTime = now.Add(time.Duration(-e.endpoint.staleThresholdInSeconds) * time.Second)
 		}
 

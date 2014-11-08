@@ -1,6 +1,7 @@
 package route_test
 
 import (
+	"fmt"
 	. "github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -80,7 +81,23 @@ var _ = Describe("Pool", func() {
 
 	Context("PruneEndpoints", func() {
 		defaultThreshold := 1 * time.Minute
+
 		Context("when an endpoint has a custom stale time", func() {
+			Context("when custom stale threshold is greater than default threshold", func() {
+				It("prunes the endpoint", func() {
+					customThreshold := int(defaultThreshold.Seconds()) + 20
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, customThreshold)
+					pool.Put(e1)
+
+					updateTime, _ := time.ParseDuration(fmt.Sprintf("%ds", customThreshold-10))
+					pool.MarkUpdated(time.Now().Add(-updateTime))
+
+					Ω(pool.IsEmpty()).To(Equal(false))
+					pool.PruneEndpoints(defaultThreshold)
+					Ω(pool.IsEmpty()).To(Equal(true))
+				})
+			})
+
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
 					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20)
