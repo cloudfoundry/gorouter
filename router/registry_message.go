@@ -5,15 +5,16 @@ import (
 )
 
 type registryMessage struct {
-	Host string            `json:"host"`
-	Port uint16            `json:"port"`
-	Uris []route.Uri       `json:"uris"`
-	Tags map[string]string `json:"tags"`
-	App  string            `json:"app"`
+	Host                    string            `json:"host"`
+	Port                    uint16            `json:"port"`
+	Uris                    []route.Uri       `json:"uris"`
+	Tags                    map[string]string `json:"tags"`
+	App                     string            `json:"app"`
+	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
 	PrivateInstanceId string `json:"private_instance_id"`
 }
 
 func (rm *registryMessage) makeEndpoint() *route.Endpoint {
-	return route.NewEndpoint(rm.App, rm.Host, rm.Port, rm.PrivateInstanceId, rm.Tags)
+	return route.NewEndpoint(rm.App, rm.Host, rm.Port, rm.PrivateInstanceId, rm.Tags, rm.StaleThresholdInSeconds)
 }

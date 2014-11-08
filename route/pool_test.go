@@ -31,8 +31,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
-			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
+			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
 
 			pool.Put(endpoint1)
 			Ω(pool.Put(endpoint2)).Should(BeFalse())
@@ -78,58 +78,89 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
-	Context("PruneBefore", func() {
-		It("prunes endpoints that haven't been updated", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
-			pool.Put(e1)
-			pool.Put(e2)
+	Context("PruneEndpoints", func() {
+		defaultThreshold := 1 * time.Minute
+		Context("when an endpoint has a custom stale time", func() {
+			Context("and it has passed the stale threshold", func() {
+				It("prunes the endpoint", func() {
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20)
 
-			t := time.Now().Add(1 * time.Second)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeTrue())
+					pool.Put(e1)
+					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
+
+					Ω(pool.IsEmpty()).To(Equal(false))
+					pool.PruneEndpoints(defaultThreshold)
+					Ω(pool.IsEmpty()).To(Equal(true))
+				})
+			})
+
+			Context("and it has not passed the stale threshold", func() {
+				It("does NOT prune the endpoint", func() {
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20)
+
+					pool.Put(e1)
+					pool.MarkUpdated(time.Now())
+
+					Ω(pool.IsEmpty()).To(Equal(false))
+					pool.PruneEndpoints(defaultThreshold)
+					Ω(pool.IsEmpty()).To(Equal(false))
+				})
+
+			})
 		})
 
-		It("does not prune updated endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
-			pool.Put(e1)
-			pool.Put(e2)
+		Context("when an endpoint does NOT have a custom stale time", func() {
+			Context("and it has passed the stale threshold", func() {
+				It("prunes the endpoint", func() {
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
 
-			t := time.Now().Add(-1 * time.Second)
-			pool.PruneBefore(t)
-			Ω(pool.IsEmpty()).Should(BeFalse())
+					pool.Put(e1)
+					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
 
-			iter := pool.Endpoints("")
-			n1 := iter.Next()
-			n2 := iter.Next()
-			Ω(n1).ShouldNot(Equal(n2))
+					Ω(pool.IsEmpty()).To(Equal(false))
+					pool.PruneEndpoints(defaultThreshold)
+					Ω(pool.IsEmpty()).To(Equal(true))
+				})
+			})
+
+			Context("and it has not passed the stale threshold", func() {
+				It("does NOT prune the endpoint", func() {
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+
+					pool.Put(e1)
+					pool.MarkUpdated(time.Now())
+
+					Ω(pool.IsEmpty()).To(Equal(false))
+					pool.PruneEndpoints(defaultThreshold)
+					Ω(pool.IsEmpty()).To(Equal(false))
+				})
+			})
 		})
 	})
 
 	Context("MarkUpdated", func() {
 		It("updates all endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
 
 			pool.Put(e1)
 
-			t := time.Time{}.Add(1 * time.Second)
-			pool.PruneBefore(t)
+			threshold := 1 * time.Second
+			pool.PruneEndpoints(threshold)
 			Ω(pool.IsEmpty()).Should(BeFalse())
 
-			pool.MarkUpdated(t)
-			pool.PruneBefore(t)
+			pool.MarkUpdated(time.Now())
+			pool.PruneEndpoints(threshold)
 			Ω(pool.IsEmpty()).Should(BeFalse())
 
-			pool.PruneBefore(t.Add(1 * time.Microsecond))
+			pool.PruneEndpoints(0)
 			Ω(pool.IsEmpty()).Should(BeTrue())
 		})
 	})
 
 	Context("Each", func() {
 		It("applies a function to each endpoint", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -144,7 +175,7 @@ var _ = Describe("Pool", func() {
 	})
 
 	It("marshals json", func() {
-		e := NewEndpoint("", "1.2.3.4", 5678, "", nil)
+		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
 		pool.Put(e)
 
 		json, err := pool.MarshalJSON()

@@ -31,19 +31,19 @@ var _ = Describe("RouteRegistry", func() {
 			"id1", map[string]string{
 				"runtime":   "ruby18",
 				"framework": "sinatra",
-			})
+			}, -1)
 
 		barEndpoint = route.NewEndpoint("54321", "192.168.1.2", 4321,
 			"id2", map[string]string{
 				"runtime":   "javascript",
 				"framework": "node",
-			})
+			}, -1)
 
 		bar2Endpoint = route.NewEndpoint("54321", "192.168.1.3", 1234,
 			"id3", map[string]string{
 				"runtime":   "javascript",
 				"framework": "node",
-			})
+			}, -1)
 	})
 
 	Context("Register", func() {
@@ -76,8 +76,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("ignores case", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil, -1)
 
 			r.Register("foo", m1)
 			r.Register("FOO", m2)
@@ -86,8 +86,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("allows multiple uris for the same endpoint", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 
 			r.Register("foo", m1)
 			r.Register("bar", m2)
@@ -121,8 +121,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("ignores uri case and matches endpoint", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 
 			r.Register("foo", m1)
 			r.Unregister("FOO", m2)
@@ -131,8 +131,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("removes the specific url/endpoint combo", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 
 			r.Register("foo", m1)
 			r.Register("bar", m1)
@@ -145,7 +145,7 @@ var _ = Describe("RouteRegistry", func() {
 
 	Context("Lookup", func() {
 		It("case insensitive lookup", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 
 			r.Register("foo", m)
 
@@ -158,8 +158,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("selects one of the routes", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil, -1)
 
 			r.Register("bar", m1)
 			r.Register("barr", m1)
@@ -201,7 +201,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("skips fresh droplets", func() {
-			endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+			endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 
 			r.Register("foo", endpoint)
 			r.Register("bar", endpoint)
@@ -307,7 +307,7 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	It("marshals", func() {
-		m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil)
+		m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
 		r.Register("foo", m)
 
 		marshalled, err := json.Marshal(r)

@@ -45,7 +45,7 @@ var _ = Describe("AccessLog", func() {
 
 			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43")
 
-			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil)
+			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1)
 
 			accessLogRecord := CreateAccessLogRecord()
 			accessLogRecord.RouteEndpoint = routeEndpoint
@@ -112,7 +112,7 @@ func CreateAccessLogRecord() *AccessLogRecord {
 		StatusCode: http.StatusOK,
 	}
 
-	b := route.NewEndpoint("my_awesome_id", "127.0.0.1", 4567, "", nil)
+	b := route.NewEndpoint("my_awesome_id", "127.0.0.1", 4567, "", nil, -1)
 
 	r := AccessLogRecord{
 		Request:       req,

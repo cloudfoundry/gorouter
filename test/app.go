@@ -83,6 +83,7 @@ func (a *TestApp) Register() {
 		Tags: a.tags,
 		Dea:  "dea",
 		App:  "0",
+		StaleThresholdInSeconds: 1,
 
 		PrivateInstanceId: uuid,
 	}
@@ -153,6 +154,7 @@ type registerMessage struct {
 	Tags map[string]string `json:"tags"`
 	Dea  string            `json:"dea"`
 	App  string            `json:"app"`
+	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
 	PrivateInstanceId string `json:"private_instance_id"`
 }

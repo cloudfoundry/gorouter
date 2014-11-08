@@ -993,7 +993,7 @@ func registerAddr(r *registry.RouteRegistry, u string, a net.Addr, instanceId st
 	x, err := strconv.Atoi(p)
 	Ω(err).NotTo(HaveOccurred())
 
-	r.Register(route.Uri(u), route.NewEndpoint("", h, uint16(x), instanceId, nil))
+	r.Register(route.Uri(u), route.NewEndpoint("", h, uint16(x), instanceId, nil, -1))
 }
 
 func registerHandler(r *registry.RouteRegistry, u string, h connHandler) net.Listener {

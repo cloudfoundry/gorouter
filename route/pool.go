@@ -80,6 +80,31 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 	return !found
 }
 
+func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
+	p.lock.Lock()
+
+	last := len(p.endpoints)
+	now := time.Now()
+
+	for i := 0; i < last; {
+		e := p.endpoints[i]
+
+		staleTime := now.Add(-defaultThreshold)
+		if e.endpoint.staleThresholdInSeconds > 0 {
+			staleTime = now.Add(time.Duration(-e.endpoint.staleThresholdInSeconds) * time.Second)
+		}
+
+		if e.updated.Before(staleTime) {
+			p.removeEndpoint(e)
+			last--
+		} else {
+			i++
+		}
+	}
+
+	p.lock.Unlock()
+}
+
 func (p *Pool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 
@@ -180,23 +205,6 @@ func (p *Pool) IsEmpty() bool {
 	p.lock.Unlock()
 
 	return l == 0
-}
-
-func (p *Pool) PruneBefore(t time.Time) {
-	p.lock.Lock()
-
-	last := len(p.endpoints)
-	for i := 0; i < last; {
-		e := p.endpoints[i]
-		if e.updated.Before(t) {
-			p.removeEndpoint(e)
-			last--
-		} else {
-			i++
-		}
-	}
-
-	p.lock.Unlock()
 }
 
 func (p *Pool) MarkUpdated(t time.Time) {

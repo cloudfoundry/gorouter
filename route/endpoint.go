@@ -6,12 +6,13 @@ import (
 )
 
 func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
-	tags map[string]string) *Endpoint {
+	tags map[string]string, staleThresholdInSeconds int) *Endpoint {
 	return &Endpoint{
 		ApplicationId:     appId,
 		addr:              fmt.Sprintf("%s:%d", host, port),
 		Tags:              tags,
 		PrivateInstanceId: privateInstanceId,
+		staleThresholdInSeconds: staleThresholdInSeconds,
 	}
 }
 
@@ -20,6 +21,7 @@ type Endpoint struct {
 	addr              string
 	Tags              map[string]string
 	PrivateInstanceId string
+	staleThresholdInSeconds int
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {

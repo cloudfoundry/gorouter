@@ -165,9 +165,8 @@ func (r *RouteRegistry) isStateStale() bool {
 
 func (r *RouteRegistry) pruneStaleDroplets() {
 	r.Lock()
-	pruneTime := time.Now().Add(-r.dropletStaleThreshold)
 	for k, pool := range r.byUri {
-		pool.PruneBefore(pruneTime)
+		pool.PruneEndpoints(r.dropletStaleThreshold)
 		if pool.IsEmpty() {
 			delete(r.byUri, k)
 		}
