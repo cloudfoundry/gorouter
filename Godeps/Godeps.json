@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/cloudfoundry/gorouter",
-	"GoVersion": "go1.3.1",
+	"GoVersion": "go1.3.3",
 	"Packages": [
 		"./..."
 	],
@@ -16,7 +16,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
-			"Rev": "39fb5c673e898bc3343f306217f91f485c40a831"
+			"Rev": "150e4e8f749b21a7f0de8e3cfd885143fcea6b32"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
@@ -29,7 +29,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "bd07e7d4d8580e6b5bc37825c8f3276f9a324175"
+			"Rev": "de79b69f590594db2b9771018784c55251d5e7e7"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
@@ -41,17 +41,17 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.1.0-11-ge809316",
-			"Rev": "e8093161dcbdab0a59dfe56f3f8c867d243ac75f"
+			"Comment": "v1.1.0-24-g7891f86",
+			"Rev": "7891f8646dc62f4e32642ba332bbe7cf0097d8c5"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Comment": "v1.0-12-g3ca2515",
-			"Rev": "3ca2515afb00bc39bc77d27cdbce85a7caaf103e"
+			"Comment": "v1.0-23-g2cd6d99",
+			"Rev": "2cd6d99ccf3ac7ae8398d8296429161bf7061ae2"
 		},
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
-			"Rev": "dc42d45218778850334afa8c0758e3e00ebf6f22"
+			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
 		}
 	]
 }

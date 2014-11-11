@@ -18,7 +18,7 @@ var natsCommand *exec.Cmd
 type NATSRunner struct {
 	port        int
 	natsSession *gexec.Session
-	natsUrls []string
+	natsUrls    []string
 	MessageBus  yagnats.NATSConn
 }
 

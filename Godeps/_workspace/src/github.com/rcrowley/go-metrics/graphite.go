@@ -45,6 +45,13 @@ func GraphiteWithConfig(c GraphiteConfig) {
 	}
 }
 
+// GraphiteOnce performs a single submission to Graphite, returning a
+// non-nil error on failed connections. This can be used in a loop
+// similar to GraphiteWithConfig for custom error handling.
+func GraphiteOnce(c GraphiteConfig) error {
+	return graphite(&c)
+}
+
 func graphite(c *GraphiteConfig) error {
 	now := time.Now().Unix()
 	du := float64(c.DurationUnit)
@@ -85,10 +92,10 @@ func graphite(c *GraphiteConfig) error {
 			t := metric.Snapshot()
 			ps := t.Percentiles(c.Percentiles)
 			fmt.Fprintf(w, "%s.%s.count %d %d\n", c.Prefix, name, t.Count(), now)
-			fmt.Fprintf(w, "%s.%s.min %d %d\n", c.Prefix, name, int64(du)*t.Min(), now)
-			fmt.Fprintf(w, "%s.%s.max %d %d\n", c.Prefix, name, int64(du)*t.Max(), now)
-			fmt.Fprintf(w, "%s.%s.mean %.2f %d\n", c.Prefix, name, du*t.Mean(), now)
-			fmt.Fprintf(w, "%s.%s.std-dev %.2f %d\n", c.Prefix, name, du*t.StdDev(), now)
+			fmt.Fprintf(w, "%s.%s.min %d %d\n", c.Prefix, name, t.Min()/int64(du), now)
+			fmt.Fprintf(w, "%s.%s.max %d %d\n", c.Prefix, name, t.Max()/int64(du), now)
+			fmt.Fprintf(w, "%s.%s.mean %.2f %d\n", c.Prefix, name, t.Mean()/du, now)
+			fmt.Fprintf(w, "%s.%s.std-dev %.2f %d\n", c.Prefix, name, t.StdDev()/du, now)
 			for psIdx, psKey := range c.Percentiles {
 				key := strings.Replace(strconv.FormatFloat(psKey*100.0, 'f', -1, 64), ".", "", 1)
 				fmt.Fprintf(w, "%s.%s.%s-percentile %.2f %d\n", c.Prefix, name, key, ps[psIdx], now)
