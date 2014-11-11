@@ -70,10 +70,6 @@ func (f *FakeNATSConn) Ping() bool {
 }
 
 func (f *FakeNATSConn) Close() {
-	f.Lock()
-	defer f.Unlock()
-
-	return
 }
 
 func (f *FakeNATSConn) Publish(subject string, payload []byte) error {
