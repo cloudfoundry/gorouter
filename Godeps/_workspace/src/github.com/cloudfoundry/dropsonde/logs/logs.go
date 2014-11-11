@@ -3,11 +3,10 @@
 //
 // Use
 //
-// See the documentation for package autowire for details on configuring through
-// environment variables.
+// See the documentation for package dropsonde for configuration details.
 //
-// Import the package (note that you do not need to additionally import
-// autowire). The package self-initializes; to send logs use
+// Importing package dropsonde and initializing will initial this package.
+// To send logs use
 //
 //		logs.SendAppLog(appId, message, sourceType, sourceInstance)
 //
@@ -17,22 +16,14 @@
 package logs
 
 import (
-	"github.com/cloudfoundry/dropsonde/autowire"
 	"github.com/cloudfoundry/dropsonde/log_sender"
-	"github.com/cloudfoundry/gosteno"
 	"io"
 )
 
 var logSender log_sender.LogSender
 
-func init() {
-	Initialize(log_sender.NewLogSender(autowire.AutowiredEmitter(), gosteno.NewLogger("autowire/logs")))
-}
-
 // Initialize prepares the logs package for use with the automatic Emitter
-// from dropsonde/autowire. This function is called by the package's init
-// method, so should only be explicitly called to reset the default
-// LogSender, e.g. in tests.
+// from dropsonde.
 func Initialize(ls log_sender.LogSender) {
 	logSender = ls
 }
@@ -41,6 +32,9 @@ func Initialize(ls log_sender.LogSender) {
 // and source instance, with a message type of std out.
 // Returns an error if one occurs while sending the event.
 func SendAppLog(appId, message, sourceType, sourceInstance string) error {
+	if logSender == nil {
+		return nil
+	}
 	return logSender.SendAppLog(appId, message, sourceType, sourceInstance)
 }
 
@@ -48,17 +42,26 @@ func SendAppLog(appId, message, sourceType, sourceInstance string) error {
 // and source instance, with a message type of std err.
 // Returns an error if one occurs while sending the event.
 func SendAppErrorLog(appId, message, sourceType, sourceInstance string) error {
+	if logSender == nil {
+		return nil
+	}
 	return logSender.SendAppErrorLog(appId, message, sourceType, sourceInstance)
 }
 
 // ScanLogStream sends a log message with the given meta-data for each line from reader.
 // Restarts on read errors and continues until EOF (or stopChan is closed).
 func ScanLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	if logSender == nil {
+		return
+	}
 	logSender.ScanLogStream(appId, sourceType, sourceInstance, reader, stopChan)
 }
 
 // ScanErrorLogStream sends a log error message with the given meta-data for each line from reader.
 // Restarts on read errors and continues until EOF (or stopChan is closed).
 func ScanErrorLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+	if logSender == nil {
+		return
+	}
 	logSender.ScanErrorLogStream(appId, sourceType, sourceInstance, reader, stopChan)
 }

@@ -1,11 +1,15 @@
 package emitter_test
 
 import (
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/emitter"
+
+	"time"
+
+	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
 	uuid "github.com/nu7hatch/gouuid"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -99,6 +103,11 @@ var _ = Describe("EventFormatter", func() {
 					Expect(envelope).To(BeNil())
 					Expect(err.Error()).To(Equal("Event not emitted due to missing origin information"))
 				})
+			})
+
+			It("sets the timestamp to now", func() {
+				envelope, _ := emitter.Wrap(testEvent, origin)
+				Expect(time.Unix(0, envelope.GetTimestamp())).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
 			})
 		})
 	})

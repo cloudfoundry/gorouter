@@ -11,6 +11,7 @@ import math "math"
 var _ = proto.Marshal
 var _ = math.Inf
 
+// / MessageType stores the destination of the message (corresponding to STDOUT or STDERR).
 type LogMessage_MessageType int32
 
 const (
@@ -44,6 +45,7 @@ func (x *LogMessage_MessageType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// / A LogMessage contains a "log line" and associated metadata.
 type LogMessage struct {
 	Message          []byte                  `protobuf:"bytes,1,req,name=message" json:"message,omitempty"`
 	MessageType      *LogMessage_MessageType `protobuf:"varint,2,req,name=message_type,enum=events.LogMessage_MessageType" json:"message_type,omitempty"`

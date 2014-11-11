@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
@@ -180,7 +180,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	proxyWriter := newProxyResponseWriter(responseWriter)
 	roundTripper := &proxyRoundTripper{
-		transport: autowire.InstrumentedRoundTripper(p.transport),
+		transport: dropsonde.InstrumentedRoundTripper(p.transport),
 		iter:      iter,
 		handler:   &handler,
 

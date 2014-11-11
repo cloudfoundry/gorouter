@@ -1,29 +1,30 @@
-package events
+package envelope_extensions
 
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/cloudfoundry/dropsonde/events"
 )
 
 const SystemAppId = "system"
 
 type hasAppId interface {
-	GetApplicationId() *UUID
+	GetApplicationId() *events.UUID
 }
 
-func (m *Envelope) GetAppId() string {
-	if m.GetEventType() == Envelope_LogMessage {
+func GetAppId(m *events.Envelope) string {
+	if m.GetEventType() == events.Envelope_LogMessage {
 		logMessage := m.GetLogMessage()
 		return logMessage.GetAppId()
 	}
 
 	var event hasAppId
 	switch m.GetEventType() {
-	case Envelope_HttpStart:
+	case events.Envelope_HttpStart:
 		event = m.GetHttpStart()
-	case Envelope_HttpStop:
+	case events.Envelope_HttpStop:
 		event = m.GetHttpStop()
-	case Envelope_HttpStartStop:
+	case events.Envelope_HttpStartStop:
 		event = m.GetHttpStartStop()
 	default:
 		return SystemAppId
@@ -31,12 +32,12 @@ func (m *Envelope) GetAppId() string {
 
 	uuid := event.GetApplicationId()
 	if uuid != nil {
-		return uuid.FormattedString()
+		return formatUUID(uuid)
 	}
 	return SystemAppId
 }
 
-func (id *UUID) FormattedString() string {
+func formatUUID(id *events.UUID) string {
 	var u [16]byte
 	binary.LittleEndian.PutUint64(u[:8], id.GetLow())
 	binary.LittleEndian.PutUint64(u[8:], id.GetHigh())

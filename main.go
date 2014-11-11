@@ -3,6 +3,7 @@ package main
 import (
 	"net/url"
 
+	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
@@ -38,6 +39,8 @@ func main() {
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
 	}
+
+	dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 
 	// setup number of procs
 	if c.GoMaxProcs != 0 {

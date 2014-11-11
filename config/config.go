@@ -6,6 +6,7 @@ import (
 	steno "github.com/cloudfoundry/gosteno"
 
 	"io/ioutil"
+	"strconv"
 	"time"
 )
 
@@ -40,10 +41,15 @@ type LoggingConfig struct {
 	Syslog             string `yaml:"syslog"`
 	Level              string `yaml:"level"`
 	LoggregatorEnabled bool   `yaml:"loggregator_enabled"`
+	MetronAddress      string `yaml:"metron_address"`
+
+	// This field is populated by the `Process` function.
+	JobName string `yaml:"-"`
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level: "debug",
+	Level:         "debug",
+	MetronAddress: "localhost:3457",
 }
 
 type Config struct {
@@ -53,6 +59,7 @@ type Config struct {
 
 	Port       uint16 `yaml:"port"`
 	Index      uint   `yaml:"index"`
+	Zone       string `yaml:"zone"`
 	GoMaxProcs int    `yaml:"go_max_procs,omitempty"`
 	TraceKey   string `yaml:"trace_key"`
 	AccessLog  string `yaml:"access_log"`
@@ -110,6 +117,7 @@ func (c *Config) Process() {
 	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
+	c.Logging.JobName = "router_" + c.Zone + "_" + strconv.Itoa(int(c.Index))
 
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval

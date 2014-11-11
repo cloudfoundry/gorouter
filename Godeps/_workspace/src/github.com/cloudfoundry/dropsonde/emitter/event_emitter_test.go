@@ -5,8 +5,8 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
-
 	"github.com/cloudfoundry/dropsonde/factories"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

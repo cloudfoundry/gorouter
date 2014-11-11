@@ -2,6 +2,8 @@ package router_test
 
 import (
 	"github.com/apcera/nats"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	cfg "github.com/cloudfoundry/gorouter/config"
@@ -42,6 +44,9 @@ var _ = Describe("Router", func() {
 		natsPort := test_util.NextAvailPort()
 		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
+
+		fakeEmitter := fake.NewFakeEventEmitter("fake")
+		dropsonde.InitializeWithEmitter(fakeEmitter)
 
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()

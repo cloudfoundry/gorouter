@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/dropsonde/autowire"
+	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/gorouter/access_log"
@@ -59,6 +59,9 @@ var _ = Describe("Proxy", func() {
 		mbus := fakeyagnats.Connect()
 
 		r = registry.NewRouteRegistry(conf, mbus)
+
+		fakeEmitter := fake.NewFakeEventEmitter("fake")
+		dropsonde.InitializeWithEmitter(fakeEmitter)
 
 		accessLogFile = new(test_util.FakeFile)
 		accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "")
@@ -510,7 +513,7 @@ var _ = Describe("Proxy", func() {
 		x := dialProxy(proxyServer)
 
 		fakeEmitter := fake.NewFakeEventEmitter("fake")
-		autowire.Initialize(fakeEmitter)
+		dropsonde.InitializeWithEmitter(fakeEmitter)
 
 		req := x.NewRequest("GET", "/", nil)
 		req.Host = "app"

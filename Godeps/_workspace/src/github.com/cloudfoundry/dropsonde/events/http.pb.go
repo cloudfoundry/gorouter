@@ -11,6 +11,7 @@ import math "math"
 var _ = proto.Marshal
 var _ = math.Inf
 
+// / Type of peer handling request.
 type PeerType int32
 
 const (
@@ -44,6 +45,7 @@ func (x *PeerType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// / HTTP method.
 type Method int32
 
 const (
@@ -86,30 +88,7 @@ func (x *Method) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type UUID struct {
-	Low              *uint64 `protobuf:"varint,1,req,name=low" json:"low,omitempty"`
-	High             *uint64 `protobuf:"varint,2,req,name=high" json:"high,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
-}
-
-func (m *UUID) Reset()         { *m = UUID{} }
-func (m *UUID) String() string { return proto.CompactTextString(m) }
-func (*UUID) ProtoMessage()    {}
-
-func (m *UUID) GetLow() uint64 {
-	if m != nil && m.Low != nil {
-		return *m.Low
-	}
-	return 0
-}
-
-func (m *UUID) GetHigh() uint64 {
-	if m != nil && m.High != nil {
-		return *m.High
-	}
-	return 0
-}
-
+// / An HttpStart event is emitted when a client sends a request (or immediately when a server receives the request).
 type HttpStart struct {
 	Timestamp        *int64    `protobuf:"varint,1,req,name=timestamp" json:"timestamp,omitempty"`
 	RequestId        *UUID     `protobuf:"bytes,2,req,name=requestId" json:"requestId,omitempty"`
@@ -206,6 +185,7 @@ func (m *HttpStart) GetInstanceId() string {
 	return ""
 }
 
+// / An HttpStop event is emitted when a client receives a response to its request (or when a server completes its handling and returns a response).
 type HttpStop struct {
 	Timestamp        *int64    `protobuf:"varint,1,req,name=timestamp" json:"timestamp,omitempty"`
 	Uri              *string   `protobuf:"bytes,2,req,name=uri" json:"uri,omitempty"`
@@ -270,6 +250,7 @@ func (m *HttpStop) GetApplicationId() *UUID {
 	return nil
 }
 
+// / An HttpStartStop event represents the whole lifecycle of an HTTP request.
 type HttpStartStop struct {
 	StartTimestamp   *int64    `protobuf:"varint,1,req,name=startTimestamp" json:"startTimestamp,omitempty"`
 	StopTimestamp    *int64    `protobuf:"varint,2,req,name=stopTimestamp" json:"stopTimestamp,omitempty"`
