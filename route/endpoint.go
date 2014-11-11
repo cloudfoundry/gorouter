@@ -3,6 +3,7 @@ package route
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
@@ -12,7 +13,7 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
 		addr:              fmt.Sprintf("%s:%d", host, port),
 		Tags:              tags,
 		PrivateInstanceId: privateInstanceId,
-		staleThresholdInSeconds: staleThresholdInSeconds,
+		staleThreshold: time.Duration(staleThresholdInSeconds) * time.Second,
 	}
 }
 
@@ -21,7 +22,7 @@ type Endpoint struct {
 	addr              string
 	Tags              map[string]string
 	PrivateInstanceId string
-	staleThresholdInSeconds int
+	staleThreshold    time.Duration
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
