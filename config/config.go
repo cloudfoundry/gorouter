@@ -63,6 +63,7 @@ type Config struct {
 	GoMaxProcs int    `yaml:"go_max_procs,omitempty"`
 	TraceKey   string `yaml:"trace_key"`
 	AccessLog  string `yaml:"access_log"`
+	DebugAddr  string `yaml:"debug_addr"`
 
 	PublishStartMessageIntervalInSeconds int `yaml:"publish_start_message_interval"`
 	PruneStaleDropletsIntervalInSeconds  int `yaml:"prune_stale_droplets_interval"`

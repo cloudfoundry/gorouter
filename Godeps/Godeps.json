@@ -19,6 +19,10 @@
 			"Rev": "150e4e8f749b21a7f0de8e3cfd885143fcea6b32"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/cf-debug-server",
+			"Rev": "9423f9d0c1282337332ee35f2f5b0be10c83279b"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
 			"Rev": "d8399b690bf4b541b1a530ca1ca7305b4f3444c2"
 		},
