@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/apcera/nats"
+	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -43,6 +44,11 @@ func main() {
 	// setup number of procs
 	if c.GoMaxProcs != 0 {
 		runtime.GOMAXPROCS(c.GoMaxProcs)
+	}
+
+	if c.DebugAddr != "" {
+		cf_debug_server.SetAddr(c.DebugAddr)
+		cf_debug_server.Run()
 	}
 
 	InitLoggerFromConfig(c, logCounter)
