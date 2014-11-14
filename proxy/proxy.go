@@ -82,8 +82,7 @@ func NewProxy(args ProxyArgs) Proxy {
 				}
 				return conn, err
 			},
-			DisableKeepAlives:     true,
-			ResponseHeaderTimeout: args.EndpointTimeout,
+			DisableKeepAlives: true,
 		},
 		waitgroup: &sync.WaitGroup{},
 	}
