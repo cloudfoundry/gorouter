@@ -1,6 +1,7 @@
 package yagnats
 
 import (
+	"sync"
 	"time"
 
 	"github.com/apcera/nats"
@@ -39,6 +40,47 @@ func (s *YSuite) TestApceraClientPingWhenNotConnected(c *C) {
 func (s *YSuite) TestApceraClientPingWhenConnectionClosed(c *C) {
 	s.NatsConn.Close()
 	c.Assert(s.NatsConn.Ping(), Equals, false)
+}
+
+func (s *YSuite) TestApceraClientReconnectCB(c *C) {
+	reconnectCalled := false
+	reconnectedClient := Must(Connect([]string{"nats://nats:nats@127.0.0.1:4223"}))
+	reconnectedClient.AddReconnectedCB(func(_ *nats.Conn) {
+		reconnectCalled = true
+	})
+
+	stopCmd(s.NatsCmd)
+	s.NatsCmd = startNats(4223)
+	waitUntilNatsUp(4223)
+
+	c.Assert(reconnectCalled, Equals, true)
+}
+
+func (s *YSuite) TestApceraClientClosdCB(c *C) {
+	closeCalled := false
+	closedClient := Must(Connect([]string{"nats://nats:nats@127.0.0.1:4223"}))
+	closedClient.AddClosedCB(func(_ *nats.Conn) {
+		closeCalled = true
+	})
+	closedClient.Close()
+
+	c.Assert(closeCalled, Equals, true)
+}
+
+func (s *YSuite) TestApceraClientDisconnectedCB(c *C) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	disconnectCalled := false
+
+	disconnectedClient := Must(Connect([]string{"nats://nats:nats@127.0.0.1:4223"}))
+	disconnectedClient.AddDisconnectedCB(func(_ *nats.Conn) {
+		defer wg.Done()
+		disconnectCalled = true
+	})
+	disconnectedClient.Close()
+
+	wg.Wait()
+	c.Assert(disconnectCalled, Equals, true)
 }
 
 func (s *YSuite) TestApceraClientSubscribe(c *C) {

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"net/url"
-
+	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -15,7 +14,6 @@ import (
 	"github.com/cloudfoundry/yagnats"
 
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -50,19 +48,16 @@ func main() {
 	InitLoggerFromConfig(c, logCounter)
 	logger := steno.NewLogger("router.main")
 
-	natsMembers := make([]string, len(c.Nats))
-	for _, info := range c.Nats {
-		uri := url.URL{
-			Scheme: "nats",
-			User:   url.UserPassword(info.User, info.Pass),
-			Host:   fmt.Sprintf("%s:%d", info.Host, info.Port),
-		}
-		natsMembers = append(natsMembers, uri.String())
-	}
-	natsClient, err := yagnats.Connect(natsMembers)
+	natsServers := c.NatsServers()
+	natsClient, err := yagnats.Connect(natsServers)
 	if err != nil {
 		logger.Fatalf("Error connecting to NATS: %s\n", err)
 	}
+
+	natsClient.AddClosedCB(func(conn *nats.Conn) {
+		logger.Errorf("Close on NATS client. nats.Conn: %+v", *conn)
+		os.Exit(1)
+	})
 
 	registry := rregistry.NewRouteRegistry(c, natsClient)
 

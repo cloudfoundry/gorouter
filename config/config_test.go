@@ -149,6 +149,28 @@ start_response_delay_interval: 15
 			})
 		})
 
+		Describe("NatsServers", func() {
+			var b = []byte(`
+nats:
+  - host: remotehost
+    port: 4223
+    user: user
+    pass: pass
+  - host: remotehost2
+    port: 4223
+    user: user2
+    pass: pass2
+`)
+
+			It("returns a slice of of the configured NATS servers", func() {
+				config.Initialize(b)
+
+				natsServers := config.NatsServers()
+				Expect(natsServers[0]).To(Equal("nats://user:pass@remotehost:4223"))
+				Expect(natsServers[1]).To(Equal("nats://user2:pass2@remotehost2:4223"))
+			})
+		})
+
 		Describe("Timeout", func() {
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`

@@ -8,19 +8,23 @@ import (
 )
 
 type NATSConn interface {
-	Close() //Disconnect?
+	Close()
 	Publish(subject string, data []byte) error
 	PublishRequest(subj, reply string, data []byte) error
 	Subscribe(subject string, handler nats.MsgHandler) (*nats.Subscription, error)
 	QueueSubscribe(subject, queue string, handler nats.MsgHandler) (*nats.Subscription, error)
 	Unsubscribe(sub *nats.Subscription) error
-	Ping() bool // Not actually in nats.Conn, but quite useful
+	Ping() bool
 	AddReconnectedCB(func(*nats.Conn))
+	AddClosedCB(func(*nats.Conn))
+	AddDisconnectedCB(func(*nats.Conn))
 }
 
-type conn struct {
+type apceraNATSWrapper struct {
 	*nats.Conn
-	reconnectcbs *[]func(*nats.Conn)
+	reconnectCbs    *[]func(*nats.Conn)
+	closedCbs       *[]func(*nats.Conn)
+	disconnectedCbs *[]func(*nats.Conn)
 	*sync.Mutex
 }
 
@@ -30,16 +34,21 @@ func Connect(urls []string) (NATSConn, error) {
 	options.ReconnectWait = 500 * time.Millisecond
 	options.MaxReconnect = -1
 
-	callbacks := make([]func(*nats.Conn), 0)
-	s := &conn{nil, &callbacks, &sync.Mutex{}}
+	reconnectCallbacks := make([]func(*nats.Conn), 0)
+	closedCallbacks := make([]func(*nats.Conn), 0)
+	disconnectedCallbacks := make([]func(*nats.Conn), 0)
 
-	options.ReconnectedCB = func(conn *nats.Conn) {
-		s.Lock()
-		defer s.Unlock()
-		for _, cb := range *s.reconnectcbs {
-			cb(conn)
-		}
+	s := &apceraNATSWrapper{
+		nil,
+		&reconnectCallbacks,
+		&closedCallbacks,
+		&disconnectedCallbacks,
+		&sync.Mutex{},
 	}
+
+	options.ReconnectedCB = s.apceraReconnectCB
+	options.ClosedCB = s.apceraClosedCB
+	options.DisconnectedCB = s.apceraDisconnectedCB
 
 	conn, err := options.Connect()
 	if err != nil {
@@ -50,19 +59,59 @@ func Connect(urls []string) (NATSConn, error) {
 	return s, nil
 }
 
-func (c *conn) AddReconnectedCB(handler func(*nats.Conn)) {
+func (c *apceraNATSWrapper) AddReconnectedCB(handler func(*nats.Conn)) {
 	c.Lock()
 	defer c.Unlock()
-	callbacks := *c.reconnectcbs
+	callbacks := *c.reconnectCbs
 	callbacks = append(callbacks, handler)
-	c.reconnectcbs = &callbacks
+	c.reconnectCbs = &callbacks
 }
 
-func (c *conn) Unsubscribe(sub *nats.Subscription) error {
+func (c *apceraNATSWrapper) AddClosedCB(handler func(*nats.Conn)) {
+	c.Lock()
+	defer c.Unlock()
+	callbacks := *c.closedCbs
+	callbacks = append(callbacks, handler)
+	c.closedCbs = &callbacks
+}
+
+func (c *apceraNATSWrapper) AddDisconnectedCB(handler func(*nats.Conn)) {
+	c.Lock()
+	defer c.Unlock()
+	callbacks := *c.disconnectedCbs
+	callbacks = append(callbacks, handler)
+	c.disconnectedCbs = &callbacks
+}
+
+func (c *apceraNATSWrapper) Unsubscribe(sub *nats.Subscription) error {
 	return sub.Unsubscribe()
 }
 
-func (c *conn) Ping() bool {
+func (c *apceraNATSWrapper) Ping() bool {
 	err := c.FlushTimeout(500 * time.Millisecond)
 	return err == nil
+}
+
+func (c *apceraNATSWrapper) apceraReconnectCB(conn *nats.Conn) {
+	c.Lock()
+	defer c.Unlock()
+	for _, cb := range *c.reconnectCbs {
+		cb(conn)
+	}
+}
+
+func (c *apceraNATSWrapper) apceraClosedCB(conn *nats.Conn) {
+	c.Lock()
+	defer c.Unlock()
+	for _, cb := range *c.closedCbs {
+		cb(conn)
+	}
+}
+
+func (c *apceraNATSWrapper) apceraDisconnectedCB(conn *nats.Conn) {
+	c.Lock()
+	defer c.Unlock()
+	for _, cb := range *c.disconnectedCbs {
+		cb(conn)
+	}
 }

@@ -11,8 +11,8 @@
 		},
 		{
 			"ImportPath": "github.com/apcera/nats",
-			"Comment": "v0.92-24-ga85ef48",
-			"Rev": "a85ef48dcb52a020cd3f301981ff9e89b8aaf369"
+			"Comment": "v1.0.1-16-g4ca550d",
+			"Rev": "4ca550d13b9b6d03b2dded15287a1eae2ae27fa8"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
@@ -33,7 +33,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "ede9a4b51471c60a58c853c0f6652ce0c1fc8337"
+			"Rev": "1ac54a8c5bcd394f3904dbad5f4d10fea5241069"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",

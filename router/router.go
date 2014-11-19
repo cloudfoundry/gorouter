@@ -96,8 +96,8 @@ func (r *Router) Run() <-chan error {
 	// Kickstart sending start messages
 	r.SendStartMessage()
 
-	// Send start again on reconnect
-	r.mbusClient.AddReconnectedCB(func(_ *nats.Conn) {
+	r.mbusClient.AddReconnectedCB(func(conn *nats.Conn) {
+		r.logger.Infof("Reconnecting to NATS server %s...", conn.Opts.Url)
 		r.SendStartMessage()
 	})
 
