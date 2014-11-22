@@ -9,6 +9,7 @@ import (
 	steno "github.com/cloudfoundry/gosteno"
 
 	"io/ioutil"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -93,7 +94,7 @@ var defaultConfig = Config{
 
 	Port:       8081,
 	Index:      0,
-	GoMaxProcs: 8,
+	GoMaxProcs: -1,
 
 	EndpointTimeoutInSeconds: 60,
 
@@ -114,6 +115,10 @@ func DefaultConfig() *Config {
 
 func (c *Config) Process() {
 	var err error
+
+	if c.GoMaxProcs == -1 {
+		c.GoMaxProcs = runtime.NumCPU()
+	}
 
 	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second
 	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
