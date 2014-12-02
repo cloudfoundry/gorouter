@@ -228,24 +228,6 @@ var _ = Describe("RouteRegistry", func() {
 			Ω(p).Should(BeNil())
 		})
 
-		It("disables pruning when NATS is unavailable", func() {
-			r.Register("foo", fooEndpoint)
-			r.Register("fooo", fooEndpoint)
-
-			r.Register("bar", barEndpoint)
-			r.Register("baar", barEndpoint)
-
-			Ω(r.NumUris()).To(Equal(4))
-			Ω(r.NumEndpoints()).To(Equal(2))
-
-			messageBus.OnPing(func() bool { return false })
-			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
-
-			Ω(r.NumUris()).To(Equal(4))
-			Ω(r.NumEndpoints()).To(Equal(2))
-		})
-
 		It("does not block when pruning", func() {
 			// when pruning stale droplets,
 			// and the stale check takes a while,
@@ -255,19 +237,9 @@ var _ = Describe("RouteRegistry", func() {
 			r.Register("foo", fooEndpoint)
 			r.Register("fooo", fooEndpoint)
 
-			barrier := make(chan struct{})
-
-			messageBus.OnPing(func() bool {
-				barrier <- struct{}{}
-				<-barrier
-				return false
-			})
-
 			r.StartPruningCycle()
-			<-barrier
 
 			p := r.Lookup("foo")
-			barrier <- struct{}{}
 			Ω(p).ShouldNot(BeNil())
 		})
 	})

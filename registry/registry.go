@@ -100,14 +100,7 @@ func (r *RouteRegistry) StartPruningCycle() {
 				select {
 				case <-r.ticker.C:
 					r.logger.Debug("Start to check and prune stale droplets")
-					if r.isStateStale() {
-						r.logger.Info("State is stale; NOT pruning")
-						r.pauseStaleTracker()
-						break
-					}
-
 					r.pruneStaleDroplets()
-
 				}
 			}
 		}()
@@ -157,10 +150,6 @@ func (r *RouteRegistry) MarshalJSON() ([]byte, error) {
 	defer r.RUnlock()
 
 	return json.Marshal(r.byUri)
-}
-
-func (r *RouteRegistry) isStateStale() bool {
-	return !r.messageBus.Ping()
 }
 
 func (r *RouteRegistry) pruneStaleDroplets() {
