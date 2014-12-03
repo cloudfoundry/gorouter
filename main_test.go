@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"github.com/cloudfoundry-incubator/candiedyaml"
-	vcap "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
@@ -13,6 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
+	"github.com/pivotal-golang/localip"
 
 	"io"
 	"net"
@@ -95,13 +95,13 @@ var _ = Describe("Router Integration", func() {
 
 	Context("Drain", func() {
 		var config *config.Config
-		var localip string
+		var localIP string
 		var statusPort uint16
 		var proxyPort uint16
 
 		BeforeEach(func() {
 			var err error
-			localip, err = vcap.LocalIP()
+			localIP, err = localip.LocalIP()
 			Ω(err).ShouldNot(HaveOccurred())
 
 			statusPort = test_util.NextAvailPort()
@@ -127,7 +127,7 @@ var _ = Describe("Router Integration", func() {
 				w.WriteHeader(http.StatusNoContent)
 			})
 			longApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 			Ω(waitAppRegistered(routesUri, longApp, 2*time.Second)).To(BeTrue())
 
 			go func() {
@@ -160,7 +160,7 @@ var _ = Describe("Router Integration", func() {
 				<-blocker
 			})
 			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
 
 			go func() {
@@ -196,7 +196,7 @@ var _ = Describe("Router Integration", func() {
 				<-blocker
 			})
 			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
 
 			go func() {
@@ -223,7 +223,7 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	It("has Nats connectivity", func() {
-		localip, err := vcap.LocalIP()
+		localIP, err := localip.LocalIP()
 		Ω(err).ShouldNot(HaveOccurred())
 
 		statusPort := test_util.NextAvailPort()
@@ -242,7 +242,7 @@ var _ = Describe("Router Integration", func() {
 		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 		runningApp.Listen()
 
-		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localip, statusPort)
+		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
 		Ω(waitAppRegistered(routesUri, zombieApp, 2*time.Second)).To(BeTrue())
 		Ω(waitAppRegistered(routesUri, runningApp, 2*time.Second)).To(BeTrue())

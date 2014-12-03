@@ -1,12 +1,12 @@
 package test_util
 
 import (
-	vcap "github.com/cloudfoundry/gorouter/common"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/localip"
 )
 
 func NextAvailPort() uint16 {
-	port, err := vcap.GrabEphemeralPort()
+	port, err := localip.LocalPort()
 	Ω(err).ShouldNot(HaveOccurred())
 
 	return port

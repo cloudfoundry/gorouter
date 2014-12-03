@@ -5,6 +5,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/localip"
 
 	"encoding/json"
 	"errors"
@@ -29,7 +30,7 @@ type TestApp struct {
 func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string) *TestApp {
 	app := new(TestApp)
 
-	port, _ := common.GrabEphemeralPort()
+	port, _ := localip.LocalPort()
 
 	app.port = port
 	app.rPort = rPort
@@ -148,12 +149,12 @@ func (a *TestApp) isStopped() bool {
 }
 
 type registerMessage struct {
-	Host string            `json:"host"`
-	Port uint16            `json:"port"`
-	Uris []route.Uri       `json:"uris"`
-	Tags map[string]string `json:"tags"`
-	Dea  string            `json:"dea"`
-	App  string            `json:"app"`
+	Host                    string            `json:"host"`
+	Port                    uint16            `json:"port"`
+	Uris                    []route.Uri       `json:"uris"`
+	Tags                    map[string]string `json:"tags"`
+	Dea                     string            `json:"dea"`
+	App                     string            `json:"app"`
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
 	PrivateInstanceId string `json:"private_instance_id"`

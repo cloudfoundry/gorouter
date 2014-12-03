@@ -13,6 +13,7 @@ import (
 	. "github.com/cloudfoundry/gorouter/common/http"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/pivotal-golang/localip"
 )
 
 var procStat *ProcessStatus
@@ -71,13 +72,13 @@ func (c *VcapComponent) Start() error {
 	c.UUID = fmt.Sprintf("%d-%s", c.Index, uuid)
 
 	if c.Host == "" {
-		host, err := LocalIP()
+		host, err := localip.LocalIP()
 		if err != nil {
 			log.Error(err.Error())
 			return err
 		}
 
-		port, err := GrabEphemeralPort()
+		port, err := localip.LocalPort()
 		if err != nil {
 			log.Error(err.Error())
 			return err

@@ -5,8 +5,8 @@ import (
 	"net/url"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
-	vcap "github.com/cloudfoundry/gorouter/common"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/pivotal-golang/localip"
 
 	"io/ioutil"
 	"runtime"
@@ -140,7 +140,7 @@ func (c *Config) Process() {
 	}
 	c.DrainTimeout = time.Duration(drain) * time.Second
 
-	c.Ip, err = vcap.LocalIP()
+	c.Ip, err = localip.LocalIP()
 	if err != nil {
 		panic(err)
 	}

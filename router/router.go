@@ -10,6 +10,7 @@ import (
 	"github.com/cloudfoundry/gorouter/varz"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/pivotal-golang/localip"
 
 	"bytes"
 	"compress/zlib"
@@ -247,7 +248,7 @@ func (r *Router) flushApps(t time.Time) {
 }
 
 func (r *Router) greetMessage() ([]byte, error) {
-	host, err := vcap.LocalIP()
+	host, err := localip.LocalIP()
 	if err != nil {
 		return nil, err
 	}

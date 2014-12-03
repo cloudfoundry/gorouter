@@ -4,6 +4,7 @@ import (
 	. "github.com/cloudfoundry/gorouter/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/localip"
 
 	"encoding/json"
 	"fmt"
@@ -25,7 +26,7 @@ var _ = Describe("Component", func() {
 	var component *VcapComponent
 
 	BeforeEach(func() {
-		port, err := GrabEphemeralPort()
+		port, err := localip.LocalPort()
 		Ω(err).ShouldNot(HaveOccurred())
 
 		component = &VcapComponent{

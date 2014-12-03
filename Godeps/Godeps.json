@@ -54,6 +54,10 @@
 			"Rev": "2cd6d99ccf3ac7ae8398d8296429161bf7061ae2"
 		},
 		{
+			"ImportPath": "github.com/pivotal-golang/localip",
+			"Rev": "ca5f12419a47fe0c8547eea32f9498eb6e9fe817"
+		},
+		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
 		}
