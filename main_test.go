@@ -37,6 +37,12 @@ var _ = Describe("Router Integration", func() {
 
 	var gorouterSession *Session
 
+	writeConfig := func(config *config.Config, cfgFile string) {
+		cfgBytes, err := candiedyaml.Marshal(config)
+		Ω(err).ShouldNot(HaveOccurred())
+		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
+	}
+
 	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
 		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
 
@@ -49,9 +55,7 @@ var _ = Describe("Router Integration", func() {
 		config.EndpointTimeoutInSeconds = 5
 		config.DrainTimeoutInSeconds = 1
 
-		cfgBytes, err := candiedyaml.Marshal(config)
-		Ω(err).ShouldNot(HaveOccurred())
-		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
+		writeConfig(config, cfgFile)
 		return config
 	}
 
@@ -219,6 +223,23 @@ var _ = Describe("Router Integration", func() {
 			urlErr := err.(*url.Error)
 			opErr := urlErr.Err.(*net.OpError)
 			Ω(opErr.Op).Should(Equal("dial"))
+		})
+	})
+
+	Context("When Dropsonde is misconfigured", func() {
+		It("fails to start", func() {
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			config := createConfig(cfgFile, statusPort, proxyPort)
+			config.Logging.MetronAddress = ""
+			writeConfig(config, cfgFile)
+
+			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+			session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+			Ω(err).ShouldNot(HaveOccurred())
+			Eventually(session, 5).Should(Exit(1))
 		})
 	})
 

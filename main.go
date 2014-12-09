@@ -34,12 +34,17 @@ func main() {
 	c := config.DefaultConfig()
 	logCounter := vcap.NewLogCounter()
 	InitLoggerFromConfig(c, logCounter)
+	logger := steno.NewLogger("router.main")
 
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
 	}
 
-	dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	if err != nil {
+		logger.Errorf("Dropsonde failed to initialize: %s", err.Error())
+		os.Exit(1)
+	}
 
 	// setup number of procs
 	if c.GoMaxProcs != 0 {
@@ -50,9 +55,6 @@ func main() {
 		cf_debug_server.SetAddr(c.DebugAddr)
 		cf_debug_server.Run()
 	}
-
-	InitLoggerFromConfig(c, logCounter)
-	logger := steno.NewLogger("router.main")
 
 	natsServers := c.NatsServers()
 	natsClient, err := yagnats.Connect(natsServers)
