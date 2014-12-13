@@ -95,6 +95,8 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	h.logger.Set("Upgrade", "tcp")
 
+	h.logrecord.StatusCode = http.StatusSwitchingProtocols
+
 	err := h.serveTcp(iter)
 	if err != nil {
 		h.writeStatus(http.StatusBadRequest, "TCP forwarding to endpoint failed.")
@@ -103,6 +105,8 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	h.logger.Set("Upgrade", "websocket")
+
+	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
 	err := h.serveWebSocket(iter)
 	if err != nil {
