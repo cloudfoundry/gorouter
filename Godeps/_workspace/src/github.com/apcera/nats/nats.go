@@ -27,13 +27,18 @@ import (
 )
 
 const (
-	Version              = "1.0.2"
+	Version              = "1.0.6"
 	DefaultURL           = "nats://localhost:4222"
 	DefaultPort          = 4222
-	DefaultMaxReconnect  = 10
+	DefaultMaxReconnect  = 60
 	DefaultReconnectWait = 2 * time.Second
 	DefaultTimeout       = 2 * time.Second
+	DefaultPingInterval  = 2 * time.Minute
+	DefaultMaxPingOut    = 2
 )
+
+// For detection and proper handling of a Stale Connection
+const STALE_CONNECTION = "Stale Connection"
 
 var (
 	ErrConnectionClosed   = errors.New("nats: Connection Closed")
@@ -47,6 +52,7 @@ var (
 	ErrNoServers          = errors.New("nats: No servers available for connection")
 	ErrJsonParse          = errors.New("nats: Connect message, json parse err")
 	ErrChanArg            = errors.New("nats: Argument needs to be a channel type")
+	ErrStaleConnection    = errors.New("nats: " + STALE_CONNECTION)
 )
 
 var DefaultOptions = Options{
@@ -54,6 +60,9 @@ var DefaultOptions = Options{
 	MaxReconnect:   DefaultMaxReconnect,
 	ReconnectWait:  DefaultReconnectWait,
 	Timeout:        DefaultTimeout,
+
+	PingInterval: DefaultPingInterval,
+	MaxPingsOut:  DefaultMaxPingOut,
 }
 
 type Status int
@@ -64,9 +73,6 @@ const (
 	CLOSED
 	RECONNECTING
 )
-
-// For detection and proper handling of a Stale Connection
-const STALE_CONNECTION = "Stale Connection"
 
 // ConnHandlers are used for asynchronous events such as
 // disconnected and closed connections.
@@ -93,6 +99,9 @@ type Options struct {
 	DisconnectedCB ConnHandler
 	ReconnectedCB  ConnHandler
 	AsyncErrorCB   ErrHandler
+
+	PingInterval time.Duration // disabled if 0 or negative
+	MaxPingsOut  int
 }
 
 const (
@@ -138,6 +147,8 @@ type Conn struct {
 	status  Status
 	err     error
 	ps      *parseState
+	ptmr    *time.Timer
+	pout    int
 }
 
 // A Subscription represents interest in a given subject.
@@ -233,6 +244,9 @@ func SecureConnect(url string) (*Conn, error) {
 // Connect will attempt to connect to a NATS server with multiple options.
 func (o Options) Connect() (*Conn, error) {
 	nc := &Conn{Opts: o}
+	if nc.Opts.MaxPingsOut == 0 {
+		nc.Opts.MaxPingsOut = DefaultMaxPingOut
+	}
 	if err := nc.setupServerPool(); err != nil {
 		return nil, err
 	}
@@ -414,21 +428,42 @@ func (nc *Conn) makeTLSConn() {
 	nc.bw = bufio.NewWriterSize(nc.conn, defaultBufSize)
 }
 
+// waitForExits will wait for all socket watcher Go routines to
+// be shutdown before proceeding.
+func (nc *Conn) waitForExits() {
+	// Kick old flusher forcefully.
+	nc.fch <- true
+	// Wait for any previous go routines.
+	nc.wg.Wait()
+}
+
 // spinUpSocketWatchers will launch the Go routines responsible for
 // reading and writing to the socket. This will be launched via a
 // go routine itself to release any locks that may be held.
 // We also use a WaitGroup to make sure we only start them on a
-// reconnect when the precious ones have exited.
+// reconnect when the previous ones have exited.
 func (nc *Conn) spinUpSocketWatchers() {
-	// Kick old flusher forcefully.
-	nc.fch <- true
-	// Wait for any previous ones.
-	nc.wg.Wait()
-	// We will wait on both.
+	// Make sure everything has exited.
+	nc.waitForExits()
+
+	// We will wait on both going forward.
 	nc.wg.Add(2)
 
+	// Spin up the readLoop and the socket flusher.
 	go nc.readLoop()
 	go nc.flusher()
+
+	nc.mu.Lock()
+	nc.pout = 0
+
+	if nc.Opts.PingInterval > 0 {
+		if nc.ptmr == nil {
+			nc.ptmr = time.AfterFunc(nc.Opts.PingInterval, nc.processPingTimer)
+		} else {
+			nc.ptmr.Reset(nc.Opts.PingInterval)
+		}
+	}
+	nc.mu.Unlock()
 }
 
 // Report the connected server's Url
@@ -439,6 +474,16 @@ func (nc *Conn) ConnectedUrl() string {
 		return _EMPTY_
 	}
 	return nc.url.String()
+}
+
+// Report the connected server's Id
+func (nc *Conn) ConnectedServerId() string {
+	nc.mu.Lock()
+	defer nc.mu.Unlock()
+	if nc.status != CONNECTED {
+		return _EMPTY_
+	}
+	return nc.info.Id
 }
 
 // Low level setup for structs, etc
@@ -673,7 +718,6 @@ func (nc *Conn) processDisconnect() {
 // This will process a disconnect when reconnect is allowed.
 // The lock should not be held on entering this function.
 func (nc *Conn) processReconnect() {
-
 	nc.mu.Lock()
 	defer nc.mu.Unlock()
 
@@ -683,28 +727,15 @@ func (nc *Conn) processReconnect() {
 			return
 		}
 		nc.status = RECONNECTING
+		if nc.ptmr != nil {
+			nc.ptmr.Stop()
+		}
 		if nc.conn != nil {
 			nc.bw.Flush()
 			nc.conn.Close()
+			nc.conn = nil
 		}
-		nc.conn = nil
-		nc.kickFlusher()
-
-		// FIXME(dlc) - We have an issue here if we have
-		// outstanding flush points (pongs) and they were not
-		// sent out, but are still in the pipe.
-
-		// Create a pending buffer to underpin the bufio Writer while
-		// we are reconnecting.
-		nc.pending = &bytes.Buffer{}
-		nc.bw = bufio.NewWriterSize(nc.pending, defaultPendingSize)
-		nc.err = nil
 		go nc.doReconnect()
-	}
-	// Perform appropriate callback if needed for a disconnect.
-	dcb := nc.Opts.DisconnectedCB
-	if dcb != nil {
-		go dcb(nc)
 	}
 }
 
@@ -723,9 +754,33 @@ func (nc *Conn) flushReconnectPendingItems() {
 // Try to reconnect using the option parameters.
 // This function assumes we are allowed to reconnect.
 func (nc *Conn) doReconnect() {
+	// We want to make sure we have the other watchers shutdown properly
+	// here before we proceed past this point.
+	nc.waitForExits()
+
+	// FIXME(dlc) - We have an issue here if we have
+	// outstanding flush points (pongs) and they were not
+	// sent out, but are still in the pipe.
+
 	// Hold the lock manually and release where needed below,
 	// can't do defer here.
 	nc.mu.Lock()
+
+	// Create a new pending buffer to underpin the bufio Writer while
+	// we are reconnecting.
+	nc.pending = &bytes.Buffer{}
+	nc.bw = bufio.NewWriterSize(nc.pending, defaultPendingSize)
+
+	// Clear any errors.
+	nc.err = nil
+
+	// Perform appropriate callback if needed for a disconnect.
+	dcb := nc.Opts.DisconnectedCB
+	if dcb != nil {
+		nc.mu.Unlock()
+		dcb(nc)
+		nc.mu.Lock()
+	}
 
 	for len(nc.srvPool) > 0 {
 		cur, err := nc.selectNextServer()
@@ -764,6 +819,10 @@ func (nc *Conn) doReconnect() {
 
 		// We are reconnected
 		nc.Reconnects += 1
+
+		// Clear out server stats for the server we connected to..
+		cur.didConnect = true
+		cur.reconnects = 0
 
 		// Process Connect logic
 		if nc.err = nc.processExpectedInfo(); nc.err == nil {
@@ -840,9 +899,7 @@ func (nc *Conn) processOpErr(err error) {
 // protocol from the server. It will dispatch appropriately based
 // on the op type.
 func (nc *Conn) readLoop() {
-	b := make([]byte, defaultBufSize)
-
-	// Release the wait group
+	// Release the wait group on exit
 	defer nc.wg.Done()
 
 	// Create a parseState if needed.
@@ -851,6 +908,9 @@ func (nc *Conn) readLoop() {
 		nc.ps = &parseState{}
 	}
 	nc.mu.Unlock()
+
+	// Stack based buffer.
+	b := make([]byte, defaultBufSize)
 
 	for {
 		// FIXME(dlc): RWLock here?
@@ -1022,6 +1082,7 @@ func (nc *Conn) processPong() {
 		ch = nc.pongs[0]
 		nc.pongs = nc.pongs[1:]
 	}
+	nc.pout = 0
 	nc.mu.Unlock()
 	if ch != nil {
 		ch <- true
@@ -1051,11 +1112,12 @@ func (nc *Conn) LastError() error {
 // sets the connection's lastError.
 func (nc *Conn) processErr(e string) {
 	// FIXME(dlc) - process Slow Consumer signals special.
-	err := errors.New("nats: " + e)
 	if e == STALE_CONNECTION {
-		nc.processOpErr(err)
+		nc.processOpErr(ErrStaleConnection)
 	} else {
-		nc.err = err
+		nc.mu.Lock()
+		nc.err = errors.New("nats: " + e)
+		nc.mu.Unlock()
 		nc.Close()
 	}
 }
@@ -1388,6 +1450,34 @@ func (nc *Conn) removeFlushEntry(ch chan bool) bool {
 	return false
 }
 
+// The lock must be held entering this function.
+func (nc *Conn) sendPing(ch chan bool) {
+	nc.pongs = append(nc.pongs, ch)
+	nc.bw.WriteString(pingProto)
+	nc.kickFlusher()
+}
+
+func (nc *Conn) processPingTimer() {
+	nc.mu.Lock()
+
+	if nc.status != CONNECTED {
+		nc.mu.Unlock()
+		return
+	}
+
+	// Check for violation
+	nc.pout += 1
+	if nc.pout > nc.Opts.MaxPingsOut {
+		nc.mu.Unlock()
+		nc.processOpErr(ErrStaleConnection)
+		return
+	}
+
+	nc.sendPing(nil)
+	nc.ptmr.Reset(nc.Opts.PingInterval)
+	nc.mu.Unlock()
+}
+
 // FlushTimeout allows a Flush operation to have an associated timeout.
 func (nc *Conn) FlushTimeout(timeout time.Duration) (err error) {
 	if timeout <= 0 {
@@ -1403,11 +1493,7 @@ func (nc *Conn) FlushTimeout(timeout time.Duration) (err error) {
 	defer t.Stop()
 
 	ch := make(chan bool) // FIXME: Inefficient?
-	//	defer close(ch)
-
-	nc.pongs = append(nc.pongs, ch)
-	nc.bw.WriteString(pingProto)
-	nc.bw.Flush()
+	nc.sendPing(ch)
 	nc.mu.Unlock()
 
 	select {
@@ -1487,6 +1573,10 @@ func (nc *Conn) close(status Status, doCBs bool) {
 	nc.clearPendingFlushCalls()
 
 	nc.mu.Lock()
+
+	if nc.ptmr != nil {
+		nc.ptmr.Stop()
+	}
 
 	// Close sync subscriber channels and release any
 	// pending NextMsg() calls.

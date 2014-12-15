@@ -11,8 +11,8 @@
 		},
 		{
 			"ImportPath": "github.com/apcera/nats",
-			"Comment": "v1.0.1-16-g4ca550d",
-			"Rev": "4ca550d13b9b6d03b2dded15287a1eae2ae27fa8"
+			"Comment": "v1.0.6",
+			"Rev": "0ad40909a5568932a6ba494f25762971a089499d"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
