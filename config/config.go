@@ -69,13 +69,14 @@ type Config struct {
 	AccessLog  string `yaml:"access_log"`
 	DebugAddr  string `yaml:"debug_addr"`
 
-	PublishStartMessageIntervalInSeconds int `yaml:"publish_start_message_interval"`
-	PruneStaleDropletsIntervalInSeconds  int `yaml:"prune_stale_droplets_interval"`
-	DropletStaleThresholdInSeconds       int `yaml:"droplet_stale_threshold"`
-	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
-	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
-	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
-	DrainTimeoutInSeconds                int `yaml:"drain_timeout,omitempty"`
+	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
+	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
+	DropletStaleThresholdInSeconds       int  `yaml:"droplet_stale_threshold"`
+	PublishActiveAppsIntervalInSeconds   int  `yaml:"publish_active_apps_interval"`
+	StartResponseDelayIntervalInSeconds  int  `yaml:"start_response_delay_interval"`
+	EndpointTimeoutInSeconds             int  `yaml:"endpoint_timeout"`
+	DrainTimeoutInSeconds                int  `yaml:"drain_timeout,omitempty"`
+	SecureCookies                        bool `yaml:"secure_cookies"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`
@@ -84,8 +85,7 @@ type Config struct {
 	StartResponseDelayInterval time.Duration `yaml:"-"`
 	EndpointTimeout            time.Duration `yaml:"-"`
 	DrainTimeout               time.Duration `yaml:"-"`
-
-	Ip string `yaml:"-"`
+	Ip                         string        `yaml:"-"`
 }
 
 var defaultConfig = Config{

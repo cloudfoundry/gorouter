@@ -122,6 +122,7 @@ prune_stale_droplets_interval: 2
 droplet_stale_threshold: 30
 publish_active_apps_interval: 4
 start_response_delay_interval: 15
+secure_cookies: true
 `)
 
 			config.Initialize(b)
@@ -132,6 +133,7 @@ start_response_delay_interval: 15
 			Ω(config.DropletStaleThreshold).To(Equal(30 * time.Second))
 			Ω(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
 			Ω(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
+			Ω(config.SecureCookies).To(BeTrue())
 		})
 
 		Context("When StartResponseDelayInterval is greater than DropletStaleThreshold", func() {
@@ -146,6 +148,19 @@ start_response_delay_interval: 15
 
 				Ω(config.DropletStaleThreshold).To(Equal(15 * time.Second))
 				Ω(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
+			})
+		})
+
+		Context("When secure cookies is set to false", func() {
+			It("set DropletStaleThreshold equal to StartResponseDelayInterval", func() {
+				var b = []byte(`
+secure_cookies: false
+`)
+
+				config.Initialize(b)
+				config.Process()
+
+				Ω(config.SecureCookies).To(BeFalse())
 			})
 		})
 
