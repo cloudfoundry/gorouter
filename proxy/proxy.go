@@ -49,16 +49,18 @@ type ProxyArgs struct {
 	Registry        LookupRegistry
 	Reporter        ProxyReporter
 	AccessLogger    access_log.AccessLogger
+	SecureCookies   bool
 }
 
 type proxy struct {
-	ip           string
-	traceKey     string
-	logger       *steno.Logger
-	registry     LookupRegistry
-	reporter     ProxyReporter
-	accessLogger access_log.AccessLogger
-	transport    *http.Transport
+	ip            string
+	traceKey      string
+	logger        *steno.Logger
+	registry      LookupRegistry
+	reporter      ProxyReporter
+	accessLogger  access_log.AccessLogger
+	transport     *http.Transport
+	secureCookies bool
 
 	waitgroup *sync.WaitGroup
 }
@@ -84,7 +86,8 @@ func NewProxy(args ProxyArgs) Proxy {
 			},
 			DisableKeepAlives: true,
 		},
-		waitgroup: &sync.WaitGroup{},
+		waitgroup:     &sync.WaitGroup{},
+		secureCookies: args.SecureCookies,
 	}
 }
 
@@ -208,7 +211,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 
 			if endpoint.PrivateInstanceId != "" {
-				setupStickySession(responseWriter, rsp, endpoint)
+				setupStickySession(responseWriter, rsp, endpoint, p.secureCookies)
 			}
 		},
 	}
@@ -313,7 +316,7 @@ func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
 }
 
-func setupStickySession(responseWriter http.ResponseWriter, response *http.Response, endpoint *route.Endpoint) {
+func setupStickySession(responseWriter http.ResponseWriter, response *http.Response, endpoint *route.Endpoint, secureCookies bool) {
 	for _, v := range response.Cookies() {
 		if v.Name == StickyCookieKey {
 			cookie := &http.Cookie{
@@ -322,6 +325,7 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 				Path:  "/",
 
 				HttpOnly: true,
+				Secure:   secureCookies,
 			}
 
 			http.SetCookie(responseWriter, cookie)

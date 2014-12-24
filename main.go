@@ -83,6 +83,7 @@ func main() {
 		Registry:        registry,
 		Reporter:        varz,
 		AccessLogger:    accessLogger,
+		SecureCookies:   c.SecureCookies,
 	}
 	p := proxy.NewProxy(args)
 

@@ -1,10 +1,10 @@
 package route_test
 
 import (
-	"time"
 	. "github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"time"
 )
 
 var _ = Describe("EndpointIterator", func() {

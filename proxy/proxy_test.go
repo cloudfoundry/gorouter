@@ -55,9 +55,10 @@ var _ = Describe("Proxy", func() {
 		conf = config.DefaultConfig()
 		conf.TraceKey = "my_trace_key"
 		conf.EndpointTimeout = 500 * time.Millisecond
+	})
 
+	JustBeforeEach(func() {
 		mbus := fakeyagnats.Connect()
-
 		r = registry.NewRouteRegistry(conf, mbus)
 
 		fakeEmitter := fake.NewFakeEventEmitter("fake")
@@ -74,15 +75,8 @@ var _ = Describe("Proxy", func() {
 			Registry:        r,
 			Reporter:        nullVarz{},
 			AccessLogger:    accessLog,
+			SecureCookies:   conf.SecureCookies,
 		})
-
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		Ω(err).NotTo(HaveOccurred())
-
-		server := http.Server{Handler: p}
-		go server.Serve(ln)
-
-		proxyServer = ln
 
 		shouldEcho = func(input string, expected string) {
 			ln := registerHandler(r, "encoding", func(x *test_util.HttpConn) {
@@ -102,6 +96,14 @@ var _ = Describe("Proxy", func() {
 
 			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 		}
+
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		Ω(err).NotTo(HaveOccurred())
+
+		server := http.Server{Handler: p}
+		go server.Serve(ln)
+
+		proxyServer = ln
 	})
 
 	AfterEach(func() {
@@ -985,6 +987,94 @@ var _ = Describe("Proxy", func() {
 
 			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 			Eventually(doneWaiting).Should(BeClosed())
+		})
+	})
+
+	Describe("secure cookies", func() {
+		Context("when configured with secure cookies", func() {
+			BeforeEach(func() {
+				conf.SecureCookies = true
+			})
+
+			It("sets up a secure http cookie on the responsse", func() {
+				done := make(chan bool)
+
+				ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
+					jSessionIdCookie := &http.Cookie{
+						Name:  StickyCookieKey,
+						Value: "xxx",
+					}
+					_, err := http.ReadRequest(x.Reader)
+					Ω(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					resp.Header.Add("Set-Cookie", jSessionIdCookie.String())
+					x.WriteResponse(resp)
+					x.Close()
+					done <- true
+				}, "my-id")
+				defer ln.Close()
+
+				x := dialProxy(proxyServer)
+				req := x.NewRequest("GET", "/", nil)
+				req.Host = "app"
+				x.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+
+				found := false
+				resp, _ := x.ReadResponse()
+				for _, cookie := range resp.Cookies() {
+					if cookie.Name == VcapCookieId {
+						found = true
+						Ω(cookie.Secure).Should(BeTrue())
+					}
+				}
+				Ω(found).Should(BeTrue())
+			})
+		})
+
+		Context("when configured without secure cookies", func() {
+			BeforeEach(func() {
+				conf.SecureCookies = false
+			})
+
+			It("sets up a cookie without the secure flag", func() {
+				done := make(chan bool)
+
+				ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
+					jSessionIdCookie := &http.Cookie{
+						Name:  StickyCookieKey,
+						Value: "xxx",
+					}
+					_, err := http.ReadRequest(x.Reader)
+					Ω(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					resp.Header.Add("Set-Cookie", jSessionIdCookie.String())
+					x.WriteResponse(resp)
+					x.Close()
+					done <- true
+				}, "my-id")
+				defer ln.Close()
+
+				x := dialProxy(proxyServer)
+				req := x.NewRequest("GET", "/", nil)
+				req.Host = "app"
+				x.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+
+				found := false
+				resp, _ := x.ReadResponse()
+				for _, cookie := range resp.Cookies() {
+					if cookie.Name == VcapCookieId {
+						found = true
+						Ω(cookie.Secure).Should(BeFalse())
+					}
+				}
+				Ω(found).Should(BeTrue())
+			})
 		})
 	})
 })

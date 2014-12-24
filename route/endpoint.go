@@ -13,7 +13,7 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
 		addr:              fmt.Sprintf("%s:%d", host, port),
 		Tags:              tags,
 		PrivateInstanceId: privateInstanceId,
-		staleThreshold: time.Duration(staleThresholdInSeconds) * time.Second,
+		staleThreshold:    time.Duration(staleThresholdInSeconds) * time.Second,
 	}
 }
 

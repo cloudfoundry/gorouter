@@ -1,10 +1,11 @@
 package test_util
 
 import (
-	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"net/url"
 	"strings"
+
+	. "github.com/onsi/gomega"
 
 	"bufio"
 	"io"
