@@ -1,8 +1,8 @@
 {
 	"ImportPath": "github.com/cloudfoundry/gorouter",
-	"GoVersion": "go1.3.3",
+	"GoVersion": "go1.4",
 	"Packages": [
-		"./..."
+		"."
 	],
 	"Deps": [
 		{
@@ -60,6 +60,10 @@
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
+		},
+		{
+			"ImportPath": "github.com/tedsuo/ifrit",
+			"Rev": "611096055721e35a95e3d1e4e2bc666fae509fcb"
 		}
 	]
 }
