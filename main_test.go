@@ -237,8 +237,7 @@ var _ = Describe("Router Integration", func() {
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Ω(err).ShouldNot(HaveOccurred())
+			session, _ := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 			Eventually(session, 5).Should(Exit(1))
 		})
 	})
