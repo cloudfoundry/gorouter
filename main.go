@@ -33,12 +33,13 @@ func init() {
 func main() {
 	c := config.DefaultConfig()
 	logCounter := vcap.NewLogCounter()
-	InitLoggerFromConfig(c, logCounter)
-	logger := steno.NewLogger("router.main")
 
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
 	}
+
+	InitLoggerFromConfig(c, logCounter)
+	logger := steno.NewLogger("router.main")
 
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
