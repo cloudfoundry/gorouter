@@ -150,7 +150,6 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession = nil
 
 			<-requestMade
-			time.Sleep(200 * time.Millisecond)
 
 			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
 

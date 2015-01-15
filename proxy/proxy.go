@@ -62,11 +62,12 @@ type proxy struct {
 	transport     *http.Transport
 	secureCookies bool
 
-	waitgroup *sync.WaitGroup
+	waitgroup     *sync.WaitGroup
+	waitgroupchan chan bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	return &proxy{
+	p := &proxy{
 		accessLogger: args.AccessLogger,
 		traceKey:     args.TraceKey,
 		ip:           args.Ip,
@@ -87,8 +88,11 @@ func NewProxy(args ProxyArgs) Proxy {
 			DisableKeepAlives: true,
 		},
 		waitgroup:     &sync.WaitGroup{},
+		waitgroupchan: make(chan bool, 1),
 		secureCookies: args.SecureCookies,
 	}
+	p.waitgroupchan <- true
+	return p
 }
 
 func hostWithoutPort(req *http.Request) string {
@@ -104,7 +108,9 @@ func hostWithoutPort(req *http.Request) string {
 }
 
 func (p *proxy) Wait() {
+	<-p.waitgroupchan
 	p.waitgroup.Wait()
+	p.waitgroupchan <- true
 }
 
 func (p *proxy) getStickySession(request *http.Request) string {
@@ -133,7 +139,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	handler := NewRequestHandler(request, responseWriter, p.reporter, &accessLog)
 
+	<-p.waitgroupchan
 	p.waitgroup.Add(1)
+	p.waitgroupchan <- true
 
 	defer func() {
 		p.accessLogger.Log(accessLog)
