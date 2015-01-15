@@ -92,7 +92,7 @@ var _ = Describe("Router Integration", func() {
 
 		os.RemoveAll(tmpdir)
 
-		if gorouterSession != nil {
+		if gorouterSession != nil && gorouterSession.ExitCode() == -1 {
 			stopGorouter(gorouterSession)
 		}
 	})
@@ -237,8 +237,8 @@ var _ = Describe("Router Integration", func() {
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			session, _ := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Eventually(session, 5).Should(Exit(1))
+			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+			Eventually(gorouterSession, 5).Should(Exit(1))
 		})
 	})
 
