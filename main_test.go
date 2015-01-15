@@ -121,10 +121,13 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(config)
 			Ω(err).ShouldNot(HaveOccurred())
 
-			blocker := make(chan bool)
+			requestMade := make(chan bool)
+			requestProcessing := make(chan bool)
+
 			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil)
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				blocker <- true
+				requestMade <- true
+				<-requestProcessing
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				Ω(err).ShouldNot(HaveOccurred())
@@ -143,11 +146,16 @@ var _ = Describe("Router Integration", func() {
 				resp.Body.Close()
 			}()
 
-			<-blocker
-
 			grouter := gorouterSession
 			gorouterSession = nil
+
+			<-requestMade
+			time.Sleep(200 * time.Millisecond)
+
 			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
+
+			requestProcessing <- true
+
 			Ω(err).ShouldNot(HaveOccurred())
 			Eventually(grouter, 5).Should(Exit(0))
 		})

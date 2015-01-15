@@ -57,9 +57,21 @@ func main() {
 	}
 
 	natsServers := c.NatsServers()
-	natsClient, err := yagnats.Connect(natsServers)
+	var natsClient yagnats.NATSConn
+	attempts := 3
+	for attempts > 0 {
+		natsClient, err = yagnats.Connect(natsServers)
+		if err == nil {
+			break
+		} else {
+			attempts--
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
 	if err != nil {
-		logger.Fatalf("Error connecting to NATS: %s\n", err)
+		logger.Errorf("Error connecting to NATS: %s\n", err)
+		os.Exit(1)
 	}
 
 	natsClient.AddClosedCB(func(conn *nats.Conn) {
