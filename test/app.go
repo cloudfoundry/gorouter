@@ -110,8 +110,9 @@ func (a *TestApp) Unregister() {
 }
 
 func (a *TestApp) VerifyAppStatus(status int) {
-	check := a.CheckAppStatus(status)
-	Ω(check).ShouldNot(HaveOccurred())
+	Eventually(func() error {
+		return a.CheckAppStatus(status)
+	}).ShouldNot(HaveOccurred())
 }
 
 func (a *TestApp) CheckAppStatus(status int) error {
