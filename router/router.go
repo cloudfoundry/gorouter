@@ -1,6 +1,8 @@
 package router
 
 import (
+	"sync"
+
 	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -32,7 +34,12 @@ type Router struct {
 	varz       varz.Varz
 	component  *vcap.VcapComponent
 
-	listener net.Listener
+	listener    net.Listener
+	activeConns uint32
+	connLock    sync.Mutex
+	idleConns   map[net.Conn]struct{}
+	drainDone   chan struct{}
+	serveDone   chan struct{}
 
 	logger *steno.Logger
 }
@@ -74,6 +81,8 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		registry:   r,
 		varz:       v,
 		component:  component,
+		serveDone:  make(chan struct{}),
+		idleConns:  make(map[net.Conn]struct{}),
 		logger:     steno.NewLogger("router"),
 	}
 
@@ -114,6 +123,28 @@ func (r *Router) Run() <-chan error {
 
 	server := http.Server{
 		Handler: dropsonde.InstrumentedHandler(r.proxy),
+		ConnState: func(conn net.Conn, state http.ConnState) {
+			r.connLock.Lock()
+			switch state {
+			case http.StateActive:
+				r.activeConns++
+				delete(r.idleConns, conn)
+			case http.StateIdle:
+				r.activeConns--
+				r.idleConns[conn] = struct{}{}
+			case http.StateHijacked, http.StateClosed:
+				i := len(r.idleConns)
+				delete(r.idleConns, conn)
+				if i == len(r.idleConns) {
+					r.activeConns--
+				}
+				if r.drainDone != nil && r.activeConns == 0 {
+					close(r.drainDone)
+					r.drainDone = nil
+				}
+			}
+			r.connLock.Unlock()
+		},
 	}
 
 	errChan := make(chan error, 1)
@@ -131,6 +162,7 @@ func (r *Router) Run() <-chan error {
 	go func() {
 		err := server.Serve(listener)
 		errChan <- err
+		close(r.serveDone)
 	}()
 
 	return errChan
@@ -139,11 +171,17 @@ func (r *Router) Run() <-chan error {
 func (r *Router) Drain(drainTimeout time.Duration) error {
 	r.listener.Close()
 
+	// no more accepts will occur
+	<-r.serveDone
+
 	drained := make(chan struct{})
-	go func() {
-		r.proxy.Wait()
+	r.connLock.Lock()
+	if r.activeConns == 0 {
 		close(drained)
-	}()
+	} else {
+		r.drainDone = drained
+	}
+	r.connLock.Unlock()
 
 	select {
 	case <-drained:

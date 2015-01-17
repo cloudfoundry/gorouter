@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
@@ -39,7 +38,6 @@ type ProxyReporter interface {
 
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
-	Wait()
 }
 
 type ProxyArgs struct {
@@ -61,9 +59,6 @@ type proxy struct {
 	accessLogger  access_log.AccessLogger
 	transport     *http.Transport
 	secureCookies bool
-
-	waitgroup     *sync.WaitGroup
-	waitgroupchan chan bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -87,11 +82,8 @@ func NewProxy(args ProxyArgs) Proxy {
 			},
 			DisableKeepAlives: true,
 		},
-		waitgroup:     &sync.WaitGroup{},
-		waitgroupchan: make(chan bool, 1),
 		secureCookies: args.SecureCookies,
 	}
-	p.waitgroupchan <- true
 	return p
 }
 
@@ -105,12 +97,6 @@ func hostWithoutPort(req *http.Request) string {
 	}
 
 	return host
-}
-
-func (p *proxy) Wait() {
-	<-p.waitgroupchan
-	p.waitgroup.Wait()
-	p.waitgroupchan <- true
 }
 
 func (p *proxy) getStickySession(request *http.Request) string {
@@ -139,13 +125,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	handler := NewRequestHandler(request, responseWriter, p.reporter, &accessLog)
 
-	<-p.waitgroupchan
-	p.waitgroup.Add(1)
-	p.waitgroupchan <- true
-
 	defer func() {
 		p.accessLogger.Log(accessLog)
-		p.waitgroup.Done()
 	}()
 
 	if !isProtocolSupported(request) {

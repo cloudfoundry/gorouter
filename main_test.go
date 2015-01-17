@@ -123,6 +123,7 @@ var _ = Describe("Router Integration", func() {
 
 			requestMade := make(chan bool)
 			requestProcessing := make(chan bool)
+			responseRead := make(chan bool)
 
 			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil)
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +132,8 @@ var _ = Describe("Router Integration", func() {
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				Ω(err).ShouldNot(HaveOccurred())
-				w.WriteHeader(http.StatusNoContent)
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte{'b'})
 			})
 			longApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -141,9 +143,12 @@ var _ = Describe("Router Integration", func() {
 				defer GinkgoRecover()
 				resp, err := http.Get(longApp.Endpoint())
 				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp.StatusCode).Should(Equal(http.StatusNoContent))
-				ioutil.ReadAll(resp.Body)
+				Ω(resp.StatusCode).Should(Equal(http.StatusOK))
+				bytes, err := ioutil.ReadAll(resp.Body)
 				resp.Body.Close()
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(bytes).Should(Equal([]byte{'b'}))
+				responseRead <- true
 			}()
 
 			grouter := gorouterSession
@@ -157,6 +162,7 @@ var _ = Describe("Router Integration", func() {
 
 			Ω(err).ShouldNot(HaveOccurred())
 			Eventually(grouter, 5).Should(Exit(0))
+			Eventually(responseRead).Should(Receive(BeTrue()))
 		})
 
 		It("will timeout if requests take too long", func() {
