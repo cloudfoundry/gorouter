@@ -47,56 +47,73 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Register", func() {
-		It("records and tracks time of last update", func() {
-			r.Register("foo", fooEndpoint)
-			r.Register("fooo", fooEndpoint)
-			Ω(r.NumUris()).To(Equal(2))
-			firstUpdateTime := r.TimeOfLastUpdate()
+		Context("uri", func() {
+			It("records and tracks time of last update", func() {
+				r.Register("foo", fooEndpoint)
+				r.Register("fooo", fooEndpoint)
+				Ω(r.NumUris()).To(Equal(2))
+				firstUpdateTime := r.TimeOfLastUpdate()
 
-			r.Register("bar", barEndpoint)
-			r.Register("baar", barEndpoint)
-			Ω(r.NumUris()).To(Equal(4))
-			secondUpdateTime := r.TimeOfLastUpdate()
+				r.Register("bar", barEndpoint)
+				r.Register("baar", barEndpoint)
+				Ω(r.NumUris()).To(Equal(4))
+				secondUpdateTime := r.TimeOfLastUpdate()
 
-			Ω(secondUpdateTime.After(firstUpdateTime)).To(BeTrue())
+				Ω(secondUpdateTime.After(firstUpdateTime)).To(BeTrue())
+			})
+
+			It("ignores duplicates", func() {
+				r.Register("bar", barEndpoint)
+				r.Register("baar", barEndpoint)
+
+				Ω(r.NumUris()).To(Equal(2))
+				Ω(r.NumEndpoints()).To(Equal(1))
+
+				r.Register("bar", barEndpoint)
+				r.Register("baar", barEndpoint)
+
+				Ω(r.NumUris()).To(Equal(2))
+				Ω(r.NumEndpoints()).To(Equal(1))
+			})
+
+			It("ignores case", func() {
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+				m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil, -1)
+
+				r.Register("foo", m1)
+				r.Register("FOO", m2)
+
+				Ω(r.NumUris()).To(Equal(1))
+			})
+
+			It("allows multiple uris for the same endpoint", func() {
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+				m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+
+				r.Register("foo", m1)
+				r.Register("bar", m2)
+
+				Ω(r.NumUris()).To(Equal(2))
+				Ω(r.NumEndpoints()).To(Equal(1))
+			})
 		})
 
-		It("ignores duplicates", func() {
-			r.Register("bar", barEndpoint)
-			r.Register("baar", barEndpoint)
+		Context("wildcard routes", func() {
+			It("records a uri starting with a '*' ", func() {
+				r.Register("*.a.route", fooEndpoint)
 
-			Ω(r.NumUris()).To(Equal(2))
-			Ω(r.NumEndpoints()).To(Equal(1))
-
-			r.Register("bar", barEndpoint)
-			r.Register("baar", barEndpoint)
-
-			Ω(r.NumUris()).To(Equal(2))
-			Ω(r.NumEndpoints()).To(Equal(1))
-		})
-
-		It("ignores case", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", nil, -1)
-
-			r.Register("foo", m1)
-			r.Register("FOO", m2)
-
-			Ω(r.NumUris()).To(Equal(1))
-		})
-
-		It("allows multiple uris for the same endpoint", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
-
-			r.Register("foo", m1)
-			r.Register("bar", m2)
-
-			Ω(r.NumUris()).To(Equal(2))
-			Ω(r.NumEndpoints()).To(Equal(1))
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(1))
+			})
 		})
 	})
+
 	Context("Unregister", func() {
+		It("Handles unknonw URIs", func() {
+			r.Unregister("bar", barEndpoint)
+			Ω(r.NumUris()).To(Equal(0))
+			Ω(r.NumEndpoints()).To(Equal(0))
+		})
 
 		It("removes uris and endpoints", func() {
 			r.Register("bar", barEndpoint)
@@ -141,6 +158,28 @@ var _ = Describe("RouteRegistry", func() {
 
 			Ω(r.NumUris()).To(Equal(1))
 		})
+
+		It("removes wildcard routes", func() {
+			r.Register("*.bar", barEndpoint)
+			r.Register("*.baar", barEndpoint)
+			Ω(r.NumUris()).To(Equal(2))
+			Ω(r.NumEndpoints()).To(Equal(1))
+
+			r.Register("*.bar", bar2Endpoint)
+			r.Register("*.baar", bar2Endpoint)
+			Ω(r.NumUris()).To(Equal(2))
+			Ω(r.NumEndpoints()).To(Equal(2))
+
+			r.Unregister("*.bar", barEndpoint)
+			r.Unregister("*.baar", barEndpoint)
+			Ω(r.NumUris()).To(Equal(2))
+			Ω(r.NumEndpoints()).To(Equal(1))
+
+			r.Unregister("*.bar", bar2Endpoint)
+			r.Unregister("*.baar", bar2Endpoint)
+			Ω(r.NumUris()).To(Equal(0))
+			Ω(r.NumEndpoints()).To(Equal(0))
+		})
 	})
 
 	Context("Lookup", func() {
@@ -176,7 +215,42 @@ var _ = Describe("RouteRegistry", func() {
 			Ω(e).ShouldNot(BeNil())
 			Ω(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:123[4|5]"))
 		})
+
+		It("selects the outer most wild card route if one exists", func() {
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", nil, -1)
+
+			r.Register("*.outer.wild.card", app1)
+			r.Register("*.wild.card", app2)
+
+			p := r.Lookup("foo.wild.card")
+			Expect(p).ToNot(BeNil())
+			e := p.Endpoints("").Next()
+			Ω(e).ShouldNot(BeNil())
+			Ω(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
+
+			p = r.Lookup("foo.space.wild.card")
+			Expect(p).ToNot(BeNil())
+			e = p.Endpoints("").Next()
+			Ω(e).ShouldNot(BeNil())
+			Ω(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
+		})
+
+		It("prefers full URIs to wildcard routes", func() {
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", nil, -1)
+
+			r.Register("not.wild.card", app1)
+			r.Register("*.wild.card", app2)
+
+			p := r.Lookup("not.wild.card")
+			Expect(p).ToNot(BeNil())
+			e := p.Endpoints("").Next()
+			Ω(e).ShouldNot(BeNil())
+			Ω(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+		})
 	})
+
 	Context("Prunes Stale Droplets", func() {
 
 		AfterEach(func() {
