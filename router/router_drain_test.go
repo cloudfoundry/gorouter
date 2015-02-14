@@ -109,7 +109,7 @@ var _ = Describe("Router", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(2 * time.Second)
+				err := router.Drain(1 * time.Second)
 				Ω(err).ShouldNot(HaveOccurred())
 				resultCh <- true
 			}()
@@ -119,7 +119,7 @@ var _ = Describe("Router", func() {
 			blocker <- false
 
 			var result bool
-			Eventually(resultCh).Should(Receive(&result))
+			Eventually(resultCh, 2).Should(Receive(&result))
 			Ω(result).To(BeTrue())
 		})
 

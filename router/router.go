@@ -34,12 +34,13 @@ type Router struct {
 	varz       varz.Varz
 	component  *vcap.VcapComponent
 
-	listener    net.Listener
-	activeConns uint32
-	connLock    sync.Mutex
-	idleConns   map[net.Conn]struct{}
-	drainDone   chan struct{}
-	serveDone   chan struct{}
+	listener         net.Listener
+	closeConnections bool
+	activeConns      uint32
+	connLock         sync.Mutex
+	idleConns        map[net.Conn]struct{}
+	drainDone        chan struct{}
+	serveDone        chan struct{}
 
 	logger *steno.Logger
 }
@@ -132,16 +133,21 @@ func (r *Router) Run() <-chan error {
 			case http.StateIdle:
 				r.activeConns--
 				r.idleConns[conn] = struct{}{}
+
+				if r.closeConnections {
+					conn.Close()
+				}
 			case http.StateHijacked, http.StateClosed:
 				i := len(r.idleConns)
 				delete(r.idleConns, conn)
 				if i == len(r.idleConns) {
 					r.activeConns--
 				}
-				if r.drainDone != nil && r.activeConns == 0 {
-					close(r.drainDone)
-					r.drainDone = nil
-				}
+			}
+
+			if r.drainDone != nil && r.activeConns == 0 {
+				close(r.drainDone)
+				r.drainDone = nil
 			}
 			r.connLock.Unlock()
 		},
@@ -176,6 +182,8 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 	drained := make(chan struct{})
 	r.connLock.Lock()
+	r.close()
+
 	if r.activeConns == 0 {
 		close(drained)
 	} else {
@@ -194,7 +202,24 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 func (r *Router) Stop() {
 	r.listener.Close()
+
+	// no more accepts will occur
+	<-r.serveDone
+
+	r.connLock.Lock()
+	r.close()
+	r.connLock.Unlock()
+
 	r.component.Stop()
+}
+
+// connLock must be locked
+func (r *Router) close() {
+	r.closeConnections = true
+
+	for conn, _ := range r.idleConns {
+		conn.Close()
+	}
 }
 
 func (r *Router) RegisterComponent() {

@@ -903,27 +903,55 @@ var _ = Describe("Proxy", func() {
 		Ω(err).NotTo(BeNil())
 	})
 
-	It("disables keepalives from clients -- force connection close", func() {
-		ln := registerHandler(r, "remote", func(x *test_util.HttpConn) {
-			http.ReadRequest(x.Reader)
-			resp := test_util.NewResponse(http.StatusOK)
-			resp.Header.Set("Connection", "keep-alive")
-			x.WriteResponse(resp)
-			x.Close()
+	Context("respect client keepalives", func() {
+		It("closes the connection when told to close", func() {
+			ln := registerHandler(r, "remote", func(x *test_util.HttpConn) {
+				http.ReadRequest(x.Reader)
+				resp := test_util.NewResponse(http.StatusOK)
+				resp.Close = true
+				x.WriteResponse(resp)
+				x.Close()
+			})
+			defer ln.Close()
+
+			x := dialProxy(proxyServer)
+
+			req := x.NewRequest("GET", "/", nil)
+			req.Host = "remote"
+			req.Close = true
+			x.WriteRequest(req)
+			resp, _ := x.ReadResponse()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			x.WriteRequest(req)
+			_, err := http.ReadResponse(x.Reader, &http.Request{})
+			Ω(err).Should(Equal(io.ErrUnexpectedEOF))
 		})
-		defer ln.Close()
 
-		x := dialProxy(proxyServer)
+		It("keeps the connection alive", func() {
+			ln := registerHandler(r, "remote", func(x *test_util.HttpConn) {
+				http.ReadRequest(x.Reader)
+				resp := test_util.NewResponse(http.StatusOK)
+				resp.Close = true
+				x.WriteResponse(resp)
+				x.Close()
+			})
+			defer ln.Close()
 
-		req := x.NewRequest("GET", "/", nil)
-		req.Host = "remote"
-		x.WriteRequest(req)
-		resp, _ := x.ReadResponse()
-		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			x := dialProxy(proxyServer)
 
-		x.WriteRequest(req)
-		_, err := http.ReadResponse(x.Reader, &http.Request{})
-		Ω(err).Should(HaveOccurred())
+			req := x.NewRequest("GET", "/", nil)
+			req.Host = "remote"
+			req.Close = false
+			x.WriteRequest(req)
+			resp, _ := x.ReadResponse()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			x.WriteRequest(req)
+			_, err := http.ReadResponse(x.Reader, &http.Request{})
+			Ω(err).ShouldNot(HaveOccurred())
+		})
+
 	})
 
 	It("retries when failed endpoints exist", func() {
