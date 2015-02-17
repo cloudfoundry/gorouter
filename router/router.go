@@ -25,6 +25,7 @@ import (
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
+var noDeadline = time.Time{}
 
 type Router struct {
 	config     *config.Config
@@ -122,17 +123,25 @@ func (r *Router) Run() <-chan error {
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
+	endpointTimeout := r.config.EndpointTimeout
+
 	server := http.Server{
 		Handler: dropsonde.InstrumentedHandler(r.proxy),
 		ConnState: func(conn net.Conn, state http.ConnState) {
+			deadlineDelta := time.Duration(0)
+
 			r.connLock.Lock()
 			switch state {
 			case http.StateActive:
 				r.activeConns++
 				delete(r.idleConns, conn)
+
+				deadlineDelta = endpointTimeout
 			case http.StateIdle:
 				r.activeConns--
 				r.idleConns[conn] = struct{}{}
+
+				deadlineDelta = endpointTimeout
 
 				if r.closeConnections {
 					conn.Close()
@@ -150,6 +159,12 @@ func (r *Router) Run() <-chan error {
 				r.drainDone = nil
 			}
 			r.connLock.Unlock()
+
+			deadline := noDeadline
+			if deadlineDelta > 0 {
+				deadline = time.Now().Add(deadlineDelta)
+			}
+			conn.SetDeadline(deadline)
 		},
 	}
 
