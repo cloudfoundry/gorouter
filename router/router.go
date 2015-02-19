@@ -128,23 +128,28 @@ func (r *Router) Run() <-chan error {
 	server := http.Server{
 		Handler: dropsonde.InstrumentedHandler(r.proxy),
 		ConnState: func(conn net.Conn, state http.ConnState) {
-			deadlineDelta := time.Duration(0)
 
 			r.connLock.Lock()
+
 			switch state {
 			case http.StateActive:
 				r.activeConns++
 				delete(r.idleConns, conn)
 
-				deadlineDelta = endpointTimeout
+				conn.SetDeadline(time.Time{})
 			case http.StateIdle:
 				r.activeConns--
 				r.idleConns[conn] = struct{}{}
 
-				deadlineDelta = endpointTimeout
-
 				if r.closeConnections {
 					conn.Close()
+				} else {
+					deadline := noDeadline
+					if endpointTimeout > 0 {
+						deadline = time.Now().Add(endpointTimeout)
+					}
+
+					conn.SetDeadline(deadline)
 				}
 			case http.StateHijacked, http.StateClosed:
 				i := len(r.idleConns)
@@ -158,13 +163,8 @@ func (r *Router) Run() <-chan error {
 				close(r.drainDone)
 				r.drainDone = nil
 			}
-			r.connLock.Unlock()
 
-			deadline := noDeadline
-			if deadlineDelta > 0 {
-				deadline = time.Now().Add(deadlineDelta)
-			}
-			conn.SetDeadline(deadline)
+			r.connLock.Unlock()
 		},
 	}
 
@@ -197,7 +197,7 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 	drained := make(chan struct{})
 	r.connLock.Lock()
-	r.close()
+	r.closeIdleConns()
 
 	if r.activeConns == 0 {
 		close(drained)
@@ -222,14 +222,14 @@ func (r *Router) Stop() {
 	<-r.serveDone
 
 	r.connLock.Lock()
-	r.close()
+	r.closeIdleConns()
 	r.connLock.Unlock()
 
 	r.component.Stop()
 }
 
 // connLock must be locked
-func (r *Router) close() {
+func (r *Router) closeIdleConns() {
 	r.closeConnections = true
 
 	for conn, _ := range r.idleConns {

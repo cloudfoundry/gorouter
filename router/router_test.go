@@ -23,11 +23,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -406,11 +404,14 @@ var _ = Describe("Router", func() {
 				uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
 				req, _ := http.NewRequest("GET", uri, nil)
 				client := http.Client{}
-				_, err := client.Do(req)
-				Ω(err).Should(HaveOccurred())
-				urlErr, ok := err.(*url.Error)
-				Ω(ok).Should(BeTrue())
-				Ω(urlErr.Err).Should(Equal(io.EOF))
+				resp, err := client.Do(req)
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(resp).ShouldNot(BeNil())
+				Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+				defer resp.Body.Close()
+
+				_, err = ioutil.ReadAll(resp.Body)
+				Ω(err).ShouldNot(HaveOccurred())
 			})
 
 			It("terminates before receiving the body", func() {
@@ -423,8 +424,9 @@ var _ = Describe("Router", func() {
 				Ω(resp.StatusCode).To(Equal(http.StatusOK))
 				defer resp.Body.Close()
 
-				_, err = ioutil.ReadAll(resp.Body)
-				Ω(err).Should(Equal(io.ErrUnexpectedEOF))
+				body, err := ioutil.ReadAll(resp.Body)
+				Ω(err).ShouldNot(HaveOccurred())
+				Ω(body).Should(HaveLen(0))
 			})
 		})
 
