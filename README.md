@@ -5,7 +5,7 @@
 This repository contains the source code for a Go implementation of the Cloud
 Foundry router.
 
-This router is now used on CloudFoundry.com, replacing the old implementation.
+You can find the old router [here](http://github.com/cloudfoundry-attic/router)
 
 ## Summary
 
@@ -173,7 +173,9 @@ Hello!
 
 ### Instrumentation
 
-Gorouter provides `/varz` and `/healthz` http endpoints for monitoring.
+Gorouter provides a `/varz` http endpoint for monitoring.
+
+There is a *deprecated* `healthz` endpoint that provides no useful information about the router. To check on the health of the router, we currently recommend checking the status of TCP port 80.
 
 The `/routes` endpoint returns the entire routing table as JSON. Each route has an associated array of host:port entries.
 
