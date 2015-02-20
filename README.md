@@ -107,13 +107,10 @@ gorouter
 
 ### Usage
 
-When gorouter starts, it sends `router.start`. This message contains an
-interval that other components should then send `router.register` on. If they
-do not send a `router.register` for an amount of time considered "stale" by the
-router, the routes are pruned. The default "staleness" is 2 minutes. The staleness
-field (minimumRegisterIntervalInSeconds) is guaranteed to be an integer value. 
+When the gorouter starts, it sends a `router.start` message. This message contains an
+interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration value. The router will prune routes that it considers to be stale based upon a seperate "staleness" value, `prune_stale_droplets_interval`, which defaults to 120 seconds. Both of these values are represented in seconds and will always be integers.
 
-The format of this message is as follows:
+The format of the `router.start` message is as follows:
 
 ```json
 {
@@ -122,12 +119,13 @@ The format of this message is as follows:
   "minimumRegisterIntervalInSeconds": 5
 }
 ```
+After a `router.start` message is received by a client, the client should send `router.register` messages. This ensures that the new router can update its routing table and synchronize with existing routers.
 
 If a component comes online after the router, it must make a NATS request
 called `router.greet` in order to determine the interval. The response to this
 message will be the same format as `router.start`.
 
-The format of route updates are as follows:
+The format of the `router.register` message is as follows:
 
 ```json
 {
@@ -140,17 +138,35 @@ The format of route updates are as follows:
   "tags": {
     "another_key": "another_value",
     "some_key": "some_value"
-  }
+  },
+  "app": "some_app_guid",
+  "stale_threshold_in_seconds": 120,
+  "private_instance_id": "some_app_instance_id"
 }
 ```
+`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold.
+`app` is a unique identifier for an application that the route is registered for. It is used to emit router access logs associated with the app through dropsonde.
+`private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. `X-CF-InstanceID` is set to this value on the request to the endpoint registered.
 
 Such a message can be sent to both the `router.register` subject to register
-URIs, and to the `router.unregister` subject to unregister URIs, respectively.
+URIs, and to the `router.unregister` subject to unregister URIs, respectively. 
 
+###Example
+
+Create a simple app
 ```
 $ nohup ruby -rsinatra -e 'get("/") { "Hello!" }' &
+```
+
+Send a register message
+```
 $ nats-pub 'router.register' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+
 Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+```
+
+See that it works!
+```
 $ curl my_first_url.vcap.me:8080
 Hello!
 ```
