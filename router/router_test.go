@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"time"
 )
@@ -385,6 +386,119 @@ var _ = Describe("Router", func() {
 		defer resp.Body.Close()
 		Ω(err).ShouldNot(HaveOccurred())
 		Ω(string(body)).Should(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
+	})
+
+	Context("HTTP keep-alive", func() {
+		It("reuses the same connection on subsequent calls", func() {
+			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			uri := fmt.Sprintf("http://%s", host)
+
+			conn, err := net.Dial("tcp", host)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			client := httputil.NewClientConn(conn, nil)
+			req, _ := http.NewRequest("GET", uri, nil)
+			Ω(req.Close).To(BeFalse())
+
+			resp, err := client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			//make second request without errors
+			resp, err = client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("resets the idle timeout on activity", func() {
+			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			uri := fmt.Sprintf("http://%s", host)
+
+			conn, err := net.Dial("tcp", host)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			client := httputil.NewClientConn(conn, nil)
+			req, _ := http.NewRequest("GET", uri, nil)
+			Ω(req.Close).To(BeFalse())
+
+			// initiate idle timeout
+			resp, err := client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			// use 3/4 of the idle timeout
+			time.Sleep(config.EndpointTimeout / 4 * 3)
+
+			//make second request without errors
+			resp, err = client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			// use another 3/4 of the idle timeout, exceeding the original timeout
+			time.Sleep(config.EndpointTimeout / 4 * 3)
+
+			// make third request without errors
+			// even though initial idle timeout was exceeded because
+			// it will have been reset
+			resp, err = client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("removes the idle timeout during an active connection", func() {
+			// create an app that takes 3/4 of the deadline to respond
+			// during an active connection
+			app := test.NewSlowApp(
+				[]route.Uri{"keepalive.vcap.me"},
+				config.Port,
+				mbusClient,
+				config.EndpointTimeout/4*3,
+			)
+			app.Listen()
+			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			uri := fmt.Sprintf("http://%s", host)
+
+			conn, err := net.Dial("tcp", host)
+			Ω(err).ShouldNot(HaveOccurred())
+
+			client := httputil.NewClientConn(conn, nil)
+			req, _ := http.NewRequest("GET", uri, nil)
+			Ω(req.Close).To(BeFalse())
+
+			// initiate idle timeout
+			resp, err := client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+
+			// use 3/4 of the idle timeout
+			time.Sleep(config.EndpointTimeout / 4 * 3)
+
+			// because 3/4 of the idle timeout is now used
+			// making a request that will last 3/4 of the timeout
+			// that does not disconnect will show that the idle timeout
+			// was removed during the active connection
+			resp, err = client.Do(req)
+			Ω(err).ToNot(HaveOccurred())
+			Ω(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		})
 	})
 
 	Context("long requests", func() {
