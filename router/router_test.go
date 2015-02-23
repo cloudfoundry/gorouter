@@ -95,7 +95,13 @@ var _ = Describe("Router", func() {
 
 			var msg []byte
 			Eventually(response, 1).Should(Receive(&msg))
-			Ω(string(msg)).To(MatchRegexp(".*\"minimumRegisterIntervalInSeconds\":5.*"))
+
+			var message vcap.RouterStart
+			err := json.Unmarshal(msg, &message)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(5))
+			Expect(message.PruneThresholdInSeconds).To(Equal(120))
 		})
 
 		It("discovers", func() {

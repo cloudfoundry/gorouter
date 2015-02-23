@@ -44,6 +44,7 @@ type RouterStart struct {
 	Id                               string   `json:"id"`
 	Hosts                            []string `json:"hosts"`
 	MinimumRegisterIntervalInSeconds int      `json:"minimumRegisterIntervalInSeconds"`
+	PruneThresholdInSeconds          int      `json:"pruneThresholdInSeconds"`
 }
 
 func (c *VcapComponent) UpdateVarz() {

@@ -335,6 +335,7 @@ func (r *Router) greetMessage() ([]byte, error) {
 		Id:    r.component.UUID,
 		Hosts: []string{host},
 		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,
+		PruneThresholdInSeconds:          r.config.DropletStaleThresholdInSeconds,
 	}
 
 	return json.Marshal(d)
