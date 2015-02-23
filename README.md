@@ -107,8 +107,13 @@ gorouter
 
 ### Usage
 
-When the gorouter starts, it sends a `router.start` message. This message contains an
-interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration value. The router will prune routes that it considers to be stale based upon a seperate "staleness" value, `prune_stale_droplets_interval`, which defaults to 120 seconds. Both of these values are represented in seconds and will always be integers.
+When the gorouter starts, it sends a `router.start` message.
+This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`.
+It is recommended that clients should send `router.register` messages on this interval.
+This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration value.
+The gorouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds.
+The gorouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds.
+All of these values are represented in seconds and will always be integers.
 
 The format of the `router.start` message is as follows:
 
@@ -116,7 +121,8 @@ The format of the `router.start` message is as follows:
 {
   "id": "some-router-id",
   "hosts": ["1.2.3.4"],
-  "minimumRegisterIntervalInSeconds": 5
+  "minimumRegisterIntervalInSeconds": 5,
+  "prunteThresholdInSeconds": 120,
 }
 ```
 After a `router.start` message is received by a client, the client should send `router.register` messages. This ensures that the new router can update its routing table and synchronize with existing routers.
