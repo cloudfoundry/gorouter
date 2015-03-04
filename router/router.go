@@ -184,6 +184,7 @@ func (r *Router) Run() <-chan error {
 	if r.config.EnableSSL {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{r.config.SSLCertificate},
+			CipherSuites: r.config.CipherSuites,
 		}
 
 		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)

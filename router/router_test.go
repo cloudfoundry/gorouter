@@ -61,6 +61,7 @@ var _ = Describe("Router", func() {
 		config.EnableSSL = true
 		config.SSLPort = 4443
 		config.SSLCertificate = cert
+		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(config, mbusClient)
@@ -647,6 +648,23 @@ var _ = Describe("Router", func() {
 			Ω(resp).ShouldNot(BeNil())
 			resp.Body.Close()
 			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("fails when the client uses an unsupported cipher suite", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+
+			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+			req, _ := http.NewRequest("GET", uri, nil)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+					CipherSuites:       []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA},
+				},
+			}
+			client := http.Client{Transport: tr}
+			_, err := client.Do(req)
+			Ω(err).To(HaveOccurred())
 		})
 	})
 })

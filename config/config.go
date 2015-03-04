@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -74,6 +75,9 @@ type Config struct {
 	SSLCertPem     string `yaml:"ssl_cert"`
 	SSLCertKey     string `yaml:"ssl_key"`
 	SSLCertificate tls.Certificate
+
+	CipherString string `yaml:"cipher_suites"`
+	CipherSuites []uint16
 
 	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
 	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
@@ -154,12 +158,47 @@ func (c *Config) Process() {
 	}
 
 	if c.EnableSSL {
+		c.CipherSuites = c.processCipherSuites()
 		cert, err := tls.X509KeyPair([]byte(c.SSLCertPem), []byte(c.SSLCertKey))
 		if err != nil {
 			panic(err)
 		}
 		c.SSLCertificate = cert
 	}
+}
+
+func (c *Config) processCipherSuites() []uint16 {
+	cipherMap := map[string]uint16{
+		"TLS_RSA_WITH_RC4_128_SHA":                0x0005,
+		"TLS_RSA_WITH_AES_128_CBC_SHA":            0x002f,
+		"TLS_RSA_WITH_AES_256_CBC_SHA":            0x0035,
+		"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":        0xc007,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    0xc009,
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    0xc00a,
+		"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          0xc011,
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      0xc013,
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      0xc014,
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   0xc02f,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": 0xc02b,
+	}
+
+	ciphers := []uint16{}
+	if len(strings.TrimSpace(c.CipherString)) == 0 {
+		for _, cipherValue := range cipherMap {
+			ciphers = append(ciphers, cipherValue)
+		}
+		return ciphers
+	}
+
+	for _, cipher := range strings.Split(c.CipherString, ":") {
+		if val, ok := cipherMap[cipher]; ok {
+			ciphers = append(ciphers, val)
+		} else {
+			panic("invalid cipher string configuration")
+		}
+	}
+
+	return ciphers
 }
 
 func (c *Config) NatsServers() []string {
