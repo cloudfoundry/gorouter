@@ -16,6 +16,7 @@ import (
 
 	"bytes"
 	"compress/zlib"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,12 +37,14 @@ type Router struct {
 	component  *vcap.VcapComponent
 
 	listener         net.Listener
+	tlsListener      net.Listener
 	closeConnections bool
 	activeConns      uint32
 	connLock         sync.Mutex
 	idleConns        map[net.Conn]struct{}
 	drainDone        chan struct{}
 	serveDone        chan struct{}
+	tlsServeDone     chan struct{}
 
 	logger *steno.Logger
 }
@@ -77,15 +80,16 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 	}
 
 	router := &Router{
-		config:     cfg,
-		proxy:      p,
-		mbusClient: mbusClient,
-		registry:   r,
-		varz:       v,
-		component:  component,
-		serveDone:  make(chan struct{}),
-		idleConns:  make(map[net.Conn]struct{}),
-		logger:     steno.NewLogger("router"),
+		config:       cfg,
+		proxy:        p,
+		mbusClient:   mbusClient,
+		registry:     r,
+		varz:         v,
+		component:    component,
+		serveDone:    make(chan struct{}),
+		tlsServeDone: make(chan struct{}),
+		idleConns:    make(map[net.Conn]struct{}),
+		logger:       steno.NewLogger("router"),
 	}
 
 	if err := router.component.Start(); err != nil {
@@ -177,6 +181,28 @@ func (r *Router) Run() <-chan error {
 		return errChan
 	}
 
+	if r.config.EnableSSL {
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{r.config.SSLCertificate},
+		}
+
+		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
+		if err != nil {
+			r.logger.Fatalf("tls.Listen: %s", err)
+			errChan <- err
+			return errChan
+		}
+
+		go func() {
+			err := server.Serve(tlsListener)
+			errChan <- err
+			close(r.tlsServeDone)
+		}()
+
+		r.tlsListener = tlsListener
+		r.logger.Infof("Listening on %s", tlsListener.Addr())
+	}
+
 	r.listener = listener
 	r.logger.Infof("Listening on %s", listener.Addr())
 
@@ -191,6 +217,11 @@ func (r *Router) Run() <-chan error {
 
 func (r *Router) Drain(drainTimeout time.Duration) error {
 	r.listener.Close()
+
+	if r.tlsListener != nil {
+		r.tlsListener.Close()
+		<-r.tlsServeDone
+	}
 
 	// no more accepts will occur
 	<-r.serveDone
@@ -217,6 +248,11 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 func (r *Router) Stop() {
 	r.listener.Close()
+
+	if r.tlsListener != nil {
+		r.tlsListener.Close()
+		<-r.tlsServeDone
+	}
 
 	// no more accepts will occur
 	<-r.serveDone

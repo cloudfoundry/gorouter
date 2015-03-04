@@ -21,6 +21,7 @@ import (
 
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -53,7 +54,13 @@ var _ = Describe("Router", func() {
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
 
+		cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+		Expect(err).ToNot(HaveOccurred())
+
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
+		config.EnableSSL = true
+		config.SSLPort = 4443
+		config.SSLCertificate = cert
 
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(config, mbusClient)
@@ -68,9 +75,16 @@ var _ = Describe("Router", func() {
 			AccessLogger:    &access_log.NullAccessLogger{},
 		})
 		r, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
+
 		Ω(err).ShouldNot(HaveOccurred())
 		router = r
-		r.Run()
+		errChan := r.Run()
+		time.Sleep(50 * time.Millisecond)
+		go func() {
+			select {
+			case <-errChan:
+			}
+		}()
 	})
 
 	AfterEach(func() {
@@ -248,7 +262,7 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("Stop", func() {
-		It("no longer responds to component requests", func() {
+		It("no longer proxies http", func() {
 			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -275,7 +289,7 @@ var _ = Describe("Router", func() {
 			Ω(err).Should(HaveOccurred())
 		})
 
-		It("no longer proxies", func() {
+		It("no longer responds to component requests", func() {
 			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
 
 			req, err := http.NewRequest("GET", host, nil)
@@ -290,6 +304,42 @@ var _ = Describe("Router", func() {
 			req, err = http.NewRequest("GET", host, nil)
 
 			_, err = http.DefaultClient.Do(req)
+			Ω(err).Should(HaveOccurred())
+		})
+
+		It("no longer proxies https", func() {
+			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
+
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				_, err := ioutil.ReadAll(r.Body)
+				defer r.Body.Close()
+				Ω(err).ShouldNot(HaveOccurred())
+				w.WriteHeader(http.StatusNoContent)
+			})
+			app.Listen()
+			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+			host := fmt.Sprintf("https://greet.vcap.me:%d/", config.SSLPort)
+
+			req, err := http.NewRequest("GET", host, nil)
+			Ω(err).ShouldNot(HaveOccurred())
+			req.SetBasicAuth("user", "pass")
+
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := http.Client{Transport: tr}
+			resp, err := client.Do(req)
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(resp).ShouldNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusNoContent))
+
+			router.Stop()
+			router = nil
+
+			req, err = http.NewRequest("GET", host, nil)
+			_, err = client.Do(req)
 			Ω(err).Should(HaveOccurred())
 		})
 	})
@@ -578,6 +628,25 @@ var _ = Describe("Router", func() {
 			x.CheckLine("hello from server")
 
 			x.Close()
+		})
+	})
+
+	Context("serving https", func() {
+		It("serves ssl traffic", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+
+			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+			req, _ := http.NewRequest("GET", uri, nil)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := http.Client{Transport: tr}
+			resp, err := client.Do(req)
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(resp).ShouldNot(BeNil())
+			resp.Body.Close()
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 	})
 })

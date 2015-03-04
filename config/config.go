@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 
@@ -61,13 +62,18 @@ type Config struct {
 	Nats    []NatsConfig  `yaml:"nats"`
 	Logging LoggingConfig `yaml:"logging"`
 
-	Port       uint16 `yaml:"port"`
-	Index      uint   `yaml:"index"`
-	Zone       string `yaml:"zone"`
-	GoMaxProcs int    `yaml:"go_max_procs,omitempty"`
-	TraceKey   string `yaml:"trace_key"`
-	AccessLog  string `yaml:"access_log"`
-	DebugAddr  string `yaml:"debug_addr"`
+	Port           uint16 `yaml:"port"`
+	Index          uint   `yaml:"index"`
+	Zone           string `yaml:"zone"`
+	GoMaxProcs     int    `yaml:"go_max_procs,omitempty"`
+	TraceKey       string `yaml:"trace_key"`
+	AccessLog      string `yaml:"access_log"`
+	DebugAddr      string `yaml:"debug_addr"`
+	EnableSSL      bool   `yaml:"enable_ssl"`
+	SSLPort        uint16 `yaml:"ssl_port"`
+	SSLCertPem     string `yaml:"ssl_cert"`
+	SSLCertKey     string `yaml:"ssl_key"`
+	SSLCertificate tls.Certificate
 
 	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
 	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
@@ -96,6 +102,8 @@ var defaultConfig = Config{
 	Port:       8081,
 	Index:      0,
 	GoMaxProcs: -1,
+	EnableSSL:  false,
+	SSLPort:    443,
 
 	EndpointTimeoutInSeconds: 60,
 
@@ -143,6 +151,14 @@ func (c *Config) Process() {
 	c.Ip, err = localip.LocalIP()
 	if err != nil {
 		panic(err)
+	}
+
+	if c.EnableSSL {
+		cert, err := tls.X509KeyPair([]byte(c.SSLCertPem), []byte(c.SSLCertKey))
+		if err != nil {
+			panic(err)
+		}
+		c.SSLCertificate = cert
 	}
 }
 
