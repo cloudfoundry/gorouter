@@ -127,60 +127,28 @@ func (r *Router) Run() <-chan error {
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
-	endpointTimeout := r.config.EndpointTimeout
-
-	server := http.Server{
-		Handler: dropsonde.InstrumentedHandler(r.proxy),
-		ConnState: func(conn net.Conn, state http.ConnState) {
-
-			r.connLock.Lock()
-
-			switch state {
-			case http.StateActive:
-				r.activeConns++
-				delete(r.idleConns, conn)
-
-				conn.SetDeadline(time.Time{})
-			case http.StateIdle:
-				r.activeConns--
-				r.idleConns[conn] = struct{}{}
-
-				if r.closeConnections {
-					conn.Close()
-				} else {
-					deadline := noDeadline
-					if endpointTimeout > 0 {
-						deadline = time.Now().Add(endpointTimeout)
-					}
-
-					conn.SetDeadline(deadline)
-				}
-			case http.StateHijacked, http.StateClosed:
-				i := len(r.idleConns)
-				delete(r.idleConns, conn)
-				if i == len(r.idleConns) {
-					r.activeConns--
-				}
-			}
-
-			if r.drainDone != nil && r.activeConns == 0 {
-				close(r.drainDone)
-				r.drainDone = nil
-			}
-
-			r.connLock.Unlock()
-		},
+	server := &http.Server{
+		Handler:   dropsonde.InstrumentedHandler(r.proxy),
+		ConnState: r.HandleConnState,
 	}
 
 	errChan := make(chan error, 1)
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	err := r.serveHTTP(server, errChan)
 	if err != nil {
-		r.logger.Fatalf("net.Listen: %s", err)
+		errChan <- err
+		return errChan
+	}
+	err = r.serveHTTPS(server, errChan)
+	if err != nil {
 		errChan <- err
 		return errChan
 	}
 
+	return errChan
+}
+
+func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 	if r.config.EnableSSL {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{r.config.SSLCertificate},
@@ -190,18 +158,26 @@ func (r *Router) Run() <-chan error {
 		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
 		if err != nil {
 			r.logger.Fatalf("tls.Listen: %s", err)
-			errChan <- err
-			return errChan
+			return err
 		}
+
+		r.tlsListener = tlsListener
+		r.logger.Infof("Listening on %s", tlsListener.Addr())
 
 		go func() {
 			err := server.Serve(tlsListener)
 			errChan <- err
 			close(r.tlsServeDone)
 		}()
+	}
+	return nil
+}
 
-		r.tlsListener = tlsListener
-		r.logger.Infof("Listening on %s", tlsListener.Addr())
+func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	if err != nil {
+		r.logger.Fatalf("net.Listen: %s", err)
+		return err
 	}
 
 	r.listener = listener
@@ -212,20 +188,11 @@ func (r *Router) Run() <-chan error {
 		errChan <- err
 		close(r.serveDone)
 	}()
-
-	return errChan
+	return nil
 }
 
 func (r *Router) Drain(drainTimeout time.Duration) error {
-	r.listener.Close()
-
-	if r.tlsListener != nil {
-		r.tlsListener.Close()
-		<-r.tlsServeDone
-	}
-
-	// no more accepts will occur
-	<-r.serveDone
+	r.stopListening()
 
 	drained := make(chan struct{})
 	r.connLock.Lock()
@@ -248,15 +215,7 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 }
 
 func (r *Router) Stop() {
-	r.listener.Close()
-
-	if r.tlsListener != nil {
-		r.tlsListener.Close()
-		<-r.tlsServeDone
-	}
-
-	// no more accepts will occur
-	<-r.serveDone
+	r.stopListening()
 
 	r.connLock.Lock()
 	r.closeIdleConns()
@@ -272,6 +231,17 @@ func (r *Router) closeIdleConns() {
 	for conn, _ := range r.idleConns {
 		conn.Close()
 	}
+}
+
+func (r *Router) stopListening() {
+	r.listener.Close()
+
+	if r.tlsListener != nil {
+		r.tlsListener.Close()
+		<-r.tlsServeDone
+	}
+
+	<-r.serveDone
 }
 
 func (r *Router) RegisterComponent() {
@@ -339,6 +309,47 @@ func (r *Router) ScheduleFlushApps() {
 			}
 		}
 	}()
+}
+
+func (r *Router) HandleConnState(conn net.Conn, state http.ConnState) {
+	endpointTimeout := r.config.EndpointTimeout
+
+	r.connLock.Lock()
+
+	switch state {
+	case http.StateActive:
+		r.activeConns++
+		delete(r.idleConns, conn)
+
+		conn.SetDeadline(time.Time{})
+	case http.StateIdle:
+		r.activeConns--
+		r.idleConns[conn] = struct{}{}
+
+		if r.closeConnections {
+			conn.Close()
+		} else {
+			deadline := noDeadline
+			if endpointTimeout > 0 {
+				deadline = time.Now().Add(endpointTimeout)
+			}
+
+			conn.SetDeadline(deadline)
+		}
+	case http.StateHijacked, http.StateClosed:
+		i := len(r.idleConns)
+		delete(r.idleConns, conn)
+		if i == len(r.idleConns) {
+			r.activeConns--
+		}
+	}
+
+	if r.drainDone != nil && r.activeConns == 0 {
+		close(r.drainDone)
+		r.drainDone = nil
+	}
+
+	r.connLock.Unlock()
 }
 
 func (r *Router) flushApps(t time.Time) {
