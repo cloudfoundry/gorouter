@@ -72,8 +72,8 @@ type Config struct {
 	DebugAddr      string `yaml:"debug_addr"`
 	EnableSSL      bool   `yaml:"enable_ssl"`
 	SSLPort        uint16 `yaml:"ssl_port"`
-	SSLCertPem     string `yaml:"ssl_cert"`
-	SSLCertKey     string `yaml:"ssl_key"`
+	SSLCertPath    string `yaml:"ssl_cert_path"`
+	SSLKeyPath     string `yaml:"ssl_key_path"`
 	SSLCertificate tls.Certificate
 
 	CipherString string `yaml:"cipher_suites"`
@@ -159,7 +159,7 @@ func (c *Config) Process() {
 
 	if c.EnableSSL {
 		c.CipherSuites = c.processCipherSuites()
-		cert, err := tls.X509KeyPair([]byte(c.SSLCertPem), []byte(c.SSLCertKey))
+		cert, err := tls.LoadX509KeyPair(c.SSLCertPath, c.SSLKeyPath)
 		if err != nil {
 			panic(err)
 		}
