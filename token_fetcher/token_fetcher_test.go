@@ -36,6 +36,10 @@ var _ = Describe("TokenFetcher", func() {
 		cfg.ClientSecret = "client-secret"
 	})
 
+	AfterEach(func() {
+		server.Close()
+	})
+
 	Describe(".NewTokenFetcher", func() {
 		It("maybe does something interesting", func() {})
 	})
@@ -80,8 +84,6 @@ var _ = Describe("TokenFetcher", func() {
 		It("returns a new token", func() {
 			responseBody := &Token{
 				AccessToken: "the token",
-				TokenType:   "token type",
-				Scope:       "scopes",
 				ExpireTime:  20,
 			}
 
@@ -102,8 +104,6 @@ var _ = Describe("TokenFetcher", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 			Expect(token.AccessToken).To(Equal("the token"))
-			Expect(token.TokenType).To(Equal("token type"))
-			Expect(token.Scope).To(Equal("scopes"))
 			Expect(token.ExpireTime).To(Equal(20))
 		})
 	})
