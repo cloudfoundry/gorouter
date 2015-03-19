@@ -15,6 +15,8 @@ import (
 	"github.com/cloudfoundry/yagnats"
 
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -41,7 +43,13 @@ func main() {
 	InitLoggerFromConfig(c, logCounter)
 	logger := steno.NewLogger("router.main")
 
-	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	make a token fetcher
+	make a route fetcher
+
+	go fetchroutes(token fetcher, config, route registry)
+
+
+	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Errorf("Dropsonde failed to initialize: %s", err.Error())
 		os.Exit(1)

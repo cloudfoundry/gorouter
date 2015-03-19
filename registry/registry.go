@@ -12,6 +12,17 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 )
 
+type RegistryInterface interface {
+	Register(uri route.Uri, endpoint *route.Endpoint)
+	Unregister(uri route.Uri, endpoint *route.Endpoint)
+	Lookup(uri route.Uri) *route.Pool
+	StartPruningCycle()
+	StopPruningCycle()
+	NumUris() int
+	NumEndpoints() int
+	MarshalJSON() ([]byte, error)
+}
+
 type RouteRegistry struct {
 	sync.RWMutex
 

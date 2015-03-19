@@ -35,6 +35,12 @@ type NatsConfig struct {
 	Pass string `yaml:"pass"`
 }
 
+type OAuthConfig struct {
+	TokenEndpoint string `yaml:"token_endpoint"`
+	ClientName    string `yaml:"client_name"`
+	ClientSecret  string `yaml:"client_secret"`
+}
+
 var defaultNatsConfig = NatsConfig{
 	Host: "localhost",
 	Port: 4222,
@@ -87,6 +93,9 @@ type Config struct {
 	EndpointTimeoutInSeconds             int  `yaml:"endpoint_timeout"`
 	DrainTimeoutInSeconds                int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies                        bool `yaml:"secure_cookies"`
+
+	OAuth         OAuthConfig `yaml:"oauth"`
+	RoutingApiUri string      `yaml:"routing_api_uri"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`

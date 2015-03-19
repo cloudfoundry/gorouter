@@ -105,6 +105,7 @@ trace_key: "foo"
 access_log: "/tmp/access_log"
 ssl_port: 4443
 enable_ssl: true
+routing_api_uri: "http://routing-api.some.url"
 `)
 
 			config.Initialize(b)
@@ -116,8 +117,23 @@ enable_ssl: true
 			Ω(config.AccessLog).To(Equal("/tmp/access_log"))
 			Ω(config.EnableSSL).To(Equal(true))
 			Ω(config.SSLPort).To(Equal(uint16(4443)))
+			Ω(config.RoutingApiUri).To(Equal("http://routing-api.some.url"))
 		})
 
+		It("sets the OAuth config", func() {
+			var b = []byte(`
+oauth:
+  token_endpoint: http://bob.url/token
+  client_name: client-name
+  client_secret: client-secret
+`)
+
+			config.Initialize(b)
+
+			Ω(config.OAuth.TokenEndpoint).To(Equal("http://bob.url/token"))
+			Ω(config.OAuth.ClientName).To(Equal("client-name"))
+			Ω(config.OAuth.ClientSecret).To(Equal("client-secret"))
+		})
 	})
 
 	Describe("Process", func() {
