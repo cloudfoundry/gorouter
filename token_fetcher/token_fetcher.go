@@ -38,7 +38,12 @@ func (f *Fetcher) FetchToken() (*Token, error) {
 	values.Add("grant_type", "client_credentials")
 	requestBody := values.Encode()
 
-	request, _ := http.NewRequest("POST", f.config.TokenEndpoint, bytes.NewBuffer([]byte(requestBody)))
+	tokenURL := fmt.Sprintf("%s:%d/oauth/token", f.config.TokenEndpoint, f.config.Port)
+	request, err := http.NewRequest("POST", tokenURL, bytes.NewBuffer([]byte(requestBody)))
+	if err != nil {
+		return nil, err
+	}
+
 	request.SetBasicAuth(f.config.ClientName, f.config.ClientSecret)
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	request.Header.Add("Accept", "application/json; charset=utf-8")

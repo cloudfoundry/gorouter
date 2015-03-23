@@ -3,6 +3,9 @@ package token_fetcher_test
 import (
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/cloudfoundry/gorouter/config"
 	. "github.com/cloudfoundry/gorouter/token_fetcher"
@@ -31,7 +34,16 @@ var _ = Describe("TokenFetcher", func() {
 	BeforeEach(func() {
 		cfg = &config.OAuthConfig{}
 		server = ghttp.NewServer()
-		cfg.TokenEndpoint = server.URL() + "/oauth/token"
+
+		url, err := url.Parse(server.URL())
+		Expect(err).ToNot(HaveOccurred())
+
+		addr := strings.Split(url.Host, ":")
+
+		cfg.TokenEndpoint = "http://" + addr[0]
+		cfg.Port, err = strconv.Atoi(addr[1])
+		Expect(err).ToNot(HaveOccurred())
+
 		cfg.ClientName = "client-name"
 		cfg.ClientSecret = "client-secret"
 	})

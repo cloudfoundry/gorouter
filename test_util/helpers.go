@@ -47,5 +47,10 @@ func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 		JobName:       "router_test_z1_0",
 	}
 
+	c.OAuth = config.OAuthConfig{
+		TokenEndpoint: "http://localhost",
+		Port:          8080,
+	}
+
 	return c
 }

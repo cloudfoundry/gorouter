@@ -3,12 +3,17 @@ package route_fetcher_test
 import (
 	"errors"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/cloudfoundry/gorouter/config"
 	testRegistry "github.com/cloudfoundry/gorouter/registry/fakes"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/token_fetcher"
 	testTokenFetcher "github.com/cloudfoundry/gorouter/token_fetcher/fakes"
+	"github.com/cloudfoundry/gosteno"
 
 	. "github.com/cloudfoundry/gorouter/route_fetcher"
 
@@ -24,6 +29,8 @@ var _ = Describe("RouteFetcher", func() {
 		registry     *testRegistry.FakeRegistryInterface
 		server       *ghttp.Server
 		fetcher      *RouteFetcher
+		logger       *gosteno.Logger
+		sink         *gosteno.TestingSink
 
 		token *token_fetcher.Token
 
@@ -33,16 +40,32 @@ var _ = Describe("RouteFetcher", func() {
 	BeforeEach(func() {
 		server = ghttp.NewServer()
 		cfg = config.DefaultConfig()
-		cfg.RoutingApiUri = server.URL() + "/v1/routes"
+		url, err := url.Parse(server.URL())
+		Expect(err).ToNot(HaveOccurred())
+
+		addr := strings.Split(url.Host, ":")
+		cfg.RoutingApi.Uri = "http://" + addr[0]
+		cfg.RoutingApi.Port, err = strconv.Atoi(addr[1])
+		Expect(err).ToNot(HaveOccurred())
+
 		tokenFetcher = &testTokenFetcher.FakeTokenFetcher{}
 		registry = &testRegistry.FakeRegistryInterface{}
+		sink = gosteno.NewTestingSink()
+
+		loggerConfig := &gosteno.Config{
+			Sinks: []gosteno.Sink{
+				sink,
+			},
+		}
+		gosteno.Init(loggerConfig)
+		logger = gosteno.NewLogger("route_fetcher_test")
 
 		token = &token_fetcher.Token{
 			AccessToken: "access_token",
 			ExpireTime:  5,
 		}
 
-		fetcher = NewRouteFetcher(tokenFetcher, registry, cfg.RoutingApiUri)
+		fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg)
 	})
 
 	Describe(".FetchRoutes", func() {
@@ -140,7 +163,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("when the routing api is unavailble", func() {
 			It("returns an error", func() {
-				fetcher := NewRouteFetcher(tokenFetcher, registry, "bogus")
+				fetcher := NewRouteFetcher(logger, tokenFetcher, registry, &config.Config{RoutingApi: config.RoutingApiConfig{Uri: "bogus"}, PruneStaleDropletsInterval: 1 * time.Second})
 
 				err := fetcher.FetchRoutes()
 				Expect(err).To(HaveOccurred())
@@ -168,6 +191,38 @@ var _ = Describe("RouteFetcher", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(registry.RegisterCallCount()).To(Equal(0))
 			})
+		})
+	})
+
+	Describe(".StartFetchCycle", func() {
+		BeforeEach(func() {
+			cfg.PruneStaleDropletsInterval = 10 * time.Millisecond
+			fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg)
+
+			tokenFetcher.FetchTokenReturns(token, nil)
+
+			server.AllowUnhandledRequests = true
+
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.RespondWithJSONEncoded(http.StatusOK, responseBody),
+				))
+		})
+
+		It("periodically fetches routes", func() {
+			fetcher.StartFetchCycle()
+
+			time.Sleep(cfg.PruneStaleDropletsInterval * 2)
+			Expect(len(server.ReceivedRequests())).To(BeNumerically(">=", 2))
+		})
+
+		It("logs the error", func() {
+			tokenFetcher.FetchTokenReturns(nil, errors.New("Unauthorized"))
+			fetcher.StartFetchCycle()
+
+			time.Sleep(cfg.PruneStaleDropletsInterval + 10*time.Millisecond)
+			Expect(sink.Records()).ToNot(BeNil())
+			Expect(sink.Records()[0].Message).To(Equal("Unauthorized"))
 		})
 	})
 })

@@ -9,14 +9,14 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route_fetcher"
 	"github.com/cloudfoundry/gorouter/router"
+	"github.com/cloudfoundry/gorouter/token_fetcher"
 	rvarz "github.com/cloudfoundry/gorouter/varz"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
 
 	"flag"
-	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -43,13 +43,7 @@ func main() {
 	InitLoggerFromConfig(c, logCounter)
 	logger := steno.NewLogger("router.main")
 
-	make a token fetcher
-	make a route fetcher
-
-	go fetchroutes(token fetcher, config, route registry)
-
-
-	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Errorf("Dropsonde failed to initialize: %s", err.Error())
 		os.Exit(1)
@@ -88,6 +82,10 @@ func main() {
 	})
 
 	registry := rregistry.NewRouteRegistry(c, natsClient)
+
+	tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
+	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c)
+	routeFetcher.StartFetchCycle()
 
 	varz := rvarz.NewVarz(registry)
 

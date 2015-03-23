@@ -6,19 +6,25 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
+	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/token_fetcher"
+	steno "github.com/cloudfoundry/gosteno"
 )
 
 type RouteFetcher struct {
-	TokenFetcher  token_fetcher.TokenFetcher
-	RouteRegistry registry.RegistryInterface
-	Uri           string
+	TokenFetcher        token_fetcher.TokenFetcher
+	RouteRegistry       registry.RegistryInterface
+	RoutingApi          config.RoutingApiConfig
+	FetchRoutesInterval time.Duration
 
+	logger    *steno.Logger
 	client    *http.Client
 	endpoints []Route
+	ticker    *time.Ticker
 }
 
 type Route struct {
@@ -29,12 +35,32 @@ type Route struct {
 	LogGuid string `json:"log_guid"`
 }
 
-func NewRouteFetcher(tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, uri string) *RouteFetcher {
+func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config) *RouteFetcher {
 	return &RouteFetcher{
-		TokenFetcher:  tokenFetcher,
-		RouteRegistry: routeRegistry,
-		Uri:           uri,
-		client:        &http.Client{},
+		TokenFetcher:        tokenFetcher,
+		RouteRegistry:       routeRegistry,
+		RoutingApi:          cfg.RoutingApi,
+		FetchRoutesInterval: cfg.PruneStaleDropletsInterval / 2,
+		client:              &http.Client{},
+		logger:              logger,
+	}
+}
+
+func (r *RouteFetcher) StartFetchCycle() {
+	if r.FetchRoutesInterval > 0 {
+		r.ticker = time.NewTicker(r.FetchRoutesInterval)
+
+		go func() {
+			for {
+				select {
+				case <-r.ticker.C:
+					err := r.FetchRoutes()
+					if err != nil {
+						r.logger.Error(err.Error())
+					}
+				}
+			}
+		}()
 	}
 }
 
@@ -44,7 +70,8 @@ func (r *RouteFetcher) FetchRoutes() error {
 		return err
 	}
 
-	request, err := http.NewRequest("GET", r.Uri, nil)
+	routingApiUri := fmt.Sprintf("%s:%d/v1/routes", r.RoutingApi.Uri, r.RoutingApi.Port)
+	request, err := http.NewRequest("GET", routingApiUri, nil)
 	if err != nil {
 		return err
 	}
@@ -68,7 +95,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	var routes []Route
 	err = json.Unmarshal(body, &routes)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	r.refreshEndpoints(routes)

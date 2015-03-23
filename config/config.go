@@ -39,6 +39,12 @@ type OAuthConfig struct {
 	TokenEndpoint string `yaml:"token_endpoint"`
 	ClientName    string `yaml:"client_name"`
 	ClientSecret  string `yaml:"client_secret"`
+	Port          int    `yaml:"port"`
+}
+
+type RoutingApiConfig struct {
+	Uri  string `yaml:"uri"`
+	Port int    `yaml:"port"`
 }
 
 var defaultNatsConfig = NatsConfig{
@@ -94,8 +100,8 @@ type Config struct {
 	DrainTimeoutInSeconds                int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies                        bool `yaml:"secure_cookies"`
 
-	OAuth         OAuthConfig `yaml:"oauth"`
-	RoutingApiUri string      `yaml:"routing_api_uri"`
+	OAuth      OAuthConfig      `yaml:"oauth"`
+	RoutingApi RoutingApiConfig `yaml:"routing_api"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`

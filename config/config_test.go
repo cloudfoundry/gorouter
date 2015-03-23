@@ -105,7 +105,6 @@ trace_key: "foo"
 access_log: "/tmp/access_log"
 ssl_port: 4443
 enable_ssl: true
-routing_api_uri: "http://routing-api.some.url"
 `)
 
 			config.Initialize(b)
@@ -117,7 +116,19 @@ routing_api_uri: "http://routing-api.some.url"
 			Ω(config.AccessLog).To(Equal("/tmp/access_log"))
 			Ω(config.EnableSSL).To(Equal(true))
 			Ω(config.SSLPort).To(Equal(uint16(4443)))
-			Ω(config.RoutingApiUri).To(Equal("http://routing-api.some.url"))
+		})
+
+		It("sets the Routing Api config", func() {
+			var b = []byte(`
+routing_api:
+  uri: http://bob.url/token
+  port: 1234
+`)
+
+			config.Initialize(b)
+
+			Ω(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
+			Ω(config.RoutingApi.Port).To(Equal(1234))
 		})
 
 		It("sets the OAuth config", func() {
@@ -126,6 +137,7 @@ oauth:
   token_endpoint: http://bob.url/token
   client_name: client-name
   client_secret: client-secret
+  port: 1234
 `)
 
 			config.Initialize(b)
@@ -133,6 +145,7 @@ oauth:
 			Ω(config.OAuth.TokenEndpoint).To(Equal("http://bob.url/token"))
 			Ω(config.OAuth.ClientName).To(Equal("client-name"))
 			Ω(config.OAuth.ClientSecret).To(Equal("client-secret"))
+			Ω(config.OAuth.Port).To(Equal(1234))
 		})
 	})
 
