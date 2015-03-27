@@ -2,12 +2,10 @@ package route_fetcher_test
 
 import (
 	"errors"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
 	"github.com/cloudfoundry/gorouter/config"
 	testRegistry "github.com/cloudfoundry/gorouter/registry/fakes"
 	"github.com/cloudfoundry/gorouter/route"
@@ -19,7 +17,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/ghttp"
 )
 
 var _ = Describe("RouteFetcher", func() {
@@ -27,26 +24,18 @@ var _ = Describe("RouteFetcher", func() {
 		cfg          *config.Config
 		tokenFetcher *testTokenFetcher.FakeTokenFetcher
 		registry     *testRegistry.FakeRegistryInterface
-		server       *ghttp.Server
 		fetcher      *RouteFetcher
 		logger       *gosteno.Logger
 		sink         *gosteno.TestingSink
+		client       *fake_routing_api.FakeClient
 
 		token *token_fetcher.Token
 
-		responseBody []Route
+		response []db.Route
 	)
 
 	BeforeEach(func() {
-		server = ghttp.NewServer()
 		cfg = config.DefaultConfig()
-		url, err := url.Parse(server.URL())
-		Expect(err).ToNot(HaveOccurred())
-
-		addr := strings.Split(url.Host, ":")
-		cfg.RoutingApi.Uri = "http://" + addr[0]
-		cfg.RoutingApi.Port, err = strconv.Atoi(addr[1])
-		Expect(err).ToNot(HaveOccurred())
 
 		tokenFetcher = &testTokenFetcher.FakeTokenFetcher{}
 		registry = &testRegistry.FakeRegistryInterface{}
@@ -65,14 +54,15 @@ var _ = Describe("RouteFetcher", func() {
 			ExpireTime:  5,
 		}
 
-		fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg)
+		client = &fake_routing_api.FakeClient{}
+		fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg, client)
 	})
 
 	Describe(".FetchRoutes", func() {
 		BeforeEach(func() {
 			tokenFetcher.FetchTokenReturns(token, nil)
 
-			responseBody = []Route{
+			response = []db.Route{
 				{
 					Route:   "foo",
 					Port:    1,
@@ -99,85 +89,53 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		It("updates the route registry", func() {
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v1/routes"),
-					ghttp.VerifyHeader(http.Header{
-						"Authorization": []string{"bearer " + token.AccessToken},
-					}),
-
-					ghttp.RespondWithJSONEncoded(http.StatusOK, responseBody),
-				))
+			client.RoutesReturns(response, nil)
 
 			err := fetcher.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(server.ReceivedRequests()).To(HaveLen(1))
 
 			Expect(registry.RegisterCallCount()).To(Equal(3))
 
 			for i := 0; i < 3; i++ {
-				response := responseBody[i]
+				response := response[i]
 				uri, endpoint := registry.RegisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(response.Route)))
 				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL)))
 			}
 		})
 
-		It("Removes unregistered routes", func() {
-			secondResponseBody := []Route{
-				responseBody[0],
+		It("removes unregistered routes", func() {
+			secondResponse := []db.Route{
+				response[0],
 			}
 
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v1/routes"),
-					ghttp.VerifyHeader(http.Header{
-						"Authorization": []string{"bearer " + token.AccessToken},
-					}),
-
-					ghttp.RespondWithJSONEncoded(http.StatusOK, responseBody),
-				),
-				ghttp.CombineHandlers(
-					ghttp.RespondWithJSONEncoded(http.StatusOK, secondResponseBody),
-				),
-			)
+			client.RoutesReturns(response, nil)
 
 			err := fetcher.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(server.ReceivedRequests()).To(HaveLen(1))
 			Expect(registry.RegisterCallCount()).To(Equal(3))
+
+			client.RoutesReturns(secondResponse, nil)
 
 			err = fetcher.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(server.ReceivedRequests()).To(HaveLen(2))
 			Expect(registry.RegisterCallCount()).To(Equal(4))
 			Expect(registry.UnregisterCallCount()).To(Equal(2))
 
 			for i := 0; i < 2; i++ {
-				response := responseBody[i+1]
+				response := response[i+1]
 				uri, endpoint := registry.UnregisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(response.Route)))
 				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL)))
 			}
 		})
 
-		Context("when the routing api is unavailble", func() {
+		Context("when the routing api returns an error", func() {
 			It("returns an error", func() {
-				fetcher := NewRouteFetcher(logger, tokenFetcher, registry, &config.Config{RoutingApi: config.RoutingApiConfig{Uri: "bogus"}, PruneStaleDropletsInterval: 1 * time.Second})
+				client.RoutesReturns(nil, errors.New("Oops!"))
 
 				err := fetcher.FetchRoutes()
 				Expect(err).To(HaveOccurred())
-			})
-		})
-
-		Context("when the routing api does not return 200", func() {
-			It("returns an error", func() {
-				server.AppendHandlers(ghttp.RespondWith(http.StatusBadRequest, "you messed up"))
-
-				err := fetcher.FetchRoutes()
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal("status code: 400, body: you messed up"))
-				Expect(server.ReceivedRequests()).Should(HaveLen(1))
 			})
 		})
 
@@ -197,23 +155,18 @@ var _ = Describe("RouteFetcher", func() {
 	Describe(".StartFetchCycle", func() {
 		BeforeEach(func() {
 			cfg.PruneStaleDropletsInterval = 10 * time.Millisecond
-			fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg)
+			fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg, client)
 
 			tokenFetcher.FetchTokenReturns(token, nil)
 
-			server.AllowUnhandledRequests = true
-
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.RespondWithJSONEncoded(http.StatusOK, responseBody),
-				))
+			client.RoutesReturns(response, nil)
 		})
 
 		It("periodically fetches routes", func() {
 			fetcher.StartFetchCycle()
 
 			time.Sleep(cfg.PruneStaleDropletsInterval * 2)
-			Expect(len(server.ReceivedRequests())).To(BeNumerically(">=", 2))
+			Expect(client.RoutesCallCount()).To(BeNumerically(">=", 2))
 		})
 
 		It("logs the error", func() {

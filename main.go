@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
+	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -17,6 +18,7 @@ import (
 	"github.com/cloudfoundry/yagnats"
 
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -84,7 +86,9 @@ func main() {
 	registry := rregistry.NewRouteRegistry(c, natsClient)
 
 	tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
-	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c)
+	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
+	routingApiClient := routing_api.NewClient(routingApiUri)
+	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient)
 	routeFetcher.StartFetchCycle()
 
 	varz := rvarz.NewVarz(registry)

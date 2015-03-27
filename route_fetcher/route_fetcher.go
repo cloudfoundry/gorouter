@@ -1,13 +1,10 @@
 package route_fetcher
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"time"
 
+	"github.com/cloudfoundry-incubator/routing-api"
+	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -18,31 +15,22 @@ import (
 type RouteFetcher struct {
 	TokenFetcher        token_fetcher.TokenFetcher
 	RouteRegistry       registry.RegistryInterface
-	RoutingApi          config.RoutingApiConfig
 	FetchRoutesInterval time.Duration
 
 	logger    *steno.Logger
-	client    *http.Client
-	endpoints []Route
+	endpoints []db.Route
 	ticker    *time.Ticker
+	client    routing_api.Client
 }
 
-type Route struct {
-	Route   string `json:"route"`
-	Port    int    `json:"port"`
-	IP      string `json:"ip"`
-	TTL     int    `json:"ttl"`
-	LogGuid string `json:"log_guid"`
-}
-
-func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config) *RouteFetcher {
+func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client) *RouteFetcher {
 	return &RouteFetcher{
 		TokenFetcher:        tokenFetcher,
 		RouteRegistry:       routeRegistry,
-		RoutingApi:          cfg.RoutingApi,
 		FetchRoutesInterval: cfg.PruneStaleDropletsInterval / 2,
-		client:              &http.Client{},
-		logger:              logger,
+
+		client: client,
+		logger: logger,
 	}
 }
 
@@ -69,31 +57,9 @@ func (r *RouteFetcher) FetchRoutes() error {
 	if err != nil {
 		return err
 	}
+	r.client.SetToken(token.AccessToken)
 
-	routingApiUri := fmt.Sprintf("%s:%d/v1/routes", r.RoutingApi.Uri, r.RoutingApi.Port)
-	request, err := http.NewRequest("GET", routingApiUri, nil)
-	if err != nil {
-		return err
-	}
-	request.Header.Add("Authorization", "bearer "+token.AccessToken)
-
-	resp, err := r.client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(fmt.Sprintf("status code: %d, body: %s", resp.StatusCode, body))
-	}
-
-	var routes []Route
-	err = json.Unmarshal(body, &routes)
+	routes, err := r.client.Routes()
 	if err != nil {
 		return err
 	}
@@ -103,7 +69,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	return nil
 }
 
-func (r *RouteFetcher) refreshEndpoints(validRoutes []Route) {
+func (r *RouteFetcher) refreshEndpoints(validRoutes []db.Route) {
 	r.deleteEndpoints(validRoutes)
 
 	r.endpoints = validRoutes
@@ -122,14 +88,14 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []Route) {
 	}
 }
 
-func (r *RouteFetcher) deleteEndpoints(validRoutes []Route) {
-	var diff []Route
+func (r *RouteFetcher) deleteEndpoints(validRoutes []db.Route) {
+	var diff []db.Route
 
 	for _, curRoute := range r.endpoints {
 		routeFound := false
 
 		for _, validRoute := range validRoutes {
-			if curRoute.equals(validRoute) {
+			if routeEquals(curRoute, validRoute) {
 				routeFound = true
 				break
 			}
@@ -155,7 +121,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []Route) {
 	}
 }
 
-func (current Route) equals(desired Route) bool {
+func routeEquals(current, desired db.Route) bool {
 	if current.Route == desired.Route && current.IP == desired.IP && current.Port == desired.Port {
 		return true
 	}
