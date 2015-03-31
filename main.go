@@ -85,11 +85,15 @@ func main() {
 
 	registry := rregistry.NewRouteRegistry(c, natsClient)
 
-	tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
-	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
-	routingApiClient := routing_api.NewClient(routingApiUri)
-	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient)
-	routeFetcher.StartFetchCycle()
+	if c.RoutingApiEnabled() {
+		logger.Info("Setting up routing_api route fetcher")
+		tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
+		routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
+		routingApiClient := routing_api.NewClient(routingApiUri)
+		routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1)
+		routeFetcher.StartFetchCycle()
+		routeFetcher.StartEventCycle()
+	}
 
 	varz := rvarz.NewVarz(registry)
 

@@ -221,6 +221,29 @@ nats:
 			})
 		})
 
+		Describe("RoutingApiEnabled", func() {
+			var b = []byte(`
+routing_api:
+  uri: http://jimisdabest.com
+  port: 8080
+`)
+			Context("when the routing api is properly configured", func() {
+				It("reports the routing api as enabled", func() {
+					config.Initialize(b)
+					config.Process()
+					Expect(config.RoutingApiEnabled()).To(BeTrue())
+				})
+			})
+
+			Context("when the routing api is not properly configured", func() {
+				It("reports the routing api as disabled", func() {
+					config.Initialize([]byte{})
+					config.Process()
+					Expect(config.RoutingApiEnabled()).To(BeFalse())
+				})
+			})
+		})
+
 		Context("When EnableSSL is set to true", func() {
 
 			Context("When it is given valid values for a certificate", func() {

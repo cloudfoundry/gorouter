@@ -23,6 +23,14 @@
 			"Rev": "6e8c6102596e3fb6a17511f9f39fae64c89144a7"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/cf_http",
+			"Rev": "db1bf7202e706de8d7460c1b54494ac7ab481a59"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
+			"Rev": "a64b5be90d5e4045ed59d9e13b6482efbe8b40ab"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
 			"Rev": "d8399b690bf4b541b1a530ca1ca7305b4f3444c2"
 		},

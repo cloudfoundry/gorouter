@@ -13,9 +13,10 @@ import (
 )
 
 type RouteFetcher struct {
-	TokenFetcher        token_fetcher.TokenFetcher
-	RouteRegistry       registry.RegistryInterface
-	FetchRoutesInterval time.Duration
+	TokenFetcher                       token_fetcher.TokenFetcher
+	RouteRegistry                      registry.RegistryInterface
+	FetchRoutesInterval                time.Duration
+	SubscriptionRetryIntervalInSeconds int
 
 	logger    *steno.Logger
 	endpoints []db.Route
@@ -23,11 +24,12 @@ type RouteFetcher struct {
 	client    routing_api.Client
 }
 
-func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client) *RouteFetcher {
+func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int) *RouteFetcher {
 	return &RouteFetcher{
-		TokenFetcher:        tokenFetcher,
-		RouteRegistry:       routeRegistry,
-		FetchRoutesInterval: cfg.PruneStaleDropletsInterval / 2,
+		TokenFetcher:                       tokenFetcher,
+		RouteRegistry:                      routeRegistry,
+		FetchRoutesInterval:                cfg.PruneStaleDropletsInterval / 2,
+		SubscriptionRetryIntervalInSeconds: subscriptionRetryInterval,
 
 		client: client,
 		logger: logger,
@@ -50,6 +52,58 @@ func (r *RouteFetcher) StartFetchCycle() {
 			}
 		}()
 	}
+}
+
+func (r *RouteFetcher) StartEventCycle() {
+	go func() {
+		for {
+			r.subscribeToEvents()
+			time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
+		}
+	}()
+}
+
+func (r *RouteFetcher) subscribeToEvents() {
+	token, err := r.TokenFetcher.FetchToken()
+	if err != nil {
+		r.logger.Error(err.Error())
+		return
+	}
+	r.client.SetToken(token.AccessToken)
+	source, err := r.client.SubscribeToEvents()
+	if err != nil {
+		r.logger.Error(err.Error())
+		return
+	}
+
+	r.logger.Info("Successfully subscribed to event stream.")
+
+	defer source.Close()
+
+	for {
+		event, err := source.Next()
+		if err != nil {
+			r.logger.Error(err.Error())
+			break
+		}
+		r.HandleEvent(event)
+	}
+}
+
+func (r *RouteFetcher) HandleEvent(e routing_api.Event) error {
+	r.logger.Infof("Handling event: %v", e)
+	eventRoute := e.Route
+	uri := route.Uri(eventRoute.Route)
+	endpoint := route.NewEndpoint(eventRoute.LogGuid, eventRoute.IP, uint16(eventRoute.Port), eventRoute.LogGuid, nil, eventRoute.TTL)
+	switch e.Action {
+	case "Delete":
+		r.RouteRegistry.Unregister(uri, endpoint)
+	case "Upsert":
+		r.RouteRegistry.Register(uri, endpoint)
+	}
+
+	r.logger.Infof("Successfully handled event: %v", e)
+	return nil
 }
 
 func (r *RouteFetcher) FetchRoutes() error {

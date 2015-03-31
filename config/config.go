@@ -230,6 +230,10 @@ func (c *Config) NatsServers() []string {
 	return natsServers
 }
 
+func (c *Config) RoutingApiEnabled() bool {
+	return (c.RoutingApi.Uri != "") && (c.RoutingApi.Port != 0)
+}
+
 func (c *Config) Initialize(configYAML []byte) error {
 	c.Nats = []NatsConfig{}
 	return candiedyaml.Unmarshal(configYAML, &c)
