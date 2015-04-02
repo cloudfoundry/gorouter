@@ -4,14 +4,14 @@
 
 package control
 
-import proto "code.google.com/p/gogoprotobuf/proto"
+import proto "github.com/gogo/protobuf/proto"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = math.Inf
 
-// / A HeartbeatRequest command elicits a heartbeat from a component or app
+// / A HeartbeatRequest command elicits a heartbeat from a component or app. When a HeartbeatRequest is received, a Heartbeat event MUST be returned with controlMessageIdentifier set to the UUID received in the request.
 type HeartbeatRequest struct {
 	XXX_unrecognized []byte `json:"-"`
 }

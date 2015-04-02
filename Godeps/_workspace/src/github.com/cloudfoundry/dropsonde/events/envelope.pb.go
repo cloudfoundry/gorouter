@@ -19,7 +19,7 @@ It has these top-level messages:
 */
 package events
 
-import proto "code.google.com/p/gogoprotobuf/proto"
+import proto "github.com/gogo/protobuf/proto"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -30,14 +30,15 @@ var _ = math.Inf
 type Envelope_EventType int32
 
 const (
-	Envelope_Heartbeat     Envelope_EventType = 1
-	Envelope_HttpStart     Envelope_EventType = 2
-	Envelope_HttpStop      Envelope_EventType = 3
-	Envelope_HttpStartStop Envelope_EventType = 4
-	Envelope_LogMessage    Envelope_EventType = 5
-	Envelope_ValueMetric   Envelope_EventType = 6
-	Envelope_CounterEvent  Envelope_EventType = 7
-	Envelope_Error         Envelope_EventType = 8
+	Envelope_Heartbeat       Envelope_EventType = 1
+	Envelope_HttpStart       Envelope_EventType = 2
+	Envelope_HttpStop        Envelope_EventType = 3
+	Envelope_HttpStartStop   Envelope_EventType = 4
+	Envelope_LogMessage      Envelope_EventType = 5
+	Envelope_ValueMetric     Envelope_EventType = 6
+	Envelope_CounterEvent    Envelope_EventType = 7
+	Envelope_Error           Envelope_EventType = 8
+	Envelope_ContainerMetric Envelope_EventType = 9
 )
 
 var Envelope_EventType_name = map[int32]string{
@@ -49,16 +50,18 @@ var Envelope_EventType_name = map[int32]string{
 	6: "ValueMetric",
 	7: "CounterEvent",
 	8: "Error",
+	9: "ContainerMetric",
 }
 var Envelope_EventType_value = map[string]int32{
-	"Heartbeat":     1,
-	"HttpStart":     2,
-	"HttpStop":      3,
-	"HttpStartStop": 4,
-	"LogMessage":    5,
-	"ValueMetric":   6,
-	"CounterEvent":  7,
-	"Error":         8,
+	"Heartbeat":       1,
+	"HttpStart":       2,
+	"HttpStop":        3,
+	"HttpStartStop":   4,
+	"LogMessage":      5,
+	"ValueMetric":     6,
+	"CounterEvent":    7,
+	"Error":           8,
+	"ContainerMetric": 9,
 }
 
 func (x Envelope_EventType) Enum() *Envelope_EventType {
@@ -91,6 +94,7 @@ type Envelope struct {
 	ValueMetric      *ValueMetric        `protobuf:"bytes,9,opt,name=valueMetric" json:"valueMetric,omitempty"`
 	CounterEvent     *CounterEvent       `protobuf:"bytes,10,opt,name=counterEvent" json:"counterEvent,omitempty"`
 	Error            *Error              `protobuf:"bytes,11,opt,name=error" json:"error,omitempty"`
+	ContainerMetric  *ContainerMetric    `protobuf:"bytes,12,opt,name=containerMetric" json:"containerMetric,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -171,6 +175,13 @@ func (m *Envelope) GetCounterEvent() *CounterEvent {
 func (m *Envelope) GetError() *Error {
 	if m != nil {
 		return m.Error
+	}
+	return nil
+}
+
+func (m *Envelope) GetContainerMetric() *ContainerMetric {
+	if m != nil {
+		return m.ContainerMetric
 	}
 	return nil
 }

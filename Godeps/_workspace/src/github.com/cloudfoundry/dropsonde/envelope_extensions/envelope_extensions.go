@@ -12,20 +12,23 @@ type hasAppId interface {
 	GetApplicationId() *events.UUID
 }
 
-func GetAppId(m *events.Envelope) string {
-	if m.GetEventType() == events.Envelope_LogMessage {
-		logMessage := m.GetLogMessage()
-		return logMessage.GetAppId()
+func GetAppId(envelope *events.Envelope) string {
+	if envelope.GetEventType() == events.Envelope_LogMessage {
+		return envelope.GetLogMessage().GetAppId()
+	}
+
+	if envelope.GetEventType() == events.Envelope_ContainerMetric {
+		return envelope.GetContainerMetric().GetApplicationId()
 	}
 
 	var event hasAppId
-	switch m.GetEventType() {
+	switch envelope.GetEventType() {
 	case events.Envelope_HttpStart:
-		event = m.GetHttpStart()
+		event = envelope.GetHttpStart()
 	case events.Envelope_HttpStop:
-		event = m.GetHttpStop()
+		event = envelope.GetHttpStop()
 	case events.Envelope_HttpStartStop:
-		event = m.GetHttpStartStop()
+		event = envelope.GetHttpStartStop()
 	default:
 		return SystemAppId
 	}
@@ -37,9 +40,9 @@ func GetAppId(m *events.Envelope) string {
 	return SystemAppId
 }
 
-func formatUUID(id *events.UUID) string {
-	var u [16]byte
-	binary.LittleEndian.PutUint64(u[:8], id.GetLow())
-	binary.LittleEndian.PutUint64(u[8:], id.GetHigh())
-	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:])
+func formatUUID(uuid *events.UUID) string {
+	var uuidBytes [16]byte
+	binary.LittleEndian.PutUint64(uuidBytes[:8], uuid.GetLow())
+	binary.LittleEndian.PutUint64(uuidBytes[8:], uuid.GetHigh())
+	return fmt.Sprintf("%x-%x-%x-%x-%x", uuidBytes[0:4], uuidBytes[4:6], uuidBytes[6:8], uuidBytes[8:10], uuidBytes[10:])
 }

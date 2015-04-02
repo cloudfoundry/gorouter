@@ -16,11 +16,11 @@
 package dropsonde_marshaller
 
 import (
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/gogo/protobuf/proto"
 	"sync/atomic"
 	"unicode"
 )

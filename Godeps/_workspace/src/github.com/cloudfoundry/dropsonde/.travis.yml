@@ -3,8 +3,8 @@ notifications:
   email:
   - cf-lamb@pivotallabs.com
 before_install:
-- go get code.google.com/p/go.tools/cmd/cover
-- go get code.google.com/p/go.tools/cmd/vet
+- 'if [[ "${TRAVIS_GO_VERSION}" =~ 1.[2-3] ]]; then go get code.google.com/p/go.tools/cmd/cover code.google.com/p/go.tools/cmd/vet; else go get golang.org/x/tools/cmd/cover golang.org/x/tools/cmd/vet; fi'
+
 - go get github.com/mattn/goveralls
 - go get github.com/onsi/ginkgo/ginkgo
 
@@ -21,6 +21,7 @@ script: PATH=$HOME/gopath/bin:$PATH ./test
 go:
 - 1.2
 - 1.3
+- 1.4
 - tip
 
 matrix:

@@ -1,9 +1,9 @@
 package envelope_extensions_test
 
 import (
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/envelope_extensions"
 	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/gogo/protobuf/proto"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -76,6 +76,17 @@ var _ = Describe("EnvelopeExtensions", func() {
 				}
 				appId := envelope_extensions.GetAppId(envelope)
 				Expect(appId).To(Equal(envelope_extensions.SystemAppId))
+			})
+		})
+
+		Context("ContainerMetric", func() {
+			It("returns the App ID ", func() {
+				envelope := &events.Envelope{
+					EventType:       events.Envelope_ContainerMetric.Enum(),
+					ContainerMetric: &events.ContainerMetric{ApplicationId: proto.String("test-app-id")},
+				}
+				appId := envelope_extensions.GetAppId(envelope)
+				Expect(appId).To(Equal("test-app-id"))
 			})
 		})
 	})

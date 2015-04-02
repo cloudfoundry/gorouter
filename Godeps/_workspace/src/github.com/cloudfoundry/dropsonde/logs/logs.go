@@ -8,11 +8,11 @@
 // Importing package dropsonde and initializing will initial this package.
 // To send logs use
 //
-//		logs.SendAppLog(appId, message, sourceType, sourceInstance)
+//		logs.SendAppLog(appID, message, sourceType, sourceInstance)
 //
 // for sending errors,
 //
-//		logs.SendAppErrorLog(appId, message, sourceType, sourceInstance)
+//		logs.SendAppErrorLog(appID, message, sourceType, sourceInstance)
 package logs
 
 import (
@@ -31,37 +31,37 @@ func Initialize(ls log_sender.LogSender) {
 // SendAppLog sends a log message with the given appid, log message, source type
 // and source instance, with a message type of std out.
 // Returns an error if one occurs while sending the event.
-func SendAppLog(appId, message, sourceType, sourceInstance string) error {
+func SendAppLog(appID, message, sourceType, sourceInstance string) error {
 	if logSender == nil {
 		return nil
 	}
-	return logSender.SendAppLog(appId, message, sourceType, sourceInstance)
+	return logSender.SendAppLog(appID, message, sourceType, sourceInstance)
 }
 
 // SendAppErrorLog sends a log error message with the given appid, log message, source type
 // and source instance, with a message type of std err.
 // Returns an error if one occurs while sending the event.
-func SendAppErrorLog(appId, message, sourceType, sourceInstance string) error {
+func SendAppErrorLog(appID, message, sourceType, sourceInstance string) error {
 	if logSender == nil {
 		return nil
 	}
-	return logSender.SendAppErrorLog(appId, message, sourceType, sourceInstance)
+	return logSender.SendAppErrorLog(appID, message, sourceType, sourceInstance)
 }
 
 // ScanLogStream sends a log message with the given meta-data for each line from reader.
-// Restarts on read errors and continues until EOF (or stopChan is closed).
-func ScanLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+// Restarts on read errors and continues until EOF.
+func ScanLogStream(appID, sourceType, sourceInstance string, reader io.Reader) {
 	if logSender == nil {
 		return
 	}
-	logSender.ScanLogStream(appId, sourceType, sourceInstance, reader, stopChan)
+	logSender.ScanLogStream(appID, sourceType, sourceInstance, reader)
 }
 
 // ScanErrorLogStream sends a log error message with the given meta-data for each line from reader.
-// Restarts on read errors and continues until EOF (or stopChan is closed).
-func ScanErrorLogStream(appId, sourceType, sourceInstance string, reader io.Reader, stopChan chan struct{}) {
+// Restarts on read errors and continues until EOF.
+func ScanErrorLogStream(appID, sourceType, sourceInstance string, reader io.Reader) {
 	if logSender == nil {
 		return
 	}
-	logSender.ScanErrorLogStream(appId, sourceType, sourceInstance, reader, stopChan)
+	logSender.ScanErrorLogStream(appID, sourceType, sourceInstance, reader)
 }

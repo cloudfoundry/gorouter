@@ -85,3 +85,13 @@ func (trace ErrorTrace) Error() string {
 
 	return msg
 }
+
+func (trace ErrorTrace) ErrorOrNil() error {
+	for _, exit := range trace {
+		if exit.Err != nil {
+			return trace
+		}
+	}
+
+	return nil
+}

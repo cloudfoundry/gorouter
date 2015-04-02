@@ -3,7 +3,6 @@ package metrics_test
 import (
 	"github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -43,6 +42,18 @@ var _ = Describe("Metrics", func() {
 		Expect(fakeMetricSender.GetCounter("count")).To(BeEquivalentTo(15))
 	})
 
+	It("delegates SendContainerMetric", func() {
+		appGuid := "some_app_guid"
+		metrics.SendContainerMetric(appGuid, 7, 42.42, 1234, 123412341234)
+
+		Expect(fakeMetricSender.GetContainerMetric(appGuid).ApplicationId).To(Equal(appGuid))
+		Expect(fakeMetricSender.GetContainerMetric(appGuid).InstanceIndex).To(BeEquivalentTo(7))
+		Expect(fakeMetricSender.GetContainerMetric(appGuid).CpuPercentage).To(BeEquivalentTo(42.42))
+		Expect(fakeMetricSender.GetContainerMetric(appGuid).MemoryBytes).To(BeEquivalentTo(1234))
+		Expect(fakeMetricSender.GetContainerMetric(appGuid).DiskBytes).To(BeEquivalentTo(123412341234))
+
+	})
+
 	Context("when Metric Sender is not initialized", func() {
 
 		BeforeEach(func() {
@@ -63,6 +74,13 @@ var _ = Describe("Metrics", func() {
 
 		It("AddToCounter is a no-op", func() {
 			err := metrics.AddToCounter("count", 10)
+
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("SendContainerMetric is a no-op", func() {
+			appGuid := "some_app_guid"
+			err := metrics.SendContainerMetric(appGuid, 0, 42.42, 1234, 123412341234)
 
 			Expect(err).ToNot(HaveOccurred())
 		})

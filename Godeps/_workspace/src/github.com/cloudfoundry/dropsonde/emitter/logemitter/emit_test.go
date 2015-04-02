@@ -1,10 +1,10 @@
 package logemitter_test
 
 import (
-	"code.google.com/p/gogoprotobuf/proto"
 	. "github.com/cloudfoundry/dropsonde/emitter/logemitter"
 	"github.com/cloudfoundry/dropsonde/emitter/logemitter/testhelpers"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
+	"github.com/gogo/protobuf/proto"
 	"log"
 	"os"
 	"strings"

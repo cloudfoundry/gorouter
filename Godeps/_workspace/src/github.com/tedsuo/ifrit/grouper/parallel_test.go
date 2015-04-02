@@ -161,32 +161,56 @@ var _ = Describe("Parallel Group", func() {
 		})
 
 		Describe("Failed start", func() {
-			BeforeEach(func() {
-				signal1 := childRunner1.WaitForCall()
-				childRunner1.TriggerReady()
-				signal3 := childRunner3.WaitForCall()
-				childRunner3.TriggerReady()
+			Context("when some processes exit before being ready", func() {
+				BeforeEach(func() {
+					signal1 := childRunner1.WaitForCall()
+					childRunner1.TriggerReady()
+					signal3 := childRunner3.WaitForCall()
+					childRunner3.TriggerReady()
 
-				childRunner2.TriggerExit(errors.New("Fail"))
+					childRunner2.TriggerExit(errors.New("Fail"))
 
-				Consistently(groupProcess.Ready()).ShouldNot(BeClosed())
+					Consistently(groupProcess.Ready()).ShouldNot(BeClosed())
 
-				Eventually(signal1).Should(Receive(Equal(os.Interrupt)))
-				Eventually(signal3).Should(Receive(Equal(os.Interrupt)))
+					Eventually(signal1).Should(Receive(Equal(os.Interrupt)))
+					Eventually(signal3).Should(Receive(Equal(os.Interrupt)))
 
-				childRunner1.TriggerExit(nil)
-				childRunner3.TriggerExit(nil)
+					childRunner1.TriggerExit(nil)
+					childRunner3.TriggerExit(nil)
+				})
+
+				It("exits after stopping all processes", func() {
+					var err error
+
+					Eventually(groupProcess.Wait()).Should(Receive(&err))
+					Ω(err).Should(ConsistOf(
+						grouper.ExitEvent{grouper.Member{"child2", childRunner2}, errors.New("Fail")},
+						grouper.ExitEvent{grouper.Member{"child1", childRunner1}, nil},
+						grouper.ExitEvent{grouper.Member{"child3", childRunner3}, nil},
+					))
+				})
 			})
 
-			It("exits after starting all processes", func() {
-				var err error
+			Context("when all processes exit before any are ready", func() {
+				BeforeEach(func() {
+					childRunner1.TriggerExit(errors.New("Fail"))
+					childRunner2.TriggerExit(nil)
+					childRunner3.TriggerExit(nil)
 
-				Eventually(groupProcess.Wait()).Should(Receive(&err))
-				Ω(err).Should(ConsistOf(
-					grouper.ExitEvent{grouper.Member{"child2", childRunner2}, errors.New("Fail")},
-					grouper.ExitEvent{grouper.Member{"child1", childRunner1}, nil},
-					grouper.ExitEvent{grouper.Member{"child3", childRunner3}, nil},
-				))
+					Consistently(groupProcess.Ready()).ShouldNot(BeClosed())
+				})
+
+				It("exits after stopping all processes", func() {
+					var err error
+
+					Eventually(groupProcess.Wait()).Should(Receive(&err))
+
+					Ω(err).Should(ConsistOf(
+						grouper.ExitEvent{grouper.Member{"child1", childRunner1}, errors.New("Fail")},
+						grouper.ExitEvent{grouper.Member{"child2", childRunner2}, nil},
+						grouper.ExitEvent{grouper.Member{"child3", childRunner3}, nil},
+					))
+				})
 			})
 		})
 	})

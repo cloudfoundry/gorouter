@@ -1,0 +1,21 @@
+language: go
+go:
+  - 1.3
+
+install:
+  - go get -t -v ./...
+  - mkdir -p $HOME/gopath/bin
+  - go install -v github.com/onsi/ginkgo/ginkgo
+  - git clone https://github.com/coreos/etcd ../../coreos/etcd
+  - pushd ../../coreos/etcd
+  - git checkout v0.4.6
+  - ./build
+  - mv ./bin/etcd $HOME/gopath/bin
+  - popd
+  - mkdir -p $HOME/bin
+  - pushd $HOME/bin
+  - popd
+
+script:
+  - export PATH=$HOME/gopath/bin:$PATH
+  - ginkgo -r --randomizeAllSpecs --failOnPending -race

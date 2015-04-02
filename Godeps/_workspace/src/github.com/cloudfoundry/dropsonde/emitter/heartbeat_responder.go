@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"sync"
 
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/control"
 	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/gogo/protobuf/proto"
 )
 
 type heartbeatResponder struct {

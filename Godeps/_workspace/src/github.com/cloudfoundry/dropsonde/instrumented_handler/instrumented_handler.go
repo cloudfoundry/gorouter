@@ -5,11 +5,12 @@ import (
 	"net"
 	"net/http"
 
+	"log"
+
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
 	uuid "github.com/nu7hatch/gouuid"
-	"log"
 )
 
 type instrumentedHandler struct {
@@ -97,6 +98,16 @@ func (irw *instrumentedResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, er
 	}
 
 	return hijacker.Hijack()
+}
+
+func (irw *instrumentedResponseWriter) CloseNotify() <-chan bool {
+	notifier, ok := irw.writer.(http.CloseNotifier)
+
+	if !ok {
+		panic("Called CloseNotify on an InstrumentedResponseWriter that wraps a non-CloseNotifiable writer")
+	}
+
+	return notifier.CloseNotify()
 }
 
 var GenerateUuid = uuid.NewV4

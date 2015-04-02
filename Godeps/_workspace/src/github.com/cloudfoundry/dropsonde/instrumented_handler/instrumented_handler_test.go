@@ -1,23 +1,20 @@
 package instrumented_handler_test
 
 import (
+	"bufio"
 	"errors"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/instrumented_handler"
 	uuid "github.com/nu7hatch/gouuid"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
-
-type FakeHandler struct{}
-
-func (fh FakeHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	rw.Write([]byte("Hello World!"))
-	rw.WriteHeader(123)
-}
 
 var _ = Describe("InstrumentedHandler", func() {
 	var fakeEmitter *fake.FakeEventEmitter
@@ -30,7 +27,7 @@ var _ = Describe("InstrumentedHandler", func() {
 		fakeEmitter = fake.NewFakeEventEmitter(origin)
 
 		var err error
-		fh := FakeHandler{}
+		fh := fakeHandler{}
 		h = instrumented_handler.InstrumentedHandler(fh, fakeEmitter)
 		req, err = http.NewRequest("GET", "http://foo.example.com/", nil)
 		Expect(err).ToNot(HaveOccurred())
@@ -105,4 +102,183 @@ var _ = Describe("InstrumentedHandler", func() {
 			})
 		})
 	})
+
+	Describe("satisfaction of interfaces", func() {
+
+		var (
+			rwChan chan http.ResponseWriter
+			fh     storageHelperHandler
+			h      http.Handler
+		)
+
+		BeforeEach(func() {
+			rwChan = make(chan http.ResponseWriter, 1)
+			fh = storageHelperHandler{rwChan: rwChan}
+			h = instrumented_handler.InstrumentedHandler(fh, fakeEmitter)
+		})
+
+		Describe("http.Flusher", func() {
+			It("panics if the underlying writer is not an http.Flusher", func() {
+				h.ServeHTTP(basicResponseWriter{}, req)
+
+				flusher := (<-rwChan).(http.Flusher)
+				Expect(flusher.Flush).To(Panic())
+			})
+
+			It("delegates Flush to the underlying writer if it is an http.Flusher", func() {
+				rw := completeResponseWriter{isFlushed: make(chan struct{})}
+				h.ServeHTTP(rw, req)
+
+				flusher := (<-rwChan).(http.Flusher)
+				flusher.Flush()
+				Expect(rw.isFlushed).To(BeClosed())
+			})
+		})
+
+		Describe("http.Hijacker", func() {
+			It("panics if the underlying writer is not an http.Hijacker", func() {
+				h.ServeHTTP(basicResponseWriter{}, req)
+
+				hijacker := (<-rwChan).(http.Hijacker)
+				Expect(func() { hijacker.Hijack() }).To(Panic())
+			})
+
+			It("delegates Hijack to the underlying writer if it is an http.Hijacker", func() {
+				rw := completeResponseWriter{isHijacked: make(chan struct{})}
+				h.ServeHTTP(rw, req)
+
+				hijacker := (<-rwChan).(http.Hijacker)
+				hijacker.Hijack()
+				Expect(rw.isHijacked).To(BeClosed())
+			})
+		})
+
+		Describe("http.CloseNotifier", func() {
+			It("panics if the underlying writer is not an http.CloseNotifier", func() {
+				h.ServeHTTP(basicResponseWriter{}, req)
+
+				closeNotifier := (<-rwChan).(http.CloseNotifier)
+				Expect(func() { closeNotifier.CloseNotify() }).To(Panic())
+			})
+
+			It("delegates CloseNotify to the underlying writer if it is an http.CloseNotifier", func() {
+				rw := completeResponseWriter{isCloseNotified: make(chan struct{})}
+				h.ServeHTTP(rw, req)
+
+				closeNotifier := (<-rwChan).(http.CloseNotifier)
+				closeNotifier.CloseNotify()
+				Expect(rw.isCloseNotified).To(BeClosed())
+			})
+		})
+	})
 })
+
+// fakeHandler is a basic http.Handler that responds with some valid data
+type fakeHandler struct{}
+
+func (fh fakeHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	rw.Write([]byte("Hello World!"))
+	rw.WriteHeader(123)
+}
+
+// storageHelperHandler stores the ResponseWriter it is given during ServeHTTP
+type storageHelperHandler struct {
+	rwChan chan http.ResponseWriter
+}
+
+func (shh storageHelperHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	shh.rwChan <- rw
+}
+
+// basicResponseWriter is a minimal http.ResponseWriter
+type basicResponseWriter struct {
+}
+
+func (basicResponseWriter) Header() http.Header {
+	return http.Header{}
+}
+
+func (basicResponseWriter) Write([]byte) (int, error) {
+	return 0, nil
+}
+
+func (basicResponseWriter) WriteHeader(int) {
+}
+
+// completeResponseWriter implements http.ResponseWriter, http.Flusher, http.Hijacker and http.CloseNotifier
+type completeResponseWriter struct {
+	isFlushed       chan struct{}
+	isHijacked      chan struct{}
+	isCloseNotified chan struct{}
+}
+
+func (completeResponseWriter) Header() http.Header {
+	return http.Header{}
+}
+
+func (completeResponseWriter) Write([]byte) (int, error) {
+	return 0, nil
+}
+
+func (completeResponseWriter) WriteHeader(int) {
+}
+
+func (rw completeResponseWriter) Flush() {
+	close(rw.isFlushed)
+}
+
+func (rw completeResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	close(rw.isHijacked)
+	return fakeConn{}, nil, nil
+}
+
+func (rw completeResponseWriter) CloseNotify() <-chan bool {
+	close(rw.isCloseNotified)
+	return make(chan bool)
+}
+
+// fakeConn is a minimal net.Conn
+type fakeConn struct{}
+
+func (fakeConn) Read([]byte) (int, error) {
+	return 0, nil
+}
+
+func (fakeConn) Write([]byte) (int, error) {
+	return 0, nil
+}
+
+func (fakeConn) Close() error {
+	return nil
+}
+
+func (fakeConn) LocalAddr() net.Addr {
+	return fakeAddr{}
+}
+
+func (fakeConn) RemoteAddr() net.Addr {
+	return fakeAddr{}
+}
+
+func (fakeConn) SetDeadline(time.Time) error {
+	return nil
+}
+
+func (fakeConn) SetReadDeadline(time.Time) error {
+	return nil
+}
+
+func (fakeConn) SetWriteDeadline(time.Time) error {
+	return nil
+}
+
+// fakeAddr is a minimal net.Addr
+type fakeAddr struct{}
+
+func (fakeAddr) Network() string {
+	return ""
+}
+
+func (fakeAddr) String() string {
+	return ""
+}

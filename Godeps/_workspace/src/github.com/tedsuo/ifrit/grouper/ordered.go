@@ -35,17 +35,17 @@ func (g *orderedGroup) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 
 	signal, errTrace := g.orderedStart(signals)
 	if errTrace != nil {
-		return g.stop(g.terminationSignal, errTrace)
+		return g.stop(g.terminationSignal, signals, errTrace)
 	}
 
 	if signal != nil {
-		return g.stop(signal, errTrace)
+		return g.stop(signal, signals, errTrace)
 	}
 
 	close(ready)
 
 	signal, errTrace = g.waitForSignal(signals, errTrace)
-	return g.stop(signal, errTrace)
+	return g.stop(signal, signals, errTrace)
 }
 
 func (g *orderedGroup) validate() error {
@@ -101,7 +101,7 @@ func (g *orderedGroup) waitForSignal(signals <-chan os.Signal, errTrace ErrorTra
 	return g.terminationSignal, errTrace
 }
 
-func (g *orderedGroup) stop(signal os.Signal, errTrace ErrorTrace) error {
+func (g *orderedGroup) stop(signal os.Signal, signals <-chan os.Signal, errTrace ErrorTrace) error {
 	errOccurred := false
 	exited := map[string]struct{}{}
 	if len(errTrace) > 0 {
@@ -121,13 +121,17 @@ func (g *orderedGroup) stop(signal os.Signal, errTrace ErrorTrace) error {
 		if p, ok := g.pool[m.Name]; ok {
 			p.Signal(signal)
 
-			err := <-p.Wait()
-			errTrace = append(errTrace, ExitEvent{
-				Member: m,
-				Err:    err,
-			})
-			if err != nil {
-				errOccurred = true
+			select {
+			case err := <-p.Wait():
+				errTrace = append(errTrace, ExitEvent{
+					Member: m,
+					Err:    err,
+				})
+				if err != nil {
+					errOccurred = true
+				}
+			case signal := <-signals:
+				p.Signal(signal)
 			}
 		}
 	}

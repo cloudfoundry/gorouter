@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/ginkgo/interrupthandler"
 	"github.com/onsi/ginkgo/ginkgo/testrunner"
 	"github.com/onsi/ginkgo/types"
 )
@@ -15,7 +16,7 @@ import (
 func BuildRunCommand() *Command {
 	commandFlags := NewRunCommandFlags(flag.NewFlagSet("ginkgo", flag.ExitOnError))
 	notifier := NewNotifier(commandFlags)
-	interruptHandler := NewInterruptHandler()
+	interruptHandler := interrupthandler.NewInterruptHandler()
 	runner := &SpecRunner{
 		commandFlags:     commandFlags,
 		notifier:         notifier,
@@ -39,7 +40,7 @@ func BuildRunCommand() *Command {
 type SpecRunner struct {
 	commandFlags     *RunWatchAndBuildCommandFlags
 	notifier         *Notifier
-	interruptHandler *InterruptHandler
+	interruptHandler *interrupthandler.InterruptHandler
 	suiteRunner      *SuiteRunner
 }
 
@@ -80,7 +81,7 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 		for {
 			r.UpdateSeed()
 			randomizedRunners := r.randomizeOrder(runners)
-			runResult, numSuites = r.suiteRunner.RunSuites(randomizedRunners, r.commandFlags.KeepGoing, nil)
+			runResult, numSuites = r.suiteRunner.RunSuites(randomizedRunners, r.commandFlags.NumCompilers, r.commandFlags.KeepGoing, nil)
 			iteration++
 
 			if r.interruptHandler.WasInterrupted() {
@@ -96,7 +97,7 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 		}
 	} else {
 		randomizedRunners := r.randomizeOrder(runners)
-		runResult, numSuites = r.suiteRunner.RunSuites(randomizedRunners, r.commandFlags.KeepGoing, nil)
+		runResult, numSuites = r.suiteRunner.RunSuites(randomizedRunners, r.commandFlags.NumCompilers, r.commandFlags.KeepGoing, nil)
 	}
 
 	for _, runner := range runners {

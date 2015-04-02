@@ -5,9 +5,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
+	"github.com/gogo/protobuf/proto"
 	"net/http"
 )
 
@@ -119,6 +119,22 @@ var _ = Describe("HTTP event creation", func() {
 			logEvent.Timestamp = nil
 
 			Expect(logEvent).To(Equal(expectedLogEvent))
+		})
+	})
+
+	Describe("NewContainerMetric", func() {
+		It("should set the appropriate fields", func() {
+			expectedContainerMetric := &events.ContainerMetric{
+				ApplicationId: proto.String("some_app_id"),
+				InstanceIndex: proto.Int32(7),
+				CpuPercentage: proto.Float64(42.24),
+				MemoryBytes:   proto.Uint64(1234),
+				DiskBytes:     proto.Uint64(13231231),
+			}
+
+			containerMetric := factories.NewContainerMetric("some_app_id", 7, 42.24, 1234, 13231231)
+
+			Expect(containerMetric).To(Equal(expectedContainerMetric))
 		})
 	})
 })

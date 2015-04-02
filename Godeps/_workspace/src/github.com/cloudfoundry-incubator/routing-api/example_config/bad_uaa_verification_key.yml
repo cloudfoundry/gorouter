@@ -1,0 +1,5 @@
+uaa_verification_key: "-----BEGIN PUBLIC KEY-----
+
+      not a key
+
+      -----END PUBLIC KEY-----"

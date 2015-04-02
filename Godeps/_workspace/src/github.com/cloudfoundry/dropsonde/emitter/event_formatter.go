@@ -1,41 +1,44 @@
 package emitter
 
 import (
-	"code.google.com/p/gogoprotobuf/proto"
 	"errors"
 	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/gogo/protobuf/proto"
 	"time"
 )
 
 var ErrorMissingOrigin = errors.New("Event not emitted due to missing origin information")
 var ErrorUnknownEventType = errors.New("Cannot create envelope for unknown event type")
 
-func Wrap(e events.Event, origin string) (*events.Envelope, error) {
+func Wrap(event events.Event, origin string) (*events.Envelope, error) {
 	if origin == "" {
 		return nil, ErrorMissingOrigin
 	}
 
 	envelope := &events.Envelope{Origin: proto.String(origin), Timestamp: proto.Int64(time.Now().UnixNano())}
 
-	switch e := e.(type) {
+	switch event := event.(type) {
 	case *events.Heartbeat:
 		envelope.EventType = events.Envelope_Heartbeat.Enum()
-		envelope.Heartbeat = e
+		envelope.Heartbeat = event
 	case *events.HttpStart:
 		envelope.EventType = events.Envelope_HttpStart.Enum()
-		envelope.HttpStart = e
+		envelope.HttpStart = event
 	case *events.HttpStop:
 		envelope.EventType = events.Envelope_HttpStop.Enum()
-		envelope.HttpStop = e
+		envelope.HttpStop = event
 	case *events.ValueMetric:
 		envelope.EventType = events.Envelope_ValueMetric.Enum()
-		envelope.ValueMetric = e
+		envelope.ValueMetric = event
 	case *events.CounterEvent:
 		envelope.EventType = events.Envelope_CounterEvent.Enum()
-		envelope.CounterEvent = e
+		envelope.CounterEvent = event
 	case *events.LogMessage:
 		envelope.EventType = events.Envelope_LogMessage.Enum()
-		envelope.LogMessage = e
+		envelope.LogMessage = event
+	case *events.ContainerMetric:
+		envelope.EventType = events.Envelope_ContainerMetric.Enum()
+		envelope.ContainerMetric = event
 	default:
 		return nil, ErrorUnknownEventType
 	}

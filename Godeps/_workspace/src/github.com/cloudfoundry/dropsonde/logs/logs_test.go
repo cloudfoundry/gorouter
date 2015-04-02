@@ -63,11 +63,11 @@ var _ = Describe("Logs", func() {
 		})
 
 		It("ScanLogStream is a no-op", func() {
-			Expect(func() { logs.ScanLogStream("app-id", "src-type", "src-instance", nil, nil) }).ShouldNot(Panic())
+			Expect(func() { logs.ScanLogStream("app-id", "src-type", "src-instance", nil) }).ShouldNot(Panic())
 		})
 
 		It("ScanErrorLogStream is a no-op", func() {
-			Expect(func() { logs.ScanErrorLogStream("app-id", "src-type", "src-instance", nil, nil) }).ShouldNot(Panic())
+			Expect(func() { logs.ScanErrorLogStream("app-id", "src-type", "src-instance", nil) }).ShouldNot(Panic())
 		})
 
 	})

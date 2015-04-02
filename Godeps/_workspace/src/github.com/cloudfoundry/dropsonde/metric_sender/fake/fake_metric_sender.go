@@ -1,10 +1,13 @@
 package fake
 
-import "sync"
+import (
+	"sync"
+)
 
 type FakeMetricSender struct {
-	counters map[string]uint64
-	values   map[string]Metric
+	counters         map[string]uint64
+	values           map[string]Metric
+	containerMetrics map[string]ContainerMetric
 	sync.RWMutex
 }
 
@@ -13,10 +16,19 @@ type Metric struct {
 	Unit  string
 }
 
+type ContainerMetric struct {
+	ApplicationId string
+	InstanceIndex int32
+	CpuPercentage float64
+	MemoryBytes   uint64
+	DiskBytes     uint64
+}
+
 func NewFakeMetricSender() *FakeMetricSender {
 	return &FakeMetricSender{
-		counters: make(map[string]uint64),
-		values:   make(map[string]Metric),
+		counters:         make(map[string]uint64),
+		values:           make(map[string]Metric),
+		containerMetrics: make(map[string]ContainerMetric),
 	}
 }
 
@@ -44,6 +56,14 @@ func (fms *FakeMetricSender) AddToCounter(name string, delta uint64) error {
 	return nil
 }
 
+func (fms *FakeMetricSender) SendContainerMetric(applicationId string, instanceIndex int32, cpuPercentage float64, memoryBytes uint64, diskBytes uint64) error {
+	fms.Lock()
+	defer fms.Unlock()
+	fms.containerMetrics[applicationId] = ContainerMetric{ApplicationId: applicationId, InstanceIndex: instanceIndex, CpuPercentage: cpuPercentage, MemoryBytes: memoryBytes, DiskBytes: diskBytes}
+
+	return nil
+}
+
 func (fms *FakeMetricSender) GetValue(name string) Metric {
 	fms.RLock()
 	defer fms.RUnlock()
@@ -56,4 +76,11 @@ func (fms *FakeMetricSender) GetCounter(name string) uint64 {
 	defer fms.RUnlock()
 
 	return fms.counters[name]
+}
+
+func (fms *FakeMetricSender) GetContainerMetric(applicationId string) ContainerMetric {
+	fms.RLock()
+	defer fms.RUnlock()
+
+	return fms.containerMetrics[applicationId]
 }
