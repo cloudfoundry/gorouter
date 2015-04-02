@@ -211,9 +211,6 @@ var _ = Describe("RouteFetcher", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
 
-				tokenFetcher.FetchTokenReturns(token, nil)
-				fetcher.StartEventCycle()
-
 				received := make(chan struct{})
 
 				eventSource.NextStub = func() (routing_api.Event, error) {
@@ -230,6 +227,9 @@ var _ = Describe("RouteFetcher", func() {
 					return event, nil
 				}
 
+				tokenFetcher.FetchTokenReturns(token, nil)
+				fetcher.StartEventCycle()
+
 				<-received
 
 				Expect(registry.UnregisterCallCount()).To(Equal(1))
@@ -240,15 +240,15 @@ var _ = Describe("RouteFetcher", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
 
-				tokenFetcher.FetchTokenReturns(token, nil)
-				fetcher.StartEventCycle()
-
 				received := make(chan struct{})
 
 				eventSource.NextStub = func() (routing_api.Event, error) {
 					received <- struct{}{}
 					return routing_api.Event{}, errors.New("beep boop im a robot")
 				}
+
+				tokenFetcher.FetchTokenReturns(token, nil)
+				fetcher.StartEventCycle()
 
 				<-received
 
