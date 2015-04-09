@@ -141,13 +141,21 @@ var _ = Describe("Router Integration", func() {
 
 			go func() {
 				defer GinkgoRecover()
+
+				//Open a connection that never goes active
+				conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", localIP, proxyPort))
+				Expect(err).NotTo(HaveOccurred())
+				err = conn.Close()
+				Expect(err).NotTo(HaveOccurred())
+
+				//Open a connection that goes active
 				resp, err := http.Get(longApp.Endpoint())
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp.StatusCode).Should(Equal(http.StatusOK))
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(resp.StatusCode).Should(Equal(http.StatusOK))
 				bytes, err := ioutil.ReadAll(resp.Body)
 				resp.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(bytes).Should(Equal([]byte{'b'}))
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(bytes).Should(Equal([]byte{'b'}))
 				responseRead <- true
 			}()
 
