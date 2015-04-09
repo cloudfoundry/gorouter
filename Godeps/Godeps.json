@@ -1,9 +1,6 @@
 {
 	"ImportPath": "github.com/cloudfoundry/gorouter",
-	"GoVersion": "go1.4.2",
-	"Packages": [
-		"./..."
-	],
+	"GoVersion": "go1.4.1",
 	"Deps": [
 		{
 			"ImportPath": "github.com/apcera/nats",
@@ -29,6 +26,10 @@
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
 			"Rev": "9aef8ff4c758c3bc56bb00bfbe0d2af538e03ff6"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry-incubator/uaa-token-fetcher",
+			"Rev": "d984db92b74f6a223e6ff2fb028bf379f0fb1a80"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
