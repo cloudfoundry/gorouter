@@ -197,6 +197,9 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 	drained := make(chan struct{})
 	r.connLock.Lock()
+
+	r.logger.Infof("Draining with %d outstanding active connections", len(r.activeConns))
+	r.logger.Infof("Draining with %d outstanding idle connections", len(r.idleConns))
 	r.closeIdleConns()
 
 	if len(r.activeConns) == 0 {
