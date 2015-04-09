@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
+	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/pivotal-golang/localip"
 
@@ -33,13 +34,6 @@ type NatsConfig struct {
 	Port uint16 `yaml:"port"`
 	User string `yaml:"user"`
 	Pass string `yaml:"pass"`
-}
-
-type OAuthConfig struct {
-	TokenEndpoint string `yaml:"token_endpoint"`
-	ClientName    string `yaml:"client_name"`
-	ClientSecret  string `yaml:"client_secret"`
-	Port          int    `yaml:"port"`
 }
 
 type RoutingApiConfig struct {
@@ -100,8 +94,8 @@ type Config struct {
 	DrainTimeoutInSeconds                int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies                        bool `yaml:"secure_cookies"`
 
-	OAuth      OAuthConfig      `yaml:"oauth"`
-	RoutingApi RoutingApiConfig `yaml:"routing_api"`
+	OAuth      token_fetcher.OAuthConfig `yaml:"oauth"`
+	RoutingApi RoutingApiConfig          `yaml:"routing_api"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`

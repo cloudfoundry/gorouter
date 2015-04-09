@@ -5,10 +5,10 @@ import (
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/token_fetcher"
 	steno "github.com/cloudfoundry/gosteno"
 )
 

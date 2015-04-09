@@ -7,11 +7,11 @@ import (
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	fake_routing_api "github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
+	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
+	testTokenFetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher/fakes"
 	"github.com/cloudfoundry/gorouter/config"
 	testRegistry "github.com/cloudfoundry/gorouter/registry/fakes"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/token_fetcher"
-	testTokenFetcher "github.com/cloudfoundry/gorouter/token_fetcher/fakes"
 	"github.com/cloudfoundry/gosteno"
 
 	. "github.com/cloudfoundry/gorouter/route_fetcher"
