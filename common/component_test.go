@@ -2,6 +2,7 @@ package common_test
 
 import (
 	. "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/localip"
@@ -112,6 +113,49 @@ var _ = Describe("Component", func() {
 
 		code, _, _ := doGetRequest(req)
 		Ω(code).Should(Equal(404))
+	})
+
+	Context("#Register", func() {
+		var fakeNats *fakeyagnats.FakeNATSConn
+		BeforeEach(func() {
+			fakeNats = fakeyagnats.Connect()
+		})
+
+		Context("When the JobName is set", func() {
+			BeforeEach(func() {
+				component = &VcapComponent{
+					Host:        fmt.Sprintf("127.0.0.1:%d", 12345),
+					Credentials: []string{"username", "password"},
+					JobName:     "router_z1",
+				}
+			})
+
+			It("includes the job_name property in the announce message", func() {
+				component.Register(fakeNats)
+				Ω(len(fakeNats.PublishedMessages("vcap.component.announce"))).To(Equal(1))
+				for _, msg := range fakeNats.PublishedMessages("vcap.component.announce") {
+					Ω(msg.Data).To(MatchRegexp("^{.*\"job_name\":\"router_z1\".*}$"))
+				}
+			})
+		})
+
+		Context("When the JobName is not set", func() {
+			BeforeEach(func() {
+				component = &VcapComponent{
+					Host:        fmt.Sprintf("127.0.0.1:%d", 12345),
+					Credentials: []string{"username", "password"},
+				}
+			})
+
+			It("includes the job_name property in the announce message", func() {
+				component.Register(fakeNats)
+				Ω(len(fakeNats.PublishedMessages("vcap.component.announce"))).To(Equal(1))
+				for _, msg := range fakeNats.PublishedMessages("vcap.component.announce") {
+					Ω(msg.Data).ShouldNot(MatchRegexp("^{.*\"job_name\":\"router_z1\".*}$"))
+				}
+			})
+		})
+
 	})
 
 })

@@ -105,6 +105,7 @@ trace_key: "foo"
 access_log: "/tmp/access_log"
 ssl_port: 4443
 enable_ssl: true
+name: router_z1
 `)
 
 			config.Initialize(b)
@@ -116,6 +117,7 @@ enable_ssl: true
 			Ω(config.AccessLog).To(Equal("/tmp/access_log"))
 			Ω(config.EnableSSL).To(Equal(true))
 			Ω(config.SSLPort).To(Equal(uint16(4443)))
+			Ω(config.Name).To(Equal("router_z1"))
 		})
 
 		It("sets the Routing Api config", func() {

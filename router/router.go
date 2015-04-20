@@ -69,6 +69,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 	component := &vcap.VcapComponent{
 		Type:        "Router",
 		Index:       cfg.Index,
+		JobName:     cfg.Name,
 		Host:        host,
 		Credentials: []string{cfg.Status.User, cfg.Status.Pass},
 		Config:      cfg,
