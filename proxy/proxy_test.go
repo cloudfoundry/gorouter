@@ -14,16 +14,12 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/test_util"
-	"github.com/cloudfoundry/yagnats/fakeyagnats"
 
-	. "github.com/cloudfoundry/gorouter/proxy"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -43,74 +39,6 @@ func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, 
 }
 
 var _ = Describe("Proxy", func() {
-	var r *registry.RouteRegistry
-	var p Proxy
-	var conf *config.Config
-	var proxyServer net.Listener
-	var accessLog access_log.AccessLogger
-	var accessLogFile *test_util.FakeFile
-	var shouldEcho func(input string, expected string)
-
-	BeforeEach(func() {
-		conf = config.DefaultConfig()
-		conf.TraceKey = "my_trace_key"
-		conf.EndpointTimeout = 500 * time.Millisecond
-	})
-
-	JustBeforeEach(func() {
-		mbus := fakeyagnats.Connect()
-		r = registry.NewRouteRegistry(conf, mbus)
-
-		fakeEmitter := fake.NewFakeEventEmitter("fake")
-		dropsonde.InitializeWithEmitter(fakeEmitter)
-
-		accessLogFile = new(test_util.FakeFile)
-		accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "")
-		go accessLog.Run()
-
-		p = NewProxy(ProxyArgs{
-			EndpointTimeout: conf.EndpointTimeout,
-			Ip:              conf.Ip,
-			TraceKey:        conf.TraceKey,
-			Registry:        r,
-			Reporter:        nullVarz{},
-			AccessLogger:    accessLog,
-			SecureCookies:   conf.SecureCookies,
-		})
-
-		shouldEcho = func(input string, expected string) {
-			ln := registerHandler(r, "encoding", func(x *test_util.HttpConn) {
-				x.CheckLine("GET " + expected + " HTTP/1.1")
-				resp := test_util.NewResponse(http.StatusOK)
-				x.WriteResponse(resp)
-				x.Close()
-			})
-			defer ln.Close()
-
-			x := dialProxy(proxyServer)
-
-			req := x.NewRequest("GET", input, nil)
-			req.Host = "encoding"
-			x.WriteRequest(req)
-			resp, _ := x.ReadResponse()
-
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
-		}
-
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		Ω(err).NotTo(HaveOccurred())
-
-		server := http.Server{Handler: p}
-		go server.Serve(ln)
-
-		proxyServer = ln
-	})
-
-	AfterEach(func() {
-		proxyServer.Close()
-		accessLog.Stop()
-	})
-
 	It("responds to http/1.0", func() {
 		ln := registerHandler(r, "test", func(x *test_util.HttpConn) {
 			x.CheckLine("GET / HTTP/1.1")
@@ -219,7 +147,7 @@ var _ = Describe("Proxy", func() {
 	It("responds to load balancer check", func() {
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
 		x.WriteRequest(req)
 
@@ -230,7 +158,7 @@ var _ = Describe("Proxy", func() {
 	It("responds to unknown host with 404", func() {
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "unknown"
 		x.WriteRequest(req)
 
@@ -248,7 +176,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "enfant-terrible"
 		x.WriteRequest(req)
 
@@ -271,7 +199,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "trace-test"
 		req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
 		x.WriteRequest(req)
@@ -296,7 +224,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "trace-test"
 		req.Header.Set(router_http.VcapTraceHeader, "a_bad_trace_key")
 		x.WriteRequest(req)
@@ -323,7 +251,7 @@ var _ = Describe("Proxy", func() {
 		defer ln.Close()
 
 		x := dialProxy(proxyServer)
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -351,7 +279,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		req.Header.Add("X-Forwarded-For", "1.2.3.4")
 		x.WriteRequest(req)
@@ -380,7 +308,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -408,7 +336,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
 		req.Header.Add("X-Request-Start", "user-set2")
@@ -438,7 +366,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -466,7 +394,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
 		x.WriteRequest(req)
@@ -496,7 +424,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -517,7 +445,7 @@ var _ = Describe("Proxy", func() {
 		fakeEmitter := fake.NewFakeEventEmitter("fake")
 		dropsonde.InitializeWithEmitter(fakeEmitter)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -555,7 +483,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "app"
 		x.WriteRequest(req)
 
@@ -590,7 +518,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/chat", nil)
+		req := test_util.NewRequest("GET", "/chat", nil)
 		req.Host = "ws"
 		req.Header.Set("Upgrade", "WebsockeT")
 		req.Header.Set("Connection", "UpgradE")
@@ -636,7 +564,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/chat", nil)
+		req := test_util.NewRequest("GET", "/chat", nil)
 		req.Host = "ws-cs-header"
 		req.Header.Add("Upgrade", "Websocket")
 		req.Header.Add("Connection", "keep-alive, Upgrade")
@@ -684,7 +612,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/chat", nil)
+		req := test_util.NewRequest("GET", "/chat", nil)
 		req.Host = "ws-cs-header"
 		req.Header.Add("Upgrade", "Websocket")
 		req.Header.Add("Connection", "keep-alive")
@@ -719,7 +647,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/chat", nil)
+		req := test_util.NewRequest("GET", "/chat", nil)
 		req.Host = "tcp-handler"
 		req.Header.Set("Upgrade", "tcp")
 
@@ -763,7 +691,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "chunk"
 
 		err := req.Write(x)
@@ -801,7 +729,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 
 		req.Header.Set("Connection", "close")
 		req.Host = "not-modified"
@@ -853,7 +781,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "slow-app"
 
 		started := time.Now()
@@ -892,7 +820,7 @@ var _ = Describe("Proxy", func() {
 
 		x := dialProxy(proxyServer)
 
-		req := x.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "/", nil)
 		req.Host = "slow-app"
 		x.WriteRequest(req)
 
@@ -916,7 +844,7 @@ var _ = Describe("Proxy", func() {
 
 			x := dialProxy(proxyServer)
 
-			req := x.NewRequest("GET", "/", nil)
+			req := test_util.NewRequest("GET", "/", nil)
 			req.Host = "remote"
 			req.Close = true
 			x.WriteRequest(req)
@@ -925,7 +853,7 @@ var _ = Describe("Proxy", func() {
 
 			x.WriteRequest(req)
 			_, err := http.ReadResponse(x.Reader, &http.Request{})
-			Ω(err).Should(Equal(io.ErrUnexpectedEOF))
+			Ω(err).Should(HaveOccurred())
 		})
 
 		It("keeps the connection alive", func() {
@@ -940,7 +868,7 @@ var _ = Describe("Proxy", func() {
 
 			x := dialProxy(proxyServer)
 
-			req := x.NewRequest("GET", "/", nil)
+			req := test_util.NewRequest("GET", "/", nil)
 			req.Host = "remote"
 			req.Close = false
 			x.WriteRequest(req)
@@ -970,101 +898,13 @@ var _ = Describe("Proxy", func() {
 		for i := 0; i < 5; i++ {
 			x := dialProxy(proxyServer)
 
-			req := x.NewRequest("GET", "/", nil)
+			req := test_util.NewRequest("GET", "/", nil)
 			req.Host = "retries"
 			x.WriteRequest(req)
 			resp, _ := x.ReadResponse()
 
 			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 		}
-	})
-
-	Describe("secure cookies", func() {
-		Context("when configured with secure cookies", func() {
-			BeforeEach(func() {
-				conf.SecureCookies = true
-			})
-
-			It("sets up a secure http cookie on the responsse", func() {
-				done := make(chan bool)
-
-				ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
-					jSessionIdCookie := &http.Cookie{
-						Name:  StickyCookieKey,
-						Value: "xxx",
-					}
-					_, err := http.ReadRequest(x.Reader)
-					Ω(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					resp.Header.Add("Set-Cookie", jSessionIdCookie.String())
-					x.WriteResponse(resp)
-					x.Close()
-					done <- true
-				}, "my-id")
-				defer ln.Close()
-
-				x := dialProxy(proxyServer)
-				req := x.NewRequest("GET", "/", nil)
-				req.Host = "app"
-				x.WriteRequest(req)
-
-				Eventually(done).Should(Receive())
-
-				found := false
-				resp, _ := x.ReadResponse()
-				for _, cookie := range resp.Cookies() {
-					if cookie.Name == VcapCookieId {
-						found = true
-						Ω(cookie.Secure).Should(BeTrue())
-					}
-				}
-				Ω(found).Should(BeTrue())
-			})
-		})
-
-		Context("when configured without secure cookies", func() {
-			BeforeEach(func() {
-				conf.SecureCookies = false
-			})
-
-			It("sets up a cookie without the secure flag", func() {
-				done := make(chan bool)
-
-				ln := registerHandlerWithInstanceId(r, "app", func(x *test_util.HttpConn) {
-					jSessionIdCookie := &http.Cookie{
-						Name:  StickyCookieKey,
-						Value: "xxx",
-					}
-					_, err := http.ReadRequest(x.Reader)
-					Ω(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					resp.Header.Add("Set-Cookie", jSessionIdCookie.String())
-					x.WriteResponse(resp)
-					x.Close()
-					done <- true
-				}, "my-id")
-				defer ln.Close()
-
-				x := dialProxy(proxyServer)
-				req := x.NewRequest("GET", "/", nil)
-				req.Host = "app"
-				x.WriteRequest(req)
-
-				Eventually(done).Should(Receive())
-
-				found := false
-				resp, _ := x.ReadResponse()
-				for _, cookie := range resp.Cookies() {
-					if cookie.Name == VcapCookieId {
-						found = true
-						Ω(cookie.Secure).Should(BeFalse())
-					}
-				}
-				Ω(found).Should(BeTrue())
-			})
-		})
 	})
 })
 

@@ -197,7 +197,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 
 			if endpoint.PrivateInstanceId != "" {
-				setupStickySession(responseWriter, rsp, endpoint, p.secureCookies)
+				setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies)
 			}
 		},
 	}
@@ -302,21 +302,37 @@ func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
 }
 
-func setupStickySession(responseWriter http.ResponseWriter, response *http.Response, endpoint *route.Endpoint, secureCookies bool) {
+func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,
+	endpoint *route.Endpoint,
+	originalEndpointId string,
+	secureCookies bool) {
+
+	maxAge := 0
+
+	// did the endpoint change?
+	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
+
 	for _, v := range response.Cookies() {
 		if v.Name == StickyCookieKey {
-			cookie := &http.Cookie{
-				Name:  VcapCookieId,
-				Value: endpoint.PrivateInstanceId,
-				Path:  "/",
-
-				HttpOnly: true,
-				Secure:   secureCookies,
+			sticky = true
+			if v.MaxAge < 0 {
+				maxAge = v.MaxAge
 			}
-
-			http.SetCookie(responseWriter, cookie)
-			return
+			break
 		}
+	}
+
+	if sticky {
+		cookie := &http.Cookie{
+			Name:     VcapCookieId,
+			Value:    endpoint.PrivateInstanceId,
+			Path:     "/",
+			MaxAge:   maxAge,
+			HttpOnly: true,
+			Secure:   secureCookies,
+		}
+
+		http.SetCookie(responseWriter, cookie)
 	}
 }
 

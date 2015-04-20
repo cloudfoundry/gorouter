@@ -1,16 +1,16 @@
 package test_util
 
 import (
+	"io"
 	"io/ioutil"
-	"net/url"
 	"strings"
 
 	. "github.com/onsi/gomega"
 
 	"bufio"
-	"io"
 	"net"
 	"net/http"
+	"net/url"
 )
 
 type HttpConn struct {
@@ -36,13 +36,6 @@ func (x *HttpConn) ReadRequest() (*http.Request, string) {
 	Ω(err).NotTo(HaveOccurred())
 
 	return req, string(b)
-}
-
-func (x *HttpConn) NewRequest(method, urlStr string, body io.Reader) *http.Request {
-	req, err := http.NewRequest(method, urlStr, body)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	req.URL = &url.URL{Host: req.URL.Host, Opaque: urlStr}
-	return req
 }
 
 func (x *HttpConn) WriteRequest(req *http.Request) {
@@ -102,4 +95,11 @@ func (x *HttpConn) WriteLines(lines []string) {
 	}
 
 	x.WriteLine("")
+}
+
+func NewRequest(method, urlStr string, body io.Reader) *http.Request {
+	req, err := http.NewRequest(method, urlStr, body)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	req.URL = &url.URL{Host: req.URL.Host, Opaque: urlStr}
+	return req
 }
