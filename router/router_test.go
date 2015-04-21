@@ -487,17 +487,13 @@ var _ = Describe("Router", func() {
 			Ω(req.Close).To(BeFalse())
 
 			// initiate idle timeout
-			resp, err := client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
-			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			assertServerResponse(client, req)
 
 			// use 3/4 of the idle timeout
 			time.Sleep(config.EndpointTimeout / 4 * 3)
 
 			//make second request without errors
-			resp, err = client.Do(req)
+			resp, err := client.Do(req)
 			Ω(err).ToNot(HaveOccurred())
 			Ω(resp).ToNot(BeNil())
 			resp.Body.Close()
@@ -537,11 +533,7 @@ var _ = Describe("Router", func() {
 			Ω(req.Close).To(BeFalse())
 
 			// initiate idle timeout
-			resp, err := client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
-			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			assertServerResponse(client, req)
 
 			// use 3/4 of the idle timeout
 			time.Sleep(config.EndpointTimeout / 4 * 3)
@@ -550,7 +542,7 @@ var _ = Describe("Router", func() {
 			// making a request that will last 3/4 of the timeout
 			// that does not disconnect will show that the idle timeout
 			// was removed during the active connection
-			resp, err = client.Do(req)
+			resp, err := client.Do(req)
 			Ω(err).ToNot(HaveOccurred())
 			Ω(resp).ToNot(BeNil())
 			resp.Body.Close()
@@ -808,4 +800,23 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	port, err = ioutil.ReadAll(resp.Body)
 
 	return string(port)
+}
+
+func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
+	var resp *http.Response
+	var err error
+
+	for i := 0; i < 3; i++ {
+		resp, err = client.Do(req)
+		Ω(err).ToNot(HaveOccurred())
+		Ω(resp).ToNot(BeNil())
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	Ω(resp.StatusCode).To(Equal(http.StatusOK))
 }

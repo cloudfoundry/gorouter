@@ -112,7 +112,7 @@ func (a *TestApp) Unregister() {
 func (a *TestApp) VerifyAppStatus(status int) {
 	Eventually(func() error {
 		return a.CheckAppStatus(status)
-	}).ShouldNot(HaveOccurred())
+	}, 2*time.Second).ShouldNot(HaveOccurred())
 }
 
 func (a *TestApp) CheckAppStatus(status int) error {

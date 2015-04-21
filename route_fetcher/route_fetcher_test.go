@@ -166,10 +166,17 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		It("periodically fetches routes", func() {
+			received := make(chan struct{})
+
+			client.RoutesStub = func() ([]db.Route, error) {
+				received <- struct{}{}
+				return []db.Route{}, nil
+			}
+
 			fetcher.StartFetchCycle()
 
-			time.Sleep(cfg.PruneStaleDropletsInterval * 2)
-			Expect(client.RoutesCallCount()).To(BeNumerically(">=", 2))
+			Eventually(received).Should(Receive())
+			Eventually(received).Should(Receive())
 		})
 
 		It("logs the error", func() {
