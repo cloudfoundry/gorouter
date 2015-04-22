@@ -183,16 +183,10 @@ var _ = Describe("RouteFetcher", func() {
 			tokenFetcher.FetchTokenReturns(nil, errors.New("Unauthorized"))
 			fetcher.StartFetchCycle()
 
-			time.Sleep(cfg.PruneStaleDropletsInterval + 10*time.Millisecond)
-			Expect(sink.Records()).ToNot(BeNil())
-			Expect(sink.Records()[0].Message).To(Equal("Unauthorized"))
-		})
+			Eventually(func() int {
+				return len(sink.Records())
+			}).Should(BeNumerically(">=", 1))
 
-		It("logs the error", func() {
-			tokenFetcher.FetchTokenReturns(nil, errors.New("Unauthorized"))
-			fetcher.StartFetchCycle()
-
-			time.Sleep(cfg.PruneStaleDropletsInterval + 10*time.Millisecond)
 			Expect(sink.Records()).ToNot(BeNil())
 			Expect(sink.Records()[0].Message).To(Equal("Unauthorized"))
 		})
@@ -201,15 +195,20 @@ var _ = Describe("RouteFetcher", func() {
 	Describe(".StartEventCycle", func() {
 		Context("when fetching the auth token fails", func() {
 			It("logs the failure and tries again", func() {
-				tokenFetcher.FetchTokenReturns(nil, errors.New("failed to get the token"))
+				received := make(chan struct{})
+
+				tokenFetcher.FetchTokenStub = func() (*token_fetcher.Token, error) {
+					received <- struct{}{}
+					return nil, errors.New("failed to get the token")
+				}
 				fetcher.StartEventCycle()
 
-				time.Sleep(1 * time.Millisecond)
+				Eventually(received).Should(Receive())
+				Eventually(received).Should(Receive())
+
 				Expect(sink.Records()).ToNot(BeNil())
 				Expect(sink.Records()[0].Message).To(Equal("failed to get the token"))
-				Eventually(func() int {
-					return tokenFetcher.FetchTokenCallCount()
-				}, 1).Should(BeNumerically(">=", 2))
+				Expect(tokenFetcher.FetchTokenCallCount()).To(Equal(2))
 			})
 		})
 
