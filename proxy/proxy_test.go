@@ -15,6 +15,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/stats"
@@ -39,6 +40,55 @@ func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, 
 }
 
 var _ = Describe("Proxy", func() {
+	Describe("helper functions", func() {
+		It("chops up paths", func() {
+			Expect(proxy.ChopUpPath("/path/foo/")).To(Equal([]string{"", "/path", "/path/foo"}))
+			Expect(proxy.ChopUpPath("/")).To(Equal([]string{""}))
+			Expect(proxy.ChopUpPath("/path/")).To(Equal([]string{"", "/path"}))
+		})
+	})
+	It("responds to http/1.0 with path", func() {
+		ln := registerHandler(r, "test/my_path", func(x *test_util.HttpConn) {
+			x.CheckLine("GET /my_path HTTP/1.1")
+
+			x.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				"Content-Length: 0",
+			})
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		x.WriteLines([]string{
+			"GET /my_path HTTP/1.0",
+			"Host: test",
+		})
+
+		x.CheckLine("HTTP/1.0 200 OK")
+	})
+
+	FIt("responds to http/1.0 with path/path", func() {
+		ln := registerHandler(r, "test/my%20path/your_path", func(x *test_util.HttpConn) {
+			x.CheckLine("GET /my%20path/your_path HTTP/1.1")
+
+			x.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				"Content-Length: 0",
+			})
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		x.WriteLines([]string{
+			"GET /my%20path/your_path HTTP/1.0",
+			"Host: test",
+		})
+
+		x.CheckLine("HTTP/1.0 200 OK")
+	})
+
 	It("responds to http/1.0", func() {
 		ln := registerHandler(r, "test", func(x *test_util.HttpConn) {
 			x.CheckLine("GET / HTTP/1.1")
