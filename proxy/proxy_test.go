@@ -932,6 +932,30 @@ var _ = Describe("Proxy", func() {
 
 	})
 
+	It("disables compression", func() {
+		ln := registerHandler(r, "remote", func(x *test_util.HttpConn) {
+			request, _ := http.ReadRequest(x.Reader)
+			encoding := request.Header["Accept-Encoding"]
+			var resp *http.Response
+			if len(encoding) != 0 {
+				resp = test_util.NewResponse(http.StatusInternalServerError)
+			} else {
+				resp = test_util.NewResponse(http.StatusOK)
+			}
+			x.WriteResponse(resp)
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "/", nil)
+		req.Host = "remote"
+		x.WriteRequest(req)
+		resp, _ := x.ReadResponse()
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+	})
+
 	It("retries when failed endpoints exist", func() {
 		ln := registerHandler(r, "retries", func(x *test_util.HttpConn) {
 			x.CheckLine("GET / HTTP/1.1")
