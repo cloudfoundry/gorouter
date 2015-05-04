@@ -11,7 +11,7 @@ type FakeRouteFetcherInterface struct {
 	FetchRoutesStub        func() error
 	fetchRoutesMutex       sync.RWMutex
 	fetchRoutesArgsForCall []struct{}
-	fetchRoutesReturns struct {
+	fetchRoutesReturns     struct {
 		result1 error
 	}
 }

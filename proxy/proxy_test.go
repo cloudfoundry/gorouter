@@ -1,9 +1,11 @@
 package proxy_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -112,34 +114,46 @@ var _ = Describe("Proxy", func() {
 
 	It("Logs a request", func() {
 		ln := registerHandler(r, "test", func(x *test_util.HttpConn) {
-			x.CheckLine("GET / HTTP/1.1")
+			req, body := x.ReadRequest()
+			Ω(req.Method).Should(Equal("POST"))
+			Ω(req.URL.Path).Should(Equal("/"))
+			Ω(req.ProtoMajor).Should(Equal(1))
+			Ω(req.ProtoMinor).Should(Equal(1))
 
-			x.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			Ω(body).Should(Equal("ABCD"))
 
+			rsp := test_util.NewResponse(200)
+			out := &bytes.Buffer{}
+			out.WriteString("DEFG")
+			rsp.Body = ioutil.NopCloser(out)
+			x.WriteResponse(rsp)
 		})
 		defer ln.Close()
 
 		x := dialProxy(proxyServer)
 
-		x.WriteLines([]string{
-			"GET / HTTP/1.0",
-			"Host: test",
-		})
+		body := &bytes.Buffer{}
+		body.WriteString("ABCD")
+		req := test_util.NewRequest("POST", "/", ioutil.NopCloser(body))
+		req.Host = "test"
+		x.WriteRequest(req)
 
-		x.CheckLine("HTTP/1.0 200 OK")
+		x.CheckLine("HTTP/1.1 200 OK")
 
 		var payload []byte
 		Eventually(func() int {
 			accessLogFile.Read(&payload)
 			return len(payload)
 		}).ShouldNot(BeZero())
-		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
+
 		//make sure the record includes all the data
 		//since the building of the log record happens throughout the life of the request
-		Ω(string(payload)).To(MatchRegexp(".*200.*\n"))
+		Ω(strings.HasPrefix(string(payload), "test - [")).Should(BeTrue())
+		Ω(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
+		Ω(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" vcap_request_id:`))
+		Ω(string(payload)).To(ContainSubstring(`response_time:`))
+		Ω(string(payload)).To(ContainSubstring(`app_id:`))
+		Ω(payload[len(payload)-1]).To(Equal(byte('\n')))
 	})
 
 	It("Logs a request when it exits early", func() {

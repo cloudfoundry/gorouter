@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -80,7 +81,7 @@ func NewProxy(args ProxyArgs) Proxy {
 				}
 				return conn, err
 			},
-			DisableKeepAlives: true,
+			DisableKeepAlives:  true,
 			DisableCompression: true,
 		},
 		secureCookies: args.SecureCookies,
@@ -144,9 +145,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		StartedAt: startedAt,
 	}
 
+	requestBodyCounter := &countingReadCloser{delegate: request.Body}
+	request.Body = requestBodyCounter
+
 	handler := NewRequestHandler(request, responseWriter, p.reporter, &accessLog)
 
 	defer func() {
+		accessLog.RequestBytesReceived = requestBodyCounter.count
 		p.accessLogger.Log(accessLog)
 	}()
 
@@ -226,7 +231,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	p.newReverseProxy(roundTripper, request).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
-	accessLog.BodyBytesSent = int64(proxyWriter.Size())
+	accessLog.BodyBytesSent = proxyWriter.Size()
 }
 
 func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.Handler {
@@ -390,4 +395,19 @@ func setTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 	responseWriter.Header().Set(router_http.VcapRouterHeader, routerIp)
 	responseWriter.Header().Set(router_http.VcapBackendHeader, addr)
 	responseWriter.Header().Set(router_http.CfRouteEndpointHeader, addr)
+}
+
+type countingReadCloser struct {
+	delegate io.ReadCloser
+	count    int
+}
+
+func (crc *countingReadCloser) Read(b []byte) (int, error) {
+	n, err := crc.delegate.Read(b)
+	crc.count += n
+	return n, err
+}
+
+func (crc *countingReadCloser) Close() error {
+	return crc.delegate.Close()
 }

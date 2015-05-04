@@ -11,13 +11,14 @@ import (
 )
 
 type AccessLogRecord struct {
-	Request       *http.Request
-	StatusCode    int
-	RouteEndpoint *route.Endpoint
-	StartedAt     time.Time
-	FirstByteAt   time.Time
-	FinishedAt    time.Time
-	BodyBytesSent int64
+	Request              *http.Request
+	StatusCode           int
+	RouteEndpoint        *route.Endpoint
+	StartedAt            time.Time
+	FirstByteAt          time.Time
+	FinishedAt           time.Time
+	BodyBytesSent        int
+	RequestBytesReceived int
 }
 
 func (r *AccessLogRecord) FormatStartedAt() string {
@@ -48,6 +49,7 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 		fmt.Fprintf(b, `%d `, r.StatusCode)
 	}
 
+	fmt.Fprintf(b, `%d `, r.RequestBytesReceived)
 	fmt.Fprintf(b, `%d `, r.BodyBytesSent)
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("Referer"))
 	fmt.Fprintf(b, `"%s" `, r.FormatRequestHeader("User-Agent"))
