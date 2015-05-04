@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -14,7 +13,6 @@ import (
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
-	"github.com/onsi/gomega/format"
 )
 
 const (
@@ -102,20 +100,6 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func ChopUpPath(str string) []string {
-	// Remove :<port>
-	ln := len(str)
-	if str[ln-1:ln] == "/" {
-		str = str[0 : ln-1]
-	}
-	ret := strings.Split(str, "/")
-
-	for i := 1; i < len(ret); i++ {
-		ret[i] = ret[i-1] + "/" + ret[i]
-	}
-	return ret
-}
-
 func (p *proxy) getStickySession(request *http.Request) string {
 	// Try choosing a backend using sticky session
 	if _, err := request.Cookie(StickyCookieKey); err == nil {
@@ -127,17 +111,9 @@ func (p *proxy) getStickySession(request *http.Request) string {
 }
 
 func (p *proxy) lookup(request *http.Request) *route.Pool {
-	chopt := ChopUpPath(request.RequestURI)
-	fmt.Println(format.Object(request, 1))
-	// fmt.Println(format.Object(chopt, 1))
-	for i := len(chopt) - 1; i >= 0; i-- {
-		uri := route.Uri(hostWithoutPort(request) + chopt[i])
-		ret := p.registry.Lookup(uri)
-		if ret != nil && !ret.IsEmpty() {
-			return ret
-		}
-	}
-	return nil
+	uri := route.Uri(hostWithoutPort(request))
+	// Choose backend using host alone
+	return p.registry.Lookup(uri)
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
