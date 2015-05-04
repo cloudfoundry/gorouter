@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -13,6 +14,7 @@ import (
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/onsi/gomega/format"
 )
 
 const (
@@ -126,6 +128,8 @@ func (p *proxy) getStickySession(request *http.Request) string {
 
 func (p *proxy) lookup(request *http.Request) *route.Pool {
 	chopt := ChopUpPath(request.RequestURI)
+	fmt.Println(format.Object(request, 1))
+	// fmt.Println(format.Object(chopt, 1))
 	for i := len(chopt) - 1; i >= 0; i-- {
 		uri := route.Uri(hostWithoutPort(request) + chopt[i])
 		ret := p.registry.Lookup(uri)
