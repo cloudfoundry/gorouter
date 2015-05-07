@@ -260,4 +260,21 @@ var _ = Describe("Trie", func() {
 		Expect(pools).To(ContainElement(p1))
 		Expect(pools).To(ContainElement(p2))
 	})
+
+	It("Can be represented by a map", func() {
+		e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+		e2 := route.NewEndpoint("", "192.168.1.1", 4321, "", nil, -1)
+		p1 := route.NewPool(42)
+		p2 := route.NewPool(42)
+		p1.Put(e1)
+		p2.Put(e2)
+		r.Insert("/foo", p1)
+		r.Insert("/foo/bar/baz", p2)
+		expectedMap := map[route.Uri]*route.Pool{
+			"foo":         p1,
+			"foo/bar/baz": p2,
+		}
+
+		Expect(r.ToMap()).To(Equal(expectedMap))
+	})
 })

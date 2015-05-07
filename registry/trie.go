@@ -165,6 +165,28 @@ func (r *Trie) Snip() {
 	r.Parent.Snip()
 }
 
+func (r *Trie) ToMap() map[route.Uri]*route.Pool {
+	return r.toMap(r.Segment, make(map[route.Uri]*route.Pool))
+}
+
+func (r *Trie) toMap(segment string, m map[route.Uri]*route.Pool) map[route.Uri]*route.Pool {
+	if r.Pool != nil {
+		m[route.Uri(segment)] = r.Pool
+	}
+
+	for _, child := range r.ChildNodes {
+		var newseg string
+		if len(segment) == 0 {
+			newseg = segment + child.Segment
+		} else {
+			newseg = segment + "/" + child.Segment
+		}
+		child.toMap(newseg, m)
+	}
+
+	return m
+}
+
 func (r *Trie) isRoot() bool {
 	return r.Parent == nil
 }

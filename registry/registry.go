@@ -28,8 +28,7 @@ type RouteRegistry struct {
 
 	logger *steno.Logger
 
-	byUri   *Trie
-	poolMap map[route.Uri]*route.Pool
+	byUri *Trie
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
@@ -46,7 +45,6 @@ func NewRouteRegistry(c *config.Config, mbus yagnats.NATSConn) *RouteRegistry {
 	r.logger = steno.NewLogger("router.registry")
 
 	r.byUri = NewTrie()
-	r.poolMap = make(map[route.Uri]*route.Pool)
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
@@ -66,7 +64,6 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	if !found {
 		pool = route.NewPool(r.dropletStaleThreshold / 4)
 		r.byUri.Insert(string(uri), pool)
-		r.poolMap[uri] = pool
 	}
 
 	pool.Put(endpoint)
@@ -86,7 +83,6 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 
 		if pool.IsEmpty() {
 			r.byUri.Delete(string(uri))
-			delete(r.poolMap, uri)
 		}
 	}
 
@@ -163,7 +159,7 @@ func (r *RouteRegistry) MarshalJSON() ([]byte, error) {
 	r.RLock()
 	defer r.RUnlock()
 
-	return json.Marshal(r.poolMap)
+	return json.Marshal(r.byUri.ToMap())
 }
 
 func (r *RouteRegistry) pruneStaleDroplets() {
@@ -172,10 +168,5 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
 	})
-	for k, pool := range r.poolMap {
-		if pool.IsEmpty() {
-			delete(r.poolMap, k)
-		}
-	}
 	r.Unlock()
 }
