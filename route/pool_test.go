@@ -2,10 +2,11 @@ package route_test
 
 import (
 	"fmt"
+	"time"
+
 	. "github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("Pool", func() {

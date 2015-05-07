@@ -272,6 +272,10 @@ var _ = Describe("RouteRegistry", func() {
 
 			Ω(r.NumUris()).To(Equal(0))
 			Ω(r.NumEndpoints()).To(Equal(0))
+
+			marshalled, err := json.Marshal(r)
+			Ω(err).NotTo(HaveOccurred())
+			Ω(string(marshalled)).To(Equal(`{}`))
 		})
 
 		It("skips fresh droplets", func() {
@@ -359,5 +363,9 @@ var _ = Describe("RouteRegistry", func() {
 		marshalled, err := json.Marshal(r)
 		Ω(err).NotTo(HaveOccurred())
 		Ω(string(marshalled)).To(Equal(`{"foo":["192.168.1.1:1234"]}`))
+		r.Unregister("foo", m)
+		marshalled, err = json.Marshal(r)
+		Ω(err).NotTo(HaveOccurred())
+		Ω(string(marshalled)).To(Equal(`{}`))
 	})
 })
