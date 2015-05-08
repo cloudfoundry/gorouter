@@ -38,7 +38,7 @@ standalone environment.
 
 Download gorouter:
 ```bash
-go get -v github.com/cloudfoundry/gorouter
+go get -d github.com/cloudfoundry/gorouter
 cd $GOPATH/src/github.com/cloudfoundry/gorouter
 ```
 
