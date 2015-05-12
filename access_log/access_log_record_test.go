@@ -21,6 +21,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"[01/01/2000:00:00:00 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"200 " +
+			"30 " +
 			"23 " +
 			"\"FakeReferer\" " +
 			"\"FakeUserAgent\" " +
@@ -28,7 +29,8 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60.000000000 " +
-			"app_id:FakeApplicationId\n"
+			"app_id:FakeApplicationId" +
+			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
 	})
@@ -56,13 +58,15 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"MissingResponseStatusCode " +
 			"0 " +
+			"0 " +
 			"\"-\" " +
 			"\"-\" " +
 			"FakeRemoteAddr " +
 			"x_forwarded_for:\"-\" " +
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
-			"app_id:FakeApplicationId\n"
+			"app_id:FakeApplicationId" +
+			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
 	})
@@ -96,7 +100,8 @@ func CompleteAccessLogRecord() AccessLogRecord {
 		RouteEndpoint: &route.Endpoint{
 			ApplicationId: "FakeApplicationId",
 		},
-		StartedAt:  time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-		FinishedAt: time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+		StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+		FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+		RequestBytesReceived: 30,
 	}
 }
