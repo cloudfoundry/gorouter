@@ -22,6 +22,7 @@ type VcapComponent struct {
 	// These fields are from individual components
 	Type        string                    `json:"type"`
 	Index       uint                      `json:"index"`
+	JobName     string                    `json:"job_name,omitempty"`
 	Host        string                    `json:"host"`
 	Credentials []string                  `json:"credentials"`
 	Config      interface{}               `json:"-"`

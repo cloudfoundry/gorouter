@@ -71,6 +71,7 @@ type Config struct {
 
 	Port           uint16 `yaml:"port"`
 	Index          uint   `yaml:"index"`
+	Name           string `yaml:"name"`
 	Zone           string `yaml:"zone"`
 	GoMaxProcs     int    `yaml:"go_max_procs,omitempty"`
 	TraceKey       string `yaml:"trace_key"`
