@@ -17,7 +17,6 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/stats"
@@ -42,13 +41,6 @@ func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, 
 }
 
 var _ = Describe("Proxy", func() {
-	Describe("helper functions", func() {
-		It("chops up paths", func() {
-			Expect(proxy.ChopUpPath("/path/foo/")).To(Equal([]string{"", "/path", "/path/foo"}))
-			Expect(proxy.ChopUpPath("/")).To(Equal([]string{""}))
-			Expect(proxy.ChopUpPath("/path/")).To(Equal([]string{"", "/path"}))
-		})
-	})
 	It("responds to http/1.0 with path", func() {
 		ln := registerHandler(r, "test/my_path", func(x *test_util.HttpConn) {
 			x.CheckLine("GET /my_path HTTP/1.1")
@@ -68,6 +60,43 @@ var _ = Describe("Proxy", func() {
 		})
 
 		x.CheckLine("HTTP/1.0 200 OK")
+	})
+
+	It("responds transparently to a trailing slash versus no trailing slash", func() {
+		lnWithoutSlash := registerHandler(r, "test/my%20path/your_path", func(x *test_util.HttpConn) {
+			x.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
+
+			x.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				"Content-Length: 0",
+			})
+		})
+		defer lnWithoutSlash.Close()
+
+		lnWithSlash := registerHandler(r, "test/another-path/your_path/", func(x *test_util.HttpConn) {
+			x.CheckLine("GET /another-path/your_path HTTP/1.1")
+
+			x.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				"Content-Length: 0",
+			})
+		})
+		defer lnWithSlash.Close()
+
+		x := dialProxy(proxyServer)
+		y := dialProxy(proxyServer)
+
+		x.WriteLines([]string{
+			"GET /my%20path/your_path/ HTTP/1.0",
+			"Host: test",
+		})
+		x.CheckLine("HTTP/1.0 200 OK")
+
+		y.WriteLines([]string{
+			"GET /another-path/your_path HTTP/1.0",
+			"Host: test",
+		})
+		y.CheckLine("HTTP/1.0 200 OK")
 	})
 
 	It("responds to http/1.0 with path/path", func() {

@@ -101,25 +101,6 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-// Return /foo/bar/baz as [foo, foo/bar, foo/bar/baz]
-func ChopUpPath(str string) []string {
-	// Remove :<port>
-	ln := len(str)
-
-	// Remove leading /
-	if str[ln-1:ln] == "/" {
-		str = str[0 : ln-1]
-	}
-
-	ret := strings.Split(str, "/")
-
-	for i := 1; i < len(ret); i++ {
-		ret[i] = ret[i-1] + "/" + ret[i]
-	}
-
-	return ret
-}
-
 func (p *proxy) getStickySession(request *http.Request) string {
 	// Try choosing a backend using sticky session
 	if _, err := request.Cookie(StickyCookieKey); err == nil {

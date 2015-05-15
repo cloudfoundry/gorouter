@@ -60,10 +60,10 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	uri = uri.ToLower()
 
-	pool, found := r.byUri.Find(string(uri.ToLower()))
+	pool, found := r.byUri.Find(uri)
 	if !found {
 		pool = route.NewPool(r.dropletStaleThreshold / 4)
-		r.byUri.Insert(string(uri), pool)
+		r.byUri.Insert(uri, pool)
 	}
 
 	pool.Put(endpoint)
@@ -77,12 +77,12 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 
 	uri = uri.ToLower()
 
-	pool, found := r.byUri.Find(string(uri))
+	pool, found := r.byUri.Find(uri)
 	if found {
 		pool.Remove(endpoint)
 
 		if pool.IsEmpty() {
-			r.byUri.Delete(string(uri))
+			r.byUri.Delete(uri)
 		}
 	}
 
@@ -94,10 +94,10 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 
 	uri = uri.ToLower()
 	var err error
-	pool, found := r.byUri.Find(string(uri))
+	pool, found := r.byUri.Find(uri)
 	for !found && err == nil {
 		uri, err = uri.NextWildcard()
-		pool, found = r.byUri.Find(string(uri))
+		pool, found = r.byUri.Find(uri)
 	}
 
 	r.RUnlock()

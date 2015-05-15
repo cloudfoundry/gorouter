@@ -13,16 +13,16 @@ type Trie struct {
 	Parent     *Trie
 }
 
-func (r *Trie) Find(key string) (*route.Pool, bool) {
+func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
+	key := uri.String()
 	node := r
 	var lastPool *route.Pool
 
 	for {
 		pathParts := parts(key)
-		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+		SegmentValue := pathParts[0]
 
 		matchingChild, ok := node.ChildNodes[SegmentValue]
-
 		if !ok {
 			break
 		}
@@ -51,12 +51,13 @@ func (r *Trie) Find(key string) (*route.Pool, bool) {
 	return nil, false
 }
 
-func (r *Trie) Insert(key string, value *route.Pool) *Trie {
+func (r *Trie) Insert(uri route.Uri, value *route.Pool) *Trie {
 	node := r
+	key := uri.String()
 
 	for {
 		pathParts := parts(key)
-		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+		SegmentValue := pathParts[0]
 
 		matchingChild, ok := node.ChildNodes[SegmentValue]
 
@@ -80,14 +81,17 @@ func (r *Trie) Insert(key string, value *route.Pool) *Trie {
 	return node
 }
 
-func (r *Trie) Delete(key string) bool {
+func (r *Trie) Delete(uri route.Uri) bool {
 	node := r
+	key := uri.String()
 	initialKey := key
 
 	for {
 		pathParts := parts(key)
-		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+		SegmentValue := pathParts[0]
 
+		// It is currently impossible to Delete a non-existent path. This invariant is
+		// provided by the fact that a call to Find is done before Delete in the registry.
 		matchingChild, _ := node.ChildNodes[SegmentValue]
 
 		node = matchingChild
@@ -111,7 +115,7 @@ func (r *Trie) deleteEmptyNodes(key string) {
 
 	for {
 		pathParts := parts(key)
-		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+		SegmentValue := pathParts[0]
 
 		matchingChild, _ := node.ChildNodes[SegmentValue]
 
@@ -233,5 +237,5 @@ func (r *Trie) isLeaf() bool {
 }
 
 func parts(key string) []string {
-	return strings.SplitAfterN(strings.TrimPrefix(key, "/"), "/", 2)
+	return strings.SplitN(strings.TrimPrefix(key, "/"), "/", 2)
 }
