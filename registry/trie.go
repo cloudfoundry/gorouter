@@ -17,7 +17,10 @@ func (r *Trie) Find(key string) (*route.Pool, bool) {
 	node := r
 	var lastPool *route.Pool
 
-	for _, SegmentValue := range parts(key) {
+	for {
+		pathParts := parts(key)
+		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+
 		matchingChild, ok := node.ChildNodes[SegmentValue]
 
 		if !ok {
@@ -29,6 +32,12 @@ func (r *Trie) Find(key string) (*route.Pool, bool) {
 		if nil != node.Pool {
 			lastPool = node.Pool
 		}
+
+		if len(pathParts) != 2 {
+			break
+		}
+
+		key = pathParts[1]
 	}
 
 	if nil != node.Pool {
@@ -45,7 +54,10 @@ func (r *Trie) Find(key string) (*route.Pool, bool) {
 func (r *Trie) Insert(key string, value *route.Pool) *Trie {
 	node := r
 
-	for _, SegmentValue := range parts(key) {
+	for {
+		pathParts := parts(key)
+		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+
 		matchingChild, ok := node.ChildNodes[SegmentValue]
 
 		if !ok {
@@ -56,6 +68,12 @@ func (r *Trie) Insert(key string, value *route.Pool) *Trie {
 		}
 
 		node = matchingChild
+
+		if len(pathParts) != 2 {
+			break
+		}
+
+		key = pathParts[1]
 	}
 
 	node.Pool = value
@@ -64,14 +82,24 @@ func (r *Trie) Insert(key string, value *route.Pool) *Trie {
 
 func (r *Trie) Delete(key string) bool {
 	node := r
+	initialKey := key
 
-	for _, SegmentValue := range parts(key) {
+	for {
+		pathParts := parts(key)
+		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+
 		matchingChild, _ := node.ChildNodes[SegmentValue]
 
 		node = matchingChild
+
+		if len(pathParts) != 2 {
+			break
+		}
+
+		key = pathParts[1]
 	}
 	node.Pool = nil
-	r.deleteEmptyNodes(key)
+	r.deleteEmptyNodes(initialKey)
 
 	return true
 }
@@ -81,7 +109,10 @@ func (r *Trie) deleteEmptyNodes(key string) {
 	nodeToKeep := r
 	var nodeToRemove *Trie
 
-	for _, SegmentValue := range parts(key) {
+	for {
+		pathParts := parts(key)
+		SegmentValue := strings.TrimSuffix(pathParts[0], "/")
+
 		matchingChild, _ := node.ChildNodes[SegmentValue]
 
 		if nil == nodeToRemove && nil == matchingChild.Pool && len(matchingChild.ChildNodes) < 2 {
@@ -92,6 +123,12 @@ func (r *Trie) deleteEmptyNodes(key string) {
 		}
 
 		node = matchingChild
+
+		if len(pathParts) != 2 {
+			break
+		}
+
+		key = pathParts[1]
 	}
 
 	if node.isLeaf() {
@@ -196,5 +233,5 @@ func (r *Trie) isLeaf() bool {
 }
 
 func parts(key string) []string {
-	return strings.Split(strings.TrimPrefix(key, "/"), "/")
+	return strings.SplitAfterN(strings.TrimPrefix(key, "/"), "/", 2)
 }
