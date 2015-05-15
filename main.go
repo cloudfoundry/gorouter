@@ -57,7 +57,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		cf_debug_server.Run(c.DebugAddr)
+		cf_debug_server.Run(c.DebugAddr, nil)
 	}
 
 	natsServers := c.NatsServers()
