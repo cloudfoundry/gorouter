@@ -27,10 +27,44 @@ var _ = Describe("Trie", func() {
 			Expect(ok).To(BeTrue())
 		})
 
-		It("finds a existing key", func() {
+		It("finds an exact match to an existing key", func() {
 			p := route.NewPool(42)
 			r.Insert("/foo/bar", p)
 			node, ok := r.Find("/foo/bar")
+			Expect(node).To(Equal(p))
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns nil when no exact match is found", func() {
+			p := route.NewPool(42)
+			r.Insert("/foo/bar/baz", p)
+			node, ok := r.Find("/foo/bar")
+			Expect(node).To(BeNil())
+			Expect(ok).To(BeFalse())
+		})
+
+		It("returns nil if a shorter path exists", func() {
+			p := route.NewPool(42)
+			r.Insert("/foo/bar", p)
+			node, ok := r.Find("/foo/bar/baz")
+			Expect(node).To(BeNil())
+			Expect(ok).To(BeFalse())
+		})
+	})
+
+	Describe(".MatchUri", func() {
+		It("works for the root node", func() {
+			p := route.NewPool(42)
+			r.Insert("/", p)
+			node, ok := r.MatchUri("/")
+			Expect(node).To(Equal(p))
+			Expect(ok).To(BeTrue())
+		})
+
+		It("finds a existing key", func() {
+			p := route.NewPool(42)
+			r.Insert("/foo/bar", p)
+			node, ok := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p))
 			Expect(ok).To(BeTrue())
 		})
@@ -38,7 +72,7 @@ var _ = Describe("Trie", func() {
 		It("finds a matching shorter key", func() {
 			p := route.NewPool(42)
 			r.Insert("/foo/bar", p)
-			node, ok := r.Find("/foo/bar/baz")
+			node, ok := r.MatchUri("/foo/bar/baz")
 			Expect(node).To(Equal(p))
 			Expect(ok).To(BeTrue())
 		})
@@ -46,7 +80,7 @@ var _ = Describe("Trie", func() {
 		It("returns nil when no match found", func() {
 			p := route.NewPool(42)
 			r.Insert("/foo/bar/baz", p)
-			node, ok := r.Find("/foo/bar")
+			node, ok := r.MatchUri("/foo/bar")
 			Expect(node).To(BeNil())
 			Expect(ok).To(BeFalse())
 		})
@@ -56,7 +90,7 @@ var _ = Describe("Trie", func() {
 			p2 := route.NewPool(42)
 			r.Insert("/foo", p1)
 			r.Insert("/foo/bar/baz", p2)
-			node, ok := r.Find("/foo/bar")
+			node, ok := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p1))
 			Expect(ok).To(BeTrue())
 		})
@@ -66,7 +100,7 @@ var _ = Describe("Trie", func() {
 			p2 := route.NewPool(42)
 			r.Insert("/foo/bar/baz", p2)
 			r.Insert("/foo", p1)
-			node, ok := r.Find("/foo/bar")
+			node, ok := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p1))
 			Expect(ok).To(BeTrue())
 		})
@@ -90,6 +124,22 @@ var _ = Describe("Trie", func() {
 
 			Expect(child1).To(Equal(childBar))
 		})
+
+		It("adds a child node", func() {
+			rootPool := route.NewPool(0)
+			childPool := route.NewPool(0)
+
+			_ = r.Insert("example", rootPool)
+
+			baseNode := r
+			Expect(len(baseNode.ChildNodes)).To(Equal(1))
+			exampleNode := baseNode.ChildNodes["example"]
+			Expect(exampleNode.Segment).To(Equal("example"))
+
+			_ = r.Insert("example/bar", childPool)
+
+			Expect(len(exampleNode.ChildNodes)).To(Equal(1))
+		})
 	})
 
 	Describe(".Delete", func() {
@@ -101,9 +151,9 @@ var _ = Describe("Trie", func() {
 
 			ok := r.Delete("/foo")
 			Expect(ok).To(BeTrue())
-			_, ok = r.Find("/foo")
+			_, ok = r.MatchUri("/foo")
 			Expect(ok).To(BeFalse())
-			_, ok = r.Find("/foo/bar")
+			_, ok = r.MatchUri("/foo/bar")
 			Expect(ok).To(BeTrue())
 		})
 
@@ -130,7 +180,7 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/something/baz", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.Find("/foo/something/baz")
+			_, ok := r.MatchUri("/foo/something/baz")
 			Expect(ok).To(BeTrue())
 		})
 
@@ -141,7 +191,7 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/bar", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.Find("/foo/bar")
+			_, ok := r.MatchUri("/foo/bar")
 			Expect(ok).To(BeTrue())
 		})
 
@@ -163,9 +213,9 @@ var _ = Describe("Trie", func() {
 
 			ok := r.Delete("/foo")
 			Expect(ok).To(BeTrue())
-			_, ok = r.Find("/foo")
+			_, ok = r.MatchUri("/foo")
 			Expect(ok).To(BeFalse())
-			_, ok = r.Find("/foo/bar")
+			_, ok = r.MatchUri("/foo/bar")
 			Expect(ok).To(BeTrue())
 		})
 
@@ -192,7 +242,7 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/something/baz", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.Find("/foo/something/baz")
+			_, ok := r.MatchUri("/foo/something/baz")
 			Expect(ok).To(BeTrue())
 		})
 
@@ -203,7 +253,7 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/bar", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.Find("/foo/bar")
+			_, ok := r.MatchUri("/foo/bar")
 			Expect(ok).To(BeTrue())
 		})
 	})

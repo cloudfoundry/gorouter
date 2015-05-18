@@ -94,10 +94,10 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 
 	uri = uri.ToLower()
 	var err error
-	pool, found := r.byUri.Find(uri)
+	pool, found := r.byUri.MatchUri(uri)
 	for !found && err == nil {
 		uri, err = uri.NextWildcard()
-		pool, found = r.byUri.Find(uri)
+		pool, found = r.byUri.MatchUri(uri)
 	}
 
 	r.RUnlock()

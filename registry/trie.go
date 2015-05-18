@@ -14,7 +14,36 @@ type Trie struct {
 }
 
 func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
-	key := uri.String()
+	key := strings.TrimPrefix(uri.String(), "/")
+	node := r
+
+	for {
+		pathParts := parts(key)
+		SegmentValue := pathParts[0]
+
+		matchingChild, ok := node.ChildNodes[SegmentValue]
+		if !ok {
+			return nil, false
+		}
+
+		node = matchingChild
+
+		if len(pathParts) <= 1 {
+			break
+		}
+
+		key = pathParts[1]
+	}
+
+	if nil != node.Pool {
+		return node.Pool, true
+	}
+
+	return nil, false
+}
+
+func (r *Trie) MatchUri(uri route.Uri) (*route.Pool, bool) {
+	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 	var lastPool *route.Pool
 
@@ -33,7 +62,7 @@ func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
 			lastPool = node.Pool
 		}
 
-		if len(pathParts) != 2 {
+		if len(pathParts) <= 1 {
 			break
 		}
 
@@ -52,8 +81,8 @@ func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
 }
 
 func (r *Trie) Insert(uri route.Uri, value *route.Pool) *Trie {
+	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
-	key := uri.String()
 
 	for {
 		pathParts := parts(key)
@@ -82,8 +111,8 @@ func (r *Trie) Insert(uri route.Uri, value *route.Pool) *Trie {
 }
 
 func (r *Trie) Delete(uri route.Uri) bool {
+	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
-	key := uri.String()
 	initialKey := key
 
 	for {
@@ -96,7 +125,7 @@ func (r *Trie) Delete(uri route.Uri) bool {
 
 		node = matchingChild
 
-		if len(pathParts) != 2 {
+		if len(pathParts) <= 1 {
 			break
 		}
 
@@ -128,7 +157,7 @@ func (r *Trie) deleteEmptyNodes(key string) {
 
 		node = matchingChild
 
-		if len(pathParts) != 2 {
+		if len(pathParts) <= 1 {
 			break
 		}
 
@@ -237,5 +266,5 @@ func (r *Trie) isLeaf() bool {
 }
 
 func parts(key string) []string {
-	return strings.SplitN(strings.TrimPrefix(key, "/"), "/", 2)
+	return strings.SplitN(key, "/", 2)
 }

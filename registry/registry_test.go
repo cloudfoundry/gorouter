@@ -96,6 +96,17 @@ var _ = Describe("RouteRegistry", func() {
 				Ω(r.NumUris()).To(Equal(2))
 				Ω(r.NumEndpoints()).To(Equal(1))
 			})
+
+			It("allows routes with paths", func() {
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+
+				r.Register("foo", m1)
+				r.Register("foo/v1", m1)
+
+				Ω(r.NumUris()).To(Equal(2))
+				Ω(r.NumEndpoints()).To(Equal(1))
+
+			})
 		})
 
 		Context("wildcard routes", func() {
@@ -179,6 +190,32 @@ var _ = Describe("RouteRegistry", func() {
 			r.Unregister("*.baar", bar2Endpoint)
 			Ω(r.NumUris()).To(Equal(0))
 			Ω(r.NumEndpoints()).To(Equal(0))
+		})
+
+		It("removes a route with a path", func() {
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+
+			r.Register("foo/bar", m1)
+			r.Unregister("foo/bar", m1)
+
+			Ω(r.NumUris()).To(Equal(0))
+		})
+
+		It("only unregisters the exact uri", func() {
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1)
+
+			r.Register("foo", m1)
+			r.Register("foo/bar", m1)
+
+			r.Unregister("foo", m1)
+			Ω(r.NumUris()).To(Equal(1))
+
+			p1 := r.Lookup("foo/bar")
+			iter := p1.Endpoints("")
+			Ω(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+
+			p2 := r.Lookup("foo")
+			Expect(p2).To(BeNil())
 		})
 	})
 
