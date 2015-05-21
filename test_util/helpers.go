@@ -1,6 +1,8 @@
 package test_util
 
 import (
+	"path/filepath"
+
 	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 
@@ -8,6 +10,21 @@ import (
 )
 
 func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
+	return generateConfig(natsPort, statusPort, proxyPort)
+}
+
+func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Config {
+	c := generateConfig(natsPort, statusPort, proxyPort)
+
+	c.EnableSSL = true
+	c.SSLKeyPath = filepath.Join("test", "assets", "private.pem")
+	c.SSLCertPath = filepath.Join("test", "assets", "public.pem")
+	c.SSLPort = SSLPort
+
+	return c
+}
+
+func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 	c := config.DefaultConfig()
 
 	c.Port = proxyPort

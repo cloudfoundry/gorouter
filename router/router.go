@@ -133,7 +133,7 @@ func (r *Router) Run() <-chan error {
 		ConnState: r.HandleConnState,
 	}
 
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 
 	err := r.serveHTTP(server, errChan)
 	if err != nil {

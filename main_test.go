@@ -43,9 +43,7 @@ var _ = Describe("Router Integration", func() {
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
 
-	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
-		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
-
+	configDrainSetup := func(config *config.Config) {
 		// ensure the threshold is longer than the interval that we check,
 		// because we set the route's timestamp to time.Now() on the interval
 		// as part of pausing
@@ -54,6 +52,21 @@ var _ = Describe("Router Integration", func() {
 		config.StartResponseDelayIntervalInSeconds = 1
 		config.EndpointTimeoutInSeconds = 5
 		config.DrainTimeoutInSeconds = 1
+	}
+
+	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
+		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
+
+		configDrainSetup(config)
+
+		writeConfig(config, cfgFile)
+		return config
+	}
+
+	createSSLConfig := func(cfgFile string, statusPort, proxyPort, SSLPort uint16) *config.Config {
+		config := test_util.SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort)
+
+		configDrainSetup(config)
 
 		writeConfig(config, cfgFile)
 		return config
@@ -102,6 +115,7 @@ var _ = Describe("Router Integration", func() {
 		var localIP string
 		var statusPort uint16
 		var proxyPort uint16
+		var cfgFile string
 
 		BeforeEach(func() {
 			var err error
@@ -111,9 +125,11 @@ var _ = Describe("Router Integration", func() {
 			statusPort = test_util.NextAvailPort()
 			proxyPort = test_util.NextAvailPort()
 
-			cfgFile := filepath.Join(tmpdir, "config.yml")
+			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort)
+		})
 
+		JustBeforeEach(func() {
 			gorouterSession = startGorouterSession(cfgFile)
 		})
 
@@ -244,6 +260,21 @@ var _ = Describe("Router Integration", func() {
 			urlErr := err.(*url.Error)
 			opErr := urlErr.Err.(*net.OpError)
 			Ω(opErr.Op).Should(Equal("dial"))
+		})
+
+		Context("when ssl is enabled", func() {
+			BeforeEach(func() {
+				createSSLConfig(cfgFile, statusPort, proxyPort, test_util.NextAvailPort())
+			})
+
+			It("drains properly", func() {
+				grouter := gorouterSession
+				gorouterSession = nil
+				err := grouter.Command.Process.Signal(syscall.SIGUSR1)
+
+				Ω(err).ShouldNot(HaveOccurred())
+				Eventually(grouter, 5).Should(Exit(0))
+			})
 		})
 	})
 
