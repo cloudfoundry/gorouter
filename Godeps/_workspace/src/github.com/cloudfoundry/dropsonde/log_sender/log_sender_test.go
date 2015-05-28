@@ -3,6 +3,7 @@ package log_sender_test
 import (
 	"bytes"
 	"errors"
+
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/log_sender"
@@ -40,8 +41,8 @@ var _ = Describe("LogSender", func() {
 			err := sender.SendAppLog("app-id", "custom-log-message", "App", "0")
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(emitter.Messages).To(HaveLen(1))
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			Expect(emitter.GetMessages()).To(HaveLen(1))
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_OUT))
 			Expect(log.GetMessage()).To(BeEquivalentTo("custom-log-message"))
 			Expect(log.GetAppId()).To(Equal("app-id"))
@@ -56,15 +57,6 @@ var _ = Describe("LogSender", func() {
 
 			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead"), Value: proto.Float64(2), Unit: proto.String("count")}))
 		})
-
-		It("counts number of log messages read per app", func() {
-			sender.SendAppLog("app-id1", "custom-log-message", "App", "0")
-			sender.SendAppLog("app-id1", "custom-log-message", "App", "0")
-			sender.SendAppLog("app-id2", "custom-log-message", "App", "0")
-
-			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead.app-id1"), Value: proto.Float64(2), Unit: proto.String("count")}))
-			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead.app-id2"), Value: proto.Float64(1), Unit: proto.String("count")}))
-		})
 	})
 
 	Describe("SendAppErrorLog", func() {
@@ -72,8 +64,8 @@ var _ = Describe("LogSender", func() {
 			err := sender.SendAppErrorLog("app-id", "custom-log-error-message", "App", "0")
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(emitter.Messages).To(HaveLen(1))
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			Expect(emitter.GetMessages()).To(HaveLen(1))
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_ERR))
 			Expect(log.GetMessage()).To(BeEquivalentTo("custom-log-error-message"))
 			Expect(log.GetAppId()).To(Equal("app-id"))
@@ -87,15 +79,6 @@ var _ = Describe("LogSender", func() {
 			sender.SendAppErrorLog("app-id", "custom-log-message", "App", "0")
 
 			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead"), Value: proto.Float64(2), Unit: proto.String("count")}))
-		})
-
-		It("counts number of log messages read per app", func() {
-			sender.SendAppErrorLog("app-id1", "custom-log-message", "App", "0")
-			sender.SendAppErrorLog("app-id1", "custom-log-message", "App", "0")
-			sender.SendAppErrorLog("app-id2", "custom-log-message", "App", "0")
-
-			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead.app-id1"), Value: proto.Float64(2), Unit: proto.String("count")}))
-			Eventually(emitter.GetEvents).Should(ContainElement(&events.ValueMetric{Name: proto.String("logSenderTotalMessagesRead.app-id2"), Value: proto.Float64(1), Unit: proto.String("count")}))
 		})
 	})
 
@@ -145,14 +128,14 @@ var _ = Describe("LogSender", func() {
 			messages := emitter.GetMessages()
 			Expect(messages).To(HaveLen(2))
 
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessage()).To(BeEquivalentTo("line 1"))
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_OUT))
 			Expect(log.GetAppId()).To(Equal("someId"))
 			Expect(log.GetSourceType()).To(Equal("app"))
 			Expect(log.GetSourceInstance()).To(Equal("0"))
 
-			log = emitter.Messages[1].Event.(*events.LogMessage)
+			log = emitter.GetMessages()[1].Event.(*events.LogMessage)
 			Expect(log.GetMessage()).To(BeEquivalentTo("line 2"))
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_OUT))
 		})
@@ -164,7 +147,7 @@ var _ = Describe("LogSender", func() {
 			messages := emitter.GetMessages()
 			Expect(messages).To(HaveLen(1))
 
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_OUT))
 			Expect(log.GetMessage()).To(BeEquivalentTo("one"))
 
@@ -231,14 +214,14 @@ var _ = Describe("LogSender", func() {
 			messages := emitter.GetMessages()
 			Expect(messages).To(HaveLen(2))
 
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessage()).To(BeEquivalentTo("line 1"))
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_ERR))
 			Expect(log.GetAppId()).To(Equal("someId"))
 			Expect(log.GetSourceType()).To(Equal("app"))
 			Expect(log.GetSourceInstance()).To(Equal("0"))
 
-			log = emitter.Messages[1].Event.(*events.LogMessage)
+			log = emitter.GetMessages()[1].Event.(*events.LogMessage)
 			Expect(log.GetMessage()).To(BeEquivalentTo("line 2"))
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_ERR))
 		})
@@ -250,7 +233,7 @@ var _ = Describe("LogSender", func() {
 			messages := emitter.GetMessages()
 			Expect(messages).To(HaveLen(1))
 
-			log := emitter.Messages[0].Event.(*events.LogMessage)
+			log := emitter.GetMessages()[0].Event.(*events.LogMessage)
 			Expect(log.GetMessageType()).To(Equal(events.LogMessage_ERR))
 			Expect(log.GetMessage()).To(BeEquivalentTo("one"))
 

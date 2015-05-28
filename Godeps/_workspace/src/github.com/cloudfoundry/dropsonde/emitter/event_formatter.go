@@ -2,9 +2,10 @@ package emitter
 
 import (
 	"errors"
+	"time"
+
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/gogo/protobuf/proto"
-	"time"
 )
 
 var ErrorMissingOrigin = errors.New("Event not emitted due to missing origin information")

@@ -2,14 +2,15 @@ package log_sender
 
 import (
 	"bufio"
-	"github.com/cloudfoundry/dropsonde/emitter"
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gosteno"
-	"github.com/gogo/protobuf/proto"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/gosteno"
+	"github.com/gogo/protobuf/proto"
 )
 
 // A LogSender emits log events.
@@ -22,19 +23,17 @@ type LogSender interface {
 }
 
 type logSender struct {
-	eventEmitter            emitter.EventEmitter
-	logger                  *gosteno.Logger
-	logMessageReceiveCounts map[string]float64
-	logMessageTotalCount    float64
+	eventEmitter         emitter.EventEmitter
+	logger               *gosteno.Logger
+	logMessageTotalCount float64
 	sync.RWMutex
 }
 
 // NewLogSender instantiates a logSender with the given EventEmitter.
 func NewLogSender(eventEmitter emitter.EventEmitter, counterEmissionInterval time.Duration, logger *gosteno.Logger) LogSender {
 	l := logSender{
-		eventEmitter:            eventEmitter,
-		logger:                  logger,
-		logMessageReceiveCounts: make(map[string]float64),
+		eventEmitter: eventEmitter,
+		logger:       logger,
 	}
 
 	go func() {
@@ -55,7 +54,6 @@ func NewLogSender(eventEmitter emitter.EventEmitter, counterEmissionInterval tim
 func (l *logSender) SendAppLog(appID, message, sourceType, sourceInstance string) error {
 	l.Lock()
 	l.logMessageTotalCount++
-	l.logMessageReceiveCounts[appID]++
 	l.Unlock()
 
 	return l.eventEmitter.Emit(makeLogMessage(appID, message, sourceType, sourceInstance, events.LogMessage_OUT))
@@ -67,7 +65,6 @@ func (l *logSender) SendAppLog(appID, message, sourceType, sourceInstance string
 func (l *logSender) SendAppErrorLog(appID, message, sourceType, sourceInstance string) error {
 	l.Lock()
 	l.logMessageTotalCount++
-	l.logMessageReceiveCounts[appID]++
 	l.Unlock()
 
 	return l.eventEmitter.Emit(makeLogMessage(appID, message, sourceType, sourceInstance, events.LogMessage_ERR))
@@ -110,14 +107,6 @@ func (l *logSender) emitCounters() {
 		Value: proto.Float64(l.logMessageTotalCount),
 		Unit:  proto.String("count"),
 	})
-
-	for appID, count := range l.logMessageReceiveCounts {
-		l.eventEmitter.Emit(&events.ValueMetric{
-			Name:  proto.String("logSenderTotalMessagesRead." + appID),
-			Value: proto.Float64(count),
-			Unit:  proto.String("count"),
-		})
-	}
 }
 
 func makeLogMessage(appID, message, sourceType, sourceInstance string, messageType events.LogMessage_MessageType) *events.LogMessage {

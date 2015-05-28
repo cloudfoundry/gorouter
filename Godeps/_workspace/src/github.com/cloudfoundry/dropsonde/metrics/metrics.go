@@ -21,13 +21,16 @@ package metrics
 
 import (
 	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
 )
 
 var metricSender metric_sender.MetricSender
+var metricBatcher *metricbatcher.MetricBatcher
 
 // Initialize prepares the metrics package for use with the automatic Emitter.
-func Initialize(ms metric_sender.MetricSender) {
+func Initialize(ms metric_sender.MetricSender, mb *metricbatcher.MetricBatcher) {
 	metricSender = ms
+	metricBatcher = mb
 }
 
 // SendValue sends a value event for the named metric. See
@@ -49,6 +52,16 @@ func IncrementCounter(name string) error {
 	return metricSender.IncrementCounter(name)
 }
 
+// BatchIncrementCounter increments a counter but, unlike IncrementCounter, does
+// not emit a CounterEvent for each increment; instead, the increments are batched
+// and a single CounterEvent is sent after the timeout.
+func BatchIncrementCounter(name string) {
+	if metricBatcher == nil {
+		return
+	}
+	metricBatcher.BatchIncrementCounter(name)
+}
+
 // AddToCounter sends an event to increment the named counter by the specified
 // (positive) delta. Maintaining the value of the counter is the responsibility
 // of the receiver, as with IncrementCounter.
@@ -57,6 +70,16 @@ func AddToCounter(name string, delta uint64) error {
 		return nil
 	}
 	return metricSender.AddToCounter(name, delta)
+}
+
+// BatchAddCounter adds delta to a counter but, unlike AddCounter, does not emit a
+// CounterEvent for each add; instead, the adds are batched and a single CounterEvent
+// is sent after the timeout.
+func BatchAddCounter(name string, delta uint64) {
+	if metricBatcher == nil {
+		return
+	}
+	metricBatcher.BatchAddCounter(name, delta)
 }
 
 // SendContainerMetric sends a metric that records resource usage of an app in a container.

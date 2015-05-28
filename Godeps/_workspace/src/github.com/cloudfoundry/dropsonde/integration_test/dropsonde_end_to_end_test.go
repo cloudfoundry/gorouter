@@ -2,22 +2,24 @@ package integration_test
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/control"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/gogo/protobuf/proto"
 	uuid "github.com/nu7hatch/gouuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"net"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
 )
 
 // these tests need to be invoked individually from an external script,
@@ -28,7 +30,9 @@ var _ = Describe("Autowire End-to-End", func() {
 
 		BeforeEach(func() {
 			dropsonde.Initialize("localhost:3457", origin...)
-			metrics.Initialize(metric_sender.NewMetricSender(dropsonde.AutowiredEmitter()))
+			sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+			batcher := metricbatcher.New(sender, 100*time.Millisecond)
+			metrics.Initialize(sender, batcher)
 		})
 
 		It("emits HTTP client/server events and heartbeats", func() {
@@ -37,8 +41,7 @@ var _ = Describe("Autowire End-to-End", func() {
 			defer udpListener.Close()
 			udpDataChan := make(chan []byte, 16)
 
-			receivedEvents := make(map[string]bool)
-			heartbeatUuidsChan := make(chan string, 1000)
+			var receivedEvents []eventTracker
 
 			lock := sync.RWMutex{}
 			heartbeatRequest := newHeartbeatRequest()
@@ -71,17 +74,19 @@ var _ = Describe("Autowire End-to-End", func() {
 
 					var eventId = envelope.GetEventType().String()
 
+					tracker := eventTracker{eventType: eventId}
+
 					switch envelope.GetEventType() {
 					case events.Envelope_HttpStart:
-						eventId += envelope.GetHttpStart().GetPeerType().String()
+						tracker.name = envelope.GetHttpStart().GetPeerType().String()
 					case events.Envelope_HttpStop:
-						eventId += envelope.GetHttpStop().GetPeerType().String()
+						tracker.name = envelope.GetHttpStop().GetPeerType().String()
 					case events.Envelope_Heartbeat:
-						heartbeatUuidsChan <- envelope.GetHeartbeat().GetControlMessageIdentifier().String()
+						tracker.name = envelope.GetHeartbeat().GetControlMessageIdentifier().String()
 					case events.Envelope_ValueMetric:
-						eventId += envelope.GetValueMetric().GetName()
+						tracker.name = envelope.GetValueMetric().GetName()
 					case events.Envelope_CounterEvent:
-						eventId += envelope.GetCounterEvent().GetName()
+						tracker.name = envelope.GetCounterEvent().GetName()
 					default:
 						panic("Unexpected message type")
 
@@ -94,7 +99,7 @@ var _ = Describe("Autowire End-to-End", func() {
 					func() {
 						lock.Lock()
 						defer lock.Unlock()
-						receivedEvents[eventId] = true
+						receivedEvents = append(receivedEvents, tracker)
 					}()
 				}
 			}()
@@ -110,24 +115,31 @@ var _ = Describe("Autowire End-to-End", func() {
 
 			metrics.SendValue("TestMetric", 0, "")
 			metrics.IncrementCounter("TestIncrementCounter")
+			metrics.BatchIncrementCounter("TestBatchedCounter")
 
-			expectedEventTypes := []string{"HttpStartClient", "HttpStartServer", "HttpStopServer", "HttpStopClient", "ValueMetricnumCPUS", "ValueMetricTestMetric", "CounterEventTestIncrementCounter"}
-
-			for _, eventType := range expectedEventTypes {
-				Eventually(func() bool {
-					lock.RLock()
-					defer lock.RUnlock()
-					_, ok := receivedEvents[eventType]
-					return ok
-				}).Should(BeTrue(), fmt.Sprintf("missing %s", eventType))
+			expectedEvents := []eventTracker{
+				{eventType: "HttpStart", name: "Client"},
+				{eventType: "HttpStart", name: "Server"},
+				{eventType: "HttpStop", name: "Client"},
+				{eventType: "HttpStop", name: "Server"},
+				{eventType: "ValueMetric", name: "numCPUS"},
+				{eventType: "ValueMetric", name: "TestMetric"},
+				{eventType: "CounterEvent", name: "TestIncrementCounter"},
+				{eventType: "CounterEvent", name: "TestBatchedCounter"},
+				{eventType: "Heartbeat", name: heartbeatRequest.GetIdentifier().String()},
 			}
 
-			heartbeatUuid := heartbeatRequest.GetIdentifier().String()
-			Eventually(heartbeatUuidsChan).Should(Receive(Equal(heartbeatUuid)))
-
+			for _, tracker := range expectedEvents {
+				Eventually(func() []eventTracker { lock.Lock(); defer lock.Unlock(); return receivedEvents }).Should(ContainElement(tracker))
+			}
 		})
 	})
 })
+
+type eventTracker struct {
+	eventType string
+	name      string
+}
 
 type FakeHandler struct{}
 

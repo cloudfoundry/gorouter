@@ -5,10 +5,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"net/http"
+
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/gogo/protobuf/proto"
-	"net/http"
 )
 
 var _ = Describe("HTTP event creation", func() {

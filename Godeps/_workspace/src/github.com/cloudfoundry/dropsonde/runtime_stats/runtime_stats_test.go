@@ -4,14 +4,15 @@ import (
 	"github.com/cloudfoundry/dropsonde/runtime_stats"
 
 	"errors"
+	"log"
+	"runtime"
+	"time"
+
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/gogo/protobuf/proto"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"log"
-	"runtime"
-	"time"
 )
 
 var _ = Describe("RuntimeStats", func() {

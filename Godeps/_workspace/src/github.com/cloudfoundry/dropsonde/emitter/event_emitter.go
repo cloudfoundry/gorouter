@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"fmt"
+
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/gogo/protobuf/proto"
 )

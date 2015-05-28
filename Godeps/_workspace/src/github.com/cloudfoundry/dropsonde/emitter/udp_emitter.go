@@ -1,9 +1,10 @@
 package emitter
 
 import (
+	"net"
+
 	"github.com/cloudfoundry/dropsonde/control"
 	"github.com/gogo/protobuf/proto"
-	"net"
 )
 
 type udpEmitter struct {

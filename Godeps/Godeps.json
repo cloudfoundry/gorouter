@@ -33,7 +33,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
-			"Rev": "0afd306c305053e4cf1a90e9b58eb24cb1f126b5"
+			"Rev": "bcd67f4b34b7f744b9dc9bc0a0e1a228e3b24cd1"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -63,7 +63,7 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Rev": "bc946d07d1016848dfd2507f90f0859c9471681e"
+			"Rev": "b9e369e8ffb6773efc654ea13594566404314ee1"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",
