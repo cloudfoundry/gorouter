@@ -56,6 +56,8 @@ func (h *RequestHandler) Logger() *steno.Logger {
 }
 
 func (h *RequestHandler) HandleHeartbeat() {
+	h.response.Header().Set("Cache-Control", "private, max-age=0")
+	h.response.Header().Set("Expires", "0")
 	h.logrecord.StatusCode = http.StatusOK
 	h.response.WriteHeader(http.StatusOK)
 	h.response.Write([]byte("ok\n"))

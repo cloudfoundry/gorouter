@@ -244,7 +244,9 @@ var _ = Describe("Proxy", func() {
 		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
 		x.WriteRequest(req)
 
-		_, body := x.ReadResponse()
+		resp, body := x.ReadResponse()
+		Ω(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
+		Ω(resp.Header.Get("Expires")).To(Equal("0"))
 		Ω(body).To(Equal("ok\n"))
 	})
 
