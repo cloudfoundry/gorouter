@@ -17,6 +17,7 @@ import (
 	"github.com/cloudfoundry/gunk/natsrunner"
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
+	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 
 	"bufio"
@@ -59,7 +60,7 @@ var _ = Describe("Router", func() {
 
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 		config.EnableSSL = true
-		config.SSLPort = 4443
+		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
@@ -77,7 +78,7 @@ var _ = Describe("Router", func() {
 		})
 		r, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
 
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		router = r
 		errChan := r.Run()
 		time.Sleep(50 * time.Millisecond)
@@ -145,11 +146,11 @@ var _ = Describe("Router", func() {
 			var emptyTime time.Time
 			var emptyDuration vcap.Duration
 
-			Ω(cc.Type).To(Equal("Router"))
-			Ω(cc.Index).To(Equal(uint(2)))
-			Ω(cc.UUID).ToNot(Equal(""))
-			Ω(cc.Start).ToNot(Equal(emptyTime))
-			Ω(cc.Uptime).ToNot(Equal(emptyDuration))
+			Expect(cc.Type).To(Equal("Router"))
+			Expect(cc.Index).To(Equal(uint(2)))
+			Expect(cc.UUID).ToNot(Equal(""))
+			Expect(cc.Start).ToNot(Equal(emptyTime))
+			Expect(cc.Uptime).ToNot(Equal(emptyDuration))
 
 			verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1])
 			verify_health_z(cc.Host, registry)
@@ -158,12 +159,12 @@ var _ = Describe("Router", func() {
 		It("registers and unregisters", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 			app.VerifyAppStatus(200)
 
 			app.Unregister()
-			Ω(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
 			app.VerifyAppStatus(404)
 		})
 
@@ -190,18 +191,18 @@ var _ = Describe("Router", func() {
 	It("registry contains last updated varz", func() {
 		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, config.Port, mbusClient, nil)
 		app1.Listen()
-		Ω(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
+		Expect(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
 
 		time.Sleep(100 * time.Millisecond)
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 
 		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
 		app2.Listen()
-		Ω(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
+		Expect(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
 
 		// updateTime should be after initial update time
 		updateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
-		Ω(updateTime).To(BeNumerically("<", initialUpdateTime))
+		Expect(updateTime).To(BeNumerically("<", initialUpdateTime))
 	})
 
 	It("varz", func() {
@@ -209,7 +210,7 @@ var _ = Describe("Router", func() {
 		app.Listen()
 		additionalRequests := 100
 		go app.RegisterRepeatedly(100 * time.Millisecond)
-		Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+		Expect(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
 		// Send seed request
 		sendRequests("count.vcap.me", config.Port, 1)
 		initial_varz := readVarz(varz)
@@ -222,12 +223,12 @@ var _ = Describe("Router", func() {
 		initialRequestCount := fetchRecursively(initial_varz, "requests").(float64)
 		updatedRequestCount := fetchRecursively(updated_varz, "requests").(float64)
 		requestCount := int(updatedRequestCount - initialRequestCount)
-		Ω(requestCount).To(Equal(additionalRequests))
+		Expect(requestCount).To(Equal(additionalRequests))
 
 		initialResponse2xxCount := fetchRecursively(initial_varz, "responses_2xx").(float64)
 		updatedResponse2xxCount := fetchRecursively(updated_varz, "responses_2xx").(float64)
 		response2xxCount := int(updatedResponse2xxCount - initialResponse2xxCount)
-		Ω(response2xxCount).To(Equal(additionalRequests))
+		Expect(response2xxCount).To(Equal(additionalRequests))
 
 		app.Unregister()
 	})
@@ -240,13 +241,13 @@ var _ = Describe("Router", func() {
 		}
 
 		for _, app := range apps {
-			Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
 		}
 		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", config.Port)
 		port2 := getAppPortWithSticky("sticky.vcap.me", config.Port, sessionCookie, vcapCookie)
 
-		Ω(port1).To(Equal(port2))
-		Ω(vcapCookie.Path).To(Equal("/"))
+		Expect(port1).To(Equal(port2))
+		Expect(vcapCookie.Path).To(Equal("/"))
 
 		for _, app := range apps {
 			app.Unregister()
@@ -258,7 +259,7 @@ var _ = Describe("Router", func() {
 			errCh := router.Run()
 			var err error
 			Eventually(errCh).Should(Receive(&err))
-			Ω(err).ShouldNot(BeNil())
+			Expect(err).ToNot(BeNil())
 		})
 	})
 
@@ -269,14 +270,14 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 			req, err := http.NewRequest("GET", app.Endpoint(), nil)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			sendAndReceive(req, http.StatusNoContent)
 
@@ -284,17 +285,17 @@ var _ = Describe("Router", func() {
 			router = nil
 
 			req, err = http.NewRequest("GET", app.Endpoint(), nil)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			client := http.Client{}
 			_, err = client.Do(req)
-			Ω(err).Should(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("no longer responds to component requests", func() {
 			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
 
 			req, err := http.NewRequest("GET", host, nil)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			req.SetBasicAuth("user", "pass")
 
 			sendAndReceive(req, http.StatusOK)
@@ -305,7 +306,7 @@ var _ = Describe("Router", func() {
 			req, err = http.NewRequest("GET", host, nil)
 
 			_, err = http.DefaultClient.Do(req)
-			Ω(err).Should(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("no longer proxies https", func() {
@@ -314,16 +315,16 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 			host := fmt.Sprintf("https://greet.vcap.me:%d/", config.SSLPort)
 
 			req, err := http.NewRequest("GET", host, nil)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			req.SetBasicAuth("user", "pass")
 
 			tr := &http.Transport{
@@ -331,17 +332,17 @@ var _ = Describe("Router", func() {
 			}
 			client := http.Client{Transport: tr}
 			resp, err := client.Do(req)
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(resp).ShouldNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusNoContent))
+			Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 			router.Stop()
 			router = nil
 
 			req, err = http.NewRequest("GET", host, nil)
 			_, err = client.Do(req)
-			Ω(err).Should(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
@@ -360,23 +361,23 @@ var _ = Describe("Router", func() {
 			msg = string(b)
 		})
 		app.Listen()
-		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+		Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 		url := app.Endpoint()
 
 		buf := bytes.NewBufferString("foobar")
 		r, err := http.NewRequest("PUT", url, buf)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		client := http.Client{}
 		resp, err := client.Do(r)
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-		Ω(rr).ShouldNot(BeNil())
-		Ω(rr.Method).To(Equal("PUT"))
-		Ω(rr.Proto).To(Equal("HTTP/1.1"))
-		Ω(msg).To(Equal("foobar"))
+		Expect(rr).ToNot(BeNil())
+		Expect(rr.Method).To(Equal("PUT"))
+		Expect(rr.Proto).To(Equal("HTTP/1.1"))
+		Expect(msg).To(Equal("foobar"))
 	})
 
 	It("supports 100 Continue", func() {
@@ -393,11 +394,11 @@ var _ = Describe("Router", func() {
 		app.Listen()
 		go app.RegisterRepeatedly(1 * time.Second)
 
-		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+		Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 		host := fmt.Sprintf("foo.vcap.me:%d", config.Port)
 		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		defer conn.Close()
 
 		fmt.Fprintf(conn, "POST / HTTP/1.1\r\n"+
@@ -411,13 +412,13 @@ var _ = Describe("Router", func() {
 
 		buf := bufio.NewReader(conn)
 		line, err := buf.ReadString('\n')
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(strings.Contains(line, "100 Continue")).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Contains(line, "100 Continue")).To(BeTrue())
 
 		var rr *http.Request
 		Eventually(rCh).Should(Receive(&rr))
-		Ω(rr).ShouldNot(BeNil())
-		Ω(rr.Header.Get("Expect")).To(Equal(""))
+		Expect(rr).ToNot(BeNil())
+		Expect(rr.Header.Get("Expect")).To(Equal(""))
 	})
 
 	It("handles a /routes request", func() {
@@ -435,14 +436,14 @@ var _ = Describe("Router", func() {
 		req.SetBasicAuth("user", "pass")
 
 		resp, err = client.Do(req)
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(resp).ShouldNot(BeNil())
-		Ω(resp.StatusCode).To(Equal(200))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(resp).ToNot(BeNil())
+		Expect(resp.StatusCode).To(Equal(200))
 
 		body, err := ioutil.ReadAll(resp.Body)
 		defer resp.Body.Close()
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(string(body)).Should(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(string(body)).To(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
 	})
 
 	Context("HTTP keep-alive", func() {
@@ -453,24 +454,24 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			client := httputil.NewClientConn(conn, nil)
 			req, _ := http.NewRequest("GET", uri, nil)
-			Ω(req.Close).To(BeFalse())
+			Expect(req.Close).To(BeFalse())
 
 			resp, err := client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			//make second request without errors
 			resp, err = client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
 		It("resets the idle timeout on activity", func() {
@@ -480,11 +481,11 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			client := httputil.NewClientConn(conn, nil)
 			req, _ := http.NewRequest("GET", uri, nil)
-			Ω(req.Close).To(BeFalse())
+			Expect(req.Close).To(BeFalse())
 
 			// initiate idle timeout
 			assertServerResponse(client, req)
@@ -494,10 +495,10 @@ var _ = Describe("Router", func() {
 
 			//make second request without errors
 			resp, err := client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			// use another 3/4 of the idle timeout, exceeding the original timeout
 			time.Sleep(config.EndpointTimeout / 4 * 3)
@@ -506,10 +507,10 @@ var _ = Describe("Router", func() {
 			// even though initial idle timeout was exceeded because
 			// it will have been reset
 			resp, err = client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
 		It("removes the idle timeout during an active connection", func() {
@@ -526,11 +527,11 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			client := httputil.NewClientConn(conn, nil)
 			req, _ := http.NewRequest("GET", uri, nil)
-			Ω(req.Close).To(BeFalse())
+			Expect(req.Close).To(BeFalse())
 
 			// initiate idle timeout
 			assertServerResponse(client, req)
@@ -543,10 +544,10 @@ var _ = Describe("Router", func() {
 			// that does not disconnect will show that the idle timeout
 			// was removed during the active connection
 			resp, err := client.Do(req)
-			Ω(err).ToNot(HaveOccurred())
-			Ω(resp).ToNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 	})
 
@@ -568,13 +569,13 @@ var _ = Describe("Router", func() {
 				req, _ := http.NewRequest("GET", uri, nil)
 				client := http.Client{}
 				resp, err := client.Do(req)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp).ShouldNot(BeNil())
-				Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 				defer resp.Body.Close()
 
 				_, err = ioutil.ReadAll(resp.Body)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("terminates before receiving the body", func() {
@@ -582,14 +583,14 @@ var _ = Describe("Router", func() {
 				req, _ := http.NewRequest("GET", uri, nil)
 				client := http.Client{}
 				resp, err := client.Do(req)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp).ShouldNot(BeNil())
-				Ω(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 				defer resp.Body.Close()
 
 				body, err := ioutil.ReadAll(resp.Body)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(body).Should(HaveLen(0))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(body).To(HaveLen(0))
 			})
 		})
 
@@ -615,7 +616,7 @@ var _ = Describe("Router", func() {
 			x.WriteRequest(req)
 
 			resp, _ := x.ReadResponse()
-			Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+			Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
 
 			x.WriteLine("hello from client")
 			x.CheckLine("hello from server")
@@ -636,10 +637,10 @@ var _ = Describe("Router", func() {
 			}
 			client := http.Client{Transport: tr}
 			resp, err := client.Do(req)
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(resp).ShouldNot(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
 			resp.Body.Close()
-			Ω(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
 		It("fails when the client uses an unsupported cipher suite", func() {
@@ -656,18 +657,18 @@ var _ = Describe("Router", func() {
 			}
 			client := http.Client{Transport: tr}
 			_, err := client.Do(req)
-			Ω(err).To(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
 
 func readVarz(v vvarz.Varz) map[string]interface{} {
 	varz_byte, err := v.MarshalJSON()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	varz_data := make(map[string]interface{})
 	err = json.Unmarshal(varz_byte, &varz_data)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return varz_data
 }
@@ -678,7 +679,7 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	for _, y := range s {
 		z := x.(map[string]interface{})
 		x, ok = z[y]
-		Ω(ok).Should(BeTrue(), fmt.Sprintf("no key: %s", s))
+		Expect(ok).To(BeTrue(), fmt.Sprintf("no key: %s", s))
 	}
 
 	return x
@@ -690,7 +691,7 @@ func verify_health_z(host string, r *rregistry.RouteRegistry) {
 
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
 	bytes := verify_success(req)
-	Ω(string(bytes)).To(Equal("ok"))
+	Expect(string(bytes)).To(Equal("ok"))
 }
 
 func verify_var_z(host, user, pass string) {
@@ -703,9 +704,9 @@ func verify_var_z(host, user, pass string) {
 	// Request without username:password should be rejected
 	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
 	resp, err = client.Do(req)
-	Ω(err).ShouldNot(HaveOccurred())
-	Ω(resp).ShouldNot(BeNil())
-	Ω(resp.StatusCode).To(Equal(401))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp).ToNot(BeNil())
+	Expect(resp.StatusCode).To(Equal(401))
 
 	// varz Basic auth
 	req.SetBasicAuth(user, pass)
@@ -713,9 +714,9 @@ func verify_var_z(host, user, pass string) {
 	varz := make(map[string]interface{})
 	json.Unmarshal(bytes, &varz)
 
-	Ω(varz["num_cores"]).ToNot(Equal(0))
-	Ω(varz["type"]).To(Equal("Router"))
-	Ω(varz["uuid"]).ToNot(Equal(""))
+	Expect(varz["num_cores"]).ToNot(Equal(0))
+	Expect(varz["type"]).To(Equal("Router"))
+	Expect(varz["uuid"]).ToNot(Equal(""))
 }
 
 func verify_success(req *http.Request) []byte {
@@ -725,13 +726,13 @@ func verify_success(req *http.Request) []byte {
 func sendAndReceive(req *http.Request, statusCode int) []byte {
 	var client http.Client
 	resp, err := client.Do(req)
-	Ω(err).ShouldNot(HaveOccurred())
-	Ω(resp).ShouldNot(BeNil())
-	Ω(resp.StatusCode).To(Equal(statusCode))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp).ToNot(BeNil())
+	Expect(resp.StatusCode).To(Equal(statusCode))
 	defer resp.Body.Close()
 
 	bytes, err := ioutil.ReadAll(resp.Body)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return bytes
 }
@@ -741,9 +742,9 @@ func sendRequests(url string, rPort uint16, times int) {
 
 	for i := 0; i < times; i++ {
 		r, err := http.Get(uri)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
-		Ω(r.StatusCode).To(Equal(http.StatusOK))
+		Expect(r.StatusCode).To(Equal(http.StatusOK))
 		// Close the body to avoid open files limit error
 		r.Body.Close()
 	}
@@ -759,13 +760,13 @@ func getSessionAndAppPort(url string, rPort uint16) (*http.Cookie, *http.Cookie,
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
 
 	req, err = http.NewRequest("GET", uri, nil)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	resp, err = client.Do(req)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	port, err = ioutil.ReadAll(resp.Body)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	var sessionCookie, vcapCookie *http.Cookie
 	for _, cookie := range resp.Cookies() {
@@ -789,13 +790,13 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	uri := fmt.Sprintf("http://%s:%d/sticky", url, rPort)
 
 	req, err = http.NewRequest("GET", uri, nil)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	req.AddCookie(sessionCookie)
 	req.AddCookie(vcapCookie)
 
 	resp, err = client.Do(req)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	port, err = ioutil.ReadAll(resp.Body)
 
@@ -808,8 +809,8 @@ func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
 
 	for i := 0; i < 3; i++ {
 		resp, err = client.Do(req)
-		Ω(err).ToNot(HaveOccurred())
-		Ω(resp).ToNot(BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(resp).ToNot(BeNil())
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			break
@@ -818,5 +819,5 @@ func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	Ω(resp.StatusCode).To(Equal(http.StatusOK))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 }

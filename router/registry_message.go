@@ -10,7 +10,8 @@ type registryMessage struct {
 	Uris                    []route.Uri       `json:"uris"`
 	Tags                    map[string]string `json:"tags"`
 	App                     string            `json:"app"`
-	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
+	Service_Uri             route.Uri
+	StaleThresholdInSeconds int `json:"stale_threshold_in_seconds"`
 
 	PrivateInstanceId string `json:"private_instance_id"`
 }

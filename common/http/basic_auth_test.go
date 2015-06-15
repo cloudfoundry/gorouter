@@ -30,7 +30,7 @@ var _ = Describe("http", func() {
 		z := &http.Server{Handler: y}
 
 		l, err := net.Listen("tcp", "127.0.0.1:0")
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		go z.Serve(l)
 
@@ -38,7 +38,7 @@ var _ = Describe("http", func() {
 		listener = l
 
 		r, err := http.NewRequest("GET", "http://"+l.Addr().String(), nil)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		return r
 	}
 
@@ -47,9 +47,9 @@ var _ = Describe("http", func() {
 			req := bootstrap(nil)
 
 			resp, err := http.DefaultClient.Do(req)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			Ω(resp.StatusCode).Should(Equal(http.StatusUnauthorized))
+			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 		})
 
 		It("with invalid header", func() {
@@ -58,14 +58,14 @@ var _ = Describe("http", func() {
 			req.Header.Set("Authorization", "invalid")
 
 			resp, err := http.DefaultClient.Do(req)
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(resp.StatusCode).Should(Equal(http.StatusUnauthorized))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 		})
 
 		It("with bad credentials", func() {
 			f := func(u, p string) bool {
-				Ω(u).Should(Equal("user"))
-				Ω(p).Should(Equal("bad"))
+				Expect(u).To(Equal("user"))
+				Expect(p).To(Equal("bad"))
 				return false
 			}
 
@@ -74,14 +74,14 @@ var _ = Describe("http", func() {
 			req.SetBasicAuth("user", "bad")
 
 			resp, err := http.DefaultClient.Do(req)
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(resp.StatusCode).Should(Equal(http.StatusUnauthorized))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 		})
 	})
 	It("succeeds with good credentials", func() {
 		f := func(u, p string) bool {
-			Ω(u).Should(Equal("user"))
-			Ω(p).Should(Equal("good"))
+			Expect(u).To(Equal("user"))
+			Expect(p).To(Equal("good"))
 			return true
 		}
 
@@ -90,7 +90,7 @@ var _ = Describe("http", func() {
 		req.SetBasicAuth("user", "good")
 
 		resp, err := http.DefaultClient.Do(req)
-		Ω(err).ShouldNot(HaveOccurred())
-		Ω(resp.StatusCode).Should(Equal(http.StatusOK))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 })

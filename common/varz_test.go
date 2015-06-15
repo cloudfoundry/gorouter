@@ -17,11 +17,11 @@ var _ = Describe("Varz", func() {
 		varz.LogCounts = NewLogCounter()
 
 		bytes, err := json.Marshal(varz)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		data := make(map[string]interface{})
 		err = json.Unmarshal(bytes, &data)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		members := []string{
 			"type",
@@ -38,11 +38,11 @@ var _ = Describe("Varz", func() {
 		}
 
 		_, ok := data["config"]
-		Ω(ok).Should(BeFalse(), "config should be omitted from /varz")
+		Expect(ok).To(BeFalse(), "config should be omitted from /varz")
 
 		for _, key := range members {
 			_, ok = data[key]
-			Ω(ok).Should(BeTrue(), fmt.Sprintf("member %s not found", key))
+			Expect(ok).To(BeTrue(), fmt.Sprintf("member %s not found", key))
 		}
 	})
 
@@ -59,7 +59,7 @@ var _ = Describe("Varz", func() {
 		counts := data["log_counts"].(map[string]interface{})
 		count := counts["info"]
 
-		Ω(count).Should(Equal(float64(1)))
+		Expect(count).To(Equal(float64(1)))
 	})
 
 	Context("UniqueVarz", func() {
@@ -78,8 +78,8 @@ var _ = Describe("Varz", func() {
 			data := make(map[string]interface{})
 			json.Unmarshal(bytes, &data)
 
-			Ω(data["my_type"]).Should(Equal("Router"))
-			Ω(data["my_index"]).Should(Equal(float64(1)))
+			Expect(data["my_type"]).To(Equal("Router"))
+			Expect(data["my_index"]).To(Equal(float64(1)))
 		})
 
 		It("marshals as a map", func() {
@@ -90,8 +90,8 @@ var _ = Describe("Varz", func() {
 			data := make(map[string]interface{})
 			json.Unmarshal(bytes, &data)
 
-			Ω(data["my_type"]).Should(Equal("Dea"))
-			Ω(data["my_index"]).Should(Equal(float64(1)))
+			Expect(data["my_type"]).To(Equal("Dea"))
+			Expect(data["my_index"]).To(Equal(float64(1)))
 		})
 	})
 })

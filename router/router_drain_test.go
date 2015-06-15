@@ -55,7 +55,7 @@ var _ = Describe("Router", func() {
 			AccessLogger:    &access_log.NullAccessLogger{},
 		})
 		r, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		router = r
 		r.Run()
 	})
@@ -81,27 +81,27 @@ var _ = Describe("Router", func() {
 
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				<-blocker
 
 				w.WriteHeader(http.StatusNoContent)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 			go func() {
 				defer GinkgoRecover()
 				req, err := http.NewRequest("GET", app.Endpoint(), nil)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				client := http.Client{}
 				resp, err := client.Do(req)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp).ShouldNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
 				defer resp.Body.Close()
 				_, err = ioutil.ReadAll(resp.Body)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				resultCh <- false
 			}()
 
@@ -110,7 +110,7 @@ var _ = Describe("Router", func() {
 			go func() {
 				defer GinkgoRecover()
 				err := router.Drain(1 * time.Second)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				resultCh <- true
 			}()
 
@@ -120,7 +120,7 @@ var _ = Describe("Router", func() {
 
 			var result bool
 			Eventually(resultCh, 2).Should(Receive(&result))
-			Ω(result).To(BeTrue())
+			Expect(result).To(BeTrue())
 		})
 
 		It("times out if it takes too long", func() {
@@ -133,22 +133,22 @@ var _ = Describe("Router", func() {
 
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				time.Sleep(1 * time.Second)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Expect(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
 
 			go func() {
 				defer GinkgoRecover()
 				req, err := http.NewRequest("GET", app.Endpoint(), nil)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				client := http.Client{}
 				resp, err := client.Do(req)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(resp).ShouldNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
 				defer resp.Body.Close()
 			}()
 
@@ -162,7 +162,7 @@ var _ = Describe("Router", func() {
 
 			var result error
 			Eventually(resultCh).Should(Receive(&result))
-			Ω(result).Should(Equal(DrainTimeout))
+			Expect(result).To(Equal(DrainTimeout))
 		})
 	})
 })

@@ -27,7 +27,7 @@ var _ = Describe("Component", func() {
 
 	BeforeEach(func() {
 		port, err := localip.LocalPort()
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		component = &VcapComponent{
 			Host:        fmt.Sprintf("127.0.0.1:%d", port),
@@ -45,17 +45,17 @@ var _ = Describe("Component", func() {
 
 		req := buildGetRequest(component, path)
 		code, _, _ := doGetRequest(req)
-		Ω(code).Should(Equal(401))
+		Expect(code).To(Equal(401))
 
 		req = buildGetRequest(component, path)
 		req.SetBasicAuth("username", "incorrect-password")
 		code, _, _ = doGetRequest(req)
-		Ω(code).Should(Equal(401))
+		Expect(code).To(Equal(401))
 
 		req = buildGetRequest(component, path)
 		req.SetBasicAuth("incorrect-username", "password")
 		code, _, _ = doGetRequest(req)
-		Ω(code).Should(Equal(401))
+		Expect(code).To(Equal(401))
 	})
 
 	It("allows multiple info routes", func() {
@@ -73,18 +73,18 @@ var _ = Describe("Component", func() {
 		req.SetBasicAuth("username", "password")
 
 		code, header, body := doGetRequest(req)
-		Ω(code).Should(Equal(200))
-		Ω(header.Get("Content-Type")).Should(Equal("application/json"))
-		Ω(body).Should(Equal(`{"key":"value1"}` + "\n"))
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"key":"value1"}` + "\n"))
 
 		//access path2
 		req = buildGetRequest(component, path2)
 		req.SetBasicAuth("username", "password")
 
 		code, header, body = doGetRequest(req)
-		Ω(code).Should(Equal(200))
-		Ω(header.Get("Content-Type")).Should(Equal("application/json"))
-		Ω(body).Should(Equal(`{"key":"value2"}` + "\n"))
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"key":"value2"}` + "\n"))
 	})
 
 	It("allows authorized access", func() {
@@ -99,9 +99,9 @@ var _ = Describe("Component", func() {
 		req.SetBasicAuth("username", "password")
 
 		code, header, body := doGetRequest(req)
-		Ω(code).Should(Equal(200))
-		Ω(header.Get("Content-Type")).Should(Equal("application/json"))
-		Ω(body).Should(Equal(`{"key":"value"}` + "\n"))
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"key":"value"}` + "\n"))
 	})
 
 	It("returns 404 for non existent paths", func() {
@@ -111,7 +111,7 @@ var _ = Describe("Component", func() {
 		req.SetBasicAuth("username", "password")
 
 		code, _, _ := doGetRequest(req)
-		Ω(code).Should(Equal(404))
+		Expect(code).To(Equal(404))
 	})
 
 })
@@ -128,12 +128,12 @@ func serveComponent(component *VcapComponent) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	Ω(true).ShouldNot(BeTrue(), "Could not connect to vcap.Component")
+	Expect(true).ToNot(BeTrue(), "Could not connect to vcap.Component")
 }
 
 func buildGetRequest(component *VcapComponent, path string) *http.Request {
 	req, err := http.NewRequest("GET", "http://"+component.Host+path, nil)
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	return req
 }
 
@@ -143,12 +143,12 @@ func doGetRequest(req *http.Request) (int, http.Header, string) {
 	var err error
 
 	resp, err = client.Do(req)
-	Ω(err).ShouldNot(HaveOccurred())
-	Ω(resp).ShouldNot(BeNil())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp).ToNot(BeNil())
 
 	body, err := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return resp.StatusCode, resp.Header, string(body)
 }

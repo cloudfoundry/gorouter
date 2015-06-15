@@ -30,9 +30,9 @@ status:
 
 			config.Initialize(b)
 
-			Ω(config.Status.Port).To(Equal(uint16(1234)))
-			Ω(config.Status.User).To(Equal("user"))
-			Ω(config.Status.Pass).To(Equal("pass"))
+			Expect(config.Status.Port).To(Equal(uint16(1234)))
+			Expect(config.Status.User).To(Equal("user"))
+			Expect(config.Status.Pass).To(Equal("pass"))
 
 		})
 
@@ -43,7 +43,7 @@ endpoint_timeout: 10
 
 			config.Initialize(b)
 
-			Ω(config.EndpointTimeoutInSeconds).To(Equal(10))
+			Expect(config.EndpointTimeoutInSeconds).To(Equal(10))
 		})
 
 		It("sets drain timeout", func() {
@@ -53,7 +53,7 @@ drain_timeout: 10
 
 			config.Initialize(b)
 
-			Ω(config.DrainTimeoutInSeconds).To(Equal(10))
+			Expect(config.DrainTimeoutInSeconds).To(Equal(10))
 		})
 
 		It("sets nats config", func() {
@@ -66,18 +66,18 @@ nats:
 `)
 			config.Initialize(b)
 
-			Ω(config.Nats).To(HaveLen(1))
-			Ω(config.Nats[0].Host).To(Equal("remotehost"))
-			Ω(config.Nats[0].Port).To(Equal(uint16(4223)))
-			Ω(config.Nats[0].User).To(Equal("user"))
-			Ω(config.Nats[0].Pass).To(Equal("pass"))
+			Expect(config.Nats).To(HaveLen(1))
+			Expect(config.Nats[0].Host).To(Equal("remotehost"))
+			Expect(config.Nats[0].Port).To(Equal(uint16(4223)))
+			Expect(config.Nats[0].User).To(Equal("user"))
+			Expect(config.Nats[0].Pass).To(Equal("pass"))
 		})
 
 		It("sets default logging configs", func() {
-			Ω(config.Logging.File).To(Equal(""))
-			Ω(config.Logging.Syslog).To(Equal(""))
-			Ω(config.Logging.Level).To(Equal("debug"))
-			Ω(config.Logging.LoggregatorEnabled).To(Equal(false))
+			Expect(config.Logging.File).To(Equal(""))
+			Expect(config.Logging.Syslog).To(Equal(""))
+			Expect(config.Logging.Level).To(Equal("debug"))
+			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 		})
 
 		It("sets logging config", func() {
@@ -90,10 +90,10 @@ logging:
 `)
 			config.Initialize(b)
 
-			Ω(config.Logging.File).To(Equal("/tmp/file"))
-			Ω(config.Logging.Syslog).To(Equal("syslog"))
-			Ω(config.Logging.Level).To(Equal("debug2"))
-			Ω(config.Logging.LoggregatorEnabled).To(Equal(true))
+			Expect(config.Logging.File).To(Equal("/tmp/file"))
+			Expect(config.Logging.Syslog).To(Equal("syslog"))
+			Expect(config.Logging.Level).To(Equal("debug2"))
+			Expect(config.Logging.LoggregatorEnabled).To(Equal(true))
 		})
 
 		It("sets the rest of config", func() {
@@ -109,13 +109,13 @@ enable_ssl: true
 
 			config.Initialize(b)
 
-			Ω(config.Port).To(Equal(uint16(8082)))
-			Ω(config.Index).To(Equal(uint(1)))
-			Ω(config.GoMaxProcs).To(Equal(2))
-			Ω(config.TraceKey).To(Equal("foo"))
-			Ω(config.AccessLog).To(Equal("/tmp/access_log"))
-			Ω(config.EnableSSL).To(Equal(true))
-			Ω(config.SSLPort).To(Equal(uint16(4443)))
+			Expect(config.Port).To(Equal(uint16(8082)))
+			Expect(config.Index).To(Equal(uint(1)))
+			Expect(config.GoMaxProcs).To(Equal(2))
+			Expect(config.TraceKey).To(Equal("foo"))
+			Expect(config.AccessLog).To(Equal("/tmp/access_log"))
+			Expect(config.EnableSSL).To(Equal(true))
+			Expect(config.SSLPort).To(Equal(uint16(4443)))
 		})
 
 		It("sets the Routing Api config", func() {
@@ -127,8 +127,8 @@ routing_api:
 
 			config.Initialize(b)
 
-			Ω(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
-			Ω(config.RoutingApi.Port).To(Equal(1234))
+			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
+			Expect(config.RoutingApi.Port).To(Equal(1234))
 		})
 
 		It("sets the OAuth config", func() {
@@ -142,10 +142,10 @@ oauth:
 
 			config.Initialize(b)
 
-			Ω(config.OAuth.TokenEndpoint).To(Equal("http://bob.url/token"))
-			Ω(config.OAuth.ClientName).To(Equal("client-name"))
-			Ω(config.OAuth.ClientSecret).To(Equal("client-secret"))
-			Ω(config.OAuth.Port).To(Equal(1234))
+			Expect(config.OAuth.TokenEndpoint).To(Equal("http://bob.url/token"))
+			Expect(config.OAuth.ClientName).To(Equal("client-name"))
+			Expect(config.OAuth.ClientSecret).To(Equal("client-secret"))
+			Expect(config.OAuth.Port).To(Equal(1234))
 		})
 	})
 
@@ -163,12 +163,12 @@ secure_cookies: true
 			config.Initialize(b)
 			config.Process()
 
-			Ω(config.PublishStartMessageIntervalInSeconds).To(Equal(1))
-			Ω(config.PruneStaleDropletsInterval).To(Equal(2 * time.Second))
-			Ω(config.DropletStaleThreshold).To(Equal(30 * time.Second))
-			Ω(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
-			Ω(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
-			Ω(config.SecureCookies).To(BeTrue())
+			Expect(config.PublishStartMessageIntervalInSeconds).To(Equal(1))
+			Expect(config.PruneStaleDropletsInterval).To(Equal(2 * time.Second))
+			Expect(config.DropletStaleThreshold).To(Equal(30 * time.Second))
+			Expect(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
+			Expect(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
+			Expect(config.SecureCookies).To(BeTrue())
 		})
 
 		Context("When StartResponseDelayInterval is greater than DropletStaleThreshold", func() {
@@ -181,8 +181,8 @@ start_response_delay_interval: 15
 				config.Initialize(b)
 				config.Process()
 
-				Ω(config.DropletStaleThreshold).To(Equal(15 * time.Second))
-				Ω(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
+				Expect(config.DropletStaleThreshold).To(Equal(15 * time.Second))
+				Expect(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
 			})
 		})
 
@@ -195,7 +195,7 @@ secure_cookies: false
 				config.Initialize(b)
 				config.Process()
 
-				Ω(config.SecureCookies).To(BeFalse())
+				Expect(config.SecureCookies).To(BeFalse())
 			})
 		})
 
@@ -348,8 +348,8 @@ drain_timeout: 15
 				config.Initialize(b)
 				config.Process()
 
-				Ω(config.EndpointTimeout).To(Equal(10 * time.Second))
-				Ω(config.DrainTimeout).To(Equal(15 * time.Second))
+				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Expect(config.DrainTimeout).To(Equal(15 * time.Second))
 			})
 
 			It("defaults to the EndpointTimeout when not set", func() {
@@ -360,8 +360,8 @@ endpoint_timeout: 10
 				config.Initialize(b)
 				config.Process()
 
-				Ω(config.EndpointTimeout).To(Equal(10 * time.Second))
-				Ω(config.DrainTimeout).To(Equal(10 * time.Second))
+				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Expect(config.DrainTimeout).To(Equal(10 * time.Second))
 			})
 		})
 	})
