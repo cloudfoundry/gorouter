@@ -195,20 +195,19 @@ var _ = Describe("RouteFetcher", func() {
 	Describe(".StartEventCycle", func() {
 		Context("when fetching the auth token fails", func() {
 			It("logs the failure and tries again", func() {
-				received := make(chan struct{})
-
 				tokenFetcher.FetchTokenStub = func() (*token_fetcher.Token, error) {
-					received <- struct{}{}
 					return nil, errors.New("failed to get the token")
 				}
 				fetcher.StartEventCycle()
 
-				Eventually(received).Should(Receive())
-				Eventually(received).Should(Receive())
-
-				Expect(sink.Records()).ToNot(BeNil())
-				Expect(sink.Records()[0].Message).To(Equal("failed to get the token"))
-				Expect(tokenFetcher.FetchTokenCallCount()).To(Equal(2))
+				Eventually(func() string {
+					if len(sink.Records()) > 0 {
+						return sink.Records()[0].Message
+					} else {
+						return ""
+					}
+				}).Should(Equal("failed to get the token"))
+				Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">=", 2))
 			})
 		})
 
@@ -217,10 +216,7 @@ var _ = Describe("RouteFetcher", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
 
-				received := make(chan struct{})
-
 				eventSource.NextStub = func() (routing_api.Event, error) {
-					received <- struct{}{}
 					event := routing_api.Event{
 						Action: "Delete",
 						Route: db.Route{
@@ -236,42 +232,36 @@ var _ = Describe("RouteFetcher", func() {
 				tokenFetcher.FetchTokenReturns(token, nil)
 				fetcher.StartEventCycle()
 
-				<-received
-
-				Expect(registry.UnregisterCallCount()).To(Equal(1))
-				Expect(client.SubscribeToEventsCallCount()).To(Equal(1))
+				Eventually(registry.UnregisterCallCount).Should(BeNumerically(">=", 1))
+				Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
 			})
 
 			It("responds to errors, and retries subscribing", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
 
-				received := make(chan struct{})
-
 				eventSource.NextStub = func() (routing_api.Event, error) {
-					received <- struct{}{}
 					return routing_api.Event{}, errors.New("beep boop im a robot")
 				}
 
 				tokenFetcher.FetchTokenReturns(token, nil)
 				fetcher.StartEventCycle()
 
-				<-received
-
-				Expect(sink.Records()).ToNot(BeNil())
-				Expect(sink.Records()[1].Message).To(Equal("beep boop im a robot"))
-				Eventually(func() int {
-					return tokenFetcher.FetchTokenCallCount()
-				}, 1).Should(BeNumerically(">=", 2))
-				Expect(eventSource.CloseCallCount()).To(Equal(1))
+				Eventually(func() string {
+					if len(sink.Records()) > 1 {
+						return sink.Records()[1].Message
+					} else {
+						return ""
+					}
+				}).Should(Equal("beep boop im a robot"))
+				Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">=", 2))
+				Eventually(eventSource.CloseCallCount).Should(BeNumerically(">=", 2))
 			})
 		})
 
 		Context("and the event source fails to subscribe", func() {
 			It("logs the error and tries again", func() {
-				subscribed := make(chan struct{})
 				client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
-					subscribed <- struct{}{}
 					err := errors.New("i failed to subscribe")
 					return &fake_routing_api.FakeEventSource{}, err
 				}
@@ -279,10 +269,13 @@ var _ = Describe("RouteFetcher", func() {
 				tokenFetcher.FetchTokenReturns(token, nil)
 				fetcher.StartEventCycle()
 
-				<-subscribed
-
-				Expect(sink.Records()).ToNot(BeNil())
-				Expect(sink.Records()[0].Message).To(Equal("i failed to subscribe"))
+				Eventually(func() string {
+					if len(sink.Records()) > 0 {
+						return sink.Records()[0].Message
+					} else {
+						return ""
+					}
+				}).Should(Equal("i failed to subscribe"))
 			})
 		})
 	})
