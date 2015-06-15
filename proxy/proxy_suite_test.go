@@ -91,5 +91,5 @@ func shouldEcho(input string, expected string) {
 	x.WriteRequest(req)
 	resp, _ := x.ReadResponse()
 
-	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	Ω(resp.StatusCode).To(Equal(http.StatusOK))
 }

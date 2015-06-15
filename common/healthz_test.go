@@ -10,6 +10,6 @@ var _ = Describe("Healthz", func() {
 	It("has a Value", func() {
 		healthz := &Healthz{}
 		ok := healthz.Value()
-		Expect(ok).To(Equal("ok"))
+		Ω(ok).Should(Equal("ok"))
 	})
 })

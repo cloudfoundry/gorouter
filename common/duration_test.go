@@ -17,27 +17,27 @@ var _ = Describe("Durations", func() {
 			var i interface{} = &d
 
 			_, ok := i.(json.Marshaler)
-			Expect(ok).To(BeTrue())
+			Ω(ok).Should(BeTrue())
 
 			_, ok = i.(json.Unmarshaler)
-			Expect(ok).To(BeTrue())
+			Ω(ok).Should(BeTrue())
 		})
 
 		It("marshals JSON", func() {
 			d := Duration(time.Hour*36 + time.Second*10)
 			b, err := json.Marshal(d)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(string(b)).To(Equal(`"1d:12h:0m:10s"`))
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(string(b)).To(Equal(`"1d:12h:0m:10s"`))
 		})
 
 		It("unmarshals JSON", func() {
 			d := Duration(time.Hour*36 + time.Second*20)
 			b, err := json.Marshal(d)
-			Expect(err).ToNot(HaveOccurred())
+			Ω(err).ShouldNot(HaveOccurred())
 
 			var dd Duration
 			dd.UnmarshalJSON(b)
-			Expect(dd).To(Equal(d))
+			Ω(dd).To(Equal(d))
 		})
 	})
 
@@ -48,19 +48,19 @@ var _ = Describe("Durations", func() {
 
 			t := Time(n)
 			b, e := json.Marshal(t)
-			Expect(e).ToNot(HaveOccurred())
-			Expect(string(b)).To(Equal(fmt.Sprintf(`"%s"`, n.Format(f))))
+			Ω(e).ShouldNot(HaveOccurred())
+			Ω(string(b)).To(Equal(fmt.Sprintf(`"%s"`, n.Format(f))))
 		})
 
 		It("unmarshals JSON", func() {
 			t := Time(time.Unix(time.Now().Unix(), 0)) // The precision of Time is 'second'
 			b, err := json.Marshal(t)
-			Expect(err).ToNot(HaveOccurred())
+			Ω(err).ShouldNot(HaveOccurred())
 
 			var tt Time
 			err = tt.UnmarshalJSON(b)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(tt).To(Equal(t))
+			Ω(err).ShouldNot(HaveOccurred())
+			Ω(tt).To(Equal(t))
 		})
 	})
 })

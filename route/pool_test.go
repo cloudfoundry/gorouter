@@ -21,7 +21,7 @@ var _ = Describe("Pool", func() {
 			endpoint := &Endpoint{}
 
 			b := pool.Put(endpoint)
-			Expect(b).To(BeTrue())
+			Ω(b).Should(BeTrue())
 		})
 
 		It("handles duplicate endpoints", func() {
@@ -29,7 +29,7 @@ var _ = Describe("Pool", func() {
 
 			pool.Put(endpoint)
 			b := pool.Put(endpoint)
-			Expect(b).To(BeFalse())
+			Ω(b).Should(BeFalse())
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
@@ -37,7 +37,7 @@ var _ = Describe("Pool", func() {
 			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
 
 			pool.Put(endpoint1)
-			Expect(pool.Put(endpoint2)).To(BeFalse())
+			Ω(pool.Put(endpoint2)).Should(BeFalse())
 		})
 	})
 
@@ -47,28 +47,28 @@ var _ = Describe("Pool", func() {
 			pool.Put(endpoint)
 
 			b := pool.Remove(endpoint)
-			Expect(b).To(BeTrue())
-			Expect(pool.IsEmpty()).To(BeTrue())
+			Ω(b).Should(BeTrue())
+			Ω(pool.IsEmpty()).Should(BeTrue())
 		})
 
 		It("fails to remove an endpoint that doesn't exist", func() {
 			endpoint := &Endpoint{}
 
 			b := pool.Remove(endpoint)
-			Expect(b).To(BeFalse())
+			Ω(b).Should(BeFalse())
 		})
 	})
 
 	Context("IsEmpty", func() {
 		It("starts empty", func() {
-			Expect(pool.IsEmpty()).To(BeTrue())
+			Ω(pool.IsEmpty()).To(BeTrue())
 		})
 
 		It("not empty after adding an endpoint", func() {
 			endpoint := &Endpoint{}
 			pool.Put(endpoint)
 
-			Expect(pool.IsEmpty()).To(BeFalse())
+			Ω(pool.IsEmpty()).Should(BeFalse())
 		})
 
 		It("is empty after removing everything", func() {
@@ -76,7 +76,7 @@ var _ = Describe("Pool", func() {
 			pool.Put(endpoint)
 			pool.Remove(endpoint)
 
-			Expect(pool.IsEmpty()).To(BeTrue())
+			Ω(pool.IsEmpty()).To(BeTrue())
 		})
 	})
 
@@ -93,9 +93,9 @@ var _ = Describe("Pool", func() {
 					updateTime, _ := time.ParseDuration(fmt.Sprintf("%ds", customThreshold-10))
 					pool.MarkUpdated(time.Now().Add(-updateTime))
 
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 					pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(true))
+					Ω(pool.IsEmpty()).To(Equal(true))
 				})
 			})
 
@@ -106,9 +106,9 @@ var _ = Describe("Pool", func() {
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
 
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 					pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(true))
+					Ω(pool.IsEmpty()).To(Equal(true))
 				})
 			})
 
@@ -119,9 +119,9 @@ var _ = Describe("Pool", func() {
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
 
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 					pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 				})
 
 			})
@@ -135,9 +135,9 @@ var _ = Describe("Pool", func() {
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
 
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 					pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(true))
+					Ω(pool.IsEmpty()).To(Equal(true))
 				})
 			})
 
@@ -148,9 +148,9 @@ var _ = Describe("Pool", func() {
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
 
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 					pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(false))
+					Ω(pool.IsEmpty()).To(Equal(false))
 				})
 			})
 		})
@@ -164,14 +164,14 @@ var _ = Describe("Pool", func() {
 
 			threshold := 1 * time.Second
 			pool.PruneEndpoints(threshold)
-			Expect(pool.IsEmpty()).To(BeFalse())
+			Ω(pool.IsEmpty()).Should(BeFalse())
 
 			pool.MarkUpdated(time.Now())
 			pool.PruneEndpoints(threshold)
-			Expect(pool.IsEmpty()).To(BeFalse())
+			Ω(pool.IsEmpty()).Should(BeFalse())
 
 			pool.PruneEndpoints(0)
-			Expect(pool.IsEmpty()).To(BeTrue())
+			Ω(pool.IsEmpty()).Should(BeTrue())
 		})
 	})
 
@@ -186,9 +186,9 @@ var _ = Describe("Pool", func() {
 			pool.Each(func(e *Endpoint) {
 				endpoints[e.CanonicalAddr()] = e
 			})
-			Expect(endpoints).To(HaveLen(2))
-			Expect(endpoints[e1.CanonicalAddr()]).To(Equal(e1))
-			Expect(endpoints[e2.CanonicalAddr()]).To(Equal(e2))
+			Ω(endpoints).Should(HaveLen(2))
+			Ω(endpoints[e1.CanonicalAddr()]).Should(Equal(e1))
+			Ω(endpoints[e2.CanonicalAddr()]).Should(Equal(e2))
 		})
 	})
 
@@ -197,8 +197,8 @@ var _ = Describe("Pool", func() {
 		pool.Put(e)
 
 		json, err := pool.MarshalJSON()
-		Expect(err).ToNot(HaveOccurred())
+		Ω(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`["1.2.3.4:5678"]`))
+		Ω(string(json)).To(Equal(`["1.2.3.4:5678"]`))
 	})
 })

@@ -62,7 +62,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
+				Ω(getCookie(proxy.VcapCookieId, resp.Cookies())).Should(BeNil())
 			})
 		})
 
@@ -80,14 +80,14 @@ var _ = Describe("Session Affinity", func() {
 
 				resp, _ := x.ReadResponse()
 				jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
-				Expect(jsessionId).ToNot(BeNil())
+				Ω(jsessionId).ShouldNot(BeNil())
 
 				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
-				Expect(cookie).ToNot(BeNil())
-				Expect(cookie.Value).To(Equal("my-id"))
-				Expect(cookie.Secure).To(BeFalse())
-				Expect(cookie.MaxAge).To(BeZero())
-				Expect(cookie.Expires).To(BeZero())
+				Ω(cookie).ShouldNot(BeNil())
+				Ω(cookie.Value).Should(Equal("my-id"))
+				Ω(cookie.Secure).Should(BeFalse())
+				Ω(cookie.MaxAge).Should(BeZero())
+				Ω(cookie.Expires).Should(BeZero())
 			})
 
 			Context("with secure cookies enabled", func() {
@@ -108,14 +108,14 @@ var _ = Describe("Session Affinity", func() {
 
 					resp, _ := x.ReadResponse()
 					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
-					Expect(jsessionId).ToNot(BeNil())
+					Ω(jsessionId).ShouldNot(BeNil())
 
 					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
-					Expect(cookie).ToNot(BeNil())
-					Expect(cookie.Value).To(Equal("my-id"))
-					Expect(cookie.Secure).To(BeTrue())
-					Expect(cookie.MaxAge).To(BeZero())
-					Expect(cookie.Expires).To(BeZero())
+					Ω(cookie).ShouldNot(BeNil())
+					Ω(cookie.Value).Should(Equal("my-id"))
+					Ω(cookie.Secure).Should(BeTrue())
+					Ω(cookie.MaxAge).Should(BeZero())
+					Ω(cookie.Expires).Should(BeZero())
 				})
 			})
 		})
@@ -158,8 +158,8 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				Expect(getCookie(proxy.StickyCookieKey, resp.Cookies())).To(BeNil())
-				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
+				Ω(getCookie(proxy.StickyCookieKey, resp.Cookies())).Should(BeNil())
+				Ω(getCookie(proxy.VcapCookieId, resp.Cookies())).Should(BeNil())
 			})
 
 			Context("when the preferred server is gone", func() {
@@ -175,11 +175,11 @@ var _ = Describe("Session Affinity", func() {
 
 					resp, _ := x.ReadResponse()
 					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
-					Expect(cookie).ToNot(BeNil())
-					Expect(cookie.Value).To(Equal("other-id"))
-					Expect(cookie.Secure).To(BeFalse())
-					Expect(cookie.MaxAge).To(BeZero())
-					Expect(cookie.Expires).To(BeZero())
+					Ω(cookie).ShouldNot(BeNil())
+					Ω(cookie.Value).Should(Equal("other-id"))
+					Ω(cookie.Secure).Should(BeFalse())
+					Ω(cookie.MaxAge).Should(BeZero())
+					Ω(cookie.Expires).Should(BeZero())
 				})
 			})
 		})
@@ -198,14 +198,14 @@ var _ = Describe("Session Affinity", func() {
 
 				resp, _ := x.ReadResponse()
 				jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
-				Expect(jsessionId).ToNot(BeNil())
+				Ω(jsessionId).ShouldNot(BeNil())
 
 				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
-				Expect(cookie).ToNot(BeNil())
-				Expect(cookie.Value).To(Equal("some-id"))
-				Expect(cookie.Secure).To(BeFalse())
-				Expect(cookie.MaxAge).To(BeZero())
-				Expect(cookie.Expires).To(BeZero())
+				Ω(cookie).ShouldNot(BeNil())
+				Ω(cookie.Value).Should(Equal("some-id"))
+				Ω(cookie.Secure).Should(BeFalse())
+				Ω(cookie.MaxAge).Should(BeZero())
+				Ω(cookie.Expires).Should(BeZero())
 			})
 
 			Context("when the JSESSIONID is expired", func() {
@@ -226,15 +226,15 @@ var _ = Describe("Session Affinity", func() {
 
 					resp, _ := x.ReadResponse()
 					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
-					Expect(jsessionId).ToNot(BeNil())
-					Expect(jsessionId.MaxAge).To(Equal(-1))
+					Ω(jsessionId).ShouldNot(BeNil())
+					Ω(jsessionId.MaxAge).Should(Equal(-1))
 
 					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
-					Expect(cookie).ToNot(BeNil())
-					Expect(cookie.Value).To(Equal("my-id"))
-					Expect(cookie.Secure).To(BeFalse())
-					Expect(cookie.MaxAge).To(Equal(-1))
-					Expect(cookie.Expires).To(BeZero())
+					Ω(cookie).ShouldNot(BeNil())
+					Ω(cookie.Value).Should(Equal("my-id"))
+					Ω(cookie.Secure).Should(BeFalse())
+					Ω(cookie.MaxAge).Should(Equal(-1))
+					Ω(cookie.Expires).Should(BeZero())
 				})
 			})
 		})

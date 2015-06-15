@@ -22,7 +22,7 @@ var _ = Describe("AccessLogRecord", func() {
 		r := registry.NewRouteRegistry(c, mbus)
 
 		accesslog, err := access_log.CreateRunningAccessLogger(c)
-		Expect(err).ToNot(HaveOccurred())
+		Ω(err).ToNot(HaveOccurred())
 
 		proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout: c.EndpointTimeout,

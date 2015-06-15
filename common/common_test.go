@@ -9,7 +9,7 @@ import (
 var _ = Describe("common", func() {
 	It("createsa uuid", func() {
 		uuid, err := GenerateUUID()
-		Expect(err).ToNot(HaveOccurred())
-		Expect(uuid).To(HaveLen(36))
+		Ω(err).ShouldNot(HaveOccurred())
+		Ω(uuid).Should(HaveLen(36))
 	})
 })

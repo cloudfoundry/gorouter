@@ -144,12 +144,12 @@ var _ = Describe("Proxy", func() {
 	It("Logs a request", func() {
 		ln := registerHandler(r, "test", func(x *test_util.HttpConn) {
 			req, body := x.ReadRequest()
-			Expect(req.Method).To(Equal("POST"))
-			Expect(req.URL.Path).To(Equal("/"))
-			Expect(req.ProtoMajor).To(Equal(1))
-			Expect(req.ProtoMinor).To(Equal(1))
+			Ω(req.Method).Should(Equal("POST"))
+			Ω(req.URL.Path).Should(Equal("/"))
+			Ω(req.ProtoMajor).Should(Equal(1))
+			Ω(req.ProtoMinor).Should(Equal(1))
 
-			Expect(body).To(Equal("ABCD"))
+			Ω(body).Should(Equal("ABCD"))
 
 			rsp := test_util.NewResponse(200)
 			out := &bytes.Buffer{}
@@ -177,12 +177,12 @@ var _ = Describe("Proxy", func() {
 
 		//make sure the record includes all the data
 		//since the building of the log record happens throughout the life of the request
-		Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-		Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-		Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" vcap_request_id:`))
-		Expect(string(payload)).To(ContainSubstring(`response_time:`))
-		Expect(string(payload)).To(ContainSubstring(`app_id:`))
-		Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
+		Ω(strings.HasPrefix(string(payload), "test - [")).Should(BeTrue())
+		Ω(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
+		Ω(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" vcap_request_id:`))
+		Ω(string(payload)).To(ContainSubstring(`response_time:`))
+		Ω(string(payload)).To(ContainSubstring(`app_id:`))
+		Ω(payload[len(payload)-1]).To(Equal(byte('\n')))
 	})
 
 	It("Logs a request when it exits early", func() {
@@ -198,11 +198,11 @@ var _ = Describe("Proxy", func() {
 		var payload []byte
 		Eventually(func() int {
 			n, e := accessLogFile.Read(&payload)
-			Expect(e).ToNot(HaveOccurred())
+			Ω(e).ShouldNot(HaveOccurred())
 			return n
 		}).ShouldNot(BeZero())
 
-		Expect(string(payload)).To(MatchRegexp("^test.*\n"))
+		Ω(string(payload)).To(MatchRegexp("^test.*\n"))
 	})
 
 	It("responds to HTTP/1.1", func() {
@@ -245,7 +245,7 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		_, body := x.ReadResponse()
-		Expect(body).To(Equal("ok\n"))
+		Ω(body).To(Equal("ok\n"))
 	})
 
 	It("responds to unknown host with 404", func() {
@@ -256,9 +256,9 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, body := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		Expect(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
+		Ω(resp.StatusCode).To(Equal(http.StatusNotFound))
+		Ω(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+		Ω(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
 	})
 
 	It("responds to misbehaving host with 502", func() {
@@ -274,9 +274,9 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, body := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("endpoint_failure"))
-		Expect(body).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
+		Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+		Ω(resp.Header.Get("X-Cf-RouterError")).To(Equal("endpoint_failure"))
+		Ω(body).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
 	})
 
 	It("trace headers added on correct TraceKey", func() {
@@ -298,10 +298,10 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(ln.Addr().String()))
-		Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(ln.Addr().String()))
-		Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(conf.Ip))
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		Ω(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(ln.Addr().String()))
+		Ω(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(ln.Addr().String()))
+		Ω(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(conf.Ip))
 	})
 
 	It("trace headers not added on incorrect TraceKey", func() {
@@ -323,9 +323,9 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-		Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(""))
-		Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
+		Ω(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
+		Ω(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(""))
+		Ω(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
 	})
 
 	It("X-Forwarded-For is added", func() {
@@ -350,7 +350,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer bool
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+		Ω(answer).To(BeTrue())
 
 		x.ReadResponse()
 	})
@@ -379,7 +379,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer bool
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+		Ω(answer).To(BeTrue())
 
 		x.ReadResponse()
 	})
@@ -407,7 +407,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
+		Ω(answer).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
 
 		x.ReadResponse()
 	})
@@ -437,7 +437,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer []string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal([]string{"", "user-set2"}))
+		Ω(answer).To(Equal([]string{"", "user-set2"}))
 
 		x.ReadResponse()
 	})
@@ -465,7 +465,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp(uuid_regex))
+		Ω(answer).To(MatchRegexp(uuid_regex))
 
 		x.ReadResponse()
 	})
@@ -494,8 +494,8 @@ var _ = Describe("Proxy", func() {
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).ToNot(Equal("A-BOGUS-REQUEST-ID"))
-		Expect(answer).To(MatchRegexp(uuid_regex))
+		Ω(answer).ToNot(Equal("A-BOGUS-REQUEST-ID"))
+		Ω(answer).To(MatchRegexp(uuid_regex))
 
 		x.ReadResponse()
 	})
@@ -523,7 +523,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal("fake-instance-id"))
+		Ω(answer).To(Equal("fake-instance-id"))
 
 		x.ReadResponse()
 	})
@@ -582,7 +582,7 @@ var _ = Describe("Proxy", func() {
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
+		Ω(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
 
 		x.ReadResponse()
 	})
@@ -620,12 +620,12 @@ var _ = Describe("Proxy", func() {
 
 		var answer bool
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+		Ω(answer).To(BeTrue())
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
-		Expect(resp.Header.Get("Upgrade")).To(Equal("WebsockeT"))
-		Expect(resp.Header.Get("Connection")).To(Equal("UpgradE"))
+		Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+		Ω(resp.Header.Get("Upgrade")).To(Equal("WebsockeT"))
+		Ω(resp.Header.Get("Connection")).To(Equal("UpgradE"))
 
 		x.WriteLine("hello from client")
 		x.CheckLine("hello from server")
@@ -666,13 +666,13 @@ var _ = Describe("Proxy", func() {
 
 		var answer bool
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+		Ω(answer).To(BeTrue())
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+		Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
 
-		Expect(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
-		Expect(resp.Header.Get("Connection")).To(Equal("Upgrade"))
+		Ω(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+		Ω(resp.Header.Get("Connection")).To(Equal("Upgrade"))
 
 		x.WriteLine("hello from client")
 		x.CheckLine("hello from server")
@@ -715,13 +715,13 @@ var _ = Describe("Proxy", func() {
 
 		var answer bool
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+		Ω(answer).To(BeTrue())
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+		Ω(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
 
-		Expect(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
-		Expect(resp.Header.Get("Connection")).To(Equal("Upgrade"))
+		Ω(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+		Ω(resp.Header.Get("Connection")).To(Equal("Upgrade"))
 
 		x.WriteLine("hello from client")
 		x.CheckLine("hello from server")
@@ -793,18 +793,18 @@ var _ = Describe("Proxy", func() {
 		resp, err := http.ReadResponse(x.Reader, &http.Request{})
 		Ω(err).NotTo(HaveOccurred())
 
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		Expect(resp.TransferEncoding).To(Equal([]string{"chunked"}))
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
+		Ω(resp.TransferEncoding).To(Equal([]string{"chunked"}))
 
 		// Expect 3 individual reads to complete
 		b := make([]byte, 16)
 		for i := 0; i < 3; i++ {
 			n, err := resp.Body.Read(b[0:])
 			if err != nil {
-				Expect(err).To(Equal(io.EOF))
+				Ω(err).To(Equal(io.EOF))
 			}
-			Expect(n).To(Equal(5))
-			Expect(string(b[0:n])).To(Equal("hello"))
+			Ω(n).To(Equal(5))
+			Ω(string(b[0:n])).To(Equal("hello"))
 		}
 	})
 
@@ -829,8 +829,8 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-		Expect(resp.TransferEncoding).To(BeNil())
+		Ω(resp.StatusCode).To(Equal(http.StatusNoContent))
+		Ω(resp.TransferEncoding).To(BeNil())
 	})
 
 	It("maintains percent-encoded values in URLs", func() {
@@ -881,8 +881,8 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+		Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
+		Ω(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
 	})
 
 	It("proxy detects closed client connection", func() {
@@ -942,11 +942,11 @@ var _ = Describe("Proxy", func() {
 			req.Close = true
 			x.WriteRequest(req)
 			resp, _ := x.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 
 			x.WriteRequest(req)
 			_, err := http.ReadResponse(x.Reader, &http.Request{})
-			Expect(err).To(HaveOccurred())
+			Ω(err).Should(HaveOccurred())
 		})
 
 		It("keeps the connection alive", func() {
@@ -966,11 +966,11 @@ var _ = Describe("Proxy", func() {
 			req.Close = false
 			x.WriteRequest(req)
 			resp, _ := x.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 
 			x.WriteRequest(req)
 			_, err := http.ReadResponse(x.Reader, &http.Request{})
-			Expect(err).ToNot(HaveOccurred())
+			Ω(err).ShouldNot(HaveOccurred())
 		})
 
 	})
@@ -996,7 +996,7 @@ var _ = Describe("Proxy", func() {
 		req.Host = "remote"
 		x.WriteRequest(req)
 		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Ω(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
 	It("retries when failed endpoints exist", func() {
@@ -1009,7 +1009,7 @@ var _ = Describe("Proxy", func() {
 		defer ln.Close()
 
 		ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
-		Expect(err).To(BeNil())
+		Ω(err).Should(BeNil())
 		registerAddr(r, "retries", ip, "instanceId")
 
 		for i := 0; i < 5; i++ {
@@ -1020,7 +1020,7 @@ var _ = Describe("Proxy", func() {
 			x.WriteRequest(req)
 			resp, _ := x.ReadResponse()
 
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Ω(resp.StatusCode).To(Equal(http.StatusOK))
 		}
 	})
 })

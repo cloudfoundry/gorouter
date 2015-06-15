@@ -16,19 +16,19 @@ var _ = Describe("LogCounter", func() {
 	It("counts the number of records", func() {
 		counter := NewLogCounter()
 		counter.AddRecord(info)
-		Expect(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(1))
+		Ω(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(1))
 
 		counter.AddRecord(info)
-		Expect(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(2))
+		Ω(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(2))
 	})
 
 	It("counts all log levels", func() {
 		counter := NewLogCounter()
 		counter.AddRecord(info)
-		Expect(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(1))
+		Ω(counter.GetCount(steno.LOG_INFO.Name)).To(Equal(1))
 
 		counter.AddRecord(err)
-		Expect(counter.GetCount(steno.LOG_ERROR.Name)).To(Equal(1))
+		Ω(counter.GetCount(steno.LOG_ERROR.Name)).To(Equal(1))
 	})
 
 	It("marshals the set of counts", func() {
@@ -37,13 +37,13 @@ var _ = Describe("LogCounter", func() {
 		counter.AddRecord(err)
 
 		b, e := counter.MarshalJSON()
-		Expect(e).ToNot(HaveOccurred())
+		Ω(e).ShouldNot(HaveOccurred())
 
 		v := map[string]int{}
 		e = json.Unmarshal(b, &v)
-		Expect(e).ToNot(HaveOccurred())
-		Expect(v).To(HaveLen(2))
-		Expect(v[steno.LOG_INFO.Name]).To(Equal(1))
-		Expect(v[steno.LOG_ERROR.Name]).To(Equal(1))
+		Ω(e).ShouldNot(HaveOccurred())
+		Ω(v).Should(HaveLen(2))
+		Ω(v[steno.LOG_INFO.Name]).Should(Equal(1))
+		Ω(v[steno.LOG_ERROR.Name]).Should(Equal(1))
 	})
 })

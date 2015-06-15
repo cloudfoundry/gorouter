@@ -72,7 +72,7 @@ var _ = Describe("AccessLog", func() {
 				n, _ := fakeFile.Read(&payload)
 				return n
 			}).ShouldNot(Equal(0))
-			Expect(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
+			Ω(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
 
 			accessLogger.Stop()
 		})
