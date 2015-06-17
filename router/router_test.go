@@ -17,6 +17,7 @@ import (
 	"github.com/cloudfoundry/gunk/natsrunner"
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
+	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 
 	"bufio"
@@ -59,7 +60,7 @@ var _ = Describe("Router", func() {
 
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
 		config.EnableSSL = true
-		config.SSLPort = 4443
+		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
@@ -109,7 +110,7 @@ var _ = Describe("Router", func() {
 			mbusClient.PublishRequest("router.greet", "router.greet.test.response", []byte{})
 
 			var msg []byte
-			Eventually(response, 1).Should(Receive(&msg))
+			Eventually(response).Should(Receive(&msg))
 
 			var message vcap.RouterStart
 			err := json.Unmarshal(msg, &message)
@@ -158,12 +159,19 @@ var _ = Describe("Router", func() {
 		It("registers and unregisters", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			app.VerifyAppStatus(200)
 
 			app.Unregister()
-			Ω(waitAppUnregistered(registry, app, time.Second*5)).To(BeTrue())
+
+			Eventually(func() bool {
+				return appUnregistered(registry, app)
+			}).Should(BeTrue())
+
 			app.VerifyAppStatus(404)
 		})
 
@@ -190,14 +198,19 @@ var _ = Describe("Router", func() {
 	It("registry contains last updated varz", func() {
 		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, config.Port, mbusClient, nil)
 		app1.Listen()
-		Ω(waitAppRegistered(registry, app1, time.Second*1)).To(BeTrue())
+
+		Eventually(func() bool {
+			return appRegistered(registry, app1)
+		}).Should(BeTrue())
 
 		time.Sleep(100 * time.Millisecond)
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 
 		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
 		app2.Listen()
-		Ω(waitAppRegistered(registry, app2, time.Second*1)).To(BeTrue())
+		Eventually(func() bool {
+			return appRegistered(registry, app2)
+		}).Should(BeTrue())
 
 		// updateTime should be after initial update time
 		updateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
@@ -209,7 +222,11 @@ var _ = Describe("Router", func() {
 		app.Listen()
 		additionalRequests := 100
 		go app.RegisterRepeatedly(100 * time.Millisecond)
-		Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
+
 		// Send seed request
 		sendRequests("count.vcap.me", config.Port, 1)
 		initial_varz := readVarz(varz)
@@ -240,7 +257,9 @@ var _ = Describe("Router", func() {
 		}
 
 		for _, app := range apps {
-			Ω(waitAppRegistered(registry, app, time.Millisecond*500)).To(BeTrue())
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 		}
 		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", config.Port)
 		port2 := getAppPortWithSticky("sticky.vcap.me", config.Port, sessionCookie, vcapCookie)
@@ -273,7 +292,9 @@ var _ = Describe("Router", func() {
 				w.WriteHeader(http.StatusNoContent)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			req, err := http.NewRequest("GET", app.Endpoint(), nil)
 			Ω(err).ShouldNot(HaveOccurred())
@@ -318,7 +339,9 @@ var _ = Describe("Router", func() {
 				w.WriteHeader(http.StatusNoContent)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			host := fmt.Sprintf("https://greet.vcap.me:%d/", config.SSLPort)
 
@@ -360,7 +383,9 @@ var _ = Describe("Router", func() {
 			msg = string(b)
 		})
 		app.Listen()
-		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
 
 		url := app.Endpoint()
 
@@ -393,7 +418,9 @@ var _ = Describe("Router", func() {
 		app.Listen()
 		go app.RegisterRepeatedly(1 * time.Second)
 
-		Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
 
 		host := fmt.Sprintf("foo.vcap.me:%d", config.Port)
 		conn, err := net.DialTimeout("tcp", host, 10*time.Second)

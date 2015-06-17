@@ -1,6 +1,8 @@
 package main_test
 
 import (
+	"errors"
+
 	"github.com/cloudfoundry-incubator/candiedyaml"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
@@ -153,7 +155,10 @@ var _ = Describe("Router Integration", func() {
 			})
 			longApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-			Ω(waitAppRegistered(routesUri, longApp, 2*time.Second)).To(BeTrue())
+
+			Eventually(func() bool {
+				return appRegistered(routesUri, longApp)
+			}).Should(BeTrue())
 
 			go func() {
 				defer GinkgoRecover()
@@ -202,7 +207,7 @@ var _ = Describe("Router Integration", func() {
 			})
 			timeoutApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
+			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
 
 			go func() {
 				_, err := http.Get(timeoutApp.Endpoint())
@@ -238,7 +243,7 @@ var _ = Describe("Router Integration", func() {
 			})
 			timeoutApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-			Ω(waitAppRegistered(routesUri, timeoutApp, 2*time.Second)).To(BeTrue())
+			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
 
 			go func() {
 				http.Get(timeoutApp.Endpoint())
@@ -316,8 +321,8 @@ var _ = Describe("Router Integration", func() {
 
 		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
-		Ω(waitAppRegistered(routesUri, zombieApp, 2*time.Second)).To(BeTrue())
-		Ω(waitAppRegistered(routesUri, runningApp, 2*time.Second)).To(BeTrue())
+		Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
+		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
 		heartbeatInterval := 200 * time.Millisecond
 		zombieTicker := time.NewTicker(heartbeatInterval)
@@ -401,46 +406,34 @@ func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {
 	return yagnats.Connect(natsMembers)
 }
 
-func waitAppRegistered(routesUri string, app *test.TestApp, timeout time.Duration) bool {
-	return waitMsgReceived(routesUri, app, true, timeout)
+func appRegistered(routesUri string, app *test.TestApp) bool {
+	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
+	return err == nil && routeFound
 }
 
-func waitAppUnregistered(routesUri string, app *test.TestApp, timeout time.Duration) bool {
-	return waitMsgReceived(routesUri, app, false, timeout)
+func appUnregistered(routesUri string, app *test.TestApp) bool {
+	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
+	return err == nil && !routeFound
 }
 
-func waitMsgReceived(uri string, app *test.TestApp, expectedToBeFound bool, timeout time.Duration) bool {
-	interval := time.Millisecond * 50
-	repetitions := int(timeout / interval)
-
-	for j := 0; j < repetitions; j++ {
-		resp, err := http.Get(uri)
-		if err == nil {
-			switch resp.StatusCode {
-			case http.StatusOK:
-				bytes, err := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
-				routes := make(map[string][]string)
-				err = json.Unmarshal(bytes, &routes)
-				Ω(err).ShouldNot(HaveOccurred())
-				route := routes[string(app.Urls()[0])]
-				if expectedToBeFound {
-					if route != nil {
-						return true
-					}
-				} else {
-					if route == nil {
-						return true
-					}
-				}
-			default:
-				println("Failed to receive routes: ", resp.StatusCode, uri)
-			}
-		}
-
-		time.Sleep(interval)
+func routeExists(routesEndpoint, routeName string) (bool, error) {
+	resp, err := http.Get(routesEndpoint)
+	if err != nil {
+		return false, err
 	}
+	switch resp.StatusCode {
+	case http.StatusOK:
+		bytes, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		Expect(err).ToNot(HaveOccurred())
+		routes := make(map[string][]string)
+		err = json.Unmarshal(bytes, &routes)
+		Expect(err).ToNot(HaveOccurred())
 
-	return false
+		_, found := routes[routeName]
+		return found, nil
+
+	default:
+		return false, errors.New("Didn't get an OK response")
+	}
 }

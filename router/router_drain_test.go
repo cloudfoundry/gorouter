@@ -87,8 +87,14 @@ var _ = Describe("Router", func() {
 
 				w.WriteHeader(http.StatusNoContent)
 			})
+
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			drainTimeout := 1 * time.Second
 
 			go func() {
 				defer GinkgoRecover()
@@ -109,17 +115,17 @@ var _ = Describe("Router", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(1 * time.Second)
+				err := router.Drain(drainTimeout)
 				Ω(err).ShouldNot(HaveOccurred())
 				resultCh <- true
 			}()
 
-			Consistently(resultCh).ShouldNot(Receive())
+			Consistently(resultCh, drainTimeout/4).ShouldNot(Receive())
 
 			blocker <- false
 
 			var result bool
-			Eventually(resultCh, 2).Should(Receive(&result))
+			Eventually(resultCh).Should(Receive(&result))
 			Ω(result).To(BeTrue())
 		})
 
@@ -138,7 +144,10 @@ var _ = Describe("Router", func() {
 				time.Sleep(1 * time.Second)
 			})
 			app.Listen()
-			Ω(waitAppRegistered(registry, app, time.Second*5)).To(BeTrue())
+
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			go func() {
 				defer GinkgoRecover()
