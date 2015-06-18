@@ -72,7 +72,7 @@ var _ = Describe("Router", func() {
 
 	Context("Drain", func() {
 		It("waits until the last request completes", func() {
-			app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			blocker := make(chan bool)
 			resultCh := make(chan bool, 2)
@@ -120,7 +120,7 @@ var _ = Describe("Router", func() {
 				resultCh <- true
 			}()
 
-			Consistently(resultCh, drainTimeout/4).ShouldNot(Receive())
+			Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
 
 			blocker <- false
 
@@ -130,7 +130,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("times out if it takes too long", func() {
-			app := test.NewTestApp([]route.Uri{"draintimeout.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewTestApp([]route.Uri{"draintimeout.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 2)

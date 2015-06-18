@@ -18,16 +18,17 @@ import (
 type TestApp struct {
 	mutex sync.Mutex
 
-	port       uint16      // app listening port
-	rPort      uint16      // router listening port
-	urls       []route.Uri // host registered host name
-	mbusClient yagnats.NATSConn
-	tags       map[string]string
-	mux        *http.ServeMux
-	stopped    bool
+	port         uint16      // app listening port
+	rPort        uint16      // router listening port
+	urls         []route.Uri // host registered host name
+	mbusClient   yagnats.NATSConn
+	tags         map[string]string
+	mux          *http.ServeMux
+	stopped      bool
+	routeService string
 }
 
-func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string) *TestApp {
+func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string, routeService string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := localip.LocalPort()
@@ -37,6 +38,7 @@ func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tag
 	app.urls = urls
 	app.mbusClient = mbusClient
 	app.tags = tags
+	app.routeService = routeService
 
 	app.mux = http.NewServeMux()
 
@@ -86,6 +88,7 @@ func (a *TestApp) Register() {
 		App:  "0",
 		StaleThresholdInSeconds: 1,
 
+		RouteServiceUrl:   a.routeService,
 		PrivateInstanceId: uuid,
 	}
 
@@ -158,5 +161,6 @@ type registerMessage struct {
 	App                     string            `json:"app"`
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
+	RouteServiceUrl   string `json:"route_service_url"`
 	PrivateInstanceId string `json:"private_instance_id"`
 }

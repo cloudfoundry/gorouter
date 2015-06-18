@@ -10,7 +10,7 @@ import (
 )
 
 func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string) *TestApp {
-	app := NewTestApp(urls, rPort, mbusClient, tags)
+	app := NewTestApp(urls, rPort, mbusClient, tags, "")
 	app.AddHandler("/", greetHandler)
 
 	return app

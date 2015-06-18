@@ -103,7 +103,7 @@ var _ = Describe("RouteFetcher", func() {
 				response := response[i]
 				uri, endpoint := registry.RegisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(response.Route)))
-				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL)))
+				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL, "")))
 			}
 		})
 
@@ -129,7 +129,7 @@ var _ = Describe("RouteFetcher", func() {
 				response := response[i+1]
 				uri, endpoint := registry.UnregisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(response.Route)))
-				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL)))
+				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL, "")))
 			}
 		})
 
@@ -308,6 +308,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.LogGuid,
 						nil,
 						eventRoute.TTL,
+						"",
 					)))
 			})
 		})
@@ -339,6 +340,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.LogGuid,
 						nil,
 						eventRoute.TTL,
+						"",
 					)))
 			})
 		})

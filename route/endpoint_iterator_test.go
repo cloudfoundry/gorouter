@@ -1,10 +1,11 @@
 package route_test
 
 import (
+	"time"
+
 	. "github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("EndpointIterator", func() {
@@ -16,9 +17,9 @@ var _ = Describe("EndpointIterator", func() {
 
 	Describe("Next", func() {
 		It("performs round-robin through the endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
-			e3 := NewEndpoint("", "1.2.7.8", 1234, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
+			e3 := NewEndpoint("", "1.2.7.8", 1234, "", nil, -1, "")
 			endpoints := []*Endpoint{e1, e2, e3}
 
 			for _, e := range endpoints {
@@ -52,11 +53,11 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("finds the initial endpoint by private id", func() {
-			b := NewEndpoint("", "1.2.3.4", 1235, "b", nil, -1)
-			pool.Put(NewEndpoint("", "1.2.3.4", 1234, "a", nil, -1))
+			b := NewEndpoint("", "1.2.3.4", 1235, "b", nil, -1, "")
+			pool.Put(NewEndpoint("", "1.2.3.4", 1234, "a", nil, -1, ""))
 			pool.Put(b)
-			pool.Put(NewEndpoint("", "1.2.3.4", 1236, "c", nil, -1))
-			pool.Put(NewEndpoint("", "1.2.3.4", 1237, "d", nil, -1))
+			pool.Put(NewEndpoint("", "1.2.3.4", 1236, "c", nil, -1, ""))
+			pool.Put(NewEndpoint("", "1.2.3.4", 1237, "d", nil, -1, ""))
 
 			for i := 0; i < 10; i++ {
 				iter := pool.Endpoints(b.PrivateInstanceId)
@@ -67,11 +68,11 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("finds the initial endpoint by canonical addr", func() {
-			b := NewEndpoint("", "1.2.3.4", 1235, "b", nil, -1)
-			pool.Put(NewEndpoint("", "1.2.3.4", 1234, "a", nil, -1))
+			b := NewEndpoint("", "1.2.3.4", 1235, "b", nil, -1, "")
+			pool.Put(NewEndpoint("", "1.2.3.4", 1234, "a", nil, -1, ""))
 			pool.Put(b)
-			pool.Put(NewEndpoint("", "1.2.3.4", 1236, "c", nil, -1))
-			pool.Put(NewEndpoint("", "1.2.3.4", 1237, "d", nil, -1))
+			pool.Put(NewEndpoint("", "1.2.3.4", 1236, "c", nil, -1, ""))
+			pool.Put(NewEndpoint("", "1.2.3.4", 1237, "d", nil, -1, ""))
 
 			for i := 0; i < 10; i++ {
 				iter := pool.Endpoints(b.CanonicalAddr())
@@ -82,8 +83,8 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("finds when there are multiple private ids", func() {
-			endpointFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1)
-			endpointBar := NewEndpoint("", "5.6.7.8", 5678, "bar", nil, -1)
+			endpointFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1, "")
+			endpointBar := NewEndpoint("", "5.6.7.8", 5678, "bar", nil, -1, "")
 
 			pool.Put(endpointFoo)
 			pool.Put(endpointBar)
@@ -100,7 +101,7 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("returns the next available endpoint when the initial is not found", func() {
-			eFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1)
+			eFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1, "")
 			pool.Put(eFoo)
 
 			iter := pool.Endpoints("bogus")
@@ -110,7 +111,7 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("finds the correct endpoint when private ids change", func() {
-			endpointFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1)
+			endpointFoo := NewEndpoint("", "1.2.3.4", 1234, "foo", nil, -1, "")
 			pool.Put(endpointFoo)
 
 			iter := pool.Endpoints(endpointFoo.PrivateInstanceId)
@@ -118,7 +119,7 @@ var _ = Describe("EndpointIterator", func() {
 			Ω(foundEndpoint).ShouldNot(BeNil())
 			Ω(foundEndpoint).Should(Equal(endpointFoo))
 
-			endpointBar := NewEndpoint("", "1.2.3.4", 1234, "bar", nil, -1)
+			endpointBar := NewEndpoint("", "1.2.3.4", 1234, "bar", nil, -1, "")
 			pool.Put(endpointBar)
 
 			iter = pool.Endpoints("foo")
@@ -132,8 +133,8 @@ var _ = Describe("EndpointIterator", func() {
 
 	Describe("Failed", func() {
 		It("skips failed endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -152,8 +153,8 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("resets when all endpoints are failed", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -172,8 +173,8 @@ var _ = Describe("EndpointIterator", func() {
 		It("resets failed endpoints after exceeding failure duration", func() {
 			pool = NewPool(50 * time.Millisecond)
 
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
 			pool.Put(e1)
 			pool.Put(e2)
 

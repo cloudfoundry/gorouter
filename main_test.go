@@ -143,7 +143,7 @@ var _ = Describe("Router Integration", func() {
 			requestProcessing := make(chan bool)
 			responseRead := make(chan bool)
 
-			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil)
+			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil, "")
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				requestMade <- true
 				<-requestProcessing
@@ -200,7 +200,7 @@ var _ = Describe("Router Integration", func() {
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 1)
-			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil)
+			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -236,7 +236,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(config)
 
 			blocker := make(chan bool)
-			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil)
+			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -340,6 +340,7 @@ var _ = Describe("Router Integration", func() {
 		}()
 
 		zombieApp.VerifyAppStatus(200)
+		runningApp.VerifyAppStatus(200)
 
 		// Give enough time to register multiple times
 		time.Sleep(heartbeatInterval * 3)

@@ -12,7 +12,7 @@ import (
 )
 
 func NewStickyApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string) *TestApp {
-	app := NewTestApp(urls, rPort, mbusClient, tags)
+	app := NewTestApp(urls, rPort, mbusClient, tags, "")
 	app.AddHandler("/sticky", stickyHandler(app.port))
 
 	return app

@@ -7,13 +7,14 @@ import (
 )
 
 func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
-	tags map[string]string, staleThresholdInSeconds int) *Endpoint {
+	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string) *Endpoint {
 	return &Endpoint{
 		ApplicationId:     appId,
 		addr:              fmt.Sprintf("%s:%d", host, port),
 		Tags:              tags,
 		PrivateInstanceId: privateInstanceId,
 		staleThreshold:    time.Duration(staleThresholdInSeconds) * time.Second,
+		RouteServiceUrl:   routeServiceUrl,
 	}
 }
 
@@ -23,6 +24,7 @@ type Endpoint struct {
 	Tags              map[string]string
 	PrivateInstanceId string
 	staleThreshold    time.Duration
+	RouteServiceUrl   string
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
@@ -35,12 +37,14 @@ func (e *Endpoint) CanonicalAddr() string {
 
 func (e *Endpoint) ToLogData() interface{} {
 	return struct {
-		ApplicationId string
-		Addr          string
-		Tags          map[string]string
+		ApplicationId   string
+		Addr            string
+		Tags            map[string]string
+		RouteServiceUrl string
 	}{
 		e.ApplicationId,
 		e.addr,
 		e.Tags,
+		e.RouteServiceUrl,
 	}
 }

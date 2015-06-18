@@ -33,8 +33,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
-			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 			pool.Put(endpoint1)
 			Ω(pool.Put(endpoint2)).Should(BeFalse())
@@ -87,7 +87,7 @@ var _ = Describe("Pool", func() {
 			Context("when custom stale threshold is greater than default threshold", func() {
 				It("prunes the endpoint", func() {
 					customThreshold := int(defaultThreshold.Seconds()) + 20
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, customThreshold)
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, customThreshold, "")
 					pool.Put(e1)
 
 					updateTime, _ := time.ParseDuration(fmt.Sprintf("%ds", customThreshold-10))
@@ -101,7 +101,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20)
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
@@ -114,7 +114,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20)
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
@@ -130,7 +130,7 @@ var _ = Describe("Pool", func() {
 		Context("when an endpoint does NOT have a custom stale time", func() {
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
@@ -143,7 +143,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
@@ -158,7 +158,7 @@ var _ = Describe("Pool", func() {
 
 	Context("MarkUpdated", func() {
 		It("updates all endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 			pool.Put(e1)
 
@@ -177,8 +177,8 @@ var _ = Describe("Pool", func() {
 
 	Context("Each", func() {
 		It("applies a function to each endpoint", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1)
+			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -193,7 +193,7 @@ var _ = Describe("Pool", func() {
 	})
 
 	It("marshals json", func() {
-		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1)
+		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 		pool.Put(e)
 
 		json, err := pool.MarshalJSON()

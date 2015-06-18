@@ -156,43 +156,82 @@ var _ = Describe("Router", func() {
 			verify_health_z(cc.Host, registry)
 		})
 
-		It("registers and unregisters", func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+		Context("Register and Unregister", func() {
+			var app *test.TestApp
 
-			Eventually(func() bool {
-				return appRegistered(registry, app)
-			}).Should(BeTrue())
+			assertRegisterUnregister := func() {
+				app.Listen()
 
-			app.VerifyAppStatus(200)
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
 
-			app.Unregister()
+				app.VerifyAppStatus(200)
 
-			Eventually(func() bool {
-				return appUnregistered(registry, app)
-			}).Should(BeTrue())
+				app.Unregister()
 
-			app.VerifyAppStatus(404)
-		})
+				Eventually(func() bool {
+					return appUnregistered(registry, app)
+				}).Should(BeTrue())
 
-		It("sends start on a nats connect", func() {
-			started := make(chan bool)
-			cb := make(chan bool)
+				app.VerifyAppStatus(404)
+			}
 
-			mbusClient.Subscribe("router.start", func(*nats.Msg) {
-				started <- true
+			Describe("app with no route service", func() {
+				BeforeEach(func() {
+					app = test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				})
+
+				It("registers and unregisters", func() {
+					assertRegisterUnregister()
+				})
 			})
 
-			mbusClient.AddReconnectedCB(func(_ *nats.Conn) {
-				cb <- true
+			Describe("app with an https route service", func() {
+				BeforeEach(func() {
+					app = test.NewRouteServiceApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, "https://my-service.me")
+				})
+
+				It("registers and unregisters", func() {
+					assertRegisterUnregister()
+				})
 			})
 
-			natsRunner.Stop()
-			natsRunner.Start()
+			Describe("app with an http route service", func() {
+				BeforeEach(func() {
+					app = test.NewRouteServiceApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, "http://my-insecure-service.me")
+				})
 
-			Eventually(started, 4).Should(Receive())
-			Eventually(cb, 4).Should(Receive())
+				It("does not register", func() {
+					app.Listen()
+
+					Consistently(func() bool {
+						return appRegistered(registry, app)
+					}).Should(BeFalse())
+
+					app.VerifyAppStatus(404)
+				})
+			})
 		})
+	})
+
+	It("sends start on a nats connect", func() {
+		started := make(chan bool)
+		cb := make(chan bool)
+
+		mbusClient.Subscribe("router.start", func(*nats.Msg) {
+			started <- true
+		})
+
+		mbusClient.AddReconnectedCB(func(_ *nats.Conn) {
+			cb <- true
+		})
+
+		natsRunner.Stop()
+		natsRunner.Start()
+
+		Eventually(started, 4).Should(Receive())
+		Eventually(cb, 4).Should(Receive())
 	})
 
 	It("registry contains last updated varz", func() {
@@ -283,7 +322,7 @@ var _ = Describe("Router", func() {
 
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
-			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -330,7 +369,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("no longer proxies https", func() {
-			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -369,7 +408,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("handles a PUT request", func() {
-		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil)
+		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 		var rr *http.Request
 		var msg string
@@ -405,7 +444,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("supports 100 Continue", func() {
-		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil)
+		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
 		rCh := make(chan *http.Request)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)

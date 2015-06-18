@@ -253,7 +253,7 @@ func (r *Router) RegisterComponent() {
 }
 
 func (r *Router) SubscribeRegister() {
-	r.subscribeRegistry("router.register", func(registryMessage *registryMessage) {
+	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
 		r.logger.Debugf("Got router.register: %v", registryMessage)
 
 		for _, uri := range registryMessage.Uris {
@@ -266,7 +266,7 @@ func (r *Router) SubscribeRegister() {
 }
 
 func (r *Router) SubscribeUnregister() {
-	r.subscribeRegistry("router.unregister", func(registryMessage *registryMessage) {
+	r.subscribeRegistry("router.unregister", func(registryMessage *RegistryMessage) {
 		r.logger.Debugf("Got router.unregister: %v", registryMessage)
 
 		for _, uri := range registryMessage.Uris {
@@ -393,11 +393,11 @@ func (r *Router) greetMessage() ([]byte, error) {
 	return json.Marshal(d)
 }
 
-func (r *Router) subscribeRegistry(subject string, successCallback func(*registryMessage)) {
+func (r *Router) subscribeRegistry(subject string, successCallback func(*RegistryMessage)) {
 	callback := func(message *nats.Msg) {
 		payload := message.Data
 
-		var msg registryMessage
+		var msg RegistryMessage
 
 		err := json.Unmarshal(payload, &msg)
 		if err != nil {
@@ -407,6 +407,12 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*registr
 
 		logMessage := fmt.Sprintf("%s: Received message", subject)
 		r.logger.Debugd(map[string]interface{}{"message": msg}, logMessage)
+
+		if !msg.ValidateMessage() {
+			logMessage := fmt.Sprintf("%s: Unable to validate message. route_service_url must be https", subject)
+			r.logger.Warnd(map[string]interface{}{"message": msg}, logMessage)
+			return
+		}
 
 		successCallback(&msg)
 	}
