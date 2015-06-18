@@ -353,43 +353,17 @@ var _ = Describe("Router Integration", func() {
 		staleCheckInterval := config.PruneStaleDropletsInterval
 		staleThreshold := config.DropletStaleThreshold
 		// Give router time to make a bad decision (i.e. prune routes)
-		time.Sleep(staleCheckInterval + staleThreshold + 250*time.Millisecond)
+		time.Sleep(10 * (staleCheckInterval + staleThreshold))
 
-		// While NATS is down no routes should go down
-		zombieApp.VerifyAppStatus(200)
-		runningApp.VerifyAppStatus(200)
+		// While NATS is down all routes should go down
+		zombieApp.VerifyAppStatus(404)
+		runningApp.VerifyAppStatus(404)
 
 		natsRunner.Start()
 
-		// Right after NATS starts up all routes should stay up
-		zombieApp.VerifyAppStatus(200)
+		// After NATS starts up the zombie should stay gone
+		zombieApp.VerifyAppStatus(404)
 		runningApp.VerifyAppStatus(200)
-
-		zombieGone := make(chan bool)
-
-		go func() {
-			for {
-				// Finally the zombie is cleaned up. Maybe proactively enqueue Unregister events in DEA's.
-				err := zombieApp.CheckAppStatus(404)
-				if err != nil {
-					time.Sleep(100 * time.Millisecond)
-					continue
-				}
-
-				err = runningApp.CheckAppStatus(200)
-				if err != nil {
-					time.Sleep(100 * time.Millisecond)
-					continue
-				}
-
-				zombieGone <- true
-
-				break
-			}
-		}()
-
-		waitTime := staleCheckInterval + staleThreshold + 5*time.Second
-		Eventually(zombieGone, waitTime.Seconds()).Should(Receive())
 	})
 })
 
