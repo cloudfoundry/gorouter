@@ -725,6 +725,31 @@ var _ = Describe("Router", func() {
 			Ω(err).To(HaveOccurred())
 		})
 	})
+
+	Describe("SubscribeRegister", func() {
+		Context("when the register message JSON fails to unmarshall", func() {
+			BeforeEach(func() {
+				// the port is too high
+				mbusClient.Publish("router.register", []byte(`
+{
+  "dea": "dea1",
+  "app": "app1",
+  "uris": [
+    "test.com"
+  ],
+  "host": "1.2.3.4",
+  "port": 65536,
+  "private_instance_id": "private_instance_id"
+}
+`))
+			})
+
+			It("does not add the route to the route table", func() {
+				// Pool.IsEmpty() is better but the pool is not intialized yet
+				Consistently(func() *route.Pool { return registry.Lookup("test.com") }).Should(BeZero())
+			})
+		})
+	})
 })
 
 func readVarz(v vvarz.Varz) map[string]interface{} {

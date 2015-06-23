@@ -403,6 +403,7 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 		if err != nil {
 			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
 			r.logger.Warnd(map[string]interface{}{"payload": string(payload)}, logMessage)
+			return
 		}
 
 		logMessage := fmt.Sprintf("%s: Received message", subject)
