@@ -234,13 +234,13 @@ func (p *Pool) Each(f func(endpoint *Endpoint)) {
 
 func (p *Pool) MarshalJSON() ([]byte, error) {
 	p.lock.Lock()
-	addresses := make([]string, 0, len(p.endpoints))
+	endpoints := make([]Endpoint, 0, len(p.endpoints))
 	for _, e := range p.endpoints {
-		addresses = append(addresses, e.endpoint.addr)
+		endpoints = append(endpoints, *e.endpoint)
 	}
 	p.lock.Unlock()
 
-	return json.Marshal(addresses)
+	return json.Marshal(endpoints)
 }
 
 func newEndpointIterator(p *Pool, initial string) EndpointIterator {

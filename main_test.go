@@ -401,7 +401,7 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 		bytes, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		Expect(err).ToNot(HaveOccurred())
-		routes := make(map[string][]string)
+		routes := make(map[string]interface{})
 		err = json.Unmarshal(bytes, &routes)
 		Expect(err).ToNot(HaveOccurred())
 

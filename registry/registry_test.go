@@ -394,12 +394,12 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	It("marshals", func() {
-		m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+		m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "https://my-routeService.com")
 		r.Register("foo", m)
 
 		marshalled, err := json.Marshal(r)
 		Ω(err).NotTo(HaveOccurred())
-		Ω(string(marshalled)).To(Equal(`{"foo":["192.168.1.1:1234"]}`))
+		Ω(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234","ttl":-1,"route_service_url":"https://my-routeService.com"}]}`))
 		r.Unregister("foo", m)
 		marshalled, err = json.Marshal(r)
 		Ω(err).NotTo(HaveOccurred())

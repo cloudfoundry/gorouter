@@ -193,12 +193,14 @@ var _ = Describe("Pool", func() {
 	})
 
 	It("marshals json", func() {
-		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "https://my-rs.com")
+		e2 := NewEndpoint("", "5.6.7.8", 5678, "", nil, -1, "")
 		pool.Put(e)
+		pool.Put(e2)
 
 		json, err := pool.MarshalJSON()
 		Ω(err).ToNot(HaveOccurred())
 
-		Ω(string(json)).To(Equal(`["1.2.3.4:5678"]`))
+		Ω(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com"},{"address":"5.6.7.8:5678","ttl":-1}]`))
 	})
 })

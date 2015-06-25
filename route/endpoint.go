@@ -28,7 +28,16 @@ type Endpoint struct {
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
-	return json.Marshal(e.addr)
+	var jsonObj struct {
+		Address         string `json:"address"`
+		TTL             int    `json:"ttl"`
+		RouteServiceUrl string `json:"route_service_url,omitempty"`
+	}
+
+	jsonObj.Address = e.addr
+	jsonObj.RouteServiceUrl = e.RouteServiceUrl
+	jsonObj.TTL = int(e.staleThreshold.Seconds())
+	return json.Marshal(jsonObj)
 }
 
 func (e *Endpoint) CanonicalAddr() string {
