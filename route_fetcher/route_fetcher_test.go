@@ -74,11 +74,12 @@ var _ = Describe("RouteFetcher", func() {
 					LogGuid: "guid",
 				},
 				{
-					Route:   "foo",
-					Port:    2,
-					IP:      "2.2.2.2",
-					TTL:     1,
-					LogGuid: "guid",
+					Route:           "foo",
+					Port:            2,
+					IP:              "2.2.2.2",
+					TTL:             1,
+					LogGuid:         "guid",
+					RouteServiceUrl: "route-service-url",
 				},
 				{
 					Route:   "bar",
@@ -100,10 +101,17 @@ var _ = Describe("RouteFetcher", func() {
 			Expect(registry.RegisterCallCount()).To(Equal(3))
 
 			for i := 0; i < 3; i++ {
-				response := response[i]
+				expectedRoute := response[i]
 				uri, endpoint := registry.RegisterArgsForCall(i)
-				Expect(uri).To(Equal(route.Uri(response.Route)))
-				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL, "")))
+				Expect(uri).To(Equal(route.Uri(expectedRoute.Route)))
+				Expect(endpoint).To(Equal(
+					route.NewEndpoint(expectedRoute.LogGuid,
+						expectedRoute.IP, uint16(expectedRoute.Port),
+						expectedRoute.LogGuid,
+						nil,
+						expectedRoute.TTL,
+						expectedRoute.RouteServiceUrl,
+					)))
 			}
 		})
 
@@ -125,11 +133,24 @@ var _ = Describe("RouteFetcher", func() {
 			Expect(registry.RegisterCallCount()).To(Equal(4))
 			Expect(registry.UnregisterCallCount()).To(Equal(2))
 
+			expectedUnregisteredRoutes := []db.Route{
+				response[1],
+				response[2],
+			}
+
 			for i := 0; i < 2; i++ {
-				response := response[i+1]
+				expectedRoute := expectedUnregisteredRoutes[i]
 				uri, endpoint := registry.UnregisterArgsForCall(i)
-				Expect(uri).To(Equal(route.Uri(response.Route)))
-				Expect(endpoint).To(Equal(route.NewEndpoint(response.LogGuid, response.IP, uint16(response.Port), response.LogGuid, nil, response.TTL, "")))
+				Expect(uri).To(Equal(route.Uri(expectedRoute.Route)))
+				Expect(endpoint).To(Equal(
+					route.NewEndpoint(expectedRoute.LogGuid,
+						expectedRoute.IP,
+						uint16(expectedRoute.Port),
+						expectedRoute.LogGuid,
+						nil,
+						expectedRoute.TTL,
+						expectedRoute.RouteServiceUrl,
+					)))
 			}
 		})
 
@@ -220,11 +241,12 @@ var _ = Describe("RouteFetcher", func() {
 					event := routing_api.Event{
 						Action: "Delete",
 						Route: db.Route{
-							Route:   "z.a.k",
-							Port:    63,
-							IP:      "42.42.42.42",
-							TTL:     1,
-							LogGuid: "Tomato",
+							Route:           "z.a.k",
+							Port:            63,
+							IP:              "42.42.42.42",
+							TTL:             1,
+							LogGuid:         "Tomato",
+							RouteServiceUrl: "route-service-url",
 						}}
 					return event, nil
 				}
@@ -284,11 +306,12 @@ var _ = Describe("RouteFetcher", func() {
 		Context("When the event is an Upsert", func() {
 			It("registers the route from the registry", func() {
 				eventRoute := db.Route{
-					Route:   "z.a.k",
-					Port:    63,
-					IP:      "42.42.42.42",
-					TTL:     1,
-					LogGuid: "Tomato",
+					Route:           "z.a.k",
+					Port:            63,
+					IP:              "42.42.42.42",
+					TTL:             1,
+					LogGuid:         "Tomato",
+					RouteServiceUrl: "route-service-url",
 				}
 
 				event := routing_api.Event{
@@ -308,7 +331,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.LogGuid,
 						nil,
 						eventRoute.TTL,
-						"",
+						eventRoute.RouteServiceUrl,
 					)))
 			})
 		})
@@ -316,11 +339,12 @@ var _ = Describe("RouteFetcher", func() {
 		Context("When the event is a DELETE", func() {
 			It("unregisters the route from the registry", func() {
 				eventRoute := db.Route{
-					Route:   "z.a.k",
-					Port:    63,
-					IP:      "42.42.42.42",
-					TTL:     1,
-					LogGuid: "Tomato",
+					Route:           "z.a.k",
+					Port:            63,
+					IP:              "42.42.42.42",
+					TTL:             1,
+					LogGuid:         "Tomato",
+					RouteServiceUrl: "route-service-url",
 				}
 
 				event := routing_api.Event{
@@ -340,7 +364,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.LogGuid,
 						nil,
 						eventRoute.TTL,
-						"",
+						eventRoute.RouteServiceUrl,
 					)))
 			})
 		})
