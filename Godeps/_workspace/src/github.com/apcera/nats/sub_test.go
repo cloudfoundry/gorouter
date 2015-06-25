@@ -123,7 +123,7 @@ func TestSlowSubscriber(t *testing.T) {
 	defer nc.Close()
 
 	sub, _ := nc.SubscribeSync("foo")
-	for i := 0; i < (maxChanLen + 100); i++ {
+	for i := 0; i < (nc.Opts.SubChanLen + 100); i++ {
 		nc.Publish("foo", []byte("Hello"))
 	}
 	timeout := 5 * time.Second
@@ -147,7 +147,7 @@ func TestSlowAsyncSubscriber(t *testing.T) {
 	nc.Subscribe("foo", func(_ *Msg) {
 		time.Sleep(200 * time.Second)
 	})
-	for i := 0; i < (maxChanLen + 100); i++ {
+	for i := 0; i < (nc.Opts.SubChanLen + 100); i++ {
 		nc.Publish("foo", []byte("Hello"))
 	}
 	timeout := 5 * time.Second
@@ -187,7 +187,7 @@ func TestAsyncErrHandler(t *testing.T) {
 	}
 
 	b := []byte("Hello World!")
-	for i := 0; i < (maxChanLen + 100); i++ {
+	for i := 0; i < (nc.Opts.SubChanLen + 100); i++ {
 		nc.Publish(subj, b)
 	}
 
@@ -257,6 +257,20 @@ func TestAsyncSubscribersOnClose(t *testing.T) {
 	seen := atomic.LoadInt64(&callbacks)
 	if seen != 1 {
 		t.Fatalf("Expected only one callback, received %d callbacks\n", seen)
+	}
+}
+
+func TestNextMsgCallOnAsyncSub(t *testing.T) {
+	nc := newConnection(t)
+	defer nc.Close()
+	sub, err := nc.Subscribe("foo", func(_ *Msg) {
+	})
+	if err != nil {
+		t.Fatal("Failed to subscribe: ", err)
+	}
+	_, err = sub.NextMsg(time.Second)
+	if err == nil {
+		t.Fatal("Expected an error call NextMsg() on AsyncSubscriber")
 	}
 }
 

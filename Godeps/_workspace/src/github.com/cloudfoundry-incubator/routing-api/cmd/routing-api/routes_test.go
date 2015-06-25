@@ -1,15 +1,22 @@
 package main_test
 
 import (
+	"fmt"
+
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/ginkgomon"
 
+	"github.com/cloudfoundry-incubator/routing-api/cmd/routing-api/testrunner"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Routes API", func() {
+	var routingAPIProcess ifrit.Process
+
 	BeforeEach(func() {
+		routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
 		routingAPIProcess = ginkgomon.Invoke(routingAPIRunner)
 	})
 
@@ -30,6 +37,7 @@ var _ = Describe("Routes API", func() {
 				TTL:     55,
 				LogGuid: "potato",
 			}
+
 			route2 = db.Route{
 				Route:   "d.e.f",
 				Port:    35,
@@ -37,8 +45,10 @@ var _ = Describe("Routes API", func() {
 				TTL:     66,
 				LogGuid: "banana",
 			}
+
 			routesToInsert := []db.Route{route1, route2}
-			client.UpsertRoutes(routesToInsert)
+			upsertErr := client.UpsertRoutes(routesToInsert)
+			Expect(upsertErr).NotTo(HaveOccurred())
 			routes, getErr = client.Routes()
 		})
 
@@ -47,8 +57,16 @@ var _ = Describe("Routes API", func() {
 		})
 
 		It("fetches all of the routes", func() {
-			Expect(routes).To(HaveLen(2))
-			Expect(routes).To(ConsistOf(route1, route2))
+			routingAPIRoute := db.Route{
+				Route:   fmt.Sprintf("routing-api.%s", routingAPISystemDomain),
+				Port:    routingAPIPort,
+				IP:      routingAPIIP,
+				TTL:     120,
+				LogGuid: "my_logs",
+			}
+
+			Expect(routes).To(HaveLen(3))
+			Expect(routes).To(ConsistOf(route1, route2, routingAPIRoute))
 		})
 
 		It("deletes a route", func() {
@@ -59,6 +77,25 @@ var _ = Describe("Routes API", func() {
 			routes, err = client.Routes()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(routes).NotTo(ContainElement(route1))
+		})
+
+		It("rejects bad routes", func() {
+			route3 := db.Route{
+				Route:   "/foo/b ar",
+				Port:    35,
+				IP:      "2.2.2.2",
+				TTL:     66,
+				LogGuid: "banana",
+			}
+
+			err := client.UpsertRoutes([]db.Route{route3})
+			Expect(err).To(HaveOccurred())
+
+			routes, err = client.Routes()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(routes).NotTo(ContainElement(route3))
+			Expect(routes).To(ContainElement(route1))
+			Expect(routes).To(ContainElement(route2))
 		})
 	})
 })

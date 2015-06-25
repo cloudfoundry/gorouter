@@ -3,9 +3,14 @@ package routing_api_test
 import (
 	"errors"
 
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
+	trace "github.com/cloudfoundry-incubator/trace-logger"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vito/go-sse/sse"
@@ -30,6 +35,27 @@ var _ = Describe("EventSource", func() {
 		})
 
 		Context("When the event source successfully returns an event", func() {
+			It("logs the event", func() {
+				stdout := bytes.NewBuffer([]byte{})
+				trace.SetStdout(stdout)
+				trace.Logger = trace.NewLogger("true")
+				rawEvent := sse.Event{
+					ID:    "1",
+					Name:  "Test",
+					Data:  []byte(`{"route":"jim.com","port":8080,"ip":"1.1.1.1","ttl":60,"log_guid":"logs"}`),
+					Retry: 1,
+				}
+				expectedJSON, _ := json.Marshal(rawEvent)
+
+				fakeRawEventSource.NextReturns(rawEvent, nil)
+				eventSource.Next()
+
+				log, err := ioutil.ReadAll(stdout)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(log).To(ContainSubstring("EVENT: "))
+				Expect(log).To(ContainSubstring(string(expectedJSON)))
+			})
+
 			Context("When the event is unmarshalled successfully", func() {
 				It("returns the raw event", func() {
 					rawEvent := sse.Event{

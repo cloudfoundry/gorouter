@@ -45,7 +45,7 @@ func (runner *NATSRunner) Start() {
 		gexec.NewPrefixedWriter("\x1b[32m[o]\x1b[34m[gnatsd]\x1b[0m ", ginkgo.GinkgoWriter),
 		gexec.NewPrefixedWriter("\x1b[91m[e]\x1b[34m[gnatsd]\x1b[0m ", ginkgo.GinkgoWriter),
 	)
-	Ω(err).ShouldNot(HaveOccurred(), "Make sure to have gnatsd on your path")
+	Expect(err).NotTo(HaveOccurred(), "Make sure to have gnatsd on your path")
 
 	runner.natsSession = sess
 

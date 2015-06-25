@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	trace "github.com/cloudfoundry-incubator/trace-logger"
 )
 
 type OAuthConfig struct {
@@ -49,6 +50,8 @@ func (f *Fetcher) FetchToken() (*Token, error) {
 		return nil, err
 	}
 
+	trace.DumpRequest(request)
+
 	request.SetBasicAuth(f.config.ClientName, f.config.ClientSecret)
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	request.Header.Add("Accept", "application/json; charset=utf-8")
@@ -58,6 +61,8 @@ func (f *Fetcher) FetchToken() (*Token, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	trace.DumpResponse(resp)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

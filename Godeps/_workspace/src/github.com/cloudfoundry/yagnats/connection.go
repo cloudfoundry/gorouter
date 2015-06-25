@@ -3,7 +3,6 @@ package yagnats
 import (
 	"bufio"
 	"errors"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -95,8 +94,14 @@ type ConnectionCluster struct {
 	Members []ConnectionProvider
 }
 
-func (c *ConnectionCluster) ProvideConnection() (*Connection, error) {
-	return c.Members[rand.Intn(len(c.Members))].ProvideConnection()
+func (c *ConnectionCluster) ProvideConnection() (conn *Connection, err error) {
+	for _, cp := range c.Members {
+		conn, err = cp.ProvideConnection()
+		if err == nil {
+			return conn, nil
+		}
+	}
+	return nil, err
 }
 
 func (c *Connection) Dial() error {

@@ -11,14 +11,31 @@ import (
 )
 
 var _ = Describe("DB", func() {
+	Describe("etcd error", func() {
+		var (
+			etcd db.DB
+			err  error
+		)
+
+		BeforeEach(func() {
+			etcd, err = db.NewETCD(etcdRunner.NodeURLS(), 0)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should not return an etcd instance", func() {
+			Expect(etcd).To(BeNil())
+		})
+	})
+
 	Describe("etcd", func() {
 		var (
 			etcd  db.DB
 			route db.Route
+			err   error
 		)
 
 		BeforeEach(func() {
-			etcd = db.NewETCD(etcdRunner.NodeURLS())
+			etcd, err = db.NewETCD(etcdRunner.NodeURLS(), 10)
 			route = db.Route{
 				Route:   "post_here",
 				Port:    7000,
@@ -26,6 +43,7 @@ var _ = Describe("DB", func() {
 				TTL:     50,
 				LogGuid: "my-guid",
 			}
+			Expect(err).NotTo(HaveOccurred())
 			etcd.Connect()
 		})
 
@@ -61,6 +79,7 @@ var _ = Describe("DB", func() {
 			Context("when multiple entries present", func() {
 				var (
 					route2 db.Route
+					route3 db.Route
 				)
 
 				BeforeEach(func() {
@@ -72,22 +91,34 @@ var _ = Describe("DB", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					route2 = db.Route{
-						Route:   "some-route",
+						Route:           "some-route",
+						Port:            5500,
+						IP:              "3.1.5.7",
+						TTL:             1000,
+						LogGuid:         "your-guid",
+						RouteServiceUrl: "https://my-rs.com",
+					}
+					err = etcd.SaveRoute(route2)
+					Expect(err).NotTo(HaveOccurred())
+
+					route3 = db.Route{
+						Route:   "some-other-route",
 						Port:    5500,
 						IP:      "3.1.5.7",
 						TTL:     1000,
 						LogGuid: "your-guid",
 					}
-					err = etcd.SaveRoute(route2)
+					err = etcd.SaveRoute(route3)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("Returns a list with one route", func() {
+				It("Returns a list with multiple routes", func() {
 					routes, err := etcd.ReadRoutes()
 					Expect(err).NotTo(HaveOccurred())
 
 					Expect(routes).To(ContainElement(route))
 					Expect(routes).To(ContainElement(route2))
+					Expect(routes).To(ContainElement(route3))
 				})
 			})
 		})
@@ -97,10 +128,10 @@ var _ = Describe("DB", func() {
 				err := etcd.SaveRoute(route)
 				Expect(err).NotTo(HaveOccurred())
 
-				response, err := etcdClient.Get(`/routes/post_here,1.2.3.4:7000`, false, false)
+				node, err := etcdClient.Get(`/routes/post_here,1.2.3.4:7000`)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(response.Node.TTL).To(Equal(int64(50)))
-				Expect(response.Node.Value).To(MatchJSON(`{
+				Expect(node.TTL).To(Equal(uint64(50)))
+				Expect(node.Value).To(MatchJSON(`{
 						"ip": "1.2.3.4",
 						"route": "post_here",
 						"port": 7000,
@@ -109,10 +140,34 @@ var _ = Describe("DB", func() {
 					}`))
 			})
 
-			It("Returns the ETCD error if bad inputs are given", func() {
-				route.TTL = -1
-				err := etcd.SaveRoute(route)
-				Expect(err).To(HaveOccurred())
+			Context("when a route has a route_service_url", func() {
+				BeforeEach(func() {
+					route = db.Route{
+						Route:           "post_here",
+						Port:            7000,
+						IP:              "1.2.3.4",
+						TTL:             50,
+						LogGuid:         "my-guid",
+						RouteServiceUrl: "https://my-rs.com",
+					}
+				})
+
+				It("Creates a route if none exist", func() {
+					err := etcd.SaveRoute(route)
+					Expect(err).NotTo(HaveOccurred())
+
+					node, err := etcdClient.Get(`/routes/post_here,1.2.3.4:7000`)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(node.TTL).To(Equal(uint64(50)))
+					Expect(node.Value).To(MatchJSON(`{
+						"ip": "1.2.3.4",
+						"route": "post_here",
+						"port": 7000,
+						"ttl": 50,
+						"log_guid": "my-guid",
+						"route_service_url":"https://my-rs.com"
+					}`))
+				})
 			})
 
 			Context("when an entry already exists", func() {
@@ -132,10 +187,10 @@ var _ = Describe("DB", func() {
 					err := etcd.SaveRoute(route)
 					Expect(err).NotTo(HaveOccurred())
 
-					response, err := etcdClient.Get(`/routes/next-route,9.8.7.6:12345`, false, false)
+					node, err := etcdClient.Get(`/routes/next-route,9.8.7.6:12345`)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(response.Node.TTL).To(Equal(int64(47)))
-					Expect(response.Node.Value).To(MatchJSON(`{
+					Expect(node.TTL).To(Equal(uint64(47)))
+					Expect(node.Value).To(MatchJSON(`{
 						"ip": "9.8.7.6",
 						"route": "next-route",
 						"port": 12345,
@@ -208,6 +263,7 @@ var _ = Describe("DB", func() {
 				It("returns a key not found error if the key does not exists", func() {
 					err := etcd.DeleteRoute(route)
 					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(Equal("The specified route could not be found."))
 				})
 			})
 		})

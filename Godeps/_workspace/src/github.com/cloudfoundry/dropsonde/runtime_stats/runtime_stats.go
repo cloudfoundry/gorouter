@@ -1,13 +1,12 @@
 package runtime_stats
 
 import (
-	"log"
-	"runtime"
-	"time"
-
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/gogo/protobuf/proto"
+	"log"
+	"runtime"
+	"time"
 )
 
 type RuntimeStats struct {

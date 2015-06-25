@@ -27,5 +27,11 @@ func (self StoreNode) Lookup(childKey string) (StoreNode, bool) {
 }
 
 func (self StoreNode) KeyComponents() []string {
+	// root node has no Key, rather than Key of "/"
+	if self.Key == "" {
+		return []string{}
+	}
+
+	//other Keys have leading "/"
 	return strings.Split(self.Key, "/")[1:]
 }

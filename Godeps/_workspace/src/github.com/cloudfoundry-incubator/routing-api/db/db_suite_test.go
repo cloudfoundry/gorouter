@@ -1,10 +1,11 @@
 package db_test
 
 import (
-	"github.com/cloudfoundry-incubator/routing-api/db/etcdrunner"
-	"github.com/coreos/go-etcd/etcd"
+	"fmt"
+
+	"github.com/cloudfoundry/storeadapter"
+	"github.com/cloudfoundry/storeadapter/storerunner/etcdstorerunner"
 	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 
 	"testing"
@@ -15,19 +16,22 @@ func TestDB(t *testing.T) {
 	RunSpecs(t, "DB Suite")
 }
 
-var etcdRunner *etcdrunner.ETCDRunner
-var etcdClient *etcd.Client
-
-var _ = BeforeSuite(func() {
-	etcdRunner = etcdrunner.NewETCDRunner(5001+config.GinkgoConfig.ParallelNode, 1)
-})
-
-var _ = AfterSuite(func() {
-	etcdRunner.Stop()
-})
+var etcdClient storeadapter.StoreAdapter
+var etcdPort int
+var etcdUrl string
+var etcdRunner *etcdstorerunner.ETCDClusterRunner
+var routingAPIBinPath string
 
 var _ = BeforeEach(func() {
-	etcdRunner.Stop()
+	etcdPort = 4001 + GinkgoParallelNode()
+	etcdUrl = fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
+	etcdRunner = etcdstorerunner.NewETCDClusterRunner(etcdPort, 1)
 	etcdRunner.Start()
-	etcdClient = etcdRunner.Client()
+
+	etcdClient = etcdRunner.Adapter()
+})
+
+var _ = AfterEach(func() {
+	etcdClient.Disconnect()
+	etcdRunner.Stop()
 })

@@ -20,48 +20,54 @@ type DB interface {
 }
 
 type Route struct {
-	Route   string `json:"route"`
-	Port    int    `json:"port"`
-	IP      string `json:"ip"`
-	TTL     int    `json:"ttl"`
-	LogGuid string `json:"log_guid"`
+	Route           string `json:"route"`
+	Port            uint16 `json:"port"`
+	IP              string `json:"ip"`
+	TTL             int    `json:"ttl"`
+	LogGuid         string `json:"log_guid"`
+	RouteServiceUrl string `json:"route_service_url,omitempty"`
 }
 
 type etcd struct {
 	storeAdapter *etcdstoreadapter.ETCDStoreAdapter
 }
 
-func NewETCD(nodeURLs []string) etcd {
-	workpool := workpool.NewWorkPool(1)
-	storeAdapter := etcdstoreadapter.NewETCDStoreAdapter(nodeURLs, workpool)
-	return etcd{
-		storeAdapter: storeAdapter,
+func NewETCD(nodeURLs []string, maxWorkers uint) (*etcd, error) {
+	workpool, err := workpool.NewWorkPool(int(maxWorkers))
+	if err != nil {
+		return nil, err
 	}
+
+	storeAdapter := etcdstoreadapter.NewETCDStoreAdapter(nodeURLs, workpool)
+	return &etcd{
+		storeAdapter: storeAdapter,
+	}, nil
 }
 
-func (e etcd) Connect() error {
+func (e *etcd) Connect() error {
 	return e.storeAdapter.Connect()
 }
 
-func (e etcd) Disconnect() error {
+func (e *etcd) Disconnect() error {
 	return e.storeAdapter.Disconnect()
 }
 
-func (e etcd) ReadRoutes() ([]Route, error) {
+func (e *etcd) ReadRoutes() ([]Route, error) {
 	routes, err := e.storeAdapter.ListRecursively("/routes")
 	if err != nil {
 		return []Route{}, nil
 	}
-	var route Route
+
 	listRoutes := []Route{}
 	for _, node := range routes.ChildNodes {
+		route := Route{}
 		json.Unmarshal([]byte(node.Value), &route)
 		listRoutes = append(listRoutes, route)
 	}
 	return listRoutes, nil
 }
 
-func (e etcd) SaveRoute(route Route) error {
+func (e *etcd) SaveRoute(route Route) error {
 	key := generateKey(route)
 	routeJSON, _ := json.Marshal(route)
 	node := storeadapter.StoreNode{
@@ -73,12 +79,16 @@ func (e etcd) SaveRoute(route Route) error {
 	return e.storeAdapter.SetMulti([]storeadapter.StoreNode{node})
 }
 
-func (e etcd) DeleteRoute(route Route) error {
+func (e *etcd) DeleteRoute(route Route) error {
 	key := generateKey(route)
-	return e.storeAdapter.Delete(key)
+	err := e.storeAdapter.Delete(key)
+	if err != nil && err.Error() == "the requested key could not be found" {
+		err = DBError{Type: KeyNotFound, Message: "The specified route could not be found."}
+	}
+	return err
 }
 
-func (e etcd) WatchRouteChanges() (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error) {
+func (e *etcd) WatchRouteChanges() (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error) {
 	return e.storeAdapter.Watch("/routes")
 }
 

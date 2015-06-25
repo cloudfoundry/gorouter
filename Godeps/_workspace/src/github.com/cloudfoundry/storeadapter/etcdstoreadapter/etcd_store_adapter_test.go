@@ -33,44 +33,59 @@ var _ = Describe("ETCD Store Adapter", func() {
 			Value: []byte("burgers"),
 		}
 
-		adapter = NewETCDStoreAdapter(etcdRunner.NodeURLS(),
-			workpool.NewWorkPool(10))
-		err := adapter.Connect()
-		Ω(err).ShouldNot(HaveOccurred())
+		workPool, err := workpool.NewWorkPool(10)
+		Expect(err).NotTo(HaveOccurred())
+
+		adapter = NewETCDStoreAdapter(etcdRunner.NodeURLS(), workPool)
+		err = adapter.Connect()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
 		adapter.Disconnect()
 	})
 
+	Describe("Connect", func() {
+		Context("when server is down", func() {
+			It("should return an error", func() {
+				workPool, err := workpool.NewWorkPool(10)
+				Expect(err).NotTo(HaveOccurred())
+
+				adapter = NewETCDStoreAdapter([]string{"http://127.0.0.1:6000"}, workPool)
+				err = adapter.Connect()
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
 	Describe("Get", func() {
 		BeforeEach(func() {
 			err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		Context("when getting a key", func() {
 			It("should return the appropriate store breakfastNode", func() {
 				value, err := adapter.Get("/menu/breakfast")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(value).Should(MatchStoreNode(breakfastNode))
-				Ω(value.Index).ShouldNot(BeZero())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(value).To(MatchStoreNode(breakfastNode))
+				Expect(value.Index).NotTo(BeZero())
 			})
 		})
 
 		Context("When getting a non-existent key", func() {
 			It("should return an error", func() {
 				value, err := adapter.Get("/not_a_key")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
-				Ω(value).Should(BeZero())
+				Expect(err).To(Equal(ErrorKeyNotFound))
+				Expect(value).To(BeZero())
 			})
 		})
 
 		Context("when getting a directory", func() {
 			It("should return an error", func() {
 				value, err := adapter.Get("/menu")
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
-				Ω(value).Should(BeZero())
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
+				Expect(value).To(BeZero())
 			})
 		})
 
@@ -85,8 +100,8 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("should return a timeout error", func() {
 				value, err := adapter.Get("/foo/bar")
-				Ω(err).Should(Equal(ErrorTimeout))
-				Ω(value).Should(BeZero())
+				Expect(err).To(HaveOccurred())
+				Expect(value).To(BeZero())
 			})
 		})
 	})
@@ -94,31 +109,31 @@ var _ = Describe("ETCD Store Adapter", func() {
 	Describe("SetMulti", func() {
 		It("should be able to set multiple things to the store at once", func() {
 			err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			menu, err := adapter.ListRecursively("/menu")
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(menu.ChildNodes).Should(HaveLen(2))
-			Ω(menu.ChildNodes).Should(ContainElement(MatchStoreNode(breakfastNode)))
-			Ω(menu.ChildNodes).Should(ContainElement(MatchStoreNode(lunchNode)))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(menu.ChildNodes).To(HaveLen(2))
+			Expect(menu.ChildNodes).To(ContainElement(MatchStoreNode(breakfastNode)))
+			Expect(menu.ChildNodes).To(ContainElement(MatchStoreNode(lunchNode)))
 		})
 
 		Context("Setting to an existing node", func() {
 			BeforeEach(func() {
 				err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("should be able to update existing entries", func() {
 				lunchNode.Value = []byte("steak")
 				err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				menu, err := adapter.ListRecursively("/menu")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(menu.ChildNodes).Should(HaveLen(2))
-				Ω(menu.ChildNodes).Should(ContainElement(MatchStoreNode(breakfastNode)))
-				Ω(menu.ChildNodes).Should(ContainElement(MatchStoreNode(lunchNode)))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(menu.ChildNodes).To(HaveLen(2))
+				Expect(menu.ChildNodes).To(ContainElement(MatchStoreNode(breakfastNode)))
+				Expect(menu.ChildNodes).To(ContainElement(MatchStoreNode(lunchNode)))
 			})
 
 			It("should error when attempting to set to a directory", func() {
@@ -128,7 +143,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 				}
 
 				err := adapter.SetMulti([]StoreNode{dirNode})
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 
@@ -143,7 +158,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("should return a timeout error", func() {
 				err := adapter.SetMulti([]StoreNode{breakfastNode})
-				Ω(err).Should(Equal(ErrorTimeout))
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
@@ -151,19 +166,19 @@ var _ = Describe("ETCD Store Adapter", func() {
 	Describe("List", func() {
 		BeforeEach(func() {
 			err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		Context("When listing a directory", func() {
 			It("Should list directory contents", func() {
 				value, err := adapter.ListRecursively("/menu")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(value.Key).Should(Equal("/menu"))
-				Ω(value.Dir).Should(BeTrue())
-				Ω(value.ChildNodes).Should(HaveLen(2))
-				Ω(value.ChildNodes[0].Index).ShouldNot(BeZero())
-				Ω(value.ChildNodes).Should(ContainElement(MatchStoreNode(breakfastNode)))
-				Ω(value.ChildNodes).Should(ContainElement(MatchStoreNode(lunchNode)))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(value.Key).To(Equal("/menu"))
+				Expect(value.Dir).To(BeTrue())
+				Expect(value.ChildNodes).To(HaveLen(2))
+				Expect(value.ChildNodes[0].Index).NotTo(BeZero())
+				Expect(value.ChildNodes).To(ContainElement(MatchStoreNode(breakfastNode)))
+				Expect(value.ChildNodes).To(ContainElement(MatchStoreNode(lunchNode)))
 			})
 		})
 
@@ -184,23 +199,23 @@ var _ = Describe("ETCD Store Adapter", func() {
 				}
 				err := adapter.SetMulti([]StoreNode{firstCourseDinnerNode, secondCourseDinnerNode})
 
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			Context("when listing the root directory", func() {
 				It("should list the contents recursively", func() {
 					value, err := adapter.ListRecursively("/")
-					Ω(err).ShouldNot(HaveOccurred())
-					Ω(value.Key).Should(Equal("/"))
-					Ω(value.Dir).Should(BeTrue())
-					Ω(value.ChildNodes).Should(HaveLen(1))
+					Expect(err).NotTo(HaveOccurred())
+					Expect(value.Key).To(Equal(""))
+					Expect(value.Dir).To(BeTrue())
+					Expect(value.ChildNodes).To(HaveLen(1))
 					menuNode := value.ChildNodes[0]
-					Ω(menuNode.Key).Should(Equal("/menu"))
-					Ω(menuNode.Value).Should(BeEmpty())
-					Ω(menuNode.Dir).Should(BeTrue())
-					Ω(menuNode.ChildNodes).Should(HaveLen(3))
-					Ω(menuNode.ChildNodes).Should(ContainElement(MatchStoreNode(breakfastNode)))
-					Ω(menuNode.ChildNodes).Should(ContainElement(MatchStoreNode(lunchNode)))
+					Expect(menuNode.Key).To(Equal("/menu"))
+					Expect(menuNode.Value).To(BeEmpty())
+					Expect(menuNode.Dir).To(BeTrue())
+					Expect(menuNode.ChildNodes).To(HaveLen(3))
+					Expect(menuNode.ChildNodes).To(ContainElement(MatchStoreNode(breakfastNode)))
+					Expect(menuNode.ChildNodes).To(ContainElement(MatchStoreNode(lunchNode)))
 
 					var dinnerNode StoreNode
 					for _, node := range menuNode.ChildNodes {
@@ -209,22 +224,22 @@ var _ = Describe("ETCD Store Adapter", func() {
 							break
 						}
 					}
-					Ω(dinnerNode.Dir).Should(BeTrue())
-					Ω(dinnerNode.ChildNodes).Should(ContainElement(MatchStoreNode(firstCourseDinnerNode)))
-					Ω(dinnerNode.ChildNodes).Should(ContainElement(MatchStoreNode(secondCourseDinnerNode)))
+					Expect(dinnerNode.Dir).To(BeTrue())
+					Expect(dinnerNode.ChildNodes).To(ContainElement(MatchStoreNode(firstCourseDinnerNode)))
+					Expect(dinnerNode.ChildNodes).To(ContainElement(MatchStoreNode(secondCourseDinnerNode)))
 				})
 			})
 
 			Context("when listing another directory", func() {
 				It("should list the contents recursively", func() {
 					menuNode, err := adapter.ListRecursively("/menu")
-					Ω(err).ShouldNot(HaveOccurred())
-					Ω(menuNode.Key).Should(Equal("/menu"))
-					Ω(menuNode.Value).Should(BeEmpty())
-					Ω(menuNode.Dir).Should(BeTrue())
-					Ω(menuNode.ChildNodes).Should(HaveLen(3))
-					Ω(menuNode.ChildNodes).Should(ContainElement(MatchStoreNode(breakfastNode)))
-					Ω(menuNode.ChildNodes).Should(ContainElement(MatchStoreNode(lunchNode)))
+					Expect(err).NotTo(HaveOccurred())
+					Expect(menuNode.Key).To(Equal("/menu"))
+					Expect(menuNode.Value).To(BeEmpty())
+					Expect(menuNode.Dir).To(BeTrue())
+					Expect(menuNode.ChildNodes).To(HaveLen(3))
+					Expect(menuNode.ChildNodes).To(ContainElement(MatchStoreNode(breakfastNode)))
+					Expect(menuNode.ChildNodes).To(ContainElement(MatchStoreNode(lunchNode)))
 
 					var dinnerNode StoreNode
 					for _, node := range menuNode.ChildNodes {
@@ -233,9 +248,9 @@ var _ = Describe("ETCD Store Adapter", func() {
 							break
 						}
 					}
-					Ω(dinnerNode.Dir).Should(BeTrue())
-					Ω(dinnerNode.ChildNodes).Should(ContainElement(MatchStoreNode(firstCourseDinnerNode)))
-					Ω(dinnerNode.ChildNodes).Should(ContainElement(MatchStoreNode(secondCourseDinnerNode)))
+					Expect(dinnerNode.Dir).To(BeTrue())
+					Expect(dinnerNode.ChildNodes).To(ContainElement(MatchStoreNode(firstCourseDinnerNode)))
+					Expect(dinnerNode.ChildNodes).To(ContainElement(MatchStoreNode(secondCourseDinnerNode)))
 				})
 			})
 		})
@@ -248,33 +263,33 @@ var _ = Describe("ETCD Store Adapter", func() {
 						Value: []byte("foo"),
 					},
 				})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.Delete("/empty_dir/temp")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				value, err := adapter.ListRecursively("/empty_dir")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(value.Key).Should(Equal("/empty_dir"))
-				Ω(value.Dir).Should(BeTrue())
-				Ω(value.ChildNodes).Should(HaveLen(0))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(value.Key).To(Equal("/empty_dir"))
+				Expect(value.Dir).To(BeTrue())
+				Expect(value.ChildNodes).To(HaveLen(0))
 			})
 		})
 
 		Context("when listing a non-existent key", func() {
 			It("should return an error", func() {
 				value, err := adapter.ListRecursively("/nothing-here")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
-				Ω(value).Should(BeZero())
+				Expect(err).To(Equal(ErrorKeyNotFound))
+				Expect(value).To(BeZero())
 			})
 		})
 
 		Context("when listing an entry", func() {
 			It("should return an error", func() {
 				value, err := adapter.ListRecursively("/menu/breakfast")
-				Ω(err).Should(HaveOccurred())
-				Ω(err).Should(Equal(ErrorNodeIsNotDirectory))
-				Ω(value).Should(BeZero())
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(ErrorNodeIsNotDirectory))
+				Expect(value).To(BeZero())
 			})
 		})
 
@@ -289,8 +304,8 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("should return a timeout error", func() {
 				value, err := adapter.ListRecursively("/menu")
-				Ω(err).Should(Equal(ErrorTimeout))
-				Ω(value).Should(BeZero())
+				Expect(err).To(HaveOccurred())
+				Expect(value).To(BeZero())
 			})
 		})
 	})
@@ -298,41 +313,41 @@ var _ = Describe("ETCD Store Adapter", func() {
 	Describe("Delete", func() {
 		BeforeEach(func() {
 			err := adapter.SetMulti([]StoreNode{breakfastNode, lunchNode})
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		Context("when deleting existing keys", func() {
 			It("should delete the keys", func() {
 				err := adapter.Delete("/menu/breakfast", "/menu/lunch")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				value, err := adapter.Get("/menu/breakfast")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
-				Ω(value).Should(BeZero())
+				Expect(err).To(Equal(ErrorKeyNotFound))
+				Expect(value).To(BeZero())
 
 				value, err = adapter.Get("/menu/lunch")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
-				Ω(value).Should(BeZero())
+				Expect(err).To(Equal(ErrorKeyNotFound))
+				Expect(value).To(BeZero())
 			})
 		})
 
 		Context("when deleting a non-existing key", func() {
 			It("should error", func() {
 				err := adapter.Delete("/not-a-key")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when deleting a directory", func() {
 			It("deletes the key and its contents", func() {
 				err := adapter.Delete("/menu")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				_, err = adapter.Get("/menu/breakfast")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 
 				_, err = adapter.Get("/menu")
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
@@ -347,7 +362,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("should return a timeout error", func() {
 				err := adapter.Delete("/menu/breakfast")
-				Ω(err).Should(Equal(ErrorTimeout))
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
@@ -364,21 +379,21 @@ var _ = Describe("ETCD Store Adapter", func() {
 		Context("when nodes exist in the store", func() {
 			BeforeEach(func() {
 				err := adapter.Create(nodeFoo)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.Create(nodeBar)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("deletes the given nodes", func() {
 				err := adapter.CompareAndDelete(nodeFoo, nodeBar)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				_, err = adapter.Get(nodeFoo.Key)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 
 				_, err = adapter.Get(nodeBar.Key)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 
 			Context("but the comparison fails for one node", func() {
@@ -388,13 +403,13 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 				It("returns an error", func() {
 					err := adapter.CompareAndDelete(nodeFoo, nodeBar)
-					Ω(err).Should(Equal(ErrorKeyComparisonFailed))
+					Expect(err).To(Equal(ErrorKeyComparisonFailed))
 
 					_, err = adapter.Get(nodeFoo.Key)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
 					_, err = adapter.Get(nodeBar.Key)
-					Ω(err).Should(Equal(ErrorKeyNotFound))
+					Expect(err).To(Equal(ErrorKeyNotFound))
 				})
 			})
 		})
@@ -402,19 +417,19 @@ var _ = Describe("ETCD Store Adapter", func() {
 		Context("when a node does not exist at the key", func() {
 			It("returns an error", func() {
 				err := adapter.CompareAndDelete(nodeFoo)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				parentNode := StoreNode{Key: "/dir", Value: []byte("some value")}
 
 				err = adapter.CompareAndDelete(parentNode)
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 	})
@@ -434,42 +449,42 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			BeforeEach(func() {
 				err := adapter.Create(nodeFoo)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.Create(nodeBar)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				etcdNodeFoo, err = adapter.Get(nodeFoo.Key)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				etcdNodeBar, err = adapter.Get(nodeBar.Key)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("deletes the given nodes", func() {
 				err := adapter.CompareAndDeleteByIndex(etcdNodeFoo, etcdNodeBar)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				_, err = adapter.Get(nodeFoo.Key)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 
 				_, err = adapter.Get(nodeBar.Key)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 
 			Context("but the comparison fails for one node", func() {
 				It("returns an error", func() {
 					err := adapter.CompareAndSwap(nodeFoo, nodeFoo)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
 					err = adapter.CompareAndDeleteByIndex(etcdNodeFoo, etcdNodeBar)
-					Ω(err).Should(Equal(ErrorKeyComparisonFailed))
+					Expect(err).To(Equal(ErrorKeyComparisonFailed))
 
 					_, err = adapter.Get(nodeFoo.Key)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
 					_, err = adapter.Get(nodeBar.Key)
-					Ω(err).Should(Equal(ErrorKeyNotFound))
+					Expect(err).To(Equal(ErrorKeyNotFound))
 				})
 			})
 		})
@@ -481,20 +496,20 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("returns an error", func() {
 				err := adapter.CompareAndDeleteByIndex(nodeFoo)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				parentNode, err := adapter.ListRecursively("/dir")
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.CompareAndDeleteByIndex(parentNode)
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 	})
@@ -503,10 +518,10 @@ var _ = Describe("ETCD Store Adapter", func() {
 		It("should stay in the store for the duration of its TTL and then disappear", func() {
 			breakfastNode.TTL = 1
 			err := adapter.SetMulti([]StoreNode{breakfastNode})
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			_, err = adapter.Get("/menu/breakfast")
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() interface{} {
 				_, err = adapter.Get("/menu/breakfast")
@@ -527,10 +542,11 @@ var _ = Describe("ETCD Store Adapter", func() {
 		}
 
 		waitTilLocked := func(storeNode StoreNode) chan chan bool {
-			nodeStatus, releaseLock, _ := adapter.MaintainNode(storeNode)
+			nodeStatus, releaseLock, err := adapter.MaintainNode(storeNode)
+			Expect(err).NotTo(HaveOccurred())
 
 			reporter := test_helpers.NewStatusReporter(nodeStatus)
-			Eventually(reporter.Reporting).Should(BeTrue())
+			Eventually(reporter.Reporting, 2.0).Should(BeTrue())
 			Eventually(reporter.Locked).Should(BeTrue())
 
 			return releaseLock
@@ -539,7 +555,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 		BeforeEach(func() {
 			uniqueStoreNodeForThisTest = StoreNode{
 				Key: fmt.Sprintf("analyzer-%d", counter),
-				TTL: 1,
+				TTL: 2,
 			}
 
 			counter++
@@ -550,9 +566,9 @@ var _ = Describe("ETCD Store Adapter", func() {
 				uniqueStoreNodeForThisTest.TTL = 0
 
 				nodeStatus, releaseLock, err := adapter.MaintainNode(uniqueStoreNodeForThisTest)
-				Ω(err).Should(Equal(ErrorInvalidTTL))
-				Ω(nodeStatus).Should(BeNil())
-				Ω(releaseLock).Should(BeNil())
+				Expect(err).To(Equal(ErrorInvalidTTL))
+				Expect(nodeStatus).To(BeNil())
+				Expect(releaseLock).To(BeNil())
 			})
 		})
 
@@ -567,8 +583,8 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 			It("no status is received", func() {
 				nodeStatus, releaseLock, err := adapter.MaintainNode(uniqueStoreNodeForThisTest)
-				Ω(err).Should(BeNil())
-				Ω(releaseLock).ShouldNot(BeNil())
+				Expect(err).To(BeNil())
+				Expect(releaseLock).NotTo(BeNil())
 				Consistently(nodeStatus, 2).ShouldNot(Receive())
 
 				releaseMaintainedNode(releaseLock)
@@ -578,18 +594,15 @@ var _ = Describe("ETCD Store Adapter", func() {
 		Context("when the lock is available", func() {
 			It("receive a status of true on the TTL requested", func() {
 				nodeStatus, releaseLock, err := adapter.MaintainNode(uniqueStoreNodeForThisTest)
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(nodeStatus).ShouldNot(BeNil())
-				Ω(releaseLock).ShouldNot(BeNil())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nodeStatus).NotTo(BeNil())
+				Expect(releaseLock).NotTo(BeNil())
 
-				var status bool
-				Eventually(nodeStatus, 2.0).Should(Receive(&status))
-				Ω(status).Should(BeTrue())
+				Eventually(nodeStatus, 2.0).Should(Receive(BeTrue()))
 
 				start := time.Now()
-				Eventually(nodeStatus, 2.0).Should(Receive(&status))
-				Ω(status).Should(BeTrue())
-				Ω(time.Now().Sub(start)).Should(BeNumerically("==", 1*time.Second, 400*time.Millisecond))
+				Eventually(nodeStatus, 4.0).Should(Receive(BeTrue()))
+				Expect(time.Now().Sub(start)).To(BeNumerically("~", 2*time.Second, 500*time.Millisecond))
 
 				releaseMaintainedNode(releaseLock)
 			})
@@ -617,13 +630,13 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 				It("creates the lock with the given value", func() {
 					nodeStatus, release, err := adapter.MaintainNode(uniqueStoreNodeForThisTest)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 					Eventually(nodeStatus).Should(Receive())
 
 					val, err := adapter.Get(uniqueStoreNodeForThisTest.Key)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
-					Ω(string(val.Value)).Should(Equal("some value"))
+					Expect(string(val.Value)).To(Equal("some value"))
 
 					releaseMaintainedNode(release)
 				})
@@ -638,15 +651,15 @@ var _ = Describe("ETCD Store Adapter", func() {
 					defer releaseMaintainedNode(releaseLock1)
 
 					val, err := adapter.Get(uniqueStoreNodeForThisTest.Key)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
 					releaseLock2 := waitTilLocked(otherUniqueStoreNodeForThisTest)
 					defer releaseMaintainedNode(releaseLock2)
 
 					otherval, err := adapter.Get(otherUniqueStoreNodeForThisTest.Key)
-					Ω(err).ShouldNot(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred())
 
-					Ω(string(val.Value)).ShouldNot(Equal(string(otherval.Value)))
+					Expect(string(val.Value)).NotTo(Equal(string(otherval.Value)))
 				})
 			})
 
@@ -663,7 +676,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 					var status bool
 					Eventually(nodeStatus).Should(Receive(&status))
-					Ω(status).Should(BeFalse())
+					Expect(status).To(BeFalse())
 
 					releaseMaintainedNode(release)
 				})
@@ -678,15 +691,13 @@ var _ = Describe("ETCD Store Adapter", func() {
 				otherStoreNodeForThisTest.Value = []byte("other")
 
 				nodeStatus2, releaseLock2, err2 := adapter.MaintainNode(otherStoreNodeForThisTest)
-				Ω(err2).ShouldNot(HaveOccurred())
+				Expect(err2).NotTo(HaveOccurred())
 
-				Consistently(nodeStatus2).ShouldNot(Receive())
+				Consistently(nodeStatus2).ShouldNot(Receive(BeTrue()))
 
 				releaseMaintainedNode(releaseLock1)
 
-				var status bool
-				Eventually(nodeStatus2, 2.0).Should(Receive(&status))
-				Ω(status).Should(BeTrue())
+				Eventually(nodeStatus2).Should(Receive(BeTrue()))
 
 				releaseMaintainedNode(releaseLock2)
 			})
@@ -695,14 +706,14 @@ var _ = Describe("ETCD Store Adapter", func() {
 				done := waitTilLocked(uniqueStoreNodeForThisTest)
 
 				_, err := adapter.Get(uniqueStoreNodeForThisTest.Key)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				waiting := make(chan bool)
 				done <- waiting
 				<-waiting
 
 				_, err = adapter.Get(uniqueStoreNodeForThisTest.Key)
-				Ω(err).Should(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("the status channel is closed", func() {
@@ -726,29 +737,29 @@ var _ = Describe("ETCD Store Adapter", func() {
 		BeforeEach(func() {
 			node = StoreNode{Key: "/foo", Value: []byte("some value")}
 			err := adapter.Create(node)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("creates the node at the given key", func() {
 			retrievedNode, err := adapter.Get("/foo")
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(retrievedNode).Should(MatchStoreNode(node))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrievedNode).To(MatchStoreNode(node))
 		})
 
 		Context("when a node already exists at the key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(node)
-				Ω(err).Should(Equal(ErrorKeyExists))
+				Expect(err).To(Equal(ErrorKeyExists))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.Create(StoreNode{Key: "/dir", Value: []byte("some value")})
-				Ω(err).Should(Equal(ErrorKeyExists))
+				Expect(err).To(Equal(ErrorKeyExists))
 			})
 		})
 	})
@@ -762,32 +773,32 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 		It("updates the existing node at the given key", func() {
 			err := adapter.Create(node)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			node.Value = []byte("some new value")
 
 			err = adapter.Update(node)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			retrievedNode, err := adapter.Get("/foo")
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(retrievedNode).Should(MatchStoreNode(node))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrievedNode).To(MatchStoreNode(node))
 		})
 
 		Context("when a node does not exist at the key", func() {
 			It("returns an error", func() {
 				err := adapter.Update(node)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				err = adapter.Update(StoreNode{Key: "/dir", Value: []byte("some value")})
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 	})
@@ -801,23 +812,23 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 		It("updates the existing node at the given key", func() {
 			err := adapter.Create(node)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			newNode := node
 			newNode.Value = []byte("some new value")
 
 			err = adapter.CompareAndSwap(node, newNode)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			retrievedNode, err := adapter.Get("/foo")
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(retrievedNode).Should(MatchStoreNode(newNode))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrievedNode).To(MatchStoreNode(newNode))
 		})
 
 		Context("when a node exists but the comparison fails", func() {
 			It("returns an error", func() {
 				err := adapter.Create(node)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				wrongNode := node
 				wrongNode.Value = []byte("NOPE")
@@ -826,30 +837,30 @@ var _ = Describe("ETCD Store Adapter", func() {
 				newNode.Value = []byte("some new value")
 
 				err = adapter.CompareAndSwap(wrongNode, newNode)
-				Ω(err).Should(Equal(ErrorKeyComparisonFailed))
+				Expect(err).To(Equal(ErrorKeyComparisonFailed))
 
 				retrievedNode, err := adapter.Get("/foo")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(retrievedNode).Should(MatchStoreNode(node))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(retrievedNode).To(MatchStoreNode(node))
 			})
 		})
 
 		Context("when a node does not exist at the key", func() {
 			It("returns an error", func() {
 				err := adapter.CompareAndSwap(node, node)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				newNode := StoreNode{Key: "/dir", Value: []byte("some value")}
 
 				err = adapter.CompareAndSwap(newNode, newNode)
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 	})
@@ -863,55 +874,55 @@ var _ = Describe("ETCD Store Adapter", func() {
 
 		It("updates the existing node at the given key", func() {
 			err := adapter.Create(node)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			newNode := node
 			newNode.Value = []byte("some new value")
 
 			etcd_node, err := adapter.Get("/foo")
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			err = adapter.CompareAndSwapByIndex(etcd_node.Index, newNode)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			retrievedNode, err := adapter.Get("/foo")
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(retrievedNode).Should(MatchStoreNode(newNode))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrievedNode).To(MatchStoreNode(newNode))
 		})
 
 		Context("when a node exists but the comparison fails", func() {
 			It("returns an error", func() {
 				err := adapter.Create(node)
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				newNode := node
 				newNode.Value = []byte("some new value")
 
 				err = adapter.CompareAndSwapByIndex(4271138, newNode)
-				Ω(err).Should(Equal(ErrorKeyComparisonFailed))
+				Expect(err).To(Equal(ErrorKeyComparisonFailed))
 
 				retrievedNode, err := adapter.Get("/foo")
-				Ω(err).ShouldNot(HaveOccurred())
-				Ω(retrievedNode).Should(MatchStoreNode(node))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(retrievedNode).To(MatchStoreNode(node))
 			})
 		})
 
 		Context("when a node does not exist at the key", func() {
 			It("returns an error", func() {
 				err := adapter.CompareAndSwapByIndex(4271338, node)
-				Ω(err).Should(Equal(ErrorKeyNotFound))
+				Expect(err).To(Equal(ErrorKeyNotFound))
 			})
 		})
 
 		Context("when a directory exists at the given key", func() {
 			It("returns an error", func() {
 				err := adapter.Create(StoreNode{Key: "/dir/foo", Value: []byte("some value")})
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				newNode := StoreNode{Key: "/dir", Value: []byte("some value")}
 
 				err = adapter.CompareAndSwapByIndex(4271338, newNode)
-				Ω(err).Should(Equal(ErrorNodeIsDirectory))
+				Expect(err).To(Equal(ErrorNodeIsDirectory))
 			})
 		})
 	})
@@ -1215,7 +1226,7 @@ var _ = Describe("ETCD Store Adapter", func() {
 				Expect(event.Type).To(Equal(CreateEvent))
 				Expect(event.Node.Key).To(Equal("/foo/a"))
 
-				Ω(<-errChan).Should(Equal(ErrorTimeout))
+				Expect(<-errChan).To(HaveOccurred())
 
 				close(done)
 			}, 5)

@@ -3,14 +3,19 @@ package main_test
 import (
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/ginkgomon"
 
+	"github.com/cloudfoundry-incubator/routing-api/cmd/routing-api/testrunner"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Routes API", func() {
+	var routingAPIProcess ifrit.Process
+
 	BeforeEach(func() {
+		routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
 		routingAPIProcess = ginkgomon.Invoke(routingAPIRunner)
 	})
 
@@ -43,14 +48,18 @@ var _ = Describe("Routes API", func() {
 		})
 
 		It("returns an eventstream", func() {
+			expectedEvent := routing_api.Event{
+				Action: "Upsert",
+				Route:  route1,
+			}
 			routesToInsert := []db.Route{route1}
 			client.UpsertRoutes(routesToInsert)
 
-			event, err := eventStream.Next()
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(event.Action).To(Equal("Upsert"))
-			Expect(event.Route).To(Equal(route1))
+			Eventually(func() routing_api.Event {
+				event, err := eventStream.Next()
+				Expect(err).NotTo(HaveOccurred())
+				return event
+			}).Should(Equal(expectedEvent))
 		})
 
 		It("gets events for updated routes", func() {
@@ -63,29 +72,33 @@ var _ = Describe("Routes API", func() {
 			}
 
 			client.UpsertRoutes([]db.Route{route1})
-			event1, err := eventStream.Next()
-			Expect(err).ToNot(HaveOccurred())
-			Expect(event1.Route).To(Equal(route1))
+			Eventually(func() db.Route {
+				event, err := eventStream.Next()
+				Expect(err).NotTo(HaveOccurred())
+				return event.Route
+			}).Should(Equal(route1))
 
 			client.UpsertRoutes([]db.Route{routeUpdated})
-			event2, err := eventStream.Next()
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(event2.Action).To(Equal("Upsert"))
-			Expect(event2.Route).To(Equal(routeUpdated))
+			Eventually(func() db.Route {
+				event, err := eventStream.Next()
+				Expect(err).NotTo(HaveOccurred())
+				return event.Route
+			}).Should(Equal(routeUpdated))
 		})
 
 		It("gets events for deleted routes", func() {
 			client.UpsertRoutes([]db.Route{route1})
-			_, err := eventStream.Next()
-			Expect(err).ToNot(HaveOccurred())
 
+			expectedEvent := routing_api.Event{
+				Action: "Delete",
+				Route:  route1,
+			}
 			client.DeleteRoutes([]db.Route{route1})
-			event, err := eventStream.Next()
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(event.Action).To(Equal("Delete"))
-			Expect(event.Route).To(Equal(route1))
+			Eventually(func() routing_api.Event {
+				event, err := eventStream.Next()
+				Expect(err).NotTo(HaveOccurred())
+				return event
+			}).Should(Equal(expectedEvent))
 		})
 
 		It("gets events for expired routes", func() {
@@ -98,14 +111,17 @@ var _ = Describe("Routes API", func() {
 			}
 
 			client.UpsertRoutes([]db.Route{routeExpire})
-			_, err := eventStream.Next()
-			Expect(err).ToNot(HaveOccurred())
 
-			event, err := eventStream.Next()
+			expectedEvent := routing_api.Event{
+				Action: "Delete",
+				Route:  routeExpire,
+			}
 
-			Expect(err).ToNot(HaveOccurred())
-			Expect(event.Action).To(Equal("Delete"))
-			Expect(event.Route).To(Equal(routeExpire))
+			Eventually(func() routing_api.Event {
+				event, err := eventStream.Next()
+				Expect(err).NotTo(HaveOccurred())
+				return event
+			}).Should(Equal(expectedEvent))
 		})
 	})
 })

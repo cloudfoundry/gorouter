@@ -1,4 +1,4 @@
-package metricbatcher_test
+package trace_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestMetricBatcher(t *testing.T) {
+func TestTrace(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "MetricBatcher Suite")
+	RunSpecs(t, "Trace Suite")
 }

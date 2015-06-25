@@ -1,78 +1,147 @@
 package workpool
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+)
 
-type AroundWork interface {
-	Around(func())
-}
-
-type AroundWorkFunc func(work func())
-
-func (f AroundWorkFunc) Around(work func()) {
-	f(work)
-}
+const waitTimeout = 5 * time.Second
 
 type WorkPool struct {
-	workChan chan func()
-	stopped  chan struct{}
-	around   AroundWork
-	wg       *sync.WaitGroup
+	workQueue chan func()
+	stopping  chan struct{}
+	stopped   int32
+
+	mutex       sync.Mutex
+	maxWorkers  int
+	numWorkers  int
+	idleWorkers int
 }
 
-var DefaultAround = AroundWorkFunc(func(work func()) {
-	work()
-})
+func NewWorkPool(maxWorkers int) (*WorkPool, error) {
+	if maxWorkers < 1 {
+		return nil, fmt.Errorf("must provide positive maxWorkers; provided %d", maxWorkers)
+	}
 
-func NewWorkPool(workers int) *WorkPool {
-	// Pending = 1 to provide a weak FIFO guarantee
-	return New(workers, 1, AroundWorkFunc(DefaultAround))
+	return newWorkPoolWithPending(maxWorkers, 0), nil
 }
 
-func New(workers, pending int, aroundWork AroundWork) *WorkPool {
-	workChan := make(chan func(), pending)
-	wg := new(sync.WaitGroup)
-
-	w := &WorkPool{
-		workChan: workChan,
-		stopped:  make(chan struct{}),
-		around:   aroundWork,
-		wg:       wg,
+func newWorkPoolWithPending(maxWorkers, pending int) *WorkPool {
+	return &WorkPool{
+		workQueue:  make(chan func(), maxWorkers+pending),
+		stopping:   make(chan struct{}),
+		maxWorkers: maxWorkers,
 	}
-
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go worker(workChan, w)
-	}
-
-	return w
 }
 
 func (w *WorkPool) Submit(work func()) {
+	if atomic.LoadInt32(&w.stopped) == 1 {
+		return
+	}
+
 	select {
-	case <-w.stopped:
-	case w.workChan <- work:
+	case w.workQueue <- work:
+		if atomic.LoadInt32(&w.stopped) == 1 {
+			w.drain()
+		} else {
+			w.addWorker()
+		}
+	case <-w.stopping:
 	}
 }
 
 func (w *WorkPool) Stop() {
-	select {
-	case <-w.stopped:
-	default:
-		close(w.stopped)
+	if atomic.CompareAndSwapInt32(&w.stopped, 0, 1) {
+		close(w.stopping)
+		w.drain()
 	}
-
-	w.wg.Wait()
 }
 
-func worker(workChan chan func(), w *WorkPool) {
-	defer w.wg.Done()
+func (w *WorkPool) addWorker() bool {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
 
+	if w.idleWorkers > 0 || w.numWorkers == w.maxWorkers {
+		return false
+	}
+
+	w.numWorkers++
+	go worker(w)
+	return true
+}
+
+func (w *WorkPool) workerStopping(force bool) bool {
+	w.mutex.Lock()
+	if !force {
+		if len(w.workQueue) < w.numWorkers {
+			w.mutex.Unlock()
+			return false
+		}
+	}
+
+	w.numWorkers--
+	w.mutex.Unlock()
+
+	return true
+}
+
+func (w *WorkPool) drain() {
 	for {
 		select {
-		case <-w.stopped:
+		case <-w.workQueue:
+		default:
 			return
-		case work := <-w.workChan:
-			w.around.Around(work)
+		}
+	}
+}
+
+func worker(w *WorkPool) {
+	timer := time.NewTimer(waitTimeout)
+	defer timer.Stop()
+
+	for {
+		if atomic.LoadInt32(&w.stopped) == 1 {
+			w.workerStopping(true)
+			return
+		}
+
+		select {
+		case <-timer.C:
+			if w.workerStopping(false) {
+				return
+			}
+			timer.Reset(waitTimeout)
+
+		case <-w.stopping:
+			w.workerStopping(true)
+			return
+
+		case work := <-w.workQueue:
+			timer.Stop()
+
+			w.mutex.Lock()
+			w.idleWorkers--
+			w.mutex.Unlock()
+
+		NOWORK:
+			for {
+				work()
+				select {
+				case work = <-w.workQueue:
+				case <-w.stopping:
+					break NOWORK
+				default:
+					break NOWORK
+				}
+			}
+
+			w.mutex.Lock()
+			w.idleWorkers++
+			w.mutex.Unlock()
+
+			timer.Reset(waitTimeout)
 		}
 	}
 }

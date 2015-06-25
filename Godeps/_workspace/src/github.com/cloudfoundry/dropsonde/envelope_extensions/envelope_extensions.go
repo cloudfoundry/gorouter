@@ -3,7 +3,6 @@ package envelope_extensions
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/cloudfoundry/dropsonde/events"
 )
 

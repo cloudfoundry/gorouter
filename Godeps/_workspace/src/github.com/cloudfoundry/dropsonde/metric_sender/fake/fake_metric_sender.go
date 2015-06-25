@@ -84,12 +84,3 @@ func (fms *FakeMetricSender) GetContainerMetric(applicationId string) ContainerM
 
 	return fms.containerMetrics[applicationId]
 }
-
-func (fms *FakeMetricSender) Reset() {
-	fms.Lock()
-	defer fms.Unlock()
-
-	fms.counters = make(map[string]uint64)
-	fms.values = make(map[string]Metric)
-	fms.containerMetrics = make(map[string]ContainerMetric)
-}

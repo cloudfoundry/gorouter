@@ -1,4 +1,4 @@
-// Copyright 2012 Apcera Inc. All rights reserved.
+// Copyright 2012-2014 Apcera Inc. All rights reserved.
 
 package nats
 
@@ -14,6 +14,24 @@ func NewEConn(t *testing.T) *EncodedConn {
 		t.Fatalf("Failed to create an encoded connection: %v\n", err)
 	}
 	return ec
+}
+
+func TestConstructorErrs(t *testing.T) {
+	c := newConnection(t)
+	_, err := NewEncodedConn(nil, "default")
+	if err == nil {
+		t.Fatal("Expected err for nil connection")
+	}
+	_, err = NewEncodedConn(c, "foo22")
+	if err == nil {
+		t.Fatal("Expected err for bad encoder")
+	}
+	c.Close()
+	_, err = NewEncodedConn(c, "default")
+	if err == nil {
+		t.Fatal("Expected err for closed connection")
+	}
+
 }
 
 func TestMarshalString(t *testing.T) {
@@ -248,6 +266,38 @@ func TestExtendedSubscribeCB2(t *testing.T) {
 	}
 }
 
+func TestRawMsgSubscribeCB(t *testing.T) {
+	ec := NewEConn(t)
+	defer ec.Close()
+
+	ch := make(chan bool)
+
+	testString := "Hello World!"
+	oSubj := "cb_args"
+	oReply := "foobar"
+
+	ec.Subscribe(oSubj, func(m *Msg) {
+		s := string(m.Data)
+		if s != testString {
+			t.Fatalf("Received test string of '%s', wanted '%s'\n", s, testString)
+		}
+		if m.Subject != oSubj {
+			t.Fatalf("Received subject of '%s', wanted '%s'\n", m.Subject, oSubj)
+		}
+		if m.Reply != oReply {
+			t.Fatalf("Received reply of '%s', wanted '%s'\n", m.Reply, oReply)
+		}
+		ch <- true
+	})
+	ec.PublishRequest(oSubj, oReply, testString)
+	if e := wait(ch); e != nil {
+		if ec.LastError() != nil {
+			e = ec.LastError()
+		}
+		t.Fatalf("Did not receive the message: %s", e)
+	}
+}
+
 func TestEncRequest(t *testing.T) {
 	ec := NewEConn(t)
 	defer ec.Close()
@@ -300,5 +350,26 @@ func TestAsyncMarshalErr(t *testing.T) {
 	ec.Publish(subject, testString)
 	if e := wait(ch); e != nil {
 		t.Fatalf("Did not receive the message: %s", e)
+	}
+}
+
+func TestEncodeNil(t *testing.T) {
+	de := &DefaultEncoder{}
+	_, err := de.Encode("foo", nil)
+	if err != nil {
+		t.Fatalf("Expected no error encoding nil: %v", err)
+	}
+}
+
+func TestDecodeDefault(t *testing.T) {
+	de := &DefaultEncoder{}
+	b, err := de.Encode("foo", 22)
+	if err != nil {
+		t.Fatalf("Expected no error encoding number: %v", err)
+	}
+	var c chan bool
+	err = de.Decode("foo", b, &c)
+	if err == nil {
+		t.Fatalf("Expected an error decoding")
 	}
 }

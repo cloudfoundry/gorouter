@@ -1,6 +1,7 @@
 package etcdstoreadapter
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -8,11 +9,10 @@ import (
 	"github.com/cloudfoundry/gunk/workpool"
 	"github.com/cloudfoundry/storeadapter"
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 type ETCDStoreAdapter struct {
-	urls              []string
 	client            *etcd.Client
 	workPool          *workpool.WorkPool
 	inflightWatches   map[chan bool]bool
@@ -20,8 +20,11 @@ type ETCDStoreAdapter struct {
 }
 
 func NewETCDStoreAdapter(urls []string, workPool *workpool.WorkPool) *ETCDStoreAdapter {
+	client := etcd.NewClient(urls)
+	client.SetConsistency(etcd.STRONG_CONSISTENCY)
+
 	return &ETCDStoreAdapter{
-		urls:              urls,
+		client:            client,
 		workPool:          workPool,
 		inflightWatches:   map[chan bool]bool{},
 		inflightWatchLock: &sync.Mutex{},
@@ -29,7 +32,9 @@ func NewETCDStoreAdapter(urls []string, workPool *workpool.WorkPool) *ETCDStoreA
 }
 
 func (adapter *ETCDStoreAdapter) Connect() error {
-	adapter.client = etcd.NewClient(adapter.urls)
+	if !adapter.client.SyncCluster() {
+		return errors.New("sync cluster failed")
+	}
 
 	return nil
 }

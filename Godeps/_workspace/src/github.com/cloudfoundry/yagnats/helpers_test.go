@@ -12,11 +12,17 @@ import (
 )
 
 type FakeConnectionProvider struct {
-	ReadBuffer  string
-	WriteBuffer []byte
+	ReadBuffer   string
+	WriteBuffer  []byte
+	ReturnsError bool
 }
 
 func (c *FakeConnectionProvider) ProvideConnection() (*Connection, error) {
+	if c.ReturnsError {
+		err := errors.New("error on dialing")
+		return nil, err
+	}
+
 	connection := NewConnection("", "", "")
 
 	connection.conn = &fakeConn{

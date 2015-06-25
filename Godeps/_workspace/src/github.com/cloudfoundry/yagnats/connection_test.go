@@ -141,39 +141,60 @@ func (s *CSuite) TestConnectionOnMessageCallback(c *C) {
 	}
 }
 
-func (s *CSuite) TestConnectionClusterReconnectsToRandomNode(c *C) {
+func (s *CSuite) TestConnectionClusterReconnectsAnother(c *C) {
 	hellos := 0
+	thanks := 0
 	goodbyes := 0
+	errs := 0
 
-	for i := 0; i < 100; i++ {
-		node1 := &FakeConnectionProvider{
-			ReadBuffer:  "+OK\r\nMSG foo 1 5\r\nhello\r\n",
-			WriteBuffer: []byte{},
-		}
-
-		node2 := &FakeConnectionProvider{
-			ReadBuffer:  "+OK\r\nMSG foo 1 7\r\ngoodbye\r\n",
-			WriteBuffer: []byte{},
-		}
-
-		cluster := &ConnectionCluster{[]ConnectionProvider{node1, node2}}
-
-		conn, err := cluster.ProvideConnection()
-		c.Assert(err, IsNil)
-
-		conn.OnMessage(func(msg *MsgPacket) {
-			if string(msg.Payload) == "hello" {
-				hellos += 1
-			}
-
-			if string(msg.Payload) == "goodbye" {
-				goodbyes += 1
-			}
-		})
-
-		conn.ErrOrOK()
+	nodes := [](*FakeConnectionProvider){
+		&FakeConnectionProvider{
+			ReadBuffer:   "+OK\r\nMSG foo 1 5\r\nhello\r\n",
+			WriteBuffer:  []byte{},
+			ReturnsError: false,
+		},
+		&FakeConnectionProvider{
+			ReadBuffer:   "+OK\r\nMSG foo 1 5\r\nthank\r\n",
+			WriteBuffer:  []byte{},
+			ReturnsError: false,
+		},
+		&FakeConnectionProvider{
+			ReadBuffer:   "+OK\r\nMSG foo 1 7\r\ngoodbye\r\n",
+			WriteBuffer:  []byte{},
+			ReturnsError: false,
+		},
 	}
 
-	c.Assert(hellos, Not(Equals), 0)
-	c.Assert(goodbyes, Not(Equals), 0)
+	for i := 0; i < 4; i++ {
+		if i > 0 {
+			nodes[i-1].ReturnsError = true
+		}
+
+		cluster := &ConnectionCluster{[]ConnectionProvider{nodes[0], nodes[1], nodes[2]}}
+
+		conn, err := cluster.ProvideConnection()
+		if err != nil {
+			c.Assert(err.Error(), Equals, "error on dialing")
+			errs += 1
+		} else {
+			conn.OnMessage(func(msg *MsgPacket) {
+				if string(msg.Payload) == "hello" {
+					hellos += 1
+				}
+				if string(msg.Payload) == "thank" {
+					thanks += 1
+				}
+				if string(msg.Payload) == "goodbye" {
+					goodbyes += 1
+				}
+			})
+
+			conn.ErrOrOK()
+		}
+	}
+
+	c.Assert(hellos, Equals, 1)
+	c.Assert(thanks, Equals, 1)
+	c.Assert(goodbyes, Equals, 1)
+	c.Assert(errs, Equals, 1)
 }

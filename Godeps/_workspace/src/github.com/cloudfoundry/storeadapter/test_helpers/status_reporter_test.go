@@ -19,7 +19,7 @@ var _ = Describe("StatusReporter", func() {
 	Describe("Reporting", func() {
 		Context("when no status has been reported", func() {
 			It("returns false", func() {
-				Ω(statusReporter.Reporting()).Should(BeFalse())
+				Expect(statusReporter.Reporting()).To(BeFalse())
 			})
 		})
 

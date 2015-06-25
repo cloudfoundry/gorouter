@@ -5,7 +5,6 @@ import (
 	"github.com/cloudfoundry/dropsonde/logs"
 
 	"errors"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

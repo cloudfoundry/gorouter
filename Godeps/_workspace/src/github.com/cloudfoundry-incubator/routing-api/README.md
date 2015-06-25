@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/cloudfoundry-incubator/routing-api.svg)](https://travis-ci.org/cloudfoundry-incubator/routing-api)
+
 # CF Routing API
 
 ## Installing this Repo
@@ -27,23 +29,23 @@ go get github.com/cloudfoundry-incubator/routing-api/cmd/routing-api
 
 #### etcd
 
-To run the tests you need a running etcd cluster on version 0.4.6. To get that do:
+To run the tests you need a running etcd cluster on version 2.0.1. To get that do:
 
 ```sh
 go get github.com/coreos/etcd
 cd $GOPATH/src/github.com/coreos/etcd
 git fetch --tags
-git checkout v0.4.6
+git checkout v2.0.1
 go install .
 ```
 
 Once installed, you can run etcd with the command `etcd` and you should see the
-following output:
+output contain the following lines:
 ```
-   | Using the directory majestic.etcd as the etcd curation directory because a directory was not specified.
-   | majestic is starting a new cluster
-   | etcd server [name majestic, listen on :4001, advertised url http://127.0.0.1:4001]   <-- default location of the etcd server
-   | peer server [name majestic, listen on :7001, advertised url http://127.0.0.1:7001]
+   | etcd: listening for peers on http://localhost:2380
+   | etcd: listening for peers on http://localhost:7001
+   | etcd: listening for client requests on http://localhost:2379
+   | etcd: listening for client requests on http://localhost:4001
 ```
 
 Note that this will run an etcd server and create a new directory at that location 
@@ -55,9 +57,13 @@ you can simply run etcd in a temporary directory.
 To easily generate a token with the `route.advertise` scope, you will need to
 install the `uaac` CLI tool (`gem install cf-uaac`) and follow these steps:
 
+- Get the admin client token
 ```bash
 uaac target uaa.10.244.0.34.xip.io
 uaac token client get admin # You will need to provide the client_secret, found in your CF manifest.
+```
+- Generate the route client and retrieve its token
+```bash
 uaac client add route --authorities "route.advertise" --authorized_grant_type "client_credentials"
 uaac token client get route
 uaac context
@@ -65,6 +71,16 @@ uaac context
 
 The last command will show you the client's token, which can then be used to
 curl the Routing API as a Authorization header.
+
+In order to generate a token for the `route.admin` scope, you will need to follow these steps:
+
+- Get the admin client token
+- Generate the route admin client and retrieve its token
+```
+uaac client add route-admin --authorities "route.admin" --authorized_grant_type "client_credentials"
+uaac token client get route-admin
+uaac context
+```
 
 ## API Server Configuration
 
@@ -139,6 +155,16 @@ To delete a route:
 
 ```sh
 curl -vvv -H "Authorization: bearer [token with uaa route.advertise scope]" -X DELETE http://127.0.0.1:8080/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45}]'
+```
+
+To list advertised routes:
+```sh
+curl -vvv -H "Authorization: bearer [token with uaa route.admin scope]" http://127.0.0.1:8080/v1/routes
+```
+
+To subscribe to route changes:
+```sh
+curl -vvv -H "Authorization: bearer [token with uaa route.admin scope]" http://127.0.0.1:8080/v1/events
 ```
 
 ## Known issues

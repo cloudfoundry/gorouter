@@ -31,12 +31,12 @@ func newTestRequest(body interface{}) *http.Request {
 		reader = bytes.NewReader(body)
 	default:
 		jsonBytes, err := json.Marshal(body)
-		Ω(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		reader = bytes.NewReader(jsonBytes)
 	}
 
 	request, err := http.NewRequest("", "", reader)
-	Ω(err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	return request
 }
 
@@ -273,7 +273,7 @@ var _ = Describe("RoutesHandler", func() {
 
 			Context("when the database deletion fails", func() {
 				It("returns a 204 if the key was not found", func() {
-					database.DeleteRouteReturns(errors.New("Key not found"))
+					database.DeleteRouteReturns(db.DBError{Type: db.KeyNotFound, Message: "The specified route could not be found."})
 
 					request = newTestRequest(route)
 					routesHandler.Delete(responseRecorder, request)
@@ -365,6 +365,16 @@ var _ = Describe("RoutesHandler", func() {
 					Expect(database.SaveRouteArgsForCall(1)).To(Equal(route[1]))
 				})
 
+				It("accepts route_service_url parameters", func() {
+					route[0].RouteServiceUrl = "https://my-rs.com"
+					request = newTestRequest(route)
+					routesHandler.Upsert(responseRecorder, request)
+
+					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
+					Expect(database.SaveRouteCallCount()).To(Equal(1))
+					Expect(database.SaveRouteArgsForCall(0)).To(Equal(route[0]))
+				})
+
 				It("logs the route declaration", func() {
 					request = newTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
@@ -380,6 +390,15 @@ var _ = Describe("RoutesHandler", func() {
 
 					Expect(logger.Logs()[0].Message).To(ContainSubstring("request"))
 					Expect(logger.Logs()[0].Data["route_creation"]).To(Equal(log_data["route_creation"]))
+				})
+
+				It("does not require route_service_url on the request", func() {
+					route[0].RouteServiceUrl = ""
+
+					request = newTestRequest(route)
+					routesHandler.Upsert(responseRecorder, request)
+
+					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
 				})
 
 				It("does not require log guid on the request", func() {
@@ -419,6 +438,15 @@ var _ = Describe("RoutesHandler", func() {
 			Context("when there are errors with the input", func() {
 				BeforeEach(func() {
 					validator.ValidateCreateReturns(&routing_api.Error{"a type", "error message"})
+				})
+
+				It("blows up when a port does not fit into a uint16", func() {
+					json := `[{"route":"my-route.com","ip":"1.2.3.4", "port":65537}]`
+					request = newTestRequest(json)
+					routesHandler.Upsert(responseRecorder, request)
+
+					Expect(responseRecorder.Code).To(Equal(http.StatusBadRequest))
+					Expect(responseRecorder.Body.String()).To(ContainSubstring("cannot unmarshal number 65537 into Go value of type uint16"))
 				})
 
 				It("does not write to the key-value store backend", func() {

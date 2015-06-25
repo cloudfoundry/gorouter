@@ -1,5 +1,9 @@
+log_guid: "my_logs"
 uaa_verification_key: "-----BEGIN PUBLIC KEY-----
 
       not a key
 
       -----END PUBLIC KEY-----"
+metron_config:
+  address: "1.2.3.4"
+  port: "4567"

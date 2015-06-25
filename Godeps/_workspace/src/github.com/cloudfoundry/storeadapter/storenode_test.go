@@ -28,24 +28,25 @@ var _ = Describe("Storenode", func() {
 	Describe("Lookup", func() {
 		It("should do a depth=1 search for children with childKey", func() {
 			node, found := cage.Lookup("baby")
-			Ω(node).Should(Equal(gorillaBaby))
-			Ω(found).Should(BeTrue())
+			Expect(node).To(Equal(gorillaBaby))
+			Expect(found).To(BeTrue())
 		})
 
 		Context("when there is no child that matches", func() {
 			It("should return zero value and false", func() {
 				node, found := cage.Lookup("babe E.")
-				Ω(node).Should(BeZero())
-				Ω(found).Should(BeFalse())
+				Expect(node).To(BeZero())
+				Expect(found).To(BeFalse())
 			})
 		})
 	})
 
 	Describe("KeyComponents", func() {
 		It("returns the path segments of the key", func() {
-			Ω(gorillaBaby.KeyComponents()).Should(Equal([]string{
+			Expect(gorillaBaby.KeyComponents()).To(Equal([]string{
 				"zoo", "apes", "gorillas", "baby",
 			}))
+
 		})
 	})
 })

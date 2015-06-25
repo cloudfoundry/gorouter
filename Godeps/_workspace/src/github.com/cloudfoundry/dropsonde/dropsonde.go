@@ -15,10 +15,6 @@ package dropsonde
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/instrumented_handler"
@@ -26,18 +22,19 @@ import (
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
-	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/dropsonde/runtime_stats"
 	"github.com/cloudfoundry/gosteno"
+	"net/http"
+	"strings"
+	"time"
 )
 
 var autowiredEmitter emitter.EventEmitter
 
 const (
-	statsInterval        = 10 * time.Second
-	defaultBatchInterval = 5 * time.Second
-	originDelimiter      = "/"
+	statsInterval   = 10 * time.Second
+	originDelimiter = "/"
 )
 
 func init() {
@@ -91,9 +88,7 @@ func InstrumentedRoundTripper(roundTripper http.RoundTripper) http.RoundTripper 
 }
 
 func initialize() {
-	sender := metric_sender.NewMetricSender(AutowiredEmitter())
-	batcher := metricbatcher.New(sender, defaultBatchInterval)
-	metrics.Initialize(sender, batcher)
+	metrics.Initialize(metric_sender.NewMetricSender(AutowiredEmitter()))
 	logs.Initialize(log_sender.NewLogSender(AutowiredEmitter(), statsInterval, gosteno.NewLogger("dropsonde/logs")))
 	go runtime_stats.NewRuntimeStats(autowiredEmitter, statsInterval).Run(nil)
 	http.DefaultTransport = InstrumentedRoundTripper(http.DefaultTransport)

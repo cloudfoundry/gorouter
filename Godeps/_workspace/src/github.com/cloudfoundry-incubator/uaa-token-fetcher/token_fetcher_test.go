@@ -9,6 +9,9 @@ import (
 
 	. "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 
+	"bytes"
+
+	trace "github.com/cloudfoundry-incubator/trace-logger"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -116,6 +119,29 @@ var _ = Describe("TokenFetcher", func() {
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 			Expect(token.AccessToken).To(Equal("the token"))
 			Expect(token.ExpireTime).To(Equal(20))
+		})
+
+		It("logs requests and responses", func() {
+			stdout := bytes.NewBuffer([]byte{})
+			trace.SetStdout(stdout)
+			trace.NewLogger("true")
+
+			server.AppendHandlers(
+				ghttp.RespondWith(http.StatusBadRequest, "you messed up"),
+			)
+
+			fetcher := NewTokenFetcher(cfg)
+			_, err := fetcher.FetchToken()
+			Expect(err).To(HaveOccurred())
+
+			r, err := ioutil.ReadAll(stdout)
+			log := string(r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(log).To(ContainSubstring("REQUEST: "))
+			Expect(log).To(ContainSubstring("POST /oauth/token HTTP/1.1"))
+
+			Expect(log).To(ContainSubstring("RESPONSE: "))
+			Expect(log).To(ContainSubstring("HTTP/1.1 400 Bad Request"))
 		})
 	})
 })

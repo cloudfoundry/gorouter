@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e -u -x
+
+go install -v github.com/onsi/ginkgo/ginkgo
+
+FIRST_GOPATH=$(echo $GOPATH | cut -d':' -f1)
+pushd $FIRST_GOPATH/src
+  mkdir -p github.com/coreos
+  cd github.com/coreos
+  git clone https://github.com/coreos/etcd
+  cd etcd
+  git checkout tags/v2.0.1
+  go install
+popd

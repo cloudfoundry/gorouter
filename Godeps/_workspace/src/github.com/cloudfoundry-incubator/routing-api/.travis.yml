@@ -1,0 +1,16 @@
+language: go
+go:
+  - 1.4
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+before_script:
+  - ./bin/install_dependencies
+
+script:
+  - ./bin/test
+
+sudo: false

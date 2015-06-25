@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -e -u -x
+
+ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"

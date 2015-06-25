@@ -22,8 +22,10 @@ func Invoke(runner ifrit.Runner) ifrit.Process {
 }
 
 func Interrupt(process ifrit.Process, intervals ...interface{}) {
-	process.Signal(os.Interrupt)
-	Eventually(process.Wait(), intervals...).Should(Receive(), "interrupted ginkgomon process failed to exit in time")
+	if process != nil {
+		process.Signal(os.Interrupt)
+		Eventually(process.Wait(), intervals...).Should(Receive(), "interrupted ginkgomon process failed to exit in time")
+	}
 }
 
 func Kill(process ifrit.Process, intervals ...interface{}) {

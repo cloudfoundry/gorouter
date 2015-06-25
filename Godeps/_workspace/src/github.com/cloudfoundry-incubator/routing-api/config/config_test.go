@@ -1,6 +1,8 @@
 package config_test
 
 import (
+	"time"
+
 	"github.com/cloudfoundry-incubator/routing-api/config"
 
 	. "github.com/onsi/ginkgo"
@@ -18,7 +20,10 @@ var _ = Describe("Config", func() {
 				Expect(cfg.LogGuid).To(Equal("my_logs"))
 				Expect(cfg.MetronConfig.Address).To(Equal("1.2.3.4"))
 				Expect(cfg.MetronConfig.Port).To(Equal("4567"))
-
+				Expect(cfg.DebugAddress).To(Equal("1.2.3.4:1234"))
+				Expect(cfg.MaxConcurrentETCDRequests).To(Equal((uint)(10)))
+				Expect(cfg.UAAPublicKey).To(ContainSubstring("-----BEGIN PUBLIC KEY-----"))
+				Expect(cfg.StatsdClientFlushInterval).To(Equal(10 * time.Millisecond))
 			})
 		})
 
@@ -41,25 +46,31 @@ var _ = Describe("Config", func() {
 			cfg = &config.Config{}
 		})
 
-		Context("With a proper yml file", func() {
-			test_config := `uaa_verification_key: "public_key"
-log_guid: "some-guid"`
-
-			It("sets the UaaPublicKey", func() {
-				err := cfg.Initialize([]byte(test_config))
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(cfg.UAAPublicKey).To(Equal("public_key"))
-			})
-		})
-
 		Context("when there are errors in the yml file", func() {
-			test_config := `
-uaa:
-`
-			It("errors if no UaaPublicKey is found", func() {
-				err := cfg.Initialize([]byte(test_config))
-				Expect(err).To(HaveOccurred())
+			var test_config string
+			Context("UAA errors", func() {
+				BeforeEach(func() {
+					test_config = `
+					uaa:`
+				})
+
+				It("errors if no UaaPublicKey is found", func() {
+					err := cfg.Initialize([]byte(test_config))
+					Expect(err).To(HaveOccurred())
+				})
+			})
+
+			Context("MaxConcurrentETCDRequests errors", func() {
+				BeforeEach(func() {
+					test_config = `uaa_verification_key: "public_key"
+log_guid: "some-guid"
+max_concurrent_etcd_requests: '-1'`
+				})
+
+				It("errors if max concurrent requests is negative", func() {
+					err := cfg.Initialize([]byte(test_config))
+					Expect(err).To(HaveOccurred())
+				})
 			})
 		})
 	})

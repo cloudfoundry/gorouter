@@ -7,22 +7,27 @@ import (
 
 	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/metrics"
 	"github.com/cloudfoundry/storeadapter"
 	"github.com/pivotal-golang/lager"
 	"github.com/vito/go-sse/sse"
 )
 
 type EventStreamHandler struct {
-	token  authentication.Token
-	db     db.DB
-	logger lager.Logger
+	token    authentication.Token
+	db       db.DB
+	logger   lager.Logger
+	stats    metrics.PartialStatsdClient
+	stopChan <-chan struct{}
 }
 
-func NewEventStreamHandler(token authentication.Token, database db.DB, logger lager.Logger) *EventStreamHandler {
+func NewEventStreamHandler(token authentication.Token, database db.DB, logger lager.Logger, stats metrics.PartialStatsdClient, stopChan <-chan struct{}) *EventStreamHandler {
 	return &EventStreamHandler{
-		token:  token,
-		db:     database,
-		logger: logger,
+		token:    token,
+		db:       database,
+		logger:   logger,
+		stats:    stats,
+		stopChan: stopChan,
 	}
 }
 
@@ -37,7 +42,10 @@ func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Reques
 	flusher := w.(http.Flusher)
 	closeNotifier := w.(http.CloseNotifier).CloseNotify()
 
-	resultChan, _, _ := h.db.WatchRouteChanges()
+	resultChan, cancelChan, errChan := h.db.WatchRouteChanges()
+
+	h.stats.GaugeDelta("total_subscriptions", 1, 1.0)
+	defer h.stats.GaugeDelta("total_subscriptions", -1, 1.0)
 
 	w.Header().Add("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -60,8 +68,12 @@ func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Reques
 			switch eventType {
 			case "Delete":
 				nodeValue = event.PrevNode.Value
-			case "Upsert":
+			case "Create":
 				nodeValue = event.Node.Value
+				eventType = "Upsert"
+			case "Update":
+				nodeValue = event.Node.Value
+				eventType = "Upsert"
 			}
 
 			err = sse.Event{
@@ -77,7 +89,15 @@ func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Reques
 			flusher.Flush()
 
 			eventID++
+		case err := <-errChan:
+			log.Error("watch-error", err)
+			return
+		case <-h.stopChan:
+			log.Info("event-stream-stopped")
+			cancelChan <- true
+			return
 		case <-closeNotifier:
+			log.Info("connection-closed")
 			return
 		}
 	}
@@ -87,8 +107,10 @@ func stringifyEventType(eventType storeadapter.EventType) (string, error) {
 	switch eventType {
 	case storeadapter.InvalidEvent:
 		return "Invalid", nil
-	case storeadapter.CreateEvent, storeadapter.UpdateEvent:
-		return "Upsert", nil
+	case storeadapter.CreateEvent:
+		return "Create", nil
+	case storeadapter.UpdateEvent:
+		return "Update", nil
 	case storeadapter.DeleteEvent, storeadapter.ExpireEvent:
 		return "Delete", nil
 	default:

@@ -16,16 +16,14 @@
 package dropsonde_unmarshaller
 
 import (
-	"sync"
-	"sync/atomic"
-	"unicode"
-
 	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gogo/protobuf/proto"
+	"sync"
+	"sync/atomic"
+	"unicode"
 )
 
 // A DropsondeUnmarshaller is an self-instrumenting tool for converting Protocol
@@ -78,7 +76,6 @@ func (u *dropsondeUnmarshaller) UnmarshallMessage(message []byte) (*events.Envel
 	err := proto.Unmarshal(message, envelope)
 	if err != nil {
 		u.logger.Debugf("dropsondeUnmarshaller: unmarshal error %v for message %v", err, message)
-		metrics.BatchIncrementCounter("dropsondeUnmarshaller.unmarshalErrors")
 		incrementCount(&u.unmarshalErrorCount)
 		return nil, err
 	}
@@ -95,8 +92,6 @@ func (u *dropsondeUnmarshaller) UnmarshallMessage(message []byte) (*events.Envel
 }
 
 func (u *dropsondeUnmarshaller) incrementLogMessageReceiveCount(appID string) {
-	metrics.BatchIncrementCounter("dropsondeUnmarshaller.logMessageTotal")
-
 	_, ok := u.logMessageReceiveCounts[appID]
 	if ok == false {
 		var count uint64
@@ -109,12 +104,6 @@ func (u *dropsondeUnmarshaller) incrementLogMessageReceiveCount(appID string) {
 }
 
 func (u *dropsondeUnmarshaller) incrementReceiveCount(eventType events.Envelope_EventType) {
-	modifiedEventName := []rune(eventType.String())
-	modifiedEventName[0] = unicode.ToLower(modifiedEventName[0])
-	metricName := string(modifiedEventName) + "Received"
-
-	metrics.BatchIncrementCounter("dropsondeUnmarshaller." + metricName)
-
 	incrementCount(u.receiveCounts[eventType])
 }
 
@@ -126,9 +115,15 @@ func (u *dropsondeUnmarshaller) metrics() []instrumentation.Metric {
 	var metrics []instrumentation.Metric
 
 	u.RLock()
+	for appID, count := range u.logMessageReceiveCounts {
+		metricValue := atomic.LoadUint64(count)
+		tags := make(map[string]interface{})
+		tags["appId"] = appID
+		metrics = append(metrics, instrumentation.Metric{Name: "logMessageReceived", Value: metricValue, Tags: tags})
+	}
 
 	metricValue := atomic.LoadUint64(u.receiveCounts[events.Envelope_LogMessage])
-	metrics = append(metrics, instrumentation.Metric{Name: logMessageTotal, Value: metricValue})
+	metrics = append(metrics, instrumentation.Metric{Name: "logMessageTotal", Value: metricValue})
 
 	u.RUnlock()
 
@@ -144,7 +139,7 @@ func (u *dropsondeUnmarshaller) metrics() []instrumentation.Metric {
 	}
 
 	metrics = append(metrics, instrumentation.Metric{
-		Name:  unmarshalErrors,
+		Name:  "unmarshalErrors",
 		Value: atomic.LoadUint64(&u.unmarshalErrorCount),
 	})
 

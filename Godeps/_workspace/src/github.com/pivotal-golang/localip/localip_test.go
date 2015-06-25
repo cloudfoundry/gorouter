@@ -13,19 +13,19 @@ var _ = Describe("Localip", func() {
 	Describe("LocalIP", func() {
 		It("returns a local IP", func() {
 			ip, err := localip.LocalIP()
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			// http://golang.org/pkg/net/#ParseIP
 			// If s is not a valid textual representation of an IP address, ParseIP returns nil.
-			Ω(net.ParseIP(ip)).ShouldNot(BeNil())
+			Expect(net.ParseIP(ip)).NotTo(BeNil())
 		})
 	})
 
 	Describe("LocalPort", func() {
 		It("returns a local port", func() {
 			port, err := localip.LocalPort()
-			Ω(err).ShouldNot(HaveOccurred())
-			Ω(port).Should(BeNumerically(">", 0))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(port).To(BeNumerically(">", 0))
 		})
 	})
 })

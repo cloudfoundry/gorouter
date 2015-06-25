@@ -1,20 +1,18 @@
 package logemitter_test
 
 import (
-	"log"
-	"os"
-	"strings"
-
 	. "github.com/cloudfoundry/dropsonde/emitter/logemitter"
 	"github.com/cloudfoundry/dropsonde/emitter/logemitter/testhelpers"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
 	"github.com/gogo/protobuf/proto"
-
-	"io/ioutil"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/cloudfoundry/loggregatorlib/loggregatorclient/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
 )
 
 var _ = BeforeSuite(func() {

@@ -84,7 +84,7 @@ func (fake *FakeDB) SaveRoute(route db.Route) error {
 	fake.saveRouteArgsForCall = append(fake.saveRouteArgsForCall, struct {
 		route db.Route
 	}{route})
-	fake.saveRouteMutex.Unlock()
+	defer fake.saveRouteMutex.Unlock()
 	if fake.SaveRouteStub != nil {
 		return fake.SaveRouteStub(route)
 	} else {

@@ -1,11 +1,14 @@
 {
 	"ImportPath": "github.com/cloudfoundry/gorouter",
-	"GoVersion": "go1.4.1",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/apcera/nats",
-			"Comment": "v1.0.6",
-			"Rev": "0ad40909a5568932a6ba494f25762971a089499d"
+			"Comment": "v1.0.6-25-g574d117",
+			"Rev": "574d117d5095925c53a2c86e6283800118dbfff7"
 		},
 		{
 			"ImportPath": "github.com/bmizerany/pat",
@@ -25,15 +28,19 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
-			"Rev": "9aef8ff4c758c3bc56bb00bfbe0d2af538e03ff6"
+			"Rev": "f67b34e3667f99481f57b18f0a707614471108cc"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry-incubator/trace-logger",
+			"Rev": "24964ef4dbb527a373d4db141cbbd41eb21a56f9"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-token-fetcher",
-			"Rev": "d984db92b74f6a223e6ff2fb028bf379f0fb1a80"
+			"Rev": "536d9c8d4ddfc124536cfb7462583b3200e3bde1"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
-			"Rev": "bcd67f4b34b7f744b9dc9bc0a0e1a228e3b24cd1"
+			"Rev": "0afd306c305053e4cf1a90e9b58eb24cb1f126b5"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -42,28 +49,28 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "de79b69f590594db2b9771018784c55251d5e7e7"
+			"Rev": "1e83496bd55b10dde3ac60f22ab5058eaa4042e0"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gunk/workpool",
-			"Rev": "de79b69f590594db2b9771018784c55251d5e7e7"
+			"Rev": "1e83496bd55b10dde3ac60f22ab5058eaa4042e0"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/storeadapter",
-			"Rev": "dff7a18fad3c03aae624a5ae0bce53d142d72971"
+			"Rev": "776fd8b514e4c7ae50db872e14dc0995ae3721ca"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "1ac54a8c5bcd394f3904dbad5f4d10fea5241069"
+			"Rev": "7025c6846809817ab52c641b5353edd7cd8db7db"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v0.4.6",
-			"Rev": "6aa2da5a7a905609c93036b9307185a04a5a84a5"
+			"Comment": "v2.0.0-7-g73a8ef7",
+			"Rev": "73a8ef737e8ea002281a28b4cb92a1de121ad4c6"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Rev": "b9e369e8ffb6773efc654ea13594566404314ee1"
+			"Rev": "bc946d07d1016848dfd2507f90f0859c9471681e"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",
@@ -81,15 +88,15 @@
 		},
 		{
 			"ImportPath": "github.com/pivotal-golang/localip",
-			"Rev": "ca5f12419a47fe0c8547eea32f9498eb6e9fe817"
+			"Rev": "c773e5fa43049a431973996f93afa7ee10312139"
 		},
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
-			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
+			"Rev": "a5cfc242a56ba7fa70b785f678d6214837bf93b9"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",
-			"Rev": "4d62400529d15177ea24ec270bca3735629e4fd5"
+			"Rev": "65ca48cd8a947d0e80efa4bda726f0363352e5f9"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/rata",

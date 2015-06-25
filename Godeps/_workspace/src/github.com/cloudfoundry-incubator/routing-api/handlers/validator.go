@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
@@ -48,15 +51,70 @@ func (v Validator) ValidateDelete(routes []db.Route) *routing_api.Error {
 }
 
 func requiredValidation(route db.Route) *routing_api.Error {
+	err := validateRouteUrl(route.Route)
+	if err != nil {
+		return err
+	}
+
+	err = validateRouteServiceUrl(route.RouteServiceUrl)
+	if err != nil {
+		return err
+	}
+
 	if route.Port <= 0 {
 		return &routing_api.Error{routing_api.RouteInvalidError, "Each route request requires a port greater than 0"}
 	}
+
 	if route.Route == "" {
 		return &routing_api.Error{routing_api.RouteInvalidError, "Each route request requires a valid route"}
 	}
 
 	if route.IP == "" {
 		return &routing_api.Error{routing_api.RouteInvalidError, "Each route request requires an IP"}
+	}
+
+	return nil
+}
+
+func validateRouteUrl(route string) *routing_api.Error {
+	err := validateUrl(route)
+	if err != nil {
+		return &routing_api.Error{routing_api.RouteInvalidError, err.Error()}
+	}
+
+	return nil
+}
+
+func validateRouteServiceUrl(routeService string) *routing_api.Error {
+	if routeService == "" {
+		return nil
+	}
+
+	if !strings.HasPrefix(routeService, "https://") {
+		return &routing_api.Error{routing_api.RouteServiceUrlInvalidError, "Route service url must use HTTPS."}
+	}
+
+	err := validateUrl(routeService)
+	if err != nil {
+		return &routing_api.Error{routing_api.RouteServiceUrlInvalidError, err.Error()}
+	}
+
+	return nil
+}
+
+func validateUrl(urlToValidate string) error {
+	if strings.ContainsAny(urlToValidate, "?#") {
+		return errors.New("Url cannot contain any of [?, #]")
+	}
+
+	parsedURL, err := url.Parse(urlToValidate)
+
+	if err != nil {
+		return err
+	}
+
+	if parsedURL.String() != urlToValidate {
+		return errors.New("Url cannot contain invalid characters")
 	}
 
 	return nil

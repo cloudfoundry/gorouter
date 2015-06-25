@@ -4,8 +4,8 @@ package fake_routing_api
 import (
 	"sync"
 
-	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api"
 )
 
 type FakeClient struct {
