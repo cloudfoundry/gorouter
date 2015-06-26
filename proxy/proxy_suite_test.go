@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http"
 
@@ -13,11 +14,11 @@ import (
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"testing"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var (
@@ -41,6 +42,7 @@ var _ = BeforeEach(func() {
 })
 
 var _ = JustBeforeEach(func() {
+	var err error
 	mbus := fakeyagnats.Connect()
 	r = registry.NewRouteRegistry(conf, mbus)
 
@@ -51,6 +53,14 @@ var _ = JustBeforeEach(func() {
 	accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "")
 	go accessLog.Run()
 
+	conf.EnableSSL = true
+	conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+
+	tlsConfig := &tls.Config{
+		CipherSuites:       conf.CipherSuites,
+		InsecureSkipVerify: true,
+	}
+
 	p = proxy.NewProxy(proxy.ProxyArgs{
 		EndpointTimeout: conf.EndpointTimeout,
 		Ip:              conf.Ip,
@@ -59,15 +69,14 @@ var _ = JustBeforeEach(func() {
 		Reporter:        nullVarz{},
 		AccessLogger:    accessLog,
 		SecureCookies:   conf.SecureCookies,
+		TLSConfig:       tlsConfig,
 	})
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")
 	Ω(err).NotTo(HaveOccurred())
 
 	server := http.Server{Handler: p}
-	go server.Serve(ln)
-
-	proxyServer = ln
+	go server.Serve(proxyServer)
 })
 
 var _ = AfterEach(func() {

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
 	"github.com/cloudfoundry-incubator/routing-api"
@@ -110,6 +112,9 @@ func main() {
 		Reporter:        varz,
 		AccessLogger:    accessLogger,
 		SecureCookies:   c.SecureCookies,
+		TLSConfig: &tls.Config{
+			CipherSuites: c.CipherSuites,
+		},
 	}
 	p := proxy.NewProxy(args)
 

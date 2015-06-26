@@ -2,11 +2,14 @@ package test_util
 
 import (
 	"path/filepath"
+	"runtime"
 
 	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 
 	"time"
+
+	. "github.com/onsi/gomega"
 )
 
 func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
@@ -17,8 +20,13 @@ func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Conf
 	c := generateConfig(natsPort, statusPort, proxyPort)
 
 	c.EnableSSL = true
-	c.SSLKeyPath = filepath.Join("test", "assets", "private.pem")
-	c.SSLCertPath = filepath.Join("test", "assets", "public.pem")
+
+	_, filename, _, _ := runtime.Caller(0)
+	testPath, err := filepath.Abs(filepath.Join(filename, "..", "..", "test", "assets"))
+	Expect(err).NotTo(HaveOccurred())
+
+	c.SSLKeyPath = filepath.Join(testPath, "private.pem")
+	c.SSLCertPath = filepath.Join(testPath, "public.pem")
 	c.SSLPort = SSLPort
 
 	return c
