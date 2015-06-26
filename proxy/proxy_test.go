@@ -24,7 +24,6 @@ import (
 	"github.com/cloudfoundry/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 )
 
@@ -1030,7 +1029,6 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Context("with route services", func() {
-
 		var (
 			routeServiceListener net.Listener
 			routeServiceHandler  http.Handler
@@ -1042,20 +1040,7 @@ var _ = Describe("Proxy", func() {
 			routeServiceListener, err = net.Listen("tcp", "127.0.0.1:0")
 			Expect(err).NotTo(HaveOccurred())
 
-			cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
-			Expect(err).ToNot(HaveOccurred())
-			conf.EnableSSL = true
-			conf.SSLPort = 4443 + uint16(config.GinkgoConfig.ParallelNode)
-			conf.SSLCertificate = cert
-			conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-
-			tlsConfig := &tls.Config{
-				Certificates:       []tls.Certificate{conf.SSLCertificate},
-				CipherSuites:       conf.CipherSuites,
-				InsecureSkipVerify: true,
-			}
-
-			tlsListener := tls.NewListener(routeServiceListener, tlsConfig)
+			tlsListener := newTlsListener(routeServiceListener)
 			server := &http.Server{Handler: routeServiceHandler}
 			go func() {
 				err := server.Serve(tlsListener)
@@ -1063,41 +1048,31 @@ var _ = Describe("Proxy", func() {
 			}()
 		})
 
-		Context("route service", func() {
-			var called bool
-			BeforeEach(func() {
-				called = false
-				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					called = true
-					Expect(r.Header.Get("X-CF-RouteServiceInfo")).To(Equal("test/my_path"))
-					Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
-				})
-			})
-
-			It("redirects the request to the route service url", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-					conn.CheckLine("GET /my_path HTTP/1.1")
-
-					conn.WriteLines([]string{
-						"HTTP/1.1 200 OK",
-						"Content-Length: 0",
-					})
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				conn.WriteLines([]string{
-					"GET /my_path HTTP/1.0",
-					"Host: test",
-				})
-
-				conn.CheckLine("HTTP/1.0 200 OK")
-
-				Eventually(func() bool { return called }).Should(BeTrue())
+		BeforeEach(func() {
+			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Expect(r.Header.Get("X-CF-RouteServiceInfo")).To(Equal("test/my_path"))
+				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
+				w.Write([]byte("My Special Snowflake Route Service\n"))
 			})
 		})
 
+		It("redirects the request to the route service url", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my_path HTTP/1.0",
+				"Host: test",
+			})
+
+			res, body := conn.ReadResponse()
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+		})
 	})
 })
 
@@ -1160,4 +1135,17 @@ func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
 	Ω(err).NotTo(HaveOccurred())
 
 	return test_util.NewHttpConn(conn)
+}
+
+func newTlsListener(listener net.Listener) net.Listener {
+	cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+	Expect(err).ToNot(HaveOccurred())
+
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		CipherSuites:       []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
+		InsecureSkipVerify: true,
+	}
+
+	return tls.NewListener(listener, tlsConfig)
 }
