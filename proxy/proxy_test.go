@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -884,7 +886,11 @@ var _ = Describe("Proxy", func() {
 		started := time.Now()
 		conn.WriteRequest(req)
 
+		// HACK: Don't output annoying log messages from i/o timeout
+		log.SetOutput(ioutil.Discard)
 		resp, _ := conn.ReadResponse()
+		log.SetOutput(os.Stderr)
+
 		Ω(resp.StatusCode).To(Equal(http.StatusBadGateway))
 		Ω(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
 	})
