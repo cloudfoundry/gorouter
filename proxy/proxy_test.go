@@ -1104,36 +1104,38 @@ func registerHandlerWithInstanceId(reg *registry.RouteRegistry, path string, rou
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	Ω(err).NotTo(HaveOccurred())
 
-	go func() {
-		var tempDelay time.Duration // how long to sleep on accept failure
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				if ne, ok := err.(net.Error); ok && ne.Temporary() {
-					if tempDelay == 0 {
-						tempDelay = 5 * time.Millisecond
-					} else {
-						tempDelay *= 2
-					}
-					if max := 1 * time.Second; tempDelay > max {
-						tempDelay = max
-					}
-					fmt.Printf("http: Accept error: %v; retrying in %v\n", err, tempDelay)
-					time.Sleep(tempDelay)
-					continue
-				}
-				break
-			}
-			go func() {
-				defer GinkgoRecover()
-				handler(test_util.NewHttpConn(conn))
-			}()
-		}
-	}()
+	go runBackendInstance(ln, handler)
 
 	registerAddr(reg, path, routeServiceUrl, ln.Addr(), instanceId)
 
 	return ln
+}
+
+func runBackendInstance(ln net.Listener, handler connHandler) {
+	var tempDelay time.Duration // how long to sleep on accept failure
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				fmt.Printf("http: Accept error: %v; retrying in %v\n", err, tempDelay)
+				time.Sleep(tempDelay)
+				continue
+			}
+			break
+		}
+		go func() {
+			defer GinkgoRecover()
+			handler(test_util.NewHttpConn(conn))
+		}()
+	}
 }
 
 func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
