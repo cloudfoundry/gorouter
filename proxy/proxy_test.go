@@ -1062,22 +1062,28 @@ var _ = Describe("Proxy", func() {
 			})
 		})
 
-		It("redirects the request to the route service url", func() {
-			ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-				Fail("Should not get here")
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-
-			conn.WriteLines([]string{
-				"GET /my_path HTTP/1.0",
-				"Host: test",
+		Context("with SSLSkipValidation enabled", func() {
+			BeforeEach(func() {
+				conf.SSLSkipValidation = true
 			})
 
-			res, body := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusOK))
-			Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+			It("redirects the request to the route service url", func() {
+				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+					Fail("Should not get here")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				conn.WriteLines([]string{
+					"GET /my_path HTTP/1.0",
+					"Host: test",
+				})
+
+				res, body := conn.ReadResponse()
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
+				Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+			})
 		})
 
 		It("returns an error when a bad route service url is used", func() {
@@ -1100,6 +1106,26 @@ var _ = Describe("Proxy", func() {
 
 			Expect(res.StatusCode).To(Equal(http.StatusInternalServerError))
 			Expect(body).NotTo(ContainSubstring("My Special Snowflake Route Service"))
+		})
+
+		It("returns a 502 when the SSL cert of the route service is signed by an unknown authority", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my_path HTTP/1.0",
+				"Host: test",
+			})
+
+			// HACK disable output from http proxy and cert validation
+			log.SetOutput(ioutil.Discard)
+			res, _ := conn.ReadResponse()
+			log.SetOutput(os.Stderr)
+			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 		})
 	})
 })
@@ -1172,9 +1198,8 @@ func newTlsListener(listener net.Listener) net.Listener {
 	Expect(err).ToNot(HaveOccurred())
 
 	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		CipherSuites:       []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
-		InsecureSkipVerify: true,
+		Certificates: []tls.Certificate{cert},
+		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
 	}
 
 	return tls.NewListener(listener, tlsConfig)

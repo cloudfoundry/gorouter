@@ -69,18 +69,19 @@ type Config struct {
 	Nats    []NatsConfig  `yaml:"nats"`
 	Logging LoggingConfig `yaml:"logging"`
 
-	Port           uint16 `yaml:"port"`
-	Index          uint   `yaml:"index"`
-	Zone           string `yaml:"zone"`
-	GoMaxProcs     int    `yaml:"go_max_procs,omitempty"`
-	TraceKey       string `yaml:"trace_key"`
-	AccessLog      string `yaml:"access_log"`
-	DebugAddr      string `yaml:"debug_addr"`
-	EnableSSL      bool   `yaml:"enable_ssl"`
-	SSLPort        uint16 `yaml:"ssl_port"`
-	SSLCertPath    string `yaml:"ssl_cert_path"`
-	SSLKeyPath     string `yaml:"ssl_key_path"`
-	SSLCertificate tls.Certificate
+	Port              uint16 `yaml:"port"`
+	Index             uint   `yaml:"index"`
+	Zone              string `yaml:"zone"`
+	GoMaxProcs        int    `yaml:"go_max_procs,omitempty"`
+	TraceKey          string `yaml:"trace_key"`
+	AccessLog         string `yaml:"access_log"`
+	DebugAddr         string `yaml:"debug_addr"`
+	EnableSSL         bool   `yaml:"enable_ssl"`
+	SSLPort           uint16 `yaml:"ssl_port"`
+	SSLCertPath       string `yaml:"ssl_cert_path"`
+	SSLKeyPath        string `yaml:"ssl_key_path"`
+	SSLCertificate    tls.Certificate
+	SSLSkipValidation bool `yaml:"ssl_skip_validation"`
 
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16

@@ -147,6 +147,20 @@ oauth:
 			Ω(config.OAuth.ClientSecret).To(Equal("client-secret"))
 			Ω(config.OAuth.Port).To(Equal(1234))
 		})
+
+		It("sets the SkipSSLValidation config", func() {
+			var b = []byte(`
+ssl_skip_validation: true
+`)
+			config.Initialize(b)
+			Ω(config.SSLSkipValidation).To(BeTrue())
+		})
+
+		It("defaults the SkipSSLValidation config to false", func() {
+			var b = []byte(``)
+			config.Initialize(b)
+			Ω(config.SSLSkipValidation).To(BeFalse())
+		})
 	})
 
 	Describe("Process", func() {

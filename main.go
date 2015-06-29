@@ -113,7 +113,8 @@ func main() {
 		AccessLogger:    accessLogger,
 		SecureCookies:   c.SecureCookies,
 		TLSConfig: &tls.Config{
-			CipherSuites: c.CipherSuites,
+			CipherSuites:       c.CipherSuites,
+			InsecureSkipVerify: c.SSLSkipValidation,
 		},
 	}
 	p := proxy.NewProxy(args)
