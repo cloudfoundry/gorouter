@@ -1079,6 +1079,28 @@ var _ = Describe("Proxy", func() {
 			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
 		})
+
+		It("returns an error when a bad route service url is used", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://bad%20hostname.com", func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my_path HTTP/1.0",
+				"Host: test",
+			})
+
+			// HACK: Don't output error message from parsing bad URL
+			log.SetOutput(ioutil.Discard)
+			res, body := conn.ReadResponse()
+			log.SetOutput(os.Stderr)
+
+			Expect(res.StatusCode).To(Equal(http.StatusInternalServerError))
+			Expect(body).NotTo(ContainSubstring("My Special Snowflake Route Service"))
+		})
 	})
 })
 
