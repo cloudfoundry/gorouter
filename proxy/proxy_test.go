@@ -1127,7 +1127,29 @@ var _ = Describe("Proxy", func() {
 			log.SetOutput(os.Stderr)
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 		})
+
+		It("returns a 200 when we route to a route service that has a valid cert", func() {
+			// sorry google we are using you
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://www.google.com", func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my_path HTTP/1.0",
+				"Host: test",
+			})
+
+			// HACK disable output from http proxy and cert validation
+			log.SetOutput(ioutil.Discard)
+			res, _ := conn.ReadResponse()
+			log.SetOutput(os.Stderr)
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+		})
 	})
+
 })
 
 func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId string) {

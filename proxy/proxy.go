@@ -274,6 +274,7 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			if err != nil {
 				return nil, err
 			}
+			request.Host = rsURL.Host
 			request.URL = rsURL
 		}
 		res, err = p.transport.RoundTrip(request)
