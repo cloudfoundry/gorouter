@@ -1056,7 +1056,7 @@ var _ = Describe("Proxy", func() {
 
 		BeforeEach(func() {
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				Expect(r.Header.Get("X-CF-RouteServiceInfo")).To(Equal("test/my_path"))
+				Expect(r.Header.Get("X-CF-RouteServiceSignature")).To(Equal("test/my_path"))
 				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
 				w.Write([]byte("My Special Snowflake Route Service\n"))
 			})

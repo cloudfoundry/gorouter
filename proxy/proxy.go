@@ -155,8 +155,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	// We know if we have a RS here
-	//
 	stickyEndpointId := p.getStickySession(request)
 	iter := &wrappedIterator{
 		nested: routePool.Endpoints(stickyEndpointId),
@@ -180,8 +178,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	// request going to the endpoint addr
-	//
 	proxyWriter := newProxyResponseWriter(responseWriter)
 	roundTripper := &proxyRoundTripper{
 		transport: dropsonde.InstrumentedRoundTripper(p.transport),
@@ -269,7 +265,7 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 			setRequestXCfInstanceId(request, endpoint)
 		} else {
-			request.Header.Set("X-CF-RouteServiceInfo", request.URL.Host+request.URL.Path)
+			request.Header.Set("X-CF-RouteServiceSignature", request.URL.Host+request.URL.Path)
 			rsURL, err := url.Parse(endpoint.RouteServiceUrl)
 			if err != nil {
 				return nil, err
@@ -289,6 +285,7 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 		p.iter.EndpointFailed()
 
 		p.handler.Logger().Set("Error", err.Error())
+		p.handler.Logger().Warnf("proxy.endpoint.failed")
 
 		retry++
 		if retry == retries {
