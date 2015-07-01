@@ -7,7 +7,7 @@ import (
 
 func NextAvailPort() uint16 {
 	port, err := localip.LocalPort()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return port
 }

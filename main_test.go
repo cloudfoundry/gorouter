@@ -41,7 +41,7 @@ var _ = Describe("Router Integration", func() {
 
 	writeConfig := func(config *config.Config, cfgFile string) {
 		cfgBytes, err := candiedyaml.Marshal(config)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
 
@@ -77,7 +77,7 @@ var _ = Describe("Router Integration", func() {
 	startGorouterSession := func(cfgFile string) *Session {
 		gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		Eventually(session, 5).Should(Say("gorouter.started"))
 		gorouterSession = session
 
@@ -86,14 +86,14 @@ var _ = Describe("Router Integration", func() {
 
 	stopGorouter := func(gorouterSession *Session) {
 		err := gorouterSession.Command.Process.Signal(syscall.SIGTERM)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(gorouterSession.Wait(5 * time.Second)).Should(Exit(0))
 	}
 
 	BeforeEach(func() {
 		var err error
 		tmpdir, err = ioutil.TempDir("", "gorouter")
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		natsPort = test_util.NextAvailPort()
 		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
@@ -122,7 +122,7 @@ var _ = Describe("Router Integration", func() {
 		BeforeEach(func() {
 			var err error
 			localIP, err = localip.LocalIP()
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			statusPort = test_util.NextAvailPort()
 			proxyPort = test_util.NextAvailPort()
@@ -137,7 +137,7 @@ var _ = Describe("Router Integration", func() {
 
 		It("waits for all requests to finish", func() {
 			mbusClient, err := newMessageBus(config)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			requestMade := make(chan bool)
 			requestProcessing := make(chan bool)
@@ -149,7 +149,7 @@ var _ = Describe("Router Integration", func() {
 				<-requestProcessing
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte{'b'})
 			})
@@ -189,14 +189,14 @@ var _ = Describe("Router Integration", func() {
 
 			requestProcessing <- true
 
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			Eventually(grouter, 5).Should(Exit(0))
 			Eventually(responseRead).Should(Receive(BeTrue()))
 		})
 
 		It("will timeout if requests take too long", func() {
 			mbusClient, err := newMessageBus(config)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 1)
@@ -222,14 +222,14 @@ var _ = Describe("Router Integration", func() {
 			grouter := gorouterSession
 			gorouterSession = nil
 			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			Eventually(grouter, 5).Should(Exit(0))
 
 			var result error
 			Eventually(resultCh, 5).Should(Receive(&result))
-			Ω(result).Should(BeAssignableToTypeOf(&url.Error{}))
+			Expect(result).To(BeAssignableToTypeOf(&url.Error{}))
 			urlErr := result.(*url.Error)
-			Ω(urlErr.Err).Should(Equal(io.EOF))
+			Expect(urlErr.Err).To(Equal(io.EOF))
 		})
 
 		It("prevents new connections", func() {
@@ -257,14 +257,14 @@ var _ = Describe("Router Integration", func() {
 			grouter := gorouterSession
 			gorouterSession = nil
 			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
-			Ω(err).ShouldNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			Eventually(grouter, 5).Should(Exit(0))
 
 			_, err = http.Get(timeoutApp.Endpoint())
-			Ω(err).Should(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 			urlErr := err.(*url.Error)
 			opErr := urlErr.Err.(*net.OpError)
-			Ω(opErr.Op).Should(Equal("dial"))
+			Expect(opErr.Op).To(Equal("dial"))
 		})
 
 		Context("when ssl is enabled", func() {
@@ -277,7 +277,7 @@ var _ = Describe("Router Integration", func() {
 				gorouterSession = nil
 				err := grouter.Command.Process.Signal(syscall.SIGUSR1)
 
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				Eventually(grouter, 5).Should(Exit(0))
 			})
 		})
@@ -301,7 +301,7 @@ var _ = Describe("Router Integration", func() {
 
 	It("has Nats connectivity", func() {
 		localIP, err := localip.LocalIP()
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		statusPort := test_util.NextAvailPort()
 		proxyPort := test_util.NextAvailPort()

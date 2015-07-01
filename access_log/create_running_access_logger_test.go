@@ -13,7 +13,7 @@ var _ = Describe("AccessLog", func() {
 	It("creates null access loger if no access log and loggregator is disabled", func() {
 		config := config.DefaultConfig()
 
-		Ω(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
+		Expect(CreateRunningAccessLogger(config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
 	})
 
 	It("creates an access log when loggegrator is enabled", func() {
@@ -53,7 +53,7 @@ var _ = Describe("AccessLog", func() {
 		config.AccessLog = "/this\\is/illegal"
 
 		a, err := CreateRunningAccessLogger(config)
-		Ω(err).To(HaveOccurred())
-		Ω(a).To(BeNil())
+		Expect(err).To(HaveOccurred())
+		Expect(a).To(BeNil())
 	})
 })

@@ -20,7 +20,7 @@ var _ = Describe("TopApps", func() {
 		topApps.Mark("a", time.Unix(1, 0))
 		topApps.Mark("b", time.Unix(1, 0))
 		apps := topApps.TopSince(time.Unix(0, 0), 5)
-		Ω(apps).To(HaveLen(2))
+		Expect(apps).To(HaveLen(2))
 	})
 
 	It("mark updates existing application ids", func() {
@@ -28,7 +28,7 @@ var _ = Describe("TopApps", func() {
 		topApps.Mark("b", time.Unix(1, 0))
 
 		apps := topApps.TopSince(time.Unix(0, 0), 5)
-		Ω(apps).To(HaveLen(1))
+		Expect(apps).To(HaveLen(1))
 	})
 
 	It("trims aging application ids", func() {
@@ -37,19 +37,19 @@ var _ = Describe("TopApps", func() {
 		}
 
 		apps := topApps.TopSince(time.Unix(0, 0), 5)
-		Ω(apps).To(HaveLen(3))
+		Expect(apps).To(HaveLen(3))
 
 		topApps.Trim(time.Unix(1, 0))
 		apps = topApps.TopSince(time.Unix(1, 0), 5)
-		Ω(apps).To(HaveLen(2))
+		Expect(apps).To(HaveLen(2))
 
 		topApps.Trim(time.Unix(2, 0))
 		apps = topApps.TopSince(time.Unix(2, 0), 5)
-		Ω(apps).To(HaveLen(1))
+		Expect(apps).To(HaveLen(1))
 
 		topApps.Trim(time.Unix(3, 0))
 		apps = topApps.TopSince(time.Unix(3, 0), 5)
-		Ω(apps).To(HaveLen(0))
+		Expect(apps).To(HaveLen(0))
 	})
 
 	It("reports top application ids", func() {
@@ -71,9 +71,9 @@ var _ = Describe("TopApps", func() {
 			}
 		}
 
-		Ω(topApps.TopSince(time.Unix(2, 0), 3)).To(Equal(f(g("c", 3), g("b", 2), g("a", 1))))
-		Ω(topApps.TopSince(time.Unix(3, 0), 3)).To(Equal(f(g("c", 2), g("b", 1))))
-		Ω(topApps.TopSince(time.Unix(4, 0), 3)).To(Equal(f(g("c", 1))))
-		Ω(topApps.TopSince(time.Unix(5, 0), 3)).To(Equal(f()))
+		Expect(topApps.TopSince(time.Unix(2, 0), 3)).To(Equal(f(g("c", 3), g("b", 2), g("a", 1))))
+		Expect(topApps.TopSince(time.Unix(3, 0), 3)).To(Equal(f(g("c", 2), g("b", 1))))
+		Expect(topApps.TopSince(time.Unix(4, 0), 3)).To(Equal(f(g("c", 1))))
+		Expect(topApps.TopSince(time.Unix(5, 0), 3)).To(Equal(f()))
 	})
 })

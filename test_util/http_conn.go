@@ -72,7 +72,7 @@ func (x *HttpConn) WriteResponse(resp *http.Response) {
 func (x *HttpConn) CheckLine(expected string) {
 	l, err := x.Reader.ReadString('\n')
 	Ω(err).NotTo(HaveOccurred())
-	Ω(strings.TrimRight(l, "\r\n")).To(Equal(expected))
+	Expect(strings.TrimRight(l, "\r\n")).To(Equal(expected))
 }
 
 func (x *HttpConn) CheckLines(expected []string) {

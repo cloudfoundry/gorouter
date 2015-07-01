@@ -35,11 +35,11 @@ func (n *Nats) Port() uint16 {
 func (n *Nats) Start() {
 	cmd := exec.Command("gnatsd", "-p", strconv.Itoa(int(n.port)), "--user", "nats", "--pass", "nats")
 	err := cmd.Start()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	n.cmd = cmd
 
 	err = n.waitUntilNatsUp()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func (n *Nats) Stop() {
@@ -47,7 +47,7 @@ func (n *Nats) Stop() {
 	n.cmd.Wait()
 
 	err := n.waitUntilNatsDown()
-	Ω(err).ShouldNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func (n *Nats) waitUntilNatsUp() error {

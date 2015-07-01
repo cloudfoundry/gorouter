@@ -42,14 +42,14 @@ var _ = Describe("EndpointIterator", func() {
 			}
 
 			for i := 0; i < len(endpoints); i++ {
-				Ω(counts[i]).To(Equal(loops))
+				Expect(counts[i]).To(Equal(loops))
 			}
 		})
 
 		It("returns nil when no endpoints exist", func() {
 			iter := pool.Endpoints("")
 			e := iter.Next()
-			Ω(e).Should(BeNil())
+			Expect(e).To(BeNil())
 		})
 
 		It("finds the initial endpoint by private id", func() {
@@ -62,8 +62,8 @@ var _ = Describe("EndpointIterator", func() {
 			for i := 0; i < 10; i++ {
 				iter := pool.Endpoints(b.PrivateInstanceId)
 				e := iter.Next()
-				Ω(e).ShouldNot(BeNil())
-				Ω(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
+				Expect(e).ToNot(BeNil())
+				Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
 			}
 		})
 
@@ -77,8 +77,8 @@ var _ = Describe("EndpointIterator", func() {
 			for i := 0; i < 10; i++ {
 				iter := pool.Endpoints(b.CanonicalAddr())
 				e := iter.Next()
-				Ω(e).ShouldNot(BeNil())
-				Ω(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
+				Expect(e).ToNot(BeNil())
+				Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
 			}
 		})
 
@@ -91,13 +91,13 @@ var _ = Describe("EndpointIterator", func() {
 
 			iter := pool.Endpoints(endpointFoo.PrivateInstanceId)
 			foundEndpoint := iter.Next()
-			Ω(foundEndpoint).ToNot(BeNil())
-			Ω(foundEndpoint).To(Equal(endpointFoo))
+			Expect(foundEndpoint).ToNot(BeNil())
+			Expect(foundEndpoint).To(Equal(endpointFoo))
 
 			iter = pool.Endpoints(endpointBar.PrivateInstanceId)
 			foundEndpoint = iter.Next()
-			Ω(foundEndpoint).ToNot(BeNil())
-			Ω(foundEndpoint).To(Equal(endpointBar))
+			Expect(foundEndpoint).ToNot(BeNil())
+			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
 
 		It("returns the next available endpoint when the initial is not found", func() {
@@ -106,8 +106,8 @@ var _ = Describe("EndpointIterator", func() {
 
 			iter := pool.Endpoints("bogus")
 			e := iter.Next()
-			Ω(e).ShouldNot(BeNil())
-			Ω(e).Should(Equal(eFoo))
+			Expect(e).ToNot(BeNil())
+			Expect(e).To(Equal(eFoo))
 		})
 
 		It("finds the correct endpoint when private ids change", func() {
@@ -116,18 +116,18 @@ var _ = Describe("EndpointIterator", func() {
 
 			iter := pool.Endpoints(endpointFoo.PrivateInstanceId)
 			foundEndpoint := iter.Next()
-			Ω(foundEndpoint).ShouldNot(BeNil())
-			Ω(foundEndpoint).Should(Equal(endpointFoo))
+			Expect(foundEndpoint).ToNot(BeNil())
+			Expect(foundEndpoint).To(Equal(endpointFoo))
 
 			endpointBar := NewEndpoint("", "1.2.3.4", 1234, "bar", nil, -1, "")
 			pool.Put(endpointBar)
 
 			iter = pool.Endpoints("foo")
 			foundEndpoint = iter.Next()
-			Ω(foundEndpoint).ShouldNot(Equal(endpointFoo))
+			Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
 			iter = pool.Endpoints("bar")
-			Ω(foundEndpoint).Should(Equal(endpointBar))
+			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
 	})
 
@@ -140,16 +140,16 @@ var _ = Describe("EndpointIterator", func() {
 
 			iter := pool.Endpoints("")
 			n := iter.Next()
-			Ω(n).ShouldNot(BeNil())
+			Expect(n).ToNot(BeNil())
 
 			iter.EndpointFailed()
 
 			nn1 := iter.Next()
 			nn2 := iter.Next()
-			Ω(nn1).ShouldNot(BeNil())
-			Ω(nn2).ShouldNot(BeNil())
-			Ω(nn1).ShouldNot(Equal(n))
-			Ω(nn1).Should(Equal(nn2))
+			Expect(nn1).ToNot(BeNil())
+			Expect(nn2).ToNot(BeNil())
+			Expect(nn1).ToNot(Equal(n))
+			Expect(nn1).To(Equal(nn2))
 		})
 
 		It("resets when all endpoints are failed", func() {
@@ -163,11 +163,11 @@ var _ = Describe("EndpointIterator", func() {
 			iter.EndpointFailed()
 			n2 := iter.Next()
 			iter.EndpointFailed()
-			Ω(n1).ShouldNot(Equal(n2))
+			Expect(n1).ToNot(Equal(n2))
 
 			n1 = iter.Next()
 			n2 = iter.Next()
-			Ω(n1).ShouldNot(Equal(n2))
+			Expect(n1).ToNot(Equal(n2))
 		})
 
 		It("resets failed endpoints after exceeding failure duration", func() {
@@ -181,19 +181,19 @@ var _ = Describe("EndpointIterator", func() {
 			iter := pool.Endpoints("")
 			n1 := iter.Next()
 			n2 := iter.Next()
-			Ω(n1).ShouldNot(Equal(n2))
+			Expect(n1).ToNot(Equal(n2))
 
 			iter.EndpointFailed()
 
 			n1 = iter.Next()
 			n2 = iter.Next()
-			Ω(n1).Should(Equal(n2))
+			Expect(n1).To(Equal(n2))
 
 			time.Sleep(50 * time.Millisecond)
 
 			n1 = iter.Next()
 			n2 = iter.Next()
-			Ω(n1).ShouldNot(Equal(n2))
+			Expect(n1).ToNot(Equal(n2))
 		})
 	})
 })

@@ -18,8 +18,8 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		defer ginkgo.GinkgoRecover()
 
-		Ω(r.Header.Get("Upgrade")).Should(Equal("websocket"))
-		Ω(r.Header.Get("Connection")).Should(Equal("upgrade"))
+		Expect(r.Header.Get("Upgrade")).To(Equal("websocket"))
+		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
 
 		conn, _, err := w.(http.Hijacker).Hijack()
 		x := test_util.NewHttpConn(conn)
@@ -31,7 +31,7 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn
 		time.Sleep(delay)
 
 		x.WriteResponse(resp)
-		Ω(err).ShouldNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		x.CheckLine("hello from client")
 		x.WriteLine("hello from server")
