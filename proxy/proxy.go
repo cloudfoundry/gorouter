@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	VcapCookieId    = "__VCAP_ID__"
-	StickyCookieKey = "JSESSIONID"
-	retries         = 3
+	VcapCookieId          = "__VCAP_ID__"
+	StickyCookieKey       = "JSESSIONID"
+	retries               = 3
+	routeServiceSignature = "X-CF-RouteServiceSignature"
 )
 
 var noEndpointsAvailable = errors.New("No endpoints available")
@@ -260,19 +261,11 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 
-		if endpoint.RouteServiceUrl == "" {
-			request.URL.Host = endpoint.CanonicalAddr()
-			request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-			setRequestXCfInstanceId(request, endpoint)
-		} else {
-			request.Header.Set("X-CF-RouteServiceSignature", request.URL.Host+request.URL.Path)
-			rsURL, err := url.Parse(endpoint.RouteServiceUrl)
-			if err != nil {
-				return nil, err
-			}
-			request.Host = rsURL.Host
-			request.URL = rsURL
+		err = processIncomingRequest(request, endpoint)
+		if err != nil {
+			return nil, err
 		}
+
 		res, err = p.transport.RoundTrip(request)
 		if err == nil {
 			break
@@ -318,6 +311,30 @@ func (i *wrappedIterator) Next() *route.Endpoint {
 
 func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
+}
+
+// Do not modify header object
+func isValidSignature(header *http.Header) bool {
+	return header.Get(routeServiceSignature) == ""
+}
+
+func processIncomingRequest(request *http.Request, endpoint *route.Endpoint) error {
+	if endpoint.RouteServiceUrl != "" && isValidSignature(&request.Header) {
+		request.Header.Set(routeServiceSignature, request.URL.Host+request.URL.Path)
+		rsURL, err := url.Parse(endpoint.RouteServiceUrl)
+		if err != nil {
+			return err
+		}
+		request.Host = rsURL.Host
+		request.URL = rsURL
+	} else {
+		request.URL.Host = endpoint.CanonicalAddr()
+		request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+		request.Header.Del(routeServiceSignature)
+		setRequestXCfInstanceId(request, endpoint)
+	}
+
+	return nil
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,

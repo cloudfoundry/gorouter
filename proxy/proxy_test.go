@@ -1067,22 +1067,60 @@ var _ = Describe("Proxy", func() {
 				conf.SSLSkipValidation = true
 			})
 
-			It("redirects the request to the route service url", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-					Fail("Should not get here")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				conn.WriteLines([]string{
-					"GET /my_path HTTP/1.0",
-					"Host: test",
+			Context("when a request has a valid Route service signature header", func() {
+				BeforeEach(func() {
+					routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						Fail("Should not get here")
+					})
 				})
 
-				res, body := conn.ReadResponse()
-				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+				It("routes to the backend instance", func() {
+					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+						req, _ := conn.ReadRequest()
+						Expect(req.Header.Get("X-CF-RouteServiceSignature")).To(Equal(""))
+
+						out := &bytes.Buffer{}
+						out.WriteString("backend instance")
+						res := &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       ioutil.NopCloser(out),
+						}
+						conn.WriteResponse(res)
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+
+					conn.WriteLines([]string{
+						"GET /my_path HTTP/1.1",
+						"Host: test",
+						"X-CF-RouteServiceSignature: some-signature",
+					})
+
+					res, body := conn.ReadResponse()
+					Expect(res.StatusCode).To(Equal(http.StatusOK))
+					Expect(body).To(ContainSubstring("backend instance"))
+				})
+			})
+
+			Context("when a request does not have a valid Route service signature header", func() {
+				It("redirects the request to the route service url", func() {
+					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+						Fail("Should not get here")
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+
+					conn.WriteLines([]string{
+						"GET /my_path HTTP/1.0",
+						"Host: test",
+					})
+
+					res, body := conn.ReadResponse()
+					Expect(res.StatusCode).To(Equal(http.StatusOK))
+					Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+				})
 			})
 		})
 
@@ -1142,10 +1180,7 @@ var _ = Describe("Proxy", func() {
 				"Host: test",
 			})
 
-			// HACK disable output from http proxy and cert validation
-			log.SetOutput(ioutil.Discard)
 			res, _ := conn.ReadResponse()
-			log.SetOutput(os.Stderr)
 			Expect(res.StatusCode).To(Equal(http.StatusOK))
 		})
 	})
