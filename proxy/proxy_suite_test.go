@@ -95,8 +95,7 @@ func shouldEcho(input string, expected string) {
 
 	x := dialProxy(proxyServer)
 
-	req := test_util.NewRequest("GET", input, nil)
-	req.Host = "encoding"
+	req := test_util.NewRequest("GET", "encoding", input, nil)
 	x.WriteRequest(req)
 	resp, _ := x.ReadResponse()
 

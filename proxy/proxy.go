@@ -19,13 +19,15 @@ import (
 )
 
 const (
-	VcapCookieId          = "__VCAP_ID__"
-	StickyCookieKey       = "JSESSIONID"
-	retries               = 3
-	routeServiceSignature = "X-CF-RouteServiceSignature"
+	VcapCookieId             = "__VCAP_ID__"
+	StickyCookieKey          = "JSESSIONID"
+	retries                  = 3
+	routeServiceSignature    = "X-CF-RouteServiceSignature"
+	routeServiceForwardedUrl = "X-CF-Forwarded-Url"
 )
 
 var noEndpointsAvailable = errors.New("No endpoints available")
+var invalidRouteServiceSignature = errors.New("Invalid route service header signature")
 
 type LookupRegistry interface {
 	Lookup(uri route.Uri) *route.Pool
@@ -123,7 +125,6 @@ func (p *proxy) lookup(request *http.Request) *route.Pool {
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
-
 	accessLog := access_log.AccessLogRecord{
 		Request:   request,
 		StartedAt: startedAt,
@@ -315,26 +316,49 @@ func (i *wrappedIterator) EndpointFailed() {
 
 // Do not modify header object
 func isValidSignature(header *http.Header) bool {
-	return header.Get(routeServiceSignature) == ""
+	return header.Get(routeServiceSignature) != ""
+}
+
+func processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
+	request.Header.Set(routeServiceSignature, request.URL.Host+request.URL.Path)
+
+	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
+
+	request.Header.Set(routeServiceForwardedUrl, clientRequestUrl)
+
+	rsURL, err := url.Parse(endpoint.RouteServiceUrl)
+	if err != nil {
+		return err
+	}
+	request.Host = rsURL.Host
+	request.URL = rsURL
+
+	return nil
+}
+
+func processBackend(request *http.Request, endpoint *route.Endpoint) {
+	request.URL.Host = endpoint.CanonicalAddr()
+	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+	request.Header.Del(routeServiceSignature)
+	setRequestXCfInstanceId(request, endpoint)
 }
 
 func processIncomingRequest(request *http.Request, endpoint *route.Endpoint) error {
-	if endpoint.RouteServiceUrl != "" && isValidSignature(&request.Header) {
-		request.Header.Set(routeServiceSignature, request.URL.Host+request.URL.Path)
-		rsURL, err := url.Parse(endpoint.RouteServiceUrl)
-		if err != nil {
-			return err
+	var err error
+
+	if endpoint.RouteServiceUrl != "" {
+		if request.Header.Get(routeServiceSignature) == "" {
+			err = processRoutingService(request, endpoint)
+		} else if isValidSignature(&request.Header) {
+			processBackend(request, endpoint)
+		} else {
+			return invalidRouteServiceSignature
 		}
-		request.Host = rsURL.Host
-		request.URL = rsURL
 	} else {
-		request.URL.Host = endpoint.CanonicalAddr()
-		request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-		request.Header.Del(routeServiceSignature)
-		setRequestXCfInstanceId(request, endpoint)
+		processBackend(request, endpoint)
 	}
 
-	return nil
+	return err
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,

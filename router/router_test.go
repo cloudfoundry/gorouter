@@ -674,8 +674,7 @@ var _ = Describe("Router", func() {
 
 			x := test_util.NewHttpConn(conn)
 
-			req := test_util.NewRequest("GET", "/chat", nil)
-			req.Host = "ws-app.vcap.me"
+			req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
 

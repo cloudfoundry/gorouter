@@ -49,10 +49,7 @@ var _ = Describe("Proxy", func() {
 		ln := registerHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET /my_path HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer ln.Close()
 
@@ -70,47 +67,38 @@ var _ = Describe("Proxy", func() {
 		lnWithoutSlash := registerHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer lnWithoutSlash.Close()
 
 		lnWithSlash := registerHandler(r, "test/another-path/your_path/", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET /another-path/your_path HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer lnWithSlash.Close()
 
 		conn := dialProxy(proxyServer)
 		y := dialProxy(proxyServer)
 
-		conn.WriteLines([]string{
-			"GET /my%20path/your_path/ HTTP/1.0",
-			"Host: test",
-		})
-		conn.CheckLine("HTTP/1.0 200 OK")
+		req := test_util.NewRequest("GET", "test", "/my%20path/your_path/", nil)
+		conn.WriteRequest(req)
 
-		y.WriteLines([]string{
-			"GET /another-path/your_path HTTP/1.0",
-			"Host: test",
-		})
-		y.CheckLine("HTTP/1.0 200 OK")
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		req = test_util.NewRequest("GET", "test", "/another-path/your_path", nil)
+		y.WriteRequest(req)
+
+		resp, _ = y.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
 	It("responds to http/1.0 with path/path", func() {
 		ln := registerHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET /my%20path/your_path HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer ln.Close()
 
@@ -128,10 +116,7 @@ var _ = Describe("Proxy", func() {
 		ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET / HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer ln.Close()
 
@@ -167,11 +152,11 @@ var _ = Describe("Proxy", func() {
 
 		body := &bytes.Buffer{}
 		body.WriteString("ABCD")
-		req := test_util.NewRequest("POST", "/", ioutil.NopCloser(body))
-		req.Host = "test"
+		req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
 		conn.WriteRequest(req)
 
-		conn.CheckLine("HTTP/1.1 200 OK")
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 		var payload []byte
 		Eventually(func() int {
@@ -197,7 +182,8 @@ var _ = Describe("Proxy", func() {
 			"Host: test",
 		})
 
-		conn.CheckLine("HTTP/1.0 400 Bad Request")
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 
 		var payload []byte
 		Eventually(func() int {
@@ -213,10 +199,7 @@ var _ = Describe("Proxy", func() {
 		ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET / HTTP/1.1")
 
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				"Content-Length: 0",
-			})
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 		})
 		defer ln.Close()
 
@@ -227,7 +210,8 @@ var _ = Describe("Proxy", func() {
 			"Host: test",
 		})
 
-		conn.CheckLine("HTTP/1.1 200 OK")
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
 	It("does not respond to unsupported HTTP versions", func() {
@@ -238,13 +222,14 @@ var _ = Describe("Proxy", func() {
 			"Host: test",
 		})
 
-		conn.CheckLine("HTTP/1.0 400 Bad Request")
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 	})
 
 	It("responds to load balancer check", func() {
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "", "/", nil)
 		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
 		conn.WriteRequest(req)
 
@@ -257,8 +242,7 @@ var _ = Describe("Proxy", func() {
 	It("responds to unknown host with 404", func() {
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "unknown"
+		req := test_util.NewRequest("GET", "unknown", "/", nil)
 		conn.WriteRequest(req)
 
 		resp, body := conn.ReadResponse()
@@ -275,8 +259,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "enfant-terrible"
+		req := test_util.NewRequest("GET", "enfant-terrible", "/", nil)
 		conn.WriteRequest(req)
 
 		resp, body := conn.ReadResponse()
@@ -298,8 +281,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "trace-test"
+		req := test_util.NewRequest("GET", "trace-test", "/", nil)
 		req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
 		conn.WriteRequest(req)
 
@@ -323,8 +305,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "trace-test"
+		req := test_util.NewRequest("GET", "trace-test", "/", nil)
 		req.Header.Set(router_http.VcapTraceHeader, "a_bad_trace_key")
 		conn.WriteRequest(req)
 
@@ -350,8 +331,7 @@ var _ = Describe("Proxy", func() {
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		var answer bool
@@ -378,8 +358,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		req.Header.Add("X-Forwarded-For", "1.2.3.4")
 		conn.WriteRequest(req)
 
@@ -407,8 +386,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		var answer string
@@ -435,8 +413,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
 		req.Header.Add("X-Request-Start", "user-set2")
 		conn.WriteRequest(req)
@@ -465,8 +442,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		var answer string
@@ -493,8 +469,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
 		conn.WriteRequest(req)
 
@@ -523,8 +498,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		var answer string
@@ -544,8 +518,7 @@ var _ = Describe("Proxy", func() {
 		fakeEmitter := fake.NewFakeEventEmitter("fake")
 		dropsonde.InitializeWithEmitter(fakeEmitter)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		findStartEvent := func() *events.HttpStart {
@@ -582,8 +555,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "app"
+		req := test_util.NewRequest("GET", "app", "/", nil)
 		conn.WriteRequest(req)
 
 		var answer string
@@ -617,8 +589,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/chat", nil)
-		req.Host = "ws"
+		req := test_util.NewRequest("GET", "ws", "/chat", nil)
 		req.Header.Set("Upgrade", "WebsockeT")
 		req.Header.Set("Connection", "UpgradE")
 
@@ -663,8 +634,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/chat", nil)
-		req.Host = "ws-cs-header"
+		req := test_util.NewRequest("GET", "ws-cs-header", "/chat", nil)
 		req.Header.Add("Upgrade", "Websocket")
 		req.Header.Add("Connection", "keep-alive, Upgrade")
 
@@ -711,8 +681,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/chat", nil)
-		req.Host = "ws-cs-header"
+		req := test_util.NewRequest("GET", "ws-cs-header", "/chat", nil)
 		req.Header.Add("Upgrade", "Websocket")
 		req.Header.Add("Connection", "keep-alive")
 		req.Header.Add("Connection", "Upgrade")
@@ -746,8 +715,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/chat", nil)
-		req.Host = "tcp-handler"
+		req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
 		req.Header.Set("Upgrade", "tcp")
 
 		req.Header.Set("Connection", "UpgradE")
@@ -790,8 +758,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "chunk"
+		req := test_util.NewRequest("GET", "chunk", "/", nil)
 
 		err := req.Write(conn)
 		Ω(err).NotTo(HaveOccurred())
@@ -828,10 +795,9 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
+		req := test_util.NewRequest("GET", "not-modified", "/", nil)
 
 		req.Header.Set("Connection", "close")
-		req.Host = "not-modified"
 		conn.WriteRequest(req)
 
 		resp, _ := conn.ReadResponse()
@@ -880,8 +846,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "slow-app"
+		req := test_util.NewRequest("GET", "slow-app", "/", nil)
 
 		started := time.Now()
 		conn.WriteRequest(req)
@@ -907,7 +872,7 @@ var _ = Describe("Proxy", func() {
 				fmt.Sprintf("Content-Length: %d", timesToTick),
 			})
 
-			for i := 0; i < 10; i++ {
+			for i := 0; i < timesToTick; i++ {
 				_, err := conn.Conn.Write([]byte("x"))
 				if err != nil {
 					serverResult <- err
@@ -923,8 +888,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "slow-app"
+		req := test_util.NewRequest("GET", "slow-app", "/", nil)
 		conn.WriteRequest(req)
 
 		conn.Conn.Close()
@@ -947,8 +911,7 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "/", nil)
-			req.Host = "remote"
+			req := test_util.NewRequest("GET", "remote", "/", nil)
 			req.Close = true
 			conn.WriteRequest(req)
 			resp, _ := conn.ReadResponse()
@@ -971,8 +934,7 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "/", nil)
-			req.Host = "remote"
+			req := test_util.NewRequest("GET", "remote", "/", nil)
 			req.Close = false
 			conn.WriteRequest(req)
 			resp, _ := conn.ReadResponse()
@@ -1002,8 +964,7 @@ var _ = Describe("Proxy", func() {
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "/", nil)
-		req.Host = "remote"
+		req := test_util.NewRequest("GET", "remote", "/", nil)
 		conn.WriteRequest(req)
 		resp, _ := conn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -1025,8 +986,7 @@ var _ = Describe("Proxy", func() {
 		for i := 0; i < 5; i++ {
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "/", nil)
-			req.Host = "retries"
+			req := test_util.NewRequest("GET", "retries", "/", nil)
 			conn.WriteRequest(req)
 			resp, _ := conn.ReadResponse()
 
@@ -1056,8 +1016,12 @@ var _ = Describe("Proxy", func() {
 
 		BeforeEach(func() {
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				Expect(r.Header.Get("X-CF-RouteServiceSignature")).To(Equal("test/my_path"))
+				Expect(r.Header.Get("X-CF-RouteServiceSignature")).To(Equal("my_host.com/resource+9-9_9"))
 				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
+
+				// validate client request header
+				Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal("http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"))
+
 				w.Write([]byte("My Special Snowflake Route Service\n"))
 			})
 		})
@@ -1065,6 +1029,25 @@ var _ = Describe("Proxy", func() {
 		Context("with SSLSkipValidation enabled", func() {
 			BeforeEach(func() {
 				conf.SSLSkipValidation = true
+			})
+
+			Context("when a request does not have a valid Route service signature header", func() {
+				It("redirects the request to the route service url", func() {
+					ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+						Fail("Should not get here")
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+
+					conn.WriteRequest(req)
+
+					res, body := conn.ReadResponse()
+					Expect(res.StatusCode).To(Equal(http.StatusOK))
+					Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+				})
 			})
 
 			Context("when a request has a valid Route service signature header", func() {
@@ -1091,35 +1074,13 @@ var _ = Describe("Proxy", func() {
 
 					conn := dialProxy(proxyServer)
 
-					conn.WriteLines([]string{
-						"GET /my_path HTTP/1.1",
-						"Host: test",
-						"X-CF-RouteServiceSignature: some-signature",
-					})
+					req := test_util.NewRequest("GET", "test", "/my_path", nil)
+					req.Header.Set("X-CF-RouteServiceSignature", "some-signature")
+					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
 					Expect(res.StatusCode).To(Equal(http.StatusOK))
 					Expect(body).To(ContainSubstring("backend instance"))
-				})
-			})
-
-			Context("when a request does not have a valid Route service signature header", func() {
-				It("redirects the request to the route service url", func() {
-					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-						Fail("Should not get here")
-					})
-					defer ln.Close()
-
-					conn := dialProxy(proxyServer)
-
-					conn.WriteLines([]string{
-						"GET /my_path HTTP/1.0",
-						"Host: test",
-					})
-
-					res, body := conn.ReadResponse()
-					Expect(res.StatusCode).To(Equal(http.StatusOK))
-					Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
 				})
 			})
 		})
@@ -1132,10 +1093,8 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			conn.WriteLines([]string{
-				"GET /my_path HTTP/1.0",
-				"Host: test",
-			})
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			conn.WriteRequest(req)
 
 			// HACK: Don't output error message from parsing bad URL
 			log.SetOutput(ioutil.Discard)
@@ -1154,10 +1113,8 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			conn.WriteLines([]string{
-				"GET /my_path HTTP/1.0",
-				"Host: test",
-			})
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			conn.WriteRequest(req)
 
 			// HACK disable output from http proxy and cert validation
 			log.SetOutput(ioutil.Discard)
@@ -1175,10 +1132,8 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			conn.WriteLines([]string{
-				"GET /my_path HTTP/1.0",
-				"Host: test",
-			})
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			conn.WriteRequest(req)
 
 			res, _ := conn.ReadResponse()
 			Expect(res.StatusCode).To(Equal(http.StatusOK))

@@ -55,8 +55,7 @@ var _ = Describe("Session Affinity", func() {
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "/", nil)
-				req.Host = "app"
+				req := test_util.NewRequest("GET", "app", "/", nil)
 				x.WriteRequest(req)
 
 				Eventually(done).Should(Receive())
@@ -72,8 +71,7 @@ var _ = Describe("Session Affinity", func() {
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "/", nil)
-				req.Host = "app"
+				req := test_util.NewRequest("GET", "app", "/", nil)
 				x.WriteRequest(req)
 
 				Eventually(done).Should(Receive())
@@ -100,8 +98,7 @@ var _ = Describe("Session Affinity", func() {
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
-					req := test_util.NewRequest("GET", "/", nil)
-					req.Host = "app"
+					req := test_util.NewRequest("GET", "app", "/", nil)
 					x.WriteRequest(req)
 
 					Eventually(done).Should(Receive())
@@ -135,8 +132,7 @@ var _ = Describe("Session Affinity", func() {
 				Secure:   false,
 			}
 
-			req = test_util.NewRequest("GET", "/", nil)
-			req.Host = host
+			req = test_util.NewRequest("GET", host, "/", nil)
 			req.AddCookie(cookie)
 
 			jSessionIdCookie := &http.Cookie{
@@ -190,8 +186,7 @@ var _ = Describe("Session Affinity", func() {
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "/", nil)
-				req.Host = "app"
+				req := test_util.NewRequest("GET", "app", "/", nil)
 				x.WriteRequest(req)
 
 				Eventually(done).Should(Receive())
@@ -218,8 +213,7 @@ var _ = Describe("Session Affinity", func() {
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
-					req := test_util.NewRequest("GET", "/", nil)
-					req.Host = "app"
+					req := test_util.NewRequest("GET", "app", "/", nil)
 					x.WriteRequest(req)
 
 					Eventually(done).Should(Receive())
