@@ -239,6 +239,17 @@ curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
 {"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
 ```
 
+### Profiling the Server
+
+The GoRouter runs the [cf_debug_server](https://github.com/cloudfoundry-incubator/cf-debug-server), which is a wrapper around the go pprof tool. In order to generate this profile, do the following:
+
+```bash
+# Establish a SSH tunnel to your server (not necessary if you can connect directly)
+ssh -L localhost:8080:[INTERNAL_SERVER_IP]:17001 vcap@[BOSH_DIRECTOR]
+# Run the profile tool.
+go tool pprof http://localhost:8080/debug/pprof/profile
+```
+
 ## Logs
 
 The router's logging is specified in its YAML configuration file, in a [steno configuration format](http://github.com/cloudfoundry/steno#from-yaml-file).
