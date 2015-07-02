@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/cloudfoundry/gorouter.png)](https://travis-ci.org/cloudfoundry/gorouter)
 
-# gorouter
+# GoRouter
 
 This repository contains the source code for a Go implementation of the Cloud
 Foundry router.
@@ -17,21 +17,39 @@ standalone environment.
 - Go should be installed and in the PATH
 - GOPATH should be set as described in http://golang.org/doc/code.html
 - [gnatsd](https://github.com/apcera/gnatsd) installed and in the PATH
+- [godep](https://github.com/tools/godep) installed and in the PATH
+- Install [direnv](http://direnv.net/) if you are planning to do gorouter
+development as part of cf-release.
 
 ### Development Setup
 
 Download gorouter:
+
+Option 1: GoRouter (standalone)
 ```bash
 go get -d github.com/cloudfoundry/gorouter
 cd $GOPATH/src/github.com/cloudfoundry/gorouter
 ```
 
-To install exactly the dependecies vendored with gorouter, use [godep](https://github.com/tools/godep):
+Option 2: GoRouter (as part of [cf-release](https://github.com/cloudfoundry/cf-release))
+```bash
+git clone https://github.com/cloudfoundry/cf-release
+cd cf-release
+./update
+cd cf-release/src/github.com/cloudfoundry/gorouter
+```
+ *Note: direnv will automatically set your GOPATH when you cd into the gorouter directory. You will need to run `direnv allow` the first time.*
+
+
+To install exactly the dependencies vendored with gorouter, use [godep](https://github.com/tools/godep):
 
 ```bash
 go get -v github.com/tools/godep
 godep restore ./...
 ```
+
+
+
 
 ### Running Tests
 
@@ -139,7 +157,7 @@ The format of the `router.register` message is as follows:
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. `X-CF-InstanceID` is set to this value on the request to the endpoint registered.
 
 Such a message can be sent to both the `router.register` subject to register
-URIs, and to the `router.unregister` subject to unregister URIs, respectively. 
+URIs, and to the `router.unregister` subject to unregister URIs, respectively.
 
 ###Example
 
