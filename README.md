@@ -210,6 +210,8 @@ curl -vvv -A "HTTP-Monitor/1.1" http://127.0.0.1/
 > Accept: */*
 >
 < HTTP/1.1 200 OK
+< Cache-Control: private, max-age=0
+< Expires: 0
 < Date: Mon, 10 Feb 2014 00:55:25 GMT
 < Transfer-Encoding: chunked
 <
