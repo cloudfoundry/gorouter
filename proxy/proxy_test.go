@@ -1051,14 +1051,15 @@ var _ = Describe("Proxy", func() {
 			})
 
 			Context("when a request has a valid Route service signature header", func() {
+				var sigHeader string
 				BeforeEach(func() {
+					sigHeader = "X-CF-Proxy-Signature"
 					routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						Fail("Should not get here")
 					})
 				})
 
 				It("routes to the backend instance", func() {
-					sigHeader := "X-CF-Proxy-Signature"
 					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
 						Expect(req.Header.Get(sigHeader)).To(Equal(""))
@@ -1082,6 +1083,34 @@ var _ = Describe("Proxy", func() {
 					res, body := conn.ReadResponse()
 					Expect(res.StatusCode).To(Equal(http.StatusOK))
 					Expect(body).To(ContainSubstring("backend instance"))
+				})
+
+				Context("and is forwarding to a route service on CF", func() {
+					It("does not strip the signature header", func() {
+						ln := registerHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
+							req, _ := conn.ReadRequest()
+							Expect(req.Header.Get(sigHeader)).To(Equal("some-signature"))
+
+							out := &bytes.Buffer{}
+							out.WriteString("route service instance")
+							res := &http.Response{
+								StatusCode: http.StatusOK,
+								Body:       ioutil.NopCloser(out),
+							}
+							conn.WriteResponse(res)
+						})
+						defer ln.Close()
+
+						conn := dialProxy(proxyServer)
+
+						req := test_util.NewRequest("GET", "test", "/my_path", nil)
+						req.Header.Set(sigHeader, "some-signature")
+						conn.WriteRequest(req)
+
+						res, body := conn.ReadResponse()
+						Expect(res.StatusCode).To(Equal(http.StatusOK))
+						Expect(body).To(ContainSubstring("route service instance"))
+					})
 				})
 			})
 		})

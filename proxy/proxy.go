@@ -343,7 +343,6 @@ func (p *proxyRoundTripper) processBackend(request *http.Request, endpoint *rout
 
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-	request.Header.Del(routeServiceSignature)
 	setRequestXCfInstanceId(request, endpoint)
 }
 
@@ -354,6 +353,7 @@ func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoi
 		if request.Header.Get(routeServiceSignature) == "" {
 			err = p.processRoutingService(request, endpoint)
 		} else if isValidSignature(&request.Header) {
+			request.Header.Del(routeServiceSignature)
 			p.processBackend(request, endpoint)
 		} else {
 			return invalidRouteServiceSignature
