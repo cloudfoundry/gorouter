@@ -262,7 +262,7 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 
-		err = processIncomingRequest(request, endpoint)
+		err = p.processIncomingRequest(request, endpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +319,9 @@ func isValidSignature(header *http.Header) bool {
 	return header.Get(routeServiceSignature) != ""
 }
 
-func processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
+func (p *proxyRoundTripper) processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
+	p.handler.Logger().Debug("proxy.route-service")
+
 	request.Header.Set(routeServiceSignature, request.URL.Host+request.URL.Path)
 
 	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
@@ -336,26 +338,28 @@ func processRoutingService(request *http.Request, endpoint *route.Endpoint) erro
 	return nil
 }
 
-func processBackend(request *http.Request, endpoint *route.Endpoint) {
+func (p *proxyRoundTripper) processBackend(request *http.Request, endpoint *route.Endpoint) {
+	p.handler.Logger().Debug("proxy.backend")
+
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Del(routeServiceSignature)
 	setRequestXCfInstanceId(request, endpoint)
 }
 
-func processIncomingRequest(request *http.Request, endpoint *route.Endpoint) error {
+func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) error {
 	var err error
 
 	if endpoint.RouteServiceUrl != "" {
 		if request.Header.Get(routeServiceSignature) == "" {
-			err = processRoutingService(request, endpoint)
+			err = p.processRoutingService(request, endpoint)
 		} else if isValidSignature(&request.Header) {
-			processBackend(request, endpoint)
+			p.processBackend(request, endpoint)
 		} else {
 			return invalidRouteServiceSignature
 		}
 	} else {
-		processBackend(request, endpoint)
+		p.processBackend(request, endpoint)
 	}
 
 	return err
