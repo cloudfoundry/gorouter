@@ -22,7 +22,7 @@ const (
 	VcapCookieId             = "__VCAP_ID__"
 	StickyCookieKey          = "JSESSIONID"
 	retries                  = 3
-	routeServiceSignature    = "X-CF-RouteServiceSignature"
+	routeServiceSignature    = "X-CF-Proxy-Signature"
 	routeServiceForwardedUrl = "X-CF-Forwarded-Url"
 )
 

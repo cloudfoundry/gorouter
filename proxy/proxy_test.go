@@ -1016,7 +1016,7 @@ var _ = Describe("Proxy", func() {
 
 		BeforeEach(func() {
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				Expect(r.Header.Get("X-CF-RouteServiceSignature")).To(Equal("my_host.com/resource+9-9_9"))
+				Expect(r.Header.Get("X-CF-Proxy-Signature")).To(Equal("my_host.com/resource+9-9_9"))
 				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
 
 				// validate client request header
@@ -1058,9 +1058,10 @@ var _ = Describe("Proxy", func() {
 				})
 
 				It("routes to the backend instance", func() {
+					sigHeader := "X-CF-Proxy-Signature"
 					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
-						Expect(req.Header.Get("X-CF-RouteServiceSignature")).To(Equal(""))
+						Expect(req.Header.Get(sigHeader)).To(Equal(""))
 
 						out := &bytes.Buffer{}
 						out.WriteString("backend instance")
@@ -1075,7 +1076,7 @@ var _ = Describe("Proxy", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
-					req.Header.Set("X-CF-RouteServiceSignature", "some-signature")
+					req.Header.Set(sigHeader, "some-signature")
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
