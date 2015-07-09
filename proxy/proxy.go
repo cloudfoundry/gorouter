@@ -208,7 +208,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 
 			if endpoint.PrivateInstanceId != "" {
-				setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies)
+
+				setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
 			}
 		},
 	}
@@ -368,7 +369,8 @@ func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoi
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,
 	endpoint *route.Endpoint,
 	originalEndpointId string,
-	secureCookies bool) {
+	secureCookies bool,
+	path string) {
 
 	maxAge := 0
 
@@ -389,7 +391,7 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 		cookie := &http.Cookie{
 			Name:     VcapCookieId,
 			Value:    endpoint.PrivateInstanceId,
-			Path:     "/",
+			Path:     path,
 			MaxAge:   maxAge,
 			HttpOnly: true,
 			Secure:   secureCookies,

@@ -33,17 +33,24 @@ type Pool struct {
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
 
+	contextPath string
+
 	retryAfterFailure time.Duration
 	nextIdx           int
 }
 
-func NewPool(retryAfterFailure time.Duration) *Pool {
+func NewPool(retryAfterFailure time.Duration, contextPath string) *Pool {
 	return &Pool{
 		endpoints:         make([]*endpointElem, 0, 1),
 		index:             make(map[string]*endpointElem),
 		retryAfterFailure: retryAfterFailure,
 		nextIdx:           -1,
+		contextPath:       contextPath,
 	}
+}
+
+func (p *Pool) ContextPath() string {
+	return p.contextPath
 }
 
 func (p *Pool) Put(endpoint *Endpoint) bool {

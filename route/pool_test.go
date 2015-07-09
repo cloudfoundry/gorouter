@@ -13,7 +13,7 @@ var _ = Describe("Pool", func() {
 	var pool *Pool
 
 	BeforeEach(func() {
-		pool = NewPool(2 * time.Minute)
+		pool = NewPool(2*time.Minute, "")
 	})
 
 	Context("Put", func() {

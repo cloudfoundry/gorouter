@@ -17,7 +17,7 @@ var _ = Describe("Session Affinity", func() {
 
 	responseNoCookies := func(x *test_util.HttpConn) {
 		_, err := http.ReadRequest(x.Reader)
-		Ω(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		resp := test_util.NewResponse(http.StatusOK)
 		x.WriteResponse(resp)
@@ -27,7 +27,7 @@ var _ = Describe("Session Affinity", func() {
 
 	responseWithJSessionID := func(x *test_util.HttpConn) {
 		_, err := http.ReadRequest(x.Reader)
-		Ω(err).NotTo(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		resp := test_util.NewResponse(http.StatusOK)
 		resp.Header.Add("Set-Cookie", jSessionIdCookie.String())
@@ -46,6 +46,105 @@ var _ = Describe("Session Affinity", func() {
 			MaxAge:  1,
 			Expires: time.Now(),
 		}
+	})
+
+	Context("context paths", func() {
+		Context("when two requests have the same context paths", func() {
+			It("responds with the same instance id", func() {
+				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				defer ln.Close()
+				ln2 := registerHandlerWithInstanceId(r, "app.com/path2/context/path", "", responseWithJSessionID, "instance-id-2")
+				defer ln2.Close()
+
+				conn := dialProxy(proxyServer)
+				req := test_util.NewRequest("GET", "app.com", "/path1/some/sub/path/index.html", nil)
+				conn.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ := conn.ReadResponse()
+				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/path1"))
+				Expect(cookie.Value).To(Equal("instance-id-1"))
+
+				req2 := test_util.NewRequest("GET", "app.com", "/path1/other/sub/path/index.html", nil)
+				conn.WriteRequest(req2)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ = conn.ReadResponse()
+				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/path1"))
+				Expect(cookie.Value).To(Equal("instance-id-1"))
+			})
+		})
+
+		Context("when two requests have different context paths", func() {
+			It("responds with different instance ids", func() {
+				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				defer ln.Close()
+				ln2 := registerHandlerWithInstanceId(r, "app.com/path2/context/path", "", responseWithJSessionID, "instance-id-2")
+				defer ln2.Close()
+
+				conn := dialProxy(proxyServer)
+				req := test_util.NewRequest("GET", "app.com", "/path1/some/sub/path/index.html", nil)
+				conn.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ := conn.ReadResponse()
+				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/path1"))
+				Expect(cookie.Value).To(Equal("instance-id-1"))
+
+				req2 := test_util.NewRequest("GET", "app.com", "/path2/context/path/index.html", nil)
+				conn.WriteRequest(req2)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ = conn.ReadResponse()
+				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/path2/context/path"))
+				Expect(cookie.Value).To(Equal("instance-id-2"))
+			})
+		})
+
+		Context("when only one request has a context path", func() {
+			It("responds with different instance ids", func() {
+				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				defer ln.Close()
+				ln2 := registerHandlerWithInstanceId(r, "app.com", "", responseWithJSessionID, "instance-id-2")
+				defer ln2.Close()
+
+				conn := dialProxy(proxyServer)
+				req := test_util.NewRequest("GET", "app.com", "/path1/some/sub/path/index.html", nil)
+				conn.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ := conn.ReadResponse()
+				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/path1"))
+				Expect(cookie.Value).To(Equal("instance-id-1"))
+
+				req2 := test_util.NewRequest("GET", "app.com", "/path2/context/path/index.html", nil)
+				conn.WriteRequest(req2)
+
+				Eventually(done).Should(Receive())
+
+				resp, _ = conn.ReadResponse()
+				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				Expect(cookie).ToNot(BeNil())
+				Expect(cookie.Path).To(Equal("/"))
+				Expect(cookie.Value).To(Equal("instance-id-2"))
+			})
+		})
+
 	})
 
 	Context("first request", func() {

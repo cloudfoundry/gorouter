@@ -2,6 +2,7 @@ package registry
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,7 +63,8 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	pool, found := r.byUri.Find(uri)
 	if !found {
-		pool = route.NewPool(r.dropletStaleThreshold / 4)
+		contextPath := parseContextPath(uri)
+		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byUri.Insert(uri, pool)
 	}
 
@@ -169,4 +171,14 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		t.Snip()
 	})
 	r.Unlock()
+}
+
+func parseContextPath(uri route.Uri) string {
+	contextPath := "/"
+	split := strings.SplitN(strings.TrimPrefix(uri.String(), "/"), "/", 2)
+
+	if len(split) > 1 {
+		contextPath += split[1]
+	}
+	return contextPath
 }
