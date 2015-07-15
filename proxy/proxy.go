@@ -259,6 +259,7 @@ type proxyRoundTripper struct {
 
 func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
+	var sig string
 	var res *http.Response
 	var endpoint *route.Endpoint
 	retry := 0
@@ -272,7 +273,8 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 
-		err = p.processIncomingRequest(request, endpoint)
+		// determine where we need to route to (backend or route service)
+		sig, err = p.processIncomingRequest(request, endpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -285,6 +287,9 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 		if ne, netErr := err.(*net.OpError); !netErr || ne.Op != "dial" {
 			break
 		}
+
+		// post processing of request in case of error / retry
+		postProcess(request, sig)
 
 		p.iter.EndpointFailed()
 
@@ -305,6 +310,15 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 	p.err = err
 
 	return res, err
+}
+
+func postProcess(request *http.Request, sig string) {
+	// if we have a request which comes from a route service
+	// we will want to restore the signed header so we do not
+	// route to the route service on a retry
+	if sig != "" {
+		request.Header.Set(RouteServiceSignature, sig)
+	}
 }
 
 type wrappedIterator struct {
@@ -365,23 +379,25 @@ func (p *proxyRoundTripper) processBackend(request *http.Request, endpoint *rout
 	setRequestXCfInstanceId(request, endpoint)
 }
 
-func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) error {
+func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) (string, error) {
 	var err error
+	var sig string
 
 	if endpoint.RouteServiceUrl != "" {
 		if request.Header.Get(RouteServiceSignature) == "" {
-			return p.processRoutingService(request, endpoint)
+			return "", p.processRoutingService(request, endpoint)
 		}
 		err = p.validateSignature(&request.Header)
 		if err != nil {
 			p.handler.HandleBadSignature(err)
-			return err
+			return "", err
 		}
+		sig = request.Header.Get(RouteServiceSignature)
 		request.Header.Del(RouteServiceSignature)
 	}
 
 	p.processBackend(request, endpoint)
-	return nil
+	return sig, err
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,

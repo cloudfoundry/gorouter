@@ -853,10 +853,7 @@ var _ = Describe("Proxy", func() {
 		started := time.Now()
 		conn.WriteRequest(req)
 
-		// HACK: Don't output annoying log messages from i/o timeout
-		log.SetOutput(ioutil.Discard)
-		resp, _ := conn.ReadResponse()
-		log.SetOutput(os.Stderr)
+		resp, _ := readResponse(conn)
 
 		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
@@ -1058,7 +1055,7 @@ var _ = Describe("Proxy", func() {
 			Context("when a request has a valid Route service signature header", func() {
 				BeforeEach(func() {
 					routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						Fail("Should not get here")
+						Fail("Should not get here into Route Service")
 					})
 				})
 
@@ -1115,6 +1112,23 @@ var _ = Describe("Proxy", func() {
 						Expect(body).To(ContainSubstring("route service instance"))
 					})
 				})
+
+				It("returns 502 when backend not available", func() {
+					ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
+					Expect(err).To(BeNil())
+
+					// register route service, should NOT route to it
+					registerAddr(r, "mybadapp.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId")
+
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "mybadapp.com", "/", nil)
+					req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Unix(), 10))
+					conn.WriteRequest(req)
+					resp, _ := conn.ReadResponse()
+
+					Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+				})
 			})
 		})
 
@@ -1147,10 +1161,7 @@ var _ = Describe("Proxy", func() {
 			req := test_util.NewRequest("GET", "test", "/my_path", nil)
 			conn.WriteRequest(req)
 
-			// HACK: Don't output error message from parsing bad URL
-			log.SetOutput(ioutil.Discard)
-			res, body := conn.ReadResponse()
-			log.SetOutput(os.Stderr)
+			res, body := readResponse(conn)
 
 			Expect(res.StatusCode).To(Equal(http.StatusInternalServerError))
 			Expect(body).NotTo(ContainSubstring("My Special Snowflake Route Service"))
@@ -1167,10 +1178,8 @@ var _ = Describe("Proxy", func() {
 			req := test_util.NewRequest("GET", "test", "/my_path", nil)
 			conn.WriteRequest(req)
 
-			// HACK disable output from http proxy and cert validation
-			log.SetOutput(ioutil.Discard)
-			res, _ := conn.ReadResponse()
-			log.SetOutput(os.Stderr)
+			res, _ := readResponse(conn)
+
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 		})
 
@@ -1186,12 +1195,23 @@ var _ = Describe("Proxy", func() {
 			req := test_util.NewRequest("GET", "test", "/my_path", nil)
 			conn.WriteRequest(req)
 
-			res, _ := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			res, _ := readResponse(conn)
+
+			okCodes := []int{http.StatusOK, http.StatusFound}
+			Expect(okCodes).Should(ContainElement(res.StatusCode))
 		})
 	})
 
 })
+
+// HACK: this is used to silence any http warnings in logs
+// that clutter stdout/stderr when running unit tests
+func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
+	log.SetOutput(ioutil.Discard)
+	res, body := conn.ReadResponse()
+	log.SetOutput(os.Stderr)
+	return res, body
+}
 
 func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId string) {
 	host, portStr, err := net.SplitHostPort(addr.String())
