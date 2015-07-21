@@ -81,3 +81,8 @@ func (t Time) Elapsed() Duration {
 	d := time.Since(time.Time(t))
 	return Duration(d)
 }
+
+func UnixToTime(unixTime string) (time.Time, error) {
+	unixTimeInt, err := strconv.ParseInt(unixTime, 10, 64)
+	return time.Unix(unixTimeInt, 0), err
+}

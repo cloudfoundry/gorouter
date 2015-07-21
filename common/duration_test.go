@@ -62,5 +62,30 @@ var _ = Describe("Durations", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tt).To(Equal(t))
 		})
+
+	})
+
+	Describe("Unix To Time", func() {
+		Context("when the unix time is valid", func() {
+			It("converts unix time stamp to time struct", func() {
+				unixTime := "1437497865"
+
+				tm, err := UnixToTime(unixTime)
+				Expect(err).ToNot(HaveOccurred())
+				expectedTime, err := time.Parse(time.UnixDate, "Tue Jul 21 16:57:45 UTC 2015")
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(tm.Sub(expectedTime)).To(Equal(time.Duration(0)))
+			})
+		})
+
+		Context("when the unix time is invalid", func() {
+			It("returns an error", func() {
+				unixTime := "invalid time string"
+
+				_, err := UnixToTime(unixTime)
+				Expect(err).To(HaveOccurred())
+			})
+		})
 	})
 })

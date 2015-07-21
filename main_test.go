@@ -194,7 +194,7 @@ var _ = Describe("Router Integration", func() {
 			Eventually(responseRead).Should(Receive(BeTrue()))
 		})
 
-		It("will timeout if requests take too long", func() {
+		It("returns EOF error when the gorouter terminates before a request completes", func() {
 			mbusClient, err := newMessageBus(config)
 			Expect(err).ToNot(HaveOccurred())
 

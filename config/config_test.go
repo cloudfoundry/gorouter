@@ -356,6 +356,7 @@ cipher_suites: potato
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`
 endpoint_timeout: 10
+route_service_timeout: 10
 drain_timeout: 15
 `)
 
@@ -363,6 +364,7 @@ drain_timeout: 15
 				config.Process()
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Expect(config.RouteServiceTimeout).To(Equal(10 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(15 * time.Second))
 			})
 

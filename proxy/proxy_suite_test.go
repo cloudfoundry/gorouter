@@ -62,14 +62,15 @@ var _ = JustBeforeEach(func() {
 	}
 
 	p = proxy.NewProxy(proxy.ProxyArgs{
-		EndpointTimeout: conf.EndpointTimeout,
-		Ip:              conf.Ip,
-		TraceKey:        conf.TraceKey,
-		Registry:        r,
-		Reporter:        nullVarz{},
-		AccessLogger:    accessLog,
-		SecureCookies:   conf.SecureCookies,
-		TLSConfig:       tlsConfig,
+		EndpointTimeout:     conf.EndpointTimeout,
+		Ip:                  conf.Ip,
+		TraceKey:            conf.TraceKey,
+		Registry:            r,
+		Reporter:            nullVarz{},
+		AccessLogger:        accessLog,
+		SecureCookies:       conf.SecureCookies,
+		TLSConfig:           tlsConfig,
+		RouteServiceTimeout: conf.RouteServiceTimeout,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

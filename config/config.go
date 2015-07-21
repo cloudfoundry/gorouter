@@ -86,14 +86,16 @@ type Config struct {
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16
 
-	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
-	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
-	DropletStaleThresholdInSeconds       int  `yaml:"droplet_stale_threshold"`
-	PublishActiveAppsIntervalInSeconds   int  `yaml:"publish_active_apps_interval"`
-	StartResponseDelayIntervalInSeconds  int  `yaml:"start_response_delay_interval"`
-	EndpointTimeoutInSeconds             int  `yaml:"endpoint_timeout"`
-	DrainTimeoutInSeconds                int  `yaml:"drain_timeout,omitempty"`
-	SecureCookies                        bool `yaml:"secure_cookies"`
+	PublishStartMessageIntervalInSeconds int `yaml:"publish_start_message_interval"`
+	PruneStaleDropletsIntervalInSeconds  int `yaml:"prune_stale_droplets_interval"`
+	DropletStaleThresholdInSeconds       int `yaml:"droplet_stale_threshold"`
+	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
+	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
+	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
+	RouteServiceTimeoutInSeconds         int `yaml:"route_service_timeout"`
+
+	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
+	SecureCookies         bool `yaml:"secure_cookies"`
 
 	OAuth      token_fetcher.OAuthConfig `yaml:"oauth"`
 	RoutingApi RoutingApiConfig          `yaml:"routing_api"`
@@ -104,6 +106,7 @@ type Config struct {
 	PublishActiveAppsInterval  time.Duration `yaml:"-"`
 	StartResponseDelayInterval time.Duration `yaml:"-"`
 	EndpointTimeout            time.Duration `yaml:"-"`
+	RouteServiceTimeout        time.Duration `yaml:"-"`
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
 }
@@ -119,7 +122,8 @@ var defaultConfig = Config{
 	EnableSSL:  false,
 	SSLPort:    443,
 
-	EndpointTimeoutInSeconds: 60,
+	EndpointTimeoutInSeconds:     60,
+	RouteServiceTimeoutInSeconds: 60,
 
 	PublishStartMessageIntervalInSeconds: 30,
 	PruneStaleDropletsIntervalInSeconds:  30,
@@ -148,6 +152,7 @@ func (c *Config) Process() {
 	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
+	c.RouteServiceTimeout = time.Duration(c.RouteServiceTimeoutInSeconds) * time.Second
 	c.Logging.JobName = "router_" + c.Zone + "_" + strconv.Itoa(int(c.Index))
 
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {

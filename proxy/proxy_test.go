@@ -19,7 +19,9 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/stats"
@@ -1016,7 +1018,10 @@ var _ = Describe("Proxy", func() {
 
 		BeforeEach(func() {
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				Expect(r.Header.Get("X-CF-Proxy-Signature")).To(Equal("my_host.com/resource+9-9_9"))
+				tm, err := common.UnixToTime(r.Header.Get(proxy.RouteServiceSignature))
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(time.Since(tm)).Should(BeNumerically(">=", 0))
 				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
 
 				// validate client request header
@@ -1051,9 +1056,7 @@ var _ = Describe("Proxy", func() {
 			})
 
 			Context("when a request has a valid Route service signature header", func() {
-				var sigHeader string
 				BeforeEach(func() {
-					sigHeader = "X-CF-Proxy-Signature"
 					routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						Fail("Should not get here")
 					})
@@ -1062,7 +1065,7 @@ var _ = Describe("Proxy", func() {
 				It("routes to the backend instance", func() {
 					ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
-						Expect(req.Header.Get(sigHeader)).To(Equal(""))
+						Expect(req.Header.Get(proxy.RouteServiceSignature)).To(Equal(""))
 
 						out := &bytes.Buffer{}
 						out.WriteString("backend instance")
@@ -1077,7 +1080,7 @@ var _ = Describe("Proxy", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
-					req.Header.Set(sigHeader, "some-signature")
+					req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Unix(), 10))
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -1089,7 +1092,7 @@ var _ = Describe("Proxy", func() {
 					It("does not strip the signature header", func() {
 						ln := registerHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
 							req, _ := conn.ReadRequest()
-							Expect(req.Header.Get(sigHeader)).To(Equal("some-signature"))
+							Expect(req.Header.Get(proxy.RouteServiceSignature)).To(Equal("some-signature"))
 
 							out := &bytes.Buffer{}
 							out.WriteString("route service instance")
@@ -1104,7 +1107,7 @@ var _ = Describe("Proxy", func() {
 						conn := dialProxy(proxyServer)
 
 						req := test_util.NewRequest("GET", "test", "/my_path", nil)
-						req.Header.Set(sigHeader, "some-signature")
+						req.Header.Set(proxy.RouteServiceSignature, "some-signature")
 						conn.WriteRequest(req)
 
 						res, body := conn.ReadResponse()
@@ -1112,6 +1115,24 @@ var _ = Describe("Proxy", func() {
 						Expect(body).To(ContainSubstring("route service instance"))
 					})
 				})
+			})
+		})
+
+		Context("when a request has an expired Route service signature header", func() {
+			It("returns an route service request expired error", func() {
+				ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+					Fail("Should not get here")
+				})
+				defer ln.Close()
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "test", "/my_path", nil)
+				req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Add(-2*conf.RouteServiceTimeout).Unix(), 10))
+				conn.WriteRequest(req)
+
+				res, body := conn.ReadResponse()
+				Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
+				Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
 			})
 		})
 

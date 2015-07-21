@@ -94,6 +94,13 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
 }
 
+func (h *RequestHandler) HandleBadSignature(err error) {
+	h.logger.Set("Error", err.Error())
+	h.logger.Warnf("proxy.badsignature")
+
+	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
+}
+
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	h.logger.Set("Upgrade", "tcp")
 
