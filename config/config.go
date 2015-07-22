@@ -97,8 +97,9 @@ type Config struct {
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
 
-	OAuth      token_fetcher.OAuthConfig `yaml:"oauth"`
-	RoutingApi RoutingApiConfig          `yaml:"routing_api"`
+	OAuth              token_fetcher.OAuthConfig `yaml:"oauth"`
+	RoutingApi         RoutingApiConfig          `yaml:"routing_api"`
+	RouteServiceSecret string                    `yaml:"route_service_secret"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`

@@ -7,8 +7,8 @@ import (
 )
 
 type Crypto interface {
-	Encrypt(plainText, iv []byte) (cipherText, nonce []byte, err error)
-	Decrypt(cipherText, iv, nonce []byte) ([]byte, error)
+	Encrypt(plainText []byte) (cipherText []byte, nonce []byte, iv []byte, err error)
+	Decrypt(cipherText, nonce, iv []byte) ([]byte, error)
 }
 
 type AesGCM struct {
@@ -30,18 +30,23 @@ func NewAesGCM(key []byte) (*AesGCM, error) {
 	return &aesGCM, nil
 }
 
-func (gcm *AesGCM) Encrypt(plainText, iv []byte) (cipherText, nonce []byte, err error) {
+func (gcm *AesGCM) Encrypt(plainText []byte) (cipherText, nonce []byte, iv []byte, err error) {
 	nonce, err = gcm.generateNonce()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	iv, err = randomBytes(12)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	cipherText = gcm.Seal(nil, nonce, plainText, iv)
 
-	return cipherText, nonce, nil
+	return cipherText, nonce, iv, nil
 }
 
-func (gcm *AesGCM) Decrypt(cipherText, iv, nonce []byte) ([]byte, error) {
+func (gcm *AesGCM) Decrypt(cipherText, nonce, iv []byte) ([]byte, error) {
 	plainText, err := gcm.Open(nil, nonce, cipherText, iv)
 	if err != nil {
 		return nil, err
@@ -51,7 +56,11 @@ func (gcm *AesGCM) Decrypt(cipherText, iv, nonce []byte) ([]byte, error) {
 }
 
 func (gcm *AesGCM) generateNonce() ([]byte, error) {
-	b := make([]byte, gcm.NonceSize())
+	return randomBytes(uint(gcm.NonceSize()))
+}
+
+func randomBytes(size uint) ([]byte, error) {
+	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {
 		return nil, err

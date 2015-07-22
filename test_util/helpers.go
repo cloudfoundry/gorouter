@@ -78,5 +78,7 @@ func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 		Port:          8080,
 	}
 
+	c.RouteServiceSecret = "kCvXxNMB0JO2vinxoru9Hg=="
+
 	return c
 }

@@ -19,11 +19,12 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/route_service"
 	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/test_util"
 
@@ -997,6 +998,8 @@ var _ = Describe("Proxy", func() {
 		var (
 			routeServiceListener net.Listener
 			routeServiceHandler  http.Handler
+			signatureHeader      string
+			metadataHeader       string
 		)
 
 		JustBeforeEach(func() {
@@ -1015,10 +1018,14 @@ var _ = Describe("Proxy", func() {
 
 		BeforeEach(func() {
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				tm, err := common.UnixToTime(r.Header.Get(proxy.RouteServiceSignature))
-				Expect(err).ToNot(HaveOccurred())
+				metadataHeader := r.Header.Get(proxy.RouteServiceMetadata)
+				signatureHeader := r.Header.Get(proxy.RouteServiceSignature)
 
-				Expect(time.Since(tm)).Should(BeNumerically(">=", 0))
+				crypto, err := secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+
+				Expect(err).ToNot(HaveOccurred())
 				Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
 
 				// validate client request header
@@ -1026,6 +1033,11 @@ var _ = Describe("Proxy", func() {
 
 				w.Write([]byte("My Special Snowflake Route Service\n"))
 			})
+			crypto, err := secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
+			Expect(err).ToNot(HaveOccurred())
+
+			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		Context("with SSLSkipValidation enabled", func() {
@@ -1077,7 +1089,8 @@ var _ = Describe("Proxy", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
-					req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Unix(), 10))
+					req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
+					req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -1123,7 +1136,8 @@ var _ = Describe("Proxy", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "mybadapp.com", "/", nil)
-					req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Unix(), 10))
+					req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
+					req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
 					conn.WriteRequest(req)
 					resp, _ := conn.ReadResponse()
 

@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/gorouter/access_log"
+	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
@@ -61,6 +62,10 @@ var _ = JustBeforeEach(func() {
 		InsecureSkipVerify: conf.SSLSkipValidation,
 	}
 
+	crypto, err := secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
+
+	Expect(err).ToNot(HaveOccurred())
+
 	p = proxy.NewProxy(proxy.ProxyArgs{
 		EndpointTimeout:     conf.EndpointTimeout,
 		Ip:                  conf.Ip,
@@ -71,6 +76,7 @@ var _ = JustBeforeEach(func() {
 		SecureCookies:       conf.SecureCookies,
 		TLSConfig:           tlsConfig,
 		RouteServiceTimeout: conf.RouteServiceTimeout,
+		Crypto:              crypto,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

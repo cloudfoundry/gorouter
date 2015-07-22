@@ -8,15 +8,15 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
-	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/route_service"
 	steno "github.com/cloudfoundry/gosteno"
 )
 
@@ -26,6 +26,7 @@ const (
 	retries                  = 3
 	RouteServiceSignature    = "X-CF-Proxy-Signature"
 	RouteServiceForwardedUrl = "X-CF-Forwarded-Url"
+	RouteServiceMetadata     = "X-CF-Proxy-Metadata"
 )
 
 var noEndpointsAvailable = errors.New("No endpoints available")
@@ -59,6 +60,7 @@ type ProxyArgs struct {
 	SecureCookies       bool
 	TLSConfig           *tls.Config
 	RouteServiceTimeout time.Duration
+	Crypto              secure.Crypto
 }
 
 type proxy struct {
@@ -71,6 +73,7 @@ type proxy struct {
 	transport           *http.Transport
 	secureCookies       bool
 	routeServiceTimeout time.Duration
+	crypto              secure.Crypto
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -98,6 +101,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		},
 		secureCookies:       args.SecureCookies,
 		routeServiceTimeout: args.RouteServiceTimeout,
+		crypto:              args.Crypto,
 	}
 
 	return p
@@ -193,6 +197,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		iter:                iter,
 		handler:             &handler,
 		routeServiceTimeout: p.routeServiceTimeout,
+		crypto:              p.crypto,
 
 		after: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 			accessLog.FirstByteAt = time.Now()
@@ -252,6 +257,7 @@ type proxyRoundTripper struct {
 	iter                route.EndpointIterator
 	handler             *RequestHandler
 	routeServiceTimeout time.Duration
+	crypto              secure.Crypto
 
 	response *http.Response
 	err      error
@@ -340,22 +346,31 @@ func (i *wrappedIterator) EndpointFailed() {
 
 // Do not modify header object
 func (p *proxyRoundTripper) validateSignature(header *http.Header) error {
-	requestedTimeHeader := header.Get(RouteServiceSignature)
-	requestedTime, err := common.UnixToTime(requestedTimeHeader)
+	metadataHeader := header.Get(RouteServiceMetadata)
+	signatureHeader := header.Get(RouteServiceSignature)
+
+	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.crypto)
 	if err != nil {
 		return err
 	}
 
-	if time.Since(requestedTime) > p.routeServiceTimeout {
+	if time.Since(signature.RequestedTime) > p.routeServiceTimeout {
 		return routeServiceExpired
 	}
+
 	return nil
 }
 
 func (p *proxyRoundTripper) processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
 	p.handler.Logger().Debug("proxy.route-service")
 
-	request.Header.Set(RouteServiceSignature, strconv.FormatInt(time.Now().Unix(), 10))
+	signatureHeader, metadataHeader, err := route_service.BuildSignatureAndMetadata(p.crypto)
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set(RouteServiceSignature, signatureHeader)
+	request.Header.Set(RouteServiceMetadata, metadataHeader)
 
 	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
 

@@ -365,6 +365,22 @@ var _ = Describe("Router Integration", func() {
 		zombieApp.VerifyAppStatus(404)
 		runningApp.VerifyAppStatus(200)
 	})
+
+	Context("when the route service is misconfigured", func() {
+		It("fails to start", func() {
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			config := createConfig(cfgFile, statusPort, proxyPort)
+			config.RouteServiceSecret = "invalid secret"
+			writeConfig(config, cfgFile)
+
+			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+			Eventually(gorouterSession, 5).Should(Exit(1))
+		})
+	})
 })
 
 func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {

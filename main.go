@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
@@ -10,6 +11,7 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
@@ -77,7 +79,20 @@ func main() {
 		logger.Fatalf("Error creating access logger: %s\n", err)
 	}
 
-	proxy := buildProxy(c, registry, accessLogger, varz)
+	routeServiceSecretDecoded, err := base64.StdEncoding.DecodeString(c.RouteServiceSecret)
+	if err != nil {
+		logger.Errorf("Error decoding route service secret: %s\n", err)
+		os.Exit(1)
+	}
+
+	crypto, err := secure.NewAesGCM(routeServiceSecretDecoded)
+
+	if err != nil {
+		logger.Errorf("Error creating route service crypto: %s\n", err)
+		os.Exit(1)
+	}
+
+	proxy := buildProxy(c, registry, accessLogger, varz, crypto)
 
 	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter)
 	if err != nil {
@@ -142,7 +157,7 @@ func waitOnErrOrSignal(c *config.Config, logger *steno.Logger, errChan <-chan er
 	}
 }
 
-func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, varz rvarz.Varz) proxy.Proxy {
+func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, varz rvarz.Varz, crypto secure.Crypto) proxy.Proxy {
 	args := proxy.ProxyArgs{
 		EndpointTimeout: c.EndpointTimeout,
 		Ip:              c.Ip,
@@ -155,6 +170,8 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 			CipherSuites:       c.CipherSuites,
 			InsecureSkipVerify: c.SSLSkipValidation,
 		},
+		RouteServiceTimeout: c.RouteServiceTimeout,
+		Crypto:              crypto,
 	}
 	return proxy.NewProxy(args)
 }

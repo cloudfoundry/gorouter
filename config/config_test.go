@@ -161,6 +161,14 @@ ssl_skip_validation: true
 			config.Initialize(b)
 			Expect(config.SSLSkipValidation).To(BeFalse())
 		})
+
+		It("sets the route service secret config", func() {
+			var b = []byte(`
+route_service_secret: tWPE+sWJq+ZnGJpyKkIPYg==
+`)
+			config.Initialize(b)
+			Expect(config.RouteServiceSecret).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
+		})
 	})
 
 	Describe("Process", func() {

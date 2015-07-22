@@ -96,7 +96,7 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 
 func (h *RequestHandler) HandleBadSignature(err error) {
 	h.logger.Set("Error", err.Error())
-	h.logger.Warnf("proxy.badsignature")
+	h.logger.Warnf("proxy.signature.validation.failed")
 
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
 }
