@@ -243,6 +243,31 @@ nats:
 			})
 		})
 
+		Describe("RouteServiceEnabled", func() {
+			var configYaml []byte
+			Context("when the route service secret not configured", func() {
+				BeforeEach(func() {
+					configYaml = []byte(`other_key: other_value`)
+				})
+				It("disables route services", func() {
+					config.Initialize(configYaml)
+					config.Process()
+					Expect(config.RouteServiceEnabled).To(BeFalse())
+				})
+			})
+
+			Context("when the route service secret is properly configured", func() {
+				BeforeEach(func() {
+					configYaml = []byte(`route_service_secret: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=`)
+				})
+				It("enables route services", func() {
+					config.Initialize(configYaml)
+					config.Process()
+					Expect(config.RouteServiceEnabled).To(BeTrue())
+				})
+			})
+		})
+
 		Describe("RoutingApiEnabled", func() {
 			var b = []byte(`
 routing_api:

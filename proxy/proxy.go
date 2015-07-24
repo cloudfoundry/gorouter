@@ -59,6 +59,7 @@ type ProxyArgs struct {
 	AccessLogger        access_log.AccessLogger
 	SecureCookies       bool
 	TLSConfig           *tls.Config
+	RouteServiceEnabled bool
 	RouteServiceTimeout time.Duration
 	Crypto              secure.Crypto
 }
@@ -72,6 +73,7 @@ type proxy struct {
 	accessLogger        access_log.AccessLogger
 	transport           *http.Transport
 	secureCookies       bool
+	routeServiceEnabled bool
 	routeServiceTimeout time.Duration
 	crypto              secure.Crypto
 }
@@ -100,6 +102,7 @@ func NewProxy(args ProxyArgs) Proxy {
 			TLSClientConfig:    args.TLSConfig,
 		},
 		secureCookies:       args.SecureCookies,
+		routeServiceEnabled: args.RouteServiceEnabled,
 		routeServiceTimeout: args.RouteServiceTimeout,
 		crypto:              args.Crypto,
 	}
@@ -196,6 +199,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		transport:           dropsonde.InstrumentedRoundTripper(p.transport),
 		iter:                iter,
 		handler:             &handler,
+		routeServiceEnabled: p.routeServiceEnabled,
 		routeServiceTimeout: p.routeServiceTimeout,
 		crypto:              p.crypto,
 
@@ -256,6 +260,7 @@ type proxyRoundTripper struct {
 	after               AfterRoundTrip
 	iter                route.EndpointIterator
 	handler             *RequestHandler
+	routeServiceEnabled bool
 	routeServiceTimeout time.Duration
 	crypto              secure.Crypto
 
@@ -399,6 +404,11 @@ func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoi
 	var sig string
 
 	if endpoint.RouteServiceUrl != "" {
+		if !p.routeServiceEnabled {
+			p.handler.HandleUnsupportedRouteService()
+			err := errors.New("Unsupported Route Service")
+			return "", err
+		}
 		if request.Header.Get(RouteServiceSignature) == "" {
 			return "", p.processRoutingService(request, endpoint)
 		}

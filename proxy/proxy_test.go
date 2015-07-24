@@ -994,7 +994,7 @@ var _ = Describe("Proxy", func() {
 		}
 	})
 
-	Context("with route services", func() {
+	Context("with route services URL", func() {
 		var (
 			routeServiceListener net.Listener
 			routeServiceHandler  http.Handler
@@ -1017,6 +1017,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		BeforeEach(func() {
+			conf.RouteServiceEnabled = true
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				metadataHeader := r.Header.Get(proxy.RouteServiceMetadata)
 				signatureHeader := r.Header.Get(proxy.RouteServiceSignature)
@@ -1038,6 +1039,33 @@ var _ = Describe("Proxy", func() {
 
 			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto)
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		Context("with Route Services disabled", func() {
+			BeforeEach(func() {
+				conf.RouteServiceEnabled = false
+				conf.SSLSkipValidation = true
+				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					Fail("Should not get here into Route Service")
+				})
+			})
+
+			It("return 502 Bad Gateway", func() {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+					Fail("Should not get here into the app")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "my_host.com", "/", nil)
+
+				conn.WriteRequest(req)
+
+				res, body := conn.ReadResponse()
+				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(body).To(ContainSubstring("Route services are not supported"))
+			})
 		})
 
 		Context("with SSLSkipValidation enabled", func() {

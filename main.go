@@ -79,17 +79,21 @@ func main() {
 		logger.Fatalf("Error creating access logger: %s\n", err)
 	}
 
-	routeServiceSecretDecoded, err := base64.StdEncoding.DecodeString(c.RouteServiceSecret)
-	if err != nil {
-		logger.Errorf("Error decoding route service secret: %s\n", err)
-		os.Exit(1)
-	}
+	var crypto secure.Crypto
 
-	crypto, err := secure.NewAesGCM(routeServiceSecretDecoded)
+	if c.RouteServiceEnabled {
+		routeServiceSecretDecoded, err := base64.StdEncoding.DecodeString(c.RouteServiceSecret)
+		if err != nil {
+			logger.Errorf("Error decoding route service secret: %s\n", err)
+			os.Exit(1)
+		}
 
-	if err != nil {
-		logger.Errorf("Error creating route service crypto: %s\n", err)
-		os.Exit(1)
+		crypto, err = secure.NewAesGCM(routeServiceSecretDecoded)
+
+		if err != nil {
+			logger.Errorf("Error creating route service crypto: %s\n", err)
+			os.Exit(1)
+		}
 	}
 
 	proxy := buildProxy(c, registry, accessLogger, varz, crypto)
@@ -170,6 +174,7 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 			CipherSuites:       c.CipherSuites,
 			InsecureSkipVerify: c.SSLSkipValidation,
 		},
+		RouteServiceEnabled: c.RouteServiceEnabled,
 		RouteServiceTimeout: c.RouteServiceTimeout,
 		Crypto:              crypto,
 	}

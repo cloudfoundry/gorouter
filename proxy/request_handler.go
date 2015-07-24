@@ -101,6 +101,13 @@ func (h *RequestHandler) HandleBadSignature(err error) {
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
 }
 
+func (h *RequestHandler) HandleUnsupportedRouteService() {
+	h.logger.Warnf("proxy.routeservice.unsupported")
+
+	h.response.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+	h.writeStatus(http.StatusBadGateway, "Route services are not supported")
+}
+
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	h.logger.Set("Upgrade", "tcp")
 

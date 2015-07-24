@@ -110,6 +110,7 @@ type Config struct {
 	RouteServiceTimeout        time.Duration `yaml:"-"`
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
+	RouteServiceEnabled        bool          `yaml:"-"`
 }
 
 var defaultConfig = Config{
@@ -180,6 +181,10 @@ func (c *Config) Process() {
 			panic(err)
 		}
 		c.SSLCertificate = cert
+	}
+
+	if c.RouteServiceSecret != "" {
+		c.RouteServiceEnabled = true
 	}
 }
 

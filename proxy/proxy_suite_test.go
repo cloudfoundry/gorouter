@@ -75,6 +75,7 @@ var _ = JustBeforeEach(func() {
 		AccessLogger:        accessLog,
 		SecureCookies:       conf.SecureCookies,
 		TLSConfig:           tlsConfig,
+		RouteServiceEnabled: conf.RouteServiceEnabled,
 		RouteServiceTimeout: conf.RouteServiceTimeout,
 		Crypto:              crypto,
 	})
