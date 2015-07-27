@@ -250,6 +250,10 @@ ssh -L localhost:8080:[INTERNAL_SERVER_IP]:17001 vcap@[BOSH_DIRECTOR]
 go tool pprof http://localhost:8080/debug/pprof/profile
 ```
 
+## Load Balancing
+
+The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection.
+
 ## Logs
 
 The router's logging is specified in its YAML configuration file, in a [steno configuration format](http://github.com/cloudfoundry/steno#from-yaml-file).
