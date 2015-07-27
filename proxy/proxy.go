@@ -326,10 +326,12 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 func postProcess(request *http.Request, sig string) {
 	// if we have a request which comes from a route service
 	// we will want to restore the signed header so we do not
-	// route to the route service on a retry
-	if sig != "" {
-		request.Header.Set(RouteServiceSignature, sig)
-	}
+	// route to the route service on a retry to the application
+	//
+	// we also want to remove the signed header if the request
+	// to the route service failed so we do not route the request
+	// to the app without first going through the route service
+	request.Header.Set(RouteServiceSignature, sig)
 }
 
 type wrappedIterator struct {

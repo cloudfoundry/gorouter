@@ -1090,6 +1090,25 @@ var _ = Describe("Proxy", func() {
 					Expect(res.StatusCode).To(Equal(http.StatusOK))
 					Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
 				})
+
+				Context("when the route service is not available", func() {
+					It("returns a 502 bad gateway error", func() {
+						ln := registerHandlerWithRouteService(r, "my_host.com", "https://bad-route-service", func(conn *test_util.HttpConn) {
+							Fail("Should not get here")
+						})
+						defer ln.Close()
+
+						conn := dialProxy(proxyServer)
+
+						req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+
+						conn.WriteRequest(req)
+
+						res, _ := conn.ReadResponse()
+						Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+						// Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+					})
+				})
 			})
 
 			Context("when a request has a valid Route service signature header", func() {
