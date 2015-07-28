@@ -14,6 +14,7 @@ import (
 )
 
 var _ = Describe("AccessLogRecord", func() {
+
 	It("Makes a record with all values", func() {
 		record := CompleteAccessLogRecord()
 
@@ -76,6 +77,45 @@ var _ = Describe("AccessLogRecord", func() {
 		Expect(record.LogMessage()).To(Equal(""))
 	})
 
+	It("Appends extra headers if specified", func() {
+		record := AccessLogRecord{
+			Request: &http.Request{
+				Host:   "FakeRequestHost",
+				Method: "FakeRequestMethod",
+				Proto:  "FakeRequestProto",
+				URL: &url.URL{
+					Opaque: "http://example.com/request",
+				},
+				Header: http.Header{
+					"X-Extra-Header": []string{"Cheerio"},
+				},
+				RemoteAddr: "FakeRemoteAddr",
+			},
+			RouteEndpoint: &route.Endpoint{
+				ApplicationId: "FakeApplicationId",
+			},
+			StartedAt:         time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			ExtraHeadersToLog: []string{"X-Extra-Header"},
+		}
+
+		recordString := "FakeRequestHost - " +
+			"[01/01/2000:00:00:00 +0000] " +
+			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
+			"MissingResponseStatusCode " +
+			"0 " +
+			"0 " +
+			"\"-\" " +
+			"\"-\" " +
+			"FakeRemoteAddr " +
+			"x_forwarded_for:\"-\" " +
+			"vcap_request_id:- " +
+			"response_time:MissingFinishedAt " +
+			"app_id:FakeApplicationId " +
+			"headers:{\"X-Extra-Header\":\"Cheerio\"}" +
+			"\n"
+
+		Expect(record.LogMessage()).To(Equal(recordString))
+	})
 })
 
 func CompleteAccessLogRecord() AccessLogRecord {

@@ -58,6 +58,7 @@ type ProxyArgs struct {
 	RouteServiceTimeout time.Duration
 	Crypto              secure.Crypto
 	CryptoPrev          secure.Crypto
+	ExtraHeadersToLog   []string
 }
 
 type proxy struct {
@@ -70,6 +71,7 @@ type proxy struct {
 	transport          *http.Transport
 	secureCookies      bool
 	routeServiceConfig *route_service.RouteServiceConfig
+	ExtraHeadersToLog  []string
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -99,6 +101,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		},
 		secureCookies:      args.SecureCookies,
 		routeServiceConfig: routeServiceConfig,
+		ExtraHeadersToLog:  args.ExtraHeadersToLog,
 	}
 
 	return p
@@ -134,8 +137,9 @@ func (p *proxy) lookup(request *http.Request) *route.Pool {
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
 	accessLog := access_log.AccessLogRecord{
-		Request:   request,
-		StartedAt: startedAt,
+		Request:           request,
+		StartedAt:         startedAt,
+		ExtraHeadersToLog: p.ExtraHeadersToLog,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: request.Body}
