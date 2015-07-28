@@ -1202,7 +1202,8 @@ var _ = Describe("Proxy", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
-				req.Header.Set(proxy.RouteServiceSignature, strconv.FormatInt(time.Now().Add(-2*conf.RouteServiceTimeout).Unix(), 10))
+				req.Header.Set(proxy.RouteServiceSignature, "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6")
+				req.Header.Set(proxy.RouteServiceMetadata, "eyJpdiI6IjlBVnBiZWRIdUZMbU1KaVciLCJub25jZSI6InpWdHM5aU1RdXNVV2U5UkoifQ==")
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
