@@ -185,6 +185,7 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 		RouteServiceTimeout: c.RouteServiceTimeout,
 		Crypto:              crypto,
 		CryptoPrev:          cryptoPrev,
+		ExtraHeadersToLog:   c.ExtraHeadersToLog,
 	}
 	return proxy.NewProxy(args)
 }

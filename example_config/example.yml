@@ -26,3 +26,8 @@ publish_active_apps_interval: 0 # 0 means disabled
 secure_cookies: true
 route_service_timeout: 60
 route_service_secret: "tWPE+sWJq+ZnGJpyKkIPYg=="
+
+extra_headers_to_log:
+  - Span-Id
+  - Trace-Id
+  - Cache-Control

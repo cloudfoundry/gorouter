@@ -112,6 +112,8 @@ type Config struct {
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
 	RouteServiceEnabled        bool          `yaml:"-"`
+
+	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
 }
 
 var defaultConfig = Config{

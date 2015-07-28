@@ -2,6 +2,7 @@ package access_log
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ type AccessLogRecord struct {
 	FinishedAt           time.Time
 	BodyBytesSent        int
 	RequestBytesReceived int
+	ExtraHeadersToLog    []string
 }
 
 func (r *AccessLogRecord) FormatStartedAt() string {
@@ -69,6 +71,10 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 		fmt.Fprintf(b, `app_id:%s`, r.RouteEndpoint.ApplicationId)
 	}
 
+	if r.ExtraHeadersToLog != nil {
+		fmt.Fprintf(b, ` headers:%s`, r.ExtraHeaders())
+	}
+
 	fmt.Fprint(b, "\n")
 	return b
 }
@@ -93,4 +99,16 @@ func (r *AccessLogRecord) LogMessage() string {
 
 	recordBuffer := r.makeRecord()
 	return recordBuffer.String()
+}
+
+func (r *AccessLogRecord) ExtraHeaders() string {
+	extraHeadersToLog := make(map[string]string)
+	for _, header := range r.ExtraHeadersToLog {
+		extraHeadersToLog[header] = r.FormatRequestHeader(header)
+	}
+	marshalledExtraHeadersToLog, err := json.Marshal(extraHeadersToLog)
+	if err != nil {
+		return fmt.Sprintf("{\"error\": \"Unable to marshal json in AccessLogRecord.ExtraHeaders(): %s\"}", err)
+	}
+	return string(marshalledExtraHeadersToLog)
 }
