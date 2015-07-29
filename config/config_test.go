@@ -169,6 +169,14 @@ route_service_secret: tWPE+sWJq+ZnGJpyKkIPYg==
 			config.Initialize(b)
 			Expect(config.RouteServiceSecret).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
 		})
+
+		It("sets the route service secret prev config", func() {
+			var b = []byte(`
+route_service_secret_prev: tWPE+sWJq+ZnGJpyKkIPYg=P
+`)
+			config.Initialize(b)
+			Expect(config.RouteServiceSecretPrev).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=P"))
+		})
 	})
 
 	Describe("Process", func() {
