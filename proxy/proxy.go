@@ -30,7 +30,6 @@ const (
 )
 
 var noEndpointsAvailable = errors.New("No endpoints available")
-var invalidRouteServiceSignature = errors.New("Invalid route service header signature")
 var routeServiceExpired = errors.New("Route service request expired")
 
 type LookupRegistry interface {
@@ -62,6 +61,7 @@ type ProxyArgs struct {
 	RouteServiceEnabled bool
 	RouteServiceTimeout time.Duration
 	Crypto              secure.Crypto
+	CryptoPrev          secure.Crypto
 }
 
 type proxy struct {
@@ -76,6 +76,7 @@ type proxy struct {
 	routeServiceEnabled bool
 	routeServiceTimeout time.Duration
 	crypto              secure.Crypto
+	cryptoPrev          secure.Crypto
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -105,6 +106,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		routeServiceEnabled: args.RouteServiceEnabled,
 		routeServiceTimeout: args.RouteServiceTimeout,
 		crypto:              args.Crypto,
+		cryptoPrev:          args.CryptoPrev,
 	}
 
 	return p
@@ -202,6 +204,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		RouteServiceEnabled: p.routeServiceEnabled,
 		routeServiceTimeout: p.routeServiceTimeout,
 		Crypto:              p.crypto,
+		cryptoPrev:          p.cryptoPrev,
 
 		after: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 			accessLog.FirstByteAt = time.Now()
@@ -225,7 +228,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 
 			if endpoint.PrivateInstanceId != "" {
-
 				setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
 			}
 		},
@@ -263,6 +265,7 @@ type ProxyRoundTripper struct {
 	RouteServiceEnabled bool
 	routeServiceTimeout time.Duration
 	Crypto              secure.Crypto
+	cryptoPrev          secure.Crypto
 
 	response *http.Response
 	err      error
@@ -357,6 +360,13 @@ func (p *ProxyRoundTripper) validateSignature(header *http.Header) error {
 	signatureHeader := header.Get(RouteServiceSignature)
 
 	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.Crypto)
+	if err != nil {
+		// Decrypt the head again trying to use the old key.
+		if p.cryptoPrev != nil {
+			signature, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.cryptoPrev)
+		}
+	}
+
 	if err != nil {
 		return err
 	}

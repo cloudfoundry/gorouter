@@ -29,6 +29,8 @@ var (
 	proxyServer   net.Listener
 	accessLog     access_log.AccessLogger
 	accessLogFile *test_util.FakeFile
+	crypto        secure.Crypto
+	cryptoPrev    secure.Crypto
 )
 
 func TestProxy(t *testing.T) {
@@ -37,6 +39,13 @@ func TestProxy(t *testing.T) {
 }
 
 var _ = BeforeEach(func() {
+	var err error
+
+	crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
+	Expect(err).NotTo(HaveOccurred())
+
+	cryptoPrev = nil
+
 	conf = config.DefaultConfig()
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
@@ -62,10 +71,6 @@ var _ = JustBeforeEach(func() {
 		InsecureSkipVerify: conf.SSLSkipValidation,
 	}
 
-	crypto, err := secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
-
-	Expect(err).ToNot(HaveOccurred())
-
 	p = proxy.NewProxy(proxy.ProxyArgs{
 		EndpointTimeout:     conf.EndpointTimeout,
 		Ip:                  conf.Ip,
@@ -78,6 +83,7 @@ var _ = JustBeforeEach(func() {
 		RouteServiceEnabled: conf.RouteServiceEnabled,
 		RouteServiceTimeout: conf.RouteServiceTimeout,
 		Crypto:              crypto,
+		CryptoPrev:          cryptoPrev,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")
