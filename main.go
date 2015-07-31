@@ -80,23 +80,15 @@ func main() {
 	}
 
 	var crypto secure.Crypto
-
+	var cryptoPrev secure.Crypto
 	if c.RouteServiceEnabled {
-		routeServiceSecretDecoded, err := base64.StdEncoding.DecodeString(c.RouteServiceSecret)
-		if err != nil {
-			logger.Errorf("Error decoding route service secret: %s\n", err)
-			os.Exit(1)
-		}
-
-		crypto, err = secure.NewAesGCM(routeServiceSecretDecoded)
-
-		if err != nil {
-			logger.Errorf("Error creating route service crypto: %s\n", err)
-			os.Exit(1)
+		crypto = createCrypto(c.RouteServiceSecret, logger)
+		if c.RouteServiceSecretPrev != "" {
+			cryptoPrev = createCrypto(c.RouteServiceSecretPrev, logger)
 		}
 	}
 
-	proxy := buildProxy(c, registry, accessLogger, varz, crypto)
+	proxy := buildProxy(c, registry, accessLogger, varz, crypto, cryptoPrev)
 
 	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter)
 	if err != nil {
@@ -161,7 +153,22 @@ func waitOnErrOrSignal(c *config.Config, logger *steno.Logger, errChan <-chan er
 	}
 }
 
-func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, varz rvarz.Varz, crypto secure.Crypto) proxy.Proxy {
+func createCrypto(secret string, logger *steno.Logger) *secure.AesGCM {
+	secretDecoded, err := base64.StdEncoding.DecodeString(secret)
+	if err != nil {
+		logger.Errorf("Error decoding route service secret: %s\n", err)
+		os.Exit(1)
+	}
+
+	crypto, err := secure.NewAesGCM(secretDecoded)
+	if err != nil {
+		logger.Errorf("Error creating route service crypto: %s\n", err)
+		os.Exit(1)
+	}
+	return crypto
+}
+
+func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, varz rvarz.Varz, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	args := proxy.ProxyArgs{
 		EndpointTimeout: c.EndpointTimeout,
 		Ip:              c.Ip,
@@ -177,6 +184,7 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 		RouteServiceEnabled: c.RouteServiceEnabled,
 		RouteServiceTimeout: c.RouteServiceTimeout,
 		Crypto:              crypto,
+		CryptoPrev:          cryptoPrev,
 	}
 	return proxy.NewProxy(args)
 }
