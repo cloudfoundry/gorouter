@@ -19,9 +19,9 @@ import (
 )
 
 type RequestHandler struct {
-	logger    *steno.Logger
-	reporter  ProxyReporter
-	logrecord *access_log.AccessLogRecord
+	StenoLogger *steno.Logger
+	reporter    ProxyReporter
+	logrecord   *access_log.AccessLogRecord
 
 	request  *http.Request
 	response http.ResponseWriter
@@ -30,9 +30,9 @@ type RequestHandler struct {
 func NewRequestHandler(request *http.Request, response http.ResponseWriter, r ProxyReporter,
 	alr *access_log.AccessLogRecord) RequestHandler {
 	return RequestHandler{
-		logger:    createLogger(request),
-		reporter:  r,
-		logrecord: alr,
+		StenoLogger: createLogger(request),
+		reporter:    r,
+		logrecord:   alr,
 
 		request:  request,
 		response: response,
@@ -52,7 +52,7 @@ func createLogger(request *http.Request) *steno.Logger {
 }
 
 func (h *RequestHandler) Logger() *steno.Logger {
-	return h.logger
+	return h.StenoLogger
 }
 
 func (h *RequestHandler) HandleHeartbeat() {
@@ -79,7 +79,7 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 }
 
 func (h *RequestHandler) HandleMissingRoute() {
-	h.logger.Warnf("proxy.endpoint.not-found")
+	h.StenoLogger.Warnf("proxy.endpoint.not-found")
 
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
 	message := fmt.Sprintf("Requested route ('%s') does not exist.", h.request.Host)
@@ -87,29 +87,29 @@ func (h *RequestHandler) HandleMissingRoute() {
 }
 
 func (h *RequestHandler) HandleBadGateway(err error) {
-	h.logger.Set("Error", err.Error())
-	h.logger.Warnf("proxy.endpoint.failed")
+	h.StenoLogger.Set("Error", err.Error())
+	h.StenoLogger.Warnf("proxy.endpoint.failed")
 
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
 }
 
 func (h *RequestHandler) HandleBadSignature(err error) {
-	h.logger.Set("Error", err.Error())
-	h.logger.Warnf("proxy.signature.validation.failed")
+	h.StenoLogger.Set("Error", err.Error())
+	h.StenoLogger.Warnf("proxy.signature.validation.failed")
 
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
 }
 
 func (h *RequestHandler) HandleUnsupportedRouteService() {
-	h.logger.Warnf("proxy.routeservice.unsupported")
+	h.StenoLogger.Warnf("proxy.routeservice.unsupported")
 
 	h.response.Header().Set("X-Cf-RouterError", "route_service_unsupported")
 	h.writeStatus(http.StatusBadGateway, "Route services are not supported")
 }
 
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
-	h.logger.Set("Upgrade", "tcp")
+	h.StenoLogger.Set("Upgrade", "tcp")
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
@@ -120,7 +120,7 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 }
 
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
-	h.logger.Set("Upgrade", "websocket")
+	h.StenoLogger.Set("Upgrade", "websocket")
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
@@ -133,7 +133,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 func (h *RequestHandler) writeStatus(code int, message string) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
-	h.logger.Warn(body)
+	h.StenoLogger.Warn(body)
 	h.logrecord.StatusCode = code
 
 	http.Error(h.response, body, code)
@@ -175,8 +175,8 @@ func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
 
 		iter.EndpointFailed()
 
-		h.logger.Set("Error", err.Error())
-		h.logger.Warn("proxy.tcp.failed")
+		h.StenoLogger.Set("Error", err.Error())
+		h.StenoLogger.Warn("proxy.tcp.failed")
 
 		retry++
 		if retry == retries {
@@ -225,8 +225,8 @@ func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
 
 		iter.EndpointFailed()
 
-		h.logger.Set("Error", err.Error())
-		h.logger.Warn("proxy.websocket.failed")
+		h.StenoLogger.Set("Error", err.Error())
+		h.StenoLogger.Warn("proxy.websocket.failed")
 
 		retry++
 		if retry == retries {
@@ -249,7 +249,7 @@ func (h *RequestHandler) setupRequest(endpoint *route.Endpoint) {
 	h.setRequestURL(endpoint.CanonicalAddr())
 	h.setRequestXForwardedFor()
 	setRequestXRequestStart(h.request)
-	setRequestXVcapRequestId(h.request, h.logger)
+	setRequestXVcapRequestId(h.request, h.StenoLogger)
 }
 
 func (h *RequestHandler) setRequestURL(addr string) {

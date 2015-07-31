@@ -177,7 +177,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
-				handler.logger.Set("RouteEndpoint", endpoint.ToLogData())
+				handler.Logger().Set("RouteEndpoint", endpoint.ToLogData())
 				accessLog.RouteEndpoint = endpoint
 				p.reporter.CaptureRoutingRequest(endpoint, request)
 			}
@@ -195,13 +195,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	proxyWriter := newProxyResponseWriter(responseWriter)
-	roundTripper := &proxyRoundTripper{
-		transport:           dropsonde.InstrumentedRoundTripper(p.transport),
-		iter:                iter,
-		handler:             &handler,
-		routeServiceEnabled: p.routeServiceEnabled,
+	roundTripper := &ProxyRoundTripper{
+		Transport:           dropsonde.InstrumentedRoundTripper(p.transport),
+		Iter:                iter,
+		Handler:             &handler,
+		RouteServiceEnabled: p.routeServiceEnabled,
 		routeServiceTimeout: p.routeServiceTimeout,
-		crypto:              p.crypto,
+		Crypto:              p.crypto,
 
 		after: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 			accessLog.FirstByteAt = time.Now()
@@ -255,32 +255,32 @@ func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, req *http.Requ
 	return rproxy
 }
 
-type proxyRoundTripper struct {
-	transport           http.RoundTripper
+type ProxyRoundTripper struct {
+	Transport           http.RoundTripper
 	after               AfterRoundTrip
-	iter                route.EndpointIterator
-	handler             *RequestHandler
-	routeServiceEnabled bool
+	Iter                route.EndpointIterator
+	Handler             *RequestHandler
+	RouteServiceEnabled bool
 	routeServiceTimeout time.Duration
-	crypto              secure.Crypto
+	Crypto              secure.Crypto
 
 	response *http.Response
 	err      error
 }
 
-func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
 	var sig string
 	var res *http.Response
 	var endpoint *route.Endpoint
 	retry := 0
 	for {
-		endpoint = p.iter.Next()
+		endpoint = p.Iter.Next()
 
 		if endpoint == nil {
-			p.handler.reporter.CaptureBadGateway(request)
+			p.Handler.reporter.CaptureBadGateway(request)
 			err = noEndpointsAvailable
-			p.handler.HandleBadGateway(err)
+			p.Handler.HandleBadGateway(err)
 			return nil, err
 		}
 
@@ -290,7 +290,7 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 
-		res, err = p.transport.RoundTrip(request)
+		res, err = p.Transport.RoundTrip(request)
 		if err == nil {
 			break
 		}
@@ -302,10 +302,10 @@ func (p *proxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 		// post processing of request in case of error / retry
 		postProcess(request, sig)
 
-		p.iter.EndpointFailed()
+		p.Iter.EndpointFailed()
 
-		p.handler.Logger().Set("Error", err.Error())
-		p.handler.Logger().Warnf("proxy.endpoint.failed")
+		p.Handler.Logger().Set("Error", err.Error())
+		p.Handler.Logger().Warnf("proxy.endpoint.failed")
 
 		retry++
 		if retry == retries {
@@ -352,11 +352,11 @@ func (i *wrappedIterator) EndpointFailed() {
 }
 
 // Do not modify header object
-func (p *proxyRoundTripper) validateSignature(header *http.Header) error {
+func (p *ProxyRoundTripper) validateSignature(header *http.Header) error {
 	metadataHeader := header.Get(RouteServiceMetadata)
 	signatureHeader := header.Get(RouteServiceSignature)
 
-	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.crypto)
+	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.Crypto)
 	if err != nil {
 		return err
 	}
@@ -368,10 +368,10 @@ func (p *proxyRoundTripper) validateSignature(header *http.Header) error {
 	return nil
 }
 
-func (p *proxyRoundTripper) processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
-	p.handler.Logger().Debug("proxy.route-service")
+func (p *ProxyRoundTripper) processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
+	p.Handler.Logger().Debug("proxy.route-service")
 
-	signatureHeader, metadataHeader, err := route_service.BuildSignatureAndMetadata(p.crypto)
+	signatureHeader, metadataHeader, err := route_service.BuildSignatureAndMetadata(p.Crypto)
 	if err != nil {
 		return err
 	}
@@ -393,21 +393,21 @@ func (p *proxyRoundTripper) processRoutingService(request *http.Request, endpoin
 	return nil
 }
 
-func (p *proxyRoundTripper) processBackend(request *http.Request, endpoint *route.Endpoint) {
-	p.handler.Logger().Debug("proxy.backend")
+func (p *ProxyRoundTripper) processBackend(request *http.Request, endpoint *route.Endpoint) {
+	p.Handler.Logger().Debug("proxy.backend")
 
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	setRequestXCfInstanceId(request, endpoint)
 }
 
-func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) (string, error) {
+func (p *ProxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) (string, error) {
 	var err error
 	var sig string
 
 	if endpoint.RouteServiceUrl != "" {
-		if !p.routeServiceEnabled {
-			p.handler.HandleUnsupportedRouteService()
+		if !p.RouteServiceEnabled {
+			p.Handler.HandleUnsupportedRouteService()
 			err := errors.New("Unsupported Route Service")
 			return "", err
 		}
@@ -416,7 +416,7 @@ func (p *proxyRoundTripper) processIncomingRequest(request *http.Request, endpoi
 		}
 		err = p.validateSignature(&request.Header)
 		if err != nil {
-			p.handler.HandleBadSignature(err)
+			p.Handler.HandleBadSignature(err)
 			return "", err
 		}
 		sig = request.Header.Get(RouteServiceSignature)
