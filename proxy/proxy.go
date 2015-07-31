@@ -361,9 +361,14 @@ func (p *ProxyRoundTripper) validateSignature(header *http.Header) error {
 
 	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.Crypto)
 	if err != nil {
+		p.Handler.Logger().Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.current_key")
 		// Decrypt the head again trying to use the old key.
 		if p.cryptoPrev != nil {
 			signature, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.cryptoPrev)
+
+			if err != nil {
+				p.Handler.Logger().Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.previous_key")
+			}
 		}
 	}
 
@@ -372,6 +377,7 @@ func (p *ProxyRoundTripper) validateSignature(header *http.Header) error {
 	}
 
 	if time.Since(signature.RequestedTime) > p.routeServiceTimeout {
+		p.Handler.Logger().Debug("proxy.route-service.timeout")
 		return routeServiceExpired
 	}
 
