@@ -990,6 +990,40 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		}
 	})
+
+	Context("when the endpoint is nil", func() {
+		It("responds with a 502 BadGateway", func() {
+			ln := registerHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			pool := r.Lookup(route.Uri("nil-endpoint"))
+			endpoints := make([]*route.Endpoint, 0)
+			pool.Each(func(e *route.Endpoint) {
+				endpoints = append(endpoints, e)
+			})
+			for _, e := range endpoints {
+				pool.Remove(e)
+			}
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
+			conn.WriteRequest(req)
+
+			b := make([]byte, 0, 0)
+			buf := bytes.NewBuffer(b)
+			log.SetOutput(buf)
+			res, _ := conn.ReadResponse()
+			log.SetOutput(os.Stderr)
+			Expect(buf).NotTo(ContainSubstring("multiple response.WriteHeader calls"))
+			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+		})
+	})
 })
 
 // HACK: this is used to silence any http warnings in logs

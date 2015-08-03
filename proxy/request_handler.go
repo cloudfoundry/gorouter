@@ -23,10 +23,10 @@ type RequestHandler struct {
 	logrecord   *access_log.AccessLogRecord
 
 	request  *http.Request
-	response *proxyResponseWriter
+	response ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response *proxyResponseWriter, r ProxyReporter,
+func NewRequestHandler(request *http.Request, response ProxyResponseWriter, r ProxyReporter,
 	alr *access_log.AccessLogRecord) RequestHandler {
 	return RequestHandler{
 		StenoLogger: createLogger(request),
@@ -91,6 +91,7 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
+	h.response.Done()
 }
 
 func (h *RequestHandler) HandleBadSignature(err error) {

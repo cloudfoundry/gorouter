@@ -149,7 +149,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	requestBodyCounter := &countingReadCloser{delegate: request.Body}
 	request.Body = requestBodyCounter
 
-	proxyWriter := newProxyResponseWriter(responseWriter)
+	proxyWriter := NewProxyResponseWriter(responseWriter)
 	handler := NewRequestHandler(request, proxyWriter, p.reporter, &accessLog)
 
 	defer func() {
@@ -223,7 +223,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			if err != nil {
 				p.reporter.CaptureBadGateway(request)
 				handler.HandleBadGateway(err)
-				handler.response.Done()
 				return
 			}
 
@@ -233,13 +232,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		},
 	}
 
-	p.newReverseProxy(roundTripper, request).ServeHTTP(proxyWriter, request)
+	newReverseProxy(roundTripper, request).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = proxyWriter.Size()
 }
 
-func (p *proxy) newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.Handler {
+func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
 			request.URL.Scheme = "http"

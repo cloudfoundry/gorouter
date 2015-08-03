@@ -7,6 +7,17 @@ import (
 	"net/http"
 )
 
+type ProxyResponseWriter interface {
+	Header() http.Header
+	Hijack() (net.Conn, *bufio.ReadWriter, error)
+	Write(b []byte) (int, error)
+	WriteHeader(s int)
+	Done()
+	Flush()
+	Status() int
+	Size() int
+}
+
 type proxyResponseWriter struct {
 	w      http.ResponseWriter
 	status int
@@ -16,7 +27,7 @@ type proxyResponseWriter struct {
 	done    bool
 }
 
-func newProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
+func NewProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
 	proxyWriter := &proxyResponseWriter{
 		w:       w,
 		flusher: w.(http.Flusher),
