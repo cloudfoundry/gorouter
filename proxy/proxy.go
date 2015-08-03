@@ -266,9 +266,6 @@ type ProxyRoundTripper struct {
 	routeServiceTimeout time.Duration
 	Crypto              secure.Crypto
 	cryptoPrev          secure.Crypto
-
-	response *http.Response
-	err      error
 }
 
 func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -319,9 +316,6 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 	if p.after != nil {
 		p.after(res, endpoint, err)
 	}
-
-	p.response = res
-	p.err = err
 
 	return res, err
 }
