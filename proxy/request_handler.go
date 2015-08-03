@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -24,10 +23,10 @@ type RequestHandler struct {
 	logrecord   *access_log.AccessLogRecord
 
 	request  *http.Request
-	response http.ResponseWriter
+	response *proxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response http.ResponseWriter, r ProxyReporter,
+func NewRequestHandler(request *http.Request, response *proxyResponseWriter, r ProxyReporter,
 	alr *access_log.AccessLogRecord) RequestHandler {
 	return RequestHandler{
 		StenoLogger: createLogger(request),
@@ -99,6 +98,7 @@ func (h *RequestHandler) HandleBadSignature(err error) {
 	h.StenoLogger.Warnf("proxy.signature.validation.failed")
 
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
+	h.response.Done()
 }
 
 func (h *RequestHandler) HandleUnsupportedRouteService() {
@@ -106,6 +106,7 @@ func (h *RequestHandler) HandleUnsupportedRouteService() {
 
 	h.response.Header().Set("X-Cf-RouterError", "route_service_unsupported")
 	h.writeStatus(http.StatusBadGateway, "Route services are not supported")
+	h.response.Done()
 }
 
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
@@ -295,12 +296,7 @@ func setRequestXCfInstanceId(request *http.Request, endpoint *route.Endpoint) {
 }
 
 func (h *RequestHandler) hijack() (client net.Conn, io *bufio.ReadWriter, err error) {
-	hijacker, ok := h.response.(http.Hijacker)
-	if !ok {
-		return nil, nil, errors.New("response writer cannot hijack")
-	}
-
-	return hijacker.Hijack()
+	return h.response.Hijack()
 }
 
 func forwardIO(a, b net.Conn) {

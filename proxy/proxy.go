@@ -149,7 +149,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	requestBodyCounter := &countingReadCloser{delegate: request.Body}
 	request.Body = requestBodyCounter
 
-	handler := NewRequestHandler(request, responseWriter, p.reporter, &accessLog)
+	proxyWriter := newProxyResponseWriter(responseWriter)
+	handler := NewRequestHandler(request, proxyWriter, p.reporter, &accessLog)
 
 	defer func() {
 		accessLog.RequestBytesReceived = requestBodyCounter.count
@@ -196,7 +197,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	proxyWriter := newProxyResponseWriter(responseWriter)
 	roundTripper := &ProxyRoundTripper{
 		Transport:           dropsonde.InstrumentedRoundTripper(p.transport),
 		Iter:                iter,
@@ -223,7 +223,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			if err != nil {
 				p.reporter.CaptureBadGateway(request)
 				handler.HandleBadGateway(err)
-				proxyWriter.Done()
+				handler.response.Done()
 				return
 			}
 
