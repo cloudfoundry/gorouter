@@ -352,8 +352,9 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request, routeS
 				// An endpoint has a route service and this request did not come from the service
 				routeServiceConfig.SetupRouteServiceRequest(request, routeServiceArgs)
 			} else if hasBeenToRouteService(routeServiceArgs.UrlString, sig) {
-				// Remove the header since the backend should not see it
+				// Remove the headers since the backend should not see it
 				request.Header.Del(RouteServiceSignature)
+				request.Header.Del(RouteServiceMetadata)
 			}
 		},
 		Transport:     proxyTransport,

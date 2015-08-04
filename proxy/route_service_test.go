@@ -139,10 +139,11 @@ var _ = Describe("Route Services", func() {
 				})
 			})
 
-			It("routes to the backend instance", func() {
+			It("routes to the backend instance and strips headers", func() {
 				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
 					Expect(req.Header.Get(proxy.RouteServiceSignature)).To(Equal(""))
+					Expect(req.Header.Get(proxy.RouteServiceMetadata)).To(Equal(""))
 
 					out := &bytes.Buffer{}
 					out.WriteString("backend instance")
