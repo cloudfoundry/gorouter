@@ -102,6 +102,14 @@ func (h *RequestHandler) HandleBadSignature(err error) {
 	h.response.Done()
 }
 
+func (h *RequestHandler) HandleRouteServiceFailure(err error) {
+	h.StenoLogger.Set("Error", err.Error())
+	h.StenoLogger.Warnf("proxy.route-service.failed")
+
+	h.writeStatus(http.StatusInternalServerError, "Route service request failed.")
+	h.response.Done()
+}
+
 func (h *RequestHandler) HandleUnsupportedRouteService() {
 	h.StenoLogger.Warnf("proxy.routeservice.unsupported")
 

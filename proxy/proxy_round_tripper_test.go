@@ -1,12 +1,15 @@
 package proxy_test
 
 import (
+	"errors"
+	"net"
 	"net/http"
 
 	"github.com/cloudfoundry/gorouter/access_log"
 	securefakes "github.com/cloudfoundry/gorouter/common/secure/fakes"
 	"github.com/cloudfoundry/gorouter/proxy"
 	proxyfakes "github.com/cloudfoundry/gorouter/proxy/fakes"
+	"github.com/cloudfoundry/gorouter/route"
 	routefakes "github.com/cloudfoundry/gorouter/route/fakes"
 	"github.com/cloudfoundry/gorouter/test_util"
 
@@ -22,6 +25,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			transport         *proxyfakes.FakeRoundTripper
 			req               *http.Request
 			resp              *proxyfakes.FakeProxyResponseWriter
+			crypto            *securefakes.FakeCrypto
 		)
 
 		BeforeEach(func() {
@@ -33,16 +37,50 @@ var _ = Describe("ProxyRoundTripper", func() {
 			nullAccessRecord := &access_log.AccessLogRecord{}
 
 			handler := proxy.NewRequestHandler(req, resp, nullVarz, nullAccessRecord)
-			crypto := &securefakes.FakeCrypto{}
+			crypto = &securefakes.FakeCrypto{}
 			transport = &proxyfakes.FakeRoundTripper{}
 
 			proxyRoundTripper = &proxy.ProxyRoundTripper{
-				Iter:                endpointIterator,
-				RouteServiceEnabled: true,
-				Handler:             &handler,
-				Crypto:              crypto,
-				Transport:           transport,
+				Iter:      endpointIterator,
+				Handler:   &handler,
+				Transport: transport,
 			}
+		})
+
+		Context("when the first request to the route service fails", func() {
+			BeforeEach(func() {
+				firstCall := true
+
+				transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+					var err error
+
+					err = nil
+
+					if firstCall {
+						err = &net.OpError{
+							Err: errors.New("error"),
+							Op:  "dial",
+						}
+					}
+					firstCall = false
+
+					return nil, err
+				}
+			})
+
+			It("does not set X-CF-Forwarded-Url to the route service URL", func() {
+				endpoint := &route.Endpoint{
+					RouteServiceUrl: "https://routeservice.net/",
+				}
+				endpointIterator.NextReturns(endpoint)
+				crypto.EncryptReturns([]byte("signature"), []byte{}, []byte{}, nil)
+				req := test_util.NewRequest("GET", "myapp.com", "/", nil)
+				req.URL.Scheme = "http"
+				req.Header.Set(proxy.RouteServiceForwardedUrl, "http://myapp.com/")
+				_, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(req.Header.Get(proxy.RouteServiceForwardedUrl)).To(Equal("http://myapp.com/"))
+			})
 		})
 
 		Context("when there are no more endpoints available", func() {

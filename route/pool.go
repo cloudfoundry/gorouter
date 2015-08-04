@@ -33,7 +33,8 @@ type Pool struct {
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
 
-	contextPath string
+	contextPath     string
+	routeServiceUrl string
 
 	retryAfterFailure time.Duration
 	nextIdx           int
@@ -85,6 +86,18 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 	e.updated = time.Now()
 
 	return !found
+}
+
+func (p *Pool) RouteServiceUrl() string {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if len(p.endpoints) > 0 {
+		endpt := p.endpoints[len(p.endpoints)-1]
+		return endpt.endpoint.RouteServiceUrl
+	} else {
+		return ""
+	}
 }
 
 func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {

@@ -41,6 +41,30 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
+	Context("RouteServiceUrl", func() {
+		It("returns the route_service_url associated with the pool", func() {
+			endpoint := &Endpoint{}
+			endpointRS := &Endpoint{RouteServiceUrl: "my-url"}
+			b := pool.Put(endpoint)
+			Expect(b).To(BeTrue())
+
+			url := pool.RouteServiceUrl()
+			Expect(url).To(BeEmpty())
+
+			b = pool.Put(endpointRS)
+			Expect(b).To(BeFalse())
+			url = pool.RouteServiceUrl()
+			Expect(url).To(Equal("my-url"))
+		})
+
+		Context("when there are no endpoints in the pool", func() {
+			It("returns the empty string", func() {
+				url := pool.RouteServiceUrl()
+				Expect(url).To(Equal(""))
+			})
+		})
+	})
+
 	Context("Remove", func() {
 		It("removes endpoints", func() {
 			endpoint := &Endpoint{}

@@ -3,10 +3,8 @@ package proxy_test
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/proxy"
@@ -249,8 +247,6 @@ var _ = Describe("Route Services", func() {
 		})
 
 		Context("when there is no previous key in the configuration", func() {
-			// Do nothing because the default value if previous key is nil.
-
 			It("rejects the signature", func() {
 				ln := registerHandlerWithRouteService(r, "test/my_path", "https://badkey.com", func(conn *test_util.HttpConn) {
 					Fail("Should not get here")
@@ -263,13 +259,7 @@ var _ = Describe("Route Services", func() {
 				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
-				b := make([]byte, 0, 0)
-				buf := bytes.NewBuffer(b)
-				log.SetOutput(buf)
 				res, body := conn.ReadResponse()
-				log.SetOutput(os.Stderr)
-				Expect(buf).To(ContainSubstring("message authentication failed"))
-
 				Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
 				Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
 			})
@@ -352,12 +342,7 @@ var _ = Describe("Route Services", func() {
 				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
-				b := make([]byte, 0, 0)
-				buf := bytes.NewBuffer(b)
-				log.SetOutput(buf)
 				res, body := conn.ReadResponse()
-				log.SetOutput(os.Stderr)
-				Expect(buf).To(ContainSubstring("message authentication failed"))
 
 				Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
 				Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))

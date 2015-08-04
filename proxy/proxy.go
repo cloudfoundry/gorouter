@@ -64,22 +64,100 @@ type ProxyArgs struct {
 	CryptoPrev          secure.Crypto
 }
 
-type proxy struct {
-	ip                  string
-	traceKey            string
-	logger              *steno.Logger
-	registry            LookupRegistry
-	reporter            ProxyReporter
-	accessLogger        access_log.AccessLogger
-	transport           *http.Transport
-	secureCookies       bool
+type RouteServiceConfig struct {
 	routeServiceEnabled bool
 	routeServiceTimeout time.Duration
 	crypto              secure.Crypto
 	cryptoPrev          secure.Crypto
+	logger              *steno.Logger
+}
+
+type RouteServiceArgs struct {
+	UrlString string
+	ParsedUrl *url.URL
+	Signature string
+	Metadata  string
+}
+
+func NewRouteServiceConfig(enabled bool, timeout time.Duration, crypto secure.Crypto, cryptoPrev secure.Crypto) *RouteServiceConfig {
+	return &RouteServiceConfig{
+		routeServiceEnabled: enabled,
+		routeServiceTimeout: timeout,
+		crypto:              crypto,
+		cryptoPrev:          cryptoPrev,
+		logger:              steno.NewLogger("router.proxy.route-service"),
+	}
+}
+
+func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
+	return rs.routeServiceEnabled
+}
+
+func (rs *RouteServiceConfig) GenerateSignatureAndMetadata() (string, string, error) {
+	signatureHeader, metadataHeader, err := route_service.BuildSignatureAndMetadata(rs.crypto)
+	if err != nil {
+		return "", "", err
+	}
+	return signatureHeader, metadataHeader, nil
+}
+
+func (rs *RouteServiceConfig) SetupRouteServiceRequest(request *http.Request, args RouteServiceArgs) {
+	rs.logger.Debug("proxy.route-service")
+	request.Header.Set(RouteServiceSignature, args.Signature)
+	request.Header.Set(RouteServiceMetadata, args.Metadata)
+
+	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
+
+	request.Header.Set(RouteServiceForwardedUrl, clientRequestUrl)
+
+	request.Host = args.ParsedUrl.Host
+	request.URL = args.ParsedUrl
+}
+
+func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header) error {
+	metadataHeader := headers.Get(RouteServiceMetadata)
+	signatureHeader := headers.Get(RouteServiceSignature)
+
+	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
+	if err != nil {
+		rs.logger.Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.current_key")
+		// Decrypt the head again trying to use the old key.
+		if rs.cryptoPrev != nil {
+			signature, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
+
+			if err != nil {
+				rs.logger.Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.previous_key")
+			}
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if time.Since(signature.RequestedTime) > rs.routeServiceTimeout {
+		rs.logger.Debug("proxy.route-service.timeout")
+		return routeServiceExpired
+	}
+
+	return nil
+}
+
+type proxy struct {
+	ip                 string
+	traceKey           string
+	logger             *steno.Logger
+	registry           LookupRegistry
+	reporter           ProxyReporter
+	accessLogger       access_log.AccessLogger
+	transport          *http.Transport
+	secureCookies      bool
+	routeServiceConfig *RouteServiceConfig
 }
 
 func NewProxy(args ProxyArgs) Proxy {
+	routeServiceConfig := NewRouteServiceConfig(args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev)
+
 	p := &proxy{
 		accessLogger: args.AccessLogger,
 		traceKey:     args.TraceKey,
@@ -102,11 +180,8 @@ func NewProxy(args ProxyArgs) Proxy {
 			DisableCompression: true,
 			TLSClientConfig:    args.TLSConfig,
 		},
-		secureCookies:       args.SecureCookies,
-		routeServiceEnabled: args.RouteServiceEnabled,
-		routeServiceTimeout: args.RouteServiceTimeout,
-		crypto:              args.Crypto,
-		cryptoPrev:          args.CryptoPrev,
+		secureCookies:      args.SecureCookies,
+		routeServiceConfig: routeServiceConfig,
 	}
 
 	return p
@@ -197,14 +272,37 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
+	routeServiceUrl := routePool.RouteServiceUrl()
+	// Attempted to use a route service when it is not supported
+	if routeServiceUrl != "" && !p.routeServiceConfig.RouteServiceEnabled() {
+		handler.HandleUnsupportedRouteService()
+		return
+	}
+
+	var routeServiceArgs RouteServiceArgs
+	if hasBeenToRouteService(routeServiceUrl, request.Header.Get(RouteServiceSignature)) {
+		// A request from a route service destined for a backend instances
+		routeServiceArgs.UrlString = routeServiceUrl
+		err := p.routeServiceConfig.ValidateSignature(&request.Header)
+		if err != nil {
+			handler.HandleBadSignature(err)
+			return
+		}
+	} else if routeServiceUrl != "" {
+		// Generate signature, metadata, and parse Url for any errors
+		var err error
+		routeServiceArgs, err = validateRouteServiceRequest(p.routeServiceConfig, routeServiceUrl)
+		if err != nil {
+			handler.HandleRouteServiceFailure(err)
+			return
+		}
+	}
+
 	roundTripper := &ProxyRoundTripper{
-		Transport:           dropsonde.InstrumentedRoundTripper(p.transport),
-		Iter:                iter,
-		Handler:             &handler,
-		RouteServiceEnabled: p.routeServiceEnabled,
-		routeServiceTimeout: p.routeServiceTimeout,
-		Crypto:              p.crypto,
-		cryptoPrev:          p.cryptoPrev,
+		Transport:      dropsonde.InstrumentedRoundTripper(p.transport),
+		Iter:           iter,
+		Handler:        &handler,
+		ServingBackend: request.Header.Get(RouteServiceSignature) != "" || routeServiceUrl == "",
 
 		after: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 			accessLog.FirstByteAt = time.Now()
@@ -232,13 +330,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		},
 	}
 
-	newReverseProxy(roundTripper, request).ServeHTTP(proxyWriter, request)
+	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = proxyWriter.Size()
 }
 
-func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.Handler {
+func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request, routeServiceArgs RouteServiceArgs, routeServiceConfig *RouteServiceConfig) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
 			request.URL.Scheme = "http"
@@ -248,6 +346,15 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.H
 
 			setRequestXRequestStart(req)
 			setRequestXVcapRequestId(req, nil)
+
+			sig := request.Header.Get(RouteServiceSignature)
+			if forwardingToRouteService(routeServiceArgs.UrlString, sig) {
+				// An endpoint has a route service and this request did not come from the service
+				routeServiceConfig.SetupRouteServiceRequest(request, routeServiceArgs)
+			} else if hasBeenToRouteService(routeServiceArgs.UrlString, sig) {
+				// Remove the header since the backend should not see it
+				request.Header.Del(RouteServiceSignature)
+			}
 		},
 		Transport:     proxyTransport,
 		FlushInterval: 50 * time.Millisecond,
@@ -257,19 +364,15 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request) http.H
 }
 
 type ProxyRoundTripper struct {
-	Transport           http.RoundTripper
-	after               AfterRoundTrip
-	Iter                route.EndpointIterator
-	Handler             *RequestHandler
-	RouteServiceEnabled bool
-	routeServiceTimeout time.Duration
-	Crypto              secure.Crypto
-	cryptoPrev          secure.Crypto
+	Transport      http.RoundTripper
+	after          AfterRoundTrip
+	Iter           route.EndpointIterator
+	Handler        *RequestHandler
+	ServingBackend bool
 }
 
 func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
-	var sig string
 	var res *http.Response
 	var endpoint *route.Endpoint
 	retry := 0
@@ -283,23 +386,17 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			return nil, err
 		}
 
-		// determine where we need to route to (backend or route service)
-		sig, err = p.processIncomingRequest(request, endpoint)
-		if err != nil {
-			return nil, err
+		if p.ServingBackend {
+			p.processBackend(request, endpoint)
 		}
 
 		res, err = p.Transport.RoundTrip(request)
 		if err == nil {
 			break
 		}
-
 		if ne, netErr := err.(*net.OpError); !netErr || ne.Op != "dial" {
 			break
 		}
-
-		// post processing of request in case of error / retry
-		postProcess(request, sig)
 
 		p.Iter.EndpointFailed()
 
@@ -319,17 +416,6 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 	return res, err
 }
 
-func postProcess(request *http.Request, sig string) {
-	// if we have a request which comes from a route service
-	// we will want to restore the signed header so we do not
-	// route to the route service on a retry to the application
-	//
-	// we also want to remove the signed header if the request
-	// to the route service failed so we do not route the request
-	// to the app without first going through the route service
-	request.Header.Set(RouteServiceSignature, sig)
-}
-
 type wrappedIterator struct {
 	nested    route.EndpointIterator
 	afterNext func(*route.Endpoint)
@@ -347,59 +433,24 @@ func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
 }
 
-// Do not modify header object
-func (p *ProxyRoundTripper) validateSignature(header *http.Header) error {
-	metadataHeader := header.Get(RouteServiceMetadata)
-	signatureHeader := header.Get(RouteServiceSignature)
-
-	signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.Crypto)
+func validateRouteServiceRequest(routeServiceConfig *RouteServiceConfig, routeServiceUrl string) (RouteServiceArgs, error) {
+	var routeServiceArgs RouteServiceArgs
+	sig, metadata, err := routeServiceConfig.GenerateSignatureAndMetadata()
 	if err != nil {
-		p.Handler.Logger().Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.current_key")
-		// Decrypt the head again trying to use the old key.
-		if p.cryptoPrev != nil {
-			signature, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, p.cryptoPrev)
-
-			if err != nil {
-				p.Handler.Logger().Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.previous_key")
-			}
-		}
+		return routeServiceArgs, err
 	}
 
+	routeServiceArgs.UrlString = routeServiceUrl
+	routeServiceArgs.Signature = sig
+	routeServiceArgs.Metadata = metadata
+
+	rsURL, err := url.Parse(routeServiceUrl)
 	if err != nil {
-		return err
+		return routeServiceArgs, err
 	}
+	routeServiceArgs.ParsedUrl = rsURL
 
-	if time.Since(signature.RequestedTime) > p.routeServiceTimeout {
-		p.Handler.Logger().Debug("proxy.route-service.timeout")
-		return routeServiceExpired
-	}
-
-	return nil
-}
-
-func (p *ProxyRoundTripper) processRoutingService(request *http.Request, endpoint *route.Endpoint) error {
-	p.Handler.Logger().Debug("proxy.route-service")
-
-	signatureHeader, metadataHeader, err := route_service.BuildSignatureAndMetadata(p.Crypto)
-	if err != nil {
-		return err
-	}
-
-	request.Header.Set(RouteServiceSignature, signatureHeader)
-	request.Header.Set(RouteServiceMetadata, metadataHeader)
-
-	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
-
-	request.Header.Set(RouteServiceForwardedUrl, clientRequestUrl)
-
-	rsURL, err := url.Parse(endpoint.RouteServiceUrl)
-	if err != nil {
-		return err
-	}
-	request.Host = rsURL.Host
-	request.URL = rsURL
-
-	return nil
+	return routeServiceArgs, nil
 }
 
 func (p *ProxyRoundTripper) processBackend(request *http.Request, endpoint *route.Endpoint) {
@@ -408,32 +459,6 @@ func (p *ProxyRoundTripper) processBackend(request *http.Request, endpoint *rout
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	setRequestXCfInstanceId(request, endpoint)
-}
-
-func (p *ProxyRoundTripper) processIncomingRequest(request *http.Request, endpoint *route.Endpoint) (string, error) {
-	var err error
-	var sig string
-
-	if endpoint.RouteServiceUrl != "" {
-		if !p.RouteServiceEnabled {
-			p.Handler.HandleUnsupportedRouteService()
-			err := errors.New("Unsupported Route Service")
-			return "", err
-		}
-		if request.Header.Get(RouteServiceSignature) == "" {
-			return "", p.processRoutingService(request, endpoint)
-		}
-		err = p.validateSignature(&request.Header)
-		if err != nil {
-			p.Handler.HandleBadSignature(err)
-			return "", err
-		}
-		sig = request.Header.Get(RouteServiceSignature)
-		request.Header.Del(RouteServiceSignature)
-	}
-
-	p.processBackend(request, endpoint)
-	return sig, err
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,
@@ -469,6 +494,14 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 
 		http.SetCookie(responseWriter, cookie)
 	}
+}
+
+func forwardingToRouteService(rsUrl, sigHeader string) bool {
+	return sigHeader == "" && rsUrl != ""
+}
+
+func hasBeenToRouteService(rsUrl, sigHeader string) bool {
+	return sigHeader != "" && rsUrl != ""
 }
 
 func isProtocolSupported(request *http.Request) bool {
