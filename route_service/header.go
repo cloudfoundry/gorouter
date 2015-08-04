@@ -25,6 +25,9 @@ func BuildSignatureAndMetadata(crypto secure.Crypto) (string, string, error) {
 	}
 
 	signatureJsonEncrypted, nonce, iv, err := crypto.Encrypt(signatureJson)
+	if err != nil {
+		return "", "", err
+	}
 
 	metadata := Metadata{
 		IV:    iv,

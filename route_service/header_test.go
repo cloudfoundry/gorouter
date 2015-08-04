@@ -3,6 +3,7 @@ package route_service_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -50,10 +51,20 @@ var _ = Describe("Route Service Header", func() {
 			Expect(metadataStruct.Nonce).To(Equal([]byte("some-nonce")))
 			Expect(metadataStruct.IV).To(Equal([]byte("some-iv")))
 		})
+
+		Context("when unable to encrypt the signature", func() {
+			BeforeEach(func() {
+				crypto.EncryptReturns([]byte{}, []byte{}, []byte{}, errors.New("No entropy"))
+			})
+
+			It("returns an error", func() {
+				_, _, err := route_service.BuildSignatureAndMetadata(crypto)
+				Expect(err).To(HaveOccurred())
+			})
+		})
 	})
 
 	Describe("Parse signature from headers", func() {
-
 		It("parses signature from signature and metadata headers", func() {
 			signatureHeader := "eyJyZXF1ZXN0ZWRfdGltZSI6IjIwMTUtMDctMjNUMTA6NDg6MDguMjQwMDMwNzIyLTA3OjAwIn1lbmNyeXB0ZWRzb21lLW5vbmNlc29tZS1pdg=="
 			metadataHeader := "eyJpdiI6ImMyOXRaUzFwZGc9PSIsIm5vbmNlIjoiYzI5dFpTMXViMjVqWlE9PSJ9"
