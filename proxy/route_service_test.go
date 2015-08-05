@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/cloudfoundry/gorouter/common/secure"
-	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/route_service"
 	"github.com/cloudfoundry/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
@@ -40,8 +39,8 @@ var _ = Describe("Route Services", func() {
 	BeforeEach(func() {
 		conf.RouteServiceEnabled = true
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			metadataHeader := r.Header.Get(proxy.RouteServiceMetadata)
-			signatureHeader := r.Header.Get(proxy.RouteServiceSignature)
+			metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
+			signatureHeader := r.Header.Get(route_service.RouteServiceSignature)
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
@@ -142,8 +141,8 @@ var _ = Describe("Route Services", func() {
 			It("routes to the backend instance and strips headers", func() {
 				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
-					Expect(req.Header.Get(proxy.RouteServiceSignature)).To(Equal(""))
-					Expect(req.Header.Get(proxy.RouteServiceMetadata)).To(Equal(""))
+					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
+					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
 
 					out := &bytes.Buffer{}
 					out.WriteString("backend instance")
@@ -158,8 +157,8 @@ var _ = Describe("Route Services", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
-				req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -171,7 +170,7 @@ var _ = Describe("Route Services", func() {
 				It("does not strip the signature header", func() {
 					ln := registerHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
-						Expect(req.Header.Get(proxy.RouteServiceSignature)).To(Equal("some-signature"))
+						Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal("some-signature"))
 
 						out := &bytes.Buffer{}
 						out.WriteString("route service instance")
@@ -186,7 +185,7 @@ var _ = Describe("Route Services", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
-					req.Header.Set(proxy.RouteServiceSignature, "some-signature")
+					req.Header.Set(route_service.RouteServiceSignature, "some-signature")
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -205,8 +204,8 @@ var _ = Describe("Route Services", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "mybadapp.com", "/", nil)
-				req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 				resp, _ := conn.ReadResponse()
 
@@ -229,8 +228,8 @@ var _ = Describe("Route Services", func() {
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "test", "/my_path", nil)
-			req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-			req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 			conn.WriteRequest(req)
 
 			res, body := conn.ReadResponse()
@@ -256,8 +255,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
-				req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -290,8 +289,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
-				req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -313,8 +312,8 @@ var _ = Describe("Route Services", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
-					req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-					req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -339,8 +338,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
-				req.Header.Set(proxy.RouteServiceSignature, signatureHeader)
-				req.Header.Set(proxy.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()

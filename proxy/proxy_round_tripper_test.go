@@ -11,6 +11,7 @@ import (
 	proxyfakes "github.com/cloudfoundry/gorouter/proxy/fakes"
 	"github.com/cloudfoundry/gorouter/route"
 	routefakes "github.com/cloudfoundry/gorouter/route/fakes"
+	"github.com/cloudfoundry/gorouter/route_service"
 	"github.com/cloudfoundry/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -76,10 +77,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 				crypto.EncryptReturns([]byte("signature"), []byte{}, []byte{}, nil)
 				req := test_util.NewRequest("GET", "myapp.com", "/", nil)
 				req.URL.Scheme = "http"
-				req.Header.Set(proxy.RouteServiceForwardedUrl, "http://myapp.com/")
+				req.Header.Set(route_service.RouteServiceForwardedUrl, "http://myapp.com/")
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(req.Header.Get(proxy.RouteServiceForwardedUrl)).To(Equal("http://myapp.com/"))
+				Expect(req.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal("http://myapp.com/"))
 			})
 		})
 

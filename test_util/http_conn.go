@@ -101,7 +101,7 @@ func NewRequest(method, host, rawPath string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, "http://"+host+rawPath, body)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	req.URL = &url.URL{Host: host, Opaque: rawPath}
+	req.URL = &url.URL{Scheme: "http", Host: host, Opaque: rawPath}
 	req.Host = host
 	return req
 }
