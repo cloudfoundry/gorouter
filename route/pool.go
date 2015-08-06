@@ -93,7 +93,7 @@ func (p *Pool) RouteServiceUrl() string {
 	defer p.lock.Unlock()
 
 	if len(p.endpoints) > 0 {
-		endpt := p.endpoints[len(p.endpoints)-1]
+		endpt := p.endpoints[0]
 		return endpt.endpoint.RouteServiceUrl
 	} else {
 		return ""
