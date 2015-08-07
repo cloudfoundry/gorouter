@@ -16,7 +16,8 @@ type ProxyRoundTripper struct {
 }
 
 type RoundTripEventHandler interface {
-	BeforeRoundTrip(request *http.Request) (*route.Endpoint, error)
+	SelectEndpoint(request *http.Request) (*route.Endpoint, error)
+	PreprocessRequest(request *http.Request, endpoint *route.Endpoint)
 	HandleError(err error)
 }
 
@@ -29,7 +30,7 @@ type RouteServiceRoundTripper struct {
 	Handler *RequestHandler
 }
 
-func (be *BackendRoundTripper) BeforeRoundTrip(request *http.Request) (*route.Endpoint, error) {
+func (be *BackendRoundTripper) SelectEndpoint(request *http.Request) (*route.Endpoint, error) {
 	endpoint := be.Iter.Next()
 
 	if endpoint == nil {
@@ -38,8 +39,6 @@ func (be *BackendRoundTripper) BeforeRoundTrip(request *http.Request) (*route.En
 		be.Handler.HandleBadGateway(err)
 		return nil, err
 	}
-	be.setupBackendRequest(request, endpoint)
-
 	return endpoint, nil
 }
 
@@ -49,8 +48,10 @@ func (be *BackendRoundTripper) HandleError(err error) {
 	be.Handler.Logger().Warnf("proxy.endpoint.failed")
 }
 
-func (rs *RouteServiceRoundTripper) BeforeRoundTrip(request *http.Request) (*route.Endpoint, error) {
+func (rs *RouteServiceRoundTripper) SelectEndpoint(request *http.Request) (*route.Endpoint, error) {
 	return newRouteServiceEndpoint(), nil
+}
+func (be *RouteServiceRoundTripper) PreprocessRequest(request *http.Request, endpoint *route.Endpoint) {
 }
 
 func (rs *RouteServiceRoundTripper) HandleError(err error) {
@@ -58,7 +59,7 @@ func (rs *RouteServiceRoundTripper) HandleError(err error) {
 	rs.Handler.Logger().Warnf("proxy.route-service.failed")
 }
 
-func (be *BackendRoundTripper) setupBackendRequest(request *http.Request, endpoint *route.Endpoint) {
+func (be *BackendRoundTripper) PreprocessRequest(request *http.Request, endpoint *route.Endpoint) {
 	be.Handler.Logger().Debug("proxy.backend")
 
 	request.URL.Host = endpoint.CanonicalAddr()
@@ -75,13 +76,14 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 
 	retry := 0
 	for {
-		endpoint, err = handler.BeforeRoundTrip(request)
+		endpoint, err = handler.SelectEndpoint(request)
 		if err != nil {
 			return nil, err
 		}
 
-		res, err = p.Transport.RoundTrip(request)
+		handler.PreprocessRequest(request, endpoint)
 
+		res, err = p.Transport.RoundTrip(request)
 		if err == nil {
 			break
 		}
