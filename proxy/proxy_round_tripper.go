@@ -15,7 +15,7 @@ type ProxyRoundTripper struct {
 	ServingBackend bool
 }
 
-type RoundTripper interface {
+type RoundTripEventHandler interface {
 	BeforeRoundTrip(request *http.Request) (*route.Endpoint, error)
 	HandleError(err error)
 }
@@ -71,22 +71,11 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 	var res *http.Response
 	var endpoint *route.Endpoint
 
-	var rt RoundTripper
-
-	if p.ServingBackend {
-		rt = &BackendRoundTripper{
-			Iter:    p.Iter,
-			Handler: p.Handler,
-		}
-	} else {
-		rt = &RouteServiceRoundTripper{
-			Handler: p.Handler,
-		}
-	}
+	handler := p.eventHandler()
 
 	retry := 0
 	for {
-		endpoint, err = rt.BeforeRoundTrip(request)
+		endpoint, err = handler.BeforeRoundTrip(request)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +89,7 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 			break
 		}
 
-		rt.HandleError(err)
+		handler.HandleError(err)
 
 		retry++
 		if retry == retries {
@@ -113,4 +102,19 @@ func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, er
 	}
 
 	return res, err
+}
+
+func (p *ProxyRoundTripper) eventHandler() RoundTripEventHandler {
+	var r RoundTripEventHandler
+	if p.ServingBackend {
+		r = &BackendRoundTripper{
+			Iter:    p.Iter,
+			Handler: p.Handler,
+		}
+	} else {
+		r = &RouteServiceRoundTripper{
+			Handler: p.Handler,
+		}
+	}
+	return r
 }
