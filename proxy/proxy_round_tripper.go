@@ -58,6 +58,14 @@ func (rs *RouteServiceRoundTripper) HandleError(err error) {
 	rs.Handler.Logger().Warnf("proxy.route-service.failed")
 }
 
+func (be *BackendRoundTripper) setupBackendRequest(request *http.Request, endpoint *route.Endpoint) {
+	be.Handler.Logger().Debug("proxy.backend")
+
+	request.URL.Host = endpoint.CanonicalAddr()
+	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+	setRequestXCfInstanceId(request, endpoint)
+}
+
 func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response

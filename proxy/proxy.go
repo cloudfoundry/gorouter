@@ -337,14 +337,6 @@ func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig,
 	return routeServiceArgs, nil
 }
 
-func (be *BackendRoundTripper) setupBackendRequest(request *http.Request, endpoint *route.Endpoint) {
-	be.Handler.Logger().Debug("proxy.backend")
-
-	request.URL.Host = endpoint.CanonicalAddr()
-	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-	setRequestXCfInstanceId(request, endpoint)
-}
-
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,
 	endpoint *route.Endpoint,
 	originalEndpointId string,
