@@ -23,7 +23,7 @@ import (
 const (
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
-	retries         = 3
+	maxRetries      = 3
 )
 
 var noEndpointsAvailable = errors.New("No endpoints available")
@@ -189,7 +189,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	servingBackend := true
+	backend := true
 
 	routeServiceUrl := routePool.RouteServiceUrl()
 	// Attempted to use a route service when it is not supported
@@ -212,7 +212,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		} else {
 			var err error
 			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl)
-			servingBackend = false
+			backend = false
 			if err != nil {
 				handler.HandleRouteServiceFailure(err)
 				return
@@ -220,37 +220,33 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		}
 	}
 
-	roundTripper := &ProxyRoundTripper{
-		Transport:      dropsonde.InstrumentedRoundTripper(p.transport),
-		Iter:           iter,
-		Handler:        &handler,
-		ServingBackend: servingBackend,
+	after := func(rsp *http.Response, endpoint *route.Endpoint, err error) {
+		accessLog.FirstByteAt = time.Now()
+		if rsp != nil {
+			accessLog.StatusCode = rsp.StatusCode
+		}
 
-		After: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
-			accessLog.FirstByteAt = time.Now()
-			if rsp != nil {
-				accessLog.StatusCode = rsp.StatusCode
-			}
+		if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
+			setTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
+		}
 
-			if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
-				setTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
-			}
+		latency := time.Since(startedAt)
 
-			latency := time.Since(startedAt)
+		p.reporter.CaptureRoutingResponse(endpoint, rsp, startedAt, latency)
 
-			p.reporter.CaptureRoutingResponse(endpoint, rsp, startedAt, latency)
+		if err != nil {
+			p.reporter.CaptureBadGateway(request)
+			handler.HandleBadGateway(err)
+			return
+		}
 
-			if err != nil {
-				p.reporter.CaptureBadGateway(request)
-				handler.HandleBadGateway(err)
-				return
-			}
-
-			if endpoint.PrivateInstanceId != "" {
-				setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
-			}
-		},
+		if endpoint.PrivateInstanceId != "" {
+			setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
+		}
 	}
+
+	roundTripper := NewProxyRoundTripper(backend,
+		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler, after)
 
 	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig).ServeHTTP(proxyWriter, request)
 

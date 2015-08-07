@@ -7,116 +7,121 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 )
 
-type ProxyRoundTripper struct {
-	Transport      http.RoundTripper
-	After          AfterRoundTrip
-	Iter           route.EndpointIterator
-	Handler        *RequestHandler
-	ServingBackend bool
-}
-
-type RoundTripEventHandler interface {
-	SelectEndpoint(request *http.Request) (*route.Endpoint, error)
-	PreprocessRequest(request *http.Request, endpoint *route.Endpoint)
-	HandleError(err error)
+func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIterator route.EndpointIterator,
+	handler RequestHandler, afterRoundTrip AfterRoundTrip) http.RoundTripper {
+	if backend {
+		return &BackendRoundTripper{
+			transport: transport,
+			iter:      endpointIterator,
+			handler:   &handler,
+			after:     afterRoundTrip,
+		}
+	} else {
+		return &RouteServiceRoundTripper{
+			transport: transport,
+			handler:   &handler,
+			after:     afterRoundTrip,
+		}
+	}
 }
 
 type BackendRoundTripper struct {
-	Iter    route.EndpointIterator
-	Handler *RequestHandler
+	iter      route.EndpointIterator
+	transport http.RoundTripper
+	after     AfterRoundTrip
+	handler   *RequestHandler
 }
 
-type RouteServiceRoundTripper struct {
-	Handler *RequestHandler
-}
-
-func (be *BackendRoundTripper) SelectEndpoint(request *http.Request) (*route.Endpoint, error) {
-	endpoint := be.Iter.Next()
-
-	if endpoint == nil {
-		be.Handler.reporter.CaptureBadGateway(request)
-		err := noEndpointsAvailable
-		be.Handler.HandleBadGateway(err)
-		return nil, err
-	}
-	return endpoint, nil
-}
-
-func (be *BackendRoundTripper) HandleError(err error) {
-	be.Iter.EndpointFailed()
-	be.Handler.Logger().Set("Error", err.Error())
-	be.Handler.Logger().Warnf("proxy.endpoint.failed")
-}
-
-func (rs *RouteServiceRoundTripper) SelectEndpoint(request *http.Request) (*route.Endpoint, error) {
-	return newRouteServiceEndpoint(), nil
-}
-func (be *RouteServiceRoundTripper) PreprocessRequest(request *http.Request, endpoint *route.Endpoint) {
-}
-
-func (rs *RouteServiceRoundTripper) HandleError(err error) {
-	rs.Handler.Logger().Set("Error", err.Error())
-	rs.Handler.Logger().Warnf("proxy.route-service.failed")
-}
-
-func (be *BackendRoundTripper) PreprocessRequest(request *http.Request, endpoint *route.Endpoint) {
-	be.Handler.Logger().Debug("proxy.backend")
-
-	request.URL.Host = endpoint.CanonicalAddr()
-	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-	setRequestXCfInstanceId(request, endpoint)
-}
-
-func (p *ProxyRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
 	var endpoint *route.Endpoint
 
-	handler := p.eventHandler()
-
-	retry := 0
-	for {
-		endpoint, err = handler.SelectEndpoint(request)
+	for retry := 0; retry < maxRetries; retry++ {
+		endpoint, err = rt.selectEndpoint(request)
 		if err != nil {
 			return nil, err
 		}
 
-		handler.PreprocessRequest(request, endpoint)
+		rt.setupRequest(request, endpoint)
 
-		res, err = p.Transport.RoundTrip(request)
-		if err == nil {
-			break
-		}
-		if ne, netErr := err.(*net.OpError); !netErr || ne.Op != "dial" {
+		res, err = rt.transport.RoundTrip(request)
+		if err == nil || !retryableError(err) {
 			break
 		}
 
-		handler.HandleError(err)
-
-		retry++
-		if retry == retries {
-			break
-		}
+		rt.reportError(err)
 	}
 
-	if p.After != nil {
-		p.After(res, endpoint, err)
+	if rt.after != nil {
+		rt.after(res, endpoint, err)
 	}
 
 	return res, err
 }
 
-func (p *ProxyRoundTripper) eventHandler() RoundTripEventHandler {
-	var r RoundTripEventHandler
-	if p.ServingBackend {
-		r = &BackendRoundTripper{
-			Iter:    p.Iter,
-			Handler: p.Handler,
-		}
-	} else {
-		r = &RouteServiceRoundTripper{
-			Handler: p.Handler,
-		}
+func (rt *BackendRoundTripper) selectEndpoint(request *http.Request) (*route.Endpoint, error) {
+	endpoint := rt.iter.Next()
+
+	if endpoint == nil {
+		rt.handler.reporter.CaptureBadGateway(request)
+		err := noEndpointsAvailable
+		rt.handler.HandleBadGateway(err)
+		return nil, err
 	}
-	return r
+	return endpoint, nil
+}
+
+func (rt *BackendRoundTripper) setupRequest(request *http.Request, endpoint *route.Endpoint) {
+	rt.handler.Logger().Debug("proxy.backend")
+	request.URL.Host = endpoint.CanonicalAddr()
+	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+	setRequestXCfInstanceId(request, endpoint)
+}
+
+func (rt *BackendRoundTripper) reportError(err error) {
+	rt.iter.EndpointFailed()
+	rt.handler.Logger().Set("Error", err.Error())
+	rt.handler.Logger().Warnf("proxy.endpoint.failed")
+}
+
+type RouteServiceRoundTripper struct {
+	transport http.RoundTripper
+	after     AfterRoundTrip
+	handler   *RequestHandler
+}
+
+func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	var err error
+	var res *http.Response
+
+	for retry := 0; retry < maxRetries; retry++ {
+		res, err = rt.transport.RoundTrip(request)
+		if err == nil || !retryableError(err) {
+			break
+		}
+
+		rt.reportError(err)
+	}
+
+	if rt.after != nil {
+		endpoint := newRouteServiceEndpoint()
+		rt.after(res, endpoint, err)
+	}
+
+	return res, err
+}
+
+func (rs *RouteServiceRoundTripper) reportError(err error) {
+	rs.handler.Logger().Set("Error", err.Error())
+	rs.handler.Logger().Warnf("proxy.route-service.failed")
+}
+
+func retryableError(err error) bool {
+	ne, netErr := err.(*net.OpError)
+	if netErr && ne.Op == "dial" {
+		return true
+	}
+
+	return false
 }

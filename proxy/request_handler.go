@@ -189,7 +189,7 @@ func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
 		h.StenoLogger.Warn("proxy.tcp.failed")
 
 		retry++
-		if retry == retries {
+		if retry == maxRetries {
 			return err
 		}
 	}
@@ -239,7 +239,7 @@ func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
 		h.StenoLogger.Warn("proxy.websocket.failed")
 
 		retry++
-		if retry == retries {
+		if retry == maxRetries {
 			return err
 		}
 	}

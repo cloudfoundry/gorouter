@@ -20,15 +20,17 @@ import (
 var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
-			proxyRoundTripper *proxy.ProxyRoundTripper
+			proxyRoundTripper http.RoundTripper
 			endpointIterator  *routefakes.FakeEndpointIterator
 			transport         *proxyfakes.FakeRoundTripper
+			handler           proxy.RequestHandler
 			req               *http.Request
 			resp              *proxyfakes.FakeProxyResponseWriter
 			dialError         = &net.OpError{
 				Err: errors.New("error"),
 				Op:  "dial",
 			}
+			after proxy.AfterRoundTrip
 		)
 
 		BeforeEach(func() {
@@ -39,17 +41,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 			nullVarz := nullVarz{}
 			nullAccessRecord := &access_log.AccessLogRecord{}
 
-			handler := proxy.NewRequestHandler(req, resp, nullVarz, nullAccessRecord)
+			handler = proxy.NewRequestHandler(req, resp, nullVarz, nullAccessRecord)
 			transport = &proxyfakes.FakeRoundTripper{}
 
-			proxyRoundTripper = &proxy.ProxyRoundTripper{
-				Iter:      endpointIterator,
-				Handler:   &handler,
-				Transport: transport,
-				After: func(rsp *http.Response, endpoint *route.Endpoint, err error) {
-					Expect(endpoint.Tags).ShouldNot(BeNil())
-				},
+			after = func(rsp *http.Response, endpoint *route.Endpoint, err error) {
+				Expect(endpoint.Tags).ShouldNot(BeNil())
 			}
+
 		})
 
 		Context("backend", func() {
@@ -59,7 +57,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 
 				endpointIterator.NextReturns(endpoint)
-				proxyRoundTripper.ServingBackend = true
+
+				servingBackend := true
+				proxyRoundTripper = proxy.NewProxyRoundTripper(
+					servingBackend, transport, endpointIterator, handler, after)
 			})
 
 			Context("when backend is unavailable", func() {
@@ -122,7 +123,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 				endpointIterator.NextReturns(endpoint)
 				req.Header.Set(route_service.RouteServiceForwardedUrl, "http://myapp.com/")
-				proxyRoundTripper.ServingBackend = false
+				servingBackend := false
+				proxyRoundTripper = proxy.NewProxyRoundTripper(
+					servingBackend, transport, endpointIterator, handler, after)
 			})
 
 			It("does not fetch the next endpoint", func() {
