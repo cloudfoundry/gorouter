@@ -189,6 +189,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
+	servingBackend := true
+
 	routeServiceUrl := routePool.RouteServiceUrl()
 	// Attempted to use a route service when it is not supported
 	if routeServiceUrl != "" && !p.routeServiceConfig.RouteServiceEnabled() {
@@ -196,27 +198,28 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	rsSignature := request.Header.Get(route_service.RouteServiceSignature)
 	var routeServiceArgs route_service.RouteServiceArgs
-	if hasBeenToRouteService(routeServiceUrl, rsSignature) {
-		// A request from a route service destined for a backend instances
-		routeServiceArgs.UrlString = routeServiceUrl
-		err := p.routeServiceConfig.ValidateSignature(&request.Header)
-		if err != nil {
-			handler.HandleBadSignature(err)
-			return
-		}
-	} else if routeServiceUrl != "" {
-		// Generate signature, metadata, and parse Url for any errors
-		var err error
-		routeServiceArgs, err = validateRouteServiceRequest(p.routeServiceConfig, routeServiceUrl)
-		if err != nil {
-			handler.HandleRouteServiceFailure(err)
-			return
+	if routeServiceUrl != "" {
+		rsSignature := request.Header.Get(route_service.RouteServiceSignature)
+		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
+			// A request from a route service destined for a backend instances
+			routeServiceArgs.UrlString = routeServiceUrl
+			err := p.routeServiceConfig.ValidateSignature(&request.Header)
+			if err != nil {
+				handler.HandleBadSignature(err)
+				return
+			}
+		} else {
+			var err error
+			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl)
+			servingBackend = false
+			if err != nil {
+				handler.HandleRouteServiceFailure(err)
+				return
+			}
 		}
 	}
 
-	servingBackend := hasBeenToRouteService(routeServiceUrl, rsSignature) || routeServiceUrl == ""
 	roundTripper := &ProxyRoundTripper{
 		Transport:      dropsonde.InstrumentedRoundTripper(p.transport),
 		Iter:           iter,
@@ -314,7 +317,7 @@ func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
 }
 
-func validateRouteServiceRequest(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl string) (route_service.RouteServiceArgs, error) {
+func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl string) (route_service.RouteServiceArgs, error) {
 	var routeServiceArgs route_service.RouteServiceArgs
 	sig, metadata, err := routeServiceConfig.GenerateSignatureAndMetadata()
 	if err != nil {
