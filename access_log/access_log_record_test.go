@@ -15,7 +15,32 @@ import (
 
 var _ = Describe("AccessLogRecord", func() {
 	It("Makes a record with all values", func() {
-		record := CompleteAccessLogRecord()
+		record := AccessLogRecord{
+			Request: &http.Request{
+				Host:   "FakeRequestHost",
+				Method: "FakeRequestMethod",
+				Proto:  "FakeRequestProto",
+				URL: &url.URL{
+					Opaque: "http://example.com/request",
+				},
+				Header: http.Header{
+					"Referer":                       []string{"FakeReferer"},
+					"User-Agent":                    []string{"FakeUserAgent"},
+					"X-Forwarded-For":               []string{"FakeProxy1, FakeProxy2"},
+					"X-Forwarded-Proto":             []string{"FakeOriginalRequestProto"},
+					router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
+				},
+				RemoteAddr: "FakeRemoteAddr",
+			},
+			BodyBytesSent: 23,
+			StatusCode:    200,
+			RouteEndpoint: &route.Endpoint{
+				ApplicationId: "FakeApplicationId",
+			},
+			StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+			RequestBytesReceived: 30,
+		}
 
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00 +0000] " +
@@ -27,6 +52,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeUserAgent\" " +
 			"FakeRemoteAddr " +
 			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
+			"x_forwarded_proto:\"FakeOriginalRequestProto\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60.000000000 " +
 			"app_id:FakeApplicationId" +
@@ -63,6 +89,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"-\" " +
 			"FakeRemoteAddr " +
 			"x_forwarded_for:\"-\" " +
+			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId" +
@@ -77,31 +104,3 @@ var _ = Describe("AccessLogRecord", func() {
 	})
 
 })
-
-func CompleteAccessLogRecord() AccessLogRecord {
-	return AccessLogRecord{
-		Request: &http.Request{
-			Host:   "FakeRequestHost",
-			Method: "FakeRequestMethod",
-			Proto:  "FakeRequestProto",
-			URL: &url.URL{
-				Opaque: "http://example.com/request",
-			},
-			Header: http.Header{
-				"Referer":                       []string{"FakeReferer"},
-				"User-Agent":                    []string{"FakeUserAgent"},
-				"X-Forwarded-For":               []string{"FakeProxy1, FakeProxy2"},
-				router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
-			},
-			RemoteAddr: "FakeRemoteAddr",
-		},
-		BodyBytesSent: 23,
-		StatusCode:    200,
-		RouteEndpoint: &route.Endpoint{
-			ApplicationId: "FakeApplicationId",
-		},
-		StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-		FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
-		RequestBytesReceived: 30,
-	}
-}
