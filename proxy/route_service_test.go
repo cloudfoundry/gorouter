@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/route_service"
@@ -20,6 +21,7 @@ var _ = Describe("Route Services", func() {
 		signatureHeader      string
 		metadataHeader       string
 		cryptoKey            = "ABCDEFGHIJKLMNOP"
+		forwardedUrl         string
 	)
 
 	JustBeforeEach(func() {
@@ -38,6 +40,8 @@ var _ = Describe("Route Services", func() {
 
 	BeforeEach(func() {
 		conf.RouteServiceEnabled = true
+		forwardedUrl = "http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
+
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
 			signatureHeader := r.Header.Get(route_service.RouteServiceSignature)
@@ -50,14 +54,19 @@ var _ = Describe("Route Services", func() {
 			Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
 
 			// validate client request header
-			Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal("http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"))
+			Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal(forwardedUrl))
 
 			w.Write([]byte("My Special Snowflake Route Service\n"))
 		})
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 
-		signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto)
+		signature := &route_service.Signature{
+			RequestedTime: time.Now(),
+			ForwardedUrl:  forwardedUrl,
+		}
+
+		signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -159,6 +168,7 @@ var _ = Describe("Route Services", func() {
 				req := test_util.NewRequest("GET", "test", "/my_path", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -206,6 +216,7 @@ var _ = Describe("Route Services", func() {
 				req := test_util.NewRequest("GET", "mybadapp.com", "/", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
 				conn.WriteRequest(req)
 				resp, _ := conn.ReadResponse()
 
@@ -222,6 +233,45 @@ var _ = Describe("Route Services", func() {
 
 		It("returns an route service request expired error", func() {
 			ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+			conn.WriteRequest(req)
+
+			res, body := conn.ReadResponse()
+			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
+			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
+		})
+	})
+
+	Context("when a route service modifies the X-CF-Forwarded-Url header", func() {
+		It("returns a bad request error", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://rs.com", func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+			req.Header.Set(route_service.RouteServiceForwardedUrl, "some-other-url")
+			conn.WriteRequest(req)
+
+			res, body := conn.ReadResponse()
+			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
+			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
+		})
+	})
+
+	Context("when a route service strips off the X-CF-Forwarded-Url header", func() {
+		It("returns a bad request error", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://rs.com", func(conn *test_util.HttpConn) {
 				Fail("Should not get here")
 			})
 			defer ln.Close()
@@ -300,8 +350,11 @@ var _ = Describe("Route Services", func() {
 
 			Context("when a request has an expired Route service signature header", func() {
 				BeforeEach(func() {
-					signatureHeader = "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6"
-					metadataHeader = "eyJpdiI6IjlBVnBiZWRIdUZMbU1KaVciLCJub25jZSI6InpWdHM5aU1RdXNVV2U5UkoifQ=="
+					signature := &route_service.Signature{
+						RequestedTime: time.Now().Add(-10 * time.Hour),
+						ForwardedUrl:  forwardedUrl,
+					}
+					signatureHeader, metadataHeader, _ = route_service.BuildSignatureAndMetadata(crypto, signature)
 				})
 
 				It("returns an route service request expired error", func() {
@@ -314,6 +367,7 @@ var _ = Describe("Route Services", func() {
 					req := test_util.NewRequest("GET", "test", "/my_path", nil)
 					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
