@@ -299,6 +299,17 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
+	It("logs component logs", func() {
+		statusPort := test_util.NextAvailPort()
+		proxyPort := test_util.NextAvailPort()
+		cfgFile := filepath.Join(tmpdir, "config.yml")
+		createConfig(cfgFile, statusPort, proxyPort)
+
+		gorouterSession = startGorouterSession(cfgFile)
+
+		Expect(gorouterSession.Out.Contents()).To(ContainSubstring("Component Router registered successfully"))
+	})
+
 	It("has Nats connectivity", func() {
 		localIP, err := localip.LocalIP()
 		Expect(err).ToNot(HaveOccurred())

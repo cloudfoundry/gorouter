@@ -77,6 +77,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
+		Logger: steno.NewLogger("common.logger"),
 	}
 
 	router := &Router{
