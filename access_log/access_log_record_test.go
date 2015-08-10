@@ -55,7 +55,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
 			"x_forwarded_proto:\"FakeOriginalRequestProto\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
-			"response_time:60.000000000 " +
+			"response_time:60 " +
 			"app_id:FakeApplicationId" +
 			"\n"
 
@@ -83,7 +83,7 @@ var _ = Describe("AccessLogRecord", func() {
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
-			"MissingResponseStatusCode " +
+			"- " +
 			"0 " +
 			"0 " +
 			"\"-\" " +
@@ -92,7 +92,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_for:\"-\" " +
 			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
-			"response_time:MissingFinishedAt " +
+			"response_time:- " +
 			"app_id:FakeApplicationId" +
 			"\n"
 
@@ -130,7 +130,7 @@ var _ = Describe("AccessLogRecord", func() {
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
-			"MissingResponseStatusCode " +
+			"- " +
 			"0 " +
 			"0 " +
 			"\"-\" " +
@@ -139,7 +139,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_for:\"-\" " +
 			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
-			"response_time:MissingFinishedAt " +
+			"response_time:- " +
 			"app_id:FakeApplicationId " +
 			"cache_control:\"no-cache\" " +
 			"accept_encoding:\"gzip, deflate\" " +
