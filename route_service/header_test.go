@@ -15,7 +15,8 @@ import (
 
 var _ = Describe("Route Service Header", func() {
 	var (
-		crypto = new(fakes.FakeCrypto)
+		crypto    = new(fakes.FakeCrypto)
+		signature *route_service.Signature
 	)
 
 	BeforeEach(func() {
@@ -36,13 +37,15 @@ var _ = Describe("Route Service Header", func() {
 			cipherText = append(cipherText, iv...)
 			return cipherText, nonce, iv, nil
 		}
+
+		signature = &route_service.Signature{RequestedTime: time.Now()}
 	})
 
 	Describe("Build Signature and Metadata", func() {
 		It("builds signature and metadata headers", func() {
-			signature, metadata, err := route_service.BuildSignatureAndMetadata(crypto)
+			signatureHeader, metadata, err := route_service.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(signature).ToNot(BeNil())
+			Expect(signatureHeader).ToNot(BeNil())
 			metadataDecoded, err := base64.URLEncoding.DecodeString(metadata)
 			Expect(err).ToNot(HaveOccurred())
 			metadataStruct := route_service.Metadata{}
@@ -58,7 +61,7 @@ var _ = Describe("Route Service Header", func() {
 			})
 
 			It("returns an error", func() {
-				_, _, err := route_service.BuildSignatureAndMetadata(crypto)
+				_, _, err := route_service.BuildSignatureAndMetadata(crypto, signature)
 				Expect(err).To(HaveOccurred())
 			})
 		})

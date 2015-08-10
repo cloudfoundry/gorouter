@@ -16,7 +16,8 @@ const (
 	RouteServiceMetadata     = "X-CF-Proxy-Metadata"
 )
 
-var routeServiceExpired = errors.New("Route service request expired")
+var RouteServiceExpired = errors.New("Route service request expired")
+var RouteServiceForwardedUrlMismatch = errors.New("Route service forwarded url mismatch")
 
 type RouteServiceConfig struct {
 	routeServiceEnabled bool
@@ -48,7 +49,11 @@ func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
 }
 
 func (rs *RouteServiceConfig) GenerateSignatureAndMetadata() (string, string, error) {
-	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto)
+	signature := &Signature{
+		RequestedTime: time.Now(),
+	}
+
+	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signature)
 	if err != nil {
 		return "", "", err
 	}
@@ -84,16 +89,31 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header) error {
 				rs.logger.Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.previous_key")
 			}
 		}
+
+		return err
 	}
 
+	err = rs.validateSignatureTimeout(signature)
 	if err != nil {
 		return err
 	}
 
+	return rs.validateForwardedUrl(signature, headers)
+}
+
+func (rs *RouteServiceConfig) validateSignatureTimeout(signature Signature) error {
 	if time.Since(signature.RequestedTime) > rs.routeServiceTimeout {
 		rs.logger.Debug("proxy.route-service.timeout")
-		return routeServiceExpired
+		return RouteServiceExpired
 	}
+	return nil
+}
 
+func (rs *RouteServiceConfig) validateForwardedUrl(signature Signature, headers *http.Header) error {
+	if headers.Get(RouteServiceForwardedUrl) != signature.ForwardedUrl {
+		var err = RouteServiceForwardedUrlMismatch
+		rs.logger.Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.forwarded-url.mismatch")
+		return err
+	}
 	return nil
 }

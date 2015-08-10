@@ -83,14 +83,22 @@ var _ = Describe("Route Service Config", func() {
 			signatureHeader string
 			metadataHeader  string
 			headers         *http.Header
+			signature       *route_service.Signature
 		)
 
 		BeforeEach(func() {
 			h := make(http.Header, 0)
 			headers = &h
 			var err error
-			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto)
+
+			signature = &route_service.Signature{
+				RequestedTime: time.Now(),
+				ForwardedUrl:  "some-forwarded-url",
+			}
+			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
+
+			headers.Set(route_service.RouteServiceForwardedUrl, "some-forwarded-url")
 		})
 
 		JustBeforeEach(func() {
@@ -105,13 +113,19 @@ var _ = Describe("Route Service Config", func() {
 
 		Context("when the timestamp is expired", func() {
 			BeforeEach(func() {
-				signatureHeader = "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6"
-				metadataHeader = "eyJpdiI6IjlBVnBiZWRIdUZMbU1KaVciLCJub25jZSI6InpWdHM5aU1RdXNVV2U5UkoifQ=="
+				signature = &route_service.Signature{
+					RequestedTime: time.Now().Add(-10 * time.Hour),
+					ForwardedUrl:  "some-forwarded-url",
+				}
+				var err error
+				signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("returns an route service request expired error", func() {
 				err := config.ValidateSignature(headers)
 				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
 				Expect(err.Error()).To(ContainSubstring("request expired"))
 			})
 		})
@@ -124,6 +138,30 @@ var _ = Describe("Route Service Config", func() {
 			It("returns an error", func() {
 				err := config.ValidateSignature(headers)
 				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("when the X-CF-Forwarded-Url is missing", func() {
+			BeforeEach(func() {
+				headers.Del(route_service.RouteServiceForwardedUrl)
+			})
+
+			It("returns a route service request bad forwarded url error", func() {
+				err := config.ValidateSignature(headers)
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
+			})
+		})
+
+		Context("when the X-CF-Forwarded-Url is different from the signature", func() {
+			BeforeEach(func() {
+				headers.Set(route_service.RouteServiceForwardedUrl, "some-other-url")
+			})
+
+			It("returns a route service request bad forwarded url error", func() {
+				err := config.ValidateSignature(headers)
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
 			})
 		})
 
@@ -158,14 +196,19 @@ var _ = Describe("Route Service Config", func() {
 
 				Context("when a request has an expired Route service signature header", func() {
 					BeforeEach(func() {
-						signatureHeader = "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6"
-						metadataHeader = "eyJpdiI6IjlBVnBiZWRIdUZMbU1KaVciLCJub25jZSI6InpWdHM5aU1RdXNVV2U5UkoifQ=="
+						signature = &route_service.Signature{
+							RequestedTime: time.Now().Add(-10 * time.Hour),
+							ForwardedUrl:  "some-forwarded-url",
+						}
+						var err error
+						signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
+						Expect(err).ToNot(HaveOccurred())
 					})
 
 					It("returns an route service request expired error", func() {
 						err := config.ValidateSignature(headers)
 						Expect(err).To(HaveOccurred())
-						Expect(err.Error()).To(ContainSubstring("request expired"))
+						Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
 					})
 				})
 			})

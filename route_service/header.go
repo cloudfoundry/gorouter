@@ -9,6 +9,7 @@ import (
 )
 
 type Signature struct {
+	ForwardedUrl  string    `json:"forwarded_url"`
 	RequestedTime time.Time `json:"requested_time"`
 }
 
@@ -17,8 +18,7 @@ type Metadata struct {
 	Nonce []byte `json:"nonce"`
 }
 
-func BuildSignatureAndMetadata(crypto secure.Crypto) (string, string, error) {
-	signature := Signature{RequestedTime: time.Now()}
+func BuildSignatureAndMetadata(crypto secure.Crypto, signature *Signature) (string, string, error) {
 	signatureJson, err := json.Marshal(&signature)
 	if err != nil {
 		return "", "", err
