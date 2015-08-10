@@ -280,6 +280,11 @@ func (r *Router) SubscribeUnregister() {
 
 func (r *Router) HandleGreetings() {
 	r.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
+		if msg.Reply == "" {
+			r.logger.Warnf("Received message with empty reply on subject %s", msg.Subject)
+			return
+		}
+
 		response, _ := r.greetMessage()
 		r.mbusClient.Publish(msg.Reply, response)
 	})

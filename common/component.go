@@ -116,6 +116,11 @@ func (c *VcapComponent) Start() error {
 
 func (c *VcapComponent) Register(mbusClient yagnats.NATSConn) error {
 	mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
+		if msg.Reply == "" {
+			log.Warnf("Received message with empty reply on subject %s", msg.Subject)
+			return
+		}
+
 		c.Uptime = c.StartTime.Elapsed()
 		b, e := json.Marshal(c)
 		if e != nil {

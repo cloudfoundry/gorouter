@@ -100,24 +100,35 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("NATS", func() {
-		It("RouterGreets", func() {
-			response := make(chan []byte)
+		Context("Router Greetings", func() {
+			It("RouterGreets", func() {
+				response := make(chan []byte)
 
-			mbusClient.Subscribe("router.greet.test.response", func(msg *nats.Msg) {
-				response <- msg.Data
+				mbusClient.Subscribe("router.greet.test.response", func(msg *nats.Msg) {
+					response <- msg.Data
+				})
+
+				mbusClient.PublishRequest("router.greet", "router.greet.test.response", []byte{})
+
+				var msg []byte
+				Eventually(response).Should(Receive(&msg))
+
+				var message vcap.RouterStart
+				err := json.Unmarshal(msg, &message)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(5))
+				Expect(message.PruneThresholdInSeconds).To(Equal(120))
 			})
 
-			mbusClient.PublishRequest("router.greet", "router.greet.test.response", []byte{})
+			It("handles a empty reply on greet", func() {
+				err := mbusClient.PublishRequest("router.greet", "", []byte{})
+				Expect(err).NotTo(HaveOccurred())
 
-			var msg []byte
-			Eventually(response).Should(Receive(&msg))
-
-			var message vcap.RouterStart
-			err := json.Unmarshal(msg, &message)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(5))
-			Expect(message.PruneThresholdInSeconds).To(Equal(120))
+				Consistently(func() error {
+					return mbusClient.PublishRequest("router.greet", "test", []byte{})
+				}).ShouldNot(HaveOccurred())
+			})
 		})
 
 		It("discovers", func() {

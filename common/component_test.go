@@ -1,7 +1,12 @@
 package common_test
 
 import (
+	"strings"
+
 	. "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/test_util"
+	"github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/localip"
@@ -12,6 +17,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/cloudfoundry/gunk/natsrunner"
 )
 
 type MarshalableValue struct {
@@ -114,6 +121,62 @@ var _ = Describe("Component", func() {
 		Expect(code).To(Equal(404))
 	})
 
+	Describe("Register", func() {
+		var mbusClient yagnats.NATSConn
+		var natsRunner *natsrunner.NATSRunner
+		var logger *gosteno.Logger
+		var sink *gosteno.TestingSink
+		BeforeEach(func() {
+			natsPort := test_util.NextAvailPort()
+			natsRunner = natsrunner.NewNATSRunner(int(natsPort))
+			natsRunner.Start()
+			mbusClient = natsRunner.MessageBus
+
+			sink = gosteno.NewTestingSink()
+			c := &gosteno.Config{
+				Sinks: []gosteno.Sink{
+					sink,
+				},
+				Level:     gosteno.LOG_INFO,
+				Codec:     gosteno.NewJsonCodec(),
+				EnableLOC: true,
+			}
+			gosteno.Init(c)
+			logger = gosteno.NewLogger("test")
+		})
+
+		AfterEach(func() {
+			natsRunner.Stop()
+		})
+
+		It("subscribes to the vcap.component.discover subject", func() {
+			component.Varz = &Varz{}
+			component.Type = "TestType"
+			component.Logger = logger
+
+			err := component.Start()
+			Expect(err).ToNot(HaveOccurred())
+
+			err = component.Register(mbusClient)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = mbusClient.PublishRequest("vcap.component.discover", "", []byte(""))
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() bool {
+				found := false
+				for _, r := range sink.Records() {
+					if strings.Contains(r.Message, "Received message with empty reply on subject") {
+						found = true
+					}
+				}
+				return found
+			}).Should(BeTrue())
+
+			err = mbusClient.PublishRequest("vcap.component.discover", "reply", []byte("hi"))
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
 })
 
 func serveComponent(component *VcapComponent) {
