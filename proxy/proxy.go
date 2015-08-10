@@ -211,7 +211,10 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			}
 		} else {
 			var err error
-			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl)
+
+			// should not hardcode http, will be addressed by #100982038
+			forwardedUrlRaw := "http" + "://" + request.Host + request.RequestURI
+			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl, forwardedUrlRaw)
 			backend = false
 			if err != nil {
 				handler.HandleRouteServiceFailure(err)
@@ -313,9 +316,9 @@ func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
 }
 
-func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl string) (route_service.RouteServiceArgs, error) {
+func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl, forwardedUrlRaw string) (route_service.RouteServiceArgs, error) {
 	var routeServiceArgs route_service.RouteServiceArgs
-	sig, metadata, err := routeServiceConfig.GenerateSignatureAndMetadata()
+	sig, metadata, err := routeServiceConfig.GenerateSignatureAndMetadata(forwardedUrlRaw)
 	if err != nil {
 		return routeServiceArgs, err
 	}
@@ -323,6 +326,7 @@ func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig,
 	routeServiceArgs.UrlString = routeServiceUrl
 	routeServiceArgs.Signature = sig
 	routeServiceArgs.Metadata = metadata
+	routeServiceArgs.ForwardedUrlRaw = forwardedUrlRaw
 
 	rsURL, err := url.Parse(routeServiceUrl)
 	if err != nil {

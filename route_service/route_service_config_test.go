@@ -45,10 +45,11 @@ var _ = Describe("Route Service Config", func() {
 			parsed, err := url.Parse(str)
 			Expect(err).NotTo(HaveOccurred())
 			rsArgs = route_service.RouteServiceArgs{
-				UrlString: str,
-				ParsedUrl: parsed,
-				Signature: "signature",
-				Metadata:  "metadata",
+				UrlString:       str,
+				ParsedUrl:       parsed,
+				Signature:       "signature",
+				Metadata:        "metadata",
+				ForwardedUrlRaw: "http://test.com/path/",
 			}
 		})
 

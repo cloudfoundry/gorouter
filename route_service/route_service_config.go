@@ -28,10 +28,11 @@ type RouteServiceConfig struct {
 }
 
 type RouteServiceArgs struct {
-	UrlString string
-	ParsedUrl *url.URL
-	Signature string
-	Metadata  string
+	UrlString       string
+	ParsedUrl       *url.URL
+	Signature       string
+	Metadata        string
+	ForwardedUrlRaw string
 }
 
 func NewRouteServiceConfig(enabled bool, timeout time.Duration, crypto secure.Crypto, cryptoPrev secure.Crypto) *RouteServiceConfig {
@@ -48,9 +49,10 @@ func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
 	return rs.routeServiceEnabled
 }
 
-func (rs *RouteServiceConfig) GenerateSignatureAndMetadata() (string, string, error) {
+func (rs *RouteServiceConfig) GenerateSignatureAndMetadata(forwardedUrlRaw string) (string, string, error) {
 	signature := &Signature{
 		RequestedTime: time.Now(),
+		ForwardedUrl:  forwardedUrlRaw,
 	}
 
 	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signature)
@@ -64,10 +66,7 @@ func (rs *RouteServiceConfig) SetupRouteServiceRequest(request *http.Request, ar
 	rs.logger.Debug("proxy.route-service")
 	request.Header.Set(RouteServiceSignature, args.Signature)
 	request.Header.Set(RouteServiceMetadata, args.Metadata)
-
-	clientRequestUrl := request.URL.Scheme + "://" + request.URL.Host + request.URL.Opaque
-
-	request.Header.Set(RouteServiceForwardedUrl, clientRequestUrl)
+	request.Header.Set(RouteServiceForwardedUrl, args.ForwardedUrlRaw)
 
 	request.Host = args.ParsedUrl.Host
 	request.URL = args.ParsedUrl
