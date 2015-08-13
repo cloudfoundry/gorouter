@@ -114,7 +114,7 @@ func (h *RequestHandler) HandleUnsupportedRouteService() {
 	h.StenoLogger.Warnf("proxy.route-service.unsupported")
 
 	h.response.Header().Set("X-Cf-RouterError", "route_service_unsupported")
-	h.writeStatus(http.StatusBadGateway, "Route services are not supported")
+	h.writeStatus(http.StatusBadGateway, "Support for route services is disabled.")
 	h.response.Done()
 }
 

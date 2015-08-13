@@ -93,7 +93,7 @@ var _ = Describe("Route Services", func() {
 
 			res, body := conn.ReadResponse()
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-			Expect(body).To(ContainSubstring("Route services are not supported"))
+			Expect(body).To(ContainSubstring("Support for route services is disabled."))
 		})
 	})
 
