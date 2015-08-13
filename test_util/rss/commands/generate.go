@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -13,6 +12,13 @@ import (
 )
 
 func GenerateSignature(c *cli.Context) {
+	url := c.String("url")
+
+	if url == "" {
+		cli.ShowCommandHelp(c, "generate")
+		os.Exit(1)
+	}
+
 	crypto, err := common.CreateCrypto(c)
 	if err != nil {
 		os.Exit(1)
@@ -36,11 +42,6 @@ func GenerateSignature(c *cli.Context) {
 func createSigFromArgs(c *cli.Context) (route_service.Signature, error) {
 	signature := route_service.Signature{}
 	url := c.String("url")
-
-	if url == "" {
-		cli.ShowCommandHelp(c, "generate")
-		return signature, errors.New("url is required")
-	}
 
 	var sigTime time.Time
 

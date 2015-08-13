@@ -9,7 +9,7 @@ import (
 )
 
 var keyFlag = cli.StringFlag{
-	Name:  "key-path, p",
+	Name:  "key-path, p, k",
 	Usage: "Path of the key file used to decrypt a route service signature",
 }
 
@@ -61,7 +61,7 @@ func main() {
 	fmt.Println()
 	app := cli.NewApp()
 	app.Name = "rss"
-	app.Usage = "A CLI for the generating and opening a route service signature."
+	app.Usage = "A CLI for generating and opening a route service signature."
 	authors := []cli.Author{cli.Author{Name: "Cloud Foundry Routing Team", Email: "cf-dev@lists.cloudfoundry.org"}}
 	app.Authors = authors
 	app.Commands = cliCommands

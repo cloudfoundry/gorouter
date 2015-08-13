@@ -11,16 +11,16 @@ import (
 )
 
 func ReadSignature(c *cli.Context) {
-	crypto, err := common.CreateCrypto(c)
-	if err != nil {
-		os.Exit(1)
-	}
-
 	sigEncoded := c.String("signature")
 	metaEncoded := c.String("metadata")
 
 	if sigEncoded == "" || metaEncoded == "" {
 		cli.ShowCommandHelp(c, "read")
+		os.Exit(1)
+	}
+
+	crypto, err := common.CreateCrypto(c)
+	if err != nil {
 		os.Exit(1)
 	}
 

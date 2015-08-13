@@ -14,7 +14,6 @@ func CreateCrypto(c *cli.Context) (*secure.AesGCM, error) {
 	keyPath := c.String("key-path")
 
 	if keyPath == "" {
-		keyPath = "somepath"
 		usr, err := user.Current()
 		if err != nil {
 			fmt.Println(err.Error())
