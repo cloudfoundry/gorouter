@@ -18,7 +18,6 @@ func CreateCrypto(c *cli.Context) (*secure.AesGCM, error) {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		fmt.Println(usr.HomeDir)
 		keyPath = usr.HomeDir + "/.rss/key"
 	}
 
