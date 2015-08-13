@@ -225,6 +225,24 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
+	Context("when a request has a signature header but no metadata header", func() {
+		It("returns a bad request error", func() {
+			ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+			conn.WriteRequest(req)
+
+			res, body := conn.ReadResponse()
+			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
+			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
+		})
+	})
+
 	Context("when a request has an expired Route service signature header", func() {
 		BeforeEach(func() {
 			signatureHeader = "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6"

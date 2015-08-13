@@ -3,6 +3,7 @@ package route_service
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/cloudfoundry/gorouter/common/secure"
@@ -49,12 +50,16 @@ func SignatureFromHeaders(signatureHeader, metadataHeader string, crypto secure.
 	metadata := Metadata{}
 	signature := Signature{}
 
+	if metadataHeader == "" {
+		return signature, errors.New("No metadata found")
+	}
+
 	metadataDecoded, err := base64.URLEncoding.DecodeString(metadataHeader)
 	if err != nil {
 		return signature, err
 	}
 
-	err = json.Unmarshal([]byte(metadataDecoded), &metadata)
+	err = json.Unmarshal(metadataDecoded, &metadata)
 	signatureDecoded, err := base64.URLEncoding.DecodeString(signatureHeader)
 	if err != nil {
 		return signature, err
