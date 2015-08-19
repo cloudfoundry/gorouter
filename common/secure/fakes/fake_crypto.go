@@ -8,7 +8,7 @@ import (
 )
 
 type FakeCrypto struct {
-	EncryptStub        func(plainText []byte) (cipherText []byte, nonce []byte, iv []byte, err error)
+	EncryptStub        func(plainText []byte) (cipherText []byte, nonce []byte, err error)
 	encryptMutex       sync.RWMutex
 	encryptArgsForCall []struct {
 		plainText []byte
@@ -16,14 +16,12 @@ type FakeCrypto struct {
 	encryptReturns struct {
 		result1 []byte
 		result2 []byte
-		result3 []byte
-		result4 error
+		result3 error
 	}
-	DecryptStub        func(cipherText, iv, nonce []byte) ([]byte, error)
+	DecryptStub        func(cipherText, nonce []byte) ([]byte, error)
 	decryptMutex       sync.RWMutex
 	decryptArgsForCall []struct {
 		cipherText []byte
-		iv         []byte
 		nonce      []byte
 	}
 	decryptReturns struct {
@@ -32,7 +30,7 @@ type FakeCrypto struct {
 	}
 }
 
-func (fake *FakeCrypto) Encrypt(plainText []byte) (cipherText []byte, nonce []byte, iv []byte, err error) {
+func (fake *FakeCrypto) Encrypt(plainText []byte) (cipherText []byte, nonce []byte, err error) {
 	fake.encryptMutex.Lock()
 	fake.encryptArgsForCall = append(fake.encryptArgsForCall, struct {
 		plainText []byte
@@ -41,7 +39,7 @@ func (fake *FakeCrypto) Encrypt(plainText []byte) (cipherText []byte, nonce []by
 	if fake.EncryptStub != nil {
 		return fake.EncryptStub(plainText)
 	} else {
-		return fake.encryptReturns.result1, fake.encryptReturns.result2, fake.encryptReturns.result3, fake.encryptReturns.result4
+		return fake.encryptReturns.result1, fake.encryptReturns.result2, fake.encryptReturns.result3
 	}
 }
 
@@ -57,26 +55,24 @@ func (fake *FakeCrypto) EncryptArgsForCall(i int) []byte {
 	return fake.encryptArgsForCall[i].plainText
 }
 
-func (fake *FakeCrypto) EncryptReturns(result1 []byte, result2 []byte, result3 []byte, result4 error) {
+func (fake *FakeCrypto) EncryptReturns(result1 []byte, result2 []byte, result3 error) {
 	fake.EncryptStub = nil
 	fake.encryptReturns = struct {
 		result1 []byte
 		result2 []byte
-		result3 []byte
-		result4 error
-	}{result1, result2, result3, result4}
+		result3 error
+	}{result1, result2, result3}
 }
 
-func (fake *FakeCrypto) Decrypt(cipherText []byte, iv []byte, nonce []byte) ([]byte, error) {
+func (fake *FakeCrypto) Decrypt(cipherText []byte, nonce []byte) ([]byte, error) {
 	fake.decryptMutex.Lock()
 	fake.decryptArgsForCall = append(fake.decryptArgsForCall, struct {
 		cipherText []byte
-		iv         []byte
 		nonce      []byte
-	}{cipherText, iv, nonce})
+	}{cipherText, nonce})
 	fake.decryptMutex.Unlock()
 	if fake.DecryptStub != nil {
-		return fake.DecryptStub(cipherText, iv, nonce)
+		return fake.DecryptStub(cipherText, nonce)
 	} else {
 		return fake.decryptReturns.result1, fake.decryptReturns.result2
 	}
@@ -88,10 +84,10 @@ func (fake *FakeCrypto) DecryptCallCount() int {
 	return len(fake.decryptArgsForCall)
 }
 
-func (fake *FakeCrypto) DecryptArgsForCall(i int) ([]byte, []byte, []byte) {
+func (fake *FakeCrypto) DecryptArgsForCall(i int) ([]byte, []byte) {
 	fake.decryptMutex.RLock()
 	defer fake.decryptMutex.RUnlock()
-	return fake.decryptArgsForCall[i].cipherText, fake.decryptArgsForCall[i].iv, fake.decryptArgsForCall[i].nonce
+	return fake.decryptArgsForCall[i].cipherText, fake.decryptArgsForCall[i].nonce
 }
 
 func (fake *FakeCrypto) DecryptReturns(result1 []byte, result2 error) {

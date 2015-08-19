@@ -28,27 +28,24 @@ var _ = Describe("Crypto", func() {
 			plainText = []byte("this is a secret message!")
 		)
 
-		Context("when the key and iv are valid", func() {
+		Context("when the key is valid", func() {
 			It("encrypts the plain text into a cypher text and returns a nonce", func() {
-				cipherText, nonce, iv, err := aesGcm.Encrypt(plainText)
+				cipherText, nonce, err := aesGcm.Encrypt(plainText)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cipherText).ToNot(Equal(plainText))
 				Expect(nonce).To(HaveLen(12))
-				Expect(iv).To(HaveLen(12))
 			})
 
 			It("returns a different nonce for the same plain text", func() {
-				cipherText, nonce, iv, err := aesGcm.Encrypt(plainText)
+				cipherText, nonce, err := aesGcm.Encrypt(plainText)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cipherText).ToNot(Equal(plainText))
 				Expect(nonce).To(HaveLen(12))
-				Expect(iv).To(HaveLen(12))
 
-				cipherText2, nonce2, iv2, err := aesGcm.Encrypt(plainText)
+				cipherText2, nonce2, err := aesGcm.Encrypt(plainText)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cipherText).ToNot(Equal(cipherText2))
 				Expect(nonce).ToNot(Equal(nonce2))
-				Expect(iv).ToNot(Equal(iv2))
 			})
 		})
 
@@ -68,22 +65,21 @@ var _ = Describe("Crypto", func() {
 	Describe("Decrypt", func() {
 		var (
 			plainText  = []byte("this is a secret message!")
-			iv         []byte
 			cipherText []byte
 			nonce      []byte
 		)
 
 		BeforeEach(func() {
 			var err error
-			cipherText, nonce, iv, err = aesGcm.Encrypt(plainText)
+			cipherText, nonce, err = aesGcm.Encrypt(plainText)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cipherText).ToNot(Equal(plainText))
 			Expect(nonce).ToNot(BeNil())
 		})
 
-		Context("when using correct key, nonce, and iv", func() {
+		Context("when using correct key and nonce", func() {
 			It("decrypts the cipher text", func() {
-				decryptedText, err := aesGcm.Decrypt(cipherText, nonce, iv)
+				decryptedText, err := aesGcm.Decrypt(cipherText, nonce)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(decryptedText).To(Equal(plainText))
 			})
@@ -96,7 +92,7 @@ var _ = Describe("Crypto", func() {
 				otherAesGcm, err := secure.NewAesGCM(otherKey)
 				Expect(err).ToNot(HaveOccurred())
 
-				decryptedText, err := otherAesGcm.Decrypt(cipherText, nonce, iv)
+				decryptedText, err := otherAesGcm.Decrypt(cipherText, nonce)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("authentication failed"))
 				Expect(decryptedText).ToNot(Equal(plainText))
@@ -106,17 +102,7 @@ var _ = Describe("Crypto", func() {
 		Context("when using an invalid nonce", func() {
 			It("returns an error", func() {
 				otherNonce := []byte("0123456789AB")
-				decryptedText, err := aesGcm.Decrypt(cipherText, otherNonce, iv)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).Should(ContainSubstring("authentication failed"))
-				Expect(decryptedText).ToNot(Equal(plainText))
-			})
-		})
-
-		Context("when using an invalid iv", func() {
-			It("returns an error", func() {
-				otherIv := []byte("0123456789ABCDEF")
-				decryptedText, err := aesGcm.Decrypt(cipherText, nonce, otherIv)
+				decryptedText, err := aesGcm.Decrypt(cipherText, otherNonce)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("authentication failed"))
 				Expect(decryptedText).ToNot(Equal(plainText))

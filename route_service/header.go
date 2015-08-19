@@ -15,7 +15,6 @@ type Signature struct {
 }
 
 type Metadata struct {
-	IV    []byte `json:"iv"`
 	Nonce []byte `json:"nonce"`
 }
 
@@ -25,13 +24,12 @@ func BuildSignatureAndMetadata(crypto secure.Crypto, signature *Signature) (stri
 		return "", "", err
 	}
 
-	signatureJsonEncrypted, nonce, iv, err := crypto.Encrypt(signatureJson)
+	signatureJsonEncrypted, nonce, err := crypto.Encrypt(signatureJson)
 	if err != nil {
 		return "", "", err
 	}
 
 	metadata := Metadata{
-		IV:    iv,
 		Nonce: nonce,
 	}
 
@@ -65,7 +63,7 @@ func SignatureFromHeaders(signatureHeader, metadataHeader string, crypto secure.
 		return signature, err
 	}
 
-	signatureDecrypted, err := crypto.Decrypt(signatureDecoded, metadata.Nonce, metadata.IV)
+	signatureDecrypted, err := crypto.Decrypt(signatureDecoded, metadata.Nonce)
 	if err != nil {
 		return signature, err
 	}

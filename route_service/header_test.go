@@ -20,22 +20,19 @@ var _ = Describe("Route Service Header", func() {
 	)
 
 	BeforeEach(func() {
-		crypto.DecryptStub = func(cipherText, iv, nonce []byte) ([]byte, error) {
+		crypto.DecryptStub = func(cipherText, nonce []byte) ([]byte, error) {
 			decryptedStr := string(cipherText)
 
 			decryptedStr = strings.Replace(decryptedStr, "encrypted", "", -1)
-			decryptedStr = strings.Replace(decryptedStr, string(iv), "", -1)
 			decryptedStr = strings.Replace(decryptedStr, string(nonce), "", -1)
 			return []byte(decryptedStr), nil
 		}
 
-		crypto.EncryptStub = func(plainText []byte) ([]byte, []byte, []byte, error) {
+		crypto.EncryptStub = func(plainText []byte) ([]byte, []byte, error) {
 			nonce := []byte("some-nonce")
-			iv := []byte("some-iv")
 			cipherText := append(plainText, "encrypted"...)
 			cipherText = append(cipherText, nonce...)
-			cipherText = append(cipherText, iv...)
-			return cipherText, nonce, iv, nil
+			return cipherText, nonce, nil
 		}
 
 		signature = &route_service.Signature{RequestedTime: time.Now()}
@@ -52,12 +49,11 @@ var _ = Describe("Route Service Header", func() {
 			err = json.Unmarshal([]byte(metadataDecoded), &metadataStruct)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(metadataStruct.Nonce).To(Equal([]byte("some-nonce")))
-			Expect(metadataStruct.IV).To(Equal([]byte("some-iv")))
 		})
 
 		Context("when unable to encrypt the signature", func() {
 			BeforeEach(func() {
-				crypto.EncryptReturns([]byte{}, []byte{}, []byte{}, errors.New("No entropy"))
+				crypto.EncryptReturns([]byte{}, []byte{}, errors.New("No entropy"))
 			})
 
 			It("returns an error", func() {
@@ -68,12 +64,21 @@ var _ = Describe("Route Service Header", func() {
 	})
 
 	Describe("Parse signature from headers", func() {
-		It("parses signature from signature and metadata headers", func() {
-			signatureHeader := "eyJyZXF1ZXN0ZWRfdGltZSI6IjIwMTUtMDctMjNUMTA6NDg6MDguMjQwMDMwNzIyLTA3OjAwIn1lbmNyeXB0ZWRzb21lLW5vbmNlc29tZS1pdg=="
-			metadataHeader := "eyJpdiI6ImMyOXRaUzFwZGc9PSIsIm5vbmNlIjoiYzI5dFpTMXViMjVqWlE9PSJ9"
-			signature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+		var (
+			signatureHeader string
+			metadataHeader  string
+		)
+
+		BeforeEach(func() {
+			var err error
+			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(signature.RequestedTime.Sub(time.Unix(1437673688, 240030722))).To(Equal(time.Duration(0)))
+		})
+
+		It("parses signature from signature and metadata headers", func() {
+			decryptedSignature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(signature.RequestedTime.Sub(decryptedSignature.RequestedTime)).To(Equal(time.Duration(0)))
 		})
 	})
 
