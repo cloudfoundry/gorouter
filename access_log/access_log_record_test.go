@@ -111,7 +111,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId " +
-			"headers:{\"X-Extra-Header\":\"Cheerio\"}" +
+			"x_extra_header:Cheerio" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
