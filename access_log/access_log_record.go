@@ -2,10 +2,10 @@ package access_log
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry/gorouter/route"
@@ -72,7 +72,7 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 	}
 
 	if r.ExtraHeadersToLog != nil {
-		fmt.Fprintf(b, ` headers:%s`, r.ExtraHeaders())
+		fmt.Fprintf(b, ` %s`, r.ExtraHeaders())
 	}
 
 	fmt.Fprint(b, "\n")
@@ -102,13 +102,12 @@ func (r *AccessLogRecord) LogMessage() string {
 }
 
 func (r *AccessLogRecord) ExtraHeaders() string {
-	extraHeadersToLog := make(map[string]string)
+	extraHeaders := []string{}
 	for _, header := range r.ExtraHeadersToLog {
-		extraHeadersToLog[header] = r.FormatRequestHeader(header)
+		// X-Something-Cool -> x_something_cool
+		formatted_header_name := strings.Replace(strings.ToLower(header), "-", "_", -1)
+		headerString := fmt.Sprintf("%s:%s", formatted_header_name, r.FormatRequestHeader(header))
+		extraHeaders = append(extraHeaders, headerString)
 	}
-	marshalledExtraHeadersToLog, err := json.Marshal(extraHeadersToLog)
-	if err != nil {
-		return fmt.Sprintf("{\"error\": \"Unable to marshal json in AccessLogRecord.ExtraHeaders(): %s\"}", err)
-	}
-	return string(marshalledExtraHeadersToLog)
+	return strings.Join(extraHeaders, " ")
 }
