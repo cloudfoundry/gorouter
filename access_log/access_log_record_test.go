@@ -87,7 +87,9 @@ var _ = Describe("AccessLogRecord", func() {
 					Opaque: "http://example.com/request",
 				},
 				Header: http.Header{
-					"X-Extra-Header": []string{"Cheerio"},
+					"Cache-Control":   []string{"no-cache"},
+					"Accept-Encoding": []string{"gzip, deflate"},
+					"If-Match":        []string{"\"737060cd8c284d8af7ad3082f209582d\""},
 				},
 				RemoteAddr: "FakeRemoteAddr",
 			},
@@ -95,7 +97,7 @@ var _ = Describe("AccessLogRecord", func() {
 				ApplicationId: "FakeApplicationId",
 			},
 			StartedAt:         time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-			ExtraHeadersToLog: []string{"X-Extra-Header"},
+			ExtraHeadersToLog: []string{"Cache-Control", "Accept-Encoding", "If-Match", "Doesnt-Exist"},
 		}
 
 		recordString := "FakeRequestHost - " +
@@ -111,7 +113,10 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId " +
-			"x_extra_header:Cheerio" +
+			"cache_control:\"no-cache\" " +
+			"accept_encoding:\"gzip, deflate\" " +
+			"if_match:\"\\\"737060cd8c284d8af7ad3082f209582d\\\"\" " +
+			"doesnt_exist:\"-\"" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
