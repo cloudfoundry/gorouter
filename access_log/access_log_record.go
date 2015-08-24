@@ -106,7 +106,8 @@ func (r *AccessLogRecord) ExtraHeaders() string {
 	for _, header := range r.ExtraHeadersToLog {
 		// X-Something-Cool -> x_something_cool
 		formatted_header_name := strings.Replace(strings.ToLower(header), "-", "_", -1)
-		headerString := fmt.Sprintf("%s:%s", formatted_header_name, r.FormatRequestHeader(header))
+		escaped_header_value := strings.Replace(r.FormatRequestHeader(header), "\"", "\\\"", -1)
+		headerString := fmt.Sprintf("%s:\"%s\"", formatted_header_name, escaped_header_value)
 		extraHeaders = append(extraHeaders, headerString)
 	}
 	return strings.Join(extraHeaders, " ")
