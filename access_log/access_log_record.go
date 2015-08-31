@@ -71,7 +71,7 @@ func (r *AccessLogRecord) makeRecord() *bytes.Buffer {
 		fmt.Fprintf(b, `app_id:%s`, r.RouteEndpoint.ApplicationId)
 	}
 
-	if r.ExtraHeadersToLog != nil {
+	if r.ExtraHeadersToLog != nil && len(r.ExtraHeadersToLog) > 0 {
 		fmt.Fprintf(b, ` %s`, r.ExtraHeaders())
 	}
 
