@@ -3,9 +3,12 @@ Command line tool for reading and writing route service signatures.
 
 ## Building
 
-    cd test_util/rss
-    go build
-
+```
+cd gorouter
+direnv allow || source .envrc # Setup the correct GOPATH.
+cd test_util/rss
+go build
+```
 
 ## Using RSS cli
 
