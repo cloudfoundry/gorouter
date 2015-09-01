@@ -137,6 +137,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"-\" " +
 			"FakeRemoteAddr " +
 			"x_forwarded_for:\"-\" " +
+			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
 			"response_time:MissingFinishedAt " +
 			"app_id:FakeApplicationId " +
