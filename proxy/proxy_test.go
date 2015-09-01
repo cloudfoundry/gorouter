@@ -168,7 +168,7 @@ var _ = Describe("Proxy", func() {
 		//since the building of the log record happens throughout the life of the request
 		Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
 		Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-		Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" vcap_request_id:`))
+		Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"-" vcap_request_id:`))
 		Expect(string(payload)).To(ContainSubstring(`response_time:`))
 		Expect(string(payload)).To(ContainSubstring(`app_id:`))
 		Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
