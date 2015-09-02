@@ -162,20 +162,16 @@ ssl_skip_validation: true
 			Expect(config.SSLSkipValidation).To(BeFalse())
 		})
 
-		It("sets the route service secret config", func() {
+		It("sets the route service secrets config", func() {
 			var b = []byte(`
-route_service_secret: tWPE+sWJq+ZnGJpyKkIPYg==
+route_service_secrets:
+- tWPE+sWJq+ZnGJpyKkIPYg==
+- ir8vct56nkWBgkZ5jHI3Jg==
 `)
 			config.Initialize(b)
-			Expect(config.RouteServiceSecret).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
-		})
-
-		It("sets the route service secret prev config", func() {
-			var b = []byte(`
-route_service_secret_prev: tWPE+sWJq+ZnGJpyKkIPYg=P
-`)
-			config.Initialize(b)
-			Expect(config.RouteServiceSecretPrev).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=P"))
+			Expect(config.RouteServiceSecrets).To(HaveLen(2))
+			Expect(config.RouteServiceSecrets[0]).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
+			Expect(config.RouteServiceSecrets[1]).To(Equal("ir8vct56nkWBgkZ5jHI3Jg=="))
 		})
 	})
 
@@ -253,7 +249,7 @@ nats:
 
 		Describe("RouteServiceEnabled", func() {
 			var configYaml []byte
-			Context("when the route service secret not configured", func() {
+			Context("when the route service secrets is not configured", func() {
 				BeforeEach(func() {
 					configYaml = []byte(`other_key: other_value`)
 				})
@@ -265,13 +261,52 @@ nats:
 			})
 
 			Context("when the route service secret is properly configured", func() {
-				BeforeEach(func() {
-					configYaml = []byte(`route_service_secret: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=`)
+				Context("when there is one secret", func() {
+					BeforeEach(func() {
+						configYaml = []byte(`
+route_service_secrets:
+- 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
+`)
+						config.Initialize(configYaml)
+						config.Process()
+					})
+
+					It("enables route services", func() {
+						Expect(config.RouteServiceEnabled).To(BeTrue())
+					})
+
+					It("sets route service secret", func() {
+						Expect(config.RouteServiceSecret).To(Equal("1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y="))
+					})
 				})
-				It("enables route services", func() {
-					config.Initialize(configYaml)
-					config.Process()
-					Expect(config.RouteServiceEnabled).To(BeTrue())
+
+				Context("when there are more than one secrets", func() {
+					BeforeEach(func() {
+						configYaml = []byte(`
+route_service_secrets:
+- 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
+- 9x4acpWUqF1MzHPbstAn5Rthrd/AdT0/6R+0ak9xLns=
+- phnt3oQXrTQNSiIZep6ItZuE9Cy5Pi2fGfuTwgZNg0k=
+`)
+						config.Initialize(configYaml)
+						config.Process()
+					})
+
+					It("enables route services", func() {
+						Expect(config.RouteServiceEnabled).To(BeTrue())
+					})
+
+					It("sets route service secret", func() {
+						Expect(config.RouteServiceSecret).To(Equal("1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y="))
+					})
+
+					It("sets previous route service secret", func() {
+						Expect(config.RouteServiceSecretPrev).To(Equal("9x4acpWUqF1MzHPbstAn5Rthrd/AdT0/6R+0ak9xLns="))
+					})
+
+					It("ignores the the third secret", func() {
+						Expect(config.RouteServiceSecrets).To(HaveLen(3))
+					})
 				})
 			})
 		})

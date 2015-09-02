@@ -384,7 +384,7 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecret = "invalid secret"
+			config.RouteServiceSecrets = []string{"invalid secret"}
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -400,7 +400,7 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecretPrev = "invalid secret"
+			config.RouteServiceSecrets = []string{"YP2air+sHzCrILg3XASrTHpyUVLF2WYlN1DYz854ZIc=", "invalid secret"}
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -416,7 +416,10 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecretPrev = config.RouteServiceSecret
+			config.RouteServiceSecrets = []string{
+				"GRSAt5/9O2cdUcuORdYRnNQkYFTpsqCpX7gaCWLayeM=",
+				"ebag0InVm03No+vkWK3qVbFUWvimAcPLZo09q5Mf8qQ=",
+			}
 			writeConfig(config, cfgFile)
 
 			// The process should not have any error.

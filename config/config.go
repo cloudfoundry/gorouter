@@ -97,10 +97,9 @@ type Config struct {
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
 
-	OAuth                  token_fetcher.OAuthConfig `yaml:"oauth"`
-	RoutingApi             RoutingApiConfig          `yaml:"routing_api"`
-	RouteServiceSecret     string                    `yaml:"route_service_secret"`
-	RouteServiceSecretPrev string                    `yaml:"route_service_secret_prev"`
+	OAuth               token_fetcher.OAuthConfig `yaml:"oauth"`
+	RoutingApi          RoutingApiConfig          `yaml:"routing_api"`
+	RouteServiceSecrets []string                  `yaml:"route_service_secrets"`
 
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`
@@ -112,6 +111,8 @@ type Config struct {
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
 	RouteServiceEnabled        bool          `yaml:"-"`
+	RouteServiceSecret         string        `yaml:"-"`
+	RouteServiceSecretPrev     string        `yaml:"-"`
 
 	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
 }
@@ -186,8 +187,13 @@ func (c *Config) Process() {
 		c.SSLCertificate = cert
 	}
 
-	if c.RouteServiceSecret != "" {
+	if c.RouteServiceSecrets != nil && len(c.RouteServiceSecrets) > 0 {
 		c.RouteServiceEnabled = true
+		c.RouteServiceSecret = c.RouteServiceSecrets[0]
+
+		if len(c.RouteServiceSecrets) > 1 {
+			c.RouteServiceSecretPrev = c.RouteServiceSecrets[1]
+		}
 	}
 }
 
