@@ -173,6 +173,26 @@ route_service_secrets:
 			Expect(config.RouteServiceSecrets[0]).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
 			Expect(config.RouteServiceSecrets[1]).To(Equal("ir8vct56nkWBgkZ5jHI3Jg=="))
 		})
+
+		It("sets the route service secrets config using a comma separated list", func() {
+			var b = []byte(`
+route_service_secrets: ["tWPE+sWJq+ZnGJpyKkIPYg==","ir8vct56nkWBgkZ5jHI3Jg=="]
+`)
+			config.Initialize(b)
+			Expect(config.RouteServiceSecrets).To(HaveLen(2))
+			Expect(config.RouteServiceSecrets[0]).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
+			Expect(config.RouteServiceSecrets[1]).To(Equal("ir8vct56nkWBgkZ5jHI3Jg=="))
+		})
+
+		It("sets the route service secrets config using a comma separated list with extra values", func() {
+			var b = []byte(`
+route_service_secrets: ["tWPE+sWJq+ZnGJpyKkIPYg==", "ir8vct56nkWBgkZ5jHI3Jg==", "tr8vct56nkWBgkZ5jHI3Je=="]
+`)
+			config.Initialize(b)
+			Expect(config.RouteServiceSecrets).To(HaveLen(3))
+			Expect(config.RouteServiceSecrets[0]).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
+			Expect(config.RouteServiceSecrets[1]).To(Equal("ir8vct56nkWBgkZ5jHI3Jg=="))
+		})
 	})
 
 	Describe("Process", func() {
