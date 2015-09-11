@@ -59,7 +59,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
 	r.Lock()
 
-	uri = uri.ToLower()
+	uri = uri.RouteKey()
 
 	pool, found := r.byUri.Find(uri)
 	if !found {
@@ -77,7 +77,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	r.Lock()
 
-	uri = uri.ToLower()
+	uri = uri.RouteKey()
 
 	pool, found := r.byUri.Find(uri)
 	if found {

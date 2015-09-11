@@ -107,6 +107,20 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(r.NumEndpoints()).To(Equal(1))
 
 			})
+
+			It("excludes query strings in routes", func() {
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+
+				// discards query string
+				r.Register("dora.app.com?foo=bar", m1)
+
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(1))
+
+				p := r.Lookup("dora.app.com")
+				Expect(p).ToNot(BeNil())
+
+			})
 		})
 
 		Context("wildcard routes", func() {
@@ -216,6 +230,20 @@ var _ = Describe("RouteRegistry", func() {
 
 			p2 := r.Lookup("foo")
 			Expect(p2).To(BeNil())
+		})
+
+		It("excludes query strings in routes", func() {
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+
+			r.Register("dora.app.com", m1)
+
+			Expect(r.NumUris()).To(Equal(1))
+			Expect(r.NumEndpoints()).To(Equal(1))
+
+			// discards query string
+			r.Unregister("dora.app.com?foo=bar", m1)
+			Expect(r.NumUris()).To(Equal(0))
+
 		})
 	})
 
