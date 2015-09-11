@@ -27,9 +27,9 @@ func (u Uri) String() string {
 }
 
 func (u Uri) RouteKey() Uri {
-	key := u.String()
-	if idx := strings.Index(key, "?"); idx >= 0 {
+	key := u.ToLower()
+	if idx := strings.Index(string(key), "?"); idx >= 0 {
 		key = key[0:idx]
 	}
-	return Uri(strings.ToLower(key))
+	return key
 }

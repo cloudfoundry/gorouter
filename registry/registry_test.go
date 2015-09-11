@@ -287,16 +287,31 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
-		FIt("lookup using context path and query string", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+		Context("has context path", func() {
 
-			r.Register("dora.app.com/env", m)
-			// r.Register("dora.app.com", m)
-			p := r.Lookup("dora.app.com/env?foo=bar")
+			var m *route.Endpoint
 
-			Expect(p).ToNot(BeNil())
-			iter := p.Endpoints("")
-			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			BeforeEach(func() {
+				m = route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+			})
+
+			It("using context path and query string", func() {
+				r.Register("dora.app.com/env", m)
+				p := r.Lookup("dora.app.com/env?foo=bar")
+
+				Expect(p).ToNot(BeNil())
+				iter := p.Endpoints("")
+				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			})
+
+			It("using nested context path and query string", func() {
+				r.Register("dora.app.com/env/abc", m)
+				p := r.Lookup("dora.app.com/env/abc?foo=bar&baz=bing")
+
+				Expect(p).ToNot(BeNil())
+				iter := p.Endpoints("")
+				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			})
 		})
 	})
 
