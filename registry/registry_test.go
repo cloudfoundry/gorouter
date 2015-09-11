@@ -286,6 +286,18 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
+
+		FIt("lookup using context path and query string", func() {
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+
+			r.Register("dora.app.com/env", m)
+			// r.Register("dora.app.com", m)
+			p := r.Lookup("dora.app.com/env?foo=bar")
+
+			Expect(p).ToNot(BeNil())
+			iter := p.Endpoints("")
+			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+		})
 	})
 
 	Context("Prunes Stale Droplets", func() {

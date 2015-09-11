@@ -25,3 +25,11 @@ func (u Uri) NextWildcard() (Uri, error) {
 func (u Uri) String() string {
 	return strings.TrimSuffix(string(u), "/")
 }
+
+func (u Uri) RouteKey() Uri {
+	key := u.String()
+	if idx := strings.Index(key, "?"); idx >= 0 {
+		key = key[0:idx]
+	}
+	return Uri(strings.ToLower(key))
+}

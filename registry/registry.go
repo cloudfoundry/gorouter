@@ -94,7 +94,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	r.RLock()
 
-	uri = uri.ToLower()
+	uri = uri.RouteKey()
 	var err error
 	pool, found := r.byUri.MatchUri(uri)
 	for !found && err == nil {
