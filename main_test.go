@@ -377,14 +377,14 @@ var _ = Describe("Router Integration", func() {
 		runningApp.VerifyAppStatus(200)
 	})
 
-	Context("when the route_service_secret is misconfigured", func() {
+	Context("when the route_services_secret is misconfigured", func() {
 		It("fails to start", func() {
 			statusPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecrets = []string{"invalid secret"}
+			config.RouteServiceSecret = "invalid secret"
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -393,14 +393,15 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Context("when the route_service_secret_prev value is misconfigured", func() {
+	Context("when the route_services_secret_decrypt_only value is misconfigured", func() {
 		It("fails to start", func() {
 			statusPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecrets = []string{"YP2air+sHzCrILg3XASrTHpyUVLF2WYlN1DYz854ZIc=", "invalid secret"}
+			config.RouteServiceSecret = "YP2air+sHzCrILg3XASrTHpyUVLF2WYlN1DYz854ZIc="
+			config.RouteServiceSecretPrev = "invalid secret"
 			writeConfig(config, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -409,17 +410,15 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Context("when the route_service_secret and the route_service_secret_prev are valid", func() {
+	Context("when the route_services_secret and the route_services_secret_decrypt_only are valid", func() {
 		It("starts fine", func() {
 			statusPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecrets = []string{
-				"GRSAt5/9O2cdUcuORdYRnNQkYFTpsqCpX7gaCWLayeM=",
-				"ebag0InVm03No+vkWK3qVbFUWvimAcPLZo09q5Mf8qQ=",
-			}
+			config.RouteServiceSecret = "GRSAt5/9O2cdUcuORdYRnNQkYFTpsqCpX7gaCWLayeM="
+			config.RouteServiceSecretPrev = "ebag0InVm03No+vkWK3qVbFUWvimAcPLZo09q5Mf8qQ="
 			writeConfig(config, cfgFile)
 
 			// The process should not have any error.
