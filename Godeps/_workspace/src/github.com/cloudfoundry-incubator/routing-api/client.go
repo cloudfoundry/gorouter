@@ -20,6 +20,9 @@ type Client interface {
 	UpsertRoutes([]db.Route) error
 	Routes() ([]db.Route, error)
 	DeleteRoutes([]db.Route) error
+	RouterGroups() ([]db.RouterGroup, error)
+	UpsertTcpRouteMappings([]db.TcpRouteMapping) error
+	TcpRouteMappings() ([]db.TcpRouteMapping, error)
 
 	SubscribeToEvents() (EventSource, error)
 }
@@ -55,8 +58,24 @@ func (c *client) Routes() ([]db.Route, error) {
 	return routes, err
 }
 
+func (c *client) RouterGroups() ([]db.RouterGroup, error) {
+	var routerGroups []db.RouterGroup
+	err := c.doRequest(ListRouterGroups, nil, nil, nil, &routerGroups)
+	return routerGroups, err
+}
+
 func (c *client) DeleteRoutes(routes []db.Route) error {
 	return c.doRequest(DeleteRoute, nil, nil, routes, nil)
+}
+
+func (c *client) UpsertTcpRouteMappings(tcpRouteMappings []db.TcpRouteMapping) error {
+	return c.doRequest(UpsertTcpRouteMapping, nil, nil, tcpRouteMappings, nil)
+}
+
+func (c *client) TcpRouteMappings() ([]db.TcpRouteMapping, error) {
+	var tcpRouteMappings []db.TcpRouteMapping
+	err := c.doRequest(ListTcpRouteMapping, nil, nil, nil, &tcpRouteMappings)
+	return tcpRouteMappings, err
 }
 
 func (c *client) SubscribeToEvents() (EventSource, error) {

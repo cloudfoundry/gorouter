@@ -70,6 +70,11 @@ var _ = Describe("EventsHandler", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("checks for routing.routes.read scope", func() {
+			_, permission := token.DecodeTokenArgsForCall(0)
+			Expect(permission).To(ConsistOf(handlers.RoutingRoutesReadScope))
+		})
+
 		Context("when the user has incorrect scopes", func() {
 			BeforeEach(func() {
 				token.DecodeTokenReturns(errors.New("Not valid"))
@@ -80,7 +85,7 @@ var _ = Describe("EventsHandler", func() {
 			})
 		})
 
-		Context("when the user has route.admin scope", func() {
+		Context("when the user has routing.routes.read scope", func() {
 			BeforeEach(func() {
 				resultsChan := make(chan storeadapter.WatchEvent, 1)
 				storeNode := storeadapter.StoreNode{Value: []byte("valuable-string")}

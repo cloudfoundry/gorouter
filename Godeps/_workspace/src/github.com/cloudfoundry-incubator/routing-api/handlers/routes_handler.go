@@ -9,11 +9,6 @@ import (
 	"github.com/pivotal-golang/lager"
 )
 
-const (
-	AdminRouteScope     = "route.admin"
-	AdvertiseRouteScope = "route.advertise"
-)
-
 type RoutesHandler struct {
 	token     authentication.Token
 	maxTTL    int
@@ -35,7 +30,7 @@ func NewRoutesHandler(token authentication.Token, maxTTL int, validator RouteVal
 func (h *RoutesHandler) List(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("list-routes")
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), AdminRouteScope)
+	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -62,7 +57,7 @@ func (h *RoutesHandler) Upsert(w http.ResponseWriter, req *http.Request) {
 
 	log.Info("request", lager.Data{"route_creation": routes})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), AdvertiseRouteScope, AdminRouteScope)
+	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -98,7 +93,7 @@ func (h *RoutesHandler) Delete(w http.ResponseWriter, req *http.Request) {
 
 	log.Info("request", lager.Data{"route_deletion": routes})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), AdvertiseRouteScope, AdminRouteScope)
+	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return

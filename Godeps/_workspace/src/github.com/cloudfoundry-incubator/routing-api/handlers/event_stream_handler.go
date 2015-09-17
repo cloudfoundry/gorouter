@@ -34,7 +34,7 @@ func NewEventStreamHandler(token authentication.Token, database db.DB, logger la
 func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("event-stream-handler")
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), AdminRouteScope)
+	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return

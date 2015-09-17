@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cloudfoundry-incubator/routing-api"
+	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry-incubator/routing-api/handlers"
 )
@@ -25,6 +25,14 @@ type FakeRouteValidator struct {
 		routes []db.Route
 	}
 	validateDeleteReturns struct {
+		result1 *routing_api.Error
+	}
+	ValidateTcpRouteMappingStub        func(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
+	validateTcpRouteMappingMutex       sync.RWMutex
+	validateTcpRouteMappingArgsForCall []struct {
+		tcpRouteMappings []db.TcpRouteMapping
+	}
+	validateTcpRouteMappingReturns struct {
 		result1 *routing_api.Error
 	}
 }
@@ -90,6 +98,38 @@ func (fake *FakeRouteValidator) ValidateDeleteArgsForCall(i int) []db.Route {
 func (fake *FakeRouteValidator) ValidateDeleteReturns(result1 *routing_api.Error) {
 	fake.ValidateDeleteStub = nil
 	fake.validateDeleteReturns = struct {
+		result1 *routing_api.Error
+	}{result1}
+}
+
+func (fake *FakeRouteValidator) ValidateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
+	fake.validateTcpRouteMappingMutex.Lock()
+	fake.validateTcpRouteMappingArgsForCall = append(fake.validateTcpRouteMappingArgsForCall, struct {
+		tcpRouteMappings []db.TcpRouteMapping
+	}{tcpRouteMappings})
+	fake.validateTcpRouteMappingMutex.Unlock()
+	if fake.ValidateTcpRouteMappingStub != nil {
+		return fake.ValidateTcpRouteMappingStub(tcpRouteMappings)
+	} else {
+		return fake.validateTcpRouteMappingReturns.result1
+	}
+}
+
+func (fake *FakeRouteValidator) ValidateTcpRouteMappingCallCount() int {
+	fake.validateTcpRouteMappingMutex.RLock()
+	defer fake.validateTcpRouteMappingMutex.RUnlock()
+	return len(fake.validateTcpRouteMappingArgsForCall)
+}
+
+func (fake *FakeRouteValidator) ValidateTcpRouteMappingArgsForCall(i int) []db.TcpRouteMapping {
+	fake.validateTcpRouteMappingMutex.RLock()
+	defer fake.validateTcpRouteMappingMutex.RUnlock()
+	return fake.validateTcpRouteMappingArgsForCall[i].tcpRouteMappings
+}
+
+func (fake *FakeRouteValidator) ValidateTcpRouteMappingReturns(result1 *routing_api.Error) {
+	fake.ValidateTcpRouteMappingStub = nil
+	fake.validateTcpRouteMappingReturns = struct {
 		result1 *routing_api.Error
 	}{result1}
 }

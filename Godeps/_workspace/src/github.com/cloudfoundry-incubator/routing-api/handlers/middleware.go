@@ -16,8 +16,18 @@ func LogWrap(handler http.Handler, logger lager.Logger) http.HandlerFunc {
 			"request": r.URL.String(),
 		})
 
-		requestLog.Info("serving", lager.Data{"request-headers": r.Header})
+		requestLog.Info("serving", lager.Data{"request-headers": filter(r.Header)})
 		handler.ServeHTTP(w, r)
 		requestLog.Info("done", lager.Data{"response-headers": w.Header()})
 	}
+}
+
+func filter(header http.Header) http.Header {
+	filtered := make(http.Header)
+	for k, v := range header {
+		filtered[k] = v
+	}
+	// filter headers
+	filtered.Del("Authorization")
+	return filtered
 }

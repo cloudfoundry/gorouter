@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"text/template"
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/cmd/routing-api/testrunner"
@@ -47,9 +48,7 @@ var _ = SynchronizedBeforeSuite(
 	},
 )
 
-var _ = AfterSuite(func() {
-	gexec.CleanupBuildArtifacts()
-})
+var _ = SynchronizedAfterSuite(func() {}, gexec.CleanupBuildArtifacts)
 
 var _ = BeforeEach(func() {
 	etcdPort = 4001 + GinkgoParallelNode()
@@ -69,13 +68,12 @@ var _ = BeforeEach(func() {
 	}
 
 	client = routing_api.NewClient(routingAPIURL.String())
-	workingDir, _ := os.Getwd()
 
 	routingAPIArgs = testrunner.Args{
 		Port:         routingAPIPort,
 		IP:           routingAPIIP,
 		SystemDomain: routingAPISystemDomain,
-		ConfigPath:   workingDir + "/../../example_config/example.yml",
+		ConfigPath:   createConfig(),
 		EtcdCluster:  etcdUrl,
 		DevMode:      true,
 	}
@@ -86,3 +84,22 @@ var _ = AfterEach(func() {
 	etcdRunner.Reset()
 	etcdRunner.Stop()
 })
+
+func createConfig() string {
+	type statsdConfig struct {
+		Port int
+	}
+	actualStatsdConfig := statsdConfig{Port: 8125 + GinkgoParallelNode()}
+	workingDir, _ := os.Getwd()
+	template, err := template.ParseFiles(workingDir + "/../../example_config/example_template.yml")
+	Expect(err).NotTo(HaveOccurred())
+	configFilePath := fmt.Sprintf("/tmp/example_%d.yml", GinkgoParallelNode())
+	configFile, err := os.Create(configFilePath)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = template.Execute(configFile, actualStatsdConfig)
+	configFile.Close()
+	Expect(err).NotTo(HaveOccurred())
+
+	return configFilePath
+}

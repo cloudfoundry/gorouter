@@ -10,6 +10,6 @@ pushd $FIRST_GOPATH/src
   cd github.com/coreos
   git clone https://github.com/coreos/etcd
   cd etcd
-  git checkout tags/v2.0.1
+  git checkout tags/v2.1.1
   go install
 popd

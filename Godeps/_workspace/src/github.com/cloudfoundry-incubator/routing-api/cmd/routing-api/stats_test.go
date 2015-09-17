@@ -3,6 +3,7 @@ package main_test
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"time"
 
@@ -28,12 +29,12 @@ var _ = Describe("Routes API", func() {
 	BeforeEach(func() {
 		routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
 		routingAPIProcess = ginkgomon.Invoke(routingAPIRunner)
-		addr, err = net.ResolveUDPAddr("udp", "localhost:8125")
+		addr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("localhost:%d", 8125+GinkgoParallelNode()))
 		Expect(err).ToNot(HaveOccurred())
 
 		fakeStatsdServer, err = net.ListenUDP("udp", addr)
-		fakeStatsdServer.SetReadDeadline(time.Now().Add(15 * time.Second))
 		Expect(err).ToNot(HaveOccurred())
+		fakeStatsdServer.SetReadDeadline(time.Now().Add(15 * time.Second))
 		fakeStatsdChan = make(chan string, 1)
 
 		go func(statsChan chan string) {

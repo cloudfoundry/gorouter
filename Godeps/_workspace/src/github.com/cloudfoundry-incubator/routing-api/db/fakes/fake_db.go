@@ -12,7 +12,7 @@ type FakeDB struct {
 	ReadRoutesStub        func() ([]db.Route, error)
 	readRoutesMutex       sync.RWMutex
 	readRoutesArgsForCall []struct{}
-	readRoutesReturns     struct {
+	readRoutesReturns struct {
 		result1 []db.Route
 		result2 error
 	}
@@ -32,22 +32,37 @@ type FakeDB struct {
 	deleteRouteReturns struct {
 		result1 error
 	}
+	ReadTcpRouteMappingsStub        func() ([]db.TcpRouteMapping, error)
+	readTcpRouteMappingsMutex       sync.RWMutex
+	readTcpRouteMappingsArgsForCall []struct{}
+	readTcpRouteMappingsReturns struct {
+		result1 []db.TcpRouteMapping
+		result2 error
+	}
+	SaveTcpRouteMappingStub        func(tcpMapping db.TcpRouteMapping) error
+	saveTcpRouteMappingMutex       sync.RWMutex
+	saveTcpRouteMappingArgsForCall []struct {
+		tcpMapping db.TcpRouteMapping
+	}
+	saveTcpRouteMappingReturns struct {
+		result1 error
+	}
 	ConnectStub        func() error
 	connectMutex       sync.RWMutex
 	connectArgsForCall []struct{}
-	connectReturns     struct {
+	connectReturns struct {
 		result1 error
 	}
 	DisconnectStub        func() error
 	disconnectMutex       sync.RWMutex
 	disconnectArgsForCall []struct{}
-	disconnectReturns     struct {
+	disconnectReturns struct {
 		result1 error
 	}
 	WatchRouteChangesStub        func() (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error)
 	watchRouteChangesMutex       sync.RWMutex
 	watchRouteChangesArgsForCall []struct{}
-	watchRouteChangesReturns     struct {
+	watchRouteChangesReturns struct {
 		result1 <-chan storeadapter.WatchEvent
 		result2 chan<- bool
 		result3 <-chan error
@@ -84,7 +99,7 @@ func (fake *FakeDB) SaveRoute(route db.Route) error {
 	fake.saveRouteArgsForCall = append(fake.saveRouteArgsForCall, struct {
 		route db.Route
 	}{route})
-	defer fake.saveRouteMutex.Unlock()
+	fake.saveRouteMutex.Unlock()
 	if fake.SaveRouteStub != nil {
 		return fake.SaveRouteStub(route)
 	} else {
@@ -139,6 +154,63 @@ func (fake *FakeDB) DeleteRouteArgsForCall(i int) db.Route {
 func (fake *FakeDB) DeleteRouteReturns(result1 error) {
 	fake.DeleteRouteStub = nil
 	fake.deleteRouteReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeDB) ReadTcpRouteMappings() ([]db.TcpRouteMapping, error) {
+	fake.readTcpRouteMappingsMutex.Lock()
+	fake.readTcpRouteMappingsArgsForCall = append(fake.readTcpRouteMappingsArgsForCall, struct{}{})
+	fake.readTcpRouteMappingsMutex.Unlock()
+	if fake.ReadTcpRouteMappingsStub != nil {
+		return fake.ReadTcpRouteMappingsStub()
+	} else {
+		return fake.readTcpRouteMappingsReturns.result1, fake.readTcpRouteMappingsReturns.result2
+	}
+}
+
+func (fake *FakeDB) ReadTcpRouteMappingsCallCount() int {
+	fake.readTcpRouteMappingsMutex.RLock()
+	defer fake.readTcpRouteMappingsMutex.RUnlock()
+	return len(fake.readTcpRouteMappingsArgsForCall)
+}
+
+func (fake *FakeDB) ReadTcpRouteMappingsReturns(result1 []db.TcpRouteMapping, result2 error) {
+	fake.ReadTcpRouteMappingsStub = nil
+	fake.readTcpRouteMappingsReturns = struct {
+		result1 []db.TcpRouteMapping
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDB) SaveTcpRouteMapping(tcpMapping db.TcpRouteMapping) error {
+	fake.saveTcpRouteMappingMutex.Lock()
+	fake.saveTcpRouteMappingArgsForCall = append(fake.saveTcpRouteMappingArgsForCall, struct {
+		tcpMapping db.TcpRouteMapping
+	}{tcpMapping})
+	fake.saveTcpRouteMappingMutex.Unlock()
+	if fake.SaveTcpRouteMappingStub != nil {
+		return fake.SaveTcpRouteMappingStub(tcpMapping)
+	} else {
+		return fake.saveTcpRouteMappingReturns.result1
+	}
+}
+
+func (fake *FakeDB) SaveTcpRouteMappingCallCount() int {
+	fake.saveTcpRouteMappingMutex.RLock()
+	defer fake.saveTcpRouteMappingMutex.RUnlock()
+	return len(fake.saveTcpRouteMappingArgsForCall)
+}
+
+func (fake *FakeDB) SaveTcpRouteMappingArgsForCall(i int) db.TcpRouteMapping {
+	fake.saveTcpRouteMappingMutex.RLock()
+	defer fake.saveTcpRouteMappingMutex.RUnlock()
+	return fake.saveTcpRouteMappingArgsForCall[i].tcpMapping
+}
+
+func (fake *FakeDB) SaveTcpRouteMappingReturns(result1 error) {
+	fake.SaveTcpRouteMappingStub = nil
+	fake.saveTcpRouteMappingReturns = struct {
 		result1 error
 	}{result1}
 }

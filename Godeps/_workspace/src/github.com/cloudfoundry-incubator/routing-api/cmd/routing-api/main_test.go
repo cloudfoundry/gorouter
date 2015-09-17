@@ -10,6 +10,7 @@ import (
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/cmd/routing-api/testrunner"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/helpers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
@@ -71,12 +72,96 @@ var _ = Describe("Main", func() {
 				Expect(err).ToNot(HaveOccurred())
 				return string(body)
 			}
-			Eventually(getRoutes).Should(ContainSubstring("routing-api"))
+			Eventually(getRoutes).Should(ContainSubstring("api.example.com/routing"))
 
 			ginkgomon.Interrupt(proc)
 
-			Eventually(getRoutes).ShouldNot(ContainSubstring("routing-api"))
+			Eventually(getRoutes).ShouldNot(ContainSubstring("api.example.com/routing"))
 			Eventually(routingAPIRunner.ExitCode()).Should(Equal(0))
+		})
+
+		Context("when router groups endpoint is invoked", func() {
+			var proc ifrit.Process
+
+			BeforeEach(func() {
+				routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
+				proc = ifrit.Invoke(routingAPIRunner)
+			})
+
+			AfterEach(func() {
+				ginkgomon.Interrupt(proc)
+			})
+
+			It("returns router groups", func() {
+				client := routing_api.NewClient(fmt.Sprintf("http://127.0.0.1:%d", routingAPIPort))
+				routerGroups, err := client.RouterGroups()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(routerGroups).To(Equal([]db.RouterGroup{helpers.GetDefaultRouterGroup()}))
+			})
+		})
+
+		Context("when tcp routes create endpoint is invoked", func() {
+			var (
+				proc ifrit.Process
+				tcpRouteMapping1 db.TcpRouteMapping
+				tcpRouteMapping2 db.TcpRouteMapping
+			)
+
+			BeforeEach(func() {
+				routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
+				proc = ifrit.Invoke(routingAPIRunner)
+			})
+
+			AfterEach(func() {
+				ginkgomon.Interrupt(proc)
+			})
+
+			It("allows to create given tcp route mappings", func() {
+				client := routing_api.NewClient(fmt.Sprintf("http://127.0.0.1:%d", routingAPIPort))
+				
+				tcpRouteMapping1 = db.NewTcpRouteMapping("router-group-guid-001", 52000, "1.2.3.4", 60000)
+				tcpRouteMapping2 = db.NewTcpRouteMapping("router-group-guid-001", 52001, "1.2.3.5", 60001)
+
+				err := client.UpsertTcpRouteMappings([]db.TcpRouteMapping{tcpRouteMapping1, tcpRouteMapping2})
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		Context("when tcp routes endpoint is invoked", func() {
+			var (
+				proc ifrit.Process
+				tcpRouteMapping1 db.TcpRouteMapping
+				tcpRouteMapping2 db.TcpRouteMapping
+				tcpRouteMappings []db.TcpRouteMapping
+				client routing_api.Client
+			)
+
+			BeforeEach(func() {
+				routingAPIRunner := testrunner.New(routingAPIBinPath, routingAPIArgs)
+				proc = ifrit.Invoke(routingAPIRunner)
+			})
+
+			JustBeforeEach(func(){
+				client = routing_api.NewClient(fmt.Sprintf("http://127.0.0.1:%d", routingAPIPort))
+				
+				tcpRouteMapping1 = db.NewTcpRouteMapping("router-group-guid-001", 52000, "1.2.3.4", 60000)
+				tcpRouteMapping2 = db.NewTcpRouteMapping("router-group-guid-001", 52001, "1.2.3.5", 60001)
+				tcpRouteMappings = []db.TcpRouteMapping{tcpRouteMapping1, tcpRouteMapping2}
+				err := client.UpsertTcpRouteMappings(tcpRouteMappings)
+
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				ginkgomon.Interrupt(proc)
+			})
+
+			It("allows to retrieve tcp route mappings", func() {
+				tcpRouteMappingsResponse, err := client.TcpRouteMappings()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(tcpRouteMappingsResponse).NotTo(BeNil())
+				Expect(tcpRouteMappingsResponse).To(Equal(tcpRouteMappings))
+			})
 		})
 
 		It("closes open event streams when the process exits", func() {

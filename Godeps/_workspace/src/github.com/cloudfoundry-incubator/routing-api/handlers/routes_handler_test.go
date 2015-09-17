@@ -1,15 +1,11 @@
 package handlers_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
-	"github.com/cloudfoundry-incubator/routing-api"
+	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	fake_token "github.com/cloudfoundry-incubator/routing-api/authentication/fakes"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	fake_db "github.com/cloudfoundry-incubator/routing-api/db/fakes"
@@ -20,25 +16,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func newTestRequest(body interface{}) *http.Request {
-	var reader io.Reader
-	switch body := body.(type) {
-
-	case string:
-		reader = strings.NewReader(body)
-	case []byte:
-		reader = bytes.NewReader(body)
-	default:
-		jsonBytes, err := json.Marshal(body)
-		Expect(err).ToNot(HaveOccurred())
-		reader = bytes.NewReader(jsonBytes)
-	}
-
-	request, err := http.NewRequest("", "", reader)
-	Expect(err).ToNot(HaveOccurred())
-	return request
-}
 
 var _ = Describe("RoutesHandler", func() {
 	var (
@@ -62,19 +39,19 @@ var _ = Describe("RoutesHandler", func() {
 
 	Describe(".List", func() {
 		It("response with a 200 OK", func() {
-			request = newTestRequest("")
+			request = handlers.NewTestRequest("")
 
 			routesHandler.List(responseRecorder, request)
 
 			Expect(responseRecorder.Code).To(Equal(http.StatusOK))
 		})
 
-		It("checks for route.admin scope", func() {
-			request = newTestRequest("")
+		It("checks for routing.routes.read scope", func() {
+			request = handlers.NewTestRequest("")
 
 			routesHandler.List(responseRecorder, request)
 			_, permission := token.DecodeTokenArgsForCall(0)
-			Expect(permission).To(ConsistOf(handlers.AdminRouteScope))
+			Expect(permission).To(ConsistOf(handlers.RoutingRoutesReadScope))
 		})
 
 		Context("when the UAA token is not valid", func() {
@@ -83,7 +60,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns an Unauthorized status code", func() {
-				request = newTestRequest("")
+				request = handlers.NewTestRequest("")
 				routesHandler.List(responseRecorder, request)
 				Expect(responseRecorder.Code).To(Equal(http.StatusUnauthorized))
 			})
@@ -101,7 +78,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns an empty set", func() {
-				request = newTestRequest("")
+				request = handlers.NewTestRequest("")
 
 				routesHandler.List(responseRecorder, request)
 
@@ -127,7 +104,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns a single route", func() {
-				request = newTestRequest("")
+				request = handlers.NewTestRequest("")
 
 				routesHandler.List(responseRecorder, request)
 
@@ -168,7 +145,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns a single route", func() {
-				request = newTestRequest("")
+				request = handlers.NewTestRequest("")
 
 				routesHandler.List(responseRecorder, request)
 
@@ -197,7 +174,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns a 500 Internal Server Error", func() {
-				request = newTestRequest("")
+				request = handlers.NewTestRequest("")
 
 				routesHandler.List(responseRecorder, request)
 
@@ -221,18 +198,18 @@ var _ = Describe("RoutesHandler", func() {
 			}
 		})
 
-		It("checks for route.advertise & route.admin scope", func() {
-			request = newTestRequest(route)
+		It("checks for routing.routes.write scope", func() {
+			request = handlers.NewTestRequest(route)
 
 			routesHandler.Delete(responseRecorder, request)
 
 			_, permission := token.DecodeTokenArgsForCall(0)
-			Expect(permission).To(ConsistOf(handlers.AdvertiseRouteScope, handlers.AdminRouteScope))
+			Expect(permission).To(ConsistOf(handlers.RoutingRoutesWriteScope))
 		})
 
 		Context("when all inputs are present and correct", func() {
 			It("returns a status not found when deleting a route", func() {
-				request = newTestRequest(route)
+				request = handlers.NewTestRequest(route)
 
 				routesHandler.Delete(responseRecorder, request)
 
@@ -245,7 +222,7 @@ var _ = Describe("RoutesHandler", func() {
 				route = append(route, route[0])
 				route[1].IP = "5.4.3.2"
 
-				request = newTestRequest(route)
+				request = handlers.NewTestRequest(route)
 				routesHandler.Delete(responseRecorder, request)
 
 				Expect(responseRecorder.Code).To(Equal(http.StatusNoContent))
@@ -255,7 +232,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("logs the route deletion", func() {
-				request = newTestRequest(route)
+				request = handlers.NewTestRequest(route)
 				routesHandler.Delete(responseRecorder, request)
 
 				data := map[string]interface{}{
@@ -275,7 +252,7 @@ var _ = Describe("RoutesHandler", func() {
 				It("returns a 204 if the key was not found", func() {
 					database.DeleteRouteReturns(db.DBError{Type: db.KeyNotFound, Message: "The specified route could not be found."})
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Delete(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusNoContent))
@@ -284,7 +261,7 @@ var _ = Describe("RoutesHandler", func() {
 				It("responds with a server error", func() {
 					database.DeleteRouteReturns(errors.New("stuff broke"))
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Delete(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusInternalServerError))
@@ -295,7 +272,7 @@ var _ = Describe("RoutesHandler", func() {
 
 		Context("when there are errors with the input", func() {
 			It("returns a bad request if it cannot parse the arguments", func() {
-				request = newTestRequest("bad args")
+				request = handlers.NewTestRequest("bad args")
 
 				routesHandler.Delete(responseRecorder, request)
 
@@ -310,7 +287,7 @@ var _ = Describe("RoutesHandler", func() {
 			})
 
 			It("returns an Unauthorized status code", func() {
-				request = newTestRequest(route)
+				request = handlers.NewTestRequest(route)
 				routesHandler.Delete(responseRecorder, request)
 
 				Expect(responseRecorder.Code).To(Equal(http.StatusUnauthorized))
@@ -335,18 +312,18 @@ var _ = Describe("RoutesHandler", func() {
 				}
 			})
 
-			It("checks for route.advertise & route.admin scope", func() {
-				request = newTestRequest(route)
+			It("checks for routing.routes.write scope", func() {
+				request = handlers.NewTestRequest(route)
 
 				routesHandler.Upsert(responseRecorder, request)
 
 				_, permission := token.DecodeTokenArgsForCall(0)
-				Expect(permission).To(ConsistOf(handlers.AdvertiseRouteScope, handlers.AdminRouteScope))
+				Expect(permission).To(ConsistOf(handlers.RoutingRoutesWriteScope))
 			})
 
 			Context("when all inputs are present and correct", func() {
 				It("returns an http status created", func() {
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
@@ -356,7 +333,7 @@ var _ = Describe("RoutesHandler", func() {
 					route = append(route, route[0])
 					route[1].IP = "5.4.3.2"
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
@@ -367,7 +344,7 @@ var _ = Describe("RoutesHandler", func() {
 
 				It("accepts route_service_url parameters", func() {
 					route[0].RouteServiceUrl = "https://my-rs.com"
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
@@ -376,7 +353,7 @@ var _ = Describe("RoutesHandler", func() {
 				})
 
 				It("logs the route declaration", func() {
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					data := map[string]interface{}{
@@ -395,7 +372,7 @@ var _ = Describe("RoutesHandler", func() {
 				It("does not require route_service_url on the request", func() {
 					route[0].RouteServiceUrl = ""
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
@@ -404,7 +381,7 @@ var _ = Describe("RoutesHandler", func() {
 				It("does not require log guid on the request", func() {
 					route[0].LogGuid = ""
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusCreated))
@@ -413,7 +390,7 @@ var _ = Describe("RoutesHandler", func() {
 				It("writes to database backend", func() {
 					route[0].LogGuid = "my-guid"
 
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(database.SaveRouteCallCount()).To(Equal(1))
@@ -426,7 +403,7 @@ var _ = Describe("RoutesHandler", func() {
 					})
 
 					It("responds with a server error", func() {
-						request = newTestRequest(route)
+						request = handlers.NewTestRequest(route)
 						routesHandler.Upsert(responseRecorder, request)
 
 						Expect(responseRecorder.Code).To(Equal(http.StatusInternalServerError))
@@ -437,12 +414,12 @@ var _ = Describe("RoutesHandler", func() {
 
 			Context("when there are errors with the input", func() {
 				BeforeEach(func() {
-					validator.ValidateCreateReturns(&routing_api.Error{"a type", "error message"})
+					validator.ValidateCreateReturns(&routing_api.Error{Type: "a type", Message: "error message"})
 				})
 
 				It("blows up when a port does not fit into a uint16", func() {
 					json := `[{"route":"my-route.com","ip":"1.2.3.4", "port":65537}]`
-					request = newTestRequest(json)
+					request = handlers.NewTestRequest(json)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusBadRequest))
@@ -450,14 +427,14 @@ var _ = Describe("RoutesHandler", func() {
 				})
 
 				It("does not write to the key-value store backend", func() {
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(database.SaveRouteCallCount()).To(Equal(0))
 				})
 
 				It("logs the error", func() {
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(logger.Logs()[1].Message).To(ContainSubstring("error"))
@@ -471,7 +448,7 @@ var _ = Describe("RoutesHandler", func() {
 				})
 
 				It("returns an Unauthorized status code", func() {
-					request = newTestRequest(route)
+					request = handlers.NewTestRequest(route)
 					routesHandler.Upsert(responseRecorder, request)
 
 					Expect(responseRecorder.Code).To(Equal(http.StatusUnauthorized))

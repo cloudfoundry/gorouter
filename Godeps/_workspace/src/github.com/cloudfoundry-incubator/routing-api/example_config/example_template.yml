@@ -1,0 +1,23 @@
+# values in this example are only suitable for testing and are not recommended
+# for production systems
+log_guid: "my_logs"
+uaa_verification_key: "-----BEGIN PUBLIC KEY-----
+
+      MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDHFr+KICms+tuT1OXJwhCUmR2d
+
+      KVy7psa8xzElSyzqx7oJyfJ1JZyOzToj9T5SfTIq396agbHJWVfYphNahvZ/7uMX
+
+      qHxf+ZH9BL1gk9Y6kCnbM5R60gfwjyW1/dQPjOzn9N394zd2FJoFHwdq9Qs0wBug
+
+      spULZVNRxq7veq/fzwIDAQAB
+
+      -----END PUBLIC KEY-----"
+
+debug_address: "1.2.3.4:1234"
+metron_config:
+  address: "1.2.3.4"
+  port: "4567"
+metrics_reporting_interval: "500ms"
+statsd_endpoint: "localhost:{{.Port}}"
+statsd_client_flush_interval: "10ms"
+max_concurrent_etcd_requests: 10

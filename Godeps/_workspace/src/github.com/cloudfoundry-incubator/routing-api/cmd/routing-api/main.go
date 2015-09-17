@@ -11,7 +11,7 @@ import (
 
 	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/cloudfoundry-incubator/cf-debug-server"
-	"github.com/cloudfoundry-incubator/routing-api"
+	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/config"
 	"github.com/cloudfoundry-incubator/routing-api/db"
@@ -132,7 +132,7 @@ func constructStopper(stopChan chan struct{}) ifrit.Runner {
 }
 
 func constructRouteRegister(logGuid string, database db.DB, logger lager.Logger) ifrit.Runner {
-	host := fmt.Sprintf("routing-api.%s", *systemDomain)
+	host := fmt.Sprintf("api.%s/routing", *systemDomain)
 	route := db.Route{
 		Route:   host,
 		Port:    uint16(*port),
@@ -164,12 +164,17 @@ func constructApiServer(cfg config.Config, database db.DB, statsdClient statsd.S
 	validator := handlers.NewValidator()
 	routesHandler := handlers.NewRoutesHandler(token, *maxTTL, validator, database, logger)
 	eventStreamHandler := handlers.NewEventStreamHandler(token, database, logger, statsdClient, stopChan)
+	routeGroupsHandler := handlers.NewRouteGroupsHandler(token, logger)
+	tcpMappingsHandler := handlers.NewTcpRouteMappingsHandler(token, validator, database, logger)
 
 	actions := rata.Handlers{
-		"Upsert":      route(routesHandler.Upsert),
-		"Delete":      route(routesHandler.Delete),
-		"List":        route(routesHandler.List),
-		"EventStream": route(eventStreamHandler.EventStream),
+		routing_api.UpsertRoute:           route(routesHandler.Upsert),
+		routing_api.DeleteRoute:           route(routesHandler.Delete),
+		routing_api.ListRoute:             route(routesHandler.List),
+		routing_api.EventStreamRoute:      route(eventStreamHandler.EventStream),
+		routing_api.ListRouterGroups:      route(routeGroupsHandler.ListRouterGroups),
+		routing_api.UpsertTcpRouteMapping: route(tcpMappingsHandler.Upsert),
+		routing_api.ListTcpRouteMapping:   route(tcpMappingsHandler.List),
 	}
 
 	handler, err := rata.NewRouter(routing_api.Routes, actions)

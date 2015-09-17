@@ -58,7 +58,7 @@ var _ = Describe("Routes API", func() {
 
 		It("fetches all of the routes", func() {
 			routingAPIRoute := db.Route{
-				Route:   fmt.Sprintf("routing-api.%s", routingAPISystemDomain),
+				Route:   fmt.Sprintf("api.%s/routing", routingAPISystemDomain),
 				Port:    routingAPIPort,
 				IP:      routingAPIIP,
 				TTL:     120,
@@ -96,6 +96,29 @@ var _ = Describe("Routes API", func() {
 			Expect(routes).NotTo(ContainElement(route3))
 			Expect(routes).To(ContainElement(route1))
 			Expect(routes).To(ContainElement(route2))
+		})
+
+		Context("when a route has a context path", func() {
+			var routeWithPath db.Route
+
+			BeforeEach(func() {
+				routeWithPath = db.Route{
+					Route:   "host.com/path",
+					Port:    51480,
+					IP:      "1.2.3.4",
+					TTL:     60,
+					LogGuid: "logguid",
+				}
+				err := client.UpsertRoutes([]db.Route{routeWithPath})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("is present in the routes list", func() {
+				var err error
+				routes, err = client.Routes()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(routes).To(ContainElement(routeWithPath))
+			})
 		})
 	})
 })

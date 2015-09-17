@@ -31,6 +31,10 @@
 			"Rev": "db1bf7202e706de8d7460c1b54494ac7ab481a59"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/trace-logger",
+			"Rev": "24964ef4dbb527a373d4db141cbbd41eb21a56f9"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
 			"Rev": "0afd306c305053e4cf1a90e9b58eb24cb1f126b5"
 		},
