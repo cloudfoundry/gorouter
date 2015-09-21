@@ -516,6 +516,10 @@ var _ = Describe("Router", func() {
 		It("reuses the same connection on subsequent calls", func() {
 			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
 			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
@@ -543,6 +547,10 @@ var _ = Describe("Router", func() {
 		It("resets the idle timeout on activity", func() {
 			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
 			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
@@ -589,6 +597,10 @@ var _ = Describe("Router", func() {
 				config.EndpointTimeout/4*3,
 			)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
 			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
@@ -628,6 +640,9 @@ var _ = Describe("Router", func() {
 				)
 
 				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
 			})
 
 			It("terminates before receiving headers", func() {
@@ -668,6 +683,9 @@ var _ = Describe("Router", func() {
 				1*time.Second,
 			)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
 			Ω(err).NotTo(HaveOccurred())
@@ -694,6 +712,9 @@ var _ = Describe("Router", func() {
 		It("serves ssl traffic", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
@@ -711,6 +732,9 @@ var _ = Describe("Router", func() {
 		It("fails when the client uses an unsupported cipher suite", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
 			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
