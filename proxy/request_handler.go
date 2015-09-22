@@ -15,18 +15,19 @@ import (
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
+"github.com/cloudfoundry/gorouter/metrics"
 )
 
 type RequestHandler struct {
 	StenoLogger *steno.Logger
-	reporter    ProxyReporter
+	reporter    metrics.ProxyReporter
 	logrecord   *access_log.AccessLogRecord
 
 	request  *http.Request
 	response ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response ProxyResponseWriter, r ProxyReporter,
+func NewRequestHandler(request *http.Request, response ProxyResponseWriter, r metrics.ProxyReporter,
 	alr *access_log.AccessLogRecord) RequestHandler {
 	return RequestHandler{
 		StenoLogger: createLogger(request),

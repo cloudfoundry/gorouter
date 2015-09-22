@@ -20,6 +20,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var (
@@ -54,7 +55,7 @@ var _ = BeforeEach(func() {
 var _ = JustBeforeEach(func() {
 	var err error
 	mbus := fakeyagnats.Connect()
-	r = registry.NewRouteRegistry(conf, mbus)
+	r = registry.NewRouteRegistry(conf, mbus, new(fakes.FakeRouteReporter))
 
 	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
