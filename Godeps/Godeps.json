@@ -15,6 +15,10 @@
 			"Rev": "b8a35001b773c267eb260a691f4e5499a3531600"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry/sonde-go/events",
+			"Rev": "3d364d9ed49fee2f9fdcba278199127462cae3c4"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
 			"Rev": "5f3b3579b3dc360c8ad3f86fe9e59e58c5652d10"
 		},
@@ -40,7 +44,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
-			"Rev": "0afd306c305053e4cf1a90e9b58eb24cb1f126b5"
+			"Rev": "d2803985187151ad0e01104faffc371e8dc8b5bd"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -75,7 +79,8 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Rev": "bc946d07d1016848dfd2507f90f0859c9471681e"
+			"Comment": "v0.1-55-g2093b57",
+			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",

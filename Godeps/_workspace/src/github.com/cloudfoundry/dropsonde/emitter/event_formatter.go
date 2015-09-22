@@ -2,9 +2,10 @@ package emitter
 
 import (
 	"errors"
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/gogo/protobuf/proto"
 	"time"
+
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gogo/protobuf/proto"
 )
 
 var ErrorMissingOrigin = errors.New("Event not emitted due to missing origin information")
@@ -18,15 +19,15 @@ func Wrap(event events.Event, origin string) (*events.Envelope, error) {
 	envelope := &events.Envelope{Origin: proto.String(origin), Timestamp: proto.Int64(time.Now().UnixNano())}
 
 	switch event := event.(type) {
-	case *events.Heartbeat:
-		envelope.EventType = events.Envelope_Heartbeat.Enum()
-		envelope.Heartbeat = event
 	case *events.HttpStart:
 		envelope.EventType = events.Envelope_HttpStart.Enum()
 		envelope.HttpStart = event
 	case *events.HttpStop:
 		envelope.EventType = events.Envelope_HttpStop.Enum()
 		envelope.HttpStop = event
+	case *events.HttpStartStop:
+		envelope.EventType = events.Envelope_HttpStartStop.Enum()
+		envelope.HttpStartStop = event
 	case *events.ValueMetric:
 		envelope.EventType = events.Envelope_ValueMetric.Enum()
 		envelope.ValueMetric = event

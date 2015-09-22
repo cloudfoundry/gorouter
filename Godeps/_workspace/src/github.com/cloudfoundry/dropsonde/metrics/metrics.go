@@ -24,10 +24,23 @@ import (
 )
 
 var metricSender metric_sender.MetricSender
+var metricBatcher MetricBatcher
+
+type MetricBatcher interface {
+	BatchIncrementCounter(name string)
+	BatchAddCounter(name string, delta uint64)
+	Close()
+}
 
 // Initialize prepares the metrics package for use with the automatic Emitter.
-func Initialize(ms metric_sender.MetricSender) {
+func Initialize(ms metric_sender.MetricSender, mb MetricBatcher) {
 	metricSender = ms
+	metricBatcher = mb
+}
+
+// Closes the metrics system and flushes any batch metrics.
+func Close() {
+	metricBatcher.Close()
 }
 
 // SendValue sends a value event for the named metric. See
@@ -49,6 +62,16 @@ func IncrementCounter(name string) error {
 	return metricSender.IncrementCounter(name)
 }
 
+// BatchIncrementCounter increments a counter but, unlike IncrementCounter, does
+// not emit a CounterEvent for each increment; instead, the increments are batched
+// and a single CounterEvent is sent after the timeout.
+func BatchIncrementCounter(name string) {
+	if metricBatcher == nil {
+		return
+	}
+	metricBatcher.BatchIncrementCounter(name)
+}
+
 // AddToCounter sends an event to increment the named counter by the specified
 // (positive) delta. Maintaining the value of the counter is the responsibility
 // of the receiver, as with IncrementCounter.
@@ -57,6 +80,16 @@ func AddToCounter(name string, delta uint64) error {
 		return nil
 	}
 	return metricSender.AddToCounter(name, delta)
+}
+
+// BatchAddCounter adds delta to a counter but, unlike AddCounter, does not emit a
+// CounterEvent for each add; instead, the adds are batched and a single CounterEvent
+// is sent after the timeout.
+func BatchAddCounter(name string, delta uint64) {
+	if metricBatcher == nil {
+		return
+	}
+	metricBatcher.BatchAddCounter(name, delta)
 }
 
 // SendContainerMetric sends a metric that records resource usage of an app in a container.

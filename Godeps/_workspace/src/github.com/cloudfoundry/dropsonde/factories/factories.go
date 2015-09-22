@@ -3,21 +3,17 @@ package factories
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/cloudfoundry/dropsonde/control"
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/gogo/protobuf/proto"
-	uuid "github.com/nu7hatch/gouuid"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gogo/protobuf/proto"
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 func NewUUID(id *uuid.UUID) *events.UUID {
 	return &events.UUID{Low: proto.Uint64(binary.LittleEndian.Uint64(id[:8])), High: proto.Uint64(binary.LittleEndian.Uint64(id[8:]))}
-}
-
-func NewControlUUID(id *uuid.UUID) *control.UUID {
-	return &control.UUID{Low: proto.Uint64(binary.LittleEndian.Uint64(id[:8])), High: proto.Uint64(binary.LittleEndian.Uint64(id[8:]))}
 }
 
 func NewHttpStart(req *http.Request, peerType events.PeerType, requestId *uuid.UUID) *events.HttpStart {
@@ -63,11 +59,18 @@ func NewHttpStop(req *http.Request, statusCode int, contentLength int64, peerTyp
 	return httpStop
 }
 
-func NewHeartbeat(sentCount, receivedCount, errorCount uint64) *events.Heartbeat {
-	return &events.Heartbeat{
-		SentCount:     proto.Uint64(sentCount),
-		ReceivedCount: proto.Uint64(receivedCount),
-		ErrorCount:    proto.Uint64(errorCount),
+func NewValueMetric(name string, value float64, unit string) *events.ValueMetric {
+	return &events.ValueMetric{
+		Name:  proto.String(name),
+		Value: proto.Float64(value),
+		Unit:  proto.String(unit),
+	}
+}
+
+func NewCounterEvent(name string, delta uint64) *events.CounterEvent {
+	return &events.CounterEvent{
+		Name:  proto.String(name),
+		Delta: proto.Uint64(delta),
 	}
 }
 
