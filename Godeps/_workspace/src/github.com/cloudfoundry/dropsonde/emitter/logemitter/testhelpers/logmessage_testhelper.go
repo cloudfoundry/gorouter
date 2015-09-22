@@ -1,9 +1,10 @@
 package testhelpers
 
 import (
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/gogo/protobuf/proto"
 	"time"
+
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gogo/protobuf/proto"
 )
 
 func NewLogMessage(messageString, appId string) *events.LogMessage {

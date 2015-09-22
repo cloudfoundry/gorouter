@@ -2,14 +2,17 @@ package log_sender
 
 import (
 	"bufio"
-	"github.com/cloudfoundry/dropsonde/emitter"
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gosteno"
-	"github.com/gogo/protobuf/proto"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"fmt"
+	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gogo/protobuf/proto"
+	"syscall"
 )
 
 // A LogSender emits log events.
@@ -22,19 +25,17 @@ type LogSender interface {
 }
 
 type logSender struct {
-	eventEmitter            emitter.EventEmitter
-	logger                  *gosteno.Logger
-	logMessageReceiveCounts map[string]float64
-	logMessageTotalCount    float64
+	eventEmitter         emitter.EventEmitter
+	logger               *gosteno.Logger
+	logMessageTotalCount float64
 	sync.RWMutex
 }
 
 // NewLogSender instantiates a logSender with the given EventEmitter.
 func NewLogSender(eventEmitter emitter.EventEmitter, counterEmissionInterval time.Duration, logger *gosteno.Logger) LogSender {
 	l := logSender{
-		eventEmitter:            eventEmitter,
-		logger:                  logger,
-		logMessageReceiveCounts: make(map[string]float64),
+		eventEmitter: eventEmitter,
+		logger:       logger,
 	}
 
 	go func() {
@@ -55,7 +56,6 @@ func NewLogSender(eventEmitter emitter.EventEmitter, counterEmissionInterval tim
 func (l *logSender) SendAppLog(appID, message, sourceType, sourceInstance string) error {
 	l.Lock()
 	l.logMessageTotalCount++
-	l.logMessageReceiveCounts[appID]++
 	l.Unlock()
 
 	return l.eventEmitter.Emit(makeLogMessage(appID, message, sourceType, sourceInstance, events.LogMessage_OUT))
@@ -67,7 +67,6 @@ func (l *logSender) SendAppLog(appID, message, sourceType, sourceInstance string
 func (l *logSender) SendAppErrorLog(appID, message, sourceType, sourceInstance string) error {
 	l.Lock()
 	l.logMessageTotalCount++
-	l.logMessageReceiveCounts[appID]++
 	l.Unlock()
 
 	return l.eventEmitter.Emit(makeLogMessage(appID, message, sourceType, sourceInstance, events.LogMessage_ERR))
@@ -88,8 +87,7 @@ func (l *logSender) ScanErrorLogStream(appID, sourceType, sourceInstance string,
 func (l *logSender) scanLogStream(appID, sourceType, sourceInstance string, sender func(string, string, string, string) error, reader io.Reader) {
 	for {
 		err := sendScannedLines(appID, sourceType, sourceInstance, bufio.NewScanner(reader), sender)
-		if err == bufio.ErrTooLong {
-			l.SendAppErrorLog(appID, "Dropped log message: message too long (>64K without a newline)", sourceType, sourceInstance)
+		if l.isMessageTooLong(err, appID, sourceType, sourceInstance) {
 			continue
 		}
 		if err == nil {
@@ -101,6 +99,24 @@ func (l *logSender) scanLogStream(appID, sourceType, sourceInstance string, send
 	}
 }
 
+func (l *logSender) isMessageTooLong(err error, appID string, sourceType string, sourceInstance string) bool {
+	if err == nil {
+		return false
+	}
+
+	if err == bufio.ErrTooLong {
+		l.SendAppErrorLog(appID, "Dropped log message: message too long (>64K without a newline)", sourceType, sourceInstance)
+		return true
+	}
+
+	if strings.Contains(err.Error(), syscall.EMSGSIZE.Error()) {
+		l.SendAppErrorLog(appID, fmt.Sprintf("Dropped log message: message could not fit in UDP packet"), sourceType, sourceInstance)
+		return true
+	}
+
+	return false
+}
+
 func (l *logSender) emitCounters() {
 	l.Lock()
 	defer l.Unlock()
@@ -110,14 +126,6 @@ func (l *logSender) emitCounters() {
 		Value: proto.Float64(l.logMessageTotalCount),
 		Unit:  proto.String("count"),
 	})
-
-	for appID, count := range l.logMessageReceiveCounts {
-		l.eventEmitter.Emit(&events.ValueMetric{
-			Name:  proto.String("logSenderTotalMessagesRead." + appID),
-			Value: proto.Float64(count),
-			Unit:  proto.String("count"),
-		})
-	}
 }
 
 func makeLogMessage(appID, message, sourceType, sourceInstance string, messageType events.LogMessage_MessageType) *events.LogMessage {
@@ -139,7 +147,10 @@ func sendScannedLines(appID, sourceType, sourceInstance string, scanner *bufio.S
 			continue
 		}
 
-		send(appID, line, sourceType, sourceInstance)
+		err := send(appID, line, sourceType, sourceInstance)
+		if err != nil {
+			return err
+		}
 	}
 	return scanner.Err()
 }

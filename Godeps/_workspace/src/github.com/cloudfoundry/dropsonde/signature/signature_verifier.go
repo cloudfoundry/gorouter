@@ -8,35 +8,27 @@ package signature
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+
+	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
-	"sync/atomic"
 )
 
 const SIGNATURE_LENGTH = 32
 
 // A SignatureVerifier is a self-instrumenting pipeline object that validates
 // and removes signatures.
-type SignatureVerifier interface {
-	instrumentation.Instrumentable
-	Run(inputChan <-chan []byte, outputChan chan<- []byte)
+type Verifier struct {
+	logger       *gosteno.Logger
+	sharedSecret string
 }
 
 // NewSignatureVerifier returns a SignatureVerifier with the provided logger and
 // shared signing secret.
-func NewSignatureVerifier(logger *gosteno.Logger, sharedSecret string) SignatureVerifier {
-	return &signatureVerifier{
+func NewVerifier(logger *gosteno.Logger, sharedSecret string) *Verifier {
+	return &Verifier{
 		logger:       logger,
 		sharedSecret: sharedSecret,
 	}
-}
-
-type signatureVerifier struct {
-	logger                     *gosteno.Logger
-	sharedSecret               string
-	missingSignatureErrorCount uint64
-	invalidSignatureErrorCount uint64
-	validSignatureCount        uint64
 }
 
 // Run validates signatures. It consumes signed messages from inputChan,
@@ -46,44 +38,28 @@ type signatureVerifier struct {
 //
 // Run blocks on sending to outputChan, so the channel must be drained for the
 // function to continue consuming from inputChan.
-func (v *signatureVerifier) Run(inputChan <-chan []byte, outputChan chan<- []byte) {
+func (v *Verifier) Run(inputChan <-chan []byte, outputChan chan<- []byte) {
 	for signedMessage := range inputChan {
 		if len(signedMessage) < SIGNATURE_LENGTH {
 			v.logger.Warnf("signatureVerifier: missing signature for message %v", signedMessage)
-			incrementCount(&v.missingSignatureErrorCount)
+			metrics.BatchIncrementCounter("signatureVerifier.missingSignatureErrors")
 			continue
 		}
 
 		signature, message := signedMessage[:SIGNATURE_LENGTH], signedMessage[SIGNATURE_LENGTH:]
 		if v.verifyMessage(message, signature) {
 			outputChan <- message
-			incrementCount(&v.validSignatureCount)
-			v.logger.Debugf("signatureVerifier: valid signature %v for message %v", signature, message)
+			metrics.BatchIncrementCounter("signatureVerifier.validSignatures")
 		} else {
-			v.logger.Warnf("signatureVerifier: invalid signature %v for message %v", signature, message)
-			incrementCount(&v.invalidSignatureErrorCount)
+			v.logger.Warnf("signatureVerifier: invalid signature for message %v", message)
+			metrics.BatchIncrementCounter("signatureVerifier.invalidSignatureErrors")
 		}
 	}
 }
 
-func (v *signatureVerifier) verifyMessage(message, signature []byte) bool {
+func (v *Verifier) verifyMessage(message, signature []byte) bool {
 	expectedMAC := generateSignature(message, []byte(v.sharedSecret))
 	return hmac.Equal(signature, expectedMAC)
-}
-
-func (v *signatureVerifier) metrics() []instrumentation.Metric {
-	return []instrumentation.Metric{
-		instrumentation.Metric{Name: "missingSignatureErrors", Value: atomic.LoadUint64(&v.missingSignatureErrorCount)},
-		instrumentation.Metric{Name: "invalidSignatureErrors", Value: atomic.LoadUint64(&v.invalidSignatureErrorCount)},
-		instrumentation.Metric{Name: "validSignatures", Value: atomic.LoadUint64(&v.validSignatureCount)},
-	}
-}
-
-func (v *signatureVerifier) Emit() instrumentation.Context {
-	return instrumentation.Context{
-		Name:    "signatureVerifier",
-		Metrics: v.metrics(),
-	}
 }
 
 // SignMessage returns a message signed with the provided secret, with the
@@ -97,8 +73,4 @@ func generateSignature(message, secret []byte) []byte {
 	mac := hmac.New(sha256.New, secret)
 	mac.Write(message)
 	return mac.Sum(nil)
-}
-
-func incrementCount(count *uint64) {
-	atomic.AddUint64(count, 1)
 }

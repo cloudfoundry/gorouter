@@ -2,7 +2,7 @@ package metric_sender
 
 import (
 	"github.com/cloudfoundry/dropsonde/emitter"
-	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
 // A MetricSender emits metric events.

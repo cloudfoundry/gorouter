@@ -1,8 +1,9 @@
 package fake
 
 import (
-	"github.com/cloudfoundry/dropsonde/events"
 	"sync"
+
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
 type envelope struct {
@@ -12,7 +13,7 @@ type envelope struct {
 
 type FakeEventEmitter struct {
 	ReturnError error
-	Messages    []envelope
+	messages    []envelope
 	Origin      string
 	isClosed    bool
 	sync.RWMutex
@@ -21,6 +22,7 @@ type FakeEventEmitter struct {
 func NewFakeEventEmitter(origin string) *FakeEventEmitter {
 	return &FakeEventEmitter{Origin: origin}
 }
+
 func (f *FakeEventEmitter) Emit(e events.Event) error {
 
 	f.Lock()
@@ -32,7 +34,7 @@ func (f *FakeEventEmitter) Emit(e events.Event) error {
 		return err
 	}
 
-	f.Messages = append(f.Messages, envelope{e, f.Origin})
+	f.messages = append(f.messages, envelope{e, f.Origin})
 	return nil
 }
 
@@ -40,8 +42,8 @@ func (f *FakeEventEmitter) GetMessages() (messages []envelope) {
 	f.Lock()
 	defer f.Unlock()
 
-	messages = make([]envelope, len(f.Messages))
-	copy(messages, f.Messages)
+	messages = make([]envelope, len(f.messages))
+	copy(messages, f.messages)
 	return
 }
 
@@ -64,4 +66,13 @@ func (f *FakeEventEmitter) IsClosed() bool {
 	f.RLock()
 	defer f.RUnlock()
 	return f.isClosed
+}
+
+func (f *FakeEventEmitter) Reset() {
+	f.Lock()
+	defer f.Unlock()
+
+	f.isClosed = false
+	f.messages = []envelope{}
+	f.ReturnError = nil
 }
