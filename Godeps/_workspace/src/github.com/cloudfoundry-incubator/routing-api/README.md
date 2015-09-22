@@ -140,7 +140,7 @@ uaa:
 2. Get the admin client token
 
    ```bash
-   uaac target uaa.10.244.0.34.xip.io
+   uaac target uaa.bosh-lite.com
    uaac token client get admin # You will need to provide the client_secret, found in your CF manifest.
    ```
 
