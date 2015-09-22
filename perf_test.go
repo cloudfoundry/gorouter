@@ -13,13 +13,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	"strconv"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var _ = Describe("AccessLogRecord", func() {
 	Measure("Register", func(b Benchmarker) {
 		c := config.DefaultConfig()
 		mbus := fakeyagnats.Connect()
-		r := registry.NewRouteRegistry(c, mbus)
+		r := registry.NewRouteRegistry(c, mbus, new(fakes.FakeRouteReporter))
 
 		accesslog, err := access_log.CreateRunningAccessLogger(c)
 		Expect(err).ToNot(HaveOccurred())

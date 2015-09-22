@@ -19,6 +19,7 @@ import (
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var _ = Describe("Router", func() {
@@ -43,7 +44,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(config, mbusClient)
+		registry = rregistry.NewRouteRegistry(config, mbusClient, new(fakes.FakeRouteReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{

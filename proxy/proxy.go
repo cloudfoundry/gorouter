@@ -18,6 +18,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/route_service"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 const (
@@ -34,13 +35,6 @@ type LookupRegistry interface {
 
 type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
-type ProxyReporter interface {
-	CaptureBadRequest(req *http.Request)
-	CaptureBadGateway(req *http.Request)
-	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
-	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
-}
-
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
 }
@@ -50,7 +44,7 @@ type ProxyArgs struct {
 	Ip                  string
 	TraceKey            string
 	Registry            LookupRegistry
-	Reporter            ProxyReporter
+	Reporter            metrics.ProxyReporter
 	AccessLogger        access_log.AccessLogger
 	SecureCookies       bool
 	TLSConfig           *tls.Config
@@ -66,7 +60,7 @@ type proxy struct {
 	traceKey           string
 	logger             *steno.Logger
 	registry           LookupRegistry
-	reporter           ProxyReporter
+	reporter           metrics.ProxyReporter
 	accessLogger       access_log.AccessLogger
 	transport          *http.Transport
 	secureCookies      bool

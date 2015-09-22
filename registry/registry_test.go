@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 
 	"encoding/json"
 	"time"
@@ -16,6 +17,7 @@ import (
 var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
 	var messageBus *fakeyagnats.FakeNATSConn
+	var reporter *fakes.FakeRouteReporter
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
@@ -26,7 +28,9 @@ var _ = Describe("RouteRegistry", func() {
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
 		messageBus = fakeyagnats.Connect()
-		r = NewRouteRegistry(configObj, messageBus)
+		reporter = new(fakes.FakeRouteReporter)
+
+		r = NewRouteRegistry(configObj, messageBus, reporter)
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", map[string]string{
 				"runtime":   "ruby18",
@@ -411,6 +415,19 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("foo")
 			Expect(p).ToNot(BeNil())
+		})
+
+		It("sends route metrics to the reporter", func() {
+			r.StartPruningCycle()
+
+			time.Sleep(configObj.PruneStaleDropletsInterval - configObj.DropletStaleThreshold / 2)
+			r.Register("foo", fooEndpoint)
+			r.Register("fooo", fooEndpoint)
+
+			Eventually(reporter.CaptureRouteStatsCallCount).Should(Equal(1))
+			totalRoutes, timeSinceLastUpdate := reporter.CaptureRouteStatsArgsForCall(0)
+			Expect(totalRoutes).To(Equal(2))
+			Expect(timeSinceLastUpdate).To(BeNumerically("~",  5, 5))
 		})
 	})
 

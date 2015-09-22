@@ -6,6 +6,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/cloudfoundry/gorouter/varz"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -20,7 +21,7 @@ var _ = Describe("Varz", func() {
 	var Registry *registry.RouteRegistry
 
 	BeforeEach(func() {
-		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.Connect())
+		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.Connect(), new(fakes.FakeRouteReporter))
 		Varz = NewVarz(Registry)
 	})
 

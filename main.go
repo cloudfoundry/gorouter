@@ -28,6 +28,7 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 var configFile string
@@ -67,12 +68,14 @@ func main() {
 	logger.Info("Setting up NATs connection")
 	natsClient := connectToNatsServer(c, logger)
 
-	registry := rregistry.NewRouteRegistry(c, natsClient)
+	metricsReporter := metrics.NewMetricsReporter()
+	registry := rregistry.NewRouteRegistry(c, natsClient, metricsReporter)
 
 	logger.Info("Setting up routing_api route fetcher")
 	setupRouteFetcher(c, registry)
 
 	varz := rvarz.NewVarz(registry)
+	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
 
 	accessLogger, err := access_log.CreateRunningAccessLogger(c)
 	if err != nil {
@@ -88,7 +91,7 @@ func main() {
 		}
 	}
 
-	proxy := buildProxy(c, registry, accessLogger, varz, crypto, cryptoPrev)
+	proxy := buildProxy(c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
 
 	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter)
 	if err != nil {
@@ -168,13 +171,13 @@ func createCrypto(secret string, logger *steno.Logger) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, varz rvarz.Varz, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	args := proxy.ProxyArgs{
 		EndpointTimeout: c.EndpointTimeout,
 		Ip:              c.Ip,
 		TraceKey:        c.TraceKey,
 		Registry:        registry,
-		Reporter:        varz,
+		Reporter:        reporter,
 		AccessLogger:    accessLogger,
 		SecureCookies:   c.SecureCookies,
 		TLSConfig: &tls.Config{

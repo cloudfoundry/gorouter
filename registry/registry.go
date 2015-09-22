@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 type RegistryInterface interface {
@@ -36,11 +37,13 @@ type RouteRegistry struct {
 
 	messageBus yagnats.NATSConn
 
+	reporter metrics.RouteReporter
+
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(c *config.Config, mbus yagnats.NATSConn) *RouteRegistry {
+func NewRouteRegistry(c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 
 	r.logger = steno.NewLogger("router.registry")
@@ -51,7 +54,7 @@ func NewRouteRegistry(c *config.Config, mbus yagnats.NATSConn) *RouteRegistry {
 	r.dropletStaleThreshold = c.DropletStaleThreshold
 
 	r.messageBus = mbus
-
+	r.reporter = reporter
 	return r
 }
 
@@ -119,6 +122,8 @@ func (r *RouteRegistry) StartPruningCycle() {
 				case <-r.ticker.C:
 					r.logger.Debug("Start to check and prune stale droplets")
 					r.pruneStaleDroplets()
+					msSinceLastUpdate := uint64(time.Since(r.TimeOfLastUpdate())/time.Millisecond)
+					r.reporter.CaptureRouteStats(r.NumUris(), msSinceLastUpdate)
 				}
 			}
 		}()
