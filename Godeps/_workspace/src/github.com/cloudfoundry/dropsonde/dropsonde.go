@@ -1,9 +1,7 @@
 // Package dropsonde provides sensible defaults for using dropsonde.
 //
 // The default HTTP transport is instrumented, as well as some basic stats about
-// the Go runtime. Additionally, the default emitter is itself instrumented to
-// periodically send "heartbeat" messages containing counts of received and sent
-// events. The default emitter sends events over UDP.
+// the Go runtime. The default emitter sends events over UDP.
 //
 // Use
 //
@@ -15,26 +13,29 @@ package dropsonde
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/cloudfoundry/dropsonde/emitter"
-	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/dropsonde/instrumented_handler"
 	"github.com/cloudfoundry/dropsonde/instrumented_round_tripper"
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/dropsonde/runtime_stats"
 	"github.com/cloudfoundry/gosteno"
-	"net/http"
-	"strings"
-	"time"
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
 var autowiredEmitter emitter.EventEmitter
 
 const (
-	statsInterval   = 10 * time.Second
-	originDelimiter = "/"
+	statsInterval        = 10 * time.Second
+	defaultBatchInterval = 5 * time.Second
+	originDelimiter      = "/"
 )
 
 func init() {
@@ -88,7 +89,9 @@ func InstrumentedRoundTripper(roundTripper http.RoundTripper) http.RoundTripper 
 }
 
 func initialize() {
-	metrics.Initialize(metric_sender.NewMetricSender(AutowiredEmitter()))
+	sender := metric_sender.NewMetricSender(AutowiredEmitter())
+	batcher := metricbatcher.New(sender, defaultBatchInterval)
+	metrics.Initialize(sender, batcher)
 	logs.Initialize(log_sender.NewLogSender(AutowiredEmitter(), statsInterval, gosteno.NewLogger("dropsonde/logs")))
 	go runtime_stats.NewRuntimeStats(autowiredEmitter, statsInterval).Run(nil)
 	http.DefaultTransport = InstrumentedRoundTripper(http.DefaultTransport)
@@ -108,14 +111,7 @@ func createDefaultEmitter(origin, destination string) (emitter.EventEmitter, err
 		return nil, fmt.Errorf("Failed to initialize dropsonde: %v", err.Error())
 	}
 
-	heartbeatResponder, err := emitter.NewHeartbeatResponder(udpEmitter, origin)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to initialize dropsonde: %v", err.Error())
-	}
-
-	go udpEmitter.ListenForHeartbeatRequest(heartbeatResponder.Respond)
-
-	return emitter.NewEventEmitter(heartbeatResponder, origin), nil
+	return emitter.NewEventEmitter(udpEmitter, origin), nil
 }
 
 // NullEventEmitter is used when no event emission is desired. See

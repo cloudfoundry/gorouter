@@ -16,8 +16,9 @@
 package logs
 
 import (
-	"github.com/cloudfoundry/dropsonde/log_sender"
 	"io"
+
+	"github.com/cloudfoundry/dropsonde/log_sender"
 )
 
 var logSender log_sender.LogSender

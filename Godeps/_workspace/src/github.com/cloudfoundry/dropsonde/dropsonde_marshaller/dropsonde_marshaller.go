@@ -16,13 +16,14 @@
 package dropsonde_marshaller
 
 import (
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gogo/protobuf/proto"
 	"sync/atomic"
 	"unicode"
+
+	"github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gogo/protobuf/proto"
 )
 
 // A DropsondeMarshaller is an self-instrumenting tool for converting dropsonde
