@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -128,71 +129,6 @@ var _ = Describe("Proxy", func() {
 		})
 
 		conn.CheckLine("HTTP/1.0 200 OK")
-	})
-
-	It("Logs a request", func() {
-		ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
-			req, body := conn.ReadRequest()
-			Expect(req.Method).To(Equal("POST"))
-			Expect(req.URL.Path).To(Equal("/"))
-			Expect(req.ProtoMajor).To(Equal(1))
-			Expect(req.ProtoMinor).To(Equal(1))
-
-			Expect(body).To(Equal("ABCD"))
-
-			rsp := test_util.NewResponse(200)
-			out := &bytes.Buffer{}
-			out.WriteString("DEFG")
-			rsp.Body = ioutil.NopCloser(out)
-			conn.WriteResponse(rsp)
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		body := &bytes.Buffer{}
-		body.WriteString("ABCD")
-		req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
-		conn.WriteRequest(req)
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-		var payload []byte
-		Eventually(func() int {
-			accessLogFile.Read(&payload)
-			return len(payload)
-		}).ShouldNot(BeZero())
-
-		//make sure the record includes all the data
-		//since the building of the log record happens throughout the life of the request
-		Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-		Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-		Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"-" vcap_request_id:`))
-		Expect(string(payload)).To(ContainSubstring(`response_time:`))
-		Expect(string(payload)).To(ContainSubstring(`app_id:`))
-		Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
-	})
-
-	It("Logs a request when it exits early", func() {
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET / HTTP/0.9",
-			"Host: test",
-		})
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-
-		var payload []byte
-		Eventually(func() int {
-			n, e := accessLogFile.Read(&payload)
-			Expect(e).ToNot(HaveOccurred())
-			return n
-		}).ShouldNot(BeZero())
-
-		Expect(string(payload)).To(MatchRegexp("^test.*\n"))
 	})
 
 	It("responds to HTTP/1.1", func() {
@@ -991,6 +927,167 @@ var _ = Describe("Proxy", func() {
 		}
 	})
 
+	Context("Access log", func() {
+		It("Logs a request", func() {
+			ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
+				req, body := conn.ReadRequest()
+				Expect(req.Method).To(Equal("POST"))
+				Expect(req.URL.Path).To(Equal("/"))
+				Expect(req.ProtoMajor).To(Equal(1))
+				Expect(req.ProtoMinor).To(Equal(1))
+
+				Expect(body).To(Equal("ABCD"))
+
+				rsp := test_util.NewResponse(200)
+				out := &bytes.Buffer{}
+				out.WriteString("DEFG")
+				rsp.Body = ioutil.NopCloser(out)
+				conn.WriteResponse(rsp)
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			body := &bytes.Buffer{}
+			body.WriteString("ABCD")
+			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			var payload []byte
+			Eventually(func() int {
+				accessLogFile.Read(&payload)
+				return len(payload)
+			}).ShouldNot(BeZero())
+
+			//make sure the record includes all the data
+			//since the building of the log record happens throughout the life of the request
+			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
+			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
+			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"-" vcap_request_id:`))
+			Expect(string(payload)).To(ContainSubstring(`response_time:`))
+			Expect(string(payload)).To(ContainSubstring(`app_id:`))
+			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
+		})
+
+		It("Logs a request when it exits early", func() {
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET / HTTP/0.9",
+				"Host: test",
+			})
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+
+			var payload []byte
+			Eventually(func() int {
+				n, e := accessLogFile.Read(&payload)
+				Expect(e).ToNot(HaveOccurred())
+				return n
+			}).ShouldNot(BeZero())
+
+			Expect(string(payload)).To(MatchRegexp("^test.*\n"))
+		})
+
+		Context("when the request is a TCP Upgrade", func() {
+			It("Logs the response time", func() {
+
+				ln := registerHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
+					conn.WriteLine("hello")
+					conn.CheckLine("hello from client")
+					conn.WriteLine("hello from server")
+					conn.Close()
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
+				req.Header.Set("Upgrade", "tcp")
+
+				req.Header.Set("Connection", "Upgrade")
+
+				conn.WriteRequest(req)
+
+				conn.CheckLine("hello")
+				conn.WriteLine("hello from client")
+				conn.CheckLine("hello from server")
+
+				var payload []byte
+				Eventually(func() int {
+					accessLogFile.Read(&payload)
+					return len(payload)
+				}).ShouldNot(BeZero())
+
+				Expect(string(payload)).To(ContainSubstring(`response_time:`))
+				responseTime := parseResponseTimeFromLog(string(payload))
+				Expect(responseTime).To(BeNumerically(">", 0))
+
+				conn.Close()
+			})
+		})
+
+		Context("when the request is a web connection", func() {
+			It("Logs the response time", func() {
+				done := make(chan bool)
+				ln := registerHandler(r, "ws", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Ω(err).NotTo(HaveOccurred())
+
+					done <- req.Header.Get("Upgrade") == "Websocket" &&
+						req.Header.Get("Connection") == "Upgrade"
+
+					resp := test_util.NewResponse(http.StatusSwitchingProtocols)
+					resp.Header.Set("Upgrade", "Websocket")
+					resp.Header.Set("Connection", "Upgrade")
+
+					conn.WriteResponse(resp)
+
+					conn.CheckLine("hello from client")
+					conn.WriteLine("hello from server")
+					conn.Close()
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "ws", "/chat", nil)
+				req.Header.Set("Upgrade", "Websocket")
+				req.Header.Set("Connection", "Upgrade")
+
+				conn.WriteRequest(req)
+
+				var answer bool
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(BeTrue())
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+				Expect(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+				Expect(resp.Header.Get("Connection")).To(Equal("Upgrade"))
+
+				conn.WriteLine("hello from client")
+				conn.CheckLine("hello from server")
+
+				var payload []byte
+				Eventually(func() int {
+					accessLogFile.Read(&payload)
+					return len(payload)
+				}).ShouldNot(BeZero())
+
+				Expect(string(payload)).To(ContainSubstring(`response_time:`))
+				responseTime := parseResponseTimeFromLog(string(payload))
+				Expect(responseTime).To(BeNumerically(">", 0))
+
+				conn.Close()
+			})
+		})
+	})
+
 	Context("when the endpoint is nil", func() {
 		It("responds with a 502 BadGateway", func() {
 			ln := registerHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
@@ -1108,4 +1205,18 @@ func newTlsListener(listener net.Listener) net.Listener {
 	}
 
 	return tls.NewListener(listener, tlsConfig)
+}
+
+func parseResponseTimeFromLog(log string) float64 {
+	r, err := regexp.Compile("response_time:(\\d+.\\d+)")
+	Expect(err).ToNot(HaveOccurred())
+
+	responseTimeStr := r.FindStringSubmatch(log)
+
+	fmt.Println(responseTimeStr[1])
+
+	f, err := strconv.ParseFloat(responseTimeStr[1], 64)
+	Expect(err).ToNot(HaveOccurred())
+
+	return f
 }

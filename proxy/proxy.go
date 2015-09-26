@@ -185,11 +185,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	if isTcpUpgrade(request) {
 		handler.HandleTcpRequest(iter)
+		accessLog.FinishedAt = time.Now()
 		return
 	}
 
 	if isWebSocketUpgrade(request) {
 		handler.HandleWebSocketRequest(iter)
+		accessLog.FinishedAt = time.Now()
 		return
 	}
 

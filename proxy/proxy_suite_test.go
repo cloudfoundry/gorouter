@@ -87,7 +87,7 @@ var _ = JustBeforeEach(func() {
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")
-	Ω(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)
