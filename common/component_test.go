@@ -180,7 +180,7 @@ var _ = Describe("Component", func() {
 		})
 
 		It("subscribes to vcap.component.discover", func() {
-			var done bool
+			done := make(chan struct{})
 			members := []string{
 				"type",
 				"index",
@@ -215,20 +215,18 @@ var _ = Describe("Component", func() {
 					Expect(ok).To(BeTrue())
 				}
 
-				done = true
+				close(done)
 			})
 			Expect(err).ToNot(HaveOccurred())
 
 			err = mbusClient.PublishRequest("vcap.component.discover", "subject", []byte(""))
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() bool {
-				return done
-			}).Should(BeTrue())
+			Eventually(done).Should(BeClosed())
 		})
 
 		It("publishes to vcap.component.announce on start-up", func() {
-			var done bool
+			done := make(chan struct{})
 			members := []string{
 				"type",
 				"index",
@@ -260,16 +258,14 @@ var _ = Describe("Component", func() {
 					Expect(ok).To(BeTrue())
 				}
 
-				done = true
+				close(done)
 			})
 			Expect(err).ToNot(HaveOccurred())
 
 			err = component.Register(mbusClient)
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() bool {
-				return done
-			}).Should(BeTrue())
+			Eventually(done).Should(BeClosed())
 		})
 
 		It("can handle an empty reply in the subject", func() {
