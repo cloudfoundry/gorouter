@@ -6,6 +6,16 @@ import (
 )
 
 type GenericVarz struct {
+	// These fields are from individual components
+	Type        string   `json:"type"`
+	Index       uint     `json:"index"`
+	Host        string   `json:"host"`
+	Credentials []string `json:"credentials"`
+
+	// These fields are automatically generated
+	UUID      string `json:"uuid"`
+	StartTime Time   `json:"start"`
+
 	// Static common metrics
 	NumCores int `json:"num_cores"`
 
@@ -21,8 +31,6 @@ type Varz struct {
 	sync.Mutex
 	GenericVarz
 	UniqueVarz interface{} // Every component's unique metrics
-
-	component VcapComponent
 }
 
 func transform(x interface{}, y *map[string]interface{}) error {
@@ -53,11 +61,6 @@ func (v *Varz) MarshalJSON() ([]byte, error) {
 	}
 
 	err = transform(v.GenericVarz, &r)
-	if err != nil {
-		return nil, err
-	}
-
-	err = transform(v.component, &r)
 	if err != nil {
 		return nil, err
 	}

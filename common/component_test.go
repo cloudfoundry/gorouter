@@ -3,6 +3,7 @@ package common_test
 import (
 	"strings"
 
+	"github.com/apcera/nats"
 	. "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/cloudfoundry/gosteno"
@@ -30,15 +31,23 @@ func (m *MarshalableValue) MarshalJSON() ([]byte, error) {
 }
 
 var _ = Describe("Component", func() {
-	var component *VcapComponent
+	var (
+		component *VcapComponent
+		varz      *Varz
+	)
 
 	BeforeEach(func() {
 		port, err := localip.LocalPort()
 		Expect(err).ToNot(HaveOccurred())
 
+		varz = &Varz{
+			GenericVarz: GenericVarz{
+				Host:        fmt.Sprintf("127.0.0.1:%d", port),
+				Credentials: []string{"username", "password"},
+			},
+		}
 		component = &VcapComponent{
-			Host:        fmt.Sprintf("127.0.0.1:%d", port),
-			Credentials: []string{"username", "password"},
+			Varz: varz,
 		}
 	})
 
@@ -111,6 +120,27 @@ var _ = Describe("Component", func() {
 		Expect(body).To(Equal(`{"key":"value"}` + "\n"))
 	})
 
+	It("updates the uptime statistic", func() {
+		stringMap := make(map[string]interface{})
+		path := "/varz"
+		component.Varz.Type = "Router"
+		startComponent(component)
+
+		time.Sleep(2 * time.Second)
+		req := buildGetRequest(component, path)
+		req.SetBasicAuth("username", "password")
+
+		code, header, body := doGetRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+
+		err := json.Unmarshal([]byte(body), &stringMap)
+		Expect(err).NotTo(HaveOccurred())
+
+		duration := stringMap["uptime"].(string)
+		Expect(duration).NotTo(Equal(`"uptime":"0d:0h:0m:0s"`))
+	})
+
 	It("returns 404 for non existent paths", func() {
 		serveComponent(component)
 
@@ -149,9 +179,101 @@ var _ = Describe("Component", func() {
 			natsRunner.Stop()
 		})
 
-		It("subscribes to the vcap.component.discover subject", func() {
-			component.Varz = &Varz{}
-			component.Type = "TestType"
+		It("subscribes to vcap.component.discover", func() {
+			var done bool
+			members := []string{
+				"type",
+				"index",
+				"host",
+				"credentials",
+				"start",
+				"uuid",
+				"uptime",
+				"num_cores",
+				"mem",
+				"cpu",
+				"log_counts",
+			}
+
+			component.Varz.Type = "TestType"
+			component.Logger = logger
+
+			err := component.Start()
+			Expect(err).ToNot(HaveOccurred())
+
+			err = component.Register(mbusClient)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = mbusClient.Subscribe("subject", func(msg *nats.Msg) {
+				defer GinkgoRecover()
+				data := make(map[string]interface{})
+				err := json.Unmarshal(msg.Data, &data)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, key := range members {
+					_, ok := data[key]
+					Expect(ok).To(BeTrue())
+				}
+
+				done = true
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = mbusClient.PublishRequest("vcap.component.discover", "subject", []byte(""))
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() bool {
+				return done
+			}).Should(BeTrue())
+		})
+
+		It("publishes to vcap.component.announce on start-up", func() {
+			var done bool
+			members := []string{
+				"type",
+				"index",
+				"host",
+				"credentials",
+				"start",
+				"uuid",
+				"uptime",
+				"num_cores",
+				"mem",
+				"cpu",
+				"log_counts",
+			}
+
+			component.Varz.Type = "TestType"
+			component.Logger = logger
+
+			err := component.Start()
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = mbusClient.Subscribe("vcap.component.announce", func(msg *nats.Msg) {
+				defer GinkgoRecover()
+				data := make(map[string]interface{})
+				err := json.Unmarshal(msg.Data, &data)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, key := range members {
+					_, ok := data[key]
+					Expect(ok).To(BeTrue())
+				}
+
+				done = true
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = component.Register(mbusClient)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() bool {
+				return done
+			}).Should(BeTrue())
+		})
+
+		It("can handle an empty reply in the subject", func() {
+			component.Varz.Type = "TestType"
 			component.Logger = logger
 
 			err := component.Start()
@@ -179,11 +301,27 @@ var _ = Describe("Component", func() {
 	})
 })
 
+func startComponent(component *VcapComponent) {
+	err := component.Start()
+	Expect(err).ToNot(HaveOccurred())
+
+	for i := 0; i < 5; i++ {
+		conn, err := net.DialTimeout("tcp", component.Varz.Host, 1*time.Second)
+		if err == nil {
+			conn.Close()
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	Expect(true).ToNot(BeTrue(), "Could not connect to vcap.Component")
+}
+
 func serveComponent(component *VcapComponent) {
 	component.ListenAndServe()
 
 	for i := 0; i < 5; i++ {
-		conn, err := net.DialTimeout("tcp", component.Host, 1*time.Second)
+		conn, err := net.DialTimeout("tcp", component.Varz.Host, 1*time.Second)
 		if err == nil {
 			conn.Close()
 			return
@@ -195,7 +333,7 @@ func serveComponent(component *VcapComponent) {
 }
 
 func buildGetRequest(component *VcapComponent, path string) *http.Request {
-	req, err := http.NewRequest("GET", "http://"+component.Host+path, nil)
+	req, err := http.NewRequest("GET", "http://"+component.Varz.Host+path, nil)
 	Expect(err).ToNot(HaveOccurred())
 	return req
 }

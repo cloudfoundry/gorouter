@@ -60,20 +60,20 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 	varz := &vcap.Varz{
 		UniqueVarz: v,
 		GenericVarz: vcap.GenericVarz{
-			LogCounts: logCounter,
+			Type:        "Router",
+			Index:       cfg.Index,
+			Host:        host,
+			Credentials: []string{cfg.Status.User, cfg.Status.Pass},
+			LogCounts:   logCounter,
 		},
 	}
 
 	healthz := &vcap.Healthz{}
 
 	component := &vcap.VcapComponent{
-		Type:        "Router",
-		Index:       cfg.Index,
-		Host:        host,
-		Credentials: []string{cfg.Status.User, cfg.Status.Pass},
-		Config:      cfg,
-		Varz:        varz,
-		Healthz:     healthz,
+		Config:  cfg,
+		Varz:    varz,
+		Healthz: healthz,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
@@ -390,7 +390,7 @@ func (r *Router) greetMessage() ([]byte, error) {
 	}
 
 	d := vcap.RouterStart{
-		Id:    r.component.UUID,
+		Id:    r.component.Varz.UUID,
 		Hosts: []string{host},
 		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,
 		PruneThresholdInSeconds:          r.config.DropletStaleThresholdInSeconds,

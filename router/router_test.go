@@ -133,16 +133,16 @@ var _ = Describe("Router", func() {
 
 		It("discovers", func() {
 			// Test if router responses to discover message
-			sig := make(chan vcap.VcapComponent)
+			sig := make(chan vcap.Varz)
 
 			// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
 			// sure that router has run at least for one second
 			time.Sleep(time.Second)
 
 			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *nats.Msg) {
-				var component vcap.VcapComponent
-				_ = json.Unmarshal(msg.Data, &component)
-				sig <- component
+				var varz vcap.Varz
+				_ = json.Unmarshal(msg.Data, &varz)
+				sig <- varz
 			})
 
 			mbusClient.PublishRequest(
@@ -151,20 +151,20 @@ var _ = Describe("Router", func() {
 				[]byte{},
 			)
 
-			var cc vcap.VcapComponent
-			Eventually(sig).Should(Receive(&cc))
+			var varz vcap.Varz
+			Eventually(sig).Should(Receive(&varz))
 
 			var emptyTime time.Time
 			var emptyDuration vcap.Duration
 
-			Expect(cc.Type).To(Equal("Router"))
-			Expect(cc.Index).To(Equal(uint(2)))
-			Expect(cc.UUID).ToNot(Equal(""))
-			Expect(cc.Start).ToNot(Equal(emptyTime))
-			Expect(cc.Uptime).ToNot(Equal(emptyDuration))
+			Expect(varz.Type).To(Equal("Router"))
+			Expect(varz.Index).To(Equal(uint(2)))
+			Expect(varz.UUID).ToNot(Equal(""))
+			Expect(varz.StartTime).ToNot(Equal(emptyTime))
+			Expect(varz.Uptime).ToNot(Equal(emptyDuration))
 
-			verify_var_z(cc.Host, cc.Credentials[0], cc.Credentials[1])
-			verify_health_z(cc.Host, registry)
+			verify_var_z(varz.Host, varz.Credentials[0], varz.Credentials[1])
+			verify_health_z(varz.Host, registry)
 		})
 
 		Context("Register and Unregister", func() {

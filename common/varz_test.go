@@ -2,11 +2,13 @@ package common_test
 
 import (
 	"fmt"
+
 	. "github.com/cloudfoundry/gorouter/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"encoding/json"
+
 	steno "github.com/cloudfoundry/gosteno"
 )
 
