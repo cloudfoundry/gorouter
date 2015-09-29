@@ -237,7 +237,7 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 		if val, ok := cipherMap[cipher]; ok {
 			ciphers = append(ciphers, val)
 		} else {
-			panic("invalid cipher string configuration")
+			panic("invalid cipher string configuration: " + cipher)
 		}
 	}
 
