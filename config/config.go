@@ -206,15 +206,34 @@ func (c *Config) processCipherSuites() []uint16 {
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": 0xc02b,
 	}
 
-	ciphers := []uint16{}
-	if len(strings.TrimSpace(c.CipherString)) == 0 {
-		for _, cipherValue := range cipherMap {
-			ciphers = append(ciphers, cipherValue)
-		}
-		return ciphers
+	defaultCiphers := []string{
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		"TLS_ECDHE_RSA_WITH_RC4_128_SHA",
+		"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA",
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+		"TLS_RSA_WITH_RC4_128_SHA",
+		"TLS_RSA_WITH_AES_128_CBC_SHA",
+		"TLS_RSA_WITH_AES_256_CBC_SHA",
 	}
 
-	for _, cipher := range strings.Split(c.CipherString, ":") {
+	var ciphers []string
+
+	if len(strings.TrimSpace(c.CipherString)) == 0 {
+		ciphers = defaultCiphers
+	} else {
+		ciphers = strings.Split(c.CipherString, ":")
+	}
+
+	return convertCipherStringToInt(ciphers, cipherMap)
+}
+
+func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) []uint16 {
+	ciphers := []uint16{}
+	for _, cipher := range cipherStrs {
 		if val, ok := cipherMap[cipher]; ok {
 			ciphers = append(ciphers, val)
 		} else {
