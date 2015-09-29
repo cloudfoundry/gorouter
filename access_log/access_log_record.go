@@ -58,7 +58,7 @@ func (r *AccessLogRecord) makeRecord() string {
 	}
 
 	if r.ResponseTime() >= 0 {
-		responseTime = strconv.FormatFloat(r.ResponseTime(), 'f', -1, 32)
+		responseTime = strconv.FormatFloat(r.ResponseTime(), 'f', -1, 64)
 	}
 
 	if r.RouteEndpoint != nil {
