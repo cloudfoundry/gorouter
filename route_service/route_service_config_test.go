@@ -83,6 +83,7 @@ var _ = Describe("Route Service Config", func() {
 		var (
 			signatureHeader string
 			metadataHeader  string
+			requestUrl      string
 			headers         *http.Header
 			signature       *route_service.Signature
 		)
@@ -91,10 +92,10 @@ var _ = Describe("Route Service Config", func() {
 			h := make(http.Header, 0)
 			headers = &h
 			var err error
-
+			requestUrl = "some-forwarded-url"
 			signature = &route_service.Signature{
 				RequestedTime: time.Now(),
-				ForwardedUrl:  "some-forwarded-url",
+				ForwardedUrl:  requestUrl,
 			}
 			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
@@ -108,7 +109,7 @@ var _ = Describe("Route Service Config", func() {
 		})
 
 		It("decrypts a valid signature", func() {
-			err := config.ValidateSignature(headers)
+			err := config.ValidateSignature(headers, requestUrl)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -124,7 +125,7 @@ var _ = Describe("Route Service Config", func() {
 			})
 
 			It("returns an route service request expired error", func() {
-				err := config.ValidateSignature(headers)
+				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
 				Expect(err.Error()).To(ContainSubstring("request expired"))
@@ -137,30 +138,18 @@ var _ = Describe("Route Service Config", func() {
 				metadataHeader = "eyJpdiI6IjlBVn"
 			})
 			It("returns an error", func() {
-				err := config.ValidateSignature(headers)
+				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
 			})
 		})
 
-		Context("when the X-CF-Forwarded-Url is missing", func() {
+		Context("when the request URL is different from the signature", func() {
 			BeforeEach(func() {
-				headers.Del(route_service.RouteServiceForwardedUrl)
+				requestUrl = "not-forwarded-url"
 			})
 
 			It("returns a route service request bad forwarded url error", func() {
-				err := config.ValidateSignature(headers)
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
-			})
-		})
-
-		Context("when the X-CF-Forwarded-Url is different from the signature", func() {
-			BeforeEach(func() {
-				headers.Set(route_service.RouteServiceForwardedUrl, "some-other-url")
-			})
-
-			It("returns a route service request bad forwarded url error", func() {
-				err := config.ValidateSignature(headers)
+				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
 			})
@@ -176,7 +165,7 @@ var _ = Describe("Route Service Config", func() {
 
 			Context("when there is no previous key in the configuration", func() {
 				It("rejects the signature", func() {
-					err := config.ValidateSignature(headers)
+					err := config.ValidateSignature(headers, requestUrl)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})
@@ -191,7 +180,7 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("validates the signature", func() {
-					err := config.ValidateSignature(headers)
+					err := config.ValidateSignature(headers, requestUrl)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
@@ -207,7 +196,7 @@ var _ = Describe("Route Service Config", func() {
 					})
 
 					It("returns an route service request expired error", func() {
-						err := config.ValidateSignature(headers)
+						err := config.ValidateSignature(headers, requestUrl)
 						Expect(err).To(HaveOccurred())
 						Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
 					})
@@ -223,7 +212,7 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("rejects the signature", func() {
-					err := config.ValidateSignature(headers)
+					err := config.ValidateSignature(headers, requestUrl)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})

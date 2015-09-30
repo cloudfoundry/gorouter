@@ -207,19 +207,18 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	var routeServiceArgs route_service.RouteServiceArgs
 	if routeServiceUrl != "" {
 		rsSignature := request.Header.Get(route_service.RouteServiceSignature)
+		forwardedUrlRaw := "http" + "://" + request.Host + request.RequestURI
 		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
 			// A request from a route service destined for a backend instances
 			routeServiceArgs.UrlString = routeServiceUrl
-			err := p.routeServiceConfig.ValidateSignature(&request.Header)
+			err := p.routeServiceConfig.ValidateSignature(&request.Header, forwardedUrlRaw)
 			if err != nil {
 				handler.HandleBadSignature(err)
 				return
 			}
 		} else {
 			var err error
-
 			// should not hardcode http, will be addressed by #100982038
-			forwardedUrlRaw := "http" + "://" + request.Host + request.RequestURI
 			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl, forwardedUrlRaw)
 			backend = false
 			if err != nil {

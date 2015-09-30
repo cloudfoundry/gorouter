@@ -72,7 +72,7 @@ func (rs *RouteServiceConfig) SetupRouteServiceRequest(request *http.Request, ar
 	request.URL = args.ParsedUrl
 }
 
-func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header) error {
+func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl string) error {
 	metadataHeader := headers.Get(RouteServiceMetadata)
 	signatureHeader := headers.Get(RouteServiceSignature)
 
@@ -97,7 +97,7 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header) error {
 		return err
 	}
 
-	return rs.validateForwardedUrl(signature, headers)
+	return rs.validateForwardedUrl(signature, requestUrl)
 }
 
 func (rs *RouteServiceConfig) validateSignatureTimeout(signature Signature) error {
@@ -108,8 +108,8 @@ func (rs *RouteServiceConfig) validateSignatureTimeout(signature Signature) erro
 	return nil
 }
 
-func (rs *RouteServiceConfig) validateForwardedUrl(signature Signature, headers *http.Header) error {
-	if headers.Get(RouteServiceForwardedUrl) != signature.ForwardedUrl {
+func (rs *RouteServiceConfig) validateForwardedUrl(signature Signature, requestUrl string) error {
+	if requestUrl != signature.ForwardedUrl {
 		var err = RouteServiceForwardedUrlMismatch
 		rs.logger.Warnd(map[string]interface{}{"error": err.Error()}, "proxy.route-service.forwarded-url.mismatch")
 		return err

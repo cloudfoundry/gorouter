@@ -1213,8 +1213,6 @@ func parseResponseTimeFromLog(log string) float64 {
 
 	responseTimeStr := r.FindStringSubmatch(log)
 
-	fmt.Println(responseTimeStr[1])
-
 	f, err := strconv.ParseFloat(responseTimeStr[1], 64)
 	Expect(err).ToNot(HaveOccurred())
 

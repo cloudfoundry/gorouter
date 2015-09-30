@@ -58,6 +58,7 @@ var _ = Describe("Route Services", func() {
 
 			w.Write([]byte("My Special Snowflake Route Service\n"))
 		})
+
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -135,7 +136,6 @@ var _ = Describe("Route Services", func() {
 
 					res, _ := conn.ReadResponse()
 					Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-					// Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
 				})
 			})
 		})
@@ -148,10 +148,10 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("routes to the backend instance and strips headers", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
 					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
-					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
+					Expect(req.Header.Get(route_service.RouteServiceMetadata)).To(Equal(""))
 
 					out := &bytes.Buffer{}
 					out.WriteString("backend instance")
@@ -165,20 +165,19 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "test", "/my_path", nil)
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-				req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
-				Expect(res.StatusCode).To(Equal(http.StatusOK))
 				Expect(body).To(ContainSubstring("backend instance"))
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
 
 			Context("and is forwarding to a route service on CF", func() {
 				It("does not strip the signature header", func() {
-					ln := registerHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
+					ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
 						Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal("some-signature"))
 
@@ -194,7 +193,7 @@ var _ = Describe("Route Services", func() {
 
 					conn := dialProxy(proxyServer)
 
-					req := test_util.NewRequest("GET", "test", "/my_path", nil)
+					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 					req.Header.Set(route_service.RouteServiceSignature, "some-signature")
 					conn.WriteRequest(req)
 
@@ -209,14 +208,13 @@ var _ = Describe("Route Services", func() {
 				Expect(err).To(BeNil())
 
 				// register route service, should NOT route to it
-				registerAddr(r, "mybadapp.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId")
+				registerAddr(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId")
 
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "mybadapp.com", "/", nil)
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-				req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
 				conn.WriteRequest(req)
 				resp, _ := conn.ReadResponse()
 
@@ -227,13 +225,13 @@ var _ = Describe("Route Services", func() {
 
 	Context("when a request has a signature header but no metadata header", func() {
 		It("returns a bad request error", func() {
-			ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
 				Fail("Should not get here")
 			})
 			defer ln.Close()
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 			conn.WriteRequest(req)
 
@@ -250,13 +248,13 @@ var _ = Describe("Route Services", func() {
 		})
 
 		It("returns an route service request expired error", func() {
-			ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
 				Fail("Should not get here")
 			})
 			defer ln.Close()
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 			conn.WriteRequest(req)
@@ -267,35 +265,16 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	Context("when a route service modifies the X-CF-Forwarded-Url header", func() {
+	Context("when the signature's forwarded_url does not match the request", func() {
 		It("returns a bad request error", func() {
-			ln := registerHandlerWithRouteService(r, "test/my_path", "https://rs.com", func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithRouteService(r, "no-match.com", "https://rs.com", func(conn *test_util.HttpConn) {
 				Fail("Should not get here")
 			})
 			defer ln.Close()
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "test", "/my_path", nil)
-			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-			req.Header.Set(route_service.RouteServiceForwardedUrl, "some-other-url")
-			conn.WriteRequest(req)
-
-			res, body := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-		})
-	})
-
-	Context("when a route service strips off the X-CF-Forwarded-Url header", func() {
-		It("returns a bad request error", func() {
-			ln := registerHandlerWithRouteService(r, "test/my_path", "https://rs.com", func(conn *test_util.HttpConn) {
-				Fail("Should not get here")
-			})
-			defer ln.Close()
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "test", "/my_path", nil)
+			req := test_util.NewRequest("GET", "no-match.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+			// Generate a bad signature
 			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 			conn.WriteRequest(req)
@@ -316,13 +295,13 @@ var _ = Describe("Route Services", func() {
 
 		Context("when there is no previous key in the configuration", func() {
 			It("rejects the signature", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://badkey.com", func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://badkey.com", func(conn *test_util.HttpConn) {
 					Fail("Should not get here")
 				})
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "test", "/my_path", nil)
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
@@ -341,7 +320,7 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("forwards the request to the application", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 					conn.ReadRequest()
 
 					out := &bytes.Buffer{}
@@ -356,7 +335,7 @@ var _ = Describe("Route Services", func() {
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "test", "/my_path", nil)
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
@@ -376,13 +355,13 @@ var _ = Describe("Route Services", func() {
 				})
 
 				It("returns an route service request expired error", func() {
-					ln := registerHandlerWithRouteService(r, "test/my_path", "https://expired.com", func(conn *test_util.HttpConn) {
+					ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
 						Fail("Should not get here")
 					})
 					defer ln.Close()
 					conn := dialProxy(proxyServer)
 
-					req := test_util.NewRequest("GET", "test", "/my_path", nil)
+					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 					req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
@@ -403,13 +382,13 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("rejects the signature", func() {
-				ln := registerHandlerWithRouteService(r, "test/my_path", "https://badkey.com", func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://badkey.com", func(conn *test_util.HttpConn) {
 					Fail("Should not get here")
 				})
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "test", "/my_path", nil)
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
@@ -423,14 +402,14 @@ var _ = Describe("Route Services", func() {
 	})
 
 	It("returns an error when a bad route service url is used", func() {
-		ln := registerHandlerWithRouteService(r, "test/my_path", "https://bad%20hostname.com", func(conn *test_util.HttpConn) {
+		ln := registerHandlerWithRouteService(r, "my_host.com", "https://bad%20hostname.com", func(conn *test_util.HttpConn) {
 			Fail("Should not get here")
 		})
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "test", "/my_path", nil)
+		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 		conn.WriteRequest(req)
 
 		res, body := readResponse(conn)
@@ -440,14 +419,14 @@ var _ = Describe("Route Services", func() {
 	})
 
 	It("returns a 502 when the SSL cert of the route service is signed by an unknown authority", func() {
-		ln := registerHandlerWithRouteService(r, "test/my_path", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+		ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 			Fail("Should not get here")
 		})
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "test", "/my_path", nil)
+		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 		conn.WriteRequest(req)
 
 		res, _ := readResponse(conn)
@@ -457,14 +436,14 @@ var _ = Describe("Route Services", func() {
 
 	It("returns a 200 when we route to a route service that has a valid cert", func() {
 		// sorry google we are using you
-		ln := registerHandlerWithRouteService(r, "test/my_path", "https://www.google.com", func(conn *test_util.HttpConn) {
+		ln := registerHandlerWithRouteService(r, "my_host.com", "https://www.google.com", func(conn *test_util.HttpConn) {
 			Fail("Should not get here")
 		})
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "test", "/my_path", nil)
+		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 		conn.WriteRequest(req)
 
 		res, _ := readResponse(conn)
