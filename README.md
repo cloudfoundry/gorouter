@@ -175,7 +175,7 @@ Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first
 
 See that it works!
 ```
-$ curl my_first_url.vcap.me:8080
+$ curl my_first_url.vcap.me:8081
 Hello!
 ```
 
