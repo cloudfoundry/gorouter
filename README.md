@@ -265,6 +265,12 @@ Examples: the router can't bind to its TCP port, a CF component has published in
 * `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
 to prune routes for stale droplets.
 
+Access logs provide information for the following fields when recieving a request:
+
+`<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> <Extra Headers>`
+* Status Code, Response Time, Application ID, and Extra Headers are all optional fields
+* The absence of Status Code, Response Time or Application ID will result in a "-" in the corresponding field
+
 ## Contributing
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
