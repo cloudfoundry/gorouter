@@ -75,13 +75,6 @@ var _ = Describe("RSS Cli", func() {
 						})
 					})
 
-					Context("when the key is invalid", func() {
-						It("generates a signature with the current time", func() {
-							command := rssCommand("generate", "-u", "http://some-url.com", "-k", "fixtures/invalidkey")
-							session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-							Eventually(session).Should(gexec.Exit(1))
-						})
-					})
 				})
 			})
 		})
@@ -106,8 +99,8 @@ var _ = Describe("RSS Cli", func() {
 
 			BeforeEach(func() {
 				// generated using fixture/key file
-				sig = "MyivGj59_D2Riix-aXa3ngTKsfhARvJRRIWoytha_AGX79tdAVLfQoUejqH5mvWSNtdMK9mBKJvYqzCt8Oq2JqVmyRAGdU1WC_-8QVMxLOnXrKEM1WNPOHF8skphkCOhu-PS5_mXlnG0MLLhFN8="
-				meta = "eyJub25jZSI6Iko0Nnp1N2ZsaXNZTkErYksifQ=="
+				sig = "iVCbWwOCswjhGYfdm8yBoIC9uy6SeDfEbDRH5XiR4Mw9-GlBdfeOyS0OZrucqGMqAHIw8Huo1mcqtoGuMSZc4trmvwxtnWpKff9SZlGKz6h-54LfVBj9KrKuqkOpjvBynOwyBVRBWwi_1g=="
+				meta = "eyJub25jZSI6InRPVzgyZXhaTitTZlc4Q0MifQ=="
 			})
 
 			Context("when key argument is not provided and default key exists", func() {
@@ -141,15 +134,6 @@ var _ = Describe("RSS Cli", func() {
 					})
 				})
 
-				Context("when the key is invalid", func() {
-					It("prints the signature", func() {
-						command := rssCommand("read", "-k", "fixtures/invalidkey", "-s", sig, "-m", meta)
-						session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-						Expect(err).NotTo(HaveOccurred())
-						Eventually(session).Should(gexec.Exit(1))
-						Eventually(session.Out).Should(gbytes.Say("Error decoding key"))
-					})
-				})
 			})
 		})
 	})

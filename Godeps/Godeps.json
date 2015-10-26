@@ -115,6 +115,10 @@
 		{
 			"ImportPath": "github.com/vito/go-sse/sse",
 			"Rev": "bfb56c5590376a59535cd0edb3f5aa3447dbbe65"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto",
+			"Rev": "c8b9e6388ef638d5a8a9d865c634befdc46a6784"
 		}
 	]
 }

@@ -4,6 +4,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha1"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 type Crypto interface {
@@ -48,6 +51,11 @@ func (gcm *AesGCM) Decrypt(cipherText, nonce []byte) ([]byte, error) {
 	}
 
 	return plainText, nil
+}
+
+func NewPbkdf2(input []byte, keyLen int) []byte {
+	noSalt := []byte("")
+	return pbkdf2.Key(input, noSalt, 4096, keyLen, sha1.New)
 }
 
 func (gcm *AesGCM) generateNonce() ([]byte, error) {

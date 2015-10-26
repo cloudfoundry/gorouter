@@ -180,18 +180,18 @@ ssl_skip_validation: true
 
 		It("sets the route service secret config", func() {
 			var b = []byte(`
-route_services_secret: tWPE+sWJq+ZnGJpyKkIPYg==
+route_services_secret: super-route-service-secret 
 `)
 			config.Initialize(b)
-			Expect(config.RouteServiceSecret).To(Equal("tWPE+sWJq+ZnGJpyKkIPYg=="))
+			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))
 		})
 
 		It("sets the route service secret decrypt only config", func() {
 			var b = []byte(`
-route_services_secret_decrypt_only: OVhlXPLHIHjJL3oPIHoqjw==
+route_services_secret_decrypt_only: decrypt-only-super-route-service-secret
 `)
 			config.Initialize(b)
-			Expect(config.RouteServiceSecretPrev).To(Equal("OVhlXPLHIHjJL3oPIHoqjw=="))
+			Expect(config.RouteServiceSecretPrev).To(Equal("decrypt-only-super-route-service-secret"))
 		})
 	})
 
@@ -284,7 +284,7 @@ nats:
 				Context("when the route service secret is set", func() {
 					BeforeEach(func() {
 						configYaml = []byte(`
-route_services_secret: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
+route_services_secret: my-route-service-secret
 `)
 						config.Initialize(configYaml)
 						config.Process()
@@ -295,15 +295,15 @@ route_services_secret: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					})
 
 					It("sets route service secret", func() {
-						Expect(config.RouteServiceSecret).To(Equal("1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y="))
+						Expect(config.RouteServiceSecret).To(Equal("my-route-service-secret"))
 					})
 				})
 
 				Context("when the route service secret and the decrypt only route service secret are are set", func() {
 					BeforeEach(func() {
 						configYaml = []byte(`
-route_services_secret: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
-route_services_secret_decrypt_only: KU0x+zcd/dUU47jGnBG55d70N+1kko/PHuQUYsfL7Qc=
+route_services_secret: my-route-service-secret
+route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
 `)
 						config.Initialize(configYaml)
 						config.Process()
@@ -314,11 +314,11 @@ route_services_secret_decrypt_only: KU0x+zcd/dUU47jGnBG55d70N+1kko/PHuQUYsfL7Qc=
 					})
 
 					It("sets route service secret", func() {
-						Expect(config.RouteServiceSecret).To(Equal("1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y="))
+						Expect(config.RouteServiceSecret).To(Equal("my-route-service-secret"))
 					})
 
 					It("sets previous route service secret", func() {
-						Expect(config.RouteServiceSecretPrev).To(Equal("KU0x+zcd/dUU47jGnBG55d70N+1kko/PHuQUYsfL7Qc="))
+						Expect(config.RouteServiceSecretPrev).To(Equal("my-decrypt-only-route-service-secret"))
 					})
 				})
 

@@ -43,7 +43,7 @@ In the following example, we will generate a random key and then encrypt / decry
 
 - Generate key
       mkdir ~/.rss
-      head -c 16 /dev/urandom | base64 > ~/.rss/key
+      echo "my-super-secret-password" > ~/.rss/key
 
 - Encrypt using key
       ./rss generate --url http://myapp.com

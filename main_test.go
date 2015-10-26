@@ -377,39 +377,6 @@ var _ = Describe("Router Integration", func() {
 		runningApp.VerifyAppStatus(200)
 	})
 
-	Context("when the route_services_secret is misconfigured", func() {
-		It("fails to start", func() {
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecret = "invalid secret"
-			writeConfig(config, cfgFile)
-
-			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Eventually(gorouterSession, 5).Should(Exit(1))
-		})
-	})
-
-	Context("when the route_services_secret_decrypt_only value is misconfigured", func() {
-		It("fails to start", func() {
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecret = "YP2air+sHzCrILg3XASrTHpyUVLF2WYlN1DYz854ZIc="
-			config.RouteServiceSecretPrev = "invalid secret"
-			writeConfig(config, cfgFile)
-
-			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Eventually(gorouterSession, 5).Should(Exit(1))
-		})
-	})
-
 	Context("when the route_services_secret and the route_services_secret_decrypt_only are valid", func() {
 		It("starts fine", func() {
 			statusPort := test_util.NextAvailPort()
@@ -417,8 +384,8 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort)
-			config.RouteServiceSecret = "GRSAt5/9O2cdUcuORdYRnNQkYFTpsqCpX7gaCWLayeM="
-			config.RouteServiceSecretPrev = "ebag0InVm03No+vkWK3qVbFUWvimAcPLZo09q5Mf8qQ="
+			config.RouteServiceSecret = "route-service-secret"
+			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
 			writeConfig(config, cfgFile)
 
 			// The process should not have any error.

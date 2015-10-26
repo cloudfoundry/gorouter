@@ -2,11 +2,10 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/base64"
 
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
-	"github.com/cloudfoundry-incubator/routing-api"
+	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
@@ -157,13 +156,9 @@ func waitOnErrOrSignal(c *config.Config, logger *steno.Logger, errChan <-chan er
 }
 
 func createCrypto(secret string, logger *steno.Logger) *secure.AesGCM {
-	secretDecoded, err := base64.StdEncoding.DecodeString(secret)
-	if err != nil {
-		logger.Errorf("Error decoding route service secret: %s\n", err)
-		os.Exit(1)
-	}
-
-	crypto, err := secure.NewAesGCM(secretDecoded)
+	// generate secure encryption key using key derivation function (pbkdf2)
+	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
+	crypto, err := secure.NewAesGCM(secretPbkdf2)
 	if err != nil {
 		logger.Errorf("Error creating route service crypto: %s\n", err)
 		os.Exit(1)

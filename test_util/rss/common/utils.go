@@ -1,7 +1,7 @@
 package common
 
 import (
-	"encoding/base64"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os/user"
@@ -27,13 +27,9 @@ func CreateCrypto(c *cli.Context) (*secure.AesGCM, error) {
 		return nil, err
 	}
 
-	secretDecoded, err := base64.StdEncoding.DecodeString(string(key))
-	if err != nil {
-		fmt.Printf("Error decoding key: %s\n", err)
-		return nil, err
-	}
-
-	crypto, err := secure.NewAesGCM(secretDecoded)
+	key = bytes.Trim(key, "\n")
+	secretPbkdf := secure.NewPbkdf2(key, 16)
+	crypto, err := secure.NewAesGCM(secretPbkdf)
 	if err != nil {
 		fmt.Printf("Error creating crypto: %s\n", err)
 		return nil, err

@@ -1,8 +1,6 @@
 package secure_test
 
 import (
-	"encoding/base64"
-
 	"github.com/cloudfoundry/gorouter/common/secure"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -17,10 +15,41 @@ var _ = Describe("Crypto", func() {
 
 	BeforeEach(func() {
 		var err error
-		key, err = base64.StdEncoding.DecodeString("6TuytRTJPal4fXkAD5lwZA==")
+		// valid key size
+		key = []byte("super-secret-key")
 		Expect(err).ToNot(HaveOccurred())
 		aesGcm, err = secure.NewAesGCM(key)
 		Expect(err).ToNot(HaveOccurred())
+	})
+
+	Describe("NewPbkdf2", func() {
+
+		Context("when a plaintext secret is provided", func() {
+
+			Context("when password length is less than desired key len", func() {
+				It("generates an encryption key of desired ken length", func() {
+					k := secure.NewPbkdf2([]byte(""), 16)
+					Expect(k).To(HaveLen(16))
+
+					k = secure.NewPbkdf2([]byte("short-key"), 16)
+					Expect(k).To(HaveLen(16))
+
+					k = secure.NewPbkdf2([]byte("1234678901234567890abc"), 16)
+					Expect(k).To(HaveLen(16))
+
+					k = secure.NewPbkdf2([]byte("short-key"), 32)
+					Expect(k).To(HaveLen(32))
+				})
+			})
+
+			Context("when password length is greater than desired key len", func() {
+				It("generates an encryption key of desired ken length", func() {
+					k := secure.NewPbkdf2([]byte("this-is-a-pretty-long-secret"), 16)
+					Expect(k).To(HaveLen(16))
+				})
+			})
+
+		})
 	})
 
 	Describe("Encrypt", func() {
