@@ -37,8 +37,9 @@ type NatsConfig struct {
 }
 
 type RoutingApiConfig struct {
-	Uri  string `yaml:"uri"`
-	Port int    `yaml:"port"`
+	Uri          string `yaml:"uri"`
+	Port         int    `yaml:"port"`
+	AuthDisabled bool   `yaml:"auth_disabled"`
 }
 
 var defaultNatsConfig = NatsConfig{

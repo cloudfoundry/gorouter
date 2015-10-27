@@ -23,12 +23,12 @@ import (
 
 	"flag"
 	"fmt"
+	"github.com/cloudfoundry/gorouter/metrics"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
-	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 var configFile string
@@ -72,7 +72,7 @@ func main() {
 	registry := rregistry.NewRouteRegistry(c, natsClient, metricsReporter)
 
 	logger.Info("Setting up routing_api route fetcher")
-	setupRouteFetcher(c, registry)
+	setupRouteFetcher(c, registry, logger)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
@@ -193,15 +193,25 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 	return proxy.NewProxy(args)
 }
 
-func setupRouteFetcher(c *config.Config, registry rregistry.RegistryInterface) {
+func setupRouteFetcher(c *config.Config, registry rregistry.RegistryInterface, logger *steno.Logger) {
 	if c.RoutingApiEnabled() {
-		tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
+		tokenFetcher := newTokenFetcher(c, logger)
 		routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 		routingApiClient := routing_api.NewClient(routingApiUri)
 		routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1)
 		routeFetcher.StartFetchCycle()
 		routeFetcher.StartEventCycle()
 	}
+}
+
+func newTokenFetcher(c *config.Config, logger *steno.Logger) token_fetcher.TokenFetcher {
+	if c.RoutingApi.AuthDisabled {
+		logger.Info("using noop token fetcher")
+		return token_fetcher.NewNoOpTokenFetcher()
+	}
+	tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
+	logger.Info("using uaa token fetcher")
+	return tokenFetcher
 }
 
 func connectToNatsServer(c *config.Config, logger *steno.Logger) yagnats.NATSConn {

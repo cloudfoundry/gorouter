@@ -40,7 +40,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-token-fetcher",
-			"Rev": "536d9c8d4ddfc124536cfb7462583b3200e3bde1"
+			"Rev": "1e16d381fe1b420bb9901b1550bffce9311723f1"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",

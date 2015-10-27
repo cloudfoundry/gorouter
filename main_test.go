@@ -426,6 +426,46 @@ var _ = Describe("Router Integration", func() {
 			stopGorouter(session)
 		})
 	})
+
+	Context("when the routing api is enabled", func() {
+		var (
+			config  *config.Config
+			cfgFile string
+		)
+
+		BeforeEach(func() {
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+			config = createConfig(cfgFile, statusPort, proxyPort)
+			config.RoutingApi.Uri = "http://localhost"
+			config.RoutingApi.Port = 4567
+		})
+
+		Context("when the routing api auth is disabled ", func() {
+			It("uses the no-op token fetcher", func() {
+				config.RoutingApi.AuthDisabled = true
+				writeConfig(config, cfgFile)
+
+				// note, this will start with routing api, but will not be able to connect
+				session := startGorouterSession(cfgFile)
+				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using noop token fetcher"))
+				stopGorouter(session)
+			})
+		})
+
+		Context("when the routing api auth is enabled (default)", func() {
+			It("uses the uaa token fetcher", func() {
+				writeConfig(config, cfgFile)
+
+				// note, this will start with routing api, but will not be able to connect
+				session := startGorouterSession(cfgFile)
+				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using uaa token fetcher"))
+				stopGorouter(session)
+			})
+		})
+	})
 })
 
 func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {

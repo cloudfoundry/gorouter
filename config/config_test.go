@@ -129,6 +129,22 @@ routing_api:
 
 			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
 			Expect(config.RoutingApi.Port).To(Equal(1234))
+			Expect(config.RoutingApi.AuthDisabled).To(BeFalse())
+		})
+
+		It("sets the Routing Api config with optional values", func() {
+			var b = []byte(`
+routing_api:
+  uri: http://bob.url/token
+  port: 1234
+  auth_disabled: true
+`)
+
+			config.Initialize(b)
+
+			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
+			Expect(config.RoutingApi.Port).To(Equal(1234))
+			Expect(config.RoutingApi.AuthDisabled).To(BeTrue())
 		})
 
 		It("sets the OAuth config", func() {
