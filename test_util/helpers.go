@@ -28,6 +28,7 @@ func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Conf
 	c.SSLKeyPath = filepath.Join(testPath, "private.pem")
 	c.SSLCertPath = filepath.Join(testPath, "public.pem")
 	c.SSLPort = SSLPort
+	c.CipherString = "TLS_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
 
 	return c
 }

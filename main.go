@@ -22,12 +22,13 @@ import (
 
 	"flag"
 	"fmt"
-	"github.com/cloudfoundry/gorouter/metrics"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 var configFile string

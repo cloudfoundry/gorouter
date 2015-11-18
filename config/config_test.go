@@ -368,6 +368,7 @@ routing_api:
 enable_ssl: true
 ssl_cert_path: ../test/assets/public.pem
 ssl_key_path: ../test/assets/private.pem
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
 				It("returns a valid valid certificate", func() {
@@ -381,27 +382,6 @@ ssl_key_path: ../test/assets/private.pem
 					Expect(config.SSLCertificate).To(Equal(expectedCertificate))
 				})
 
-				It("Sets the default cipher suites", func() {
-					expectedSuites := []uint16{
-						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-						tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
-						tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
-						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-						tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-						tls.TLS_RSA_WITH_RC4_128_SHA,
-						tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-					}
-
-					config.Initialize(b)
-					config.Process()
-
-					Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
-
-				})
 			})
 
 			Context("When it is given invalid values for a certificate", func() {
@@ -409,6 +389,7 @@ ssl_key_path: ../test/assets/private.pem
 enable_ssl: true
 ssl_cert: ../notathing
 ssl_key: ../alsonotathing
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
 				It("fails to create the certificate and panics", func() {
@@ -423,13 +404,19 @@ ssl_key: ../alsonotathing
 enable_ssl: true
 ssl_cert_path: ../test/assets/public.pem
 ssl_key_path: ../test/assets/private.pem
-cipher_suites: TLS_RSA_WITH_RC4_128_SHA:TLS_RSA_WITH_AES_128_CBC_SHA
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_RSA_WITH_AES_128_CBC_SHA:TLS_RSA_WITH_AES_256_CBC_SHA
 `)
 
 				It("Construct the proper array of cipher suites", func() {
 					expectedSuites := []uint16{
-						tls.TLS_RSA_WITH_RC4_128_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
 						tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 					}
 
 					config.Initialize(b)
@@ -452,6 +439,36 @@ cipher_suites: potato
 
 					Expect(config.Process).To(Panic())
 				})
+			})
+
+			Context("When it is given an unsupported cipher suite", func() {
+				var b = []byte(`
+enable_ssl: true
+ssl_cert_path: ../test/assets/public.pem
+ssl_key_path: ../test/assets/private.pem
+cipher_suites: TLS_RSA_WITH_RC4_128_SHA
+`)
+
+				It("panics", func() {
+					config.Initialize(b)
+
+					Expect(config.Process).To(Panic())
+				})
+			})
+
+		})
+
+		Context("When given no cipher suites", func() {
+			var b = []byte(`
+enable_ssl: true
+ssl_cert_path: ../test/assets/public.pem
+ssl_key_path: ../test/assets/private.pem
+`)
+
+			It("panics", func() {
+				config.Initialize(b)
+
+				Expect(config.Process).To(Panic())
 			})
 		})
 
