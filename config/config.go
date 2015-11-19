@@ -12,7 +12,6 @@ import (
 
 	"io/ioutil"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -159,8 +158,7 @@ func (c *Config) Process() {
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
 	c.RouteServiceTimeout = time.Duration(c.RouteServiceTimeoutInSeconds) * time.Second
-	c.Logging.JobName = "router_" + c.Zone + "_" + strconv.Itoa(int(c.Index))
-
+	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
 		log := steno.NewLogger("config.logger")
