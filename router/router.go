@@ -1,7 +1,9 @@
 package router
 
 import (
+	"os"
 	"sync"
+	"syscall"
 
 	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
@@ -26,6 +28,7 @@ import (
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
+
 var noDeadline = time.Time{}
 
 type Router struct {
@@ -45,12 +48,15 @@ type Router struct {
 	drainDone        chan struct{}
 	serveDone        chan struct{}
 	tlsServeDone     chan struct{}
+	stopping         bool
+	stopLock         sync.Mutex
 
-	logger *steno.Logger
+	logger  *steno.Logger
+	errChan chan error
 }
 
-func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry, v varz.Varz,
-	logCounter *vcap.LogCounter) (*Router, error) {
+func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry,
+	v varz.Varz, logCounter *vcap.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
 	if cfg.Status.Port != 0 {
@@ -80,6 +86,11 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		Logger: steno.NewLogger("common.logger"),
 	}
 
+	routerErrChan := errChan
+	if routerErrChan == nil {
+		routerErrChan = make(chan error, 2)
+	}
+
 	router := &Router{
 		config:       cfg,
 		proxy:        p,
@@ -92,6 +103,8 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		idleConns:    make(map[net.Conn]struct{}),
 		activeConns:  make(map[net.Conn]struct{}),
 		logger:       steno.NewLogger("router"),
+		errChan:      routerErrChan,
+		stopping:     false,
 	}
 
 	if err := router.component.Start(); err != nil {
@@ -101,7 +114,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 	return router, nil
 }
 
-func (r *Router) Run() <-chan error {
+func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
 	r.RegisterComponent()
@@ -134,20 +147,65 @@ func (r *Router) Run() <-chan error {
 		ConnState: r.HandleConnState,
 	}
 
-	errChan := make(chan error, 2)
-
-	err := r.serveHTTP(server, errChan)
+	err := r.serveHTTP(server, r.errChan)
 	if err != nil {
-		errChan <- err
-		return errChan
+		r.errChan <- err
+		return err
 	}
-	err = r.serveHTTPS(server, errChan)
+	err = r.serveHTTPS(server, r.errChan)
 	if err != nil {
-		errChan <- err
-		return errChan
+		r.errChan <- err
+		return err
 	}
 
-	return errChan
+	r.logger.Info("gorouter.started")
+
+	close(ready)
+
+	r.OnErrOrSignal(signals, r.errChan)
+
+	return nil
+}
+
+func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
+	select {
+	case err := <-errChan:
+		if err != nil {
+			r.logger.Errorf("Error occurred: %s", err.Error())
+			r.DrainAndStop()
+		}
+	case sig := <-signals:
+		go func() {
+			for sig := range signals {
+				r.logger.Infod(
+					map[string]interface{}{
+						"signal": sig.String(),
+					},
+					"gorouter.signal.ignored",
+				)
+			}
+		}()
+		if sig == syscall.SIGUSR1 {
+			r.DrainAndStop()
+		} else {
+			r.Stop()
+		}
+	}
+	r.logger.Info("gorouter.exited")
+}
+
+func (r *Router) DrainAndStop() {
+	drainTimeout := r.config.DrainTimeout
+	r.logger.Infod(
+		map[string]interface{}{
+			"timeout": (drainTimeout).String(),
+		},
+		"gorouter.draining",
+	)
+
+	r.Drain(drainTimeout)
+
+	r.Stop()
 }
 
 func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
@@ -168,7 +226,11 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		go func() {
 			err := server.Serve(tlsListener)
-			errChan <- err
+			r.stopLock.Lock()
+			if !r.stopping {
+				errChan <- err
+			}
+			r.stopLock.Unlock()
 			close(r.tlsServeDone)
 		}()
 	}
@@ -187,7 +249,12 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 
 	go func() {
 		err := server.Serve(listener)
-		errChan <- err
+		r.stopLock.Lock()
+		if !r.stopping {
+			errChan <- err
+		}
+		r.stopLock.Unlock()
+
 		close(r.serveDone)
 	}()
 	return nil
@@ -197,6 +264,7 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 	r.stopListening()
 
 	drained := make(chan struct{})
+
 	r.connLock.Lock()
 
 	r.logger.Infof("Draining with %d outstanding active connections", len(r.activeConns))
@@ -208,6 +276,7 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 	} else {
 		r.drainDone = drained
 	}
+
 	r.connLock.Unlock()
 
 	select {
@@ -216,10 +285,15 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 		r.logger.Warn("router.drain.timed-out")
 		return DrainTimeout
 	}
+
 	return nil
 }
 
 func (r *Router) Stop() {
+	stoppingAt := time.Now()
+
+	r.logger.Info("gorouter.stopping")
+
 	r.stopListening()
 
 	r.connLock.Lock()
@@ -227,6 +301,12 @@ func (r *Router) Stop() {
 	r.connLock.Unlock()
 
 	r.component.Stop()
+	r.logger.Infod(
+		map[string]interface{}{
+			"took": time.Since(stoppingAt).String(),
+		},
+		"gorouter.stopped",
+	)
 }
 
 // connLock must be locked
@@ -239,6 +319,10 @@ func (r *Router) closeIdleConns() {
 }
 
 func (r *Router) stopListening() {
+	r.stopLock.Lock()
+	r.stopping = true
+	r.stopLock.Unlock()
+
 	r.listener.Close()
 
 	if r.tlsListener != nil {

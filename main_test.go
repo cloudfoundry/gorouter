@@ -80,7 +80,6 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(session, 5).Should(Say("gorouter.started"))
 		gorouterSession = session
-
 		return session
 	}
 
@@ -162,12 +161,15 @@ var _ = Describe("Router Integration", func() {
 
 			go func() {
 				defer GinkgoRecover()
-
 				//Open a connection that never goes active
-				conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", localIP, proxyPort))
-				Expect(err).NotTo(HaveOccurred())
-				err = conn.Close()
-				Expect(err).NotTo(HaveOccurred())
+				Eventually(func() bool {
+					conn, err := net.DialTimeout("tcp",
+						fmt.Sprintf("%s:%d", localIP, proxyPort), 30*time.Second)
+					if err == nil {
+						return conn.Close() == nil
+					}
+					return false
+				}).Should(BeTrue())
 
 				//Open a connection that goes active
 				resp, err := http.Get(longApp.Endpoint())
@@ -190,6 +192,7 @@ var _ = Describe("Router Integration", func() {
 			requestProcessing <- true
 
 			Expect(err).ToNot(HaveOccurred())
+
 			Eventually(grouter, 5).Should(Exit(0))
 			Eventually(responseRead).Should(Receive(BeTrue()))
 		})
@@ -210,6 +213,7 @@ var _ = Describe("Router Integration", func() {
 			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
 
 			go func() {
+				defer GinkgoRecover()
 				_, err := http.Get(timeoutApp.Endpoint())
 				resultCh <- err
 			}()

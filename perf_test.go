@@ -12,8 +12,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"strconv"
 	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"strconv"
 )
 
 var _ = Describe("AccessLogRecord", func() {

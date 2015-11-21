@@ -1,6 +1,8 @@
 package router_test
 
 import (
+	"os"
+
 	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
@@ -31,19 +33,24 @@ import (
 	"net/http/httputil"
 	"strings"
 	"time"
+
 	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var _ = Describe("Router", func() {
+	var (
+		natsRunner *natsrunner.NATSRunner
+		natsPort   uint16
+		config     *cfg.Config
 
-	var natsRunner *natsrunner.NATSRunner
-	var natsPort uint16
-	var config *cfg.Config
-
-	var mbusClient yagnats.NATSConn
-	var registry *rregistry.RouteRegistry
-	var varz vvarz.Varz
-	var router *Router
+		mbusClient   yagnats.NATSConn
+		registry     *rregistry.RouteRegistry
+		varz         vvarz.Varz
+		router       *Router
+		signals      chan os.Signal
+		closeChannel chan struct{}
+		readyChan    chan struct{}
+	)
 
 	BeforeEach(func() {
 		natsPort = test_util.NextAvailPort()
@@ -77,17 +84,20 @@ var _ = Describe("Router", func() {
 			Reporter:        varz,
 			AccessLogger:    &access_log.NullAccessLogger{},
 		})
-		r, err := NewRouter(config, proxy, mbusClient, registry, varz, logcounter)
+		router, err = NewRouter(config, proxy, mbusClient, registry, varz, logcounter, nil)
 
 		Expect(err).ToNot(HaveOccurred())
-		router = r
-		errChan := r.Run()
-		time.Sleep(50 * time.Millisecond)
+
+		readyChan = make(chan struct{})
+		closeChannel = make(chan struct{})
 		go func() {
-			select {
-			case <-errChan:
-			}
+			router.Run(signals, readyChan)
+			close(closeChannel)
 		}()
+		select {
+		case <-readyChan:
+		}
+
 	})
 
 	AfterEach(func() {
@@ -313,15 +323,6 @@ var _ = Describe("Router", func() {
 		}
 	})
 
-	Context("Run", func() {
-		It("reports an error when run twice (address in use)", func() {
-			errCh := router.Run()
-			var err error
-			Eventually(errCh).Should(Receive(&err))
-			Expect(err).ToNot(BeNil())
-		})
-	})
-
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
 			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
@@ -364,10 +365,13 @@ var _ = Describe("Router", func() {
 			router.Stop()
 			router = nil
 
-			req, err = http.NewRequest("GET", host, nil)
+			Eventually(func() error {
+				req, err = http.NewRequest("GET", host, nil)
+				Expect(err).ToNot(HaveOccurred())
 
-			_, err = http.DefaultClient.Do(req)
-			Expect(err).To(HaveOccurred())
+				_, err = http.DefaultClient.Do(req)
+				return err
+			}).Should(HaveOccurred())
 		})
 
 		It("no longer proxies https", func() {

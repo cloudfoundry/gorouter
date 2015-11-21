@@ -23,12 +23,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/cloudfoundry/gorouter/metrics"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
 )
 
 var configFile string
@@ -93,67 +95,31 @@ func main() {
 
 	proxy := buildProxy(c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
 
-	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter)
+	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter, nil)
 	if err != nil {
 		logger.Errorf("An error occurred: %s", err.Error())
 		os.Exit(1)
 	}
 
-	errChan := router.Run()
-
-	logger.Info("gorouter.started")
-
-	waitOnErrOrSignal(c, logger, errChan, router)
-
-	os.Exit(0)
+	launchRouter(c, router, logger)
 }
 
-func waitOnErrOrSignal(c *config.Config, logger *steno.Logger, errChan <-chan error, router *router.Router) {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1)
-
-	select {
-	case err := <-errChan:
-		if err != nil {
-			logger.Errorf("Error occurred: %s", err.Error())
-			os.Exit(1)
-		}
-	case sig := <-signals:
-		go func() {
-			for sig := range signals {
-				logger.Infod(
-					map[string]interface{}{
-						"signal": sig.String(),
-					},
-					"gorouter.signal.ignored",
-				)
-			}
-		}()
-
-		if sig == syscall.SIGUSR1 {
-			logger.Infod(
-				map[string]interface{}{
-					"timeout": (c.DrainTimeout).String(),
-				},
-				"gorouter.draining",
-			)
-
-			router.Drain(c.DrainTimeout)
-		}
-
-		stoppingAt := time.Now()
-
-		logger.Info("gorouter.stopping")
-
-		router.Stop()
-
-		logger.Infod(
-			map[string]interface{}{
-				"took": time.Since(stoppingAt).String(),
-			},
-			"gorouter.stopped",
-		)
+func launchRouter(c *config.Config, router *router.Router, logger *steno.Logger) {
+	members := grouper.Members{
+		{"router", router},
 	}
+
+	group := grouper.NewOrdered(os.Interrupt, members)
+
+	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
+
+	err := <-monitor.Wait()
+	if err != nil {
+		logger.Error("gorouter.exited-with-failure")
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }
 
 func createCrypto(secret string, logger *steno.Logger) *secure.AesGCM {
