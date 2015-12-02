@@ -14,6 +14,7 @@ type envelope struct {
 type FakeEventEmitter struct {
 	ReturnError error
 	messages    []envelope
+	envelopes   []*events.Envelope
 	Origin      string
 	isClosed    bool
 	sync.RWMutex
@@ -38,12 +39,36 @@ func (f *FakeEventEmitter) Emit(e events.Event) error {
 	return nil
 }
 
+func (f *FakeEventEmitter) EmitEnvelope(e *events.Envelope) error {
+
+	f.Lock()
+	defer f.Unlock()
+
+	if f.ReturnError != nil {
+		err := f.ReturnError
+		f.ReturnError = nil
+		return err
+	}
+
+	f.envelopes = append(f.envelopes, e)
+	return nil
+}
+
 func (f *FakeEventEmitter) GetMessages() (messages []envelope) {
 	f.Lock()
 	defer f.Unlock()
 
 	messages = make([]envelope, len(f.messages))
 	copy(messages, f.messages)
+	return
+}
+
+func (f *FakeEventEmitter) GetEnvelopes() (envelopes []*events.Envelope) {
+	f.Lock()
+	defer f.Unlock()
+
+	envelopes = make([]*events.Envelope, len(f.envelopes))
+	copy(envelopes, f.envelopes)
 	return
 }
 

@@ -1,15 +1,14 @@
 package dropsonde_unmarshaller
 
 import (
-	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
-	"github.com/cloudfoundry/sonde-go/events"
 	"sync"
+
+	"github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
 // A DropsondeUnmarshallerCollection is a collection of DropsondeUnmarshaller instances.
 type DropsondeUnmarshallerCollection interface {
-	instrumentation.Instrumentable
 	Run(inputChan <-chan []byte, outputChan chan<- *events.Envelope, waitGroup *sync.WaitGroup)
 	Size() int
 }
@@ -50,60 +49,4 @@ func (u *dropsondeUnmarshallerCollection) Run(inputChan <-chan []byte, outputCha
 			um.Run(inputChan, outputChan)
 		}(unmarshaller)
 	}
-}
-
-// Emit returns the current metrics the DropsondeMarshallerCollection keeps about itself.
-func (u *dropsondeUnmarshallerCollection) Emit() instrumentation.Context {
-	return instrumentation.Context{
-		Name:    "dropsondeUnmarshaller",
-		Metrics: u.metrics(),
-	}
-}
-
-func (u *dropsondeUnmarshallerCollection) metrics() []instrumentation.Metric {
-	var internalMetrics []instrumentation.Metric
-	for _, u := range u.unmarshallers {
-		internalMetrics = append(internalMetrics, u.Emit().Metrics...)
-	}
-
-	metricsByName := make(map[string][]instrumentation.Metric)
-	for _, metric := range internalMetrics {
-		metricsEntry := metricsByName[metric.Name]
-		metricsByName[metric.Name] = append(metricsEntry, metric)
-	}
-
-	var metrics []instrumentation.Metric
-	metrics = concatTotalLogMessages(metricsByName, metrics)
-	metrics = concatOtherEventTypes(metricsByName, metrics)
-
-	return metrics
-}
-
-func concatTotalLogMessages(metricsByName map[string][]instrumentation.Metric, metrics []instrumentation.Metric) []instrumentation.Metric {
-	totalLogs := uint64(0)
-	for _, metric := range metricsByName[logMessageTotal] {
-		totalLogs += metric.Value.(uint64)
-	}
-
-	return append(metrics, instrumentation.Metric{Name: logMessageTotal, Value: totalLogs})
-}
-
-func concatOtherEventTypes(metricsByName map[string][]instrumentation.Metric, metrics []instrumentation.Metric) []instrumentation.Metric {
-	metricsByEventType := make(map[string]uint64)
-
-	for eventType, eventTypeMetrics := range metricsByName {
-		if eventType == logMessageTotal {
-			continue
-		}
-
-		for _, metric := range eventTypeMetrics {
-			metricsByEventType[eventType] += metric.Value.(uint64)
-		}
-	}
-
-	for eventType, count := range metricsByEventType {
-		metrics = append(metrics, instrumentation.Metric{Name: eventType, Value: count})
-	}
-
-	return metrics
 }

@@ -16,20 +16,31 @@
 package dropsonde_marshaller
 
 import (
-	"sync/atomic"
 	"unicode"
+	"unicode/utf8"
 
+	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gogo/protobuf/proto"
 )
 
+var metricNames map[events.Envelope_EventType]string
+
+func init() {
+	metricNames = make(map[events.Envelope_EventType]string)
+	for eventType, eventName := range events.Envelope_EventType_name {
+		r, n := utf8.DecodeRuneInString(eventName)
+		modifiedName := string(unicode.ToLower(r)) + eventName[n:]
+		metricName := "dropsondeMarshaller." + modifiedName + "Received"
+		metricNames[events.Envelope_EventType(eventType)] = metricName
+	}
+}
+
 // A DropsondeMarshaller is an self-instrumenting tool for converting dropsonde
 // Envelopes to binary (Protocol Buffer) messages.
 type DropsondeMarshaller interface {
-	instrumentation.Instrumentable
 	Run(inputChan <-chan *events.Envelope, outputChan chan<- []byte)
 }
 
@@ -62,7 +73,7 @@ func (u *dropsondeMarshaller) Run(inputChan <-chan *events.Envelope, outputChan 
 		messageBytes, err := proto.Marshal(message)
 		if err != nil {
 			u.logger.Errorf("dropsondeMarshaller: marshal error %v for message %v", err, message)
-			incrementCount(&u.marshalErrorCount)
+			metrics.BatchIncrementCounter("dropsondeMarshaller.marshalErrors")
 			continue
 		}
 
@@ -74,37 +85,10 @@ func (u *dropsondeMarshaller) Run(inputChan <-chan *events.Envelope, outputChan 
 }
 
 func (u *dropsondeMarshaller) incrementMessageCount(eventType events.Envelope_EventType) {
-	incrementCount(u.messageCounts[eventType])
-}
-
-func incrementCount(count *uint64) {
-	atomic.AddUint64(count, 1)
-}
-
-func (m *dropsondeMarshaller) metrics() []instrumentation.Metric {
-	var metrics []instrumentation.Metric
-
-	for eventType, eventName := range events.Envelope_EventType_name {
-		modifiedEventName := []rune(eventName)
-		modifiedEventName[0] = unicode.ToLower(modifiedEventName[0])
-		metricName := string(modifiedEventName) + "Marshalled"
-
-		metricValue := atomic.LoadUint64(m.messageCounts[events.Envelope_EventType(eventType)])
-		metrics = append(metrics, instrumentation.Metric{Name: metricName, Value: metricValue})
+	metricName := metricNames[eventType]
+	if metricName == "" {
+		metricName = "dropsondeMarshaller.unknownEventTypeReceived"
 	}
 
-	metrics = append(metrics, instrumentation.Metric{
-		Name:  "marshalErrors",
-		Value: atomic.LoadUint64(&m.marshalErrorCount),
-	})
-
-	return metrics
-}
-
-// Emit returns the current metrics the DropsondeMarshaller keeps about itself.
-func (m *dropsondeMarshaller) Emit() instrumentation.Context {
-	return instrumentation.Context{
-		Name:    "dropsondeMarshaller",
-		Metrics: m.metrics(),
-	}
+	metrics.BatchIncrementCounter(metricName)
 }
