@@ -125,7 +125,14 @@ func (p *proxy) getStickySession(request *http.Request) string {
 }
 
 func (p *proxy) lookup(request *http.Request) *route.Pool {
-	uri := route.Uri(hostWithoutPort(request) + request.RequestURI)
+	var requestPath string
+	if request.URL.IsAbs() {
+		requestPath = request.URL.Path
+	} else {
+		requestPath = request.RequestURI
+	}
+
+	uri := route.Uri(hostWithoutPort(request) + requestPath)
 	return p.registry.Lookup(uri)
 }
 
