@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"time"
 
 	"log"
 
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gogo/protobuf/proto"
 	uuid "github.com/nu7hatch/gouuid"
 )
 
@@ -41,21 +43,17 @@ func (ih *instrumentedHandler) ServeHTTP(rw http.ResponseWriter, req *http.Reque
 	}
 	rw.Header().Set("X-CF-RequestID", requestId.String())
 
-	startEvent := factories.NewHttpStart(req, events.PeerType_Server, requestId)
-
-	err = ih.emitter.Emit(startEvent)
-	if err != nil {
-		log.Printf("failed to emit start event: %v\n", err)
-	}
+	startTime := time.Now()
 
 	instrumentedWriter := &instrumentedResponseWriter{writer: rw, statusCode: 200}
 	ih.handler.ServeHTTP(instrumentedWriter, req)
 
-	stopEvent := factories.NewHttpStop(req, instrumentedWriter.statusCode, instrumentedWriter.contentLength, events.PeerType_Server, requestId)
+	startStopEvent := factories.NewHttpStartStop(req, instrumentedWriter.statusCode, instrumentedWriter.contentLength, events.PeerType_Server, requestId)
+	startStopEvent.StartTimestamp = proto.Int64(startTime.UnixNano())
 
-	err = ih.emitter.Emit(stopEvent)
+	err = ih.emitter.Emit(startStopEvent)
 	if err != nil {
-		log.Printf("failed to emit stop event: %v\n", err)
+		log.Printf("failed to emit startstop event: %v\n", err)
 	}
 }
 

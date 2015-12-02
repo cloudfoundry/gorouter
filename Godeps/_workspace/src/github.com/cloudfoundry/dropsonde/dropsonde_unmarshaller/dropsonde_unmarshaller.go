@@ -16,22 +16,32 @@
 package dropsonde_unmarshaller
 
 import (
-	"sync"
-	"sync/atomic"
+	"fmt"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gogo/protobuf/proto"
 )
 
+var metricNames map[events.Envelope_EventType]string
+
+func init() {
+	metricNames = make(map[events.Envelope_EventType]string)
+	for eventType, eventName := range events.Envelope_EventType_name {
+		r, n := utf8.DecodeRuneInString(eventName)
+		modifiedName := string(unicode.ToLower(r)) + eventName[n:]
+		metricName := "dropsondeUnmarshaller." + modifiedName + "Received"
+		metricNames[events.Envelope_EventType(eventType)] = metricName
+	}
+}
+
 // A DropsondeUnmarshaller is an self-instrumenting tool for converting Protocol
 // Buffer-encoded dropsonde messages to Envelope instances.
 type DropsondeUnmarshaller interface {
-	instrumentation.Instrumentable
 	Run(inputChan <-chan []byte, outputChan chan<- *events.Envelope)
 	UnmarshallMessage([]byte) (*events.Envelope, error)
 }
@@ -39,25 +49,13 @@ type DropsondeUnmarshaller interface {
 // NewDropsondeUnmarshaller instantiates a DropsondeUnmarshaller and logs to the
 // provided logger.
 func NewDropsondeUnmarshaller(logger *gosteno.Logger) DropsondeUnmarshaller {
-	receiveCounts := make(map[events.Envelope_EventType]*uint64)
-	for key := range events.Envelope_EventType_name {
-		var count uint64
-		receiveCounts[events.Envelope_EventType(key)] = &count
-	}
-
 	return &dropsondeUnmarshaller{
-		logger:                  logger,
-		receiveCounts:           receiveCounts,
-		logMessageReceiveCounts: make(map[string]*uint64),
+		logger: logger,
 	}
 }
 
 type dropsondeUnmarshaller struct {
-	logger                  *gosteno.Logger
-	receiveCounts           map[events.Envelope_EventType]*uint64
-	logMessageReceiveCounts map[string]*uint64
-	unmarshalErrorCount     uint64
-	sync.RWMutex
+	logger *gosteno.Logger
 }
 
 // Run reads byte slices from inputChan, unmarshalls them to Envelopes, and
@@ -79,90 +77,34 @@ func (u *dropsondeUnmarshaller) UnmarshallMessage(message []byte) (*events.Envel
 	if err != nil {
 		u.logger.Debugf("dropsondeUnmarshaller: unmarshal error %v for message %v", err, message)
 		metrics.BatchIncrementCounter("dropsondeUnmarshaller.unmarshalErrors")
-		incrementCount(&u.unmarshalErrorCount)
 		return nil, err
 	}
 
 	u.logger.Debugf("dropsondeUnmarshaller: received message %v", spew.Sprintf("%v", envelope))
 
-	if envelope.GetEventType() == events.Envelope_LogMessage {
-		u.incrementLogMessageReceiveCount(envelope.GetLogMessage().GetAppId())
-	} else {
-		u.incrementReceiveCount(envelope.GetEventType())
+	if err := u.incrementReceiveCount(envelope.GetEventType()); err != nil {
+		u.logger.Debug(err.Error())
+		return nil, err
 	}
 
 	return envelope, nil
 }
 
-func (u *dropsondeUnmarshaller) incrementLogMessageReceiveCount(appID string) {
-	metrics.BatchIncrementCounter("dropsondeUnmarshaller.logMessageTotal")
-
-	_, ok := u.logMessageReceiveCounts[appID]
-	if ok == false {
-		var count uint64
-		u.Lock()
-		u.logMessageReceiveCounts[appID] = &count
-		u.Unlock()
-	}
-	incrementCount(u.logMessageReceiveCounts[appID])
-	incrementCount(u.receiveCounts[events.Envelope_LogMessage])
-}
-
-func (u *dropsondeUnmarshaller) incrementReceiveCount(eventType events.Envelope_EventType) {
-	name, ok := events.Envelope_EventType_name[int32(eventType)]
-
-	if !ok {
-		var newCounter uint64
-		u.receiveCounts[eventType] = &newCounter
-		name = "unknownEventType"
-	}
-
-	modifiedEventName := []rune(name)
-	modifiedEventName[0] = unicode.ToLower(modifiedEventName[0])
-	metricName := string(modifiedEventName) + "Received"
-
-	metrics.BatchIncrementCounter("dropsondeUnmarshaller." + metricName)
-
-	incrementCount(u.receiveCounts[eventType])
-}
-
-func incrementCount(count *uint64) {
-	atomic.AddUint64(count, 1)
-}
-
-func (u *dropsondeUnmarshaller) metrics() []instrumentation.Metric {
-	var metrics []instrumentation.Metric
-
-	u.RLock()
-
-	metricValue := atomic.LoadUint64(u.receiveCounts[events.Envelope_LogMessage])
-	metrics = append(metrics, instrumentation.Metric{Name: logMessageTotal, Value: metricValue})
-
-	u.RUnlock()
-
-	for eventType, counterPointer := range u.receiveCounts {
-		if eventType == events.Envelope_LogMessage {
-			continue
+func (u *dropsondeUnmarshaller) incrementReceiveCount(eventType events.Envelope_EventType) error {
+	var err error
+	switch eventType {
+	case events.Envelope_LogMessage:
+		// LogMessage is a special case. `logMessageReceived` used to be broken out by app ID, and
+		// `logMessageTotal` was the sum of all of those.
+		metrics.BatchIncrementCounter("dropsondeUnmarshaller.logMessageTotal")
+	default:
+		metricName := metricNames[eventType]
+		if metricName == "" {
+			metricName = "dropsondeUnmarshaller.unknownEventTypeReceived"
+			err = fmt.Errorf("dropsondeUnmarshaller: received unknown event type %#v", eventType)
 		}
-		modifiedEventName := []rune(eventType.String())
-		modifiedEventName[0] = unicode.ToLower(modifiedEventName[0])
-		metricName := string(modifiedEventName) + "Received"
-		metricValue := atomic.LoadUint64(counterPointer)
-		metrics = append(metrics, instrumentation.Metric{Name: metricName, Value: metricValue})
+		metrics.BatchIncrementCounter(metricName)
 	}
 
-	metrics = append(metrics, instrumentation.Metric{
-		Name:  unmarshalErrors,
-		Value: atomic.LoadUint64(&u.unmarshalErrorCount),
-	})
-
-	return metrics
-}
-
-// Emit returns the current metrics the DropsondeMarshaller keeps about itself.
-func (u *dropsondeUnmarshaller) Emit() instrumentation.Context {
-	return instrumentation.Context{
-		Name:    "dropsondeUnmarshaller",
-		Metrics: u.metrics(),
-	}
+	return err
 }
