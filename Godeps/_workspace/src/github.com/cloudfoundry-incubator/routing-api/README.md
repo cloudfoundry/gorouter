@@ -1,54 +1,20 @@
-[![Build Status](https://travis-ci.org/cloudfoundry-incubator/routing-api.svg)](https://travis-ci.org/cloudfoundry-incubator/routing-api)
+# CF Routing API Server (Experimental)
 
-# CF Routing API Server
+The initial release of this API server is currently in development and subject to backward incompatible changes.
+
+The purpose of the Routing API is to present a RESTful interface for registering and deregistering routes for both internal and external clients. This allows easier consumption by different clients as well as the ability to register routes from outside of the CF deployment.
 
 ## Downloading and Installing
 
 ### External Dependencies
 
 - Go should be installed and in the PATH
-- GOPATH should be set as described in http://golang.org/doc/code.html
-- [godep](https://github.com/tools/godep) installed and in the PATH
-- Install [direnv](http://direnv.net/) if you are planning to do routing-api
-development as part of cf-release.
+- This repo is part of [cf-routing-release](https://github.com/cloudfoundry-incubator/cf-routing-release) bosh release repo, which also acts as cannonical GOPATH. So to work on routing-api you will need to checkout [cf-routing-release](https://github.com/cloudfoundry-incubator/cf-routing-release) and follow instructions in its [README](https://github.com/cloudfoundry-incubator/cf-routing-release/blob/develop/README.md) to setup GOPATH.
 
 
 ### Development Setup
 
-Download:
-
-Option 1: Routing API (standalone)
-```bash
-go get github.com/cloudfoundry-incubator/routing-api
-cd $GOPATH/src/github.com/cloudfoundry-incubator/routing-api
-```
-
-To install the server binary you can do
-
-```sh
-cd $GOPATH/src/github.com/cloudfoundry-incubator/routing-api
-go install ./cmd/routing-api
-
-# OR
-go get github.com/cloudfoundry-incubator/routing-api/cmd/routing-api
-```
-
-Option 2: Routing API (as part of [cf-release](https://github.com/cloudfoundry/cf-release))
-```bash
-git clone https://github.com/cloudfoundry/cf-release
-cd cf-release
-./update
-cd cf-release/src/github.com/cloudfoundry-incubator/routing-api
-```
- *Note: direnv will automatically set your GOPATH when you cd into the routing-api directory. You will need to run `direnv allow` the first time.*
-
-
-To install exactly the dependencies vendored with the Routing API, use [godep](https://github.com/tools/godep):
-
-```bash
-go get -v github.com/tools/godep
-godep restore ./...
-```
+Refer to cf-routing-release [README](https://github.com/cloudfoundry-incubator/cf-routing-release/blob/develop/README.md) for development setup.
 
 ## Development
 
@@ -140,7 +106,7 @@ uaa:
 2. Get the admin client token
 
    ```bash
-   uaac target uaa.10.244.0.34.xip.io
+   uaac target uaa.bosh-lite.com
    uaac token client get admin # You will need to provide the client_secret, found in your CF manifest.
    ```
 
@@ -223,59 +189,87 @@ To obtain an token from UAA, use the `uaac` CLI for UAA.
 To add a route to the API server:
 
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45}]'
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/routing/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45}]'
 ```
 To add a route, with an associated route service, to the API server. This must be a https-only url:
 
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45, "route_service_url":"https://route-service.example.cf-app.com"}]'
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/routing/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45, "route_service_url":"https://route-service.example.cf-app.com"}]'
 ```
 
 To add a tcp route to the API server:
 
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/v1/tcp_routes/create -d '[{"route":{"router_group_guid": "tcp-default", "external_port": 5200}, "host_ip": "10.1.1.12", "host_port": 60000}]'
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/routing/v1/tcp_routes/create -d '
+[
+  {
+   "router_group_guid": "tcp-default",
+   "port": 5200,
+   "backend_ip": "10.1.1.12",
+   "backend_port": 60000
+   }
+]'
 ```
 
 To delete a route:
 
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X DELETE http://127.0.0.1:8080/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45}]'
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X DELETE http://127.0.0.1:8080/routing/v1/routes -d '[{"ip":"1.2.3.4", "route":"a_route", "port":8089, "ttl":45}]'
+```
+
+To delete a tcp route:
+
+```sh
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.write scope]" -X POST http://127.0.0.1:8080/routing/v1/tcp_routes/delete -d '
+[
+  {
+  "router_group_guid": "tcp-default",
+  "port": 5200,
+  "backend_ip": "10.1.1.12",
+  "backend_port": 60000
+  }
+]'
 ```
 
 To list registered routes:
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/v1/routes
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/routing/v1/routes
 ```
 
 To list registered tcp routes:
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/v1/tcp_routes
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/routing/v1/tcp_routes
 
 Sample response:
 [
   {
-    "route": {"router_group_guid": "tcp-default", "external_port": 5200},
-    "host_ip": "10.1.1.12",
-    "host_port": 60000
+    "router_group_guid": "tcp-default",
+    "port": 5200,
+    "backend_ip": "10.1.1.12",
+    "backend_port": 60000
   }
 ]
 ```
 
 To subscribe to route changes:
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/v1/events
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/routing/v1/events
+```
+
+To subscribe to tcp route changes:
+```sh
+curl -vvv -H "Authorization: bearer [token with uaa routing.routes.read scope]" http://127.0.0.1:8080/routing/v1/tcp_routes/events
 ```
 
 To list available Router Groups:
 ```sh
-curl -vvv -H "Authorization: bearer [token with uaa routing.router_groups.read scope]" http://127.0.0.1:8080/v1/router_groups
+curl -vvv -H "Authorization: bearer [token with uaa routing.router_groups.read scope]" http://127.0.0.1:8080/routing/v1/router_groups
 
 Sample response:
 [{
     "guid": "f7392031-a488-4890-8835-c4a038a3bded",
-    "name": "default_tcp",
-    "features": [
+    "name": "default-tcp",
+    "type": [
         "tcp"
     ]
 }]
@@ -283,5 +277,5 @@ Sample response:
 
 ## Known issues
 
-+ The routing-api will return a 404 if you attempt to hit the endpoint `http://[router host]/v1/routes/` as opposed to `http://[router host]/v1/routes`
++ The routing-api will return a 404 if you attempt to hit the endpoint `http://[router host]/routing/v1/routes/` as opposed to `http://[router host]/routing/v1/routes`
 + The routing-api currently logs everything to the ctl log.

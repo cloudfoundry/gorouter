@@ -32,7 +32,21 @@ func NewEventStreamHandler(token authentication.Token, database db.DB, logger la
 }
 
 func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Request) {
+	h.stats.GaugeDelta("total_subscriptions", 1, 1.0)
+	defer h.stats.GaugeDelta("total_subscriptions", -1, 1.0)
 	log := h.logger.Session("event-stream-handler")
+	h.handleEventStream(log, db.HTTP_ROUTE_BASE_KEY, w, req)
+}
+
+func (h *EventStreamHandler) TcpEventStream(w http.ResponseWriter, req *http.Request) {
+	h.stats.GaugeDelta("total_tcp_subscriptions", 1, 1.0)
+	defer h.stats.GaugeDelta("total_tcp_subscriptions", -1, 1.0)
+	log := h.logger.Session("tcp-event-stream-handler")
+	h.handleEventStream(log, db.TCP_MAPPING_BASE_KEY, w, req)
+}
+
+func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey string,
+	w http.ResponseWriter, req *http.Request) {
 
 	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
@@ -42,10 +56,7 @@ func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Reques
 	flusher := w.(http.Flusher)
 	closeNotifier := w.(http.CloseNotifier).CloseNotify()
 
-	resultChan, cancelChan, errChan := h.db.WatchRouteChanges()
-
-	h.stats.GaugeDelta("total_subscriptions", 1, 1.0)
-	defer h.stats.GaugeDelta("total_subscriptions", -1, 1.0)
+	resultChan, cancelChan, errChan := h.db.WatchRouteChanges(filterKey)
 
 	w.Header().Add("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")

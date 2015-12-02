@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/cloudfoundry-incubator/cf_http"
@@ -22,15 +23,19 @@ type Client interface {
 	DeleteRoutes([]db.Route) error
 	RouterGroups() ([]db.RouterGroup, error)
 	UpsertTcpRouteMappings([]db.TcpRouteMapping) error
+	DeleteTcpRouteMappings([]db.TcpRouteMapping) error
 	TcpRouteMappings() ([]db.TcpRouteMapping, error)
 
 	SubscribeToEvents() (EventSource, error)
+	SubscribeToTcpEvents() (TcpEventSource, error)
 }
 
 func NewClient(url string) Client {
 	return &client{
 		httpClient:          cf_http.NewClient(),
 		streamingHTTPClient: cf_http.NewStreamingClient(),
+
+		tokenMutex: &sync.RWMutex{},
 
 		reqGen: rata.NewRequestGenerator(url, Routes),
 	}
@@ -39,12 +44,16 @@ func NewClient(url string) Client {
 type client struct {
 	httpClient          *http.Client
 	streamingHTTPClient *http.Client
-	authToken           string
+
+	tokenMutex *sync.RWMutex
+	authToken  string
 
 	reqGen *rata.RequestGenerator
 }
 
 func (c *client) SetToken(token string) {
+	c.tokenMutex.Lock()
+	defer c.tokenMutex.Unlock()
 	c.authToken = token
 }
 
@@ -78,9 +87,31 @@ func (c *client) TcpRouteMappings() ([]db.TcpRouteMapping, error) {
 	return tcpRouteMappings, err
 }
 
+func (c *client) DeleteTcpRouteMappings(tcpRouteMappings []db.TcpRouteMapping) error {
+	return c.doRequest(DeleteTcpRouteMapping, nil, nil, tcpRouteMappings, nil)
+}
+
 func (c *client) SubscribeToEvents() (EventSource, error) {
+	eventSource, err := c.doSubscribe(EventStreamRoute)
+	if err != nil {
+		return nil, err
+	}
+	return NewEventSource(eventSource), nil
+}
+
+func (c *client) SubscribeToTcpEvents() (TcpEventSource, error) {
+	eventSource, err := c.doSubscribe(EventStreamTcpRoute)
+	if err != nil {
+		return nil, err
+	}
+	return NewTcpEventSource(eventSource), nil
+}
+
+func (c *client) doSubscribe(routeName string) (RawEventSource, error) {
 	eventSource, err := sse.Connect(c.streamingHTTPClient, time.Second, func() *http.Request {
-		request, err := c.reqGen.CreateRequest(EventStreamRoute, nil, nil)
+		request, err := c.reqGen.CreateRequest(routeName, nil, nil)
+		c.tokenMutex.RLock()
+		defer c.tokenMutex.RUnlock()
 		request.Header.Add("Authorization", "bearer "+c.authToken)
 		if err != nil {
 			panic(err) // totally shouldn't happen
@@ -93,7 +124,7 @@ func (c *client) SubscribeToEvents() (EventSource, error) {
 		return nil, err
 	}
 
-	return NewEventSource(eventSource), nil
+	return eventSource, nil
 }
 
 func (c *client) createRequest(requestName string, params rata.Params, queryParams url.Values, request interface{}) (*http.Request, error) {
@@ -110,6 +141,8 @@ func (c *client) createRequest(requestName string, params rata.Params, queryPara
 	req.URL.RawQuery = queryParams.Encode()
 	req.ContentLength = int64(len(requestJson))
 	req.Header.Set("Content-Type", "application/json")
+	c.tokenMutex.RLock()
+	defer c.tokenMutex.RUnlock()
 	req.Header.Add("Authorization", "bearer "+c.authToken)
 
 	return req, nil

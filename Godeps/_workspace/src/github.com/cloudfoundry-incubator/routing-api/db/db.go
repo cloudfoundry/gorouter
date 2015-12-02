@@ -18,18 +18,19 @@ type DB interface {
 
 	ReadTcpRouteMappings() ([]TcpRouteMapping, error)
 	SaveTcpRouteMapping(tcpMapping TcpRouteMapping) error
+	DeleteTcpRouteMapping(tcpMapping TcpRouteMapping) error
 
 	Connect() error
 	Disconnect() error
-	WatchRouteChanges() (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error)
+	WatchRouteChanges(filter string) (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error)
 }
 
-type Feature string
+type RouterGroupType string
 
 type RouterGroup struct {
-	Guid     string    `json:"guid"`
-	Name     string    `json:"name"`
-	Features []Feature `json:"features"`
+	Guid string          `json:"guid"`
+	Name string          `json:"name"`
+	Type RouterGroupType `json:"type"`
 }
 
 type Route struct {
@@ -42,14 +43,14 @@ type Route struct {
 }
 
 type TcpRouteMapping struct {
-	TcpRoute tcpRoute `json:"route"`
-	HostPort uint16   `json:"host_port"`
-	HostIP   string   `json:"host_ip"`
+	TcpRoute
+	HostPort uint16 `json:"backend_port"`
+	HostIP   string `json:"backend_ip"`
 }
 
-type tcpRoute struct {
+type TcpRoute struct {
 	RouterGroupGuid string `json:"router_group_guid"`
-	ExternalPort    uint16 `json:"external_port"`
+	ExternalPort    uint16 `json:"port"`
 }
 
 const (
@@ -67,7 +68,10 @@ func NewETCD(nodeURLs []string, maxWorkers uint) (*etcd, error) {
 		return nil, err
 	}
 
-	storeAdapter := etcdstoreadapter.NewETCDStoreAdapter(nodeURLs, workpool)
+	storeAdapter, err := etcdstoreadapter.New(&etcdstoreadapter.ETCDOptions{ClusterUrls: nodeURLs}, workpool)
+	if err != nil {
+		return nil, err
+	}
 	return &etcd{
 		storeAdapter: storeAdapter,
 	}, nil
@@ -117,8 +121,8 @@ func (e *etcd) DeleteRoute(route Route) error {
 	return err
 }
 
-func (e *etcd) WatchRouteChanges() (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error) {
-	return e.storeAdapter.Watch("/routes")
+func (e *etcd) WatchRouteChanges(filter string) (<-chan storeadapter.WatchEvent, chan<- bool, <-chan error) {
+	return e.storeAdapter.Watch(filter)
 }
 
 func generateKey(route Route) string {
@@ -154,17 +158,30 @@ func (e *etcd) SaveTcpRouteMapping(tcpMapping TcpRouteMapping) error {
 	return e.storeAdapter.SetMulti([]storeadapter.StoreNode{node})
 }
 
+func (e *etcd) DeleteTcpRouteMapping(tcpMapping TcpRouteMapping) error {
+	key := generateTcpRouteMappingKey(tcpMapping)
+	err := e.storeAdapter.Delete(key)
+	if err != nil && err.Error() == "the requested key could not be found" {
+		err = DBError{Type: KeyNotFound, Message: "The specified route (" + tcpMapping.String() + ") could not be found."}
+	}
+	return err
+}
+
 func generateTcpRouteMappingKey(tcpMapping TcpRouteMapping) string {
 	// Generating keys following this pattern
-	// /v1/tcp_routes/router_groups/{router_guid}/{external_port}/{host-ip}:{host-port}
+	// /v1/tcp_routes/router_groups/{router_guid}/{port}/{host-ip}:{host-port}
 	return fmt.Sprintf("%s/%s/%d/%s:%d", TCP_MAPPING_BASE_KEY,
 		tcpMapping.TcpRoute.RouterGroupGuid, tcpMapping.TcpRoute.ExternalPort, tcpMapping.HostIP, tcpMapping.HostPort)
 }
 
 func NewTcpRouteMapping(routerGroupGuid string, externalPort uint16, hostIP string, hostPort uint16) TcpRouteMapping {
 	return TcpRouteMapping{
-		TcpRoute: tcpRoute{RouterGroupGuid: routerGroupGuid, ExternalPort: externalPort},
+		TcpRoute: TcpRoute{RouterGroupGuid: routerGroupGuid, ExternalPort: externalPort},
 		HostPort: hostPort,
 		HostIP:   hostIP,
 	}
+}
+
+func (m TcpRouteMapping) String() string {
+	return fmt.Sprintf("%s:%d<->%s:%d", m.RouterGroupGuid, m.ExternalPort, m.HostIP, m.HostPort)
 }

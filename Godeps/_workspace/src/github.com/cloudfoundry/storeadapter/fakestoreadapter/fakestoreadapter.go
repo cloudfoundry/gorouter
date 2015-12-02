@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudfoundry/storeadapter"
 )
@@ -95,6 +96,16 @@ func (adapter *FakeStoreAdapter) Connect() error {
 }
 
 func (adapter *FakeStoreAdapter) Disconnect() error {
+	adapter.Lock()
+	defer adapter.Unlock()
+
+	if !adapter.DidDisconnect {
+		close(adapter.eventChannel)
+		if adapter.WatchErrChannel != nil {
+			close(adapter.WatchErrChannel)
+		}
+	}
+
 	adapter.DidDisconnect = true
 	return adapter.DisconnectErr
 }
@@ -102,6 +113,8 @@ func (adapter *FakeStoreAdapter) Disconnect() error {
 func (adapter *FakeStoreAdapter) sendEvent(prevNode *storeadapter.StoreNode, node *storeadapter.StoreNode, eventType storeadapter.EventType) {
 	if adapter.sendEvents {
 		go func() {
+			adapter.Lock()
+			defer adapter.Unlock()
 			adapter.eventChannel <- storeadapter.WatchEvent{
 				Type:     eventType,
 				Node:     node,
@@ -136,14 +149,13 @@ func (adapter *FakeStoreAdapter) setMulti(nodes []storeadapter.StoreNode) error 
 
 		container := adapter.rootNode
 		for i, component := range components {
+			existingNode, exists := container.nodes[component]
 			if i == len(components)-1 {
-				existingNode, exists := container.nodes[component]
 				if exists && existingNode.dir {
 					return storeadapter.ErrorNodeIsDirectory
 				}
 				container.nodes[component] = &containerNode{storeNode: node}
 			} else {
-				existingNode, exists := container.nodes[component]
 				if exists {
 					if !existingNode.dir {
 						return storeadapter.ErrorNodeIsNotDirectory
@@ -191,14 +203,9 @@ func (adapter *FakeStoreAdapter) get(key string) (storeadapter.StoreNode, error)
 		return storeadapter.StoreNode{}, adapter.GetErrInjector.Error
 	}
 
-	components := adapter.keyComponents(key)
-	container := adapter.rootNode
-	for _, component := range components {
-		var exists bool
-		container, exists = container.nodes[component]
-		if !exists {
-			return storeadapter.StoreNode{}, storeadapter.ErrorKeyNotFound
-		}
+	container, err := adapter.walkToNode(key)
+	if err != nil {
+		return storeadapter.StoreNode{}, err
 	}
 
 	if container.dir {
@@ -206,6 +213,19 @@ func (adapter *FakeStoreAdapter) get(key string) (storeadapter.StoreNode, error)
 	} else {
 		return container.storeNode, nil
 	}
+}
+
+func (adapter *FakeStoreAdapter) walkToNode(key string) (*containerNode, error) {
+	container := adapter.rootNode
+	for _, component := range adapter.keyComponents(key) {
+		var exists bool
+		container, exists = container.nodes[component]
+		if !exists {
+			return nil, storeadapter.ErrorKeyNotFound
+		}
+	}
+
+	return container, nil
 }
 
 func (adapter *FakeStoreAdapter) ListRecursively(key string) (storeadapter.StoreNode, error) {
@@ -216,15 +236,9 @@ func (adapter *FakeStoreAdapter) ListRecursively(key string) (storeadapter.Store
 		return storeadapter.StoreNode{}, adapter.ListErrInjector.Error
 	}
 
-	container := adapter.rootNode
-
-	components := adapter.keyComponents(key)
-	for _, component := range components {
-		var exists bool
-		container, exists = container.nodes[component]
-		if !exists {
-			return storeadapter.StoreNode{}, storeadapter.ErrorKeyNotFound
-		}
+	container, err := adapter.walkToNode(key)
+	if err != nil {
+		return storeadapter.StoreNode{}, err
 	}
 
 	if !container.dir {
@@ -284,6 +298,16 @@ func (adapter *FakeStoreAdapter) deleteKeys(keys ...string) error {
 			}
 		}
 
+		leaf := parentNode.nodes[components[len(components)-1]]
+		if leaf.dir {
+			var keysToDelete []string
+			for key, _ := range leaf.nodes {
+				childKey := strings.Join(append(components, key), "/")
+				keysToDelete = append(keysToDelete, childKey)
+			}
+			adapter.deleteKeys(keysToDelete...)
+		}
+
 		delete(parentNode.nodes, components[len(components)-1])
 		adapter.sendEvent(&node, nil, storeadapter.DeleteEvent)
 	}
@@ -323,7 +347,19 @@ func (adapter *FakeStoreAdapter) CompareAndDeleteByIndex(node ...storeadapter.St
 }
 
 func (adapter *FakeStoreAdapter) UpdateDirTTL(key string, ttl uint64) error {
-	panic("not implemented")
+	container, err := adapter.walkToNode(key)
+	if err != nil {
+		return err
+	}
+	if !container.dir {
+		return storeadapter.ErrorNodeIsNotDirectory
+	}
+
+	go func() {
+		time.Sleep(time.Duration(ttl) * time.Second)
+		adapter.Delete(key)
+	}()
+	return nil
 }
 
 func (adapter *FakeStoreAdapter) Update(node storeadapter.StoreNode) error {
@@ -352,6 +388,8 @@ func (adapter *FakeStoreAdapter) CompareAndSwapByIndex(oldNodeIndex uint64, newN
 }
 
 func (adapter *FakeStoreAdapter) Watch(key string) (events <-chan storeadapter.WatchEvent, stop chan<- bool, errors <-chan error) {
+	adapter.Lock()
+	defer adapter.Unlock()
 	adapter.sendEvents = true
 	adapter.WatchErrChannel = make(chan error, 1)
 

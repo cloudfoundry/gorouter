@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
-			"Rev": "68ec28ccfcdbc4ee06deb26e720171ab15be80e7"
+			"Rev": "feec74c5c6380ac3daff138ca687d6823399a508"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/trace-logger",
@@ -61,7 +61,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/storeadapter",
-			"Rev": "776fd8b514e4c7ae50db872e14dc0995ae3721ca"
+			"Rev": "57139702b98a42708276747b53fb999a02f1342b"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/yagnats",

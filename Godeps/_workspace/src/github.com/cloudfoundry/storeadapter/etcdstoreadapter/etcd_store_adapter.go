@@ -1,15 +1,18 @@
 package etcdstoreadapter
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/cloudfoundry/gunk/workpool"
 	"github.com/cloudfoundry/storeadapter"
 	"github.com/coreos/go-etcd/etcd"
-	uuid "github.com/nu7hatch/gouuid"
+	"github.com/nu7hatch/gouuid"
 )
 
 type ETCDStoreAdapter struct {
@@ -19,8 +22,59 @@ type ETCDStoreAdapter struct {
 	inflightWatchLock *sync.Mutex
 }
 
-func NewETCDStoreAdapter(urls []string, workPool *workpool.WorkPool) *ETCDStoreAdapter {
+func New(options *ETCDOptions, workPool *workpool.WorkPool) (*ETCDStoreAdapter, error) {
+	if options.IsSSL {
+		return newTLSClient(options.ClusterUrls, options.CertFile, options.KeyFile, options.CAFile, workPool)
+	}
+
+	return newHTTPClient(options.ClusterUrls, workPool), nil
+}
+
+func newHTTPClient(urls []string, workPool *workpool.WorkPool) *ETCDStoreAdapter {
 	client := etcd.NewClient(urls)
+	return newAdapter(client, workPool)
+}
+
+func newTLSClient(urls []string, cert, key, caCert string, workPool *workpool.WorkPool) (*ETCDStoreAdapter, error) {
+	client, err := NewETCDTLSClient(urls, cert, key, caCert)
+	if err != nil {
+		return nil, err
+	}
+
+	return newAdapter(client, workPool), nil
+}
+
+func NewETCDTLSClient(urls []string, certFile, keyFile, caCertFile string) (*etcd.Client, error) {
+	client := etcd.NewClient(urls)
+	tlsCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{tlsCert},
+		InsecureSkipVerify: false,
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: tlsConfig,
+		Dial: (&net.Dialer{
+			Timeout:   time.Second,
+			KeepAlive: time.Second,
+		}).Dial,
+	}
+	client.SetTransport(tr)
+	if caCertFile != "" {
+		err = client.AddRootCA(caCertFile)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func newAdapter(client *etcd.Client, workPool *workpool.WorkPool) *ETCDStoreAdapter {
 	client.SetConsistency(etcd.STRONG_CONSISTENCY)
 
 	return &ETCDStoreAdapter{

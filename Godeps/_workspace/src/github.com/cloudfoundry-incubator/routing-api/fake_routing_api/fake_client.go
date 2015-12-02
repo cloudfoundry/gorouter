@@ -52,6 +52,14 @@ type FakeClient struct {
 	upsertTcpRouteMappingsReturns struct {
 		result1 error
 	}
+	DeleteTcpRouteMappingsStub        func([]db.TcpRouteMapping) error
+	deleteTcpRouteMappingsMutex       sync.RWMutex
+	deleteTcpRouteMappingsArgsForCall []struct {
+		arg1 []db.TcpRouteMapping
+	}
+	deleteTcpRouteMappingsReturns struct {
+		result1 error
+	}
 	TcpRouteMappingsStub        func() ([]db.TcpRouteMapping, error)
 	tcpRouteMappingsMutex       sync.RWMutex
 	tcpRouteMappingsArgsForCall []struct{}
@@ -64,6 +72,13 @@ type FakeClient struct {
 	subscribeToEventsArgsForCall []struct{}
 	subscribeToEventsReturns struct {
 		result1 routing_api.EventSource
+		result2 error
+	}
+	SubscribeToTcpEventsStub        func() (routing_api.TcpEventSource, error)
+	subscribeToTcpEventsMutex       sync.RWMutex
+	subscribeToTcpEventsArgsForCall []struct{}
+	subscribeToTcpEventsReturns struct {
+		result1 routing_api.TcpEventSource
 		result2 error
 	}
 }
@@ -237,6 +252,38 @@ func (fake *FakeClient) UpsertTcpRouteMappingsReturns(result1 error) {
 	}{result1}
 }
 
+func (fake *FakeClient) DeleteTcpRouteMappings(arg1 []db.TcpRouteMapping) error {
+	fake.deleteTcpRouteMappingsMutex.Lock()
+	fake.deleteTcpRouteMappingsArgsForCall = append(fake.deleteTcpRouteMappingsArgsForCall, struct {
+		arg1 []db.TcpRouteMapping
+	}{arg1})
+	fake.deleteTcpRouteMappingsMutex.Unlock()
+	if fake.DeleteTcpRouteMappingsStub != nil {
+		return fake.DeleteTcpRouteMappingsStub(arg1)
+	} else {
+		return fake.deleteTcpRouteMappingsReturns.result1
+	}
+}
+
+func (fake *FakeClient) DeleteTcpRouteMappingsCallCount() int {
+	fake.deleteTcpRouteMappingsMutex.RLock()
+	defer fake.deleteTcpRouteMappingsMutex.RUnlock()
+	return len(fake.deleteTcpRouteMappingsArgsForCall)
+}
+
+func (fake *FakeClient) DeleteTcpRouteMappingsArgsForCall(i int) []db.TcpRouteMapping {
+	fake.deleteTcpRouteMappingsMutex.RLock()
+	defer fake.deleteTcpRouteMappingsMutex.RUnlock()
+	return fake.deleteTcpRouteMappingsArgsForCall[i].arg1
+}
+
+func (fake *FakeClient) DeleteTcpRouteMappingsReturns(result1 error) {
+	fake.DeleteTcpRouteMappingsStub = nil
+	fake.deleteTcpRouteMappingsReturns = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClient) TcpRouteMappings() ([]db.TcpRouteMapping, error) {
 	fake.tcpRouteMappingsMutex.Lock()
 	fake.tcpRouteMappingsArgsForCall = append(fake.tcpRouteMappingsArgsForCall, struct{}{})
@@ -283,6 +330,31 @@ func (fake *FakeClient) SubscribeToEventsReturns(result1 routing_api.EventSource
 	fake.SubscribeToEventsStub = nil
 	fake.subscribeToEventsReturns = struct {
 		result1 routing_api.EventSource
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClient) SubscribeToTcpEvents() (routing_api.TcpEventSource, error) {
+	fake.subscribeToTcpEventsMutex.Lock()
+	fake.subscribeToTcpEventsArgsForCall = append(fake.subscribeToTcpEventsArgsForCall, struct{}{})
+	fake.subscribeToTcpEventsMutex.Unlock()
+	if fake.SubscribeToTcpEventsStub != nil {
+		return fake.SubscribeToTcpEventsStub()
+	} else {
+		return fake.subscribeToTcpEventsReturns.result1, fake.subscribeToTcpEventsReturns.result2
+	}
+}
+
+func (fake *FakeClient) SubscribeToTcpEventsCallCount() int {
+	fake.subscribeToTcpEventsMutex.RLock()
+	defer fake.subscribeToTcpEventsMutex.RUnlock()
+	return len(fake.subscribeToTcpEventsArgsForCall)
+}
+
+func (fake *FakeClient) SubscribeToTcpEventsReturns(result1 routing_api.TcpEventSource, result2 error) {
+	fake.SubscribeToTcpEventsStub = nil
+	fake.subscribeToTcpEventsReturns = struct {
+		result1 routing_api.TcpEventSource
 		result2 error
 	}{result1, result2}
 }

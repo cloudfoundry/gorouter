@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	DefaultRouterGroupGuid    = "bad25cff-9332-48a6-8603-b619858e7992"
-	DefaultRouterGroupName    = "default_tcp"
-	DefaultRouterGroupFeature = "tcp"
+	DefaultRouterGroupGuid = "bad25cff-9332-48a6-8603-b619858e7992"
+	DefaultRouterGroupName = "default-tcp"
+	DefaultRouterGroupType = "tcp"
 )
 
 type RouteRegister struct {
@@ -55,8 +55,8 @@ func (r *RouteRegister) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 
 func GetDefaultRouterGroup() db.RouterGroup {
 	return db.RouterGroup{
-		Guid:     DefaultRouterGroupGuid,
-		Name:     DefaultRouterGroupName,
-		Features: []db.Feature{DefaultRouterGroupFeature},
+		Guid: DefaultRouterGroupGuid,
+		Name: DefaultRouterGroupName,
+		Type: DefaultRouterGroupType,
 	}
 }

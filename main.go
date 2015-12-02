@@ -35,13 +35,10 @@ import (
 
 var configFile string
 
-func init() {
-	flag.StringVar(&configFile, "c", "", "Configuration File")
-
-	flag.Parse()
-}
-
 func main() {
+	flag.StringVar(&configFile, "c", "", "Configuration File")
+	flag.Parse()
+
 	c := config.DefaultConfig()
 	logCounter := vcap.NewLogCounter()
 

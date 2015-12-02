@@ -26,7 +26,7 @@ type Config struct {
 	MaxConcurrentETCDRequests       uint          `yaml:"max_concurrent_etcd_requests"`
 }
 
-func NewConfigFromFile(configFile string) (Config, error) {
+func NewConfigFromFile(configFile string, authDisabled bool) (Config, error) {
 	c, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return Config{}, err
@@ -34,12 +34,14 @@ func NewConfigFromFile(configFile string) (Config, error) {
 
 	// Init things
 	config := Config{}
-	config.Initialize(c)
+	if err = config.Initialize(c, authDisabled); err != nil {
+		return config, err
+	}
 
 	return config, nil
 }
 
-func (cfg *Config) Initialize(file []byte) error {
+func (cfg *Config) Initialize(file []byte, authDisabled bool) error {
 	err := candiedyaml.Unmarshal(file, &cfg)
 	if err != nil {
 		return err
@@ -49,7 +51,7 @@ func (cfg *Config) Initialize(file []byte) error {
 		return errors.New("No log_guid specified")
 	}
 
-	if cfg.UAAPublicKey == "" {
+	if !authDisabled && cfg.UAAPublicKey == "" {
 		return errors.New("No uaa_verification_key specified")
 	}
 

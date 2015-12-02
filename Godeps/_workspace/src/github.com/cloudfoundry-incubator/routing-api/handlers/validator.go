@@ -8,6 +8,7 @@ import (
 
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/helpers"
 )
 
 //go:generate counterfeiter -o fakes/fake_validator.go . RouteValidator
@@ -15,7 +16,8 @@ type RouteValidator interface {
 	ValidateCreate(routes []db.Route, maxTTL int) *routing_api.Error
 	ValidateDelete(routes []db.Route) *routing_api.Error
 
-	ValidateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
+	ValidateCreateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
+	ValidateDeleteTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
 }
 
 type Validator struct{}
@@ -130,7 +132,22 @@ func validateUrl(urlToValidate string) error {
 	return nil
 }
 
-func (v Validator) ValidateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
+func (v Validator) ValidateCreateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
+	for _, tcpRouteMapping := range tcpRouteMappings {
+		err := validateTcpRouteMapping(tcpRouteMapping)
+		if err != nil {
+			return err
+		}
+		if tcpRouteMapping.TcpRoute.RouterGroupGuid != helpers.DefaultRouterGroupGuid {
+			err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError,
+				"router_group_guid: "+tcpRouteMapping.TcpRoute.RouterGroupGuid+" not found")
+			return &err
+		}
+	}
+	return nil
+}
+
+func (v Validator) ValidateDeleteTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
 	for _, tcpRouteMapping := range tcpRouteMappings {
 		err := validateTcpRouteMapping(tcpRouteMapping)
 		if err != nil {
@@ -140,25 +157,28 @@ func (v Validator) ValidateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping
 	return nil
 }
 
-func validateTcpRouteMapping(tcpRouteMappings db.TcpRouteMapping) *routing_api.Error {
-
-	if tcpRouteMappings.TcpRoute.RouterGroupGuid == "" {
-		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError, "Each tcp mapping requires a valid router group guid")
+func validateTcpRouteMapping(tcpRouteMapping db.TcpRouteMapping) *routing_api.Error {
+	if tcpRouteMapping.TcpRoute.RouterGroupGuid == "" {
+		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError,
+			"Each tcp mapping requires a non empty router group guid. RouteMapping=["+tcpRouteMapping.String()+"]")
 		return &err
 	}
 
-	if tcpRouteMappings.TcpRoute.ExternalPort <= 0 {
-		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError, "Each tcp mapping requires a positive external port")
+	if tcpRouteMapping.TcpRoute.ExternalPort <= 0 {
+		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError,
+			"Each tcp mapping requires a positive external port. RouteMapping=["+tcpRouteMapping.String()+"]")
 		return &err
 	}
 
-	if tcpRouteMappings.HostIP == "" {
-		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError, "Each tcp mapping requires a non empty host ip")
+	if tcpRouteMapping.HostIP == "" {
+		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError,
+			"Each tcp mapping requires a non empty backend ip. RouteMapping=["+tcpRouteMapping.String()+"]")
 		return &err
 	}
 
-	if tcpRouteMappings.HostPort <= 0 {
-		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError, "Each tcp mapping requires a positive host port")
+	if tcpRouteMapping.HostPort <= 0 {
+		err := routing_api.NewError(routing_api.TcpRouteMappingInvalidError,
+			"Each tcp mapping requires a positive backend port. RouteMapping=["+tcpRouteMapping.String()+"]")
 		return &err
 	}
 
