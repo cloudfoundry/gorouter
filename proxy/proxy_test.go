@@ -150,6 +150,25 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
+	It("responds to HTTP/1.1 with absolute-form request target", func() {
+		ln := registerHandler(r, "test.io", func(conn *test_util.HttpConn) {
+			conn.CheckLine("GET http://test.io/ HTTP/1.1")
+
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+		})
+		defer ln.Close()
+
+		conn := dialProxy(proxyServer)
+
+		conn.WriteLines([]string{
+			"GET http://test.io/ HTTP/1.1",
+			"Host: test.io",
+		})
+
+		resp, _ := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	})
+
 	It("does not respond to unsupported HTTP versions", func() {
 		conn := dialProxy(proxyServer)
 
