@@ -48,6 +48,16 @@ var _ = Describe("AccessLog", func() {
 
 	})
 
+	It("creates an AccessLogger if access_log_syslog is enabled", func() {
+		config := config.DefaultConfig()
+		config.Logging.LoggregatorEnabled = true
+		config.AccessLogSyslog.Enabled = true
+
+		accessLogger, _ := CreateRunningAccessLogger(config)
+		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).Logger()).ToNot(BeNil())
+
+	})
+
 	It("reports an error if the access log location is invalid", func() {
 		config := config.DefaultConfig()
 		config.AccessLog = "/this\\is/illegal"
