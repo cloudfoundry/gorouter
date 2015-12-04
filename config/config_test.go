@@ -477,7 +477,7 @@ ssl_key_path: ../test/assets/private.pem
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`
 endpoint_timeout: 10
-route_service_timeout: 10
+route_services_timeout: 10
 drain_timeout: 15
 `)
 

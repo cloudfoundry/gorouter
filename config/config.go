@@ -92,7 +92,7 @@ type Config struct {
 	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
 	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
 	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
-	RouteServiceTimeoutInSeconds         int `yaml:"route_service_timeout"`
+	RouteServiceTimeoutInSeconds         int `yaml:"route_services_timeout"`
 
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
