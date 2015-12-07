@@ -65,14 +65,16 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type AccessLogSyslogConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Syslog  string `yaml:"syslog"`
-	Level   string `yaml:"level"`
+	Enabled     bool   `yaml:"enabled"`
+	Syslog      string `yaml:"syslog"`
+	Level       string `yaml:"level"`
+	AppIdFilter string `yaml:"app_id_filter"`
 }
 
 var defaultAccessLogSyslogConfig = AccessLogSyslogConfig{
-	Enabled: false,
-	Level:   "debug",
+	Enabled:     false,
+	Level:       "debug",
+	AppIdFilter: "all",
 }
 
 type Config struct {

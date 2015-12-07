@@ -123,6 +123,7 @@ enable_ssl: true
 			Expect(config.AccessLogSyslog.Enabled).To(Equal(false))
 			Expect(config.AccessLogSyslog.Syslog).To(Equal(""))
 			Expect(config.AccessLogSyslog.Level).To(Equal("debug"))
+			Expect(config.AccessLogSyslog.AppIdFilter).To(Equal("all"))
 		})
 
 		It("sets the access_log_syslog config", func() {
@@ -131,6 +132,7 @@ access_log_syslog:
   enabled: true
   syslog: vcap.gorouter.access_log
   level: warn
+  app_id_filter: empty
 `)
 
 			config.Initialize(b)
@@ -138,6 +140,7 @@ access_log_syslog:
 			Expect(config.AccessLogSyslog.Enabled).To(Equal(true))
 			Expect(config.AccessLogSyslog.Syslog).To(Equal("vcap.gorouter.access_log"))
 			Expect(config.AccessLogSyslog.Level).To(Equal("warn"))
+			Expect(config.AccessLogSyslog.AppIdFilter).To(Equal("empty"))
 		})
 
 		It("sets the Routing Api config", func() {
@@ -202,7 +205,7 @@ ssl_skip_validation: true
 
 		It("sets the route service secret config", func() {
 			var b = []byte(`
-route_services_secret: super-route-service-secret 
+route_services_secret: super-route-service-secret
 `)
 			config.Initialize(b)
 			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))

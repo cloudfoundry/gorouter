@@ -122,3 +122,9 @@ func (r *AccessLogRecord) ExtraHeaders() string {
 
 	return strings.Join(extraHeaders, "")
 }
+
+func (r *AccessLogRecord) String() string {
+	b := new(bytes.Buffer)
+	r.WriteTo(b)
+	return b.String()
+}

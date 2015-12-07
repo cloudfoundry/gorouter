@@ -27,7 +27,7 @@ var _ = Describe("AccessLog", func() {
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42", nil)
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42", nil, ALL)
 			go accessLogger.Run()
 
 			accessLogger.Log(*CreateAccessLogRecord())
@@ -47,7 +47,7 @@ var _ = Describe("AccessLog", func() {
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43", nil)
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43", nil, ALL)
 
 			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
 
@@ -64,47 +64,73 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	Context("with a logger instance", func() {
-		It("a record with app id is not logged to logger", func() {
+		var b *SyncBuffer
+		var logger *log.Logger
+		var record *AccessLogRecord
 
-			b := new(SyncBuffer)
-			var logger = log.New(b, "", 0)
+		BeforeEach(func() {
+			b = new(SyncBuffer)
+			logger = log.New(b, "", 0)
+			record = CreateAccessLogRecord()
+		})
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger)
+		It("a record with app id is not logged to logger with empty filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, EMPTY)
 			go accessLogger.Run()
-
-			record := CreateAccessLogRecord()
 			accessLogger.Log(*record)
-
 			Consistently(b.String()).Should(Equal(""))
-
 			accessLogger.Stop()
 		})
 
-		It("a record with no app id is logged to logger", func() {
-
-			b := new(SyncBuffer)
-			var logger = log.New(b, "", 0)
-
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger)
+		It("a record with no app id is logged to logger with empty filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, EMPTY)
 			go accessLogger.Run()
-
-			record := CreateAccessLogRecord()
-			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
-			record.RouteEndpoint = routeEndpoint
+			record.RouteEndpoint = route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
 			accessLogger.Log(*record)
-
-			Eventually(func() string { return b.String() }).Should(Equal(toString(*record)))
-
+			Eventually(func() string { return b.String() }).Should(Equal(record.String()))
 			accessLogger.Stop()
 		})
 
+		It("a record with app id is logged to logger with non_empty filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, NON_EMPTY)
+			go accessLogger.Run()
+			accessLogger.Log(*record)
+			Eventually(func() string { return b.String() }).Should(Equal(record.String()))
+			accessLogger.Stop()
+		})
+
+		It("a record with no app id is not logged to logger with non_empty filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, NON_EMPTY)
+			go accessLogger.Run()
+			record.RouteEndpoint = route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
+			accessLogger.Log(*record)
+			Consistently(b.String()).Should(Equal(""))
+			accessLogger.Stop()
+		})
+
+		It("a record with app id is logged to logger with all filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, ALL)
+			go accessLogger.Run()
+			accessLogger.Log(*record)
+			Eventually(func() string { return b.String() }).Should(Equal(record.String()))
+			accessLogger.Stop()
+		})
+
+		It("a record with no app id is logged to logger with all filter", func() {
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger, ALL)
+			go accessLogger.Run()
+			record.RouteEndpoint = route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
+			accessLogger.Log(*record)
+			Eventually(func() string { return b.String() }).Should(Equal(record.String()))
+			accessLogger.Stop()
+		})
 	})
 
 	Context("with a file", func() {
 		It("writes to the log file", func() {
 			var fakeFile = new(test_util.FakeFile)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "", nil)
+			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "", nil, ALL)
 			go accessLogger.Run()
 			accessLogger.Log(*CreateAccessLogRecord())
 
@@ -173,12 +199,6 @@ type nullWriter struct{}
 
 func (n nullWriter) Write(b []byte) (int, error) {
 	return len(b), nil
-}
-
-func toString(record AccessLogRecord) string {
-	b := new(bytes.Buffer)
-	record.WriteTo(b)
-	return b.String()
 }
 
 type SyncBuffer struct {

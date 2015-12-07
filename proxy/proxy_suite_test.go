@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var (
@@ -61,7 +61,7 @@ var _ = JustBeforeEach(func() {
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 
 	accessLogFile = new(test_util.FakeFile)
-	accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "", nil)
+	accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "", nil, access_log.ALL)
 	go accessLog.Run()
 
 	conf.EnableSSL = true

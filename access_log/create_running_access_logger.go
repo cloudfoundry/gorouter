@@ -46,7 +46,7 @@ func CreateRunningAccessLogger(config *config.Config) (AccessLogger, error) {
 		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
 	}
 
-	accessLogger := NewFileAndLoggregatorAccessLogger(file, dropsondeSourceInstance, syslogLogger)
+	accessLogger := NewFileAndLoggregatorAccessLogger(file, dropsondeSourceInstance, syslogLogger, AppIdFilter(config.AccessLogSyslog.AppIdFilter))
 	go accessLogger.Run()
 	return accessLogger, nil
 }

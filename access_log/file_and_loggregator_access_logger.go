@@ -1,12 +1,19 @@
 package access_log
 
 import (
-	"bytes"
 	"io"
 	"log"
 	"regexp"
 
 	"github.com/cloudfoundry/dropsonde/logs"
+)
+
+type AppIdFilter string
+
+const (
+	EMPTY     AppIdFilter = "empty"
+	NON_EMPTY AppIdFilter = "non_empty"
+	ALL       AppIdFilter = "all"
 )
 
 type FileAndLoggregatorAccessLogger struct {
@@ -15,13 +22,15 @@ type FileAndLoggregatorAccessLogger struct {
 	stopCh                  chan struct{}
 	writer                  io.Writer
 	logger                  *log.Logger
+	loggerAppIdFilter       AppIdFilter
 }
 
-func NewFileAndLoggregatorAccessLogger(f io.Writer, dropsondeSourceInstance string, logger *log.Logger) *FileAndLoggregatorAccessLogger {
+func NewFileAndLoggregatorAccessLogger(f io.Writer, dropsondeSourceInstance string, logger *log.Logger, loggerAppIdFilter AppIdFilter) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
 		writer:                  f,
 		logger:                  logger,
+		loggerAppIdFilter:       loggerAppIdFilter,
 		channel:                 make(chan AccessLogRecord, 128),
 		stopCh:                  make(chan struct{}),
 	}
@@ -40,8 +49,8 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 			if x.dropsondeSourceInstance != "" && record.ApplicationId() != "" {
 				logs.SendAppLog(record.ApplicationId(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
 			}
-			if x.logger != nil && record.ApplicationId() == "" {
-				x.logger.Print(toString(record))
+			if x.logger != nil && matchesAppIdFilter(x.loggerAppIdFilter, record.ApplicationId()) {
+				x.logger.Print(&record)
 			}
 		case <-x.stopCh:
 			return
@@ -49,10 +58,8 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 	}
 }
 
-func toString(record AccessLogRecord) string {
-	b := new(bytes.Buffer)
-	record.WriteTo(b)
-	return b.String()
+func matchesAppIdFilter(appIdFilter AppIdFilter, s string) bool {
+	return (s == "" && appIdFilter == EMPTY) || (s != "" && appIdFilter == NON_EMPTY) || (appIdFilter == ALL)
 }
 
 func (x *FileAndLoggregatorAccessLogger) FileWriter() io.Writer {
