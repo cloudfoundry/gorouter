@@ -415,7 +415,7 @@ func (r *Router) HandleConnState(conn net.Conn, state http.ConnState) {
 		r.activeConns[conn] = struct{}{}
 		delete(r.idleConns, conn)
 
-		conn.SetDeadline(time.Time{})
+		conn.SetDeadline(noDeadline)
 	case http.StateIdle:
 		delete(r.activeConns, conn)
 		r.idleConns[conn] = struct{}{}

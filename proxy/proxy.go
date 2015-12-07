@@ -9,16 +9,17 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/common/secure"
+	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/route_service"
 	steno "github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/gorouter/metrics"
 )
 
 const (
@@ -143,7 +144,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	handler := NewRequestHandler(request, proxyWriter, p.reporter, &accessLog)
 
 	defer func() {
-		accessLog.RequestBytesReceived = requestBodyCounter.count
+		accessLog.RequestBytesReceived = requestBodyCounter.GetCount()
 		p.accessLogger.Log(accessLog)
 	}()
 
@@ -416,13 +417,17 @@ func setTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 
 type countingReadCloser struct {
 	delegate io.ReadCloser
-	count    int
+	count    uint32
 }
 
 func (crc *countingReadCloser) Read(b []byte) (int, error) {
 	n, err := crc.delegate.Read(b)
-	crc.count += n
+	atomic.AddUint32(&crc.count, uint32(n))
 	return n, err
+}
+
+func (crc *countingReadCloser) GetCount() int {
+	return int(atomic.LoadUint32(&crc.count))
 }
 
 func (crc *countingReadCloser) Close() error {

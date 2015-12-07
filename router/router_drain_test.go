@@ -1,13 +1,14 @@
 package router_test
 
 import (
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
-
-	"errors"
 
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -105,6 +106,65 @@ var _ = Describe("Router", func() {
 		return signals, closeChannel
 	}
 
+	testRouterDrain := func(config *cfg.Config, mbusClient yagnats.NATSConn, registry *rregistry.RouteRegistry, initiateDrain func()) {
+		app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+		blocker := make(chan bool)
+		resultCh := make(chan bool, 2)
+		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+			blocker <- true
+
+			_, err := ioutil.ReadAll(r.Body)
+			defer r.Body.Close()
+			Expect(err).ToNot(HaveOccurred())
+
+			<-blocker
+
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		app.Listen()
+
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
+
+		drainTimeout := 1 * time.Second
+
+		go func() {
+			defer GinkgoRecover()
+			req, err := http.NewRequest("GET", app.Endpoint(), nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			client := http.Client{}
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			defer resp.Body.Close()
+			_, err = ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			resultCh <- false
+		}()
+
+		<-blocker
+
+		go initiateDrain()
+
+		Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
+
+		blocker <- false
+
+		var result bool
+		Eventually(resultCh).Should(Receive(&result))
+		Expect(result).To(BeFalse())
+
+		req, err := http.NewRequest("GET", app.Endpoint(), nil)
+		Expect(err).ToNot(HaveOccurred())
+
+		client := http.Client{}
+		_, err = client.Do(req)
+		Expect(err).To(HaveOccurred())
+	}
+
 	BeforeEach(func() {
 		natsPort = test_util.NextAvailPort()
 		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
@@ -113,7 +173,16 @@ var _ = Describe("Router", func() {
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
 
+		sslPort := test_util.NextAvailPort()
+
+		cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+		Expect(err).ToNot(HaveOccurred())
+
 		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
+		config.EnableSSL = true
+		config.SSLPort = sslPort
+		config.SSLCertificate = cert
+		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus
@@ -130,7 +199,6 @@ var _ = Describe("Router", func() {
 		})
 
 		errChan := make(chan error, 2)
-		var err error
 		router, err = NewRouter(config, proxy, mbusClient, registry, varz, logcounter, errChan)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -252,6 +320,71 @@ var _ = Describe("Router", func() {
 			Eventually(resultCh).Should(Receive(&result))
 			Expect(result).To(Equal(DrainTimeout))
 		})
+
+		Context("with http and https servers", func() {
+			It("it drains and stops the router", func() {
+				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+				blocker := make(chan bool)
+				resultCh := make(chan bool, 2)
+				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+					blocker <- true
+
+					_, err := ioutil.ReadAll(r.Body)
+					defer r.Body.Close()
+					Expect(err).ToNot(HaveOccurred())
+
+					<-blocker
+
+					w.WriteHeader(http.StatusNoContent)
+				})
+
+				app.Listen()
+
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				drainTimeout := 1 * time.Second
+
+				go func() {
+					defer GinkgoRecover()
+					httpsUrl := fmt.Sprintf("https://%s:%d", app.Urls()[0], config.SSLPort)
+					req, err := http.NewRequest("GET", httpsUrl, nil)
+					Expect(err).NotTo(HaveOccurred())
+
+					client := http.Client{
+						Transport: &http.Transport{
+							TLSClientConfig: &tls.Config{
+								InsecureSkipVerify: true,
+							},
+						},
+					}
+					resp, err := client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp).ToNot(BeNil())
+					defer resp.Body.Close()
+					_, err = ioutil.ReadAll(resp.Body)
+					Expect(err).ToNot(HaveOccurred())
+					resultCh <- false
+				}()
+
+				<-blocker
+				go func() {
+					defer GinkgoRecover()
+					err := router.Drain(drainTimeout)
+					Expect(err).ToNot(HaveOccurred())
+					resultCh <- true
+				}()
+
+				Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
+
+				blocker <- false
+
+				var result bool
+				Eventually(resultCh).Should(Receive(&result))
+				Expect(result).To(BeTrue())
+			})
+		})
 	})
 
 	Context("OnErrOrSignal", func() {
@@ -277,64 +410,9 @@ var _ = Describe("Router", func() {
 			})
 
 			It("it drains existing connections and stops the router", func() {
-				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
-				blocker := make(chan bool)
-				resultCh := make(chan bool, 2)
-				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-					blocker <- true
-
-					_, err := ioutil.ReadAll(r.Body)
-					defer r.Body.Close()
-					Expect(err).ToNot(HaveOccurred())
-
-					<-blocker
-
-					w.WriteHeader(http.StatusNoContent)
+				testRouterDrain(config, mbusClient, registry, func() {
+					errChan <- errors.New("Initiate drain error")
 				})
-
-				app.Listen()
-
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				drainTimeout := 1 * time.Second
-
-				go func() {
-					defer GinkgoRecover()
-					req, err := http.NewRequest("GET", app.Endpoint(), nil)
-					Expect(err).ToNot(HaveOccurred())
-
-					client := http.Client{}
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
-					defer resp.Body.Close()
-					_, err = ioutil.ReadAll(resp.Body)
-					Expect(err).ToNot(HaveOccurred())
-					resultCh <- false
-				}()
-
-				<-blocker
-
-				go func() {
-					errChan <- errors.New("Fake error")
-				}()
-
-				Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
-
-				blocker <- false
-
-				var result bool
-				Eventually(resultCh).Should(Receive(&result))
-				Expect(result).To(BeFalse())
-
-				req, err := http.NewRequest("GET", app.Endpoint(), nil)
-				Expect(err).ToNot(HaveOccurred())
-
-				client := http.Client{}
-				_, err = client.Do(req)
-				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -348,57 +426,9 @@ var _ = Describe("Router", func() {
 			})
 
 			It("it drains and stops the router", func() {
-				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
-				blocker := make(chan bool)
-				resultCh := make(chan bool, 2)
-				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-					blocker <- true
-
-					_, err := ioutil.ReadAll(r.Body)
-					defer r.Body.Close()
-					Expect(err).ToNot(HaveOccurred())
-
-					<-blocker
-
-					w.WriteHeader(http.StatusNoContent)
-				})
-
-				app.Listen()
-
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				drainTimeout := 1 * time.Second
-
-				go func() {
-					defer GinkgoRecover()
-					req, err := http.NewRequest("GET", app.Endpoint(), nil)
-					Expect(err).ToNot(HaveOccurred())
-
-					client := http.Client{}
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
-					defer resp.Body.Close()
-					_, err = ioutil.ReadAll(resp.Body)
-					Expect(err).ToNot(HaveOccurred())
-					resultCh <- false
-				}()
-
-				<-blocker
-
-				go func() {
+				testRouterDrain(config, mbusClient, registry, func() {
 					signals <- syscall.SIGUSR1
-				}()
-
-				Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
-
-				blocker <- false
-
-				var result bool
-				Eventually(resultCh).Should(Receive(&result))
-				Expect(result).To(BeFalse())
+				})
 			})
 		})
 
@@ -417,60 +447,20 @@ var _ = Describe("Router", func() {
 		})
 
 		Context("when USR1 is the first of multiple signals sent", func() {
+			var (
+				signals chan os.Signal
+			)
+
+			BeforeEach(func() {
+				signals, _ = runRouter(router)
+			})
+
 			It("it drains and stops the router", func() {
-				signals, _ := runRouter(router)
-				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
-				blocker := make(chan bool)
-				resultCh := make(chan bool, 2)
-				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-					blocker <- true
-
-					_, err := ioutil.ReadAll(r.Body)
-					defer r.Body.Close()
-					Expect(err).ToNot(HaveOccurred())
-
-					<-blocker
-
-					w.WriteHeader(http.StatusNoContent)
-				})
-
-				app.Listen()
-
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				drainTimeout := 1 * time.Second
-
-				go func() {
-					defer GinkgoRecover()
-					req, err := http.NewRequest("GET", app.Endpoint(), nil)
-					Expect(err).ToNot(HaveOccurred())
-
-					client := http.Client{}
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
-					defer resp.Body.Close()
-					_, err = ioutil.ReadAll(resp.Body)
-					Expect(err).ToNot(HaveOccurred())
-					resultCh <- false
-				}()
-
-				<-blocker
-
-				go func() {
+				testRouterDrain(config, mbusClient, registry, func() {
+					signals <- syscall.SIGUSR1
 					signals <- syscall.SIGUSR1
 					signals <- syscall.SIGTERM
-				}()
-
-				Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
-
-				blocker <- false
-
-				var result bool
-				Eventually(resultCh).Should(Receive(&result))
-				Expect(result).To(BeFalse())
+				})
 			})
 		})
 
@@ -488,5 +478,4 @@ var _ = Describe("Router", func() {
 			})
 		})
 	})
-
 })
