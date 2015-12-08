@@ -34,6 +34,9 @@ type MetricBatcher interface {
 
 // Initialize prepares the metrics package for use with the automatic Emitter.
 func Initialize(ms metric_sender.MetricSender, mb MetricBatcher) {
+	if metricBatcher != nil {
+		metricBatcher.Close()
+	}
 	metricSender = ms
 	metricBatcher = mb
 }

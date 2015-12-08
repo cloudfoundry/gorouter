@@ -73,6 +73,19 @@ func NewHttpStartStop(req *http.Request, statusCode int, contentLength int64, pe
 		StatusCode:     proto.Int(statusCode),
 		ContentLength:  proto.Int64(contentLength),
 	}
+
+	if applicationId, err := uuid.ParseHex(req.Header.Get("X-CF-ApplicationID")); err == nil {
+		httpStartStop.ApplicationId = NewUUID(applicationId)
+	}
+
+	if instanceIndex, err := strconv.Atoi(req.Header.Get("X-CF-InstanceIndex")); err == nil {
+		httpStartStop.InstanceIndex = proto.Int(instanceIndex)
+	}
+
+	if instanceId := req.Header.Get("X-CF-InstanceID"); instanceId != "" {
+		httpStartStop.InstanceId = &instanceId
+	}
+
 	return httpStartStop
 }
 
