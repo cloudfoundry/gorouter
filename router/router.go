@@ -195,15 +195,17 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 }
 
 func (r *Router) DrainAndStop() {
+	drainWait := r.config.DrainWait
 	drainTimeout := r.config.DrainTimeout
 	r.logger.Info(
 		"gorouter.draining",
 		lager.Data{
+			"wait":    (drainWait).String(),
 			"timeout": (drainTimeout).String(),
 		},
 	)
 
-	r.Drain(drainTimeout)
+	r.Drain(drainWait, drainTimeout)
 
 	r.Stop()
 }
@@ -260,7 +262,11 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 	return nil
 }
 
-func (r *Router) Drain(drainTimeout time.Duration) error {
+func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
+	r.proxy.Drain()
+
+	<-time.After(drainWait)
+
 	r.stopListening()
 
 	drained := make(chan struct{})

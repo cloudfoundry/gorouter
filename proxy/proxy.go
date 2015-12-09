@@ -38,6 +38,8 @@ type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error
 
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
+	// Drain signals Proxy that the gorouter is about to shutdown
+	Drain()
 }
 
 type ProxyArgs struct {
@@ -66,6 +68,7 @@ type proxy struct {
 	accessLogger       access_log.AccessLogger
 	transport          *http.Transport
 	secureCookies      bool
+	heartbeatOK        int32
 	routeServiceConfig *route_service.RouteServiceConfig
 	ExtraHeadersToLog  []string
 }
@@ -96,6 +99,7 @@ func NewProxy(args ProxyArgs) Proxy {
 			TLSClientConfig:    args.TLSConfig,
 		},
 		secureCookies:      args.SecureCookies,
+		heartbeatOK:        1, // 1->true, 0->false
 		routeServiceConfig: routeServiceConfig,
 		ExtraHeadersToLog:  args.ExtraHeadersToLog,
 	}
@@ -137,6 +141,11 @@ func (p *proxy) lookup(request *http.Request) *route.Pool {
 	return p.registry.Lookup(uri)
 }
 
+// Drain stops sending successful heartbeats back to the loadbalancer
+func (p *proxy) Drain() {
+	atomic.StoreInt32(&(p.heartbeatOK), 0)
+}
+
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
 	accessLog := access_log.AccessLogRecord{
@@ -162,7 +171,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	if isLoadBalancerHeartbeat(request) {
-		handler.HandleHeartbeat()
+		handler.HandleHeartbeat(atomic.LoadInt32(&p.heartbeatOK) != 0)
 		return
 	}
 

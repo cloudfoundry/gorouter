@@ -94,6 +94,7 @@ type Config struct {
 	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
 	RouteServiceTimeoutInSeconds         int `yaml:"route_services_timeout"`
 
+	DrainWaitInSeconds    int  `yaml:"drain_wait,omitempty"`
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
 
@@ -109,6 +110,7 @@ type Config struct {
 	StartResponseDelayInterval time.Duration `yaml:"-"`
 	EndpointTimeout            time.Duration `yaml:"-"`
 	RouteServiceTimeout        time.Duration `yaml:"-"`
+	DrainWait                  time.Duration `yaml:"-"`
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
 	RouteServiceEnabled        bool          `yaml:"-"`
@@ -177,11 +179,14 @@ func (c *Config) Process() {
 		c.logger.Info(fmt.Sprintf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval))
 	}
 
-	drain := c.DrainTimeoutInSeconds
-	if drain == 0 {
-		drain = c.EndpointTimeoutInSeconds
+	c.DrainTimeout = c.EndpointTimeout
+	if c.DrainTimeoutInSeconds > 0 {
+		c.DrainTimeout = time.Duration(c.DrainTimeoutInSeconds) * time.Second
 	}
-	c.DrainTimeout = time.Duration(drain) * time.Second
+
+	if c.DrainWaitInSeconds > 0 {
+		c.DrainWait = time.Duration(c.DrainWaitInSeconds) * time.Second
+	}
 
 	c.Ip, err = localip.LocalIP()
 	if err != nil {

@@ -53,12 +53,17 @@ func (h *RequestHandler) Logger() lager.Logger {
 	return h.logger
 }
 
-func (h *RequestHandler) HandleHeartbeat() {
+func (h *RequestHandler) HandleHeartbeat(ok bool) {
 	h.response.Header().Set("Cache-Control", "private, max-age=0")
 	h.response.Header().Set("Expires", "0")
-	h.logrecord.StatusCode = http.StatusOK
-	h.response.WriteHeader(http.StatusOK)
-	h.response.Write([]byte("ok\n"))
+	if ok {
+		h.logrecord.StatusCode = http.StatusOK
+		h.response.WriteHeader(http.StatusOK)
+		h.response.Write([]byte("ok\n"))
+	} else {
+		h.logrecord.StatusCode = http.StatusServiceUnavailable
+		h.response.WriteHeader(http.StatusServiceUnavailable)
+	}
 	h.request.Close = true
 }
 
