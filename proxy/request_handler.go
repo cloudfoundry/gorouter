@@ -13,9 +13,9 @@ import (
 	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
-"github.com/cloudfoundry/gorouter/metrics"
 )
 
 type RequestHandler struct {
@@ -55,12 +55,17 @@ func (h *RequestHandler) Logger() *steno.Logger {
 	return h.StenoLogger
 }
 
-func (h *RequestHandler) HandleHeartbeat() {
+func (h *RequestHandler) HandleHeartbeat(ok bool) {
 	h.response.Header().Set("Cache-Control", "private, max-age=0")
 	h.response.Header().Set("Expires", "0")
-	h.logrecord.StatusCode = http.StatusOK
-	h.response.WriteHeader(http.StatusOK)
-	h.response.Write([]byte("ok\n"))
+	if ok {
+		h.logrecord.StatusCode = http.StatusOK
+		h.response.WriteHeader(http.StatusOK)
+		h.response.Write([]byte("ok\n"))
+	} else {
+		h.logrecord.StatusCode = http.StatusServiceUnavailable
+		h.response.WriteHeader(http.StatusServiceUnavailable)
+	}
 	h.request.Close = true
 }
 
