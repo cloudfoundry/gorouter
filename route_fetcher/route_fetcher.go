@@ -86,12 +86,13 @@ func (r *RouteFetcher) subscribeToEvents() {
 			r.logger.Error(err.Error())
 			break
 		}
+
+		r.logger.Debugf("Handling event: %v", event)
 		r.HandleEvent(event)
 	}
 }
 
-func (r *RouteFetcher) HandleEvent(e routing_api.Event) error {
-	r.logger.Infof("Handling event: %v", e)
+func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
 	endpoint := route.NewEndpoint(eventRoute.LogGuid, eventRoute.IP, uint16(eventRoute.Port), eventRoute.LogGuid, nil, eventRoute.TTL, eventRoute.RouteServiceUrl)
@@ -101,9 +102,6 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) error {
 	case "Upsert":
 		r.RouteRegistry.Register(uri, endpoint)
 	}
-
-	r.logger.Infof("Successfully handled event: %v", e)
-	return nil
 }
 
 func (r *RouteFetcher) FetchRoutes() error {

@@ -258,6 +258,41 @@ var _ = Describe("RouteFetcher", func() {
 				Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
 			})
 
+			It("does not log unnecessary info", func() {
+				eventSource := fake_routing_api.FakeEventSource{}
+				client.SubscribeToEventsReturns(&eventSource, nil)
+
+				eventSource.NextStub = func() (routing_api.Event, error) {
+					event := routing_api.Event{
+						Action: "Delete",
+						Route: db.Route{
+							Route:           "z.a.k",
+							Port:            63,
+							IP:              "42.42.42.42",
+							TTL:             1,
+							LogGuid:         "Tomato",
+							RouteServiceUrl: "route-service-url",
+						}}
+					return event, nil
+				}
+
+				tokenFetcher.FetchTokenReturns(token, nil)
+				fetcher.StartEventCycle()
+
+				// Subscription to event stream
+				Eventually(func() int {
+					return len(sink.Records())
+				}).Should(BeNumerically("==", 1))
+
+				// No event logs
+				Consistently(func() int {
+					return len(sink.Records())
+				}).Should(BeNumerically("==", 1))
+
+				Expect(sink.Records()).ToNot(BeNil())
+				Expect(sink.Records()[0].Message).To(Equal("Successfully subscribed to event stream."))
+			})
+
 			It("responds to errors, and retries subscribing", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
