@@ -165,6 +165,7 @@ var _ = Describe("Session Affinity", func() {
 		})
 
 		Context("when the response contains a JESSIONID cookie", func() {
+
 			It("responds with a VCAP_ID cookie scoped to the session", func() {
 				ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
 				defer ln.Close()
@@ -187,9 +188,37 @@ var _ = Describe("Session Affinity", func() {
 				Expect(cookie.Expires).To(BeZero())
 			})
 
-			Context("with secure cookies enabled", func() {
+			Context("and JESSIONID cookie is set to Secure", func() {
+
+				BeforeEach(func() {
+					jSessionIdCookie.Secure = true
+				})
+
+				It("responds with a VCAP_ID cookie that is also Secure ", func() {
+					ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
+					defer ln.Close()
+
+					x := dialProxy(proxyServer)
+					req := test_util.NewRequest("GET", "app", "/", nil)
+					x.WriteRequest(req)
+
+					Eventually(done).Should(Receive())
+
+					resp, _ := x.ReadResponse()
+					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+					Expect(jsessionId).ToNot(BeNil())
+
+					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					Expect(cookie).ToNot(BeNil())
+					Expect(cookie.Value).To(Equal("my-id"))
+					Expect(cookie.Secure).To(BeTrue())
+				})
+			})
+
+			Context("with secure cookies enabled and non-secure cookie", func() {
 				BeforeEach(func() {
 					conf.SecureCookies = true
+					jSessionIdCookie.Secure = false
 				})
 
 				It("marks the cookie as secure only", func() {
