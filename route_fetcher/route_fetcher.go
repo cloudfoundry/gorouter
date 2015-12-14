@@ -56,24 +56,30 @@ func (r *RouteFetcher) StartFetchCycle() {
 
 func (r *RouteFetcher) StartEventCycle() {
 	go func() {
+		useCachedToken := true
 		for {
-			r.subscribeToEvents()
+			token, err := r.TokenFetcher.FetchToken(useCachedToken)
+			if err != nil {
+				r.logger.Error(err.Error())
+			} else {
+				err = r.subscribeToEvents(token)
+				if err != nil && err.Error() == "unauthorized" {
+					useCachedToken = false
+				} else {
+					useCachedToken = true
+				}
+			}
 			time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
 		}
 	}()
 }
 
-func (r *RouteFetcher) subscribeToEvents() {
-	token, err := r.TokenFetcher.FetchToken()
-	if err != nil {
-		r.logger.Error(err.Error())
-		return
-	}
+func (r *RouteFetcher) subscribeToEvents(token *token_fetcher.Token) error {
 	r.client.SetToken(token.AccessToken)
 	source, err := r.client.SubscribeToEvents()
 	if err != nil {
 		r.logger.Error(err.Error())
-		return
+		return err
 	}
 
 	r.logger.Info("Successfully subscribed to event stream.")
@@ -90,6 +96,7 @@ func (r *RouteFetcher) subscribeToEvents() {
 		r.logger.Debugf("Handling event: %v", event)
 		r.HandleEvent(event)
 	}
+	return err
 }
 
 func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
@@ -105,20 +112,32 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 }
 
 func (r *RouteFetcher) FetchRoutes() error {
-	token, err := r.TokenFetcher.FetchToken()
-	if err != nil {
-		return err
+	useCachedToken := true
+	var err error
+	var routes []db.Route
+	for count := 0; count < 2; count++ {
+		token, tokenErr := r.TokenFetcher.FetchToken(useCachedToken)
+		if tokenErr != nil {
+			return tokenErr
+		}
+		r.client.SetToken(token.AccessToken)
+		routes, err = r.client.Routes()
+		if err != nil {
+			if err.Error() == "unauthorized" {
+				useCachedToken = false
+			} else {
+				return err
+			}
+		} else {
+			break
+		}
 	}
-	r.client.SetToken(token.AccessToken)
 
-	routes, err := r.client.Routes()
-	if err != nil {
-		return err
+	if err == nil {
+		r.refreshEndpoints(routes)
 	}
 
-	r.refreshEndpoints(routes)
-
-	return nil
+	return err
 }
 
 func (r *RouteFetcher) refreshEndpoints(validRoutes []db.Route) {

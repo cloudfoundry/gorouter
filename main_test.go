@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
+	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
@@ -54,6 +55,12 @@ var _ = Describe("Router Integration", func() {
 		config.StartResponseDelayIntervalInSeconds = 1
 		config.EndpointTimeoutInSeconds = 5
 		config.DrainTimeoutInSeconds = 1
+		config.OAuth = token_fetcher.OAuthConfig{
+			TokenEndpoint: "http://uaa.bosh-lite.com",
+			ClientName:    "client-id",
+			ClientSecret:  "client-secret",
+			Port:          3000,
+		}
 	}
 
 	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {

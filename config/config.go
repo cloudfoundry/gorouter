@@ -112,8 +112,13 @@ type Config struct {
 	DrainTimeout               time.Duration `yaml:"-"`
 	Ip                         string        `yaml:"-"`
 	RouteServiceEnabled        bool          `yaml:"-"`
+	TokenFetcherRetryInterval  time.Duration `yaml:"-"`
 
 	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
+
+	TokenFetcherMaxRetries                    uint32 `yaml:"token_fetcher_max_retries"`
+	TokenFetcherRetryIntervalInSeconds        int    `yaml:"token_fetcher_retry_interval"`
+	TokenFetcherExpirationBufferTimeInSeconds int64  `yaml:"token_fetcher_expiration_buffer_time"`
 }
 
 var defaultConfig = Config{
@@ -130,11 +135,14 @@ var defaultConfig = Config{
 	EndpointTimeoutInSeconds:     60,
 	RouteServiceTimeoutInSeconds: 60,
 
-	PublishStartMessageIntervalInSeconds: 30,
-	PruneStaleDropletsIntervalInSeconds:  30,
-	DropletStaleThresholdInSeconds:       120,
-	PublishActiveAppsIntervalInSeconds:   0,
-	StartResponseDelayIntervalInSeconds:  5,
+	PublishStartMessageIntervalInSeconds:      30,
+	PruneStaleDropletsIntervalInSeconds:       30,
+	DropletStaleThresholdInSeconds:            120,
+	PublishActiveAppsIntervalInSeconds:        0,
+	StartResponseDelayIntervalInSeconds:       5,
+	TokenFetcherMaxRetries:                    3,
+	TokenFetcherRetryIntervalInSeconds:        5,
+	TokenFetcherExpirationBufferTimeInSeconds: 30,
 }
 
 func DefaultConfig() *Config {
@@ -158,6 +166,7 @@ func (c *Config) Process() {
 	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
 	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
 	c.RouteServiceTimeout = time.Duration(c.RouteServiceTimeoutInSeconds) * time.Second
+	c.TokenFetcherRetryInterval = time.Duration(c.TokenFetcherRetryIntervalInSeconds) * time.Second
 	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval

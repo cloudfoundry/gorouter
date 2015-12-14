@@ -3,10 +3,10 @@ package token_fetcher
 type NoOpTokenFetcher struct {
 }
 
-func NewNoOpTokenFetcher() *NoOpTokenFetcher {
+func NewNoOpTokenFetcher() TokenFetcher {
 	return &NoOpTokenFetcher{}
 }
 
-func (f *NoOpTokenFetcher) FetchToken() (*Token, error) {
+func (f *NoOpTokenFetcher) FetchToken(useCachedToken bool) (*Token, error) {
 	return &Token{}, nil
 }
