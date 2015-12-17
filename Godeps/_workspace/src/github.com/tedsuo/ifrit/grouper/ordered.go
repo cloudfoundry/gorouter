@@ -120,18 +120,24 @@ func (g *orderedGroup) stop(signal os.Signal, signals <-chan os.Signal, errTrace
 		}
 		if p, ok := g.pool[m.Name]; ok {
 			p.Signal(signal)
-
-			select {
-			case err := <-p.Wait():
-				errTrace = append(errTrace, ExitEvent{
-					Member: m,
-					Err:    err,
-				})
-				if err != nil {
-					errOccurred = true
+		Exited:
+			for {
+				select {
+				case err := <-p.Wait():
+					errTrace = append(errTrace, ExitEvent{
+						Member: m,
+						Err:    err,
+					})
+					if err != nil {
+						errOccurred = true
+					}
+					break Exited
+				case sig := <-signals:
+					if sig != signal {
+						signal = sig
+						p.Signal(signal)
+					}
 				}
-			case signal := <-signals:
-				p.Signal(signal)
 			}
 		}
 	}

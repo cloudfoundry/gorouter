@@ -1,4 +1,9 @@
-{	
+{
+	"ImportPath": "github.com/cloudfoundry/gorouter",
+	"GoVersion": "go1.4.3",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/apcera/nats",
@@ -113,7 +118,7 @@
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",
-			"Rev": "65ca48cd8a947d0e80efa4bda726f0363352e5f9"
+			"Rev": "0daf3797556d0e6938e85b04815dc7e5744b9e2d"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/rata",
@@ -127,10 +132,5 @@
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
 			"Rev": "c8b9e6388ef638d5a8a9d865c634befdc46a6784"
 		}
-	],
-	"GoVersion": "go1.4.3",
-	"ImportPath": "github.com/cloudfoundry/gorouter",
-	"Packages": [
-		"./..."
 	]
 }
