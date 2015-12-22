@@ -155,11 +155,30 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		Context("when the routing api returns an error", func() {
-			It("returns an error", func() {
-				client.RoutesReturns(nil, errors.New("Oops!"))
+			Context("error is not unauthorized error", func() {
+				It("returns an error", func() {
+					client.RoutesReturns(nil, errors.New("Oops!"))
 
-				err := fetcher.FetchRoutes()
-				Expect(err).To(HaveOccurred())
+					err := fetcher.FetchRoutes()
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(Equal("Oops!"))
+					Expect(tokenFetcher.FetchTokenCallCount()).To(Equal(1))
+					Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
+				})
+			})
+
+			Context("error is unauthorized error", func() {
+				It("returns an error", func() {
+					client.RoutesReturns(nil, errors.New("unauthorized"))
+
+					err := fetcher.FetchRoutes()
+					Expect(tokenFetcher.FetchTokenCallCount()).To(Equal(2))
+					Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
+					Expect(tokenFetcher.FetchTokenArgsForCall(1)).To(BeFalse())
+					Expect(client.RoutesCallCount()).To(Equal(2))
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(Equal("unauthorized"))
+				})
 			})
 		})
 
@@ -171,6 +190,7 @@ var _ = Describe("RouteFetcher", func() {
 			It("returns an error", func() {
 				err := fetcher.FetchRoutes()
 				Expect(err).To(HaveOccurred())
+				Expect(tokenFetcher.FetchTokenCallCount()).To(Equal(1))
 				Expect(registry.RegisterCallCount()).To(Equal(0))
 			})
 		})
@@ -216,7 +236,7 @@ var _ = Describe("RouteFetcher", func() {
 	Describe(".StartEventCycle", func() {
 		Context("when fetching the auth token fails", func() {
 			It("logs the failure and tries again", func() {
-				tokenFetcher.FetchTokenStub = func() (*token_fetcher.Token, error) {
+				tokenFetcher.FetchTokenStub = func(useCachedToken bool) (*token_fetcher.Token, error) {
 					return nil, errors.New("failed to get the token")
 				}
 				fetcher.StartEventCycle()
@@ -258,6 +278,41 @@ var _ = Describe("RouteFetcher", func() {
 				Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
 			})
 
+			It("does not log unnecessary info", func() {
+				eventSource := fake_routing_api.FakeEventSource{}
+				client.SubscribeToEventsReturns(&eventSource, nil)
+
+				eventSource.NextStub = func() (routing_api.Event, error) {
+					event := routing_api.Event{
+						Action: "Delete",
+						Route: db.Route{
+							Route:           "z.a.k",
+							Port:            63,
+							IP:              "42.42.42.42",
+							TTL:             1,
+							LogGuid:         "Tomato",
+							RouteServiceUrl: "route-service-url",
+						}}
+					return event, nil
+				}
+
+				tokenFetcher.FetchTokenReturns(token, nil)
+				fetcher.StartEventCycle()
+
+				// Subscription to event stream
+				Eventually(func() int {
+					return len(sink.Records())
+				}).Should(BeNumerically("==", 1))
+
+				// No event logs
+				Consistently(func() int {
+					return len(sink.Records())
+				}).Should(BeNumerically("==", 1))
+
+				Expect(sink.Records()).ToNot(BeNil())
+				Expect(sink.Records()[0].Message).To(Equal("Successfully subscribed to event stream."))
+			})
+
 			It("responds to errors, and retries subscribing", func() {
 				eventSource := fake_routing_api.FakeEventSource{}
 				client.SubscribeToEventsReturns(&eventSource, nil)
@@ -282,22 +337,47 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		Context("and the event source fails to subscribe", func() {
-			It("logs the error and tries again", func() {
-				client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
-					err := errors.New("i failed to subscribe")
-					return &fake_routing_api.FakeEventSource{}, err
-				}
-
-				tokenFetcher.FetchTokenReturns(token, nil)
-				fetcher.StartEventCycle()
-
-				Eventually(func() string {
-					if len(sink.Records()) > 0 {
-						return sink.Records()[0].Message
-					} else {
-						return ""
+			Context("with error other than unauthorized", func() {
+				It("logs the error and tries again with cached access token", func() {
+					client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
+						err := errors.New("i failed to subscribe")
+						return &fake_routing_api.FakeEventSource{}, err
 					}
-				}).Should(Equal("i failed to subscribe"))
+
+					tokenFetcher.FetchTokenReturns(token, nil)
+					fetcher.StartEventCycle()
+
+					Eventually(func() string {
+						if len(sink.Records()) > 0 {
+							return sink.Records()[0].Message
+						} else {
+							return ""
+						}
+					}).Should(Equal("i failed to subscribe"))
+				})
+			})
+
+			Context("with unauthorized error", func() {
+				It("logs the error and tries again by not using cached access token", func() {
+					client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
+						err := errors.New("unauthorized")
+						return &fake_routing_api.FakeEventSource{}, err
+					}
+
+					tokenFetcher.FetchTokenReturns(token, nil)
+					fetcher.StartEventCycle()
+
+					Eventually(func() string {
+						if len(sink.Records()) > 0 {
+							return sink.Records()[0].Message
+						} else {
+							return ""
+						}
+					}).Should(Equal("unauthorized"))
+					Eventually(tokenFetcher.FetchTokenCallCount()).Should(BeNumerically(">", 2))
+					Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
+					Expect(tokenFetcher.FetchTokenArgsForCall(1)).To(BeFalse())
+				})
 			})
 		})
 	})

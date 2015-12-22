@@ -342,7 +342,7 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 	originalEndpointId string,
 	secureCookies bool,
 	path string) {
-
+	secure := false
 	maxAge := 0
 
 	// did the endpoint change?
@@ -354,18 +354,25 @@ func setupStickySession(responseWriter http.ResponseWriter, response *http.Respo
 			if v.MaxAge < 0 {
 				maxAge = v.MaxAge
 			}
+			secure = v.Secure
 			break
 		}
 	}
 
 	if sticky {
+		// right now secure attribute would as equal to the JSESSION ID cookie (if present),
+		// but override if set to true in config
+		if secureCookies {
+			secure = true
+		}
+
 		cookie := &http.Cookie{
 			Name:     VcapCookieId,
 			Value:    endpoint.PrivateInstanceId,
 			Path:     path,
 			MaxAge:   maxAge,
 			HttpOnly: true,
-			Secure:   secureCookies,
+			Secure:   secure,
 		}
 
 		http.SetCookie(responseWriter, cookie)

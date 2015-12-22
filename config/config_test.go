@@ -218,6 +218,26 @@ route_services_secret_decrypt_only: decrypt-only-super-route-service-secret
 			config.Initialize(b)
 			Expect(config.RouteServiceSecretPrev).To(Equal("decrypt-only-super-route-service-secret"))
 		})
+
+		It("sets the token fetcher config", func() {
+			var b = []byte(`
+token_fetcher_max_retries: 4
+token_fetcher_retry_interval: 10
+token_fetcher_expiration_buffer_time: 40
+`)
+			config.Initialize(b)
+			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(4)))
+			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(10))
+			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(40)))
+		})
+
+		It("default the token fetcher config", func() {
+			var b = []byte(``)
+			config.Initialize(b)
+			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(3)))
+			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(5))
+			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(30)))
+		})
 	})
 
 	Describe("Process", func() {
@@ -229,6 +249,7 @@ droplet_stale_threshold: 30
 publish_active_apps_interval: 4
 start_response_delay_interval: 15
 secure_cookies: true
+token_fetcher_retry_interval: 10
 `)
 
 			config.Initialize(b)
@@ -239,6 +260,7 @@ secure_cookies: true
 			Expect(config.DropletStaleThreshold).To(Equal(30 * time.Second))
 			Expect(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
 			Expect(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
+			Expect(config.TokenFetcherRetryInterval).To(Equal(10 * time.Second))
 			Expect(config.SecureCookies).To(BeTrue())
 		})
 
@@ -501,7 +523,7 @@ ssl_key_path: ../test/assets/private.pem
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`
 endpoint_timeout: 10
-route_service_timeout: 10
+route_services_timeout: 10
 drain_timeout: 15
 `)
 

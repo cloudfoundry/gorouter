@@ -5,6 +5,7 @@ import (
 
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
+	"github.com/cloudfoundry-incubator/cf-lager"
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
 	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/dropsonde"
@@ -19,6 +20,7 @@ import (
 	rvarz "github.com/cloudfoundry/gorouter/varz"
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/pivotal-golang/clock"
 
 	"flag"
 	"fmt"
@@ -37,6 +39,7 @@ var configFile string
 
 func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
+	cf_lager.AddFlags(flag.CommandLine)
 	flag.Parse()
 
 	c := config.DefaultConfig()
@@ -168,7 +171,18 @@ func newTokenFetcher(c *config.Config, logger *steno.Logger) token_fetcher.Token
 		logger.Info("using noop token fetcher")
 		return token_fetcher.NewNoOpTokenFetcher()
 	}
-	tokenFetcher := token_fetcher.NewTokenFetcher(&c.OAuth)
+	clock := clock.NewClock()
+	tokenFetcherConfig := token_fetcher.TokenFetcherConfig{
+		MaxNumberOfRetries:   c.TokenFetcherMaxRetries,
+		RetryInterval:        c.TokenFetcherRetryInterval,
+		ExpirationBufferTime: c.TokenFetcherExpirationBufferTimeInSeconds,
+	}
+	cfLogger, _ := cf_lager.New("router-configurer")
+	tokenFetcher, err := token_fetcher.NewTokenFetcher(cfLogger, &c.OAuth, tokenFetcherConfig, clock)
+	if err != nil {
+		logger.Errorf("Error creating token fetcher: %s\n", err)
+		os.Exit(1)
+	}
 	logger.Info("using uaa token fetcher")
 	return tokenFetcher
 }

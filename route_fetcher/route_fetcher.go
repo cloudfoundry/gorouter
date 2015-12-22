@@ -56,24 +56,30 @@ func (r *RouteFetcher) StartFetchCycle() {
 
 func (r *RouteFetcher) StartEventCycle() {
 	go func() {
+		useCachedToken := true
 		for {
-			r.subscribeToEvents()
+			token, err := r.TokenFetcher.FetchToken(useCachedToken)
+			if err != nil {
+				r.logger.Error(err.Error())
+			} else {
+				err = r.subscribeToEvents(token)
+				if err != nil && err.Error() == "unauthorized" {
+					useCachedToken = false
+				} else {
+					useCachedToken = true
+				}
+			}
 			time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
 		}
 	}()
 }
 
-func (r *RouteFetcher) subscribeToEvents() {
-	token, err := r.TokenFetcher.FetchToken()
-	if err != nil {
-		r.logger.Error(err.Error())
-		return
-	}
+func (r *RouteFetcher) subscribeToEvents(token *token_fetcher.Token) error {
 	r.client.SetToken(token.AccessToken)
 	source, err := r.client.SubscribeToEvents()
 	if err != nil {
 		r.logger.Error(err.Error())
-		return
+		return err
 	}
 
 	r.logger.Info("Successfully subscribed to event stream.")
@@ -86,12 +92,14 @@ func (r *RouteFetcher) subscribeToEvents() {
 			r.logger.Error(err.Error())
 			break
 		}
+
+		r.logger.Debugf("Handling event: %v", event)
 		r.HandleEvent(event)
 	}
+	return err
 }
 
-func (r *RouteFetcher) HandleEvent(e routing_api.Event) error {
-	r.logger.Infof("Handling event: %v", e)
+func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
 	endpoint := route.NewEndpoint(eventRoute.LogGuid, eventRoute.IP, uint16(eventRoute.Port), eventRoute.LogGuid, nil, eventRoute.TTL, eventRoute.RouteServiceUrl)
@@ -101,26 +109,35 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) error {
 	case "Upsert":
 		r.RouteRegistry.Register(uri, endpoint)
 	}
-
-	r.logger.Infof("Successfully handled event: %v", e)
-	return nil
 }
 
 func (r *RouteFetcher) FetchRoutes() error {
-	token, err := r.TokenFetcher.FetchToken()
-	if err != nil {
-		return err
+	useCachedToken := true
+	var err error
+	var routes []db.Route
+	for count := 0; count < 2; count++ {
+		token, tokenErr := r.TokenFetcher.FetchToken(useCachedToken)
+		if tokenErr != nil {
+			return tokenErr
+		}
+		r.client.SetToken(token.AccessToken)
+		routes, err = r.client.Routes()
+		if err != nil {
+			if err.Error() == "unauthorized" {
+				useCachedToken = false
+			} else {
+				return err
+			}
+		} else {
+			break
+		}
 	}
-	r.client.SetToken(token.AccessToken)
 
-	routes, err := r.client.Routes()
-	if err != nil {
-		return err
+	if err == nil {
+		r.refreshEndpoints(routes)
 	}
 
-	r.refreshEndpoints(routes)
-
-	return nil
+	return err
 }
 
 func (r *RouteFetcher) refreshEndpoints(validRoutes []db.Route) {

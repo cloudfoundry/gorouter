@@ -35,6 +35,7 @@ func New(metricSender metric_sender.MetricSender, batchDuration time.Duration) *
 			case <-mb.batchTicker.C:
 				mb.flush(mb.resetAndReturnMetrics())
 			case <-mb.closedChan:
+				mb.batchTicker.Stop()
 				return
 			}
 		}

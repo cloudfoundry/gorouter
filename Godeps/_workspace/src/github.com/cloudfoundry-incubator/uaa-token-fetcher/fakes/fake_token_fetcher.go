@@ -8,21 +8,25 @@ import (
 )
 
 type FakeTokenFetcher struct {
-	FetchTokenStub        func() (*token_fetcher.Token, error)
+	FetchTokenStub        func(useCachedToken bool) (*token_fetcher.Token, error)
 	fetchTokenMutex       sync.RWMutex
-	fetchTokenArgsForCall []struct{}
-	fetchTokenReturns     struct {
+	fetchTokenArgsForCall []struct {
+		useCachedToken bool
+	}
+	fetchTokenReturns struct {
 		result1 *token_fetcher.Token
 		result2 error
 	}
 }
 
-func (fake *FakeTokenFetcher) FetchToken() (*token_fetcher.Token, error) {
+func (fake *FakeTokenFetcher) FetchToken(useCachedToken bool) (*token_fetcher.Token, error) {
 	fake.fetchTokenMutex.Lock()
-	fake.fetchTokenArgsForCall = append(fake.fetchTokenArgsForCall, struct{}{})
+	fake.fetchTokenArgsForCall = append(fake.fetchTokenArgsForCall, struct {
+		useCachedToken bool
+	}{useCachedToken})
 	fake.fetchTokenMutex.Unlock()
 	if fake.FetchTokenStub != nil {
-		return fake.FetchTokenStub()
+		return fake.FetchTokenStub(useCachedToken)
 	} else {
 		return fake.fetchTokenReturns.result1, fake.fetchTokenReturns.result2
 	}
@@ -32,6 +36,12 @@ func (fake *FakeTokenFetcher) FetchTokenCallCount() int {
 	fake.fetchTokenMutex.RLock()
 	defer fake.fetchTokenMutex.RUnlock()
 	return len(fake.fetchTokenArgsForCall)
+}
+
+func (fake *FakeTokenFetcher) FetchTokenArgsForCall(i int) bool {
+	fake.fetchTokenMutex.RLock()
+	defer fake.fetchTokenMutex.RUnlock()
+	return fake.fetchTokenArgsForCall[i].useCachedToken
 }
 
 func (fake *FakeTokenFetcher) FetchTokenReturns(result1 *token_fetcher.Token, result2 error) {
