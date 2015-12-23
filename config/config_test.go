@@ -119,30 +119,6 @@ enable_ssl: true
 			Expect(config.SSLPort).To(Equal(uint16(4443)))
 		})
 
-		It("sets default access_log_syslog configs", func() {
-			Expect(config.AccessLogSyslog.Enabled).To(Equal(false))
-			Expect(config.AccessLogSyslog.Syslog).To(Equal(""))
-			Expect(config.AccessLogSyslog.Level).To(Equal("debug"))
-			Expect(config.AccessLogSyslog.AppIdFilter).To(Equal("all"))
-		})
-
-		It("sets the access_log_syslog config", func() {
-			var b = []byte(`
-access_log_syslog:
-  enabled: true
-  syslog: vcap.gorouter.access_log
-  level: warn
-  app_id_filter: empty
-`)
-
-			config.Initialize(b)
-
-			Expect(config.AccessLogSyslog.Enabled).To(Equal(true))
-			Expect(config.AccessLogSyslog.Syslog).To(Equal("vcap.gorouter.access_log"))
-			Expect(config.AccessLogSyslog.Level).To(Equal("warn"))
-			Expect(config.AccessLogSyslog.AppIdFilter).To(Equal("empty"))
-		})
-
 		It("sets the Routing Api config", func() {
 			var b = []byte(`
 routing_api:

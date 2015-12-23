@@ -64,24 +64,10 @@ var defaultLoggingConfig = LoggingConfig{
 	MetronAddress: "localhost:3457",
 }
 
-type AccessLogSyslogConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	Syslog      string `yaml:"syslog"`
-	Level       string `yaml:"level"`
-	AppIdFilter string `yaml:"app_id_filter"`
-}
-
-var defaultAccessLogSyslogConfig = AccessLogSyslogConfig{
-	Enabled:     false,
-	Level:       "debug",
-	AppIdFilter: "all",
-}
-
 type Config struct {
-	Status          StatusConfig          `yaml:"status"`
-	Nats            []NatsConfig          `yaml:"nats"`
-	Logging         LoggingConfig         `yaml:"logging"`
-	AccessLogSyslog AccessLogSyslogConfig `yaml:"access_log_syslog"`
+	Status  StatusConfig  `yaml:"status"`
+	Nats    []NatsConfig  `yaml:"nats"`
+	Logging LoggingConfig `yaml:"logging"`
 
 	Port              uint16 `yaml:"port"`
 	Index             uint   `yaml:"index"`
@@ -136,10 +122,9 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	Status:          defaultStatusConfig,
-	Nats:            []NatsConfig{defaultNatsConfig},
-	Logging:         defaultLoggingConfig,
-	AccessLogSyslog: defaultAccessLogSyslogConfig,
+	Status:  defaultStatusConfig,
+	Nats:    []NatsConfig{defaultNatsConfig},
+	Logging: defaultLoggingConfig,
 
 	Port:       8081,
 	Index:      0,
