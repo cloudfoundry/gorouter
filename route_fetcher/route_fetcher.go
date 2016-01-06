@@ -1,15 +1,19 @@
 package route_fetcher
 
 import (
+	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
+	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	steno "github.com/cloudfoundry/gosteno"
+	"github.com/pivotal-golang/clock"
 )
 
 type RouteFetcher struct {
@@ -18,58 +22,90 @@ type RouteFetcher struct {
 	FetchRoutesInterval                time.Duration
 	SubscriptionRetryIntervalInSeconds int
 
-	logger    *steno.Logger
-	endpoints []db.Route
-	ticker    *time.Ticker
-	client    routing_api.Client
+	logger          *steno.Logger
+	endpoints       []db.Route
+	client          routing_api.Client
+	stopEventSource int32
+	eventSource     atomic.Value
+	eventChannel    chan routing_api.Event
+
+	clock clock.Clock
 }
 
-func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int) *RouteFetcher {
+const (
+	TokenFetchErrors      = "token_fetch_errors"
+	SubscribeEventsErrors = "subscribe_events_errors"
+)
+
+func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
 	return &RouteFetcher{
 		TokenFetcher:                       tokenFetcher,
 		RouteRegistry:                      routeRegistry,
 		FetchRoutesInterval:                cfg.PruneStaleDropletsInterval / 2,
 		SubscriptionRetryIntervalInSeconds: subscriptionRetryInterval,
 
-		client: client,
-		logger: logger,
+		client:       client,
+		logger:       logger,
+		eventChannel: make(chan routing_api.Event),
+		clock:        clock,
 	}
 }
 
-func (r *RouteFetcher) StartFetchCycle() {
-	if r.FetchRoutesInterval > 0 {
-		r.ticker = time.NewTicker(r.FetchRoutesInterval)
+func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
+	close(ready)
+	r.startEventCycle()
 
-		go func() {
-			for {
-				select {
-				case <-r.ticker.C:
-					err := r.FetchRoutes()
-					if err != nil {
-						r.logger.Error(err.Error())
-					}
+	ticker := r.clock.NewTicker(r.FetchRoutesInterval)
+
+	for {
+		select {
+		case <-ticker.C():
+			err := r.FetchRoutes()
+			if err != nil {
+				r.logger.Error(err.Error())
+			}
+
+		case e := <-r.eventChannel:
+			r.HandleEvent(e)
+
+		case <-signals:
+			r.logger.Info("stopping")
+			atomic.StoreInt32(&r.stopEventSource, 1)
+			if es := r.eventSource.Load(); es != nil {
+				err := es.(routing_api.EventSource).Close()
+				if err != nil {
+					r.logger.Error(err.Error())
 				}
 			}
-		}()
+			ticker.Stop()
+			return nil
+		}
 	}
 }
 
-func (r *RouteFetcher) StartEventCycle() {
+func (r *RouteFetcher) startEventCycle() {
 	go func() {
 		useCachedToken := true
 		for {
 			token, err := r.TokenFetcher.FetchToken(useCachedToken)
 			if err != nil {
+				metrics.IncrementCounter(TokenFetchErrors)
 				r.logger.Error(err.Error())
 			} else {
+				if atomic.LoadInt32(&r.stopEventSource) == 1 {
+					return
+				}
 				err = r.subscribeToEvents(token)
 				if err != nil && err.Error() == "unauthorized" {
 					useCachedToken = false
 				} else {
 					useCachedToken = true
 				}
+				if atomic.LoadInt32(&r.stopEventSource) == 1 {
+					return
+				}
+				time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
 			}
-			time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
 		}
 	}()
 }
@@ -78,23 +114,24 @@ func (r *RouteFetcher) subscribeToEvents(token *token_fetcher.Token) error {
 	r.client.SetToken(token.AccessToken)
 	source, err := r.client.SubscribeToEvents()
 	if err != nil {
+		metrics.IncrementCounter(SubscribeEventsErrors)
 		r.logger.Error(err.Error())
 		return err
 	}
 
 	r.logger.Info("Successfully subscribed to event stream.")
 
-	defer source.Close()
+	r.eventSource.Store(source)
 
 	for {
 		event, err := source.Next()
 		if err != nil {
+			metrics.IncrementCounter(SubscribeEventsErrors)
 			r.logger.Error(err.Error())
 			break
 		}
-
 		r.logger.Debugf("Handling event: %v", event)
-		r.HandleEvent(event)
+		r.eventChannel <- event
 	}
 	return err
 }
@@ -118,6 +155,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	for count := 0; count < 2; count++ {
 		token, tokenErr := r.TokenFetcher.FetchToken(useCachedToken)
 		if tokenErr != nil {
+			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
 		}
 		r.client.SetToken(token.AccessToken)

@@ -68,13 +68,14 @@ func main() {
 	}
 
 	logger.Info("Setting up NATs connection")
-	natsClient := connectToNatsServer(c, logger)
+	natsClient := connectToNatsServer(logger, c)
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(c, natsClient, metricsReporter)
 
 	logger.Info("Setting up routing_api route fetcher")
-	setupRouteFetcher(c, registry, logger)
+	clock := clock.NewClock()
+	routeFetcher := setupRouteFetcher(logger, clock, c, registry)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
@@ -87,9 +88,9 @@ func main() {
 	var crypto secure.Crypto
 	var cryptoPrev secure.Crypto
 	if c.RouteServiceEnabled {
-		crypto = createCrypto(c.RouteServiceSecret, logger)
+		crypto = createCrypto(logger, c.RouteServiceSecret)
 		if c.RouteServiceSecretPrev != "" {
-			cryptoPrev = createCrypto(c.RouteServiceSecretPrev, logger)
+			cryptoPrev = createCrypto(logger, c.RouteServiceSecretPrev)
 		}
 	}
 
@@ -101,19 +102,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	launchRouter(c, router, logger)
-}
-
-func launchRouter(c *config.Config, router *router.Router, logger *steno.Logger) {
 	members := grouper.Members{
 		{"router", router},
+	}
+	if c.RoutingApiEnabled() {
+		members = append(members, grouper.Member{"router-fetcher", routeFetcher})
 	}
 
 	group := grouper.NewOrdered(os.Interrupt, members)
 
 	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
 
-	err := <-monitor.Wait()
+	err = <-monitor.Wait()
 	if err != nil {
 		logger.Error("gorouter.exited-with-failure")
 		os.Exit(1)
@@ -122,7 +122,7 @@ func launchRouter(c *config.Config, router *router.Router, logger *steno.Logger)
 	os.Exit(0)
 }
 
-func createCrypto(secret string, logger *steno.Logger) *secure.AesGCM {
+func createCrypto(logger *steno.Logger, secret string) *secure.AesGCM {
 	// generate secure encryption key using key derivation function (pbkdf2)
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
@@ -155,23 +155,19 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 	return proxy.NewProxy(args)
 }
 
-func setupRouteFetcher(c *config.Config, registry rregistry.RegistryInterface, logger *steno.Logger) {
-	if c.RoutingApiEnabled() {
-		tokenFetcher := newTokenFetcher(c, logger)
-		routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
-		routingApiClient := routing_api.NewClient(routingApiUri)
-		routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1)
-		routeFetcher.StartFetchCycle()
-		routeFetcher.StartEventCycle()
-	}
+func setupRouteFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+	tokenFetcher := newTokenFetcher(logger, clock, c)
+	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
+	routingApiClient := routing_api.NewClient(routingApiUri)
+	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1, clock)
+	return routeFetcher
 }
 
-func newTokenFetcher(c *config.Config, logger *steno.Logger) token_fetcher.TokenFetcher {
+func newTokenFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config) token_fetcher.TokenFetcher {
 	if c.RoutingApi.AuthDisabled {
 		logger.Info("using noop token fetcher")
 		return token_fetcher.NewNoOpTokenFetcher()
 	}
-	clock := clock.NewClock()
 	tokenFetcherConfig := token_fetcher.TokenFetcherConfig{
 		MaxNumberOfRetries:   c.TokenFetcherMaxRetries,
 		RetryInterval:        c.TokenFetcherRetryInterval,
@@ -187,7 +183,7 @@ func newTokenFetcher(c *config.Config, logger *steno.Logger) token_fetcher.Token
 	return tokenFetcher
 }
 
-func connectToNatsServer(c *config.Config, logger *steno.Logger) yagnats.NATSConn {
+func connectToNatsServer(logger *steno.Logger, c *config.Config) yagnats.NATSConn {
 	var natsClient yagnats.NATSConn
 	var err error
 
