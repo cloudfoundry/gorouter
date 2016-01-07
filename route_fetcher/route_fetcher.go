@@ -37,7 +37,8 @@ const (
 	SubscribeEventsErrors = "subscribe_events_errors"
 )
 
-func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface, cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
+func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface,
+	cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
 	return &RouteFetcher{
 		TokenFetcher:                       tokenFetcher,
 		RouteRegistry:                      routeRegistry,

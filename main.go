@@ -73,10 +73,6 @@ func main() {
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(c, natsClient, metricsReporter)
 
-	logger.Info("Setting up routing_api route fetcher")
-	clock := clock.NewClock()
-	routeFetcher := setupRouteFetcher(logger, clock, c, registry)
-
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
 
@@ -106,6 +102,8 @@ func main() {
 		{"router", router},
 	}
 	if c.RoutingApiEnabled() {
+		logger.Info("Setting up route fetcher")
+		routeFetcher := setupRouteFetcher(logger, c, registry)
 		members = append(members, grouper.Member{"router-fetcher", routeFetcher})
 	}
 
@@ -155,7 +153,8 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 	return proxy.NewProxy(args)
 }
 
-func setupRouteFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(logger *steno.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+	clock := clock.NewClock()
 	tokenFetcher := newTokenFetcher(logger, clock, c)
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	routingApiClient := routing_api.NewClient(routingApiUri)
@@ -173,7 +172,7 @@ func newTokenFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config) 
 		RetryInterval:        c.TokenFetcherRetryInterval,
 		ExpirationBufferTime: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
-	cfLogger, _ := cf_lager.New("router-configurer")
+	cfLogger, _ := cf_lager.New("token_fetcher")
 	tokenFetcher, err := token_fetcher.NewTokenFetcher(cfLogger, &c.OAuth, tokenFetcherConfig, clock)
 	if err != nil {
 		logger.Errorf("Error creating token fetcher: %s\n", err)

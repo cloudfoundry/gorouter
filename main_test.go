@@ -405,6 +405,24 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
+	Context("when no oauth config is specified", func() {
+		Context("and routing api is disabled", func() {
+			It("is able to start up", func() {
+				statusPort := test_util.NextAvailPort()
+				proxyPort := test_util.NextAvailPort()
+
+				cfgFile := filepath.Join(tmpdir, "config.yml")
+				config := createConfig(cfgFile, statusPort, proxyPort)
+				config.OAuth = token_fetcher.OAuthConfig{}
+				writeConfig(config, cfgFile)
+
+				// The process should not have any error.
+				session := startGorouterSession(cfgFile)
+				stopGorouter(session)
+			})
+		})
+	})
+
 	Context("when the routing api is enabled", func() {
 		var (
 			config  *config.Config
