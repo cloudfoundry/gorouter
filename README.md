@@ -181,62 +181,61 @@ Hello!
 
 ### Instrumentation
 
-Gorouter provides a `/varz` http endpoint for monitoring.
+The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication. 
 
-There is a *deprecated* `healthz` endpoint that provides no useful information about the router. To check on the health of the router, we currently recommend checking the status of TCP port 80.
+```
+$ curl "http://someuser:somepass@10.0.32.15:8080/varz"
+{"bad_gateways":0,"bad_requests":20,"cpu":0,"credentials":["user","pass"],"droplets":26,"host":"10.0.32.15:8080","index":0,"latency":{"50":0.001418144,"75":0.00180639025,"90":0.0070607187,"95":0.009561058849999996,"99":0.01523927838000001,"samples":1,"value":5e-07},"log_counts":{"info":9,"warn":40},"mem":19672,"ms_since_last_registry_update":1547,"num_cores":2,"rate":[1.1361328993362565,1.1344545494448148,1.1365784133171992],"requests":13832,"requests_per_sec":1.1361328993362565,"responses_2xx":13814,"responses_3xx":0,"responses_4xx":9,"responses_5xx":0,"responses_xxx":0,"start":"2016-01-07 19:04:40 +0000","tags":{"component":{"CloudController":{"latency":{"50":0.009015199,"75":0.0107408015,"90":0.015104917100000005,"95":0.01916497394999999,"99":0.034486261410000024,"samples":1,"value":5e-07},"rate":[0.13613289933245148,0.13433569936308343,0.13565885617276216],"requests":1686,"responses_2xx":1684,"responses_3xx":0,"responses_4xx":2,"responses_5xx":0,"responses_xxx":0},"HM9K":{"latency":{"50":0.0033354,"75":0.00751815875,"90":0.011916812100000005,"95":0.013760064,"99":0.013760064,"samples":1,"value":5e-07},"rate":[1.6850238803894876e-12,5.816129919395257e-05,0.00045864309255845694],"requests":12,"responses_2xx":6,"responses_3xx":0,"responses_4xx":6,"responses_5xx":0,"responses_xxx":0},"dea-0":{"latency":{"50":0.001354994,"75":0.001642107,"90":0.0020699939000000003,"95":0.0025553900499999996,"99":0.003677146940000006,"samples":1,"value":5e-07},"rate":[1.0000000000000013,1.0000000002571303,0.9999994853579043],"requests":12103,"responses_2xx":12103,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0},"uaa":{"latency":{"50":0.038288465,"75":0.245610809,"90":0.2877324668,"95":0.311816554,"99":0.311816554,"samples":1,"value":5e-07},"rate":[8.425119401947438e-13,2.9080649596976205e-05,0.00022931374141467497],"requests":17,"responses_2xx":17,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0}}},"top10_app_requests":[{"application_id":"063f95f9-492c-456f-b569-737f69c04899","rpm":60,"rps":1}],"type":"Router","uptime":"0d:3h:22m:31s","urls":21,"uuid":"0-c7fd7d76-f8d8-46b7-7a1c-7a59bcf7e286"}
+```
 
-The `/routes` endpoint returns the entire routing table as JSON. Each route has an associated array of host:port entries.
+Specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` returns the current health of the router. Use this method for healthchecks from a load balancer. This endpoint does not require credentials and should be done against port 80. The *deprecated* `/healthz` endpoint provides a similar response but requires basic authentication. 
 
-Aside from the two monitoring http endpoints (which are only reachable via the status port), specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` also returns the current health of the router. This is particularly useful when performing healthchecks from a Load Balancer.
+```
+$ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
+* Rebuilt URL to: http://10.0.32.15/
+* Hostname was NOT found in DNS cache
+*   Trying 10.0.32.15...
+* Connected to 10.0.32.15 (10.0.32.15) port 80 (#0)
+> GET / HTTP/1.1
+> User-Agent: HTTP-Monitor/1.1
+> Host: 10.0.32.15
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Cache-Control: private, max-age=0
+< Expires: 0
+< X-Cf-Requestid: 04ad84c6-43dd-4d20-7818-7c47595d9442
+< Date: Thu, 07 Jan 2016 22:30:02 GMT
+< Content-Length: 3
+< Content-Type: text/plain; charset=utf-8
+<
+ok
+* Connection #0 to host 10.0.32.15 left intact
+```
 
-Because of the nature of the data present in `/varz` and `/routes`, they require http basic authentication credentials which can be acquired through NATS. The `port`, `user` and password (`pass` is the config attribute) can be explicitly set in the gorouter.yml config file's `status` section.
+The `/routes` endpoint returns the entire routing table as JSON. This endpoint requires basic authentication and is served on port 8080. Each route has an associated array of host:port entries.
+
+```
+$ curl "http://someuser:somepass@10.0.32.15:8080/routes"
+{"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
+```
+
+Because of the nature of the data present in `/varz` and `/routes`, they require http basic authentication credentials. These credentials can be found the BOSH manifest under the `router` job:
+
+```
+    status:
+      password: zed292_bevesselled
+      port:
+      user: paronymy61-polaric
+```
+
+Or on the Gorouter VM under `/var/vcap/jobs/gorouter/config/gorouter.yml`:
 
 ```
 status:
   port: 8080
   user: some_user
   pass: some_password
-```
-
-Example interaction with curl:
-
-```
-curl -vvv -A "HTTP-Monitor/1.1" http://127.0.0.1/
-* About to connect() to 127.0.0.1 port 80 (#0)
-*   Trying 127.0.0.1... connected
-> GET / HTTP/1.1
-> User-Agent: HTTP-Monitor/1.1
-> Host: 127.0.0.1
-> Accept: */*
->
-< HTTP/1.1 200 OK
-< Cache-Control: private, max-age=0
-< Expires: 0
-< Date: Mon, 10 Feb 2014 00:55:25 GMT
-< Transfer-Encoding: chunked
-<
-ok
-* Connection #0 to host 127.0.0.1 left intact
-* Closing connection #0
-
-curl -vvv "http://someuser:somepass@127.0.0.1:8080/routes"
-* About to connect() to 127.0.0.1 port 8080 (#0)
-*   Trying 127.0.0.1...
-* connected
-* Connected to 127.0.0.1 (127.0.0.1) port 8080 (#0)
-* Server auth using Basic with user 'someuser'
-> GET /routes HTTP/1.1
-> Authorization: Basic c29tZXVzZXI6c29tZXBhc3M=
-> User-Agent: curl/7.24.0 (x86_64-apple-darwin12.0) libcurl/7.24.0 OpenSSL/0.9.8r zlib/1.2.5
-> Host: 127.0.0.1:8080
-> Accept: */*
->
-< HTTP/1.1 200 OK
-< Content-Type: application/json
-< Date: Mon, 25 Mar 2013 20:31:27 GMT
-< Transfer-Encoding: chunked
-<
-{"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
 ```
 
 ### Profiling the Server
