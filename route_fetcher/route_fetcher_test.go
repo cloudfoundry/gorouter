@@ -25,6 +25,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var sender *metrics_fakes.FakeMetricSender
+
+func init() {
+	sender = metrics_fakes.NewFakeMetricSender()
+	metrics.Initialize(sender, nil)
+}
+
 var _ = Describe("RouteFetcher", func() {
 	var (
 		cfg          *config.Config
@@ -34,7 +41,6 @@ var _ = Describe("RouteFetcher", func() {
 		logger       *gosteno.Logger
 		sink         *gosteno.TestingSink
 		client       *fake_routing_api.FakeClient
-		sender       *metrics_fakes.FakeMetricSender
 
 		token *token_fetcher.Token
 
@@ -89,8 +95,6 @@ var _ = Describe("RouteFetcher", func() {
 		clock = fakeclock.NewFakeClock(time.Now())
 		fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg, client, retryInterval, clock)
 
-		sender = metrics_fakes.NewFakeMetricSender()
-		metrics.Initialize(sender, nil)
 	})
 
 	AfterEach(func() {
@@ -292,10 +296,6 @@ var _ = Describe("RouteFetcher", func() {
 
 		Describe("Event cycle", func() {
 			Context("and the event source successfully subscribes", func() {
-				BeforeEach(func() {
-					tokenFetcher.FetchTokenReturns(token, nil)
-				})
-
 				It("responds to events", func() {
 					Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
 					eventChannel <- routing_api.Event{
@@ -312,7 +312,6 @@ var _ = Describe("RouteFetcher", func() {
 				})
 
 				It("responds to errors, and retries subscribing", func() {
-					tokenFetcher.FetchTokenReturns(token, nil)
 					currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
 					fetchTokenCallCount := tokenFetcher.FetchTokenCallCount()
@@ -338,13 +337,12 @@ var _ = Describe("RouteFetcher", func() {
 			})
 
 			Context("and the event source fails to subscribe", func() {
-				Context("with error other than unauhtorized", func() {
+				Context("with error other than unauthorized", func() {
 					BeforeEach(func() {
 						client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
 							err := errors.New("i failed to subscribe")
 							return &fake_routing_api.FakeEventSource{}, err
 						}
-						tokenFetcher.FetchTokenReturns(token, nil)
 					})
 
 					It("logs the error and tries again", func() {
@@ -376,7 +374,6 @@ var _ = Describe("RouteFetcher", func() {
 							err := errors.New("unauthorized")
 							return &fake_routing_api.FakeEventSource{}, err
 						}
-						tokenFetcher.FetchTokenReturns(token, nil)
 					})
 
 					It("logs the error and tries again by not using cached access token", func() {
