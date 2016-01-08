@@ -208,6 +208,30 @@ var _ = Describe("Proxy", func() {
 		Expect(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
 	})
 
+	It("responds to host with malicious script with 404", func() {
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "<html><header><script>alert(document.cookie);</script></header><body/></html>", "/", nil)
+		conn.WriteRequest(req)
+
+		resp, body := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+		Expect(body).To(Equal("404 Not Found: Requested route does not exist.\n"))
+	})
+
+	It("responds with 404 for a not found host name with only valid characters", func() {
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz. 0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ ", "/", nil)
+		conn.WriteRequest(req)
+
+		resp, body := conn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+		Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz. 0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
+	})
+
 	It("responds to misbehaving host with 502", func() {
 		ln := registerHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
 			conn.Close()

@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
 )
 
 var (
