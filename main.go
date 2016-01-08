@@ -156,6 +156,11 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 func setupRouteFetcher(logger *steno.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 	tokenFetcher := newTokenFetcher(logger, clock, c)
+	_ , err := tokenFetcher.FetchToken(false)
+	if err != nil {
+		logger.Errorf("Unable to fetch token: %s", err.Error())
+		os.Exit(1)
+	}
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	routingApiClient := routing_api.NewClient(routingApiUri)
 	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1, clock)
