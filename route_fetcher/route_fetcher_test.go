@@ -263,9 +263,9 @@ var _ = Describe("RouteFetcher", func() {
 		Context("on specified interval", func() {
 			It("it fetches routes", func() {
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
-				Eventually(client.RoutesCallCount).Should(Equal(1))
+				Eventually(client.RoutesCallCount, "2s").Should(Equal(1))
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
-				Eventually(client.RoutesCallCount).Should(Equal(2))
+				Eventually(client.RoutesCallCount, "2s").Should(Equal(2))
 			})
 		})
 
