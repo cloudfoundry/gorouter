@@ -2,6 +2,8 @@ package main_test
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
 	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
@@ -19,6 +21,7 @@ import (
 
 	"io"
 	"net"
+	"net/http/httptest"
 	"net/url"
 	"syscall"
 
@@ -426,6 +429,7 @@ var _ = Describe("Router Integration", func() {
 	Context("when the routing api is enabled", func() {
 		var (
 			config  *config.Config
+			ts      *httptest.Server
 			cfgFile string
 		)
 
@@ -435,8 +439,16 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort)
+			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
+				w.Write(jsonBytes)
+			}))
+
+			urlParts := strings.Split(ts.URL, ":")
 			config.RoutingApi.Uri = "http://localhost"
 			config.RoutingApi.Port = 4567
+			config.OAuth.TokenEndpoint = strings.Join(urlParts[0:2], ":")
+			config.OAuth.Port, _ = strconv.Atoi(urlParts[2])
 		})
 
 		Context("when the routing api auth is disabled ", func() {
@@ -453,12 +465,25 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when the routing api auth is enabled (default)", func() {
 			It("uses the uaa token fetcher", func() {
+				defer ts.Close()
 				writeConfig(config, cfgFile)
-
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
 				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using uaa token fetcher"))
 				stopGorouter(session)
+			})
+
+			Context("when the uaa is not avaliable", func() {
+				It("gorouter exit 1", func() {
+					ts.Close()
+					writeConfig(config, cfgFile)
+
+					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(session, 30*time.Second).Should(Say("Unable to fetch token"))
+					Expect(session).To(Exit(1))
+				})
 			})
 		})
 	})
