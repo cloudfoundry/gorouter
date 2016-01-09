@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pivotal-golang/clock/fakeclock"
+	"github.com/pivotal-golang/lager"
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
@@ -18,7 +19,6 @@ import (
 	testRegistry "github.com/cloudfoundry/gorouter/registry/fakes"
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/cloudfoundry/gorouter/route_fetcher"
-	"github.com/cloudfoundry/gosteno"
 	"github.com/tedsuo/ifrit"
 
 	. "github.com/onsi/ginkgo"
@@ -38,8 +38,8 @@ var _ = Describe("RouteFetcher", func() {
 		tokenFetcher *testTokenFetcher.FakeTokenFetcher
 		registry     *testRegistry.FakeRegistryInterface
 		fetcher      *RouteFetcher
-		logger       *gosteno.Logger
-		sink         *gosteno.TestingSink
+		logger       lager.Logger
+		sink         *lager.ReconfigurableSink
 		client       *fake_routing_api.FakeClient
 
 		token *token_fetcher.Token
@@ -59,15 +59,15 @@ var _ = Describe("RouteFetcher", func() {
 		retryInterval := 0
 		tokenFetcher = &testTokenFetcher.FakeTokenFetcher{}
 		registry = &testRegistry.FakeRegistryInterface{}
-		sink = gosteno.NewTestingSink()
 
-		loggerConfig := &gosteno.Config{
-			Sinks: []gosteno.Sink{
-				sink,
-			},
-		}
-		gosteno.Init(loggerConfig)
-		logger = gosteno.NewLogger("route_fetcher_test")
+		// loggerConfig := &gosteno.Config{
+		// 	Sinks: []gosteno.Sink{
+		// 		sink,
+		// 	},
+		// }
+		// gosteno.Init(loggerConfig)
+		cf_lager.AddFlags(flag.CommandLine)
+		logger, sink = cf_lager.New("route_fetcher_test")
 
 		token = &token_fetcher.Token{
 			AccessToken: "access_token",

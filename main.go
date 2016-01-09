@@ -21,6 +21,7 @@ import (
 	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/pivotal-golang/clock"
+	"github.com/pivotal-golang/lager"
 
 	"flag"
 	"fmt"
@@ -50,11 +51,10 @@ func main() {
 	}
 
 	InitLoggerFromConfig(c, logCounter)
-	logger := steno.NewLogger("router.main")
-
+	logger, _ := cf_lager.New("router.main")
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Errorf("Dropsonde failed to initialize: %s", err.Error())
+		logger.Error("Dropsonde failed to initialize ", err)
 		os.Exit(1)
 	}
 
@@ -78,7 +78,7 @@ func main() {
 
 	accessLogger, err := access_log.CreateRunningAccessLogger(c)
 	if err != nil {
-		logger.Fatalf("Error creating access logger: %s\n", err)
+		logger.Fatal("Error creating access logger: ", err)
 	}
 
 	var crypto secure.Crypto
@@ -94,7 +94,7 @@ func main() {
 
 	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter, nil)
 	if err != nil {
-		logger.Errorf("An error occurred: %s", err.Error())
+		logger.Error("An error occurred: ", err)
 		os.Exit(1)
 	}
 
@@ -113,19 +113,19 @@ func main() {
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Error("gorouter.exited-with-failure")
+		logger.Error("gorouter.exited-with-failure: ", err)
 		os.Exit(1)
 	}
 
 	os.Exit(0)
 }
 
-func createCrypto(logger *steno.Logger, secret string) *secure.AesGCM {
+func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
 	// generate secure encryption key using key derivation function (pbkdf2)
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
 	if err != nil {
-		logger.Errorf("Error creating route service crypto: %s\n", err)
+		logger.Error("Error creating route service crypto: %s\n", err)
 		os.Exit(1)
 	}
 	return crypto
@@ -153,23 +153,25 @@ func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLo
 	return proxy.NewProxy(args)
 }
 
-func setupRouteFetcher(logger *steno.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 
 	tokenFetcher := newTokenFetcher(logger, clock, c)
 	_, err := tokenFetcher.FetchToken(false)
 	if err != nil {
-		logger.Errorf("Unable to fetch token: %s", err.Error())
+		logger.Error("Unable to fetch token: ", err)
 		os.Exit(1)
 	}
 
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	routingApiClient := routing_api.NewClient(routingApiUri)
-	routeFetcher := route_fetcher.NewRouteFetcher(steno.NewLogger("router.route_fetcher"), tokenFetcher, registry, c, routingApiClient, 1, clock)
+
+	routerFetcherlogger, _ := cf_lager.New("router.route_fetcher")
+	routeFetcher := route_fetcher.NewRouteFetcher(routerFetcherlogger, tokenFetcher, registry, c, routingApiClient, 1, clock)
 	return routeFetcher
 }
 
-func newTokenFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config) token_fetcher.TokenFetcher {
+func newTokenFetcher(logger lager.Logger, clock clock.Clock, c *config.Config) token_fetcher.TokenFetcher {
 	if c.RoutingApi.AuthDisabled {
 		logger.Info("using noop token fetcher")
 		return token_fetcher.NewNoOpTokenFetcher()
@@ -179,17 +181,17 @@ func newTokenFetcher(logger *steno.Logger, clock clock.Clock, c *config.Config) 
 		RetryInterval:        c.TokenFetcherRetryInterval,
 		ExpirationBufferTime: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
-	cfLogger, _ := cf_lager.New("token_fetcher")
-	tokenFetcher, err := token_fetcher.NewTokenFetcher(cfLogger, &c.OAuth, tokenFetcherConfig, clock)
+
+	tokenFetcher, err := token_fetcher.NewTokenFetcher(logger, &c.OAuth, tokenFetcherConfig, clock)
 	if err != nil {
-		logger.Errorf("Error creating token fetcher: %s\n", err)
+		logger.Error("Error creating token fetcher: %s\n", err)
 		os.Exit(1)
 	}
 	logger.Info("using uaa token fetcher")
 	return tokenFetcher
 }
 
-func connectToNatsServer(logger *steno.Logger, c *config.Config) yagnats.NATSConn {
+func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn {
 	var natsClient yagnats.NATSConn
 	var err error
 
@@ -206,12 +208,12 @@ func connectToNatsServer(logger *steno.Logger, c *config.Config) yagnats.NATSCon
 	}
 
 	if err != nil {
-		logger.Errorf("Error connecting to NATS: %s\n", err)
+		logger.Error("Error connecting to NATS: %s\n", err)
 		os.Exit(1)
 	}
 
 	natsClient.AddClosedCB(func(conn *nats.Conn) {
-		logger.Errorf("Close on NATS client. nats.Conn: %+v", *conn)
+		logger.Error("Close on NATS client. nats.Conn: ", err, lager.Data{"connection": *conn})
 		os.Exit(1)
 	})
 

@@ -12,8 +12,8 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/pivotal-golang/clock"
+	"github.com/pivotal-golang/lager"
 )
 
 type RouteFetcher struct {
@@ -22,7 +22,7 @@ type RouteFetcher struct {
 	FetchRoutesInterval                time.Duration
 	SubscriptionRetryIntervalInSeconds int
 
-	logger          *steno.Logger
+	logger          lager.Logger
 	endpoints       []db.Route
 	client          routing_api.Client
 	stopEventSource int32
@@ -37,7 +37,7 @@ const (
 	SubscribeEventsErrors = "subscribe_events_errors"
 )
 
-func NewRouteFetcher(logger *steno.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface,
+func NewRouteFetcher(logger lager.Logger, tokenFetcher token_fetcher.TokenFetcher, routeRegistry registry.RegistryInterface,
 	cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
 	return &RouteFetcher{
 		TokenFetcher:                       tokenFetcher,
@@ -63,7 +63,7 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 		case <-ticker.C():
 			err := r.FetchRoutes()
 			if err != nil {
-				r.logger.Error(err.Error())
+				r.logger.Error("Failed to fetch routes: ", err)
 			}
 
 		case e := <-r.eventChannel:
@@ -75,7 +75,7 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 			if es := r.eventSource.Load(); es != nil {
 				err := es.(routing_api.EventSource).Close()
 				if err != nil {
-					r.logger.Error(err.Error())
+					r.logger.Error("Failed to close routing_api EventSource: ", err)
 				}
 			}
 			ticker.Stop()
@@ -91,7 +91,7 @@ func (r *RouteFetcher) startEventCycle() {
 			token, err := r.TokenFetcher.FetchToken(useCachedToken)
 			if err != nil {
 				metrics.IncrementCounter(TokenFetchErrors)
-				r.logger.Error(err.Error())
+				r.logger.Error("Failed to fetch Token: ", err)
 			} else {
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
@@ -116,7 +116,7 @@ func (r *RouteFetcher) subscribeToEvents(token *token_fetcher.Token) error {
 	source, err := r.client.SubscribeToEvents()
 	if err != nil {
 		metrics.IncrementCounter(SubscribeEventsErrors)
-		r.logger.Error(err.Error())
+		r.logger.Error("Failed to subscribe to events: ", err)
 		return err
 	}
 
@@ -128,10 +128,10 @@ func (r *RouteFetcher) subscribeToEvents(token *token_fetcher.Token) error {
 		event, err := source.Next()
 		if err != nil {
 			metrics.IncrementCounter(SubscribeEventsErrors)
-			r.logger.Error(err.Error())
+			r.logger.Error("Failed to get next event: ", err)
 			break
 		}
-		r.logger.Debugf("Handling event: %v", event)
+		r.logger.Debug("Handling event: ", lager.Data{"event": event})
 		r.eventChannel <- event
 	}
 	return err
