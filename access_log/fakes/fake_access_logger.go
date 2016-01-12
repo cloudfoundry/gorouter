@@ -8,15 +8,15 @@ import (
 )
 
 type FakeAccessLogger struct {
-	RunStub        func()
-	runMutex       sync.RWMutex
-	runArgsForCall []struct{}
+	RunStub         func()
+	runMutex        sync.RWMutex
+	runArgsForCall  []struct{}
 	StopStub        func()
 	stopMutex       sync.RWMutex
 	stopArgsForCall []struct{}
-	LogStub        func(record access_log.AccessLogRecord)
-	logMutex       sync.RWMutex
-	logArgsForCall []struct {
+	LogStub         func(record access_log.AccessLogRecord)
+	logMutex        sync.RWMutex
+	logArgsForCall  []struct {
 		record access_log.AccessLogRecord
 	}
 }

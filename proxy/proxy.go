@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudfoundry-incubator/cf-lager"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
@@ -55,12 +54,13 @@ type ProxyArgs struct {
 	Crypto              secure.Crypto
 	CryptoPrev          secure.Crypto
 	ExtraHeadersToLog   []string
+	Logger              lager.Logger
 }
 
 type proxy struct {
 	ip                 string
 	traceKey           string
-	logger             *lager.Logger
+	logger             lager.Logger
 	registry           LookupRegistry
 	reporter           metrics.ProxyReporter
 	accessLogger       access_log.AccessLogger
@@ -71,14 +71,13 @@ type proxy struct {
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	routeServiceConfig := route_service.NewRouteServiceConfig(args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev)
-	logger, _ := cf_lager.New("router.proxy")
+	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev)
 
 	p := &proxy{
 		accessLogger: args.AccessLogger,
 		traceKey:     args.TraceKey,
 		ip:           args.Ip,
-		logger:       &logger,
+		logger:       args.Logger,
 		registry:     args.Registry,
 		reporter:     args.Reporter,
 		transport: &http.Transport{
@@ -150,7 +149,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	request.Body = requestBodyCounter
 
 	proxyWriter := NewProxyResponseWriter(responseWriter)
-	handler := NewRequestHandler(request, proxyWriter, p.reporter, &accessLog)
+	handler := NewRequestHandler(request, proxyWriter, p.reporter, &accessLog, p.logger)
 
 	defer func() {
 		accessLog.RequestBytesReceived = requestBodyCounter.GetCount()

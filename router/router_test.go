@@ -35,6 +35,8 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 )
 
 var _ = Describe("Router", func() {
@@ -50,6 +52,7 @@ var _ = Describe("Router", func() {
 		signals      chan os.Signal
 		closeChannel chan struct{}
 		readyChan    chan struct{}
+		logger       lager.Logger
 	)
 
 	BeforeEach(func() {
@@ -76,15 +79,18 @@ var _ = Describe("Router", func() {
 		registry = rregistry.NewRouteRegistry(config, mbusClient, new(fakes.FakeRouteReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
+		logger = lagertest.NewTestLogger("router-test")
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout: config.EndpointTimeout,
+			Logger:          logger,
 			Ip:              config.Ip,
 			TraceKey:        config.TraceKey,
 			Registry:        registry,
 			Reporter:        varz,
 			AccessLogger:    &access_log.NullAccessLogger{},
 		})
-		router, err = NewRouter(config, proxy, mbusClient, registry, varz, logcounter, nil)
+
+		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, nil)
 
 		Expect(err).ToNot(HaveOccurred())
 

@@ -15,7 +15,7 @@ var _ = Describe("Config", func() {
 	var config *Config
 
 	BeforeEach(func() {
-		config = DefaultConfig()
+		config = DefaultConfig(logger)
 	})
 
 	Describe("Initialize", func() {

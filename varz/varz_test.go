@@ -2,13 +2,15 @@ package varz_test
 
 import (
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/cloudfoundry/gorouter/varz"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	"encoding/json"
 	"fmt"
@@ -19,9 +21,11 @@ import (
 var _ = Describe("Varz", func() {
 	var Varz Varz
 	var Registry *registry.RouteRegistry
+	var logger lager.Logger
 
 	BeforeEach(func() {
-		Registry = registry.NewRouteRegistry(config.DefaultConfig(), fakeyagnats.Connect(), new(fakes.FakeRouteReporter))
+		logger = lagertest.NewTestLogger("test")
+		Registry = registry.NewRouteRegistry(config.DefaultConfig(logger), fakeyagnats.Connect(), new(fakes.FakeRouteReporter))
 		Varz = NewVarz(Registry)
 	})
 

@@ -23,4 +23,4 @@ go get -v github.com/apcera/gnatsd
 go install -v github.com/onsi/ginkgo/ginkgo
 
 #Run all tests
-ginkgo -r -failOnPending -randomizeAllSpecs -skipMeasurements=true -race "$@"
+ginkgo -r -failOnPending -keepGoing -randomizeAllSpecs -skipMeasurements=true -race "$@"

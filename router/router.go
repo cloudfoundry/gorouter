@@ -12,8 +12,8 @@ import (
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/varz"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
+	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 
 	"bytes"
@@ -51,11 +51,11 @@ type Router struct {
 	stopping         bool
 	stopLock         sync.Mutex
 
-	logger  *steno.Logger
+	logger  lager.Logger
 	errChan chan error
 }
 
-func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry,
+func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry,
 	v varz.Varz, logCounter *vcap.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
@@ -83,7 +83,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
-		Logger: steno.NewLogger("common.logger"),
+		Logger: logger.Session("router"),
 	}
 
 	routerErrChan := errChan
@@ -102,7 +102,7 @@ func NewRouter(cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r
 		tlsServeDone: make(chan struct{}),
 		idleConns:    make(map[net.Conn]struct{}),
 		activeConns:  make(map[net.Conn]struct{}),
-		logger:       steno.NewLogger("router"),
+		logger:       logger,
 		errChan:      routerErrChan,
 		stopping:     false,
 	}
@@ -128,7 +128,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.SendStartMessage()
 
 	r.mbusClient.AddReconnectedCB(func(conn *nats.Conn) {
-		r.logger.Infof("Reconnecting to NATS server %s...", conn.Opts.Url)
+		r.logger.Info(fmt.Sprintf("Reconnecting to NATS server %s...", conn.Opts.Url))
 		r.SendStartMessage()
 	})
 
@@ -138,7 +138,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Wait for one start message send interval, such that the router's registry
 	// can be populated before serving requests.
 	if r.config.StartResponseDelayInterval != 0 {
-		r.logger.Infof("Waiting %s before listening...", r.config.StartResponseDelayInterval)
+		r.logger.Info(fmt.Sprintf("Waiting %s before listening...", r.config.StartResponseDelayInterval))
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
@@ -171,17 +171,17 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 	select {
 	case err := <-errChan:
 		if err != nil {
-			r.logger.Errorf("Error occurred: %s", err.Error())
+			r.logger.Error("Error occurred: ", err)
 			r.DrainAndStop()
 		}
 	case sig := <-signals:
 		go func() {
 			for sig := range signals {
-				r.logger.Infod(
-					map[string]interface{}{
+				r.logger.Info(
+					"gorouter.signal.ignored",
+					lager.Data{
 						"signal": sig.String(),
 					},
-					"gorouter.signal.ignored",
 				)
 			}
 		}()
@@ -196,11 +196,11 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 
 func (r *Router) DrainAndStop() {
 	drainTimeout := r.config.DrainTimeout
-	r.logger.Infod(
-		map[string]interface{}{
+	r.logger.Info(
+		"gorouter.draining",
+		lager.Data{
 			"timeout": (drainTimeout).String(),
 		},
-		"gorouter.draining",
 	)
 
 	r.Drain(drainTimeout)
@@ -217,12 +217,12 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
 		if err != nil {
-			r.logger.Fatalf("tls.Listen: %s", err)
+			r.logger.Fatal("tls.Listen: %s", err)
 			return err
 		}
 
 		r.tlsListener = tlsListener
-		r.logger.Infof("Listening on %s", tlsListener.Addr())
+		r.logger.Info(fmt.Sprintf("Listening on %s", tlsListener.Addr()))
 
 		go func() {
 			err := server.Serve(tlsListener)
@@ -240,12 +240,12 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
-		r.logger.Fatalf("net.Listen: %s", err)
+		r.logger.Fatal("net.Listen: %s", err)
 		return err
 	}
 
 	r.listener = listener
-	r.logger.Infof("Listening on %s", listener.Addr())
+	r.logger.Info(fmt.Sprintf("Listening on %s", listener.Addr()))
 
 	go func() {
 		err := server.Serve(listener)
@@ -267,8 +267,8 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 
 	r.connLock.Lock()
 
-	r.logger.Infof("Draining with %d outstanding active connections", len(r.activeConns))
-	r.logger.Infof("Draining with %d outstanding idle connections", len(r.idleConns))
+	r.logger.Info(fmt.Sprintf("Draining with %d outstanding active connections", len(r.activeConns)))
+	r.logger.Info(fmt.Sprintf("Draining with %d outstanding idle connections", len(r.idleConns)))
 	r.closeIdleConns()
 
 	if len(r.activeConns) == 0 {
@@ -282,7 +282,7 @@ func (r *Router) Drain(drainTimeout time.Duration) error {
 	select {
 	case <-drained:
 	case <-time.After(drainTimeout):
-		r.logger.Warn("router.drain.timed-out")
+		r.logger.Info("router.drain.timed-out")
 		return DrainTimeout
 	}
 
@@ -301,11 +301,11 @@ func (r *Router) Stop() {
 	r.connLock.Unlock()
 
 	r.component.Stop()
-	r.logger.Infod(
-		map[string]interface{}{
+	r.logger.Info(
+		"gorouter.stopped",
+		lager.Data{
 			"took": time.Since(stoppingAt).String(),
 		},
-		"gorouter.stopped",
 	)
 }
 
@@ -339,7 +339,7 @@ func (r *Router) RegisterComponent() {
 
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
-		r.logger.Debugf("Got router.register: %v", registryMessage)
+		r.logger.Debug("Got router.register:", lager.Data{"registry Messgae": registryMessage})
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
@@ -352,7 +352,7 @@ func (r *Router) SubscribeRegister() {
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *RegistryMessage) {
-		r.logger.Debugf("Got router.unregister: %v", registryMessage)
+		r.logger.Debug("Got router.unregister:", lager.Data{"registry Message": registryMessage})
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(
@@ -366,7 +366,7 @@ func (r *Router) SubscribeUnregister() {
 func (r *Router) HandleGreetings() {
 	r.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
 		if msg.Reply == "" {
-			r.logger.Warnf("Received message with empty reply on subject %s", msg.Subject)
+			r.logger.Info(fmt.Sprintf("Received message with empty reply on subject %s", msg.Subject))
 			return
 		}
 
@@ -451,7 +451,7 @@ func (r *Router) flushApps(t time.Time) {
 
 	y, err := json.Marshal(x)
 	if err != nil {
-		r.logger.Warnf("flushApps: Error marshalling JSON: %s", err)
+		r.logger.Info(fmt.Sprintf("flushApps: Error marshalling JSON: %s", err.Error()))
 		return
 	}
 
@@ -462,7 +462,7 @@ func (r *Router) flushApps(t time.Time) {
 
 	z := b.Bytes()
 
-	r.logger.Debugf("Active apps: %d, message size: %d", len(x), len(z))
+	r.logger.Debug("Debug Info", lager.Data{"Active apps": len(x), "message size:": len(z)})
 
 	r.mbusClient.Publish("router.active_apps", z)
 }
@@ -492,16 +492,16 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 		err := json.Unmarshal(payload, &msg)
 		if err != nil {
 			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
-			r.logger.Warnd(map[string]interface{}{"payload": string(payload)}, logMessage)
+			r.logger.Info(logMessage, lager.Data{"payload": string(payload)})
 			return
 		}
 
 		logMessage := fmt.Sprintf("%s: Received message", subject)
-		r.logger.Debugd(map[string]interface{}{"message": msg}, logMessage)
+		r.logger.Debug(logMessage, lager.Data{"message": msg})
 
 		if !msg.ValidateMessage() {
 			logMessage := fmt.Sprintf("%s: Unable to validate message. route_service_url must be https", subject)
-			r.logger.Warnd(map[string]interface{}{"message": msg}, logMessage)
+			r.logger.Info(logMessage, lager.Data{"message": msg})
 			return
 		}
 
@@ -510,6 +510,6 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 
 	_, err := r.mbusClient.Subscribe(subject, callback)
 	if err != nil {
-		r.logger.Errorf("Error subscribing to %s: %s", subject, err)
+		r.logger.Error(fmt.Sprintf("Error subscribing to %s ", subject), err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
@@ -23,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var sender *metrics_fakes.FakeMetricSender
@@ -39,7 +41,6 @@ var _ = Describe("RouteFetcher", func() {
 		registry     *testRegistry.FakeRegistryInterface
 		fetcher      *RouteFetcher
 		logger       lager.Logger
-		sink         *lager.ReconfigurableSink
 		client       *fake_routing_api.FakeClient
 
 		token *token_fetcher.Token
@@ -53,21 +54,13 @@ var _ = Describe("RouteFetcher", func() {
 	)
 
 	BeforeEach(func() {
-		cfg = config.DefaultConfig()
+		logger = lagertest.NewTestLogger("test")
+		cfg = config.DefaultConfig(logger)
 		cfg.PruneStaleDropletsInterval = 2 * time.Second
 
 		retryInterval := 0
 		tokenFetcher = &testTokenFetcher.FakeTokenFetcher{}
 		registry = &testRegistry.FakeRegistryInterface{}
-
-		// loggerConfig := &gosteno.Config{
-		// 	Sinks: []gosteno.Sink{
-		// 		sink,
-		// 	},
-		// }
-		// gosteno.Init(loggerConfig)
-		cf_lager.AddFlags(flag.CommandLine)
-		logger, sink = cf_lager.New("route_fetcher_test")
 
 		token = &token_fetcher.Token{
 			AccessToken: "access_token",
@@ -277,12 +270,7 @@ var _ = Describe("RouteFetcher", func() {
 			It("logs the error", func() {
 				currentTokenFetchErrors := sender.GetCounter(TokenFetchErrors)
 
-				Eventually(func() int {
-					return len(sink.Records())
-				}).Should(BeNumerically(">=", 1))
-
-				Expect(sink.Records()).ToNot(BeNil())
-				Expect(sink.Records()[0].Message).To(Equal("Unauthorized"))
+				Eventually(logger).Should(gbytes.Say("Unauthorized"))
 
 				Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">=", 2))
 				Expect(client.SubscribeToEventsCallCount()).Should(Equal(0))
@@ -319,13 +307,7 @@ var _ = Describe("RouteFetcher", func() {
 
 					errorChannel <- errors.New("beep boop im a robot")
 
-					Eventually(func() string {
-						if len(sink.Records()) > 1 {
-							return sink.Records()[1].Message
-						} else {
-							return ""
-						}
-					}).Should(Equal("beep boop im a robot"))
+					Eventually(logger).Should(gbytes.Say("beep boop im a robot"))
 
 					Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
 					Eventually(client.SubscribeToEventsCallCount).Should(BeNumerically(">", subscribeCallCount))
@@ -351,13 +333,7 @@ var _ = Describe("RouteFetcher", func() {
 
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
-						Eventually(func() string {
-							if len(sink.Records()) > 0 {
-								return sink.Records()[0].Message
-							} else {
-								return ""
-							}
-						}).Should(Equal("i failed to subscribe"))
+						Eventually(logger).Should(gbytes.Say("i failed to subscribe"))
 
 						Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
 						Eventually(client.SubscribeToEventsCallCount).Should(BeNumerically(">", subscribeCallCount))
@@ -378,14 +354,7 @@ var _ = Describe("RouteFetcher", func() {
 
 					It("logs the error and tries again by not using cached access token", func() {
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
-
-						Eventually(func() string {
-							if len(sink.Records()) > 0 {
-								return sink.Records()[0].Message
-							} else {
-								return ""
-							}
-						}).Should(Equal("unauthorized"))
+						Eventually(logger).Should(gbytes.Say("unauthorized"))
 						Eventually(tokenFetcher.FetchTokenCallCount()).Should(BeNumerically(">", 2))
 						Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
 						Expect(tokenFetcher.FetchTokenArgsForCall(1)).To(BeFalse())

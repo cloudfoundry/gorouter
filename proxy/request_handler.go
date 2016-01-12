@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/cf-lager"
 	"github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
@@ -20,7 +19,7 @@ import (
 )
 
 type RequestHandler struct {
-	CFLogger  lager.Logger
+	logger    lager.Logger
 	reporter  metrics.ProxyReporter
 	logrecord *access_log.AccessLogRecord
 
@@ -28,20 +27,18 @@ type RequestHandler struct {
 	response ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response ProxyResponseWriter, r metrics.ProxyReporter,
-	alr *access_log.AccessLogRecord) RequestHandler {
+func NewRequestHandler(request *http.Request, response ProxyResponseWriter, r metrics.ProxyReporter, alr *access_log.AccessLogRecord, logger lager.Logger) RequestHandler {
+	setupLogger(request, logger)
 	return RequestHandler{
-		CFLogger:  createLogger(request),
+		logger:    logger,
 		reporter:  r,
 		logrecord: alr,
-
-		request:  request,
-		response: response,
+		request:   request,
+		response:  response,
 	}
 }
 
-func createLogger(request *http.Request) lager.Logger {
-	logger, _ := cf_lager.New("router.proxy.request-handler")
+func setupLogger(request *http.Request, logger lager.Logger) {
 	logger.Info("Request Handler", lager.Data{
 		"RemoteAddr":        request.RemoteAddr,
 		"Host":              request.Host,
@@ -49,11 +46,11 @@ func createLogger(request *http.Request) lager.Logger {
 		"X-Forwarded-For":   request.Header["X-Forwarded-For"],
 		"X-Forwarded-Proto": request.Header["X-Forwarded-Proto"],
 	})
-	return logger
+
 }
 
 func (h *RequestHandler) Logger() lager.Logger {
-	return h.CFLogger
+	return h.logger
 }
 
 func (h *RequestHandler) HandleHeartbeat() {
@@ -80,7 +77,7 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 }
 
 func (h *RequestHandler) HandleMissingRoute() {
-	h.CFLogger.Info("proxy.endpoint.not-found")
+	h.logger.Info("proxy.endpoint.not-found")
 
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
 	var message string
@@ -93,8 +90,8 @@ func (h *RequestHandler) HandleMissingRoute() {
 }
 
 func (h *RequestHandler) HandleBadGateway(err error) {
-	h.CFLogger.Error("Error", err)
-	h.CFLogger.Info("proxy.endpoint.failed")
+	h.logger.Error("Error", err)
+	h.logger.Info("proxy.endpoint.failed")
 
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
@@ -102,23 +99,23 @@ func (h *RequestHandler) HandleBadGateway(err error) {
 }
 
 func (h *RequestHandler) HandleBadSignature(err error) {
-	h.CFLogger.Error("Error", err)
-	h.CFLogger.Info("proxy.signature.validation.failed")
+	h.logger.Error("Error", err)
+	h.logger.Info("proxy.signature.validation.failed")
 
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
 	h.response.Done()
 }
 
 func (h *RequestHandler) HandleRouteServiceFailure(err error) {
-	h.CFLogger.Error("Error", err)
-	h.CFLogger.Info("proxy.route-service.failed")
+	h.logger.Error("Error", err)
+	h.logger.Info("proxy.route-service.failed")
 
 	h.writeStatus(http.StatusInternalServerError, "Route service request failed.")
 	h.response.Done()
 }
 
 func (h *RequestHandler) HandleUnsupportedRouteService() {
-	h.CFLogger.Info("proxy.route-service.unsupported")
+	h.logger.Info("proxy.route-service.unsupported")
 
 	h.response.Header().Set("X-Cf-RouterError", "route_service_unsupported")
 	h.writeStatus(http.StatusBadGateway, "Support for route services is disabled.")
@@ -126,7 +123,7 @@ func (h *RequestHandler) HandleUnsupportedRouteService() {
 }
 
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
-	h.CFLogger.Info("Handle tcp Request", lager.Data{"Upgrade": "tcp"})
+	h.logger.Info("Handle tcp Request", lager.Data{"Upgrade": "tcp"})
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
@@ -137,7 +134,7 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 }
 
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
-	h.CFLogger.Info("Handle websocket Request", lager.Data{"Upgrade": "websocket"})
+	h.logger.Info("Handle websocket Request", lager.Data{"Upgrade": "websocket"})
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
@@ -150,7 +147,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 func (h *RequestHandler) writeStatus(code int, message string) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
-	h.CFLogger.Info("status ", lager.Data{"body": body})
+	h.logger.Info("status ", lager.Data{"body": body})
 	h.logrecord.StatusCode = code
 
 	http.Error(h.response, body, code)
@@ -192,8 +189,8 @@ func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
 
 		iter.EndpointFailed()
 
-		h.CFLogger.Error("Error", err)
-		h.CFLogger.Info("proxy.tcp.failed")
+		h.logger.Error("Error", err)
+		h.logger.Info("proxy.tcp.failed")
 
 		retry++
 		if retry == maxRetries {
@@ -242,8 +239,8 @@ func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
 
 		iter.EndpointFailed()
 
-		h.CFLogger.Error("Error", err)
-		h.CFLogger.Info("proxy.websocket.failed")
+		h.logger.Error("Error", err)
+		h.logger.Info("proxy.websocket.failed")
 
 		retry++
 		if retry == maxRetries {
@@ -266,7 +263,7 @@ func (h *RequestHandler) setupRequest(endpoint *route.Endpoint) {
 	h.setRequestURL(endpoint.CanonicalAddr())
 	h.setRequestXForwardedFor()
 	setRequestXRequestStart(h.request)
-	setRequestXVcapRequestId(h.request, h.CFLogger)
+	setRequestXVcapRequestId(h.request, h.logger)
 }
 
 func (h *RequestHandler) setRequestURL(addr string) {

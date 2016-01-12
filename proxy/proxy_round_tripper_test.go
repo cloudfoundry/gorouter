@@ -12,6 +12,8 @@ import (
 	routefakes "github.com/cloudfoundry/gorouter/route/fakes"
 	"github.com/cloudfoundry/gorouter/route_service"
 	"github.com/cloudfoundry/gorouter/test_util"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -24,6 +26,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			endpointIterator  *routefakes.FakeEndpointIterator
 			transport         *proxyfakes.FakeRoundTripper
 			handler           proxy.RequestHandler
+			logger            lager.Logger
 			req               *http.Request
 			resp              *proxyfakes.FakeProxyResponseWriter
 			dialError         = &net.OpError{
@@ -41,7 +44,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			nullVarz := nullVarz{}
 			nullAccessRecord := &access_log.AccessLogRecord{}
 
-			handler = proxy.NewRequestHandler(req, resp, nullVarz, nullAccessRecord)
+			logger = lagertest.NewTestLogger("test")
+			handler = proxy.NewRequestHandler(req, resp, nullVarz, nullAccessRecord, logger)
 			transport = &proxyfakes.FakeRoundTripper{}
 
 			after = func(rsp *http.Response, endpoint *route.Endpoint, err error) {

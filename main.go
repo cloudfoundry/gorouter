@@ -18,7 +18,6 @@ import (
 	"github.com/cloudfoundry/gorouter/route_fetcher"
 	"github.com/cloudfoundry/gorouter/router"
 	rvarz "github.com/cloudfoundry/gorouter/varz"
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/pivotal-golang/clock"
 	"github.com/pivotal-golang/lager"
@@ -38,20 +37,27 @@ import (
 
 var configFile string
 
+const (
+	DEBUG = "debug"
+	INFO  = "info"
+	ERROR = "error"
+	FATAL = "fatal"
+)
+
 func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
 	cf_lager.AddFlags(flag.CommandLine)
 	flag.Parse()
 
-	c := config.DefaultConfig()
+	logger, _ := cf_lager.New("gorouter.stdout")
+	c := config.DefaultConfig(logger)
 	logCounter := vcap.NewLogCounter()
 
 	if configFile != "" {
-		c = config.InitConfigFromFile(configFile)
+		c = config.InitConfigFromFile(logger, configFile)
 	}
 
-	InitLoggerFromConfig(c, logCounter)
-	logger, _ := cf_lager.New("router.main")
+	InitLoggerFromConfig(logger, c, logCounter)
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Error("Dropsonde failed to initialize ", err)
@@ -76,7 +82,7 @@ func main() {
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
 
-	accessLogger, err := access_log.CreateRunningAccessLogger(c)
+	accessLogger, err := access_log.CreateRunningAccessLogger(logger, c)
 	if err != nil {
 		logger.Fatal("Error creating access logger: ", err)
 	}
@@ -90,9 +96,9 @@ func main() {
 		}
 	}
 
-	proxy := buildProxy(c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
+	proxy := buildProxy(logger, c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
 
-	router, err := router.NewRouter(c, proxy, natsClient, registry, varz, logCounter, nil)
+	router, err := router.NewRouter(logger, c, proxy, natsClient, registry, varz, logCounter, nil)
 	if err != nil {
 		logger.Error("An error occurred: ", err)
 		os.Exit(1)
@@ -131,8 +137,9 @@ func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	args := proxy.ProxyArgs{
+		Logger:          logger,
 		EndpointTimeout: c.EndpointTimeout,
 		Ip:              c.Ip,
 		TraceKey:        c.TraceKey,
@@ -166,8 +173,7 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	routingApiClient := routing_api.NewClient(routingApiUri)
 
-	routerFetcherlogger, _ := cf_lager.New("router.route_fetcher")
-	routeFetcher := route_fetcher.NewRouteFetcher(routerFetcherlogger, tokenFetcher, registry, c, routingApiClient, 1, clock)
+	routeFetcher := route_fetcher.NewRouteFetcher(logger, tokenFetcher, registry, c, routingApiClient, 1, clock)
 	return routeFetcher
 }
 
@@ -220,30 +226,31 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn
 	return natsClient
 }
 
-func InitLoggerFromConfig(c *config.Config, logCounter *vcap.LogCounter) {
-	l, err := steno.GetLogLevel(c.Logging.Level)
-	if err != nil {
-		panic(err)
-	}
-
-	s := make([]steno.Sink, 0, 3)
+func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *vcap.LogCounter) {
 	if c.Logging.File != "" {
-		s = append(s, steno.NewFileSink(c.Logging.File))
-	} else {
-		s = append(s, steno.NewIOSink(os.Stdout))
+		file, err := os.OpenFile(c.Logging.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			logger.Error("error-opening-file", err, lager.Data{"file": c.Logging.File})
+		}
+		var logLevel lager.LogLevel
+		switch c.Logging.Level {
+		case DEBUG:
+			logLevel = lager.DEBUG
+		case INFO:
+			logLevel = lager.INFO
+		case ERROR:
+			logLevel = lager.ERROR
+		case FATAL:
+			logLevel = lager.FATAL
+		default:
+			panic(fmt.Errorf("unknown log level: %s", c.Logging.Level))
+		}
+		logger.RegisterSink(lager.NewWriterSink(file, logLevel))
 	}
 
-	if c.Logging.Syslog != "" {
-		s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
-	}
+	// if c.Logging.Syslog != "" {
+	// 	s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
+	// }
 
-	s = append(s, logCounter)
-
-	stenoConfig := &steno.Config{
-		Sinks: s,
-		Codec: steno.NewJsonCodec(),
-		Level: l,
-	}
-
-	steno.Init(stenoConfig)
+	logger.RegisterSink(logCounter)
 }

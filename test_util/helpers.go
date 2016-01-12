@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	"time"
 
@@ -34,7 +35,8 @@ func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Conf
 }
 
 func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
-	c := config.DefaultConfig()
+	logger := lagertest.NewTestLogger("test")
+	c := config.DefaultConfig(logger)
 
 	c.Port = proxyPort
 	c.Index = 2

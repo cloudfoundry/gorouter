@@ -1,15 +1,16 @@
 package common_test
 
 import (
-	"strings"
-
 	"github.com/apcera/nats"
 	. "github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/test_util"
-	"github.com/cloudfoundry/gosteno"
+
 	"github.com/cloudfoundry/yagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 	"github.com/pivotal-golang/localip"
 
 	"encoding/json"
@@ -154,25 +155,15 @@ var _ = Describe("Component", func() {
 	Describe("Register", func() {
 		var mbusClient yagnats.NATSConn
 		var natsRunner *natsrunner.NATSRunner
-		var logger *gosteno.Logger
-		var sink *gosteno.TestingSink
+		var logger lager.Logger
+
 		BeforeEach(func() {
 			natsPort := test_util.NextAvailPort()
 			natsRunner = natsrunner.NewNATSRunner(int(natsPort))
 			natsRunner.Start()
 			mbusClient = natsRunner.MessageBus
 
-			sink = gosteno.NewTestingSink()
-			c := &gosteno.Config{
-				Sinks: []gosteno.Sink{
-					sink,
-				},
-				Level:     gosteno.LOG_INFO,
-				Codec:     gosteno.NewJsonCodec(),
-				EnableLOC: true,
-			}
-			gosteno.Init(c)
-			logger = gosteno.NewLogger("test")
+			logger = lagertest.NewTestLogger("test")
 		})
 
 		AfterEach(func() {
@@ -281,15 +272,7 @@ var _ = Describe("Component", func() {
 			err = mbusClient.PublishRequest("vcap.component.discover", "", []byte(""))
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() bool {
-				found := false
-				for _, r := range sink.Records() {
-					if strings.Contains(r.Message, "Received message with empty reply on subject") {
-						found = true
-					}
-				}
-				return found
-			}).Should(BeTrue())
+			Eventually(logger).Should(gbytes.Say("Received message with empty reply on subject"))
 
 			err = mbusClient.PublishRequest("vcap.component.discover", "reply", []byte("hi"))
 			Expect(err).ToNot(HaveOccurred())

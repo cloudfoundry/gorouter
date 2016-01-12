@@ -1,9 +1,10 @@
 package metrics
 
 import (
+	"net/http"
+
 	dropsondeMetrics "github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gorouter/route"
-	"net/http"
 
 	"fmt"
 	"strings"
@@ -41,7 +42,7 @@ func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Re
 	dropsondeMetrics.BatchIncrementCounter(getResponseCounterName(res))
 	dropsondeMetrics.BatchIncrementCounter("responses")
 
-	latency := float64(d/time.Millisecond)
+	latency := float64(d / time.Millisecond)
 	unit := "ms"
 	dropsondeMetrics.SendValue("latency", latency, unit)
 

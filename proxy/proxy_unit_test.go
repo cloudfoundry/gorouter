@@ -43,6 +43,7 @@ var _ = Describe("Proxy Unit tests", func() {
 				TraceKey:            conf.TraceKey,
 				Registry:            r,
 				Reporter:            nullVarz{},
+				Logger:              logger,
 				AccessLogger:        fakeAccessLogger,
 				SecureCookies:       conf.SecureCookies,
 				TLSConfig:           tlsConfig,

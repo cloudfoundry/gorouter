@@ -11,7 +11,7 @@ type FakeEndpointIterator struct {
 	NextStub        func() *route.Endpoint
 	nextMutex       sync.RWMutex
 	nextArgsForCall []struct{}
-	nextReturns struct {
+	nextReturns     struct {
 		result1 *route.Endpoint
 	}
 	EndpointFailedStub        func()

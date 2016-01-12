@@ -1,8 +1,10 @@
 package metrics
+
 import (
-"net/http"
-"github.com/cloudfoundry/gorouter/route"
-"time"
+	"net/http"
+	"time"
+
+	"github.com/cloudfoundry/gorouter/route"
 )
 
 type ProxyReporter interface {

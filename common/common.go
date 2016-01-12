@@ -1,11 +1,11 @@
 package common
 
 import (
-	steno "github.com/cloudfoundry/gosteno"
 	"github.com/nu7hatch/gouuid"
+	"github.com/pivotal-golang/lager"
 )
 
-var log = steno.NewLogger("common.logger")
+var log lager.Logger
 
 func GenerateUUID() (string, error) {
 	uuid, err := uuid.NewV4()

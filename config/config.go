@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
-	"github.com/cloudfoundry-incubator/cf-lager"
 	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
+	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 )
 
@@ -65,10 +65,10 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type Config struct {
-	Status  StatusConfig  `yaml:"status"`
-	Nats    []NatsConfig  `yaml:"nats"`
-	Logging LoggingConfig `yaml:"logging"`
-
+	Status            StatusConfig  `yaml:"status"`
+	Nats              []NatsConfig  `yaml:"nats"`
+	Logging           LoggingConfig `yaml:"logging"`
+	logger            lager.Logger
 	Port              uint16 `yaml:"port"`
 	Index             uint   `yaml:"index"`
 	Zone              string `yaml:"zone"`
@@ -145,12 +145,16 @@ var defaultConfig = Config{
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 }
 
-func DefaultConfig() *Config {
+func DefaultConfig(logger lager.Logger) *Config {
 	c := defaultConfig
-
+	c.logger = logger
 	c.Process()
 
 	return &c
+}
+
+func (c *Config) Logger() lager.Logger {
+	return c.logger
 }
 
 func (c *Config) Process() {
@@ -170,8 +174,7 @@ func (c *Config) Process() {
 	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
-		log, _ := cf_lager.New("config.logger")
-		log.Info(fmt.Sprintf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval))
+		c.logger.Info(fmt.Sprintf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval))
 	}
 
 	drain := c.DrainTimeoutInSeconds
@@ -263,8 +266,8 @@ func (c *Config) Initialize(configYAML []byte) error {
 	return candiedyaml.Unmarshal(configYAML, &c)
 }
 
-func InitConfigFromFile(path string) *Config {
-	var c *Config = DefaultConfig()
+func InitConfigFromFile(logger lager.Logger, path string) *Config {
+	var c *Config = DefaultConfig(logger)
 	var e error
 
 	b, e := ioutil.ReadFile(path)

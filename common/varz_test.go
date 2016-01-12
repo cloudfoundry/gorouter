@@ -2,14 +2,14 @@ package common_test
 
 import (
 	"fmt"
+	"strconv"
 
 	. "github.com/cloudfoundry/gorouter/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/lager"
 
 	"encoding/json"
-
-	steno "github.com/cloudfoundry/gosteno"
 )
 
 var _ = Describe("Varz", func() {
@@ -52,14 +52,14 @@ var _ = Describe("Varz", func() {
 		varz := &Varz{}
 		varz.LogCounts = NewLogCounter()
 
-		varz.LogCounts.AddRecord(&steno.Record{Level: steno.LOG_INFO})
+		varz.LogCounts.Log(lager.INFO, []byte("info-message"))
 
 		bytes, _ := json.Marshal(varz)
 		data := make(map[string]interface{})
 		json.Unmarshal(bytes, &data)
 
 		counts := data["log_counts"].(map[string]interface{})
-		count := counts["info"]
+		count := counts[strconv.Itoa(int(lager.INFO))]
 
 		Expect(count).To(Equal(float64(1)))
 	})

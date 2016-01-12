@@ -14,6 +14,8 @@ import (
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	"testing"
 	"time"
@@ -31,6 +33,7 @@ var (
 	accessLog     access_log.AccessLogger
 	accessLogFile *test_util.FakeFile
 	crypto        secure.Crypto
+	logger        lager.Logger
 	cryptoPrev    secure.Crypto
 )
 
@@ -40,6 +43,7 @@ func TestProxy(t *testing.T) {
 }
 
 var _ = BeforeEach(func() {
+	logger = lagertest.NewTestLogger("test")
 	var err error
 
 	crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
@@ -47,7 +51,7 @@ var _ = BeforeEach(func() {
 
 	cryptoPrev = nil
 
-	conf = config.DefaultConfig()
+	conf = config.DefaultConfig(logger)
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
 })
@@ -76,6 +80,7 @@ var _ = JustBeforeEach(func() {
 		EndpointTimeout:     conf.EndpointTimeout,
 		Ip:                  conf.Ip,
 		TraceKey:            conf.TraceKey,
+		Logger:              logger,
 		Registry:            r,
 		Reporter:            nullVarz{},
 		AccessLogger:        accessLog,

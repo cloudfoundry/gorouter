@@ -4,11 +4,12 @@ import (
 	. "github.com/cloudfoundry/gorouter/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
 
 	"encoding/json"
 	"time"
@@ -23,7 +24,9 @@ var _ = Describe("RouteRegistry", func() {
 	var configObj *config.Config
 
 	BeforeEach(func() {
-		configObj = config.DefaultConfig()
+
+		logger := lagertest.NewTestLogger("test")
+		configObj = config.DefaultConfig(logger)
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
@@ -420,14 +423,14 @@ var _ = Describe("RouteRegistry", func() {
 		It("sends route metrics to the reporter", func() {
 			r.StartPruningCycle()
 
-			time.Sleep(configObj.PruneStaleDropletsInterval - configObj.DropletStaleThreshold / 2)
+			time.Sleep(configObj.PruneStaleDropletsInterval - configObj.DropletStaleThreshold/2)
 			r.Register("foo", fooEndpoint)
 			r.Register("fooo", fooEndpoint)
 
 			Eventually(reporter.CaptureRouteStatsCallCount).Should(Equal(1))
 			totalRoutes, timeSinceLastUpdate := reporter.CaptureRouteStatsArgsForCall(0)
 			Expect(totalRoutes).To(Equal(2))
-			Expect(timeSinceLastUpdate).To(BeNumerically("~",  5, 5))
+			Expect(timeSinceLastUpdate).To(BeNumerically("~", 5, 5))
 		})
 	})
 
