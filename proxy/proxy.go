@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudfoundry-incubator/cf-lager"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
@@ -19,7 +20,7 @@ import (
 	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/route_service"
-	steno "github.com/cloudfoundry/gosteno"
+	"github.com/pivotal-golang/lager"
 )
 
 const (
@@ -59,7 +60,7 @@ type ProxyArgs struct {
 type proxy struct {
 	ip                 string
 	traceKey           string
-	logger             *steno.Logger
+	logger             *lager.Logger
 	registry           LookupRegistry
 	reporter           metrics.ProxyReporter
 	accessLogger       access_log.AccessLogger
@@ -71,12 +72,13 @@ type proxy struct {
 
 func NewProxy(args ProxyArgs) Proxy {
 	routeServiceConfig := route_service.NewRouteServiceConfig(args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev)
+	logger, _ := cf_lager.New("router.proxy")
 
 	p := &proxy{
 		accessLogger: args.AccessLogger,
 		traceKey:     args.TraceKey,
 		ip:           args.Ip,
-		logger:       steno.NewLogger("router.proxy"),
+		logger:       &logger,
 		registry:     args.Registry,
 		reporter:     args.Reporter,
 		transport: &http.Transport{
@@ -178,7 +180,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
-				handler.Logger().Set("RouteEndpoint", endpoint.ToLogData())
+				handler.Logger().Info("", lager.Data{"RouteEndpoint": endpoint.ToLogData()})
 				accessLog.RouteEndpoint = endpoint
 				p.reporter.CaptureRoutingRequest(endpoint, request)
 			}
