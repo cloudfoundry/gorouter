@@ -4,6 +4,7 @@ bin/*
 !bin/go
 /pkg
 *.test
+*.swp
 /tmp
 *.iml
 .idea/
