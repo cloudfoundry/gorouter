@@ -83,8 +83,8 @@ func (h *RequestHandler) HandleMissingRoute() {
 
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
 	var message string
-	if onlyAllowedHostCharacters(h.request.Host) {
-		message = fmt.Sprintf("Requested route ('%s') does not exist.", h.request.Host)	
+	if ValidHost(h.request.Host) {
+		message = fmt.Sprintf("Requested route ('%s') does not exist.", h.request.Host)
 	} else {
 		message = fmt.Sprintf("Requested route does not exist.")
 	}
@@ -327,24 +327,4 @@ func forwardIO(a, b net.Conn) {
 	go copy(b, a)
 
 	<-done
-}
-
-func onlyAllowedHostCharacters(host string) bool {
-	for i := 0; i < len(host); i++ {
-		c := host[i]
-		if !isHostCharacterAllowed(c) {
-			return false
-		}
-	}
-	return true
-}
-
-func isHostCharacterAllowed(c byte) bool {
-	/* To check valid host characters, refer to:
-	   - Section 3.1 of RFC 1738
-	   - Section 3.5 of RFC 1034
-	   - Section 2.1 of RFC 1123 */
-	return ' ' == c || '-' == c || '.' == c ||
-		('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
-		('0' <= c && c <= '9')
 }

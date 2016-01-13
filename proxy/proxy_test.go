@@ -223,13 +223,13 @@ var _ = Describe("Proxy", func() {
 	It("responds with 404 for a not found host name with only valid characters", func() {
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz. 0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ ", "/", nil)
+		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ ", "/", nil)
 		conn.WriteRequest(req)
 
 		resp, body := conn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz. 0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
+		Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
 	})
 
 	It("responds to misbehaving host with 502", func() {
