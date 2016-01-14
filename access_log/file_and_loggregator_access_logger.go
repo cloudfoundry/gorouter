@@ -2,6 +2,7 @@ package access_log
 
 import (
 	"io"
+	"log"
 	"regexp"
 
 	"github.com/cloudfoundry/dropsonde/logs"
@@ -12,12 +13,14 @@ type FileAndLoggregatorAccessLogger struct {
 	channel                 chan AccessLogRecord
 	stopCh                  chan struct{}
 	writer                  io.Writer
+	logger                  *log.Logger
 }
 
-func NewFileAndLoggregatorAccessLogger(f io.Writer, dropsondeSourceInstance string) *FileAndLoggregatorAccessLogger {
+func NewFileAndLoggregatorAccessLogger(f io.Writer, dropsondeSourceInstance string, logger *log.Logger) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
 		writer:                  f,
+		logger:                  logger,
 		channel:                 make(chan AccessLogRecord, 128),
 		stopCh:                  make(chan struct{}),
 	}
@@ -36,6 +39,9 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 			if x.dropsondeSourceInstance != "" && record.ApplicationId() != "" {
 				logs.SendAppLog(record.ApplicationId(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
 			}
+			if x.logger != nil {
+				x.logger.Print(&record)
+			}
 		case <-x.stopCh:
 			return
 		}
@@ -48,6 +54,10 @@ func (x *FileAndLoggregatorAccessLogger) FileWriter() io.Writer {
 
 func (x *FileAndLoggregatorAccessLogger) DropsondeSourceInstance() string {
 	return x.dropsondeSourceInstance
+}
+
+func (x *FileAndLoggregatorAccessLogger) Logger() *log.Logger {
+	return x.logger
 }
 
 func (x *FileAndLoggregatorAccessLogger) Stop() {

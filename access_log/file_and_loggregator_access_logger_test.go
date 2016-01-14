@@ -1,6 +1,9 @@
 package access_log_test
 
 import (
+	"bytes"
+	"sync"
+
 	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	"github.com/cloudfoundry/dropsonde/logs"
 	. "github.com/cloudfoundry/gorouter/access_log"
@@ -10,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -23,7 +27,7 @@ var _ = Describe("AccessLog", func() {
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42")
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42", nil)
 			go accessLogger.Run()
 
 			accessLogger.Log(*CreateAccessLogRecord())
@@ -43,7 +47,7 @@ var _ = Describe("AccessLog", func() {
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43")
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43", nil)
 
 			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
 
@@ -56,14 +60,30 @@ var _ = Describe("AccessLog", func() {
 
 			accessLogger.Stop()
 		})
+	})
 
+	Context("with a logger instance", func() {
+		It("logs to logger", func() {
+			b := new(SyncBuffer)
+			logger := log.New(b, "", 0)
+
+			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "", logger)
+
+			record := CreateAccessLogRecord()
+			accessLogger.Log(*record)
+			go accessLogger.Run()
+
+			Eventually(func() string { return b.String() }).Should(Equal(record.String()))
+
+			accessLogger.Stop()
+		})
 	})
 
 	Context("with a file", func() {
 		It("writes to the log file", func() {
 			var fakeFile = new(test_util.FakeFile)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "")
+			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "", nil)
 			go accessLogger.Run()
 			accessLogger.Log(*CreateAccessLogRecord())
 
@@ -132,4 +152,21 @@ type nullWriter struct{}
 
 func (n nullWriter) Write(b []byte) (int, error) {
 	return len(b), nil
+}
+
+type SyncBuffer struct {
+	mutex  sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (b *SyncBuffer) Write(data []byte) (int, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.buffer.Write(data)
+}
+
+func (b *SyncBuffer) String() string {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.buffer.String()
 }

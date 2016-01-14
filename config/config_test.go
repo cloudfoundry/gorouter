@@ -181,7 +181,7 @@ ssl_skip_validation: true
 
 		It("sets the route service secret config", func() {
 			var b = []byte(`
-route_services_secret: super-route-service-secret 
+route_services_secret: super-route-service-secret
 `)
 			config.Initialize(b)
 			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))
