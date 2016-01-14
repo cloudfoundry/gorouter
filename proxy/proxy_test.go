@@ -193,7 +193,24 @@ var _ = Describe("Proxy", func() {
 		resp, body := conn.ReadResponse()
 		Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
 		Expect(resp.Header.Get("Expires")).To(Equal("0"))
+		Expect(resp.Status).To(Equal("200 OK"))
 		Expect(body).To(Equal("ok\n"))
+	})
+
+	It("responds with failure to load balancer check after StopHeartbeat() has been called", func() {
+		p.Drain()
+
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "", "/", nil)
+		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+		conn.WriteRequest(req)
+
+		resp, body := conn.ReadResponse()
+		Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
+		Expect(resp.Header.Get("Expires")).To(Equal("0"))
+		Expect(resp.Status).NotTo(Equal("200 OK"))
+		Expect(body).NotTo(Equal("ok\n"))
 	})
 
 	It("responds to unknown host with 404", func() {

@@ -262,7 +262,7 @@ var _ = Describe("Router", func() {
 			<-blocker
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(drainTimeout)
+				err := router.Drain(0, drainTimeout)
 				Expect(err).ToNot(HaveOccurred())
 				resultCh <- true
 			}()
@@ -312,7 +312,7 @@ var _ = Describe("Router", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(500 * time.Millisecond)
+				err := router.Drain(0, 500*time.Millisecond)
 				resultCh <- err
 			}()
 
@@ -371,7 +371,7 @@ var _ = Describe("Router", func() {
 				<-blocker
 				go func() {
 					defer GinkgoRecover()
-					err := router.Drain(drainTimeout)
+					err := router.Drain(0, drainTimeout)
 					Expect(err).ToNot(HaveOccurred())
 					resultCh <- true
 				}()
