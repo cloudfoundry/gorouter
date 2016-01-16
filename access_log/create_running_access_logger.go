@@ -8,6 +8,7 @@ import (
 	"github.com/pivotal-golang/lager"
 
 	"os"
+	"io"
 )
 
 func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (AccessLogger, error) {
@@ -18,12 +19,15 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 
 	var err error
 	var file *os.File
+	var writers []io.Writer
 	if config.AccessLog != "" {
 		file, err = os.OpenFile(config.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Error creating accesslog file, %s", config.AccessLog), err)
 			return nil, err
 		}
+		writers = append(writers, file)
+		writers = append(writers, os.Stdout)
 	}
 
 	var dropsondeSourceInstance string
@@ -31,7 +35,7 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
 	}
 
-	accessLogger := NewFileAndLoggregatorAccessLogger(file, dropsondeSourceInstance)
+	accessLogger := NewFileAndLoggregatorAccessLogger(logger, dropsondeSourceInstance, writers...)
 	go accessLogger.Run()
 	return accessLogger, nil
 }

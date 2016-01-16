@@ -9,21 +9,29 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/cloudfoundry/gosteno"
 
 	"net/http"
 	"net/url"
 	"time"
+	"os"
 )
 
 var _ = Describe("AccessLog", func() {
 
+	var (
+		logger       *gosteno.Logger	
+	)
 	Context("with a dropsonde source instance", func() {
+
+		BeforeEach(func(){
+			logger = gosteno.NewLogger("access_logger_test")			
+		})
 		It("logs to dropsonde", func() {
 
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
-
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "42")
+			accessLogger := NewFileAndLoggregatorAccessLogger(logger, "42")
 			go accessLogger.Run()
 
 			accessLogger.Log(*CreateAccessLogRecord())
@@ -43,7 +51,7 @@ var _ = Describe("AccessLog", func() {
 			fakeLogSender := fake.NewFakeLogSender()
 			logs.Initialize(fakeLogSender)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(nil, "43")
+			accessLogger := NewFileAndLoggregatorAccessLogger(logger, "43")
 
 			routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
 
@@ -63,8 +71,9 @@ var _ = Describe("AccessLog", func() {
 		It("writes to the log file", func() {
 			var fakeFile = new(test_util.FakeFile)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(fakeFile, "")
+			accessLogger := NewFileAndLoggregatorAccessLogger(logger, "", fakeFile)
 			go accessLogger.Run()
+
 			accessLogger.Log(*CreateAccessLogRecord())
 
 			var payload []byte
@@ -73,6 +82,29 @@ var _ = Describe("AccessLog", func() {
 				return n
 			}).ShouldNot(Equal(0))
 			Expect(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
+
+			var stdPayload []byte
+			Eventually(func() int {
+				n, _ := os.Stdout.Read(stdPayload)
+				return n
+			}).ShouldNot(Equal(0))
+			// Expect(string(stdPayload)).To(MatchRegexp("^.*foo.bar.*\n"))
+
+			// var stdoutBuffer bytes.Buffer
+			// fmt.Fprintln(io.Writer(&stdoutBuffer), os.Stdout)
+			// //os.Stdout = &stdoutBuffer
+			// fmt.Println("this is the buffer ", stdoutBuffer.String())
+
+
+			// var stdPayload []byte
+			// Eventually(func() int {
+			// 	out, _ := ioutil.ReadFile(os.Stdout)
+			// 	fmt.Print(string(out))
+			// 	// n, _ := os.Stdout.Read(stdPayload)
+			// 	// return n
+			// 	return 0
+			// }).ShouldNot(Equal(0))
+			// Expect(string(stdPayload)).To(MatchRegexp("^.*foo.bar.*\n"))
 
 			accessLogger.Stop()
 		})
