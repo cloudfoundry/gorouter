@@ -248,9 +248,5 @@ func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *vca
 		logger.RegisterSink(lager.NewWriterSink(file, logLevel))
 	}
 
-	// if c.Logging.Syslog != "" {
-	// 	s = append(s, steno.NewSyslogSink(c.Logging.Syslog))
-	// }
-
 	logger.RegisterSink(logCounter)
 }

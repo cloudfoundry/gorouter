@@ -65,7 +65,7 @@ var _ = JustBeforeEach(func() {
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 
 	accessLogFile = new(test_util.FakeFile)
-	accessLog = access_log.NewFileAndLoggregatorAccessLogger(accessLogFile, "")
+	accessLog = access_log.NewFileAndLoggregatorAccessLogger(logger, "", accessLogFile)
 	go accessLog.Run()
 
 	conf.EnableSSL = true

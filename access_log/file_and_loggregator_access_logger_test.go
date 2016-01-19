@@ -1,31 +1,36 @@
 package access_log_test
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	"github.com/cloudfoundry/dropsonde/logs"
 	. "github.com/cloudfoundry/gorouter/access_log"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test_util"
+	"github.com/pivotal-golang/lager"
+	"github.com/pivotal-golang/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/cloudfoundry/gosteno"
 
 	"net/http"
 	"net/url"
 	"time"
-	"os"
 )
 
 var _ = Describe("AccessLog", func() {
 
 	var (
-		logger       *gosteno.Logger	
+		logger lager.Logger
 	)
 	Context("with a dropsonde source instance", func() {
 
-		BeforeEach(func(){
-			logger = gosteno.NewLogger("access_logger_test")			
+		BeforeEach(func() {
+			logger = lagertest.NewTestLogger("test")
+
 		})
 		It("logs to dropsonde", func() {
 
@@ -67,44 +72,33 @@ var _ = Describe("AccessLog", func() {
 
 	})
 
-	Context("with a file", func() {
-		It("writes to the log file", func() {
-			var fakeFile = new(test_util.FakeFile)
+	Context("created with access log file", func() {
+		It("writes to the log file and Stdout", func() {
+			var fakeAccessFile = new(test_util.FakeFile)
+			fname := filepath.Join(os.TempDir(), "stdout")
+			oldStdout := os.Stdout
+			tempStdout, _ := os.Create(fname)
+			defer tempStdout.Close()
+			os.Stdout = tempStdout
+			accessLogger := NewFileAndLoggregatorAccessLogger(logger, "", fakeAccessFile, os.Stdout)
 
-			accessLogger := NewFileAndLoggregatorAccessLogger(logger, "", fakeFile)
 			go accessLogger.Run()
-
 			accessLogger.Log(*CreateAccessLogRecord())
+
+			os.Stdout = oldStdout
+			var stdoutPayload []byte
+			Eventually(func() int {
+				stdoutPayload, _ = ioutil.ReadFile(fname)
+				return len(stdoutPayload)
+			}).ShouldNot(Equal(0))
+			Expect(string(stdoutPayload)).To(MatchRegexp("^.*foo.bar.*\n"))
 
 			var payload []byte
 			Eventually(func() int {
-				n, _ := fakeFile.Read(&payload)
+				n, _ := fakeAccessFile.Read(&payload)
 				return n
 			}).ShouldNot(Equal(0))
 			Expect(string(payload)).To(MatchRegexp("^.*foo.bar.*\n"))
-
-			var stdPayload []byte
-			Eventually(func() int {
-				n, _ := os.Stdout.Read(stdPayload)
-				return n
-			}).ShouldNot(Equal(0))
-			// Expect(string(stdPayload)).To(MatchRegexp("^.*foo.bar.*\n"))
-
-			// var stdoutBuffer bytes.Buffer
-			// fmt.Fprintln(io.Writer(&stdoutBuffer), os.Stdout)
-			// //os.Stdout = &stdoutBuffer
-			// fmt.Println("this is the buffer ", stdoutBuffer.String())
-
-
-			// var stdPayload []byte
-			// Eventually(func() int {
-			// 	out, _ := ioutil.ReadFile(os.Stdout)
-			// 	fmt.Print(string(out))
-			// 	// n, _ := os.Stdout.Read(stdPayload)
-			// 	// return n
-			// 	return 0
-			// }).ShouldNot(Equal(0))
-			// Expect(string(stdPayload)).To(MatchRegexp("^.*foo.bar.*\n"))
 
 			accessLogger.Stop()
 		})
