@@ -364,6 +364,27 @@ var _ = Describe("RouteFetcher", func() {
 						}).Should(BeNumerically(">", currentSubscribeEventsErrors))
 					})
 				})
+
+				Context("with unauthorized error", func() {
+					BeforeEach(func() {
+						client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
+							err := errors.New("401 Unauthorized")
+							return &fake_routing_api.FakeEventSource{}, err
+						}
+					})
+
+					It("logs the error and tries again by not using cached access token", func() {
+						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
+						Eventually(logger).Should(gbytes.Say("401 Unauthorized"))
+						Eventually(tokenFetcher.FetchTokenCallCount()).Should(BeNumerically(">", 2))
+						Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
+						Expect(tokenFetcher.FetchTokenArgsForCall(1)).To(BeFalse())
+
+						Eventually(func() uint64 {
+							return sender.GetCounter(SubscribeEventsErrors)
+						}).Should(BeNumerically(">", currentSubscribeEventsErrors))
+					})
+				})
 			})
 		})
 	})
