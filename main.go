@@ -193,7 +193,7 @@ func newTokenFetcher(logger lager.Logger, clock clock.Clock, c *config.Config) t
 		logger.Error("Error creating token fetcher: %s\n", err)
 		os.Exit(1)
 	}
-	logger.Info("using uaa token fetcher")
+	logger.Info("Fetching token from UAA")
 	return tokenFetcher
 }
 
