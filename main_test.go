@@ -469,7 +469,7 @@ var _ = Describe("Router Integration", func() {
 				writeConfig(config, cfgFile)
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
-				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using uaa token fetcher"))
+				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("Fetching token from UAA"))
 				stopGorouter(session)
 			})
 
