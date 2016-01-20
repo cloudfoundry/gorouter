@@ -109,6 +109,19 @@ var _ = Describe("Router", func() {
 		return signals, closeChannel
 	}
 
+	healthCheckReceives := func() int {
+		url := fmt.Sprintf("http://%s:%d/", config.Ip, config.Port)
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(resp).ToNot(BeNil())
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
 	testRouterDrain := func(config *cfg.Config, mbusClient yagnats.NATSConn, registry *rregistry.RouteRegistry, initiateDrain func()) {
 		app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
@@ -330,7 +343,10 @@ var _ = Describe("Router", func() {
 			It("it drains and stops the router", func() {
 				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 				blocker := make(chan bool)
-				resultCh := make(chan bool, 2)
+				drainDone := make(chan bool)
+				clientDone := make(chan bool)
+				serviceUnavailable := make(chan bool)
+
 				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 					blocker <- true
 
@@ -349,6 +365,7 @@ var _ = Describe("Router", func() {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
+				drainWait := 1 * time.Second
 				drainTimeout := 1 * time.Second
 
 				go func() {
@@ -370,23 +387,56 @@ var _ = Describe("Router", func() {
 					defer resp.Body.Close()
 					_, err = ioutil.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
-					resultCh <- false
+					clientDone <- true
 				}()
 
+				// check for ok health
+				Consistently(func() int {
+					return healthCheckReceives()
+				}, 100*time.Millisecond).Should(Equal(http.StatusOK))
+
+				// wait for app to receive request
 				<-blocker
+
+				// check drain makes gorouter returns service unavailable
 				go func() {
 					defer GinkgoRecover()
-					err := router.Drain(0, drainTimeout)
-					Expect(err).ToNot(HaveOccurred())
-					resultCh <- true
+					Eventually(func() int {
+						result := healthCheckReceives()
+						if result == http.StatusServiceUnavailable {
+							serviceUnavailable <- true
+						}
+						return result
+					}, 100*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
 				}()
 
-				Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
+				// check that we can still connect within drainWait time
+				go func() {
+					defer GinkgoRecover()
+					<-serviceUnavailable
+					Consistently(func() int {
+						return healthCheckReceives()
+					}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+				}()
 
+				// trigger drain
+				go func() {
+					defer GinkgoRecover()
+					err := router.Drain(drainWait, drainTimeout)
+					Expect(err).ToNot(HaveOccurred())
+					drainDone <- true
+				}()
+
+				Consistently(drainDone, drainTimeout/10).ShouldNot(Receive())
+
+				// drain in progress, continue with current request
 				blocker <- false
 
 				var result bool
-				Eventually(resultCh).Should(Receive(&result))
+				Eventually(drainDone).Should(Receive(&result))
+				Expect(result).To(BeTrue())
+
+				Eventually(clientDone).Should(Receive(&result))
 				Expect(result).To(BeTrue())
 			})
 		})
