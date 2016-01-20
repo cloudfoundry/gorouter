@@ -365,7 +365,7 @@ var _ = Describe("RouteFetcher", func() {
 					})
 				})
 
-				Context("with unauthorized error", func() {
+				Context("with 401 Unauthorized error", func() {
 					BeforeEach(func() {
 						client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
 							err := errors.New("401 Unauthorized")
