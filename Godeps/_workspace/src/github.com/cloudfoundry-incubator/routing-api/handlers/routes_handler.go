@@ -10,14 +10,14 @@ import (
 )
 
 type RoutesHandler struct {
-	token     authentication.Token
+	token     authentication.TokenValidator
 	maxTTL    int
 	validator RouteValidator
 	db        db.DB
 	logger    lager.Logger
 }
 
-func NewRoutesHandler(token authentication.Token, maxTTL int, validator RouteValidator, database db.DB, logger lager.Logger) *RoutesHandler {
+func NewRoutesHandler(token authentication.TokenValidator, maxTTL int, validator RouteValidator, database db.DB, logger lager.Logger) *RoutesHandler {
 	return &RoutesHandler{
 		token:     token,
 		maxTTL:    maxTTL,

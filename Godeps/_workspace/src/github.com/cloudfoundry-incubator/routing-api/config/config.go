@@ -14,7 +14,7 @@ type MetronConfig struct {
 }
 
 type Config struct {
-	UAAPublicKey                    string        `yaml:"uaa_verification_key"`
+	UAAEndpoint                     string        `yaml:"uaa_url"`
 	DebugAddress                    string        `yaml:"debug_address"`
 	LogGuid                         string        `yaml:"log_guid"`
 	MetronConfig                    MetronConfig  `yaml:"metron_config"`
@@ -51,8 +51,8 @@ func (cfg *Config) Initialize(file []byte, authDisabled bool) error {
 		return errors.New("No log_guid specified")
 	}
 
-	if !authDisabled && cfg.UAAPublicKey == "" {
-		return errors.New("No uaa_verification_key specified")
+	if !authDisabled && cfg.UAAEndpoint == "" {
+		return errors.New("No UAA url specified")
 	}
 
 	err = cfg.process()

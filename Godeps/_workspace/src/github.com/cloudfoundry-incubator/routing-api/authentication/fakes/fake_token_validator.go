@@ -7,7 +7,7 @@ import (
 	"github.com/cloudfoundry-incubator/routing-api/authentication"
 )
 
-type FakeToken struct {
+type FakeTokenValidator struct {
 	DecodeTokenStub        func(userToken string, desiredPermissions ...string) error
 	decodeTokenMutex       sync.RWMutex
 	decodeTokenArgsForCall []struct {
@@ -20,12 +20,12 @@ type FakeToken struct {
 	CheckPublicTokenStub        func() error
 	checkPublicTokenMutex       sync.RWMutex
 	checkPublicTokenArgsForCall []struct{}
-	checkPublicTokenReturns     struct {
+	checkPublicTokenReturns struct {
 		result1 error
 	}
 }
 
-func (fake *FakeToken) DecodeToken(userToken string, desiredPermissions ...string) error {
+func (fake *FakeTokenValidator) DecodeToken(userToken string, desiredPermissions ...string) error {
 	fake.decodeTokenMutex.Lock()
 	fake.decodeTokenArgsForCall = append(fake.decodeTokenArgsForCall, struct {
 		userToken          string
@@ -39,26 +39,26 @@ func (fake *FakeToken) DecodeToken(userToken string, desiredPermissions ...strin
 	}
 }
 
-func (fake *FakeToken) DecodeTokenCallCount() int {
+func (fake *FakeTokenValidator) DecodeTokenCallCount() int {
 	fake.decodeTokenMutex.RLock()
 	defer fake.decodeTokenMutex.RUnlock()
 	return len(fake.decodeTokenArgsForCall)
 }
 
-func (fake *FakeToken) DecodeTokenArgsForCall(i int) (string, []string) {
+func (fake *FakeTokenValidator) DecodeTokenArgsForCall(i int) (string, []string) {
 	fake.decodeTokenMutex.RLock()
 	defer fake.decodeTokenMutex.RUnlock()
 	return fake.decodeTokenArgsForCall[i].userToken, fake.decodeTokenArgsForCall[i].desiredPermissions
 }
 
-func (fake *FakeToken) DecodeTokenReturns(result1 error) {
+func (fake *FakeTokenValidator) DecodeTokenReturns(result1 error) {
 	fake.DecodeTokenStub = nil
 	fake.decodeTokenReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeToken) CheckPublicToken() error {
+func (fake *FakeTokenValidator) CheckPublicToken() error {
 	fake.checkPublicTokenMutex.Lock()
 	fake.checkPublicTokenArgsForCall = append(fake.checkPublicTokenArgsForCall, struct{}{})
 	fake.checkPublicTokenMutex.Unlock()
@@ -69,17 +69,17 @@ func (fake *FakeToken) CheckPublicToken() error {
 	}
 }
 
-func (fake *FakeToken) CheckPublicTokenCallCount() int {
+func (fake *FakeTokenValidator) CheckPublicTokenCallCount() int {
 	fake.checkPublicTokenMutex.RLock()
 	defer fake.checkPublicTokenMutex.RUnlock()
 	return len(fake.checkPublicTokenArgsForCall)
 }
 
-func (fake *FakeToken) CheckPublicTokenReturns(result1 error) {
+func (fake *FakeTokenValidator) CheckPublicTokenReturns(result1 error) {
 	fake.CheckPublicTokenStub = nil
 	fake.checkPublicTokenReturns = struct {
 		result1 error
 	}{result1}
 }
 
-var _ authentication.Token = new(FakeToken)
+var _ authentication.TokenValidator = new(FakeTokenValidator)

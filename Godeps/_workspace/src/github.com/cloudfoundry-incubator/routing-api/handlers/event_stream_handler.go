@@ -14,20 +14,20 @@ import (
 )
 
 type EventStreamHandler struct {
-	token    authentication.Token
-	db       db.DB
-	logger   lager.Logger
-	stats    metrics.PartialStatsdClient
-	stopChan <-chan struct{}
+	tokenValidator authentication.TokenValidator
+	db             db.DB
+	logger         lager.Logger
+	stats          metrics.PartialStatsdClient
+	stopChan       <-chan struct{}
 }
 
-func NewEventStreamHandler(token authentication.Token, database db.DB, logger lager.Logger, stats metrics.PartialStatsdClient, stopChan <-chan struct{}) *EventStreamHandler {
+func NewEventStreamHandler(tokenValidator authentication.TokenValidator, database db.DB, logger lager.Logger, stats metrics.PartialStatsdClient, stopChan <-chan struct{}) *EventStreamHandler {
 	return &EventStreamHandler{
-		token:    token,
-		db:       database,
-		logger:   logger,
-		stats:    stats,
-		stopChan: stopChan,
+		tokenValidator: tokenValidator,
+		db:             database,
+		logger:         logger,
+		stats:          stats,
+		stopChan:       stopChan,
 	}
 }
 
@@ -48,7 +48,7 @@ func (h *EventStreamHandler) TcpEventStream(w http.ResponseWriter, req *http.Req
 func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey string,
 	w http.ResponseWriter, req *http.Request) {
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
+	err := h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return

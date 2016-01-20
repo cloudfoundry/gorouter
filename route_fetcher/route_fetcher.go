@@ -2,7 +2,6 @@ package route_fetcher
 
 import (
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -98,7 +97,7 @@ func (r *RouteFetcher) startEventCycle() {
 					return
 				}
 				err = r.subscribeToEvents(token)
-				if err != nil && caseInsensitiveContains(err.Error(), "unauthorized") {
+				if err != nil && err.Error() == "unauthorized" {
 					useCachedToken = false
 				} else {
 					useCachedToken = true
@@ -163,7 +162,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 		r.client.SetToken(token.AccessToken)
 		routes, err = r.client.Routes()
 		if err != nil {
-			if caseInsensitiveContains(err.Error(), "unauthorized") {
+			if err.Error() == "unauthorized" {
 				useCachedToken = false
 			} else {
 				return err
@@ -232,11 +231,6 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []db.Route) {
 				aRoute.RouteServiceUrl,
 			))
 	}
-}
-
-func caseInsensitiveContains(s, substr string) bool {
-	s, substr = strings.ToUpper(s), strings.ToUpper(substr)
-	return strings.Contains(s, substr)
 }
 
 func routeEquals(current, desired db.Route) bool {

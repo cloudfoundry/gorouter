@@ -121,6 +121,10 @@ func (c *client) doSubscribe(routeName string) (RawEventSource, error) {
 		return request
 	})
 	if err != nil {
+		bre, ok := err.(sse.BadResponseError)
+		if ok && bre.Response.StatusCode == http.StatusUnauthorized {
+			return nil, Error{Type: "unauthorized", Message: "unauthorized"}
+		}
 		return nil, err
 	}
 
@@ -166,6 +170,10 @@ func (c *client) do(req *http.Request, response interface{}) error {
 	defer res.Body.Close()
 
 	trace.DumpResponse(res)
+
+	if res.StatusCode == http.StatusUnauthorized {
+		return Error{Type: "unauthorized", Message: "unauthorized"}
+	}
 
 	if res.StatusCode > 299 {
 		errResponse := Error{}

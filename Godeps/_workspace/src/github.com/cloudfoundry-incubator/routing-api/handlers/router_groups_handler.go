@@ -12,14 +12,14 @@ import (
 )
 
 type RouterGroupsHandler struct {
-	token  authentication.Token
-	logger lager.Logger
+	tokenValidator authentication.TokenValidator
+	logger         lager.Logger
 }
 
-func NewRouteGroupsHandler(token authentication.Token, logger lager.Logger) *RouterGroupsHandler {
+func NewRouteGroupsHandler(tokenValidator authentication.TokenValidator, logger lager.Logger) *RouterGroupsHandler {
 	return &RouterGroupsHandler{
-		token:  token,
-		logger: logger,
+		tokenValidator: tokenValidator,
+		logger:         logger,
 	}
 }
 
@@ -28,7 +28,7 @@ func (h *RouterGroupsHandler) ListRouterGroups(w http.ResponseWriter, req *http.
 	log.Debug("started")
 	defer log.Debug("completed")
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), RouterGroupsReadScope)
+	err := h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RouterGroupsReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return

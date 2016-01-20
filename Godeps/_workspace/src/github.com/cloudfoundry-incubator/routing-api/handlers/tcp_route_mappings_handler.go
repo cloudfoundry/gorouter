@@ -10,25 +10,25 @@ import (
 )
 
 type TcpRouteMappingsHandler struct {
-	token     authentication.Token
-	validator RouteValidator
-	db        db.DB
-	logger    lager.Logger
+	tokenValidator authentication.TokenValidator
+	validator      RouteValidator
+	db             db.DB
+	logger         lager.Logger
 }
 
-func NewTcpRouteMappingsHandler(token authentication.Token, validator RouteValidator, database db.DB, logger lager.Logger) *TcpRouteMappingsHandler {
+func NewTcpRouteMappingsHandler(tokenValidator authentication.TokenValidator, validator RouteValidator, database db.DB, logger lager.Logger) *TcpRouteMappingsHandler {
 	return &TcpRouteMappingsHandler{
-		token:     token,
-		validator: validator,
-		db:        database,
-		logger:    logger,
+		tokenValidator: tokenValidator,
+		validator:      validator,
+		db:             database,
+		logger:         logger,
 	}
 }
 
 func (h *TcpRouteMappingsHandler) List(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("list-tcp-route-mappings")
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
+	err := h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -55,7 +55,7 @@ func (h *TcpRouteMappingsHandler) Upsert(w http.ResponseWriter, req *http.Reques
 
 	log.Info("request", lager.Data{"tcp_mapping_creation": tcpMappings})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
+	err = h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -91,7 +91,7 @@ func (h *TcpRouteMappingsHandler) Delete(w http.ResponseWriter, req *http.Reques
 
 	log.Info("request", lager.Data{"tcp_mapping_deletion": tcpMappings})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
+	err = h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
