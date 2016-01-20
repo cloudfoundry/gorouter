@@ -255,12 +255,11 @@ The GoRouter is, in simple terms, a reverse proxy that load balances between man
 
 ## Logs
 
-The router's logging is specified in its YAML configuration file, in a [steno configuration format](http://github.com/cloudfoundry/steno#from-yaml-file).
-The meanings of the router's log levels are as follows:
+The router's logging is specified in its YAML configuration file. It supports the following log levels:
 
-* `fatal` - An error has occurred that makes the current request unservicable.
+* `fatal` - A fatal error has occurred that makes gorouter unable to handle any requests.
 Examples: the router can't bind to its TCP port, a CF component has published invalid data to the router.
-* `warn` - An unexpected state has occurred. Examples: the router tried to publish data that could not be encoded as JSON
+* `error` - An unexpected error has occurred. Examples: the router failed to fetch token from UAA service.
 * `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
 to prune routes for stale droplets.
 
@@ -269,6 +268,8 @@ Access logs provide information for the following fields when recieving a reques
 `<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> <Extra Headers>`
 * Status Code, Response Time, Application ID, and Extra Headers are all optional fields
 * The absence of Status Code, Response Time or Application ID will result in a "-" in the corresponding field
+
+Access logs are also redirected to syslog.
 
 ## Contributing
 
