@@ -355,7 +355,7 @@ var _ = Describe("RouteFetcher", func() {
 					It("logs the error and tries again by not using cached access token", func() {
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 						Eventually(logger).Should(gbytes.Say("unauthorized"))
-						Eventually(tokenFetcher.FetchTokenCallCount()).Should(BeNumerically(">", 2))
+						Eventually(tokenFetcher.FetchTokenCallCount).Should(BeNumerically(">", 2))
 						Expect(tokenFetcher.FetchTokenArgsForCall(0)).To(BeTrue())
 						Expect(tokenFetcher.FetchTokenArgsForCall(1)).To(BeFalse())
 

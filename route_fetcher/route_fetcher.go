@@ -57,7 +57,7 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 	r.startEventCycle()
 
 	ticker := r.clock.NewTicker(r.FetchRoutesInterval)
-
+	r.logger.Debug("created-ticker", lager.Data{"interval": r.FetchRoutesInterval})
 	for {
 		select {
 		case <-ticker.C():
@@ -88,10 +88,11 @@ func (r *RouteFetcher) startEventCycle() {
 	go func() {
 		useCachedToken := true
 		for {
+			r.logger.Debug("fetching-token")
 			token, err := r.TokenFetcher.FetchToken(useCachedToken)
 			if err != nil {
 				metrics.IncrementCounter(TokenFetchErrors)
-				r.logger.Error("Failed to fetch Token: ", err)
+				r.logger.Error("failed-to-fetch-token", err)
 			} else {
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
@@ -150,16 +151,20 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 }
 
 func (r *RouteFetcher) FetchRoutes() error {
+	r.logger.Debug("fetch-routes-started")
+	defer r.logger.Debug("fetch-routes-completed")
 	useCachedToken := true
 	var err error
 	var routes []db.Route
 	for count := 0; count < 2; count++ {
+		r.logger.Debug("fetching-token")
 		token, tokenErr := r.TokenFetcher.FetchToken(useCachedToken)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
 		}
 		r.client.SetToken(token.AccessToken)
+		r.logger.Debug("fetching-routes")
 		routes, err = r.client.Routes()
 		if err != nil {
 			if err.Error() == "unauthorized" {
@@ -173,6 +178,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	}
 
 	if err == nil {
+		r.logger.Debug("refreshing-endpoints")
 		r.refreshEndpoints(routes)
 	}
 
