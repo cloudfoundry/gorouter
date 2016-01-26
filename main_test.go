@@ -479,7 +479,7 @@ var _ = Describe("Router Integration", func() {
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(session, 30*time.Second).Should(Say("Unable to fetch token"))
-					Expect(session).To(Exit(1))
+					Eventually(session, 5 * time.Second).Should(Exit(1))
 				})
 			})
 		})
