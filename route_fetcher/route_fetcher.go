@@ -94,6 +94,7 @@ func (r *RouteFetcher) startEventCycle() {
 				metrics.IncrementCounter(TokenFetchErrors)
 				r.logger.Error("failed-to-fetch-token", err)
 			} else {
+				r.logger.Debug("token-fetched-successfully")
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
 				}
