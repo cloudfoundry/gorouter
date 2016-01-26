@@ -241,7 +241,9 @@ var _ = Describe("Router", func() {
 		It("waits until the last request completes", func() {
 			app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 			blocker := make(chan bool)
-			resultCh := make(chan bool, 2)
+			drainDone := make(chan struct{})
+			clientDone := make(chan struct{})
+
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 
@@ -274,7 +276,7 @@ var _ = Describe("Router", func() {
 				defer resp.Body.Close()
 				_, err = ioutil.ReadAll(resp.Body)
 				Expect(err).ToNot(HaveOccurred())
-				resultCh <- false
+				close(clientDone)
 			}()
 
 			<-blocker
@@ -282,16 +284,15 @@ var _ = Describe("Router", func() {
 				defer GinkgoRecover()
 				err := router.Drain(0, drainTimeout)
 				Expect(err).ToNot(HaveOccurred())
-				resultCh <- true
+				close(drainDone)
 			}()
 
-			Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
+			Consistently(drainDone, drainTimeout/10).ShouldNot(BeClosed())
 
 			blocker <- false
 
-			var result bool
-			Eventually(resultCh).Should(Receive(&result))
-			Expect(result).To(BeTrue())
+			Eventually(drainDone).Should(BeClosed())
+			Eventually(clientDone).Should(BeClosed())
 		})
 
 		It("times out if it takes too long", func() {
@@ -343,8 +344,8 @@ var _ = Describe("Router", func() {
 			It("it drains and stops the router", func() {
 				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 				blocker := make(chan bool)
-				drainDone := make(chan bool)
-				clientDone := make(chan bool)
+				drainDone := make(chan struct{})
+				clientDone := make(chan struct{})
 				serviceUnavailable := make(chan bool)
 
 				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -387,7 +388,7 @@ var _ = Describe("Router", func() {
 					defer resp.Body.Close()
 					_, err = ioutil.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
-					clientDone <- true
+					close(clientDone)
 				}()
 
 				// check for ok health
@@ -424,20 +425,16 @@ var _ = Describe("Router", func() {
 					defer GinkgoRecover()
 					err := router.Drain(drainWait, drainTimeout)
 					Expect(err).ToNot(HaveOccurred())
-					drainDone <- true
+					close(drainDone)
 				}()
 
-				Consistently(drainDone, drainTimeout/10).ShouldNot(Receive())
+				Consistently(drainDone, drainTimeout/10).ShouldNot(BeClosed())
 
 				// drain in progress, continue with current request
 				blocker <- false
 
-				var result bool
-				Eventually(drainDone).Should(Receive(&result))
-				Expect(result).To(BeTrue())
-
-				Eventually(clientDone).Should(Receive(&result))
-				Expect(result).To(BeTrue())
+				Eventually(drainDone).Should(BeClosed())
+				Eventually(clientDone).Should(BeClosed())
 			})
 		})
 	})
