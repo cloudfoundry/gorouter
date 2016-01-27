@@ -394,7 +394,7 @@ var _ = Describe("RouteRegistry", func() {
 			r.Register("foo", endpoint)
 
 			r.StopPruningCycle()
-			Expect(r.NumUris()).To(Equal(1))
+			Eventually(r.NumUris).Should(Equal(1))
 			Expect(r.NumEndpoints()).To(Equal(1))
 
 			p := r.Lookup("foo")
@@ -463,8 +463,8 @@ var _ = Describe("RouteRegistry", func() {
 			t := r.TimeOfLastUpdate()
 			end := time.Now()
 
-			Expect(start.Before(t)).To(BeTrue())
-			Expect(end.After(t)).To(BeTrue())
+			Expect(t.Before(start)).To(BeFalse())
+			Expect(t.After(end)).To(BeFalse())
 		})
 	})
 
