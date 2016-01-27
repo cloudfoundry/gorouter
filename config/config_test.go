@@ -75,7 +75,6 @@ nats:
 
 		It("sets default logging configs", func() {
 			Expect(config.Logging.File).To(Equal(""))
-			Expect(config.Logging.Syslog).To(Equal(""))
 			Expect(config.Logging.Level).To(Equal("debug"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 		})
@@ -84,14 +83,12 @@ nats:
 			var b = []byte(`
 logging:
   file: /tmp/file
-  syslog: syslog
   level: debug2
   loggregator_enabled: true
 `)
 			config.Initialize(b)
 
 			Expect(config.Logging.File).To(Equal("/tmp/file"))
-			Expect(config.Logging.Syslog).To(Equal("syslog"))
 			Expect(config.Logging.Level).To(Equal("debug2"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(true))
 			Expect(config.Logging.JobName).To(Equal("gorouter"))
@@ -181,7 +178,7 @@ ssl_skip_validation: true
 
 		It("sets the route service secret config", func() {
 			var b = []byte(`
-route_services_secret: super-route-service-secret 
+route_services_secret: super-route-service-secret
 `)
 			config.Initialize(b)
 			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))
