@@ -291,6 +291,14 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 func SetupProxyRequest(source *http.Request, target *http.Request,
 	routeServiceArgs route_service.RouteServiceArgs,
 	routeServiceConfig *route_service.RouteServiceConfig) {
+	if source.Header.Get("X-Forwarded-Proto") == "" {
+		scheme := "http"
+		if source.TLS != nil {
+			scheme = "https"
+		}
+		target.Header.Set("X-Forwarded-Proto", scheme)
+	}
+
 	target.URL.Scheme = "http"
 	target.URL.Host = source.Host
 	target.URL.Opaque = source.RequestURI
