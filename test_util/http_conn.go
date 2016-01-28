@@ -30,10 +30,10 @@ func NewHttpConn(x net.Conn) *HttpConn {
 
 func (x *HttpConn) ReadRequest() (*http.Request, string) {
 	req, err := http.ReadRequest(x.Reader)
-	Ω(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	b, err := ioutil.ReadAll(req.Body)
-	Ω(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	return req, string(b)
 }
@@ -71,7 +71,7 @@ func (x *HttpConn) WriteResponse(resp *http.Response) {
 
 func (x *HttpConn) CheckLine(expected string) {
 	l, err := x.Reader.ReadString('\n')
-	Ω(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	Expect(strings.TrimRight(l, "\r\n")).To(Equal(expected))
 }
 

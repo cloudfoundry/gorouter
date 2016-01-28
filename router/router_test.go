@@ -699,7 +699,7 @@ var _ = Describe("Router", func() {
 			}).Should(BeTrue())
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
-			Ω(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			x := test_util.NewHttpConn(conn)
 

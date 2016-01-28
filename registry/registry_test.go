@@ -373,7 +373,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(0))
 
 			marshalled, err := json.Marshal(r)
-			Ω(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			Expect(string(marshalled)).To(Equal(`{}`))
 		})
 
@@ -473,11 +473,11 @@ var _ = Describe("RouteRegistry", func() {
 		r.Register("foo", m)
 
 		marshalled, err := json.Marshal(r)
-		Ω(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		Expect(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234","ttl":-1,"route_service_url":"https://my-routeService.com"}]}`))
 		r.Unregister("foo", m)
 		marshalled, err = json.Marshal(r)
-		Ω(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		Expect(string(marshalled)).To(Equal(`{}`))
 	})
 })
