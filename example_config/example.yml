@@ -11,6 +11,7 @@ nats:
 
 logging:
   file:
+  syslog:
   level: debug
 
 port: 8081

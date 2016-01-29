@@ -50,6 +50,7 @@ var defaultNatsConfig = NatsConfig{
 
 type LoggingConfig struct {
 	File               string `yaml:"file"`
+	Syslog             string `yaml:"syslog"`
 	Level              string `yaml:"level"`
 	LoggregatorEnabled bool   `yaml:"loggregator_enabled"`
 	MetronAddress      string `yaml:"metron_address"`
