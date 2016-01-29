@@ -18,13 +18,13 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	It("creates null access loger if no access log and loggregator is disabled", func() {
-		config := config.DefaultConfig(logger)
+		config := config.DefaultConfig()
 
 		Expect(CreateRunningAccessLogger(logger, config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
 	})
 
 	It("creates an access log when loggegrator is enabled", func() {
-		config := config.DefaultConfig(logger)
+		config := config.DefaultConfig()
 		config.Logging.LoggregatorEnabled = true
 		config.AccessLog = ""
 
@@ -35,7 +35,7 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	It("creates an access log if an access log is specified", func() {
-		config := config.DefaultConfig(logger)
+		config := config.DefaultConfig()
 		config.AccessLog = "/dev/null"
 
 		accessLogger, _ := CreateRunningAccessLogger(logger, config)
@@ -45,7 +45,7 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	It("creates an AccessLogger if both access log and loggregator is enabled", func() {
-		config := config.DefaultConfig(logger)
+		config := config.DefaultConfig()
 		config.Logging.LoggregatorEnabled = true
 		config.AccessLog = "/dev/null"
 
@@ -56,7 +56,7 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	It("reports an error if the access log location is invalid", func() {
-		config := config.DefaultConfig(logger)
+		config := config.DefaultConfig()
 		config.AccessLog = "/this\\is/illegal"
 
 		a, err := CreateRunningAccessLogger(logger, config)

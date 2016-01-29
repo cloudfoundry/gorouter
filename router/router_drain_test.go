@@ -203,7 +203,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(config, mbusClient, new(fakes.FakeRouteReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{

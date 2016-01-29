@@ -26,14 +26,14 @@ var _ = Describe("RouteRegistry", func() {
 	BeforeEach(func() {
 
 		logger := lagertest.NewTestLogger("test")
-		configObj = config.DefaultConfig(logger)
+		configObj = config.DefaultConfig()
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
 		messageBus = fakeyagnats.Connect()
 		reporter = new(fakes.FakeRouteReporter)
 
-		r = NewRouteRegistry(configObj, messageBus, reporter)
+		r = NewRouteRegistry(logger, configObj, messageBus, reporter)
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", map[string]string{
 				"runtime":   "ruby18",

@@ -55,7 +55,7 @@ var _ = Describe("RouteFetcher", func() {
 
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("test")
-		cfg = config.DefaultConfig(logger)
+		cfg = config.DefaultConfig()
 		cfg.PruneStaleDropletsInterval = 2 * time.Second
 
 		retryInterval := 0
@@ -258,9 +258,9 @@ var _ = Describe("RouteFetcher", func() {
 				// to be consumed by by the eventSource.NextStub to avoid starvation
 				eventChannel <- routing_api.Event{}
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
-				Eventually(client.RoutesCallCount, 2 * time.Second, 50 * time.Millisecond).Should(Equal(1))
+				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
-				Eventually(client.RoutesCallCount, 2 * time.Second, 50 * time.Millisecond).Should(Equal(2))
+				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(2))
 			})
 		})
 

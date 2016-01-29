@@ -49,13 +49,18 @@ func main() {
 	cf_lager.AddFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger, _ := cf_lager.New("gorouter.stdout")
-	c := config.DefaultConfig(logger)
+	c := config.DefaultConfig()
 	logCounter := vcap.NewLogCounter()
 
 	if configFile != "" {
-		c = config.InitConfigFromFile(logger, configFile)
+		c = config.InitConfigFromFile(configFile)
 	}
+
+	prefix := "gorouter.stdout"
+	if c.Logging.Syslog != "" {
+		prefix = c.Logging.Syslog
+	}
+	logger, _ := cf_lager.New(prefix)
 
 	InitLoggerFromConfig(logger, c, logCounter)
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
@@ -77,7 +82,7 @@ func main() {
 	natsClient := connectToNatsServer(logger, c)
 
 	metricsReporter := metrics.NewMetricsReporter()
-	registry := rregistry.NewRouteRegistry(c, natsClient, metricsReporter)
+	registry := rregistry.NewRouteRegistry(logger, c, natsClient, metricsReporter)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)

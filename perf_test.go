@@ -21,9 +21,9 @@ import (
 var _ = Describe("AccessLogRecord", func() {
 	Measure("Register", func(b Benchmarker) {
 		logger := lagertest.NewTestLogger("test")
-		c := config.DefaultConfig(logger)
+		c := config.DefaultConfig()
 		mbus := fakeyagnats.Connect()
-		r := registry.NewRouteRegistry(c, mbus, new(fakes.FakeRouteReporter))
+		r := registry.NewRouteRegistry(logger, c, mbus, new(fakes.FakeRouteReporter))
 
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())

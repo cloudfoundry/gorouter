@@ -15,6 +15,7 @@ import (
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pivotal-golang/lager/lagertest"
 )
 
 var _ = Describe("Proxy Unit tests", func() {
@@ -35,7 +36,8 @@ var _ = Describe("Proxy Unit tests", func() {
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
 			mbus := fakeyagnats.Connect()
-			r = registry.NewRouteRegistry(conf, mbus, new(fakes.FakeRouteReporter))
+			logger := lagertest.NewTestLogger("test")
+			r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteReporter))
 
 			proxyObj = proxy.NewProxy(proxy.ProxyArgs{
 				EndpointTimeout:     conf.EndpointTimeout,

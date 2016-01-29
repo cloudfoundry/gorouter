@@ -42,9 +42,9 @@ type RouteRegistry struct {
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteReporter) *RouteRegistry {
+func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteReporter) *RouteRegistry {
 	r := &RouteRegistry{}
-	r.logger = c.Logger()
+	r.logger = logger
 	r.byUri = NewTrie()
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval

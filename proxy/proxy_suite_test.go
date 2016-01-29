@@ -51,7 +51,7 @@ var _ = BeforeEach(func() {
 
 	cryptoPrev = nil
 
-	conf = config.DefaultConfig(logger)
+	conf = config.DefaultConfig()
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
 })
@@ -59,7 +59,7 @@ var _ = BeforeEach(func() {
 var _ = JustBeforeEach(func() {
 	var err error
 	mbus := fakeyagnats.Connect()
-	r = registry.NewRouteRegistry(conf, mbus, new(fakes.FakeRouteReporter))
+	r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteReporter))
 
 	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)

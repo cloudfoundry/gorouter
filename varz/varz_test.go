@@ -25,7 +25,7 @@ var _ = Describe("Varz", func() {
 
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("test")
-		Registry = registry.NewRouteRegistry(config.DefaultConfig(logger), fakeyagnats.Connect(), new(fakes.FakeRouteReporter))
+		Registry = registry.NewRouteRegistry(logger, config.DefaultConfig(), fakeyagnats.Connect(), new(fakes.FakeRouteReporter))
 		Varz = NewVarz(Registry)
 	})
 

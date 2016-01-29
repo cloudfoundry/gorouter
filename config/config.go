@@ -12,7 +12,6 @@ import (
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
 	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
-	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 )
 
@@ -68,18 +67,17 @@ type Config struct {
 	Status            StatusConfig  `yaml:"status"`
 	Nats              []NatsConfig  `yaml:"nats"`
 	Logging           LoggingConfig `yaml:"logging"`
-	logger            lager.Logger
-	Port              uint16 `yaml:"port"`
-	Index             uint   `yaml:"index"`
-	Zone              string `yaml:"zone"`
-	GoMaxProcs        int    `yaml:"go_max_procs,omitempty"`
-	TraceKey          string `yaml:"trace_key"`
-	AccessLog         string `yaml:"access_log"`
-	DebugAddr         string `yaml:"debug_addr"`
-	EnableSSL         bool   `yaml:"enable_ssl"`
-	SSLPort           uint16 `yaml:"ssl_port"`
-	SSLCertPath       string `yaml:"ssl_cert_path"`
-	SSLKeyPath        string `yaml:"ssl_key_path"`
+	Port              uint16        `yaml:"port"`
+	Index             uint          `yaml:"index"`
+	Zone              string        `yaml:"zone"`
+	GoMaxProcs        int           `yaml:"go_max_procs,omitempty"`
+	TraceKey          string        `yaml:"trace_key"`
+	AccessLog         string        `yaml:"access_log"`
+	DebugAddr         string        `yaml:"debug_addr"`
+	EnableSSL         bool          `yaml:"enable_ssl"`
+	SSLPort           uint16        `yaml:"ssl_port"`
+	SSLCertPath       string        `yaml:"ssl_cert_path"`
+	SSLKeyPath        string        `yaml:"ssl_key_path"`
 	SSLCertificate    tls.Certificate
 	SSLSkipValidation bool `yaml:"ssl_skip_validation"`
 
@@ -147,16 +145,11 @@ var defaultConfig = Config{
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 }
 
-func DefaultConfig(logger lager.Logger) *Config {
+func DefaultConfig() *Config {
 	c := defaultConfig
-	c.logger = logger
 	c.Process()
 
 	return &c
-}
-
-func (c *Config) Logger() lager.Logger {
-	return c.logger
 }
 
 func (c *Config) Process() {
@@ -176,7 +169,6 @@ func (c *Config) Process() {
 	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
-		c.logger.Info(fmt.Sprintf("DropletStaleThreshold (%s) cannot be less than StartResponseDelayInterval (%s); setting both equal to StartResponseDelayInterval and continuing", c.DropletStaleThreshold, c.StartResponseDelayInterval))
 	}
 
 	c.DrainTimeout = c.EndpointTimeout
@@ -271,8 +263,8 @@ func (c *Config) Initialize(configYAML []byte) error {
 	return candiedyaml.Unmarshal(configYAML, &c)
 }
 
-func InitConfigFromFile(logger lager.Logger, path string) *Config {
-	var c *Config = DefaultConfig(logger)
+func InitConfigFromFile(path string) *Config {
+	var c *Config = DefaultConfig()
 	var e error
 
 	b, e := ioutil.ReadFile(path)

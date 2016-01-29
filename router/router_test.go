@@ -76,10 +76,10 @@ var _ = Describe("Router", func() {
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(config, mbusClient, new(fakes.FakeRouteReporter))
+		logger = lagertest.NewTestLogger("router-test")
+		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
-		logger = lagertest.NewTestLogger("router-test")
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout: config.EndpointTimeout,
 			Logger:          logger,
