@@ -75,6 +75,11 @@ var _ = Describe("Router", func() {
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
+		// set pid file
+		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
+		Expect(err).ToNot(HaveOccurred())
+		config.PidFile = f.Name()
+
 		mbusClient = natsRunner.MessageBus
 		logger = lagertest.NewTestLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteReporter))
@@ -113,7 +118,14 @@ var _ = Describe("Router", func() {
 
 		if router != nil {
 			router.Stop()
+
+			if config.PidFile != "" {
+				// remove pid file
+				err := os.Remove(config.PidFile)
+				Expect(err).ToNot(HaveOccurred())
+			}
 		}
+
 	})
 
 	Context("NATS", func() {
@@ -250,6 +262,14 @@ var _ = Describe("Router", func() {
 
 		Eventually(started, 4).Should(Receive())
 		Eventually(cb, 4).Should(Receive())
+	})
+
+	It("creates a pidfile on startup", func() {
+
+		Eventually(func() bool {
+			_, err := os.Stat(config.PidFile)
+			return err == nil
+		}).Should(BeTrue())
 	})
 
 	It("registry contains last updated varz", func() {

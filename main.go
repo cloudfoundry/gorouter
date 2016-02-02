@@ -115,6 +115,13 @@ func main() {
 	if c.RoutingApiEnabled() {
 		logger.Info("Setting up route fetcher")
 		routeFetcher := setupRouteFetcher(logger, c, registry)
+
+		// check connectivity to routing api
+		err := routeFetcher.FetchRoutes()
+		if err != nil {
+			logger.Error("Failed to connect to the Routing API: %s\n", err)
+			os.Exit(1)
+		}
 		members = append(members, grouper.Member{"router-fetcher", routeFetcher})
 	}
 

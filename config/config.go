@@ -119,6 +119,8 @@ type Config struct {
 	TokenFetcherMaxRetries                    uint32 `yaml:"token_fetcher_max_retries"`
 	TokenFetcherRetryIntervalInSeconds        int    `yaml:"token_fetcher_retry_interval"`
 	TokenFetcherExpirationBufferTimeInSeconds int64  `yaml:"token_fetcher_expiration_buffer_time"`
+
+	PidFile string `yaml:"pid_file"`
 }
 
 var defaultConfig = Config{

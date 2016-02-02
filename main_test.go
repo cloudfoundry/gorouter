@@ -425,9 +425,10 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when the routing api is enabled", func() {
 		var (
-			config  *config.Config
-			ts      *httptest.Server
-			cfgFile string
+			config     *config.Config
+			ts         *httptest.Server
+			routingApi *httptest.Server
+			cfgFile    string
 		)
 
 		BeforeEach(func() {
@@ -436,16 +437,18 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort)
+
 			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
 				w.Write(jsonBytes)
 			}))
+			config.OAuth.TokenEndpoint, config.OAuth.Port = uriAndPort(ts.URL)
 
-			urlParts := strings.Split(ts.URL, ":")
-			config.RoutingApi.Uri = "http://localhost"
-			config.RoutingApi.Port = 4567
-			config.OAuth.TokenEndpoint = strings.Join(urlParts[0:2], ":")
-			config.OAuth.Port, _ = strconv.Atoi(urlParts[2])
+			routingApi = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
+				w.Write(jsonBytes)
+			}))
+			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApi.URL)
 		})
 
 		Context("when the routing api auth is disabled ", func() {
@@ -479,12 +482,32 @@ var _ = Describe("Router Integration", func() {
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(session, 30*time.Second).Should(Say("Unable to fetch token"))
-					Eventually(session, 5 * time.Second).Should(Exit(1))
+					Eventually(session, 5*time.Second).Should(Exit(1))
+				})
+			})
+
+			Context("when routing api is not avaliable", func() {
+				It("gorouter exit 1", func() {
+					routingApi.Close()
+					writeConfig(config, cfgFile)
+
+					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(session, 30*time.Second).Should(Say("Failed to connect to the Routing API"))
+					Eventually(session, 5*time.Second).Should(Exit(1))
 				})
 			})
 		})
 	})
 })
+
+func uriAndPort(url string) (string, int) {
+	parts := strings.Split(url, ":")
+	uri := strings.Join(parts[0:2], ":")
+	port, _ := strconv.Atoi(parts[2])
+	return uri, port
+}
 
 func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {
 	natsMembers := make([]string, len(c.Nats))
