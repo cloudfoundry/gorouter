@@ -423,7 +423,7 @@ var _ = Describe("Proxy", func() {
 		conn.ReadResponse()
 	})
 
-	It("X-VcapRequest-Id header is added", func() {
+	It("X-Vcap-Request-Id header is not overwritten", func() {
 		done := make(chan string)
 
 		ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
@@ -441,40 +441,12 @@ var _ = Describe("Proxy", func() {
 		conn := dialProxy(proxyServer)
 
 		req := test_util.NewRequest("GET", "app", "/", nil)
+		req.Header.Add(router_http.VcapRequestIdHeader, "A-DROPSONDE-REQUEST-ID")
 		conn.WriteRequest(req)
 
 		var answer string
 		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp(uuid_regex))
-
-		conn.ReadResponse()
-	})
-
-	It("X-Vcap-Request-Id header is overwritten", func() {
-		done := make(chan string)
-
-		ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get(router_http.VcapRequestIdHeader)
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).ToNot(Equal("A-BOGUS-REQUEST-ID"))
-		Expect(answer).To(MatchRegexp(uuid_regex))
+		Expect(answer).To(Equal("A-DROPSONDE-REQUEST-ID"))
 
 		conn.ReadResponse()
 	})

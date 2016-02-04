@@ -305,7 +305,6 @@ func SetupProxyRequest(source *http.Request, target *http.Request,
 	target.URL.RawQuery = ""
 
 	setRequestXRequestStart(source)
-	setRequestXVcapRequestId(source, nil)
 
 	sig := target.Header.Get(route_service.RouteServiceSignature)
 	if forwardingToRouteService(routeServiceArgs.UrlString, sig) {
