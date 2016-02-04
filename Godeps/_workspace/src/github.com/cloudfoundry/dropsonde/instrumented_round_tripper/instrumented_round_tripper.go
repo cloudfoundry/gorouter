@@ -40,7 +40,7 @@ func InstrumentedRoundTripper(roundTripper http.RoundTripper, emitter emitter.Ev
 /*
 Wraps the RoundTrip function of the given RoundTripper.
 Will provide accounting metrics for the http.Request / http.Response life-cycle
-Callers of RoundTrip are responsible for setting the ‘X-CF-RequestID’ field in the request header if they have one.
+Callers of RoundTrip are responsible for setting the ‘X-Vcap-Request-Id’ field in the request header if they have one.
 Callers are also responsible for setting the ‘X-CF-ApplicationID’ and ‘X-CF-InstanceIndex’ fields in the request header if they are known.
 */
 func (irt *instrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -51,8 +51,8 @@ func (irt *instrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	}
 
 	startTime := time.Now()
-	parentRequestId := req.Header.Get("X-CF-RequestID")
-	req.Header.Set("X-CF-RequestID", requestId.String())
+	parentRequestId := req.Header.Get("X-Vcap-Request-Id")
+	req.Header.Set("X-Vcap-Request-Id", requestId.String())
 
 	resp, roundTripErr := irt.roundTripper.RoundTrip(req)
 

@@ -20,10 +20,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/cloudfoundry/dropsonde/logging"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -75,15 +75,13 @@ func (u *dropsondeUnmarshaller) UnmarshallMessage(message []byte) (*events.Envel
 	envelope := &events.Envelope{}
 	err := proto.Unmarshal(message, envelope)
 	if err != nil {
-		u.logger.Debugf("dropsondeUnmarshaller: unmarshal error %v for message %v", err, message)
+		logging.Debugf(u.logger, "dropsondeUnmarshaller: unmarshal error %v ", err)
 		metrics.BatchIncrementCounter("dropsondeUnmarshaller.unmarshalErrors")
 		return nil, err
 	}
 
-	u.logger.Debugf("dropsondeUnmarshaller: received message %v", spew.Sprintf("%v", envelope))
-
 	if err := u.incrementReceiveCount(envelope.GetEventType()); err != nil {
-		u.logger.Debug(err.Error())
+		logging.Debugf(u.logger, err.Error())
 		return nil, err
 	}
 

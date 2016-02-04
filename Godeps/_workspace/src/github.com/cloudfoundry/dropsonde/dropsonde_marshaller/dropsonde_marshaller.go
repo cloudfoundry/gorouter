@@ -22,7 +22,6 @@ import (
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -72,12 +71,10 @@ func (u *dropsondeMarshaller) Run(inputChan <-chan *events.Envelope, outputChan 
 
 		messageBytes, err := proto.Marshal(message)
 		if err != nil {
-			u.logger.Errorf("dropsondeMarshaller: marshal error %v for message %v", err, message)
+			u.logger.Errorf("dropsondeMarshaller: marshal error %v", err)
 			metrics.BatchIncrementCounter("dropsondeMarshaller.marshalErrors")
 			continue
 		}
-
-		u.logger.Debugf("dropsondeMarshaller: marshalled message %v", spew.Sprintf("%v", message))
 
 		u.incrementMessageCount(message.GetEventType())
 		outputChan <- messageBytes

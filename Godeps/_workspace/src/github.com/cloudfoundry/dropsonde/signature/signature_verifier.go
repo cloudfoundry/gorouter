@@ -41,7 +41,7 @@ func NewVerifier(logger *gosteno.Logger, sharedSecret string) *Verifier {
 func (v *Verifier) Run(inputChan <-chan []byte, outputChan chan<- []byte) {
 	for signedMessage := range inputChan {
 		if len(signedMessage) < SIGNATURE_LENGTH {
-			v.logger.Warnf("signatureVerifier: missing signature for message %v", signedMessage)
+			v.logger.Warn("signatureVerifier: missing signature")
 			metrics.BatchIncrementCounter("signatureVerifier.missingSignatureErrors")
 			continue
 		}
@@ -51,7 +51,7 @@ func (v *Verifier) Run(inputChan <-chan []byte, outputChan chan<- []byte) {
 			outputChan <- message
 			metrics.BatchIncrementCounter("signatureVerifier.validSignatures")
 		} else {
-			v.logger.Warnf("signatureVerifier: invalid signature for message %v", message)
+			v.logger.Warn("signatureVerifier: invalid signature")
 			metrics.BatchIncrementCounter("signatureVerifier.invalidSignatureErrors")
 		}
 	}
