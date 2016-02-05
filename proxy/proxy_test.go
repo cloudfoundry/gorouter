@@ -423,34 +423,6 @@ var _ = Describe("Proxy", func() {
 		conn.ReadResponse()
 	})
 
-	It("X-Vcap-Request-Id header is not overwritten", func() {
-		done := make(chan string)
-
-		ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get(router_http.VcapRequestIdHeader)
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		req.Header.Add(router_http.VcapRequestIdHeader, "A-DROPSONDE-REQUEST-ID")
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal("A-DROPSONDE-REQUEST-ID"))
-
-		conn.ReadResponse()
-	})
-
 	It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
 		done := make(chan string)
 
@@ -546,7 +518,7 @@ var _ = Describe("Proxy", func() {
 		req := test_util.NewRequest("GET", "app", "/", nil)
 		requestId, err := uuid.NewV4()
 		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("X-CF-RequestID", requestId.String())
+		req.Header.Set("X-Vcap-Request-Id", requestId.String())
 		conn.WriteRequest(req)
 
 		findStartStopEvent := func() *events.HttpStartStop {
