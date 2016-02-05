@@ -10,6 +10,7 @@ import (
 	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	vcap "github.com/cloudfoundry/gorouter/common"
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
@@ -116,6 +117,27 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 	return router, nil
 }
 
+type gorouterHandler struct {
+	handler http.Handler
+	logger  lager.Logger
+}
+
+func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	setRequestXVcapRequestId(req, h.logger)
+
+	h.handler.ServeHTTP(res, req)
+}
+
+func setRequestXVcapRequestId(request *http.Request, logger lager.Logger) {
+	uuid, err := vcap.GenerateUUID()
+	if err == nil {
+		request.Header.Set(router_http.VcapRequestIdHeader, uuid)
+		if logger != nil {
+			logger.Info("vcap-request-id-header-set", lager.Data{router_http.VcapRequestIdHeader: uuid})
+		}
+	}
+}
+
 func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
@@ -144,8 +166,10 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		time.Sleep(r.config.StartResponseDelayInterval)
 	}
 
+	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
+
 	server := &http.Server{
-		Handler:   dropsonde.InstrumentedHandler(r.proxy),
+		Handler:   &handler,
 		ConnState: r.HandleConnState,
 	}
 

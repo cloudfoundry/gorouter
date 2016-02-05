@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/access_log"
-	"github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/route"
@@ -268,7 +267,6 @@ func (h *RequestHandler) setupRequest(endpoint *route.Endpoint) {
 	h.setRequestURL(endpoint.CanonicalAddr())
 	h.setRequestXForwardedFor()
 	setRequestXRequestStart(h.request)
-	setRequestXVcapRequestId(h.request, h.logger)
 }
 
 func (h *RequestHandler) setRequestURL(addr string) {
@@ -291,16 +289,6 @@ func (h *RequestHandler) setRequestXForwardedFor() {
 func setRequestXRequestStart(request *http.Request) {
 	if _, ok := request.Header[http.CanonicalHeaderKey("X-Request-Start")]; !ok {
 		request.Header.Set("X-Request-Start", strconv.FormatInt(time.Now().UnixNano()/1e6, 10))
-	}
-}
-
-func setRequestXVcapRequestId(request *http.Request, logger lager.Logger) {
-	uuid, err := common.GenerateUUID()
-	if err == nil {
-		request.Header.Set(router_http.VcapRequestIdHeader, uuid)
-		if logger != nil {
-			logger.Info("Request ID header", lager.Data{router_http.VcapRequestIdHeader: uuid})
-		}
 	}
 }
 

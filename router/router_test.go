@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
+	router_http "github.com/cloudfoundry/gorouter/common/http"
 	cfg "github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
@@ -21,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 
 	"bufio"
 	"bytes"
@@ -40,6 +42,9 @@ import (
 )
 
 var _ = Describe("Router", func() {
+
+	const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
+
 	var (
 		natsRunner *natsrunner.NATSRunner
 		natsPort   uint16
@@ -516,6 +521,44 @@ var _ = Describe("Router", func() {
 		Eventually(rCh).Should(Receive(&rr))
 		Expect(rr).ToNot(BeNil())
 		Expect(rr.Header.Get("Expect")).To(Equal(""))
+	})
+
+	It("X-Vcap-Request-Id header is overwritten", func() {
+		done := make(chan string)
+		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
+		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+			_, err := ioutil.ReadAll(r.Body)
+			Expect(err).NotTo(HaveOccurred())
+			w.WriteHeader(http.StatusOK)
+			done <- r.Header.Get(router_http.VcapRequestIdHeader)
+		})
+
+		app.Listen()
+		go app.RegisterRepeatedly(1 * time.Second)
+
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
+
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", config.Ip, config.Port))
+		Expect(err).NotTo(HaveOccurred())
+		defer conn.Close()
+
+		httpConn := test_util.NewHttpConn(conn)
+
+		req := test_util.NewRequest("GET", "foo.vcap.me", "/", nil)
+		req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
+
+		httpConn.WriteRequest(req)
+
+		var answer string
+		Eventually(done).Should(Receive(&answer))
+		Expect(answer).ToNot(Equal("A-BOGUS-REQUEST-ID"))
+		Expect(answer).To(MatchRegexp(uuid_regex))
+		Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
+
+		resp, _ := httpConn.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
 	It("handles a /routes request", func() {
