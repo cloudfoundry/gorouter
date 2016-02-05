@@ -36,13 +36,13 @@ type RouteRegistry struct {
 
 	messageBus yagnats.NATSConn
 
-	reporter metrics.RouteReporter
+	reporter metrics.RouteRegistryReporter
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteReporter) *RouteRegistry {
+func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteRegistryReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byUri = NewTrie()
@@ -57,6 +57,9 @@ func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSCo
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
+
+	r.reporter.CaptureRegistryMessage(endpoint)
+
 	r.Lock()
 
 	uri = uri.RouteKey()
@@ -75,6 +78,8 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+	r.reporter.CaptureRegistryMessage(endpoint)
+
 	r.Lock()
 
 	uri = uri.RouteKey()

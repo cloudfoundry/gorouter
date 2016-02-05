@@ -21,6 +21,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/factories"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/stats"
@@ -38,13 +39,13 @@ type connHandler func(*test_util.HttpConn)
 
 type nullVarz struct{}
 
-func (_ nullVarz) MarshalJSON() ([]byte, error)                               { return json.Marshal(nil) }
-func (_ nullVarz) ActiveApps() *stats.ActiveApps                              { return stats.NewActiveApps() }
-func (_ nullVarz) CaptureBadRequest(*http.Request)                            {}
-func (_ nullVarz) CaptureBadGateway(*http.Request)                            {}
-func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {}
-func (_ nullVarz) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
-}
+func (_ nullVarz) MarshalJSON() ([]byte, error)                                                     { return json.Marshal(nil) }
+func (_ nullVarz) ActiveApps() *stats.ActiveApps                                                    { return stats.NewActiveApps() }
+func (_ nullVarz) CaptureBadRequest(*http.Request)                                                  {}
+func (_ nullVarz) CaptureBadGateway(*http.Request)                                                  {}
+func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                       {}
+func (_ nullVarz) CaptureRoutingResponse(*route.Endpoint, *http.Response, time.Time, time.Duration) {}
+func (_ nullVarz) CaptureRegistryMessage(msg metrics.ComponentTagged)                               {}
 
 var _ = Describe("Proxy", func() {
 

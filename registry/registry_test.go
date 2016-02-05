@@ -18,7 +18,7 @@ import (
 var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
 	var messageBus *fakeyagnats.FakeNATSConn
-	var reporter *fakes.FakeRouteReporter
+	var reporter *fakes.FakeRouteRegistryReporter
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
@@ -31,7 +31,7 @@ var _ = Describe("RouteRegistry", func() {
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
 		messageBus = fakeyagnats.Connect()
-		reporter = new(fakes.FakeRouteReporter)
+		reporter = new(fakes.FakeRouteRegistryReporter)
 
 		r = NewRouteRegistry(logger, configObj, messageBus, reporter)
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
@@ -54,6 +54,11 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Register", func() {
+		It("emits message_count metrics", func() {
+			r.Register("foo", fooEndpoint)
+			Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
+		})
+
 		Context("uri", func() {
 			It("records and tracks time of last update", func() {
 				r.Register("foo", fooEndpoint)
@@ -141,6 +146,11 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Unregister", func() {
+		It("emits message_count metrics", func() {
+			r.Unregister("foo", fooEndpoint)
+			Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
+		})
+
 		It("Handles unknown URIs", func() {
 			r.Unregister("bar", barEndpoint)
 			Expect(r.NumUris()).To(Equal(0))

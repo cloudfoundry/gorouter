@@ -59,7 +59,7 @@ var _ = BeforeEach(func() {
 var _ = JustBeforeEach(func() {
 	var err error
 	mbus := fakeyagnats.Connect()
-	r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteReporter))
+	r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteRegistryReporter))
 
 	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)

@@ -209,6 +209,23 @@ var _ = Describe("MetricsReporter", func() {
 	})
 
 	Context("sends route metrics", func() {
+		var endpoint *route.Endpoint
+
+		BeforeEach(func() {
+			endpoint = new(route.Endpoint)
+		})
+
+		It("sends number of nats messages received from each component", func() {
+			endpoint.Tags = map[string]string{"component": "uaa"}
+			metricsReporter.CaptureRegistryMessage(endpoint)
+
+			endpoint.Tags = map[string]string{"component": "route-emitter"}
+			metricsReporter.CaptureRegistryMessage(endpoint)
+
+			Eventually(func() uint64 { return sender.GetCounter("registry_message.route-emitter") }).Should(BeEquivalentTo(1))
+			Eventually(func() uint64 { return sender.GetCounter("registry_message.uaa") }).Should(BeEquivalentTo(1))
+		})
+
 		It("sends the total routes", func() {
 			metricsReporter.CaptureRouteStats(12, 5)
 			Eventually(func() fake.Metric { return sender.GetValue("total_routes") }).Should(Equal(
@@ -217,6 +234,7 @@ var _ = Describe("MetricsReporter", func() {
 					Unit:  "",
 				}))
 		})
+
 		It("sends the time since last update", func() {
 			metricsReporter.CaptureRouteStats(12, 5)
 			Eventually(func() fake.Metric { return sender.GetValue("ms_since_last_registry_update") }).Should(Equal(

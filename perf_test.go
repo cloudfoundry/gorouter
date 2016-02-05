@@ -23,7 +23,7 @@ var _ = Describe("AccessLogRecord", func() {
 		logger := lagertest.NewTestLogger("test")
 		c := config.DefaultConfig()
 		mbus := fakeyagnats.Connect()
-		r := registry.NewRouteRegistry(logger, c, mbus, new(fakes.FakeRouteReporter))
+		r := registry.NewRouteRegistry(logger, c, mbus, new(fakes.FakeRouteRegistryReporter))
 
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())

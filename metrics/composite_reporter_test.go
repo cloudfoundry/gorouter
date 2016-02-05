@@ -14,8 +14,8 @@ import (
 
 var _ = Describe("CompositeReporter", func() {
 
-	var fakeReporter1 *fakes.FakeReporter
-	var fakeReporter2 *fakes.FakeReporter
+	var fakeReporter1 *fakes.FakeProxyReporter
+	var fakeReporter2 *fakes.FakeProxyReporter
 	var composite metrics.ProxyReporter
 
 	var req *http.Request
@@ -25,8 +25,8 @@ var _ = Describe("CompositeReporter", func() {
 	var responseDuration time.Duration
 
 	BeforeEach(func() {
-		fakeReporter1 = new(fakes.FakeReporter)
-		fakeReporter2 = new(fakes.FakeReporter)
+		fakeReporter1 = new(fakes.FakeProxyReporter)
+		fakeReporter2 = new(fakes.FakeProxyReporter)
 
 		composite = metrics.NewCompositeReporter(fakeReporter1, fakeReporter2)
 		req, _ = http.NewRequest("GET", "https://example.com", nil)

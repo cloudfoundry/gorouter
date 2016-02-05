@@ -37,7 +37,7 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			mbus := fakeyagnats.Connect()
 			logger := lagertest.NewTestLogger("test")
-			r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteReporter))
+			r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteRegistryReporter))
 
 			proxyObj = proxy.NewProxy(proxy.ProxyArgs{
 				EndpointTimeout:     conf.EndpointTimeout,

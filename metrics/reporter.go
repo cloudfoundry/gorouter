@@ -7,6 +7,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route"
 )
 
+//go:generate counterfeiter -o fakes/fake_reporter.go . ProxyReporter
 type ProxyReporter interface {
 	CaptureBadRequest(req *http.Request)
 	CaptureBadGateway(req *http.Request)
@@ -14,6 +15,8 @@ type ProxyReporter interface {
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
 }
 
-type RouteReporter interface {
+//go:generate counterfeiter -o fakes/fake_registry_reporter.go . RouteRegistryReporter
+type RouteRegistryReporter interface {
 	CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64)
+	CaptureRegistryMessage(msg ComponentTagged)
 }

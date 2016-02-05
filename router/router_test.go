@@ -82,7 +82,7 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = lagertest.NewTestLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{

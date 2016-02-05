@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+type ComponentTagged interface {
+	Component() string
+}
+
 type MetricsReporter struct {
 }
 
@@ -55,6 +59,10 @@ func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Re
 func (c *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64) {
 	dropsondeMetrics.SendValue("total_routes", float64(totalRoutes), "")
 	dropsondeMetrics.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
+}
+
+func (c *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
+	dropsondeMetrics.IncrementCounter("registry_message." + msg.Component())
 }
 
 func getResponseCounterName(res *http.Response) string {

@@ -44,6 +44,10 @@ func (e *Endpoint) CanonicalAddr() string {
 	return e.addr
 }
 
+func (rm *Endpoint) Component() string {
+	return rm.Tags["component"]
+}
+
 func (e *Endpoint) ToLogData() interface{} {
 	return struct {
 		ApplicationId   string
