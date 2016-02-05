@@ -12,7 +12,7 @@ import (
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	fake_routing_api "github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
-	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
+	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	testTokenFetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher/fakes"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
