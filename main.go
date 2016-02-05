@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 
 	"github.com/apcera/nats"
+	uaa_client "github.com/cf-routing/uaa-go-client"
+	uaa_config "github.com/cf-routing/uaa-go-client/config"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
 	"github.com/cloudfoundry-incubator/cf-lager"
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
-	token_fetcher "github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -175,8 +176,8 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 
-	tokenFetcher := newTokenFetcher(logger, clock, c)
-	_, err := tokenFetcher.FetchToken(false)
+	uaaClient := newUaaClient(logger, clock, c)
+	_, err := uaaClient.FetchToken(false)
 	if err != nil {
 		logger.Error("Unable to fetch token: ", err)
 		os.Exit(1)
@@ -185,28 +186,29 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	routingApiClient := routing_api.NewClient(routingApiUri)
 
-	routeFetcher := route_fetcher.NewRouteFetcher(logger, tokenFetcher, registry, c, routingApiClient, 1, clock)
+	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingApiClient, 1, clock)
 	return routeFetcher
 }
 
-func newTokenFetcher(logger lager.Logger, clock clock.Clock, c *config.Config) token_fetcher.TokenFetcher {
-	if c.RoutingApi.AuthDisabled {
-		logger.Info("using noop token fetcher")
-		return token_fetcher.NewNoOpTokenFetcher()
-	}
-	tokenFetcherConfig := token_fetcher.TokenFetcherConfig{
-		MaxNumberOfRetries:   c.TokenFetcherMaxRetries,
-		RetryInterval:        c.TokenFetcherRetryInterval,
-		ExpirationBufferTime: c.TokenFetcherExpirationBufferTimeInSeconds,
+func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) *uaa_client.UaaClient {
+	// if c.RoutingApi.AuthDisabled {
+	// 	logger.Info("using noop token fetcher")
+	// 	return uaa_client.NewNoOpTokenFetcher()
+	// }
+	cfg := &uaa_config.Config{
+		ClientName:            c.OAuth.ClientName,
+		ClientSecret:          c.OAuth.ClientSecret,
+		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,
+		RetryInterval:         c.TokenFetcherRetryInterval,
+		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
 
-	tokenFetcher, err := token_fetcher.NewTokenFetcher(logger, &c.OAuth, tokenFetcherConfig, clock)
+	uaaClient, err := uaa_client.NewClient(logger, cfg, clock)
 	if err != nil {
-		logger.Error("Error creating token fetcher: %s\n", err)
+		logger.Error("Error creating UAA client: %s\n", err)
 		os.Exit(1)
 	}
-	logger.Info("Fetching token from UAA")
-	return tokenFetcher
+	return uaaClient
 }
 
 func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn {
