@@ -98,6 +98,50 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
+	It("Content-type is not set by proxy", func() {
+		ln := registerHandler(r, "content-test", func(x *test_util.HttpConn) {
+			_, err := http.ReadRequest(x.Reader)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusOK)
+			x.WriteResponse(resp)
+			x.WriteLine("hello from server")
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "content-test", "/", nil)
+		req.Host = "content-test"
+		x.WriteRequest(req)
+
+		resp, _ := x.ReadResponse()
+		Expect(resp.Header.Get("content-type")).To(Equal(""))
+	})
+
+	It("Content-type xml is not set by proxy", func() {
+		ln := registerHandler(r, "content-test", func(x *test_util.HttpConn) {
+			_, err := http.ReadRequest(x.Reader)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusOK)
+			x.WriteResponse(resp)
+			x.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "content-test", "/", nil)
+		req.Host = "content-test"
+		x.WriteRequest(req)
+
+		resp, _ := x.ReadResponse()
+		Expect(resp.Header.Get("content-type")).To(Equal(""))
+	})
+
 	It("responds to http/1.0 with path/path", func() {
 		ln := registerHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET /my%20path/your_path HTTP/1.1")

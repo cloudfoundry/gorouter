@@ -263,6 +263,11 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		if endpoint.PrivateInstanceId != "" {
 			setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
 		}
+
+		if rsp.Header.Get("content-type") == "" {
+			rsp.Header.Set("content-type", "")
+		}
+
 	}
 
 	roundTripper := NewProxyRoundTripper(backend,
