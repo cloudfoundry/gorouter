@@ -99,7 +99,7 @@ func (r *RouteFetcher) startEventCycle() {
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
 				}
-				err = r.subscribeToEvents(&token)
+				err = r.subscribeToEvents(token)
 				if err != nil && err.Error() == "unauthorized" {
 					useCachedToken = false
 				} else {

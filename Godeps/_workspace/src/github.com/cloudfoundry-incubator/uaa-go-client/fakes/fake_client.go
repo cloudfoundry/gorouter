@@ -9,13 +9,13 @@ import (
 )
 
 type FakeClient struct {
-	FetchTokenStub        func(forceUpdate bool) (schema.Token, error)
+	FetchTokenStub        func(forceUpdate bool) (*schema.Token, error)
 	fetchTokenMutex       sync.RWMutex
 	fetchTokenArgsForCall []struct {
 		forceUpdate bool
 	}
 	fetchTokenReturns struct {
-		result1 schema.Token
+		result1 *schema.Token
 		result2 error
 	}
 	FetchKeyStub        func() (string, error)
@@ -36,7 +36,7 @@ type FakeClient struct {
 	}
 }
 
-func (fake *FakeClient) FetchToken(forceUpdate bool) (schema.Token, error) {
+func (fake *FakeClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	fake.fetchTokenMutex.Lock()
 	fake.fetchTokenArgsForCall = append(fake.fetchTokenArgsForCall, struct {
 		forceUpdate bool
@@ -61,10 +61,10 @@ func (fake *FakeClient) FetchTokenArgsForCall(i int) bool {
 	return fake.fetchTokenArgsForCall[i].forceUpdate
 }
 
-func (fake *FakeClient) FetchTokenReturns(result1 schema.Token, result2 error) {
+func (fake *FakeClient) FetchTokenReturns(result1 *schema.Token, result2 error) {
 	fake.FetchTokenStub = nil
 	fake.fetchTokenReturns = struct {
-		result1 schema.Token
+		result1 *schema.Token
 		result2 error
 	}{result1, result2}
 }

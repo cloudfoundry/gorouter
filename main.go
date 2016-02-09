@@ -186,7 +186,7 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	return routeFetcher
 }
 
-func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) *uaa_client.UaaClient {
+func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
 	// TODO: add a no-op
 	// if c.RoutingApi.AuthDisabled {
 	// 	logger.Info("using-noop-token-fetcher")

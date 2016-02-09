@@ -40,7 +40,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-go-client",
-			"Rev": "21806a9b18984a811ebeb61d7be65ca6fce7500c"
+			"Rev": "bda2f134e754163b706a70fb0c9ddad24823f343"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-token-fetcher",

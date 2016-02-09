@@ -29,7 +29,7 @@ type uaaKey struct {
 }
 
 type Client interface {
-	FetchToken(forceUpdate bool) (schema.Token, error)
+	FetchToken(forceUpdate bool) (*schema.Token, error)
 	FetchKey() (string, error)
 	DecodeToken(uaaToken string, desiredPermissions ...string) error
 }
@@ -46,7 +46,7 @@ type UaaClient struct {
 	rwlock           sync.RWMutex
 }
 
-func NewClient(logger lager.Logger, cfg *config.Config, clock clock.Clock) (*UaaClient, error) {
+func NewClient(logger lager.Logger, cfg *config.Config, clock clock.Clock) (Client, error) {
 
 	var (
 		client *http.Client

@@ -64,7 +64,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		token = &schema.Token{
 			AccessToken: "access_token",
-			ExpireTime:  5,
+			ExpiresIn:   5,
 		}
 		client = &fake_routing_api.FakeClient{}
 
