@@ -18,7 +18,7 @@ import (
 )
 
 type RouteFetcher struct {
-	UaaClient                          *uaa_client.UaaClient
+	UaaClient                          uaa_client.Client
 	RouteRegistry                      registry.RegistryInterface
 	FetchRoutesInterval                time.Duration
 	SubscriptionRetryIntervalInSeconds int
@@ -38,7 +38,7 @@ const (
 	SubscribeEventsErrors = "subscribe_events_errors"
 )
 
-func NewRouteFetcher(logger lager.Logger, uaaClient *uaa_client.UaaClient, routeRegistry registry.RegistryInterface,
+func NewRouteFetcher(logger lager.Logger, uaaClient uaa_client.Client, routeRegistry registry.RegistryInterface,
 	cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
 	return &RouteFetcher{
 		UaaClient:                          uaaClient,
@@ -99,7 +99,7 @@ func (r *RouteFetcher) startEventCycle() {
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
 				}
-				err = r.subscribeToEvents(token)
+				err = r.subscribeToEvents(&token)
 				if err != nil && err.Error() == "unauthorized" {
 					useCachedToken = false
 				} else {
