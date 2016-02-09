@@ -319,6 +319,7 @@ func SetupProxyRequest(source *http.Request, target *http.Request,
 		// Remove the headers since the backend should not see it
 		target.Header.Del(route_service.RouteServiceSignature)
 		target.Header.Del(route_service.RouteServiceMetadata)
+		target.Header.Del(route_service.RouteServiceForwardedUrl)
 	}
 }
 

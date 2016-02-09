@@ -152,6 +152,7 @@ var _ = Describe("Route Services", func() {
 					req, _ := conn.ReadRequest()
 					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
 					Expect(req.Header.Get(route_service.RouteServiceMetadata)).To(Equal(""))
+					Expect(req.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal(""))
 
 					out := &bytes.Buffer{}
 					out.WriteString("backend instance")
@@ -168,6 +169,7 @@ var _ = Describe("Route Services", func() {
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
 				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(route_service.RouteServiceForwardedUrl, "http://some-backend-url")
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
