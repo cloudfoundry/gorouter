@@ -1,0 +1,14 @@
+language: go
+go:
+  - 1.5.3
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+install:
+  - export PATH=$HOME/gopath/bin:$PATH
+
+script:
+  - ./scripts/test

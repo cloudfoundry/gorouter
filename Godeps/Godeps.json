@@ -39,6 +39,10 @@
 			"Rev": "24964ef4dbb527a373d4db141cbbd41eb21a56f9"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/uaa-go-client",
+			"Rev": "5b3d06df1a767c72b614a893cb38869c953e0f81"
+		},
+		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-token-fetcher",
 			"Rev": "e7e42189c4575bf1b41d51b4340ea15c99487f84"
 		},
@@ -80,6 +84,11 @@
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v2.0.0-7-g73a8ef7",
 			"Rev": "73a8ef737e8ea002281a28b4cb92a1de121ad4c6"
+		},
+		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v2.3.0-6-gf62f64e",
+			"Rev": "f62f64ea222e5e6d6d86421b5507b0862a3ebf7f"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
