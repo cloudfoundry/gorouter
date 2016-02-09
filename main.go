@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 
 	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
@@ -65,8 +66,7 @@ func main() {
 	InitLoggerFromConfig(logger, c, logCounter)
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Error("Dropsonde failed to initialize ", err)
-		os.Exit(1)
+		logger.Fatal("dropsonde-initialize-error", err)
 	}
 
 	// setup number of procs
@@ -78,18 +78,18 @@ func main() {
 		cf_debug_server.Run(c.DebugAddr)
 	}
 
-	logger.Info("Setting up NATs connection")
-	natsClient := connectToNatsServer(logger, c)
+	logger.Info("setting-up-nats-connection")
+	natsClient := connectToNatsServer(logger.Session("nats"), c)
 
 	metricsReporter := metrics.NewMetricsReporter()
-	registry := rregistry.NewRouteRegistry(logger, c, natsClient, metricsReporter)
+	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, natsClient, metricsReporter)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
 
-	accessLogger, err := access_log.CreateRunningAccessLogger(logger, c)
+	accessLogger, err := access_log.CreateRunningAccessLogger(logger.Session("access-log"), c)
 	if err != nil {
-		logger.Fatal("Error creating access logger: ", err)
+		logger.Fatal("error-creating-access-logger", err)
 	}
 
 	var crypto secure.Crypto
@@ -101,26 +101,24 @@ func main() {
 		}
 	}
 
-	proxy := buildProxy(logger, c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
+	proxy := buildProxy(logger.Session("proxy"), c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
 
-	router, err := router.NewRouter(logger, c, proxy, natsClient, registry, varz, logCounter, nil)
+	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, logCounter, nil)
 	if err != nil {
-		logger.Error("An error occurred: ", err)
-		os.Exit(1)
+		logger.Fatal("initialize-router-error", err)
 	}
 
 	members := grouper.Members{
 		{"router", router},
 	}
 	if c.RoutingApiEnabled() {
-		logger.Info("Setting up route fetcher")
-		routeFetcher := setupRouteFetcher(logger, c, registry)
+		logger.Info("setting-up-routing-api")
+		routeFetcher := setupRouteFetcher(logger.Session("route-fetcher"), c, registry)
 
 		// check connectivity to routing api
 		err := routeFetcher.FetchRoutes()
 		if err != nil {
-			logger.Error("Failed to connect to the Routing API: %s\n", err)
-			os.Exit(1)
+			logger.Fatal("routing-api-connection-failed", err)
 		}
 		members = append(members, grouper.Member{"router-fetcher", routeFetcher})
 	}
@@ -131,7 +129,7 @@ func main() {
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Error("gorouter.exited-with-failure: ", err)
+		logger.Error("gorouter.exited-with-failure", err)
 		os.Exit(1)
 	}
 
@@ -143,8 +141,7 @@ func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
 	if err != nil {
-		logger.Error("Error creating route service crypto: %s\n", err)
-		os.Exit(1)
+		logger.Fatal("error-creating-route-service-crypto", err)
 	}
 	return crypto
 }
@@ -178,8 +175,7 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	tokenFetcher := newTokenFetcher(logger, clock, c)
 	_, err := tokenFetcher.FetchToken(false)
 	if err != nil {
-		logger.Error("Unable to fetch token: ", err)
-		os.Exit(1)
+		logger.Fatal("unable-to-fetch-token", err)
 	}
 
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
@@ -191,7 +187,7 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 
 func newTokenFetcher(logger lager.Logger, clock clock.Clock, c *config.Config) token_fetcher.TokenFetcher {
 	if c.RoutingApi.AuthDisabled {
-		logger.Info("using noop token fetcher")
+		logger.Info("using-noop-token-fetcher")
 		return token_fetcher.NewNoOpTokenFetcher()
 	}
 	tokenFetcherConfig := token_fetcher.TokenFetcherConfig{
@@ -200,12 +196,11 @@ func newTokenFetcher(logger lager.Logger, clock clock.Clock, c *config.Config) t
 		ExpirationBufferTime: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
 
+	logger.Info("fetching-token-from-uaa")
 	tokenFetcher, err := token_fetcher.NewTokenFetcher(logger, &c.OAuth, tokenFetcherConfig, clock)
 	if err != nil {
-		logger.Error("Error creating token fetcher: %s\n", err)
-		os.Exit(1)
+		logger.Fatal("initialize-token-fetcher-error", err)
 	}
-	logger.Info("Fetching token from UAA")
 	return tokenFetcher
 }
 
@@ -226,13 +221,11 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn
 	}
 
 	if err != nil {
-		logger.Error("Error connecting to NATS: %s\n", err)
-		os.Exit(1)
+		logger.Fatal("nats-connection-error", err)
 	}
 
 	natsClient.AddClosedCB(func(conn *nats.Conn) {
-		logger.Error("Close on NATS client. nats.Conn: ", err, lager.Data{"connection": *conn})
-		os.Exit(1)
+		logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"connection": *conn})
 	})
 
 	return natsClient
@@ -242,7 +235,7 @@ func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *vca
 	if c.Logging.File != "" {
 		file, err := os.OpenFile(c.Logging.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			logger.Error("error-opening-file", err, lager.Data{"file": c.Logging.File})
+			logger.Fatal("error-opening-log-file", err, lager.Data{"file": c.Logging.File})
 		}
 		var logLevel lager.LogLevel
 		switch c.Logging.Level {

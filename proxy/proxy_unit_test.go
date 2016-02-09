@@ -15,6 +15,7 @@ import (
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gbytes"
 	"github.com/pivotal-golang/lager/lagertest"
 )
 
@@ -22,6 +23,7 @@ var _ = Describe("Proxy Unit tests", func() {
 	var (
 		proxyObj         proxy.Proxy
 		fakeAccessLogger *fakelogger.FakeAccessLogger
+		logger           *lagertest.TestLogger
 
 		r *registry.RouteRegistry
 	)
@@ -36,7 +38,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
 			mbus := fakeyagnats.Connect()
-			logger := lagertest.NewTestLogger("test")
+			logger = lagertest.NewTestLogger("test")
 			r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteRegistryReporter))
 
 			proxyObj = proxy.NewProxy(proxy.ProxyArgs{
@@ -56,6 +58,19 @@ var _ = Describe("Proxy Unit tests", func() {
 			})
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})
+		})
+
+		Context("when backend fails to respond", func() {
+			It("logs the error and associated endpoint", func() {
+				body := []byte("some body")
+				req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader(body))
+				resp := httptest.NewRecorder()
+
+				proxyObj.ServeHTTP(resp, req)
+
+				Eventually(logger).Should(Say("error"))
+				Eventually(logger).Should(Say("route-endpoint"))
+			})
 		})
 
 		Context("Log response time", func() {

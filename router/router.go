@@ -86,7 +86,7 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
-		Logger: logger.Session("router"),
+		Logger: logger,
 	}
 
 	routerErrChan := errChan
@@ -133,7 +133,7 @@ func setRequestXVcapRequestId(request *http.Request, logger lager.Logger) {
 	if err == nil {
 		request.Header.Set(router_http.VcapRequestIdHeader, uuid)
 		if logger != nil {
-			logger.Info("vcap-request-id-header-set", lager.Data{router_http.VcapRequestIdHeader: uuid})
+			logger.Debug("vcap-request-id-header-set", lager.Data{router_http.VcapRequestIdHeader: uuid})
 		}
 	}
 }
