@@ -187,18 +187,22 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 }
 
 func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
-	// TODO: add a no-op
-	// if c.RoutingApi.AuthDisabled {
-	// 	logger.Info("using-noop-token-fetcher")
-	// 	return uaa_client.NewNoOpTokenFetcher()
-	// }
+	if c.RoutingApi.AuthDisabled {
+		logger.Info("using-noop-token-fetcher")
+		return uaa_client.NewNoOpUaaClient()
+	}
+	tokenURL := fmt.Sprintf("%s:%d", c.OAuth.TokenEndpoint, c.OAuth.Port)
 	cfg := &uaa_config.Config{
+		UaaEndpoint:           tokenURL,
+		ClientName:            c.OAuth.ClientName,
+		ClientSecret:          c.OAuth.ClientSecret,
 		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,
 		RetryInterval:         c.TokenFetcherRetryInterval,
 		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
 
 	logger.Info("fetching-token-from-uaa")
+
 	uaaClient, err := uaa_client.NewClient(logger, cfg, clock)
 	if err != nil {
 		logger.Fatal("initialize-token-fetcher-error", err)

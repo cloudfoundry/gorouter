@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
-	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
@@ -48,20 +47,20 @@ var _ = Describe("Router Integration", func() {
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
 
-	configDrainSetup := func(config *config.Config) {
+	configDrainSetup := func(cfg *config.Config) {
 		// ensure the threshold is longer than the interval that we check,
 		// because we set the route's timestamp to time.Now() on the interval
 		// as part of pausing
-		config.PruneStaleDropletsIntervalInSeconds = 1
-		config.DropletStaleThresholdInSeconds = 2
-		config.StartResponseDelayIntervalInSeconds = 1
-		config.EndpointTimeoutInSeconds = 5
-		config.DrainTimeoutInSeconds = 1
-		config.OAuth = token_fetcher.OAuthConfig{
+		cfg.PruneStaleDropletsIntervalInSeconds = 1
+		cfg.DropletStaleThresholdInSeconds = 2
+		cfg.StartResponseDelayIntervalInSeconds = 1
+		cfg.EndpointTimeoutInSeconds = 5
+		cfg.DrainTimeoutInSeconds = 1
+
+		cfg.OAuth = config.OAuthConfig{
 			TokenEndpoint: "http://uaa.bosh-lite.com",
 			ClientName:    "client-id",
 			ClientSecret:  "client-secret",
-			Port:          3000,
 		}
 	}
 
@@ -412,9 +411,9 @@ var _ = Describe("Router Integration", func() {
 				proxyPort := test_util.NextAvailPort()
 
 				cfgFile := filepath.Join(tmpdir, "config.yml")
-				config := createConfig(cfgFile, statusPort, proxyPort)
-				config.OAuth = token_fetcher.OAuthConfig{}
-				writeConfig(config, cfgFile)
+				cfg := createConfig(cfgFile, statusPort, proxyPort)
+				cfg.OAuth = config.OAuthConfig{}
+				writeConfig(cfg, cfgFile)
 
 				// The process should not have any error.
 				session := startGorouterSession(cfgFile)
@@ -442,6 +441,7 @@ var _ = Describe("Router Integration", func() {
 				jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
 				w.Write(jsonBytes)
 			}))
+
 			config.OAuth.TokenEndpoint, config.OAuth.Port = uriAndPort(ts.URL)
 
 			routingApi = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -467,6 +467,7 @@ var _ = Describe("Router Integration", func() {
 			It("uses the uaa token fetcher", func() {
 				defer ts.Close()
 				writeConfig(config, cfgFile)
+
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
 				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("fetching-token-from-uaa"))

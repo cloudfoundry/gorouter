@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/cloudfoundry-incubator/uaa-token-fetcher"
 	"github.com/cloudfoundry/gorouter/config"
 
 	"time"
@@ -74,7 +73,7 @@ func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 		JobName:       "router_test_z1_0",
 	}
 
-	c.OAuth = token_fetcher.OAuthConfig{
+	c.OAuth = config.OAuthConfig{
 		TokenEndpoint: "http://localhost",
 		Port:          8080,
 	}
