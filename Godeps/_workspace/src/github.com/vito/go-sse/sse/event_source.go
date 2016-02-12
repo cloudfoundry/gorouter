@@ -23,6 +23,9 @@ func (err BadResponseError) Error() string {
 // To use, optionally call Connect(), and then call Next(). If Next() is called
 // prior to Connect(), it will connect for you.
 //
+// Alternatively, create a Config struct instance and call Connect() and then call
+// Next().
+//
 // Next() is often called asynchronously in a loop so that the event source can
 // be closed. Next() will block on reading from the server.
 //
@@ -38,22 +41,59 @@ type EventSource struct {
 
 	currentReadCloser *ReadCloser
 	lastEventID       string
-	retryInterval     time.Duration
 	lock              sync.Mutex
 
 	closeOnce *sync.Once
 	closed    chan struct{}
+
+	retryInterval time.Duration
+	maxRetries    uint16
+}
+
+type RetryParams struct {
+	RetryInterval time.Duration
+	MaxRetries    uint16
+}
+
+type Config struct {
+	Client         *http.Client
+	RetryParams    RetryParams
+	RequestCreator func() *http.Request
+}
+
+func (c *Config) Connect() (*EventSource, error) {
+	client := c.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	source := createEventSource(client, c.RetryParams, c.RequestCreator)
+
+	readCloser, err := source.establishConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	source.currentReadCloser = readCloser
+
+	return source, nil
 }
 
 func NewEventSource(client *http.Client, defaultRetryInterval time.Duration, requestCreator func() *http.Request) *EventSource {
+	retryParams := RetryParams{
+		RetryInterval: defaultRetryInterval,
+	}
+	return createEventSource(client, retryParams, requestCreator)
+}
+
+func createEventSource(client *http.Client, retryParams RetryParams, requestCreator func() *http.Request) *EventSource {
 	return &EventSource{
 		client:        client,
 		createRequest: requestCreator,
 
-		retryInterval: defaultRetryInterval,
-
-		closeOnce: new(sync.Once),
-		closed:    make(chan struct{}),
+		closeOnce:     new(sync.Once),
+		closed:        make(chan struct{}),
+		retryInterval: retryParams.RetryInterval,
+		maxRetries:    retryParams.MaxRetries,
 	}
 }
 
@@ -160,6 +200,7 @@ func (source *EventSource) ensureReadCloser() (*ReadCloser, error) {
 }
 
 func (source *EventSource) establishConnection() (*ReadCloser, error) {
+	var connectionRetries uint16
 	for {
 		req := source.createRequest()
 
@@ -167,6 +208,10 @@ func (source *EventSource) establishConnection() (*ReadCloser, error) {
 
 		res, err := source.client.Do(req)
 		if err != nil {
+			connectionRetries++
+			if !source.shouldRetry(connectionRetries) {
+				return nil, err
+			}
 			err := source.waitForRetry()
 			if err != nil {
 				return nil, err
@@ -215,4 +260,9 @@ func (source *EventSource) waitForRetry() error {
 	case <-source.closed:
 		return ErrSourceClosed
 	}
+}
+
+func (source *EventSource) shouldRetry(retries uint16) bool {
+	return source.maxRetries == 0 ||
+		(source.maxRetries > 0 && retries <= source.maxRetries)
 }

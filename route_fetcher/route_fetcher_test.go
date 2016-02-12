@@ -71,7 +71,7 @@ var _ = Describe("RouteFetcher", func() {
 		eventChannel = make(chan routing_api.Event)
 		errorChannel = make(chan error)
 		eventSource := fake_routing_api.FakeEventSource{}
-		client.SubscribeToEventsReturns(&eventSource, nil)
+		client.SubscribeToEventsWithMaxRetriesReturns(&eventSource, nil)
 
 		localEventChannel := eventChannel
 		localErrorChannel := errorChannel
@@ -250,7 +250,7 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		It("subscribes for events", func() {
-			Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
+			Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
 		})
 
 		Context("on specified interval", func() {
@@ -275,7 +275,7 @@ var _ = Describe("RouteFetcher", func() {
 				Eventually(logger).Should(gbytes.Say("Unauthorized"))
 
 				Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">=", 2))
-				Expect(client.SubscribeToEventsCallCount()).Should(Equal(0))
+				Expect(client.SubscribeToEventsWithMaxRetriesCallCount()).Should(Equal(0))
 				Expect(client.RoutesCallCount()).Should(Equal(0))
 
 				Eventually(func() uint64 {
@@ -287,7 +287,7 @@ var _ = Describe("RouteFetcher", func() {
 		Describe("Event cycle", func() {
 			Context("and the event source successfully subscribes", func() {
 				It("responds to events", func() {
-					Eventually(client.SubscribeToEventsCallCount).Should(Equal(1))
+					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
 					eventChannel <- routing_api.Event{
 						Action: "Delete",
 						Route: db.Route{
@@ -305,14 +305,14 @@ var _ = Describe("RouteFetcher", func() {
 					currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
 					fetchTokenCallCount := uaaClient.FetchTokenCallCount()
-					subscribeCallCount := client.SubscribeToEventsCallCount()
+					subscribeCallCount := client.SubscribeToEventsWithMaxRetriesCallCount()
 
 					errorChannel <- errors.New("beep boop im a robot")
 
 					Eventually(logger).Should(gbytes.Say("beep boop im a robot"))
 
 					Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
-					Eventually(client.SubscribeToEventsCallCount).Should(BeNumerically(">", subscribeCallCount))
+					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(BeNumerically(">", subscribeCallCount))
 
 					Eventually(func() uint64 {
 						return sender.GetCounter(SubscribeEventsErrors)
@@ -323,7 +323,7 @@ var _ = Describe("RouteFetcher", func() {
 			Context("and the event source fails to subscribe", func() {
 				Context("with error other than unauthorized", func() {
 					BeforeEach(func() {
-						client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
+						client.SubscribeToEventsWithMaxRetriesStub = func(uint16) (routing_api.EventSource, error) {
 							err := errors.New("i failed to subscribe")
 							return &fake_routing_api.FakeEventSource{}, err
 						}
@@ -331,14 +331,14 @@ var _ = Describe("RouteFetcher", func() {
 
 					It("logs the error and tries again", func() {
 						fetchTokenCallCount := uaaClient.FetchTokenCallCount()
-						subscribeCallCount := client.SubscribeToEventsCallCount()
+						subscribeCallCount := client.SubscribeToEventsWithMaxRetriesCallCount()
 
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
 						Eventually(logger).Should(gbytes.Say("i failed to subscribe"))
 
 						Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
-						Eventually(client.SubscribeToEventsCallCount).Should(BeNumerically(">", subscribeCallCount))
+						Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(BeNumerically(">", subscribeCallCount))
 
 						Eventually(func() uint64 {
 							return sender.GetCounter(SubscribeEventsErrors)
@@ -348,7 +348,7 @@ var _ = Describe("RouteFetcher", func() {
 
 				Context("with unauthorized error", func() {
 					BeforeEach(func() {
-						client.SubscribeToEventsStub = func() (routing_api.EventSource, error) {
+						client.SubscribeToEventsWithMaxRetriesStub = func(uint16) (routing_api.EventSource, error) {
 							err := errors.New("unauthorized")
 							return &fake_routing_api.FakeEventSource{}, err
 						}

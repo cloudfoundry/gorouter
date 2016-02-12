@@ -32,7 +32,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
-			"Rev": "964c5820b7701c644fd5b7c5311343746f37d77d"
+			"Rev": "af69cc990ecc0d56cafad34d0be2a0737a198fd7"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/trace-logger",
@@ -131,7 +131,7 @@
 		},
 		{
 			"ImportPath": "github.com/vito/go-sse/sse",
-			"Rev": "bfb56c5590376a59535cd0edb3f5aa3447dbbe65"
+			"Rev": "fd69d275caac5d78d793e77ddbe9bd2001d9b88d"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",

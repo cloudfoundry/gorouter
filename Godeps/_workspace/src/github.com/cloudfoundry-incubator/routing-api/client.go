@@ -15,6 +15,10 @@ import (
 	"github.com/vito/go-sse/sse"
 )
 
+const (
+	defaultMaxRetries = uint16(0)
+)
+
 //go:generate counterfeiter -o fake_routing_api/fake_client.go . Client
 type Client interface {
 	SetToken(string)
@@ -27,7 +31,9 @@ type Client interface {
 	TcpRouteMappings() ([]db.TcpRouteMapping, error)
 
 	SubscribeToEvents() (EventSource, error)
+	SubscribeToEventsWithMaxRetries(retries uint16) (EventSource, error)
 	SubscribeToTcpEvents() (TcpEventSource, error)
+	SubscribeToTcpEventsWithMaxRetries(retries uint16) (TcpEventSource, error)
 }
 
 func NewClient(url string) Client {
@@ -92,7 +98,7 @@ func (c *client) DeleteTcpRouteMappings(tcpRouteMappings []db.TcpRouteMapping) e
 }
 
 func (c *client) SubscribeToEvents() (EventSource, error) {
-	eventSource, err := c.doSubscribe(EventStreamRoute)
+	eventSource, err := c.doSubscribe(EventStreamRoute, defaultMaxRetries)
 	if err != nil {
 		return nil, err
 	}
@@ -100,26 +106,50 @@ func (c *client) SubscribeToEvents() (EventSource, error) {
 }
 
 func (c *client) SubscribeToTcpEvents() (TcpEventSource, error) {
-	eventSource, err := c.doSubscribe(EventStreamTcpRoute)
+	eventSource, err := c.doSubscribe(EventStreamTcpRoute, defaultMaxRetries)
 	if err != nil {
 		return nil, err
 	}
 	return NewTcpEventSource(eventSource), nil
 }
 
-func (c *client) doSubscribe(routeName string) (RawEventSource, error) {
-	eventSource, err := sse.Connect(c.streamingHTTPClient, time.Second, func() *http.Request {
-		request, err := c.reqGen.CreateRequest(routeName, nil, nil)
-		c.tokenMutex.RLock()
-		defer c.tokenMutex.RUnlock()
-		request.Header.Add("Authorization", "bearer "+c.authToken)
-		if err != nil {
-			panic(err) // totally shouldn't happen
-		}
+func (c *client) SubscribeToEventsWithMaxRetries(retries uint16) (EventSource, error) {
+	eventSource, err := c.doSubscribe(EventStreamRoute, retries)
+	if err != nil {
+		return nil, err
+	}
+	return NewEventSource(eventSource), nil
+}
 
-		trace.DumpRequest(request)
-		return request
-	})
+func (c *client) SubscribeToTcpEventsWithMaxRetries(retries uint16) (TcpEventSource, error) {
+	eventSource, err := c.doSubscribe(EventStreamTcpRoute, retries)
+	if err != nil {
+		return nil, err
+	}
+	return NewTcpEventSource(eventSource), nil
+}
+
+func (c *client) doSubscribe(routeName string, retries uint16) (RawEventSource, error) {
+	config := sse.Config{
+		Client: c.streamingHTTPClient,
+		RetryParams: sse.RetryParams{
+			MaxRetries:    retries,
+			RetryInterval: time.Second,
+		},
+		RequestCreator: func() *http.Request {
+			request, err := c.reqGen.CreateRequest(routeName, nil, nil)
+			c.tokenMutex.RLock()
+			defer c.tokenMutex.RUnlock()
+			request.Header.Add("Authorization", "bearer "+c.authToken)
+			if err != nil {
+				panic(err) // totally shouldn't happen
+			}
+
+			trace.DumpRequest(request)
+			return request
+		},
+	}
+	eventSource, err := config.Connect()
 	if err != nil {
 		bre, ok := err.(sse.BadResponseError)
 		if ok && bre.Response.StatusCode == http.StatusUnauthorized {

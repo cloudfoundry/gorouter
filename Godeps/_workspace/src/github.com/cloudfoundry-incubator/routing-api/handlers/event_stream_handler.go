@@ -32,15 +32,15 @@ func NewEventStreamHandler(tokenValidator authentication.TokenValidator, databas
 }
 
 func (h *EventStreamHandler) EventStream(w http.ResponseWriter, req *http.Request) {
-	h.stats.GaugeDelta("total_subscriptions", 1, 1.0)
-	defer h.stats.GaugeDelta("total_subscriptions", -1, 1.0)
+	h.stats.GaugeDelta(metrics.TotalHttpSubscriptions, 1, 1.0)
+	defer h.stats.GaugeDelta(metrics.TotalHttpSubscriptions, -1, 1.0)
 	log := h.logger.Session("event-stream-handler")
 	h.handleEventStream(log, db.HTTP_ROUTE_BASE_KEY, w, req)
 }
 
 func (h *EventStreamHandler) TcpEventStream(w http.ResponseWriter, req *http.Request) {
-	h.stats.GaugeDelta("total_tcp_subscriptions", 1, 1.0)
-	defer h.stats.GaugeDelta("total_tcp_subscriptions", -1, 1.0)
+	h.stats.GaugeDelta(metrics.TotalTcpSubscriptions, 1, 1.0)
+	defer h.stats.GaugeDelta(metrics.TotalTcpSubscriptions, -1, 1.0)
 	log := h.logger.Session("tcp-event-stream-handler")
 	h.handleEventStream(log, db.TCP_MAPPING_BASE_KEY, w, req)
 }

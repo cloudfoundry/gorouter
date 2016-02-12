@@ -10,6 +10,15 @@ import (
 	"github.com/cloudfoundry/storeadapter"
 )
 
+const (
+	TotalHttpSubscriptions = "total_http_subscriptions"
+	TotalHttpRoutes        = "total_http_routes"
+	TotalTcpSubscriptions  = "total_tcp_subscriptions"
+	TotalTcpRoutes         = "total_tcp_routes"
+	TotalTokenErrors       = "total_token_errors"
+	KeyRefreshEvents       = "key_refresh_events"
+)
+
 type PartialStatsdClient interface {
 	GaugeDelta(stat string, value int64, rate float32) error
 	Gauge(stat string, value int64, rate float32) error
@@ -37,25 +46,25 @@ func (r *MetricsReporter) Run(signals <-chan os.Signal, ready chan<- struct{}) e
 	close(ready)
 	ready = nil
 
-	r.stats.Gauge("total_subscriptions", 0, 1.0)
-	r.stats.Gauge("total_tcp_subscriptions", 0, 1.0)
+	r.stats.Gauge(TotalHttpSubscriptions, 0, 1.0)
+	r.stats.Gauge(TotalTcpSubscriptions, 0, 1.0)
 
 	for {
 		select {
 		case event := <-httpEventChan:
 			statsDelta := getStatsEventType(event)
-			r.stats.GaugeDelta("total_routes", statsDelta, 1.0)
+			r.stats.GaugeDelta(TotalHttpRoutes, statsDelta, 1.0)
 		case event := <-tcpEventChan:
 			statsDelta := getStatsEventType(event)
-			r.stats.GaugeDelta("total_tcp_routes", statsDelta, 1.0)
+			r.stats.GaugeDelta(TotalTcpRoutes, statsDelta, 1.0)
 		case <-r.ticker.C:
-			r.stats.Gauge("total_routes", r.getTotalRoutes(), 1.0)
-			r.stats.GaugeDelta("total_subscriptions", 0, 1.0)
-			r.stats.Gauge("total_tcp_routes", r.getTotalTcpRoutes(), 1.0)
-			r.stats.GaugeDelta("total_tcp_subscriptions", 0, 1.0)
+			r.stats.Gauge(TotalHttpRoutes, r.getTotalRoutes(), 1.0)
+			r.stats.GaugeDelta(TotalHttpSubscriptions, 0, 1.0)
+			r.stats.Gauge(TotalTcpRoutes, r.getTotalTcpRoutes(), 1.0)
+			r.stats.GaugeDelta(TotalTcpSubscriptions, 0, 1.0)
 
-			r.stats.Gauge("total_token_errors", GetTokenErrors(), 1.0)
-			r.stats.Gauge("key_refresh_events", GetKeyVerificationRefreshCount(), 1.0)
+			r.stats.Gauge(TotalTokenErrors, GetTokenErrors(), 1.0)
+			r.stats.Gauge(KeyRefreshEvents, GetKeyVerificationRefreshCount(), 1.0)
 		case <-signals:
 			return nil
 		case err := <-httpErrChan:

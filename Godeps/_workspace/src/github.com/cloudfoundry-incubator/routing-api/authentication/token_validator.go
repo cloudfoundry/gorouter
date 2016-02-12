@@ -152,7 +152,7 @@ func checkTokenFormat(token string) (string, error) {
 	}
 
 	tokenType, userToken := tokenParts[0], tokenParts[1]
-	if tokenType != "bearer" {
+	if !strings.EqualFold(tokenType, "bearer") {
 		return "", errors.New("Invalid token type: " + tokenType)
 	}
 

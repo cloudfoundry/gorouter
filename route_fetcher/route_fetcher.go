@@ -36,6 +36,7 @@ type RouteFetcher struct {
 const (
 	TokenFetchErrors      = "token_fetch_errors"
 	SubscribeEventsErrors = "subscribe_events_errors"
+	maxRetries            = 3
 )
 
 func NewRouteFetcher(logger lager.Logger, uaaClient uaa_client.Client, routeRegistry registry.RegistryInterface,
@@ -116,7 +117,7 @@ func (r *RouteFetcher) startEventCycle() {
 
 func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	r.client.SetToken(token.AccessToken)
-	source, err := r.client.SubscribeToEvents()
+	source, err := r.client.SubscribeToEventsWithMaxRetries(maxRetries)
 	if err != nil {
 		metrics.IncrementCounter(SubscribeEventsErrors)
 		r.logger.Error("Failed to subscribe to events: ", err)
