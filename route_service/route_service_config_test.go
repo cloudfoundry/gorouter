@@ -21,7 +21,7 @@ var _ = Describe("Route Service Config", func() {
 		cryptoPrev     secure.Crypto
 		cryptoKey      = "ABCDEFGHIJKLMNOP"
 		logger         lager.Logger
-		recommendHttps = true
+		recommendHttps bool
 	)
 
 	BeforeEach(func() {
@@ -55,6 +55,7 @@ var _ = Describe("Route Service Config", func() {
 				Signature:       "signature",
 				Metadata:        "metadata",
 				ForwardedUrlRaw: "http://test.com/path/",
+				RecommendHttps:  true,
 			}
 		})
 
@@ -82,6 +83,29 @@ var _ = Describe("Route Service Config", func() {
 			Expect(request.URL.Host).To(Equal("example-route-service.com"))
 			Expect(request.URL.Scheme).To(Equal("https"))
 		})
+
+		Context("tries to set the scheme for forwarded URL https", func() {
+			BeforeEach(func() {
+				rsArgs.RecommendHttps = true
+			})
+
+			It("sets the forwarded URL scheme to https", func() {
+				config.SetupRouteServiceRequest(request, rsArgs)
+				Expect(request.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal("http://test.com/path/"))
+			})
+		})
+
+		Context("tries to set the scheme for forwarded URL https", func() {
+			BeforeEach(func() {
+				rsArgs.RecommendHttps = true
+			})
+
+			It("sets the forwarded URL scheme to https", func() {
+				config.SetupRouteServiceRequest(request, rsArgs)
+				Expect(request.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal("https://test.com/path/"))
+			})
+		})
+
 	})
 
 	Describe("ValidateSignature", func() {

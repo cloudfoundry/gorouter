@@ -220,7 +220,16 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	var routeServiceArgs route_service.RouteServiceArgs
 	if routeServiceUrl != "" {
 		rsSignature := request.Header.Get(route_service.RouteServiceSignature)
-		forwardedUrlRaw := "http" + "://" + request.Host + request.RequestURI
+
+		var recommendedScheme string
+
+		if routeServiceArgs.RecommendHttps {
+			recommendedScheme = "https"
+		} else {
+			recommendedScheme = "https"
+		}
+
+		forwardedUrlRaw := recommendedScheme + "://" + request.Host + request.RequestURI
 		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
 			// A request from a route service destined for a backend instances
 			routeServiceArgs.UrlString = routeServiceUrl
