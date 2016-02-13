@@ -179,9 +179,17 @@ ssl_skip_validation: true
 			Expect(config.SSLSkipValidation).To(BeFalse())
 		})
 
+		It("sets the route service recommend https config", func() {
+			var b = []byte(`
+route_services_recommend_https: true
+`)
+			config.Initialize(b)
+			Expect(config.RouteServiceRecommendHttps).To(BeTrue())
+		})
+
 		It("sets the route service secret config", func() {
 			var b = []byte(`
-route_services_secret: super-route-service-secret 
+route_services_secret: super-route-service-secret
 `)
 			config.Initialize(b)
 			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))

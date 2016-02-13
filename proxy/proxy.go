@@ -43,20 +43,21 @@ type Proxy interface {
 }
 
 type ProxyArgs struct {
-	EndpointTimeout     time.Duration
-	Ip                  string
-	TraceKey            string
-	Registry            LookupRegistry
-	Reporter            metrics.ProxyReporter
-	AccessLogger        access_log.AccessLogger
-	SecureCookies       bool
-	TLSConfig           *tls.Config
-	RouteServiceEnabled bool
-	RouteServiceTimeout time.Duration
-	Crypto              secure.Crypto
-	CryptoPrev          secure.Crypto
-	ExtraHeadersToLog   []string
-	Logger              lager.Logger
+	EndpointTimeout            time.Duration
+	Ip                         string
+	TraceKey                   string
+	Registry                   LookupRegistry
+	Reporter                   metrics.ProxyReporter
+	AccessLogger               access_log.AccessLogger
+	SecureCookies              bool
+	TLSConfig                  *tls.Config
+	RouteServiceEnabled        bool
+	RouteServiceTimeout        time.Duration
+	RouteServiceRecommendHttps bool
+	Crypto                     secure.Crypto
+	CryptoPrev                 secure.Crypto
+	ExtraHeadersToLog          []string
+	Logger                     lager.Logger
 }
 
 type proxy struct {
@@ -74,7 +75,7 @@ type proxy struct {
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev)
+	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
 
 	p := &proxy{
 		accessLogger: args.AccessLogger,

@@ -102,11 +102,11 @@ type Config struct {
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
 
-	OAuth                  OAuthConfig      `yaml:"oauth"`
-	RoutingApi             RoutingApiConfig `yaml:"routing_api"`
-	RouteServiceSecret     string           `yaml:"route_services_secret"`
-	RouteServiceSecretPrev string           `yaml:"route_services_secret_decrypt_only"`
-
+	OAuth                      OAuthConfig      `yaml:"oauth"`
+	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
+	RouteServiceSecret         string           `yaml:"route_services_secret"`
+	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only"`
+	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https"`
 	// These fields are populated by the `Process` function.
 	PruneStaleDropletsInterval time.Duration `yaml:"-"`
 	DropletStaleThreshold      time.Duration `yaml:"-"`

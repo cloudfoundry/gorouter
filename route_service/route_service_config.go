@@ -25,6 +25,7 @@ type RouteServiceConfig struct {
 	crypto              secure.Crypto
 	cryptoPrev          secure.Crypto
 	logger              lager.Logger
+	recommendHttps      bool
 }
 
 type RouteServiceArgs struct {
@@ -33,15 +34,17 @@ type RouteServiceArgs struct {
 	Signature       string
 	Metadata        string
 	ForwardedUrlRaw string
+	RecommendHttps  bool
 }
 
-func NewRouteServiceConfig(logger lager.Logger, enabled bool, timeout time.Duration, crypto secure.Crypto, cryptoPrev secure.Crypto) *RouteServiceConfig {
+func NewRouteServiceConfig(logger lager.Logger, enabled bool, timeout time.Duration, crypto secure.Crypto, cryptoPrev secure.Crypto, recommendHttps bool) *RouteServiceConfig {
 	return &RouteServiceConfig{
 		routeServiceEnabled: enabled,
 		routeServiceTimeout: timeout,
 		crypto:              crypto,
 		cryptoPrev:          cryptoPrev,
 		logger:              logger,
+		recommendHttps:      recommendHttps,
 	}
 }
 
