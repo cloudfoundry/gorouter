@@ -40,7 +40,8 @@ var _ = Describe("Route Services", func() {
 
 	BeforeEach(func() {
 		conf.RouteServiceEnabled = true
-		forwardedUrl = "http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
+		recommendHttps = true
+		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
@@ -95,6 +96,52 @@ var _ = Describe("Route Services", func() {
 			res, body := conn.ReadResponse()
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 			Expect(body).To(ContainSubstring("Support for route services is disabled."))
+		})
+	})
+
+	Context("with Route Services enabled", func() {
+		BeforeEach(func() {
+			conf.RouteServiceEnabled = true
+			conf.SSLSkipValidation = true
+		})
+
+		Context("when recommendHttps is set to false", func() {
+			BeforeEach(func() {
+				furl := "http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
+				recommendHttps = false
+				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
+					signatureHeader := r.Header.Get(route_service.RouteServiceSignature)
+
+					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
+					Expect(err).ToNot(HaveOccurred())
+					_, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+
+					Expect(err).ToNot(HaveOccurred())
+					Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
+
+					// validate client request header
+					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal(furl))
+
+					w.Write([]byte("My Special Snowflake Route Service\n"))
+				})
+			})
+
+			It("routes to backend over http scheme", func() {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+					Fail("Should not get here")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+				conn.WriteRequest(req)
+
+				res, body := conn.ReadResponse()
+				Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
+			})
 		})
 	})
 

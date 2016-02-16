@@ -161,11 +161,12 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 			CipherSuites:       c.CipherSuites,
 			InsecureSkipVerify: c.SSLSkipValidation,
 		},
-		RouteServiceEnabled: c.RouteServiceEnabled,
-		RouteServiceTimeout: c.RouteServiceTimeout,
-		Crypto:              crypto,
-		CryptoPrev:          cryptoPrev,
-		ExtraHeadersToLog:   c.ExtraHeadersToLog,
+		RouteServiceEnabled:        c.RouteServiceEnabled,
+		RouteServiceTimeout:        c.RouteServiceTimeout,
+		RouteServiceRecommendHttps: c.RouteServiceRecommendHttps,
+		Crypto:            crypto,
+		CryptoPrev:        cryptoPrev,
+		ExtraHeadersToLog: c.ExtraHeadersToLog,
 	}
 	return proxy.NewProxy(args)
 }

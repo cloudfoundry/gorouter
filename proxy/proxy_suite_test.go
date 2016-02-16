@@ -26,15 +26,16 @@ import (
 )
 
 var (
-	r             *registry.RouteRegistry
-	p             proxy.Proxy
-	conf          *config.Config
-	proxyServer   net.Listener
-	accessLog     access_log.AccessLogger
-	accessLogFile *test_util.FakeFile
-	crypto        secure.Crypto
-	logger        lager.Logger
-	cryptoPrev    secure.Crypto
+	r              *registry.RouteRegistry
+	p              proxy.Proxy
+	conf           *config.Config
+	proxyServer    net.Listener
+	accessLog      access_log.AccessLogger
+	accessLogFile  *test_util.FakeFile
+	crypto         secure.Crypto
+	logger         lager.Logger
+	cryptoPrev     secure.Crypto
+	recommendHttps bool
 )
 
 func TestProxy(t *testing.T) {
@@ -77,19 +78,20 @@ var _ = JustBeforeEach(func() {
 	}
 
 	p = proxy.NewProxy(proxy.ProxyArgs{
-		EndpointTimeout:     conf.EndpointTimeout,
-		Ip:                  conf.Ip,
-		TraceKey:            conf.TraceKey,
-		Logger:              logger,
-		Registry:            r,
-		Reporter:            nullVarz{},
-		AccessLogger:        accessLog,
-		SecureCookies:       conf.SecureCookies,
-		TLSConfig:           tlsConfig,
-		RouteServiceEnabled: conf.RouteServiceEnabled,
-		RouteServiceTimeout: conf.RouteServiceTimeout,
-		Crypto:              crypto,
-		CryptoPrev:          cryptoPrev,
+		EndpointTimeout:            conf.EndpointTimeout,
+		Ip:                         conf.Ip,
+		TraceKey:                   conf.TraceKey,
+		Logger:                     logger,
+		Registry:                   r,
+		Reporter:                   nullVarz{},
+		AccessLogger:               accessLog,
+		SecureCookies:              conf.SecureCookies,
+		TLSConfig:                  tlsConfig,
+		RouteServiceEnabled:        conf.RouteServiceEnabled,
+		RouteServiceTimeout:        conf.RouteServiceTimeout,
+		Crypto:                     crypto,
+		CryptoPrev:                 cryptoPrev,
+		RouteServiceRecommendHttps: recommendHttps,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

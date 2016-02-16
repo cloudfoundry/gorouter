@@ -117,6 +117,7 @@ enable_ssl: true
 			Expect(config.AccessLog).To(Equal("/tmp/access_log"))
 			Expect(config.EnableSSL).To(Equal(true))
 			Expect(config.SSLPort).To(Equal(uint16(4443)))
+			Expect(config.RouteServiceRecommendHttps).To(BeFalse())
 		})
 
 		It("sets the Routing Api config", func() {

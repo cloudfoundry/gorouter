@@ -61,17 +61,18 @@ type ProxyArgs struct {
 }
 
 type proxy struct {
-	ip                 string
-	traceKey           string
-	logger             lager.Logger
-	registry           LookupRegistry
-	reporter           metrics.ProxyReporter
-	accessLogger       access_log.AccessLogger
-	transport          *http.Transport
-	secureCookies      bool
-	heartbeatOK        int32
-	routeServiceConfig *route_service.RouteServiceConfig
-	ExtraHeadersToLog  []string
+	ip                         string
+	traceKey                   string
+	logger                     lager.Logger
+	registry                   LookupRegistry
+	reporter                   metrics.ProxyReporter
+	accessLogger               access_log.AccessLogger
+	transport                  *http.Transport
+	secureCookies              bool
+	heartbeatOK                int32
+	routeServiceConfig         *route_service.RouteServiceConfig
+	extraHeadersToLog          []string
+	routeServiceRecommendHttps bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -99,10 +100,11 @@ func NewProxy(args ProxyArgs) Proxy {
 			DisableCompression: true,
 			TLSClientConfig:    args.TLSConfig,
 		},
-		secureCookies:      args.SecureCookies,
-		heartbeatOK:        1, // 1->true, 0->false
-		routeServiceConfig: routeServiceConfig,
-		ExtraHeadersToLog:  args.ExtraHeadersToLog,
+		secureCookies:              args.SecureCookies,
+		heartbeatOK:                1, // 1->true, 0->false
+		routeServiceConfig:         routeServiceConfig,
+		extraHeadersToLog:          args.ExtraHeadersToLog,
+		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 	}
 
 	return p
@@ -152,7 +154,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	accessLog := access_log.AccessLogRecord{
 		Request:           request,
 		StartedAt:         startedAt,
-		ExtraHeadersToLog: p.ExtraHeadersToLog,
+		ExtraHeadersToLog: p.extraHeadersToLog,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: request.Body}
@@ -223,10 +225,10 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		var recommendedScheme string
 
-		if routeServiceArgs.RecommendHttps {
+		if p.routeServiceRecommendHttps {
 			recommendedScheme = "https"
 		} else {
-			recommendedScheme = "https"
+			recommendedScheme = "http"
 		}
 
 		forwardedUrlRaw := recommendedScheme + "://" + request.Host + request.RequestURI
