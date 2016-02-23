@@ -152,18 +152,20 @@ routing_api:
 		It("sets the OAuth config", func() {
 			var b = []byte(`
 oauth:
-  token_endpoint: http://bob.url/token
+  token_endpoint: uaa.internal
+  port: 8443
+  skip_oauth_tls_verification: true
   client_name: client-name
   client_secret: client-secret
-  port: 1234
 `)
 
 			config.Initialize(b)
 
-			Expect(config.OAuth.TokenEndpoint).To(Equal("http://bob.url/token"))
+			Expect(config.OAuth.TokenEndpoint).To(Equal("uaa.internal"))
+			Expect(config.OAuth.Port).To(Equal(8443))
+			Expect(config.OAuth.SkipOAuthTLSVerification).To(Equal(true))
 			Expect(config.OAuth.ClientName).To(Equal("client-name"))
 			Expect(config.OAuth.ClientSecret).To(Equal("client-secret"))
-			Expect(config.OAuth.Port).To(Equal(1234))
 		})
 
 		It("sets the SkipSSLValidation config", func() {

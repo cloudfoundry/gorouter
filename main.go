@@ -192,9 +192,18 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 		logger.Info("using-noop-token-fetcher")
 		return uaa_client.NewNoOpUaaClient()
 	}
-	tokenURL := fmt.Sprintf("%s:%d", c.OAuth.TokenEndpoint, c.OAuth.Port)
+
+	if c.OAuth.Port == -1 {
+		logger.Fatal("tls-not-enabled", errors.New("GoRouter requires TLS enabled to get OAuth token"), lager.Data{"token-endpoint": c.OAuth.TokenEndpoint, "port": c.OAuth.Port})
+	}
+
+	scheme := "https"
+	tokenURL := fmt.Sprintf("%s://%s:%d", scheme, c.OAuth.TokenEndpoint, c.OAuth.Port)
+
+	logger.Info(fmt.Sprintf("using-%s-scheme-for-uaa", scheme))
 	cfg := &uaa_config.Config{
 		UaaEndpoint:           tokenURL,
+		SkipVerification:      c.OAuth.SkipOAuthTLSVerification,
 		ClientName:            c.OAuth.ClientName,
 		ClientSecret:          c.OAuth.ClientSecret,
 		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,

@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"crypto/tls"
 	"errors"
 	"strconv"
 	"strings"
@@ -58,9 +59,11 @@ var _ = Describe("Router Integration", func() {
 		cfg.DrainTimeoutInSeconds = 1
 
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint: "http://uaa.bosh-lite.com",
-			ClientName:    "client-id",
-			ClientSecret:  "client-secret",
+			TokenEndpoint:            "uaa.bosh-lite.com",
+			Port:                     8443,
+			ClientName:               "client-id",
+			ClientSecret:             "client-secret",
+			SkipOAuthTLSVerification: true,
 		}
 	}
 
@@ -422,12 +425,36 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
+	Context("when routing api is disabled", func() {
+		var (
+			cfgFile string
+			cfg     *config.Config
+		)
+
+		BeforeEach(func() {
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+
+			cfg = createConfig(cfgFile, statusPort, proxyPort)
+			writeConfig(cfg, cfgFile)
+		})
+
+		It("doesn't start the route fetcher", func() {
+			session := startGorouterSession(cfgFile)
+			Eventually(session).ShouldNot(Say("setting-up-routing-api"))
+			stopGorouter(session)
+		})
+
+	})
+
 	Context("when the routing api is enabled", func() {
 		var (
-			config     *config.Config
-			ts         *httptest.Server
-			routingApi *httptest.Server
-			cfgFile    string
+			config         *config.Config
+			uaaTlsListener net.Listener
+			routingApi     *httptest.Server
+			cfgFile        string
 		)
 
 		BeforeEach(func() {
@@ -437,18 +464,12 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort)
 
-			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
-				w.Write(jsonBytes)
-			}))
-
-			config.OAuth.TokenEndpoint, config.OAuth.Port = uriAndPort(ts.URL)
-
 			routingApi = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
 				w.Write(jsonBytes)
 			}))
 			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApi.URL)
+
 		})
 
 		Context("when the routing api auth is disabled ", func() {
@@ -464,19 +485,25 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		Context("when the routing api auth is enabled (default)", func() {
-			It("uses the uaa token fetcher", func() {
-				defer ts.Close()
-				writeConfig(config, cfgFile)
+			Context("when uaa is available on tls port", func() {
+				BeforeEach(func() {
+					uaaTlsListener = setupTlsServer()
+					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(uaaTlsListener.Addr().String())
+				})
 
-				// note, this will start with routing api, but will not be able to connect
-				session := startGorouterSession(cfgFile)
-				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("fetching-token-from-uaa"))
-				stopGorouter(session)
+				It("fetches a token from uaa", func() {
+					writeConfig(config, cfgFile)
+
+					// note, this will start with routing api, but will not be able to connect
+					session := startGorouterSession(cfgFile)
+					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("fetching-token-from-uaa"))
+					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using-https-scheme-for-uaa"))
+					stopGorouter(session)
+				})
 			})
 
-			Context("when the uaa is not avaliable", func() {
+			Context("when the uaa is not available", func() {
 				It("gorouter exits with non-zero code", func() {
-					ts.Close()
 					writeConfig(config, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -487,7 +514,11 @@ var _ = Describe("Router Integration", func() {
 				})
 			})
 
-			Context("when routing api is not avaliable", func() {
+			Context("when routing api is not available", func() {
+				BeforeEach(func() {
+					uaaTlsListener = setupTlsServer()
+					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(uaaTlsListener.Addr().String())
+				})
 				It("gorouter exits with non-zero code", func() {
 					routingApi.Close()
 					writeConfig(config, cfgFile)
@@ -498,6 +529,19 @@ var _ = Describe("Router Integration", func() {
 					Eventually(session, 30*time.Second).Should(Say("routing-api-connection-failed"))
 					Eventually(session, 5*time.Second).Should(Exit(2))
 				})
+			})
+		})
+
+		Context("when tls for uaa is disabled", func() {
+			It("fails fast", func() {
+				config.OAuth.Port = -1
+				writeConfig(config, cfgFile)
+
+				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
+				Eventually(session, 5*time.Second).Should(Exit(2))
 			})
 		})
 	})
@@ -532,6 +576,12 @@ func uriAndPort(url string) (string, int) {
 	return uri, port
 }
 
+func hostnameAndPort(url string) (string, int) {
+	parts := strings.Split(url, ":")
+	hostname := parts[0]
+	port, _ := strconv.Atoi(parts[1])
+	return hostname, port
+}
 func newMessageBus(c *config.Config) (yagnats.NATSConn, error) {
 	natsMembers := make([]string, len(c.Nats))
 	for _, info := range c.Nats {
@@ -576,4 +626,36 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 	default:
 		return false, errors.New("Didn't get an OK response")
 	}
+}
+
+func setupTlsServer() net.Listener {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	Expect(err).ToNot(HaveOccurred())
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(fmt.Sprintf("{\"alg\":\"alg\", \"value\": \"%s\" }", "fake-public-key")))
+	})
+
+	tlsListener := newTlsListener(listener)
+	tlsServer := &http.Server{Handler: handler}
+
+	go func() {
+		err := tlsServer.Serve(tlsListener)
+		Expect(err).ToNot(HaveOccurred())
+	}()
+	return tlsListener
+}
+
+func newTlsListener(listener net.Listener) net.Listener {
+	public := "test/assets/public.pem"
+	private := "test/assets/private.pem"
+	cert, err := tls.LoadX509KeyPair(public, private)
+	Expect(err).ToNot(HaveOccurred())
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
+	}
+
+	return tls.NewListener(listener, tlsConfig)
 }
