@@ -388,7 +388,7 @@ func (r *Router) RegisterComponent() {
 
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
-		r.logger.Debug("Got router.register:", lager.Data{"registry Messgae": registryMessage})
+		r.logger.Debug("Got router.register:", lager.Data{"registry Message": registryMessage})
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
