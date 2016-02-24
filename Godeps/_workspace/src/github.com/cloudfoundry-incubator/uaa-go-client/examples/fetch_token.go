@@ -16,7 +16,7 @@ import (
 func main() {
 	var (
 		err       error
-		uaaClient *client.UaaClient
+		uaaClient client.Client
 		token     *schema.Token
 	)
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net/url"
 	"time"
 )
 
@@ -19,7 +20,19 @@ type Config struct {
 	SkipVerification      bool
 }
 
-func (c *Config) Valid() error {
+func (c *Config) CheckEndpoint() (*url.URL, error) {
+	if c.UaaEndpoint == "" {
+		return nil, errors.New("UAA endpoint cannot be empty")
+	}
+
+	uri, err := url.Parse(c.UaaEndpoint)
+	if err != nil {
+		return nil, errors.New("UAA endpoint invalid")
+	}
+	return uri, nil
+}
+
+func (c *Config) CheckCredentials() error {
 
 	if c.ClientName == "" {
 		return errors.New("OAuth Client ID cannot be empty")
@@ -29,8 +42,5 @@ func (c *Config) Valid() error {
 		return errors.New("OAuth Client Secret cannot be empty")
 	}
 
-	if c.UaaEndpoint == "" {
-		return errors.New("UAA endpoint cannot be empty")
-	}
 	return nil
 }

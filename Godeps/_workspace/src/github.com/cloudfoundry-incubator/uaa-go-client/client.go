@@ -58,13 +58,9 @@ func NewClient(logger lager.Logger, cfg *config.Config, clock clock.Clock) (Clie
 		return nil, errors.New("Configuration cannot be nil")
 	}
 
-	if err = cfg.Valid(); err != nil {
-		return nil, err
-	}
-
-	uri, err = url.Parse(cfg.UaaEndpoint)
+	uri, err = cfg.CheckEndpoint()
 	if err != nil {
-		return nil, errors.New("UAA endpoint invalid")
+		return nil, err
 	}
 
 	if uri.Scheme == "https" {
@@ -101,6 +97,11 @@ func newSecureClient(cfg *config.Config) (*http.Client, error) {
 
 func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	u.logger.Debug("fetching-token", lager.Data{"force-update": forceUpdate})
+
+	if err := u.config.CheckCredentials(); err != nil {
+		return nil, err
+	}
+
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
@@ -210,7 +211,7 @@ func (u *UaaClient) FetchKey() (string, error) {
 	}
 	logger.Info("fetch-key-successful")
 
-	if checkPublicKey(uaaKey.Value) != nil {
+	if err = checkPublicKey(uaaKey.Value); err != nil {
 		logger.Error("error-not-valid-pem-key", err)
 		return "", err
 	}
