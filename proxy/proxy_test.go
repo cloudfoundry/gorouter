@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
@@ -117,7 +118,10 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.Header.Get("content-type")).To(Equal(""))
+		h, present := resp.Header["Content-Type"]
+		Expect(present).To(BeFalse())
+		Expect(h).To(BeNil())
+		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
 	})
 
 	It("Content-type xml is not set by proxy", func() {
@@ -139,7 +143,36 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 
 		resp, _ := x.ReadResponse()
-		Expect(resp.Header.Get("content-type")).To(Equal(""))
+
+		h, present := resp.Header["Content-Type"]
+		Expect(present).To(BeFalse())
+		Expect(h).To(BeNil())
+		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
+	})
+
+	It("Content-type header is not set for an HTTP 204 response", func() {
+		ln := registerHandler(r, "no-content-test", func(x *test_util.HttpConn) {
+			_, err := http.ReadRequest(x.Reader)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusNoContent)
+			x.WriteResponse(resp)
+			x.Close()
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "no-content-test", "/", nil)
+		req.Host = "no-content-test"
+		x.WriteRequest(req)
+
+		resp, _ := x.ReadResponse()
+
+		h, present := resp.Header["Content-Type"]
+		Expect(present).To(BeFalse())
+		Expect(h).To(BeNil())
+		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
 	})
 
 	It("responds to http/1.0 with path/path", func() {
@@ -1326,4 +1359,11 @@ func parseResponseTimeFromLog(log string) float64 {
 	Expect(err).ToNot(HaveOccurred())
 
 	return f
+}
+
+func responseContains(resp *http.Response, match string) bool {
+	dump, err := httputil.DumpResponse(resp, true)
+	Expect(err).ToNot(HaveOccurred())
+	str := strings.ToLower(string(dump))
+	return strings.Contains(str, strings.ToLower(match))
 }

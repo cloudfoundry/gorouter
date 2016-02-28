@@ -276,8 +276,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			setupStickySession(responseWriter, rsp, endpoint, stickyEndpointId, p.secureCookies, routePool.ContextPath())
 		}
 
-		if rsp.Header.Get("content-type") == "" {
-			rsp.Header.Set("content-type", "")
+		// if Content-Type not in response, nil out to suppress Go's auto-detect
+		if _, ok := rsp.Header["Content-Type"]; !ok {
+			responseWriter.Header()["Content-Type"] = nil
 		}
 
 	}
