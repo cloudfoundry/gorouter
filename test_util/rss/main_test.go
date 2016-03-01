@@ -99,8 +99,8 @@ var _ = Describe("RSS Cli", func() {
 
 			BeforeEach(func() {
 				// generated using fixture/key file
-				sig = "iVCbWwOCswjhGYfdm8yBoIC9uy6SeDfEbDRH5XiR4Mw9-GlBdfeOyS0OZrucqGMqAHIw8Huo1mcqtoGuMSZc4trmvwxtnWpKff9SZlGKz6h-54LfVBj9KrKuqkOpjvBynOwyBVRBWwi_1g=="
-				meta = "eyJub25jZSI6InRPVzgyZXhaTitTZlc4Q0MifQ=="
+				sig = "_RArsyg5lPJSfzcstt6sYJVl5J7RsGedUkrIVBaOY7Vm0Or1l9OdgdEbf1k6FfHI0-ij6YtuA0-hAqxSETZlhHLg6XtlV8Ff3C_STSOzhbKpS_YBD_elxfqlTfyrxv_vNA=="
+				meta = "eyJub25jZSI6IjN6SFNYbCtPUlJ3YzNjaWQifQ=="
 			})
 
 			Context("when key argument is not provided and default key exists", func() {
