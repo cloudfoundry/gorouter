@@ -57,23 +57,23 @@ var _ = Describe("Router Integration", func() {
 		cfg.StartResponseDelayIntervalInSeconds = 1
 		cfg.EndpointTimeoutInSeconds = 5
 		cfg.DrainTimeoutInSeconds = 1
+	}
+
+	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
+		cfg := test_util.SpecConfig(natsPort, statusPort, proxyPort)
+
+		configDrainSetup(cfg)
 
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint:            "uaa.bosh-lite.com",
+			TokenEndpoint:            "non-existent-oauth.com",
 			Port:                     8443,
 			ClientName:               "client-id",
 			ClientSecret:             "client-secret",
 			SkipOAuthTLSVerification: true,
 		}
-	}
 
-	createConfig := func(cfgFile string, statusPort, proxyPort uint16) *config.Config {
-		config := test_util.SpecConfig(natsPort, statusPort, proxyPort)
-
-		configDrainSetup(config)
-
-		writeConfig(config, cfgFile)
-		return config
+		writeConfig(cfg, cfgFile)
+		return cfg
 	}
 
 	createSSLConfig := func(cfgFile string, statusPort, proxyPort, SSLPort uint16) *config.Config {

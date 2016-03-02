@@ -68,7 +68,7 @@ func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 
 	c.Logging = config.LoggingConfig{
 		File:          "/dev/stdout",
-		Level:         "info",
+		Level:         "debug",
 		MetronAddress: "localhost:3457",
 		JobName:       "router_test_z1_0",
 	}
