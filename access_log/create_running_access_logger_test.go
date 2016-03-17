@@ -23,10 +23,25 @@ var _ = Describe("AccessLog", func() {
 		Expect(CreateRunningAccessLogger(logger, config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
 	})
 
+	It("creates null access loger if access log disabled, no access log location, and loggregator is disabled", func() {
+		config := config.DefaultConfig()
+		config.Logging.AccessLoggingEnabled = false
+
+		Expect(CreateRunningAccessLogger(logger, config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
+	})
+
+	It("creates null access loger if access log disabled when there is an access log location and loggregator is disabled", func() {
+		config := config.DefaultConfig()
+		config.AccessLog = "/dev/null"
+		config.Logging.AccessLoggingEnabled = false
+
+		Expect(CreateRunningAccessLogger(logger, config)).To(BeAssignableToTypeOf(&NullAccessLogger{}))
+	})
+
 	It("creates an access log when loggegrator is enabled", func() {
 		config := config.DefaultConfig()
 		config.Logging.LoggregatorEnabled = true
-		config.AccessLog = ""
+		config.Logging.AccessLoggingEnabled = false
 
 		accessLogger, _ := CreateRunningAccessLogger(logger, config)
 		Expect(accessLogger.(*FileAndLoggregatorAccessLogger).FileWriter()).To(BeNil())
@@ -34,7 +49,7 @@ var _ = Describe("AccessLog", func() {
 
 	})
 
-	It("creates an access log if an access log is specified", func() {
+	It("creates an access log if an access log is specified and access logging enabled", func() {
 		config := config.DefaultConfig()
 		config.AccessLog = "/dev/null"
 

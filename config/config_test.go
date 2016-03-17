@@ -87,6 +87,7 @@ logging:
   syslog: syslog
   level: debug2
   loggregator_enabled: true
+  access_logging_enabled: false
 `)
 			config.Initialize(b)
 
@@ -94,6 +95,7 @@ logging:
 			Expect(config.Logging.Syslog).To(Equal("syslog"))
 			Expect(config.Logging.Level).To(Equal("debug2"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(true))
+			Expect(config.Logging.AccessLoggingEnabled).To(Equal(false))
 			Expect(config.Logging.JobName).To(Equal("gorouter"))
 		})
 
