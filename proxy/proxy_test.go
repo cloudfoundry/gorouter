@@ -249,6 +249,25 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
+
+	It("responds to http/1.1 with absolute-form request that has encoded characters in the path", func() {
+		ln := registerHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {
+			conn.CheckLine("GET http://test.io/my%20path/your_path HTTP/1.1")
+
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+		})
+		defer ln.Close()
+
+		conn := dialProxy(proxyServer)
+
+		conn.WriteLines([]string{
+			"GET http://test.io/my%20path/your_path HTTP/1.1",
+			"Host: test.io",
+		})
+
+		conn.CheckLine("HTTP/1.1 200 OK")
+	})
+
 	It("does not respond to unsupported HTTP versions", func() {
 		conn := dialProxy(proxyServer)
 
