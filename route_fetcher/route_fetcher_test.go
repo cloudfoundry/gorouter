@@ -197,7 +197,7 @@ var _ = Describe("RouteFetcher", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(Equal("Oops!"))
 					Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
-					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeTrue())
+					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
 				})
 			})
 
@@ -207,8 +207,8 @@ var _ = Describe("RouteFetcher", func() {
 
 					err := fetcher.FetchRoutes()
 					Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
-					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeTrue())
-					Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeFalse())
+					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
+					Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeTrue())
 					Expect(client.RoutesCallCount()).To(Equal(2))
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(Equal("unauthorized"))
@@ -358,8 +358,8 @@ var _ = Describe("RouteFetcher", func() {
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 						Eventually(logger).Should(gbytes.Say("unauthorized"))
 						Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", 2))
-						Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeTrue())
-						Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeFalse())
+						Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
+						Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeTrue())
 
 						Eventually(func() uint64 {
 							return sender.GetCounter(SubscribeEventsErrors)

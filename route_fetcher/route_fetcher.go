@@ -91,7 +91,7 @@ func (r *RouteFetcher) startEventCycle() {
 		useCachedToken := true
 		for {
 			r.logger.Debug("fetching-token")
-			token, err := r.UaaClient.FetchToken(useCachedToken)
+			token, err := r.UaaClient.FetchToken(!useCachedToken)
 			if err != nil {
 				metrics.IncrementCounter(TokenFetchErrors)
 				r.logger.Error("failed-to-fetch-token", err)
@@ -161,7 +161,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	var routes []db.Route
 	for count := 0; count < 2; count++ {
 		r.logger.Debug("fetching-token")
-		token, tokenErr := r.UaaClient.FetchToken(useCachedToken)
+		token, tokenErr := r.UaaClient.FetchToken(!useCachedToken)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
