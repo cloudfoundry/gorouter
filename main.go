@@ -176,7 +176,6 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 
 	uaaClient := newUaaClient(logger, clock, c)
 
-	logger.Info("fetching-token-from-uaa")
 	_, err := uaaClient.FetchToken(false)
 	if err != nil {
 		logger.Fatal("unable-to-fetch-token", err)

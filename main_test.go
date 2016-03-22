@@ -496,8 +496,7 @@ var _ = Describe("Router Integration", func() {
 
 					// note, this will start with routing api, but will not be able to connect
 					session := startGorouterSession(cfgFile)
-					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("fetching-token-from-uaa"))
-					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using-https-scheme-for-uaa"))
+					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("started-fetching-token"))
 					stopGorouter(session)
 				})
 			})
