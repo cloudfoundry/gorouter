@@ -40,7 +40,7 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry-incubator/uaa-go-client",
-			"Rev": "43ad7d986cb3606ba6976cbf40c19ee0b8150ceb"
+			"Rev": "41dfa85f2fc97247da6fa5f2f611b851ddf8e7ad"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",

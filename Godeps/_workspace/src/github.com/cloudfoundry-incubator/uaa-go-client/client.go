@@ -47,7 +47,7 @@ type UaaClient struct {
 }
 
 func NewClient(logger lager.Logger, cfg *config.Config, clock clock.Clock) (Client, error) {
-
+	logger.Session("uaa-client")
 	var (
 		client *http.Client
 		err    error
@@ -96,7 +96,9 @@ func newSecureClient(cfg *config.Config) (*http.Client, error) {
 }
 
 func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
-	u.logger.Debug("fetching-token", lager.Data{"force-update": forceUpdate})
+	logger := u.logger.Session("uaa-client")
+	tokenURL := fmt.Sprintf("%s/oauth/token", u.config.UaaEndpoint)
+	logger.Info("started-fetching-token", lager.Data{"endpoint": tokenURL, "force-update": forceUpdate})
 
 	if err := u.config.CheckCredentials(); err != nil {
 		return nil, err
@@ -106,7 +108,7 @@ func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	defer u.lock.Unlock()
 
 	if !forceUpdate && u.canReturnCachedToken() {
-		u.logger.Debug("return-cached-token")
+		logger.Info("using-cached-token")
 		return u.cachedToken, nil
 	}
 
@@ -115,27 +117,31 @@ func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	var token *schema.Token
 	var err error
 	for retry == true {
-		token, retry, err = u.doFetch()
+		token, retry, err = u.doFetchToken()
 		if token != nil {
-			u.logger.Debug("successfully-fetched-token")
 			break
 		}
+
+		if err != nil {
+			logger.Error("error-fetching-token", err)
+		}
+
 		if retry && retryCount < u.config.MaxNumberOfRetries {
-			u.logger.Debug("retry-fetching-token", lager.Data{"retry-count": retryCount})
+			logger.Debug("retry-fetching-token", lager.Data{"retry-count": retryCount})
 			retryCount++
 			u.clock.Sleep(u.config.RetryInterval)
 			continue
 		} else {
-			u.logger.Debug("failed-getting-token")
 			return nil, err
 		}
 	}
 
+	logger.Info("successfully-fetched-token")
 	u.updateCachedToken(token)
 	return token, nil
 }
 
-func (u *UaaClient) doFetch() (*schema.Token, bool, error) {
+func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
 	values := url.Values{}
 	values.Add("grant_type", "client_credentials")
 	requestBody := values.Encode()
@@ -149,17 +155,16 @@ func (u *UaaClient) doFetch() (*schema.Token, bool, error) {
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	request.Header.Add("Accept", "application/json; charset=utf-8")
 	trace.DumpRequest(request)
-	u.logger.Debug("http-request", lager.Data{"endpoint": request.URL})
 
+	u.logger.Debug("sending-request", lager.Data{"endpoint": request.URL})
 	resp, err := u.client.Do(request)
 	if err != nil {
-		u.logger.Debug("error-fetching-token", lager.Data{"error": err.Error()})
 		return nil, true, err
 	}
 	defer resp.Body.Close()
 
 	trace.DumpResponse(resp)
-	u.logger.Debug("http-response", lager.Data{"status-code": resp.StatusCode})
+	u.logger.Debug("response-received", lager.Data{"status-code": resp.StatusCode})
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -177,27 +182,24 @@ func (u *UaaClient) doFetch() (*schema.Token, bool, error) {
 	token := &schema.Token{}
 	err = json.Unmarshal(body, token)
 	if err != nil {
-		u.logger.Debug("error-umarshalling-token", lager.Data{"error": err.Error()})
 		return nil, false, err
 	}
 	return token, false, nil
 }
 
 func (u *UaaClient) FetchKey() (string, error) {
-	logger := u.logger.Session("uaa-key-fetcher")
-	logger.Info("fetch-key-started")
-	defer logger.Info("fetch-key-completed")
+	logger := u.logger.Session("uaa-client")
 	getKeyUrl := fmt.Sprintf("%s/token_key", u.config.UaaEndpoint)
+
+	logger.Info("fetch-key-starting", lager.Data{"endpoint": getKeyUrl})
 
 	resp, err := u.client.Get(getKeyUrl)
 	if err != nil {
-		logger.Error("error-in-fetching-key", err)
 		return "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("http-error-fetching-key")
-		logger.Error("http-error-fetching-key", err)
 		return "", err
 	}
 
@@ -206,16 +208,18 @@ func (u *UaaClient) FetchKey() (string, error) {
 	uaaKey := schema.UaaKey{}
 	err = decoder.Decode(&uaaKey)
 	if err != nil {
-		logger.Error("error-in-unmarshaling-key", err)
-		return "", err
+		return "", errors.New("unmarshalling error: " + err.Error())
 	}
-	logger.Info("fetch-key-successful")
 
 	if err = checkPublicKey(uaaKey.Value); err != nil {
-		logger.Error("error-not-valid-pem-key", err)
 		return "", err
 	}
 
+	u.rwlock.Lock()
+	defer u.rwlock.Unlock()
+	u.uaaPublicKey = uaaKey.Value
+
+	logger.Info("fetch-key-successful")
 	return uaaKey.Value, nil
 }
 
@@ -243,8 +247,8 @@ func (u *UaaClient) DecodeToken(uaaToken string, desiredPermissions ...string) e
 			})
 
 			if err != nil {
+				logger.Error("decode-failed", err)
 				if matchesError(err, jwt.ValidationErrorSignatureInvalid) {
-					logger.Info("invalid-signature")
 					forceUaaKeyFetch = true
 					continue
 				}
@@ -326,19 +330,13 @@ func (u *UaaClient) getUaaTokenKey(logger lager.Logger, forceFetch bool) (string
 		if err != nil {
 			return key, err
 		}
-		err = checkPublicKey(key)
-		if err != nil {
-			return "", err
-		}
+
 		if u.getUaaPublicKey() == key {
 			logger.Info("Fetched the same verification key from UAA")
 		} else {
 			logger.Info("Fetched a different verification key from UAA")
 		}
-		u.rwlock.Lock()
-		defer u.rwlock.Unlock()
-		u.uaaPublicKey = key
-		return u.uaaPublicKey, nil
+		return key, nil
 	}
 
 	return u.getUaaPublicKey(), nil
