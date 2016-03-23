@@ -55,19 +55,21 @@ type OAuthConfig struct {
 }
 
 type LoggingConfig struct {
-	File               string `yaml:"file"`
-	Syslog             string `yaml:"syslog"`
-	Level              string `yaml:"level"`
-	LoggregatorEnabled bool   `yaml:"loggregator_enabled"`
-	MetronAddress      string `yaml:"metron_address"`
+	File                 string `yaml:"file"`
+	Syslog               string `yaml:"syslog"`
+	Level                string `yaml:"level"`
+	LoggregatorEnabled   bool   `yaml:"loggregator_enabled"`
+	AccessLoggingEnabled bool   `yaml:"access_logging_enabled"`
+	MetronAddress        string `yaml:"metron_address"`
 
 	// This field is populated by the `Process` function.
 	JobName string `yaml:"-"`
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level:         "debug",
-	MetronAddress: "localhost:3457",
+	Level:                "debug",
+	MetronAddress:        "localhost:3457",
+	AccessLoggingEnabled: true,
 }
 
 type Config struct {
