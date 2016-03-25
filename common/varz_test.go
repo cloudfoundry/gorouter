@@ -52,7 +52,11 @@ var _ = Describe("Varz", func() {
 		varz := &Varz{}
 		varz.LogCounts = NewLogCounter()
 
-		varz.LogCounts.Log(lager.INFO, []byte("info-message"))
+		infoMsg := lager.LogFormat{
+			LogLevel: lager.INFO,
+			Message:  "info-message",
+		}
+		varz.LogCounts.Log(infoMsg)
 
 		bytes, _ := json.Marshal(varz)
 		data := make(map[string]interface{})

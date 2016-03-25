@@ -20,9 +20,9 @@ func NewLogCounter() *LogCounter {
 	return lc
 }
 
-func (lc *LogCounter) Log(logLevel lager.LogLevel, payload []byte) {
+func (lc *LogCounter) Log(log lager.LogFormat) {
 	lc.Lock()
-	lc.counts[strconv.Itoa(int(logLevel))] += 1
+	lc.counts[strconv.Itoa(int(log.LogLevel))] += 1
 	lc.Unlock()
 }
 

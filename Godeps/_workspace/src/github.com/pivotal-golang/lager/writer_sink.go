@@ -5,13 +5,11 @@ import (
 	"sync"
 )
 
-const logBufferSize = 1024
-
 // A Sink represents a write destination for a Logger. It provides
 // a thread-safe interface for writing logs
 type Sink interface {
 	//Log to the sink.  Best effort -- no need to worry about errors.
-	Log(level LogLevel, payload []byte)
+	Log(LogFormat)
 }
 
 type writerSink struct {
@@ -28,13 +26,13 @@ func NewWriterSink(writer io.Writer, minLogLevel LogLevel) Sink {
 	}
 }
 
-func (sink *writerSink) Log(level LogLevel, log []byte) {
-	if level < sink.minLogLevel {
+func (sink *writerSink) Log(log LogFormat) {
+	if log.LogLevel < sink.minLogLevel {
 		return
 	}
 
 	sink.writeL.Lock()
-	sink.writer.Write(log)
+	sink.writer.Write(log.ToJSON())
 	sink.writer.Write([]byte("\n"))
 	sink.writeL.Unlock()
 }
