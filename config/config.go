@@ -65,28 +65,34 @@ type LoggingConfig struct {
 	JobName string `yaml:"-"`
 }
 
+type AccessLog struct {
+	File            string `yaml:"file"`
+	EnableStreaming bool   `yaml:"enable_streaming"`
+}
+
 var defaultLoggingConfig = LoggingConfig{
 	Level:         "debug",
 	MetronAddress: "localhost:3457",
 }
 
 type Config struct {
-	Status            StatusConfig  `yaml:"status"`
-	Nats              []NatsConfig  `yaml:"nats"`
-	Logging           LoggingConfig `yaml:"logging"`
-	Port              uint16        `yaml:"port"`
-	Index             uint          `yaml:"index"`
-	Zone              string        `yaml:"zone"`
-	GoMaxProcs        int           `yaml:"go_max_procs,omitempty"`
-	TraceKey          string        `yaml:"trace_key"`
-	AccessLog         string        `yaml:"access_log"`
-	DebugAddr         string        `yaml:"debug_addr"`
-	EnableSSL         bool          `yaml:"enable_ssl"`
-	SSLPort           uint16        `yaml:"ssl_port"`
-	SSLCertPath       string        `yaml:"ssl_cert_path"`
-	SSLKeyPath        string        `yaml:"ssl_key_path"`
-	SSLCertificate    tls.Certificate
-	SSLSkipValidation bool `yaml:"ssl_skip_validation"`
+	Status                   StatusConfig  `yaml:"status"`
+	Nats                     []NatsConfig  `yaml:"nats"`
+	Logging                  LoggingConfig `yaml:"logging"`
+	Port                     uint16        `yaml:"port"`
+	Index                    uint          `yaml:"index"`
+	Zone                     string        `yaml:"zone"`
+	GoMaxProcs               int           `yaml:"go_max_procs,omitempty"`
+	TraceKey                 string        `yaml:"trace_key"`
+	AccessLog                AccessLog     `yaml:"access_log"`
+	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
+	DebugAddr                string        `yaml:"debug_addr"`
+	EnableSSL                bool          `yaml:"enable_ssl"`
+	SSLPort                  uint16        `yaml:"ssl_port"`
+	SSLCertPath              string        `yaml:"ssl_cert_path"`
+	SSLKeyPath               string        `yaml:"ssl_key_path"`
+	SSLCertificate           tls.Certificate
+	SSLSkipValidation        bool `yaml:"ssl_skip_validation"`
 
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16

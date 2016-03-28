@@ -7,26 +7,29 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/pivotal-golang/lager"
 
-	"os"
 	"io"
+	"os"
 )
 
 func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (AccessLogger, error) {
 
-	if config.AccessLog == "" && !config.Logging.LoggregatorEnabled {
+	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
 
 	var err error
 	var file *os.File
 	var writers []io.Writer
-	if config.AccessLog != "" {
-		file, err = os.OpenFile(config.AccessLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	if config.AccessLog.File != "" {
+		file, err = os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			logger.Error(fmt.Sprintf("Error creating accesslog file, %s", config.AccessLog), err)
+			logger.Error(fmt.Sprintf("Error creating accesslog file, %s", config.AccessLog.File), err)
 			return nil, err
 		}
 		writers = append(writers, file)
+	}
+
+	if config.AccessLog.EnableStreaming {
 		writers = append(writers, os.Stdout)
 	}
 

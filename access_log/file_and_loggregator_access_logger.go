@@ -13,6 +13,7 @@ type FileAndLoggregatorAccessLogger struct {
 	channel                 chan AccessLogRecord
 	stopCh                  chan struct{}
 	writer                  io.Writer
+	writerCount             int
 	logger                  lager.Logger
 }
 
@@ -49,6 +50,9 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 func (x *FileAndLoggregatorAccessLogger) FileWriter() io.Writer {
 	return x.writer
 }
+func (x *FileAndLoggregatorAccessLogger) WriterCount() int {
+	return x.writerCount
+}
 
 func (x *FileAndLoggregatorAccessLogger) DropsondeSourceInstance() string {
 	return x.dropsondeSourceInstance
@@ -74,6 +78,7 @@ func configureWriters(a *FileAndLoggregatorAccessLogger, ws []io.Writer) {
 	for _, w := range ws {
 		if w != nil {
 			multiws = append(multiws, w)
+			a.writerCount++
 		}
 	}
 	if len(multiws) > 0 {

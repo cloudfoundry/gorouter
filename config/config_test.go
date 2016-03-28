@@ -80,6 +80,44 @@ nats:
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 		})
 
+		It("sets default access log config", func() {
+			// access entries not present in config
+			Expect(config.AccessLog.File).To(Equal(""))
+			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
+		})
+
+		It("sets access log config to file only", func() {
+			var b = []byte(`
+access_log:
+    file: "/var/vcap/sys/log/gorouter/access.log"
+`)
+			config.Initialize(b)
+			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
+			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
+		})
+
+		It("sets access log config to file and no streaming", func() {
+			var b = []byte(`
+access_log:
+    file: "/var/vcap/sys/log/gorouter/access.log"
+		enable_streaming: false
+`)
+			config.Initialize(b)
+			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
+			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
+		})
+
+		It("sets access log config to file and streaming", func() {
+			var b = []byte(`
+access_log:
+    file: "/var/vcap/sys/log/gorouter/access.log"
+    enable_streaming: true
+`)
+			config.Initialize(b)
+			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
+			Expect(config.AccessLog.EnableStreaming).To(BeTrue())
+		})
+
 		It("sets logging config", func() {
 			var b = []byte(`
 logging:
@@ -103,7 +141,8 @@ port: 8082
 index: 1
 go_max_procs: 2
 trace_key: "foo"
-access_log: "/tmp/access_log"
+access_log:
+    file: "/tmp/access_log"
 ssl_port: 4443
 enable_ssl: true
 `)
@@ -114,7 +153,8 @@ enable_ssl: true
 			Expect(config.Index).To(Equal(uint(1)))
 			Expect(config.GoMaxProcs).To(Equal(2))
 			Expect(config.TraceKey).To(Equal("foo"))
-			Expect(config.AccessLog).To(Equal("/tmp/access_log"))
+			Expect(config.AccessLog.File).To(Equal("/tmp/access_log"))
+			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
 			Expect(config.EnableSSL).To(Equal(true))
 			Expect(config.SSLPort).To(Equal(uint16(4443)))
 			Expect(config.RouteServiceRecommendHttps).To(BeFalse())
