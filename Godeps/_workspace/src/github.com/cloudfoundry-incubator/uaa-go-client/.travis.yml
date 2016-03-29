@@ -11,4 +11,4 @@ install:
   - export PATH=$HOME/gopath/bin:$PATH
 
 script:
-  - ./scripts/test
+  - ./bin/test

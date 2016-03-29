@@ -60,6 +60,7 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 
 	ticker := r.clock.NewTicker(r.FetchRoutesInterval)
 	r.logger.Debug("created-ticker", lager.Data{"interval": r.FetchRoutesInterval})
+	r.logger.Info("syncer-started")
 	for {
 		select {
 		case <-ticker.C():
@@ -118,14 +119,14 @@ func (r *RouteFetcher) startEventCycle() {
 func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	r.client.SetToken(token.AccessToken)
 
-	r.logger.Info("Subscribing to routing api event stream")
+	r.logger.Info("Subscribing-to-routing-api-event-stream")
 	source, err := r.client.SubscribeToEventsWithMaxRetries(maxRetries)
 	if err != nil {
 		metrics.IncrementCounter(SubscribeEventsErrors)
-		r.logger.Error("Failed to subscribe to event stream: ", err)
+		r.logger.Error("Failed-to-subscribe-to-routing-api-event-stream: ", err)
 		return err
 	}
-	r.logger.Info("Successfully subscribed to event stream.")
+	r.logger.Info("Successfully-subscribed-to-routing-api-event-stream")
 
 	r.eventSource.Store(source)
 
@@ -155,20 +156,20 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 }
 
 func (r *RouteFetcher) FetchRoutes() error {
-	r.logger.Debug("fetch-routes-started")
-	defer r.logger.Debug("fetch-routes-completed")
+	r.logger.Debug("syncer-fetch-routes-started")
+	defer r.logger.Debug("syncer-fetch-routes-completed")
 	forceUpdate := false
 	var err error
 	var routes []db.Route
 	for count := 0; count < 2; count++ {
-		r.logger.Debug("fetching-token")
+		r.logger.Debug("syncer-fetching-token")
 		token, tokenErr := r.UaaClient.FetchToken(forceUpdate)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
 		}
 		r.client.SetToken(token.AccessToken)
-		r.logger.Debug("fetching-routes")
+		r.logger.Debug("syncer-fetching-routes")
 		routes, err = r.client.Routes()
 		if err != nil {
 			if err.Error() == "unauthorized" {
@@ -182,7 +183,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	}
 
 	if err == nil {
-		r.logger.Debug("refreshing-endpoints")
+		r.logger.Debug("syncer-refreshing-endpoints")
 		r.refreshEndpoints(routes)
 	}
 

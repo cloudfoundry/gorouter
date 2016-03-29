@@ -98,7 +98,7 @@ func newSecureClient(cfg *config.Config) (*http.Client, error) {
 func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	logger := u.logger.Session("uaa-client")
 	tokenURL := fmt.Sprintf("%s/oauth/token", u.config.UaaEndpoint)
-	logger.Info("started-fetching-token", lager.Data{"endpoint": tokenURL, "force-update": forceUpdate})
+	logger.Debug("started-fetching-token", lager.Data{"endpoint": tokenURL, "force-update": forceUpdate})
 
 	if err := u.config.CheckCredentials(); err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 		}
 	}
 
-	logger.Info("successfully-fetched-token")
+	logger.Debug("successfully-fetched-token")
 	u.updateCachedToken(token)
 	return token, nil
 }
@@ -156,7 +156,7 @@ func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
 	request.Header.Add("Accept", "application/json; charset=utf-8")
 	trace.DumpRequest(request)
 
-	u.logger.Debug("sending-request", lager.Data{"endpoint": request.URL})
+	u.logger.Info("fetch-token-from-uaa-start", lager.Data{"endpoint": request.URL})
 	resp, err := u.client.Do(request)
 	if err != nil {
 		return nil, true, err
@@ -164,7 +164,7 @@ func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
 	defer resp.Body.Close()
 
 	trace.DumpResponse(resp)
-	u.logger.Debug("response-received", lager.Data{"status-code": resp.StatusCode})
+	u.logger.Info("fetch-token-from-uaa-end", lager.Data{"status-code": resp.StatusCode})
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
