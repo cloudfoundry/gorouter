@@ -88,10 +88,10 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 
 func (r *RouteFetcher) startEventCycle() {
 	go func() {
-		useCachedToken := true
+		forceUpdate := false
 		for {
 			r.logger.Debug("fetching-token")
-			token, err := r.UaaClient.FetchToken(!useCachedToken)
+			token, err := r.UaaClient.FetchToken(forceUpdate)
 			if err != nil {
 				metrics.IncrementCounter(TokenFetchErrors)
 				r.logger.Error("failed-to-fetch-token", err)
@@ -102,9 +102,9 @@ func (r *RouteFetcher) startEventCycle() {
 				}
 				err = r.subscribeToEvents(token)
 				if err != nil && err.Error() == "unauthorized" {
-					useCachedToken = false
+					forceUpdate = true
 				} else {
-					useCachedToken = true
+					forceUpdate = false
 				}
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
@@ -156,12 +156,12 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 func (r *RouteFetcher) FetchRoutes() error {
 	r.logger.Debug("fetch-routes-started")
 	defer r.logger.Debug("fetch-routes-completed")
-	useCachedToken := true
+	forceUpdate := false
 	var err error
 	var routes []db.Route
 	for count := 0; count < 2; count++ {
 		r.logger.Debug("fetching-token")
-		token, tokenErr := r.UaaClient.FetchToken(!useCachedToken)
+		token, tokenErr := r.UaaClient.FetchToken(forceUpdate)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
@@ -171,7 +171,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 		routes, err = r.client.Routes()
 		if err != nil {
 			if err.Error() == "unauthorized" {
-				useCachedToken = false
+				forceUpdate = true
 			} else {
 				return err
 			}

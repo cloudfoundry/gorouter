@@ -149,6 +149,38 @@ var _ = Describe("RouteFetcher", func() {
 			}
 		})
 
+		It("uses cache when fetching token from UAA", func() {
+			client.RoutesReturns(response, nil)
+
+			err := fetcher.FetchRoutes()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
+			Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
+		})
+
+		Context("when a cached token is invalid", func() {
+			BeforeEach(func() {
+				count := 0
+				client.RoutesStub = func() ([]db.Route, error) {
+					if count == 0 {
+						count++
+						return nil, errors.New("unauthorized")
+					} else {
+						return response, nil
+					}
+				}
+			})
+
+			It("uses cache when fetching token from UAA", func() {
+				client = &fake_routing_api.FakeClient{}
+				err := fetcher.FetchRoutes()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
+				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
+				Expect(uaaClient.FetchTokenArgsForCall(1)).To(Equal(true))
+			})
+		})
+
 		It("removes unregistered routes", func() {
 			secondResponse := []db.Route{
 				response[0],
@@ -261,6 +293,13 @@ var _ = Describe("RouteFetcher", func() {
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(2))
+			})
+
+			It("uses cache when fetching token from uaa", func() {
+				eventChannel <- routing_api.Event{}
+				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
+				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
+				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
 			})
 		})
 
