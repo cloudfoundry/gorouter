@@ -26,7 +26,7 @@ type AccessLogRecord struct {
 }
 
 func (r *AccessLogRecord) FormatStartedAt() string {
-	return r.StartedAt.Format("02/01/2006:15:04:05 -0700")
+	return r.StartedAt.Format("02/01/2006:15:04:05.000 -0700")
 }
 
 func (r *AccessLogRecord) FormatRequestHeader(k string) (v string) {

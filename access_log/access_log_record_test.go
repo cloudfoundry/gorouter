@@ -44,7 +44,7 @@ var _ = Describe("AccessLogRecord", func() {
 		}
 
 		recordString := "FakeRequestHost - " +
-			"[01/01/2000:00:00:00 +0000] " +
+			"[01/01/2000:00:00:00.000 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"200 " +
 			"30 " +
@@ -81,7 +81,7 @@ var _ = Describe("AccessLogRecord", func() {
 		}
 
 		recordString := "FakeRequestHost - " +
-			"[01/01/2000:00:00:00 +0000] " +
+			"[01/01/2000:00:00:00.000 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"- " +
 			"0 " +
@@ -128,7 +128,7 @@ var _ = Describe("AccessLogRecord", func() {
 		}
 
 		recordString := "FakeRequestHost - " +
-			"[01/01/2000:00:00:00 +0000] " +
+			"[01/01/2000:00:00:00.000 +0000] " +
 			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
 			"- " +
 			"0 " +
