@@ -108,7 +108,7 @@ func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 	defer u.lock.Unlock()
 
 	if !forceUpdate && u.canReturnCachedToken() {
-		logger.Info("using-cached-token")
+		logger.Debug("using-cached-token")
 		return u.cachedToken, nil
 	}
 
@@ -224,9 +224,9 @@ func (u *UaaClient) FetchKey() (string, error) {
 }
 
 func (u *UaaClient) DecodeToken(uaaToken string, desiredPermissions ...string) error {
-	logger := u.logger.Session("decode-token")
-	logger.Debug("start")
-	defer logger.Debug("completed")
+	logger := u.logger.Session("uaa-client")
+	logger.Debug("decode-token-started")
+	defer logger.Debug("decode-token-completed")
 	var err error
 	jwtToken, err := checkTokenFormat(uaaToken)
 	if err != nil {
@@ -247,7 +247,7 @@ func (u *UaaClient) DecodeToken(uaaToken string, desiredPermissions ...string) e
 			})
 
 			if err != nil {
-				logger.Error("decode-failed", err)
+				logger.Error("decode-token-failed", err)
 				if matchesError(err, jwt.ValidationErrorSignatureInvalid) {
 					forceUaaKeyFetch = true
 					continue
@@ -332,9 +332,9 @@ func (u *UaaClient) getUaaTokenKey(logger lager.Logger, forceFetch bool) (string
 		}
 
 		if u.getUaaPublicKey() == key {
-			logger.Info("Fetched the same verification key from UAA")
+			logger.Debug("Fetched the same verification key from UAA")
 		} else {
-			logger.Info("Fetched a different verification key from UAA")
+			logger.Debug("Fetched a different verification key from UAA")
 		}
 		return key, nil
 	}

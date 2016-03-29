@@ -117,13 +117,14 @@ func (r *RouteFetcher) startEventCycle() {
 
 func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	r.client.SetToken(token.AccessToken)
+
+	r.logger.Info("Subscribing to routing api event stream")
 	source, err := r.client.SubscribeToEventsWithMaxRetries(maxRetries)
 	if err != nil {
 		metrics.IncrementCounter(SubscribeEventsErrors)
-		r.logger.Error("Failed to subscribe to events: ", err)
+		r.logger.Error("Failed to subscribe to event stream: ", err)
 		return err
 	}
-
 	r.logger.Info("Successfully subscribed to event stream.")
 
 	r.eventSource.Store(source)
