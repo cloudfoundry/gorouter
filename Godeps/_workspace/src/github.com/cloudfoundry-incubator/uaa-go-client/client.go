@@ -142,6 +142,7 @@ func (u *UaaClient) FetchToken(forceUpdate bool) (*schema.Token, error) {
 }
 
 func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
+	logger := u.logger.Session("uaa-client")
 	values := url.Values{}
 	values.Add("grant_type", "client_credentials")
 	requestBody := values.Encode()
@@ -156,7 +157,7 @@ func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
 	request.Header.Add("Accept", "application/json; charset=utf-8")
 	trace.DumpRequest(request)
 
-	u.logger.Info("fetch-token-from-uaa-start", lager.Data{"endpoint": request.URL})
+	logger.Info("fetch-token-from-uaa-start", lager.Data{"endpoint": request.URL})
 	resp, err := u.client.Do(request)
 	if err != nil {
 		return nil, true, err
@@ -164,7 +165,7 @@ func (u *UaaClient) doFetchToken() (*schema.Token, bool, error) {
 	defer resp.Body.Close()
 
 	trace.DumpResponse(resp)
-	u.logger.Info("fetch-token-from-uaa-end", lager.Data{"status-code": resp.StatusCode})
+	logger.Info("fetch-token-from-uaa-end", lager.Data{"status-code": resp.StatusCode})
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
