@@ -63,8 +63,10 @@ func main() {
 		prefix = c.Logging.Syslog
 	}
 	logger, _ := cf_lager.New(prefix)
-
 	InitLoggerFromConfig(logger, c, logCounter)
+
+	logger.Info("starting")
+
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Fatal("dropsonde-initialize-error", err)
@@ -81,6 +83,7 @@ func main() {
 
 	logger.Info("setting-up-nats-connection")
 	natsClient := connectToNatsServer(logger.Session("nats"), c)
+	logger.Info("Successfully-connected-to-nats")
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, natsClient, metricsReporter)
