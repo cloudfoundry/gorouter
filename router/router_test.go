@@ -79,6 +79,7 @@ var _ = Describe("Router", func() {
 		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+		config.EnablePROXY = true
 
 		// set pid file
 		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
@@ -584,6 +585,34 @@ var _ = Describe("Router", func() {
 		defer resp.Body.Close()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(string(body)).To(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
+	})
+
+	It("handles the PROXY protocol", func() {
+		app := test.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
+
+		rCh := make(chan string)
+		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+			rCh <- r.Header.Get("X-Forwarded-For")
+		})
+		app.Listen()
+		Eventually(func() bool {
+			return appRegistered(registry, app)
+		}).Should(BeTrue())
+
+		host := fmt.Sprintf("proxy.vcap.me:%d", config.Port)
+		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+		defer conn.Close()
+
+		fmt.Fprintf(conn, "PROXY TCP4 192.168.0.1 192.168.0.2 12345 80\r\n"+
+			"GET / HTTP/1.0\r\n"+
+			"Host: %s\r\n"+
+			"\r\n", host)
+
+		var rr string
+		Eventually(rCh).Should(Receive(&rr))
+		Expect(rr).ToNot(BeNil())
+		Expect(rr).To(Equal("192.168.0.1"))
 	})
 
 	Context("HTTP keep-alive", func() {

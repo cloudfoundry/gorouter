@@ -11,6 +11,10 @@
 			"Rev": "574d117d5095925c53a2c86e6283800118dbfff7"
 		},
 		{
+			"ImportPath": "github.com/armon/go-proxyproto",
+			"Rev": "609d6338d3a76ec26ac3fe7045a164d9a58436e7"
+		},
+		{
 			"ImportPath": "github.com/bmizerany/pat",
 			"Rev": "b8a35001b773c267eb260a691f4e5499a3531600"
 		},

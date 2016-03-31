@@ -265,6 +265,16 @@ token_fetcher_expiration_buffer_time: 40
 			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(5))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(30)))
 		})
+
+		It("sets proxy protocol", func() {
+			var b = []byte(`
+enable_proxy: true
+`)
+
+			config.Initialize(b)
+
+			Expect(config.EnablePROXY).To(Equal(true))
+		})
 	})
 
 	Describe("Process", func() {

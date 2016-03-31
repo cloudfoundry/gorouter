@@ -87,6 +87,7 @@ type Config struct {
 	AccessLog                AccessLog     `yaml:"access_log"`
 	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
 	DebugAddr                string        `yaml:"debug_addr"`
+	EnablePROXY              bool          `yaml:"enable_proxy"`
 	EnableSSL                bool          `yaml:"enable_ssl"`
 	SSLPort                  uint16        `yaml:"ssl_port"`
 	SSLCertPath              string        `yaml:"ssl_cert_path"`
@@ -141,11 +142,12 @@ var defaultConfig = Config{
 	Nats:    []NatsConfig{defaultNatsConfig},
 	Logging: defaultLoggingConfig,
 
-	Port:       8081,
-	Index:      0,
-	GoMaxProcs: -1,
-	EnableSSL:  false,
-	SSLPort:    443,
+	Port:        8081,
+	Index:       0,
+	GoMaxProcs:  -1,
+	EnablePROXY: false,
+	EnableSSL:   false,
+	SSLPort:     443,
 
 	EndpointTimeoutInSeconds:     60,
 	RouteServiceTimeoutInSeconds: 60,

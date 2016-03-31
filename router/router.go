@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/armon/go-proxyproto"
 	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	vcap "github.com/cloudfoundry/gorouter/common"
@@ -267,10 +268,14 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		}
 
 		r.tlsListener = tlsListener
-		r.logger.Info(fmt.Sprintf("Listening on %s", tlsListener.Addr()))
+		if r.config.EnablePROXY {
+			r.tlsListener = &proxyproto.Listener{tlsListener}
+		}
+
+		r.logger.Info(fmt.Sprintf("Listening on %s", r.tlsListener.Addr()))
 
 		go func() {
-			err := server.Serve(tlsListener)
+			err := server.Serve(r.tlsListener)
 			r.stopLock.Lock()
 			if !r.stopping {
 				errChan <- err
@@ -290,10 +295,14 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 	}
 
 	r.listener = listener
-	r.logger.Info(fmt.Sprintf("Listening on %s", listener.Addr()))
+	if r.config.EnablePROXY {
+		r.listener = &proxyproto.Listener{listener}
+	}
+
+	r.logger.Info(fmt.Sprintf("Listening on %s", r.listener.Addr()))
 
 	go func() {
-		err := server.Serve(listener)
+		err := server.Serve(r.listener)
 		r.stopLock.Lock()
 		if !r.stopping {
 			errChan <- err
