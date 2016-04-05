@@ -94,6 +94,7 @@ var _ = JustBeforeEach(func() {
 		HealthCheckUserAgent:       "HTTP-Monitor/1.1",
 		EnableZipkin:               conf.Tracing.EnableZipkin,
 		ExtraHeadersToLog:          &conf.ExtraHeadersToLog,
+		ForceForwardedProtoHttps:   conf.ForceForwardedProtoHttps,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

@@ -61,6 +61,7 @@ type ProxyArgs struct {
 	Logger                     lager.Logger
 	HealthCheckUserAgent       string
 	EnableZipkin               bool
+	ForceForwardedProtoHttps   bool
 }
 
 type proxyHandler struct {
@@ -90,6 +91,7 @@ type proxy struct {
 	extraHeadersToLog          *[]string
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
+	forceForwardedProtoHttps   bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -126,6 +128,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
+		forceForwardedProtoHttps:   args.ForceForwardedProtoHttps,
 	}
 
 	n.UseHandler(p)
@@ -321,7 +324,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	roundTripper := round_tripper.NewProxyRoundTripper(backend,
 		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler, after)
 
-	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig).ServeHTTP(proxyWriter, request)
+	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps).ServeHTTP(proxyWriter, request)
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = proxyWriter.Size()
@@ -333,10 +336,11 @@ func (p *proxy) isLoadBalancerHeartbeat(request *http.Request) bool {
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 	routeServiceArgs route_service.RouteServiceArgs,
-	routeServiceConfig *route_service.RouteServiceConfig) http.Handler {
+	routeServiceConfig *route_service.RouteServiceConfig,
+	forceForwardedProtoHttps bool) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
-			setupProxyRequest(req, request)
+			setupProxyRequest(req, request, forceForwardedProtoHttps)
 			handleRouteServiceIntegration(request, routeServiceArgs, routeServiceConfig)
 		},
 		Transport:     proxyTransport,
@@ -363,8 +367,10 @@ func handleRouteServiceIntegration(
 	}
 }
 
-func setupProxyRequest(source *http.Request, target *http.Request) {
-	if source.Header.Get("X-Forwarded-Proto") == "" {
+func setupProxyRequest(source *http.Request, target *http.Request, forceForwardedProtoHttps bool) {
+	if forceForwardedProtoHttps {
+		target.Header.Set("X-Forwarded-Proto", "https")
+	} else if source.Header.Get("X-Forwarded-Proto") == "" {
 		scheme := "http"
 		if source.TLS != nil {
 			scheme = "https"

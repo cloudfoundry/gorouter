@@ -625,6 +625,38 @@ var _ = Describe("Proxy", func() {
 		conn.ReadResponse()
 	})
 
+	Context("Force Forwarded Proto HTTPS config option is set", func() {
+		BeforeEach(func() {
+			conf.ForceForwardedProtoHttps = true
+		})
+		It("uses config option for X-Forwarded-Proto if present", func() {
+			done := make(chan string)
+
+			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
+				req, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+
+				done <- req.Header.Get("X-Forwarded-Proto")
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "app", "/", nil)
+			conn.WriteRequest(req)
+
+			var answer string
+			Eventually(done).Should(Receive(&answer))
+			Expect(answer).To(Equal("https"))
+
+			conn.ReadResponse()
+		})
+	})
+
 	It("emits HTTP startstop events", func() {
 		ln := registerHandlerWithInstanceId(r, "app", "", func(conn *test_util.HttpConn) {
 		}, "fake-instance-id")

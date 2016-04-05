@@ -182,6 +182,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		ExtraHeadersToLog:    &c.ExtraHeadersToLog,
 		HealthCheckUserAgent: c.HealthCheckUserAgent,
 		EnableZipkin:         c.Tracing.EnableZipkin,
+		ForceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 	}
 	return proxy.NewProxy(args)
 }
