@@ -13,7 +13,6 @@ import (
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/test_util"
-	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/lager/lagertest"
 
@@ -59,8 +58,7 @@ var _ = BeforeEach(func() {
 
 var _ = JustBeforeEach(func() {
 	var err error
-	mbus := fakeyagnats.Connect()
-	r = registry.NewRouteRegistry(logger, conf, mbus, new(fakes.FakeRouteRegistryReporter))
+	r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)

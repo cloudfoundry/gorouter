@@ -9,9 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/apcera/nats"
 	. "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 )
@@ -104,7 +103,7 @@ func (c *VcapComponent) Start() error {
 	return nil
 }
 
-func (c *VcapComponent) Register(mbusClient yagnats.NATSConn) error {
+func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 	mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
 		if msg.Reply == "" {
 			log.Info(fmt.Sprintf("Received message with empty reply on subject %s", msg.Subject))

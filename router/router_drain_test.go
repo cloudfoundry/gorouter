@@ -21,8 +21,7 @@ import (
 	"github.com/cloudfoundry/gorouter/test"
 	"github.com/cloudfoundry/gorouter/test_util"
 	vvarz "github.com/cloudfoundry/gorouter/varz"
-	"github.com/cloudfoundry/gunk/natsrunner"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/lager"
@@ -32,10 +31,10 @@ import (
 var _ = Describe("Router", func() {
 	var (
 		logger     lager.Logger
-		natsRunner *natsrunner.NATSRunner
+		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 
-		mbusClient yagnats.NATSConn
+		mbusClient *nats.Conn
 		registry   *rregistry.RouteRegistry
 		varz       vvarz.Varz
 		router     *Router
@@ -122,7 +121,7 @@ var _ = Describe("Router", func() {
 		return resp.StatusCode
 	}
 
-	testRouterDrain := func(config *cfg.Config, mbusClient yagnats.NATSConn, registry *rregistry.RouteRegistry, initiateDrain func()) {
+	testRouterDrain := func(config *cfg.Config, mbusClient *nats.Conn, registry *rregistry.RouteRegistry, initiateDrain func()) {
 		app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
 		resultCh := make(chan bool, 2)
@@ -184,7 +183,7 @@ var _ = Describe("Router", func() {
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("test")
 		natsPort = test_util.NextAvailPort()
-		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
+		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
 
 		proxyPort := test_util.NextAvailPort()
@@ -195,7 +194,7 @@ var _ = Describe("Router", func() {
 		cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
 		Expect(err).ToNot(HaveOccurred())
 
-		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
+		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = sslPort
 		config.SSLCertificate = cert
@@ -203,7 +202,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{

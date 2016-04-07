@@ -9,7 +9,6 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/yagnats/fakeyagnats"
 
 	"encoding/json"
 	"time"
@@ -17,7 +16,6 @@ import (
 
 var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
-	var messageBus *fakeyagnats.FakeNATSConn
 	var reporter *fakes.FakeRouteRegistryReporter
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
@@ -30,10 +28,9 @@ var _ = Describe("RouteRegistry", func() {
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
 
-		messageBus = fakeyagnats.Connect()
 		reporter = new(fakes.FakeRouteRegistryReporter)
 
-		r = NewRouteRegistry(logger, configObj, messageBus, reporter)
+		r = NewRouteRegistry(logger, configObj, reporter)
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", map[string]string{
 				"runtime":   "ruby18",

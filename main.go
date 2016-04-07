@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 
-	"github.com/apcera/nats"
 	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
 	"github.com/cloudfoundry-incubator/cf-lager"
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
@@ -20,7 +19,7 @@ import (
 	"github.com/cloudfoundry/gorouter/route_fetcher"
 	"github.com/cloudfoundry/gorouter/router"
 	rvarz "github.com/cloudfoundry/gorouter/varz"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	"github.com/pivotal-golang/clock"
 	"github.com/pivotal-golang/lager"
 
@@ -86,7 +85,7 @@ func main() {
 	logger.Info("Successfully-connected-to-nats")
 
 	metricsReporter := metrics.NewMetricsReporter()
-	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, natsClient, metricsReporter)
+	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
@@ -220,14 +219,20 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 	return uaaClient
 }
 
-func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn {
-	var natsClient yagnats.NATSConn
+func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
+	var natsClient *nats.Conn
 	var err error
 
 	natsServers := c.NatsServers()
 	attempts := 3
 	for attempts > 0 {
-		natsClient, err = yagnats.Connect(natsServers)
+		options := nats.DefaultOptions
+		options.Servers = natsServers
+		options.PingInterval = c.NatsClientPingInterval
+		options.ClosedCB = func(conn *nats.Conn) {
+			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"connection": *conn})
+		}
+		natsClient, err = options.Connect()
 		if err == nil {
 			break
 		} else {
@@ -239,10 +244,6 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) yagnats.NATSConn
 	if err != nil {
 		logger.Fatal("nats-connection-error", err)
 	}
-
-	natsClient.AddClosedCB(func(conn *nats.Conn) {
-		logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"connection": *conn})
-	})
 
 	return natsClient
 }

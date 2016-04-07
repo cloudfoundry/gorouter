@@ -6,7 +6,6 @@ import (
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/cloudfoundry/gorouter/varz"
-	"github.com/cloudfoundry/yagnats/fakeyagnats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/lager"
@@ -25,7 +24,7 @@ var _ = Describe("Varz", func() {
 
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("test")
-		Registry = registry.NewRouteRegistry(logger, config.DefaultConfig(), fakeyagnats.Connect(), new(fakes.FakeRouteRegistryReporter))
+		Registry = registry.NewRouteRegistry(logger, config.DefaultConfig(), new(fakes.FakeRouteRegistryReporter))
 		Varz = NewVarz(Registry)
 	})
 

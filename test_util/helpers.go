@@ -11,12 +11,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func SpecConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
-	return generateConfig(natsPort, statusPort, proxyPort)
+func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+	return generateConfig(statusPort, proxyPort, natsPorts...)
 }
 
-func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Config {
-	c := generateConfig(natsPort, statusPort, proxyPort)
+func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
+	c := generateConfig(statusPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -32,7 +32,7 @@ func SpecSSLConfig(natsPort, statusPort, proxyPort, SSLPort uint16) *config.Conf
 	return c
 }
 
-func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
+func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
 	c := config.DefaultConfig()
 
 	c.Port = proxyPort
@@ -57,13 +57,14 @@ func generateConfig(natsPort, statusPort, proxyPort uint16) *config.Config {
 		Pass: "pass",
 	}
 
-	c.Nats = []config.NatsConfig{
-		{
+	c.Nats = []config.NatsConfig{}
+	for _, natsPort := range natsPorts {
+		c.Nats = append(c.Nats, config.NatsConfig{
 			Host: "localhost",
 			Port: natsPort,
 			User: "nats",
 			Pass: "nats",
-		},
+		})
 	}
 
 	c.Logging = config.LoggingConfig{

@@ -3,7 +3,7 @@ package test
 import (
 	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/localip"
 
@@ -21,14 +21,14 @@ type TestApp struct {
 	port         uint16      // app listening port
 	rPort        uint16      // router listening port
 	urls         []route.Uri // host registered host name
-	mbusClient   yagnats.NATSConn
+	mbusClient   *nats.Conn
 	tags         map[string]string
 	mux          *http.ServeMux
 	stopped      bool
 	routeService string
 }
 
-func NewTestApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, tags map[string]string, routeService string) *TestApp {
+func NewTestApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string, routeService string) *TestApp {
 	app := new(TestApp)
 
 	port, _ := localip.LocalPort()

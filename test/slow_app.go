@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 )
 
-func NewSlowApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, delay time.Duration) *TestApp {
+func NewSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, nil, "")
 
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {

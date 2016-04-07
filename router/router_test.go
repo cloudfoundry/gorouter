@@ -3,7 +3,6 @@ package router_test
 import (
 	"os"
 
-	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/gorouter/access_log"
@@ -17,8 +16,7 @@ import (
 	"github.com/cloudfoundry/gorouter/test"
 	"github.com/cloudfoundry/gorouter/test_util"
 	vvarz "github.com/cloudfoundry/gorouter/varz"
-	"github.com/cloudfoundry/gunk/natsrunner"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
@@ -46,11 +44,11 @@ var _ = Describe("Router", func() {
 	const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
 	var (
-		natsRunner *natsrunner.NATSRunner
+		natsRunner *test_util.NATSRunner
 		natsPort   uint16
 		config     *cfg.Config
 
-		mbusClient   yagnats.NATSConn
+		mbusClient   *nats.Conn
 		registry     *rregistry.RouteRegistry
 		varz         vvarz.Varz
 		router       *Router
@@ -62,7 +60,7 @@ var _ = Describe("Router", func() {
 
 	BeforeEach(func() {
 		natsPort = test_util.NextAvailPort()
-		natsRunner = natsrunner.NewNATSRunner(int(natsPort))
+		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
 
 		fakeEmitter := fake.NewFakeEventEmitter("fake")
@@ -74,7 +72,7 @@ var _ = Describe("Router", func() {
 		cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
 		Expect(err).ToNot(HaveOccurred())
 
-		config = test_util.SpecConfig(natsPort, statusPort, proxyPort)
+		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
 		config.SSLCertificate = cert
@@ -87,7 +85,7 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = lagertest.NewTestLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, mbusClient, new(fakes.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := vcap.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
@@ -258,9 +256,16 @@ var _ = Describe("Router", func() {
 			started <- true
 		})
 
-		mbusClient.AddReconnectedCB(func(_ *nats.Conn) {
+		reconnectedCbs := make([]func(*nats.Conn), 0)
+		reconnectedCbs = append(reconnectedCbs, mbusClient.Opts.ReconnectedCB)
+		reconnectedCbs = append(reconnectedCbs, func(_ *nats.Conn) {
 			cb <- true
 		})
+		mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
+			for _, rcb := range reconnectedCbs {
+				rcb(conn)
+			}
+		}
 
 		natsRunner.Stop()
 		natsRunner.Start()

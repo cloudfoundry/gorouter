@@ -4,16 +4,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nats-io/nats"
 	"github.com/onsi/ginkgo"
 
 	. "github.com/onsi/gomega"
 
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test_util"
-	"github.com/cloudfoundry/yagnats"
 )
 
-func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient yagnats.NATSConn, delay time.Duration) *TestApp {
+func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *TestApp {
 	app := NewTestApp(urls, rPort, mbusClient, nil, "")
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		defer ginkgo.GinkgoRecover()

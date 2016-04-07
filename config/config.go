@@ -126,6 +126,7 @@ type Config struct {
 	Ip                         string        `yaml:"-"`
 	RouteServiceEnabled        bool          `yaml:"-"`
 	TokenFetcherRetryInterval  time.Duration `yaml:"-"`
+	NatsClientPingInterval     time.Duration `yaml:"-"`
 
 	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
 
@@ -184,6 +185,21 @@ func (c *Config) Process() {
 	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
+	}
+
+	// To avoid routes getting purged because of unresponsive NATS server
+	// we need to set the ping interval of nats client such that it fails over
+	// to next NATS server before dropletstalethreshold is hit
+	// That's why we set the ping interval to be
+	// dropletstalethresholdinseconds/2 - startresponsedelayintervalinseconds
+	// Since nats client waits for 2 ping outs we need to divide the stale threshold
+	// by 2 and then subtract the response delay interval, which is the interval at
+	// which route.register messages are published by apps
+	pingInterval := c.DropletStaleThresholdInSeconds / 2
+	if pingInterval > c.StartResponseDelayIntervalInSeconds {
+		c.NatsClientPingInterval = time.Duration(pingInterval-c.StartResponseDelayIntervalInSeconds) * time.Second
+	} else {
+		c.NatsClientPingInterval = time.Duration(pingInterval) * time.Second
 	}
 
 	c.DrainTimeout = c.EndpointTimeout

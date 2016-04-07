@@ -7,7 +7,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/apcera/nats"
 	"github.com/cloudfoundry/dropsonde"
 	vcap "github.com/cloudfoundry/gorouter/common"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
@@ -15,7 +14,7 @@ import (
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/varz"
-	"github.com/cloudfoundry/yagnats"
+	"github.com/nats-io/nats"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 
@@ -37,7 +36,7 @@ var noDeadline = time.Time{}
 type Router struct {
 	config     *config.Config
 	proxy      proxy.Proxy
-	mbusClient yagnats.NATSConn
+	mbusClient *nats.Conn
 	registry   *registry.RouteRegistry
 	varz       varz.Varz
 	component  *vcap.VcapComponent
@@ -58,7 +57,7 @@ type Router struct {
 	errChan chan error
 }
 
-func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient yagnats.NATSConn, r *registry.RouteRegistry,
+func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
 	v varz.Varz, logCounter *vcap.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
@@ -151,10 +150,10 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Kickstart sending start messages
 	r.SendStartMessage()
 
-	r.mbusClient.AddReconnectedCB(func(conn *nats.Conn) {
+	r.mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
 		r.logger.Info(fmt.Sprintf("Reconnecting to NATS server %s...", conn.Opts.Url))
 		r.SendStartMessage()
-	})
+	}
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
@@ -388,7 +387,7 @@ func (r *Router) RegisterComponent() {
 
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
-		r.logger.Debug("Got router.register:", lager.Data{"registry Message": registryMessage})
+		//r.logger.Debug("Got router.register:", lager.Data{"registry Message": registryMessage})
 
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
@@ -432,6 +431,9 @@ func (r *Router) SendStartMessage() {
 
 	// Send start message once at start
 	err = r.mbusClient.Publish("router.start", b)
+	if err != nil {
+		r.logger.Error("failed-to-publish-greet-message", err)
+	}
 }
 
 func (r *Router) ScheduleFlushApps() {
@@ -545,8 +547,8 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 			return
 		}
 
-		logMessage := fmt.Sprintf("%s: Received message", subject)
-		r.logger.Debug(logMessage, lager.Data{"message": msg})
+		//logMessage := fmt.Sprintf("%s: Received message", subject)
+		//r.logger.Debug(logMessage, lager.Data{"message": msg})
 
 		if !msg.ValidateMessage() {
 			logMessage := fmt.Sprintf("%s: Unable to validate message. route_service_url must be https", subject)

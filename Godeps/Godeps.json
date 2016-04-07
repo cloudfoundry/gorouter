@@ -6,9 +6,9 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/apcera/nats",
-			"Comment": "v1.0.9",
-			"Rev": "574d117d5095925c53a2c86e6283800118dbfff7"
+			"ImportPath": "github.com/nats-io/nats",
+			"Comment": "v1.1.6-137-g8ad782e",
+			"Rev": "8ad782e0588e2338ad9d84181e73f3209502411f"
 		},
 		{
 			"ImportPath": "github.com/bmizerany/pat",
@@ -52,10 +52,6 @@
 			"Rev": "5c1406e9ea0ab919f92e1b194169565def41147b"
 		},
 		{
-			"ImportPath": "github.com/cloudfoundry/gunk/natsrunner",
-			"Rev": "1e83496bd55b10dde3ac60f22ab5058eaa4042e0"
-		},
-		{
 			"ImportPath": "github.com/cloudfoundry/gunk/workpool",
 			"Rev": "1e83496bd55b10dde3ac60f22ab5058eaa4042e0"
 		},
@@ -66,10 +62,6 @@
 		{
 			"ImportPath": "github.com/cloudfoundry/storeadapter",
 			"Rev": "57139702b98a42708276747b53fb999a02f1342b"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/yagnats",
-			"Rev": "7025c6846809817ab52c641b5353edd7cd8db7db"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/cli",

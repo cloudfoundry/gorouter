@@ -9,7 +9,6 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/yagnats"
 	"github.com/pivotal-golang/lager"
 )
 
@@ -34,15 +33,13 @@ type RouteRegistry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	messageBus yagnats.NATSConn
-
 	reporter metrics.RouteRegistryReporter
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSConn, reporter metrics.RouteRegistryReporter) *RouteRegistry {
+func NewRouteRegistry(logger lager.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byUri = NewTrie()
@@ -50,7 +47,6 @@ func NewRouteRegistry(logger lager.Logger, c *config.Config, mbus yagnats.NATSCo
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
 
-	r.messageBus = mbus
 	r.reporter = reporter
 	return r
 }
