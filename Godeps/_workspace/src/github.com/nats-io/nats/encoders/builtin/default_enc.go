@@ -10,7 +10,7 @@ import (
 	"unsafe"
 )
 
-// DefaultEncoder implementation for EncodedConn.
+// A Default Encoder implementation for EncodedConn.
 // This encoder will leave []byte and string untouched, but will attempt to
 // turn numbers into appropriate strings that can be decoded. It will also
 // propely encoded and decode bools. If will encode a struct, but if you want
@@ -23,7 +23,6 @@ var trueB = []byte("true")
 var falseB = []byte("false")
 var nilB = []byte("")
 
-// Encode
 func (je *DefaultEncoder) Encode(subject string, v interface{}) ([]byte, error) {
 	switch arg := v.(type) {
 	case string:
@@ -46,7 +45,6 @@ func (je *DefaultEncoder) Encode(subject string, v interface{}) ([]byte, error) 
 	}
 }
 
-// Decode
 func (je *DefaultEncoder) Decode(subject string, data []byte, vPtr interface{}) error {
 	// Figure out what it's pointing to...
 	sData := *(*string)(unsafe.Pointer(&data))

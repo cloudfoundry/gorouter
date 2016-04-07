@@ -1,4 +1,4 @@
-// Copyright 2012-2016 Apcera Inc. All rights reserved.
+// Copyright 2012-2015 Apcera Inc. All rights reserved.
 // +build ignore
 
 package main
@@ -7,22 +7,26 @@ import (
 	"flag"
 	"log"
 	"runtime"
+	"strings"
 
 	"github.com/nats-io/nats"
 )
 
-// NOTE: Use tls scheme for TLS, e.g. nats-sub -s tls://demo.nats.io:4443 foo
 func usage() {
-	log.Fatalf("Usage: nats-sub [-s server] [-t] <subject> \n")
+	log.Fatalf("Usage: nats-sub [-s server] [--ssl] [-t] <subject> \n")
 }
 
+var index = 0
+
 func printMsg(m *nats.Msg, i int) {
+	index += 1
 	log.Printf("[#%d] Received on [%s]: '%s'\n", i, m.Subject, string(m.Data))
 }
 
 func main() {
 	var urls = flag.String("s", nats.DefaultURL, "The nats server URLs (separated by comma)")
 	var showTime = flag.Bool("t", false, "Display timestamps")
+	var ssl = flag.Bool("ssl", false, "Use Secure Connection")
 
 	log.SetFlags(0)
 	flag.Usage = usage
@@ -33,7 +37,14 @@ func main() {
 		usage()
 	}
 
-	nc, err := nats.Connect(*urls)
+	opts := nats.DefaultOptions
+	opts.Servers = strings.Split(*urls, ",")
+	for i, s := range opts.Servers {
+		opts.Servers[i] = strings.Trim(s, " ")
+	}
+	opts.Secure = *ssl
+
+	nc, err := opts.Connect()
 	if err != nil {
 		log.Fatalf("Can't connect: %v\n", err)
 	}

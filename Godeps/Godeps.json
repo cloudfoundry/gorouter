@@ -7,8 +7,8 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/nats-io/nats",
-			"Comment": "v1.1.6-137-g8ad782e",
-			"Rev": "8ad782e0588e2338ad9d84181e73f3209502411f"
+			"Comment": "v1.1.2-1-gef51659",
+			"Rev": "ef5165913ac88c53c2e2be39f73f8314490ea5dd"
 		},
 		{
 			"ImportPath": "github.com/bmizerany/pat",

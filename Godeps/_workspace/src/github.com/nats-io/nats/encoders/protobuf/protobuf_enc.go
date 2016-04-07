@@ -9,7 +9,6 @@ import (
 	"github.com/nats-io/nats"
 )
 
-// Additional index for registered Encoders.
 const (
 	PROTOBUF_ENCODER = "protobuf"
 )
@@ -19,7 +18,7 @@ func init() {
 	nats.RegisterEncoder(PROTOBUF_ENCODER, &ProtobufEncoder{})
 }
 
-// ProtobufEncoder is a protobuf implementation for EncodedConn
+// A protobuf Encoder implementation for EncodedConn
 // This encoder will use the builtin protobuf lib to Marshal
 // and Unmarshal structs.
 type ProtobufEncoder struct {
@@ -31,11 +30,7 @@ var (
 	ErrInvalidProtoMsgDecode = errors.New("nats: Invalid protobuf proto.Message object passed to decode")
 )
 
-// Encode
 func (pb *ProtobufEncoder) Encode(subject string, v interface{}) ([]byte, error) {
-	if v == nil {
-		return nil, nil
-	}
 	i, found := v.(proto.Message)
 	if !found {
 		return nil, ErrInvalidProtoMsgEncode
@@ -48,11 +43,7 @@ func (pb *ProtobufEncoder) Encode(subject string, v interface{}) ([]byte, error)
 	return b, nil
 }
 
-// Decode
 func (pb *ProtobufEncoder) Decode(subject string, data []byte, vPtr interface{}) error {
-	if _, ok := vPtr.(*interface{}); ok {
-		return nil
-	}
 	i, found := vPtr.(proto.Message)
 	if !found {
 		return ErrInvalidProtoMsgDecode
