@@ -123,7 +123,7 @@ The format of the `router.start` message is as follows:
 {
   "id": "some-router-id",
   "hosts": ["1.2.3.4"],
-  "minimumRegisterIntervalInSeconds": 5,
+  "minimumRegisterIntervalInSeconds": 20,
   "prunteThresholdInSeconds": 120,
 }
 ```
