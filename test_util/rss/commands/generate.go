@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/route_service"
+	"github.com/cloudfoundry/gorouter/route_service/header"
 	"github.com/cloudfoundry/gorouter/test_util/rss/common"
 	"github.com/codegangsta/cli"
 )
@@ -29,7 +29,7 @@ func GenerateSignature(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	sigEncoded, metaEncoded, err := route_service.BuildSignatureAndMetadata(crypto, &signature)
+	sigEncoded, metaEncoded, err := header.BuildSignatureAndMetadata(crypto, &signature)
 	if err != nil {
 		fmt.Printf("Failed to create signature: %s", err.Error())
 		os.Exit(1)
@@ -39,8 +39,8 @@ func GenerateSignature(c *cli.Context) {
 	fmt.Printf("Encoded Metadata:\n%s\n\n", metaEncoded)
 }
 
-func createSigFromArgs(c *cli.Context) (route_service.Signature, error) {
-	signature := route_service.Signature{}
+func createSigFromArgs(c *cli.Context) (header.Signature, error) {
+	signature := header.Signature{}
 	url := c.String("url")
 
 	var sigTime time.Time
@@ -59,7 +59,7 @@ func createSigFromArgs(c *cli.Context) (route_service.Signature, error) {
 		sigTime = time.Now()
 	}
 
-	return route_service.Signature{
+	return header.Signature{
 		RequestedTime: sigTime,
 		ForwardedUrl:  url,
 	}, nil

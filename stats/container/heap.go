@@ -1,4 +1,4 @@
-package stats
+package container
 
 type HeapType interface {
 	SetIndex(i, j int)
@@ -31,6 +31,10 @@ func (x *Heap) Pop() interface{} {
 	y := x.h[n-1]
 	x.h = x.h[0 : n-1]
 	return y
+}
+
+func (x *Heap) Get(indx int) interface{} {
+	return x.h[indx]
 }
 
 func (x *Heap) Copy() Heap {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/route_service"
+	"github.com/cloudfoundry/gorouter/route_service/header"
 	"github.com/cloudfoundry/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,7 +50,7 @@ var _ = Describe("Route Services", func() {
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
-			_, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			_, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
@@ -63,12 +64,12 @@ var _ = Describe("Route Services", func() {
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 
-		signature := &route_service.Signature{
+		signature := &header.Signature{
 			RequestedTime: time.Now(),
 			ForwardedUrl:  forwardedUrl,
 		}
 
-		signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
+		signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -115,7 +116,7 @@ var _ = Describe("Route Services", func() {
 
 					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())
-					_, err = route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+					_, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
 
 					Expect(err).ToNot(HaveOccurred())
 					Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
@@ -396,11 +397,11 @@ var _ = Describe("Route Services", func() {
 
 			Context("when a request has an expired Route service signature header", func() {
 				BeforeEach(func() {
-					signature := &route_service.Signature{
+					signature := &header.Signature{
 						RequestedTime: time.Now().Add(-10 * time.Hour),
 						ForwardedUrl:  forwardedUrl,
 					}
-					signatureHeader, metadataHeader, _ = route_service.BuildSignatureAndMetadata(crypto, signature)
+					signatureHeader, metadataHeader, _ = header.BuildSignatureAndMetadata(crypto, signature)
 				})
 
 				It("returns an route service request expired error", func() {

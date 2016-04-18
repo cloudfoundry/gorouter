@@ -1,4 +1,4 @@
-package test
+package common
 
 import (
 	"github.com/cloudfoundry/gorouter/common"
@@ -75,6 +75,10 @@ func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
 		a.Register()
 		time.Sleep(duration)
 	}
+}
+
+func (a *TestApp) Port() uint16 {
+	return a.port
 }
 
 func (a *TestApp) Register() {

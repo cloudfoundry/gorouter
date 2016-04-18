@@ -129,9 +129,10 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	r.logger.Info("Successfully-subscribed-to-routing-api-event-stream")
 
 	r.eventSource.Store(source)
+	var event routing_api.Event
 
 	for {
-		event, err := source.Next()
+		event, err = source.Next()
 		if err != nil {
 			metrics.IncrementCounter(SubscribeEventsErrors)
 			r.logger.Error("Failed to get next event: ", err)

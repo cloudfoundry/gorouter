@@ -2,13 +2,13 @@ package router_test
 
 import (
 	"github.com/cloudfoundry/gorouter/registry"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/gorouter/test/common"
 
 	"net"
 	"time"
 )
 
-func appRegistered(registry *registry.RouteRegistry, app *test.TestApp) bool {
+func appRegistered(registry *registry.RouteRegistry, app *common.TestApp) bool {
 	for _, url := range app.Urls() {
 		pool := registry.Lookup(url)
 		if pool == nil {
@@ -19,7 +19,7 @@ func appRegistered(registry *registry.RouteRegistry, app *test.TestApp) bool {
 	return true
 }
 
-func appUnregistered(registry *registry.RouteRegistry, app *test.TestApp) bool {
+func appUnregistered(registry *registry.RouteRegistry, app *common.TestApp) bool {
 	for _, url := range app.Urls() {
 		pool := registry.Lookup(url)
 		if pool != nil {

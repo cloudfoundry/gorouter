@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
+	testcommon "github.com/cloudfoundry/gorouter/test/common"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/lager/lagertest"
 )
@@ -202,7 +203,7 @@ var _ = Describe("Router", func() {
 		})
 
 		Context("Register and Unregister", func() {
-			var app *test.TestApp
+			var app *testcommon.TestApp
 
 			assertRegisterUnregister := func() {
 				app.Listen()
@@ -339,7 +340,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("sticky session", func() {
-		apps := make([]*test.TestApp, 10)
+		apps := make([]*testcommon.TestApp, 10)
 		for i := range apps {
 			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, config.Port, mbusClient, nil)
 			apps[i].Listen()
@@ -363,7 +364,7 @@ var _ = Describe("Router", func() {
 
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
-			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -413,7 +414,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("no longer proxies https", func() {
-			app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -452,7 +453,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("handles a PUT request", func() {
-		app := test.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
 
 		var rr *http.Request
 		var msg string
@@ -488,7 +489,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("supports 100 Continue", func() {
-		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
 		rCh := make(chan *http.Request)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
@@ -532,7 +533,7 @@ var _ = Describe("Router", func() {
 
 	It("X-Vcap-Request-Id header is overwritten", func() {
 		done := make(chan string)
-		app := test.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())

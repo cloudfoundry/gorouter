@@ -4,6 +4,8 @@ import (
 	"container/heap"
 	"sync"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/stats/container"
 )
 
 const (
@@ -58,22 +60,22 @@ func (x *topAppsEntry) Trim(t int64) {
 	x.n -= n
 }
 
-type byFirstMarkTimeHeap struct{ Heap }
+type byFirstMarkTimeHeap struct{ container.Heap }
 
 func (x *byFirstMarkTimeHeap) Init() {
 	x.Heap.HeapType = x
 }
 
 func (x *byFirstMarkTimeHeap) Less(i, j int) bool {
-	yi := x.Heap.h[i].(*topAppsEntry)
-	yj := x.Heap.h[j].(*topAppsEntry)
+	yi := x.Heap.Get(i).(*topAppsEntry)
+	yj := x.Heap.Get(j).(*topAppsEntry)
 
 	// This asserts the slice of time slots is non-empty
 	return yi.t[0].t < yj.t[0].t
 }
 
 func (x *byFirstMarkTimeHeap) SetIndex(i, j int) {
-	y := x.Heap.h[i].(*topAppsEntry)
+	y := x.Heap.Get(i).(*topAppsEntry)
 	y.ti = j
 }
 
@@ -87,20 +89,20 @@ func (x *byFirstMarkTimeHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
-type byRequestsHeap struct{ Heap }
+type byRequestsHeap struct{ container.Heap }
 
 func (x *byRequestsHeap) Init() {
 	x.Heap.HeapType = x
 }
 
 func (x *byRequestsHeap) Less(i, j int) bool {
-	yi := x.Heap.h[i].(*topAppsEntry)
-	yj := x.Heap.h[j].(*topAppsEntry)
+	yi := x.Heap.Get(i).(*topAppsEntry)
+	yj := x.Heap.Get(j).(*topAppsEntry)
 	return yi.n > yj.n
 }
 
 func (x *byRequestsHeap) SetIndex(i, j int) {
-	y := x.Heap.h[i].(*topAppsEntry)
+	y := x.Heap.Get(i).(*topAppsEntry)
 	y.ni = j
 }
 

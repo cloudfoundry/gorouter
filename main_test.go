@@ -10,6 +10,7 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/gorouter/test/common"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
@@ -155,13 +156,13 @@ var _ = Describe("Router Integration", func() {
 			requestProcessing := make(chan bool)
 			responseRead := make(chan bool)
 
-			longApp := test.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil, "")
+			longApp := common.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil, "")
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				requestMade <- true
 				<-requestProcessing
-				_, err := ioutil.ReadAll(r.Body)
+				_, ioErr := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
-				Expect(err).ToNot(HaveOccurred())
+				Expect(ioErr).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte{'b'})
 			})
@@ -176,21 +177,21 @@ var _ = Describe("Router Integration", func() {
 				defer GinkgoRecover()
 				//Open a connection that never goes active
 				Eventually(func() bool {
-					conn, err := net.DialTimeout("tcp",
+					conn, dialErr := net.DialTimeout("tcp",
 						fmt.Sprintf("%s:%d", localIP, proxyPort), 30*time.Second)
-					if err == nil {
+					if dialErr == nil {
 						return conn.Close() == nil
 					}
 					return false
 				}).Should(BeTrue())
 
 				//Open a connection that goes active
-				resp, err := http.Get(longApp.Endpoint())
-				Expect(err).ShouldNot(HaveOccurred())
+				resp, httpErr := http.Get(longApp.Endpoint())
+				Expect(httpErr).ShouldNot(HaveOccurred())
 				Expect(resp.StatusCode).Should(Equal(http.StatusOK))
-				bytes, err := ioutil.ReadAll(resp.Body)
+				bytes, httpErr := ioutil.ReadAll(resp.Body)
 				resp.Body.Close()
-				Expect(err).ShouldNot(HaveOccurred())
+				Expect(httpErr).ShouldNot(HaveOccurred())
 				Expect(bytes).Should(Equal([]byte{'b'}))
 				responseRead <- true
 			}()
@@ -216,7 +217,7 @@ var _ = Describe("Router Integration", func() {
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 1)
-			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
+			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -227,8 +228,8 @@ var _ = Describe("Router Integration", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				_, err := http.Get(timeoutApp.Endpoint())
-				resultCh <- err
+				_, httpErr := http.Get(timeoutApp.Endpoint())
+				resultCh <- httpErr
 			}()
 
 			<-blocker
@@ -251,7 +252,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(config)
 
 			blocker := make(chan bool)
-			timeoutApp := test.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
+			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -678,12 +679,12 @@ func newMessageBus(c *config.Config) (*nats.Conn, error) {
 	return options.Connect()
 }
 
-func appRegistered(routesUri string, app *test.TestApp) bool {
+func appRegistered(routesUri string, app *common.TestApp) bool {
 	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
 	return err == nil && routeFound
 }
 
-func appUnregistered(routesUri string, app *test.TestApp) bool {
+func appUnregistered(routesUri string, app *common.TestApp) bool {
 	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
 	return err == nil && !routeFound
 }

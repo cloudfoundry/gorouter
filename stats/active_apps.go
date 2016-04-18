@@ -4,6 +4,8 @@ import (
 	"container/heap"
 	"sync"
 	"time"
+
+	"github.com/cloudfoundry/gorouter/stats/container"
 )
 
 const (
@@ -25,20 +27,20 @@ func (x *activeAppsEntry) Mark(t int64) {
 	}
 }
 
-type byTimeMinHeap struct{ Heap }
+type byTimeMinHeap struct{ container.Heap }
 
 func (x *byTimeMinHeap) Init() {
 	x.Heap.HeapType = x
 }
 
 func (x *byTimeMinHeap) Less(i, j int) bool {
-	yi := x.Heap.h[i].(*activeAppsEntry)
-	yj := x.Heap.h[j].(*activeAppsEntry)
+	yi := x.Heap.Get(i).(*activeAppsEntry)
+	yj := x.Heap.Get(j).(*activeAppsEntry)
 	return yi.t < yj.t
 }
 
 func (x *byTimeMinHeap) SetIndex(i, j int) {
-	y := x.Heap.h[i].(*activeAppsEntry)
+	y := x.Heap.Get(i).(*activeAppsEntry)
 	y.ti = j
 }
 
@@ -52,20 +54,20 @@ func (x *byTimeMinHeapSnapshot) SetIndex(i, j int) {
 	// No-op
 }
 
-type byTimeMaxHeap struct{ Heap }
+type byTimeMaxHeap struct{ container.Heap }
 
 func (x *byTimeMaxHeap) Init() {
 	x.Heap.HeapType = x
 }
 
 func (x *byTimeMaxHeap) Less(i, j int) bool {
-	yi := x.Heap.h[i].(*activeAppsEntry)
-	yj := x.Heap.h[j].(*activeAppsEntry)
+	yi := x.Heap.Get(i).(*activeAppsEntry)
+	yj := x.Heap.Get(j).(*activeAppsEntry)
 	return yi.t > yj.t
 }
 
 func (x *byTimeMaxHeap) SetIndex(i, j int) {
-	y := x.Heap.h[i].(*activeAppsEntry)
+	y := x.Heap.Get(i).(*activeAppsEntry)
 	y.tj = j
 }
 

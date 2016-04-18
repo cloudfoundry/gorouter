@@ -18,7 +18,7 @@ import (
 	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/cloudfoundry/gorouter/router"
-	"github.com/cloudfoundry/gorouter/test"
+	"github.com/cloudfoundry/gorouter/test/common"
 	"github.com/cloudfoundry/gorouter/test_util"
 	vvarz "github.com/cloudfoundry/gorouter/varz"
 	"github.com/nats-io/nats"
@@ -42,7 +42,7 @@ var _ = Describe("Router", func() {
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
-		app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
 		resultCh := make(chan bool, 2)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +122,7 @@ var _ = Describe("Router", func() {
 	}
 
 	testRouterDrain := func(config *cfg.Config, mbusClient *nats.Conn, registry *rregistry.RouteRegistry, initiateDrain func()) {
-		app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
 		resultCh := make(chan bool, 2)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +238,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("waits until the last request completes", func() {
-			app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 			blocker := make(chan bool)
 			drainDone := make(chan struct{})
 			clientDone := make(chan struct{})
@@ -295,7 +295,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("times out if it takes too long", func() {
-			app := test.NewTestApp([]route.Uri{"draintimeout.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := common.NewTestApp([]route.Uri{"draintimeout.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 2)
@@ -341,7 +341,7 @@ var _ = Describe("Router", func() {
 
 		Context("with http and https servers", func() {
 			It("it drains and stops the router", func() {
-				app := test.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+				app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
 				blocker := make(chan bool)
 				drainDone := make(chan struct{})
 				clientDone := make(chan struct{})

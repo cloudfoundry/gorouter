@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
+	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/varz"
 	"github.com/nats-io/nats"
 	"github.com/pivotal-golang/lager"
@@ -57,6 +59,17 @@ type Router struct {
 
 	logger  lager.Logger
 	errChan chan error
+}
+
+type RegistryMessage struct {
+	Host                    string            `json:"host"`
+	Port                    uint16            `json:"port"`
+	Uris                    []route.Uri       `json:"uris"`
+	Tags                    map[string]string `json:"tags"`
+	App                     string            `json:"app"`
+	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
+	RouteServiceUrl         string            `json:"route_service_url"`
+	PrivateInstanceId       string            `json:"private_instance_id"`
 }
 
 func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
@@ -565,4 +578,12 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 	if err != nil {
 		r.logger.Error(fmt.Sprintf("Error subscribing to %s ", subject), err)
 	}
+}
+
+func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
+	return route.NewEndpoint(rm.App, rm.Host, rm.Port, rm.PrivateInstanceId, rm.Tags, rm.StaleThresholdInSeconds, rm.RouteServiceUrl)
+}
+
+func (rm *RegistryMessage) ValidateMessage() bool {
+	return rm.RouteServiceUrl == "" || strings.HasPrefix(rm.RouteServiceUrl, "https")
 }

@@ -1,4 +1,4 @@
-package route_service_test
+package header_test
 
 import (
 	"encoding/base64"
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/common/secure/fakes"
-	"github.com/cloudfoundry/gorouter/route_service"
+	"github.com/cloudfoundry/gorouter/route_service/header"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -16,7 +16,7 @@ import (
 var _ = Describe("Route Service Header", func() {
 	var (
 		crypto    = new(fakes.FakeCrypto)
-		signature *route_service.Signature
+		signature *header.Signature
 	)
 
 	BeforeEach(func() {
@@ -35,17 +35,17 @@ var _ = Describe("Route Service Header", func() {
 			return cipherText, nonce, nil
 		}
 
-		signature = &route_service.Signature{RequestedTime: time.Now()}
+		signature = &header.Signature{RequestedTime: time.Now()}
 	})
 
 	Describe("Build Signature and Metadata", func() {
 		It("builds signature and metadata headers", func() {
-			signatureHeader, metadata, err := route_service.BuildSignatureAndMetadata(crypto, signature)
+			signatureHeader, metadata, err := header.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(signatureHeader).ToNot(BeNil())
 			metadataDecoded, err := base64.URLEncoding.DecodeString(metadata)
 			Expect(err).ToNot(HaveOccurred())
-			metadataStruct := route_service.Metadata{}
+			metadataStruct := header.Metadata{}
 			err = json.Unmarshal([]byte(metadataDecoded), &metadataStruct)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(metadataStruct.Nonce).To(Equal([]byte("some-nonce")))
@@ -57,7 +57,7 @@ var _ = Describe("Route Service Header", func() {
 			})
 
 			It("returns an error", func() {
-				_, _, err := route_service.BuildSignatureAndMetadata(crypto, signature)
+				_, _, err := header.BuildSignatureAndMetadata(crypto, signature)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -71,12 +71,12 @@ var _ = Describe("Route Service Header", func() {
 
 		BeforeEach(func() {
 			var err error
-			signatureHeader, metadataHeader, err = route_service.BuildSignatureAndMetadata(crypto, signature)
+			signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("parses signature from signature and metadata headers", func() {
-			decryptedSignature, err := route_service.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			decryptedSignature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(signature.RequestedTime.Sub(decryptedSignature.RequestedTime)).To(Equal(time.Duration(0)))
 		})
