@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/gorouter/access_log"
-	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/schema"
 	cfg "github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -204,7 +204,7 @@ var _ = Describe("Router", func() {
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-		logcounter := vcap.NewLogCounter()
+		logcounter := schema.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			Logger:          logger,
 			EndpointTimeout: config.EndpointTimeout,
@@ -443,7 +443,7 @@ var _ = Describe("Router", func() {
 			var errChan chan error
 
 			BeforeEach(func() {
-				logcounter := vcap.NewLogCounter()
+				logcounter := schema.NewLogCounter()
 				proxy := proxy.NewProxy(proxy.ProxyArgs{
 					Logger:          logger,
 					EndpointTimeout: config.EndpointTimeout,

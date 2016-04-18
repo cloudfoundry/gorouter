@@ -14,7 +14,7 @@ import (
 
 	"strconv"
 
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 )
 
 var _ = Describe("AccessLogRecord", func() {

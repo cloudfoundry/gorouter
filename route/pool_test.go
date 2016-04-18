@@ -4,28 +4,28 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/cloudfoundry/gorouter/route"
+	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Pool", func() {
-	var pool *Pool
+	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = NewPool(2*time.Minute, "")
+		pool = route.NewPool(2*time.Minute, "")
 	})
 
 	Context("Put", func() {
 		It("adds endpoints", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 
 			b := pool.Put(endpoint)
 			Expect(b).To(BeTrue())
 		})
 
 		It("handles duplicate endpoints", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 
 			pool.Put(endpoint)
 			b := pool.Put(endpoint)
@@ -33,8 +33,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
-			endpoint1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
-			endpoint2 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			endpoint2 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 			pool.Put(endpoint1)
 			Expect(pool.Put(endpoint2)).To(BeFalse())
@@ -43,8 +43,8 @@ var _ = Describe("Pool", func() {
 
 	Context("RouteServiceUrl", func() {
 		It("returns the route_service_url associated with the pool", func() {
-			endpoint := &Endpoint{}
-			endpointRS := &Endpoint{RouteServiceUrl: "my-url"}
+			endpoint := &route.Endpoint{}
+			endpointRS := &route.Endpoint{RouteServiceUrl: "my-url"}
 			b := pool.Put(endpoint)
 			Expect(b).To(BeTrue())
 
@@ -67,7 +67,7 @@ var _ = Describe("Pool", func() {
 
 	Context("Remove", func() {
 		It("removes endpoints", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 			pool.Put(endpoint)
 
 			b := pool.Remove(endpoint)
@@ -76,7 +76,7 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("fails to remove an endpoint that doesn't exist", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 
 			b := pool.Remove(endpoint)
 			Expect(b).To(BeFalse())
@@ -89,14 +89,14 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("not empty after adding an endpoint", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 			pool.Put(endpoint)
 
 			Expect(pool.IsEmpty()).To(BeFalse())
 		})
 
 		It("is empty after removing everything", func() {
-			endpoint := &Endpoint{}
+			endpoint := &route.Endpoint{}
 			pool.Put(endpoint)
 			pool.Remove(endpoint)
 
@@ -111,7 +111,7 @@ var _ = Describe("Pool", func() {
 			Context("when custom stale threshold is greater than default threshold", func() {
 				It("prunes the endpoint", func() {
 					customThreshold := int(defaultThreshold.Seconds()) + 20
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, customThreshold, "")
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, customThreshold, "")
 					pool.Put(e1)
 
 					updateTime, _ := time.ParseDuration(fmt.Sprintf("%ds", customThreshold-10))
@@ -125,7 +125,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
@@ -138,7 +138,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, 20, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
@@ -154,7 +154,7 @@ var _ = Describe("Pool", func() {
 		Context("when an endpoint does NOT have a custom stale time", func() {
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
@@ -167,7 +167,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
@@ -182,7 +182,7 @@ var _ = Describe("Pool", func() {
 
 	Context("MarkUpdated", func() {
 		It("updates all endpoints", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 			pool.Put(e1)
 
@@ -201,13 +201,13 @@ var _ = Describe("Pool", func() {
 
 	Context("Each", func() {
 		It("applies a function to each endpoint", func() {
-			e1 := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
-			e2 := NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", nil, -1, "")
 			pool.Put(e1)
 			pool.Put(e2)
 
-			endpoints := make(map[string]*Endpoint)
-			pool.Each(func(e *Endpoint) {
+			endpoints := make(map[string]*route.Endpoint)
+			pool.Each(func(e *route.Endpoint) {
 				endpoints[e.CanonicalAddr()] = e
 			})
 			Expect(endpoints).To(HaveLen(2))
@@ -217,8 +217,8 @@ var _ = Describe("Pool", func() {
 	})
 
 	It("marshals json", func() {
-		e := NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "https://my-rs.com")
-		e2 := NewEndpoint("", "5.6.7.8", 5678, "", nil, -1, "")
+		e := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "https://my-rs.com")
+		e2 := route.NewEndpoint("", "5.6.7.8", 5678, "", nil, -1, "")
 		pool.Put(e)
 		pool.Put(e2)
 

@@ -8,8 +8,10 @@ import (
 	"syscall"
 
 	"github.com/cloudfoundry/dropsonde"
-	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/health"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/common/schema"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
@@ -39,7 +41,7 @@ type Router struct {
 	mbusClient *nats.Conn
 	registry   *registry.RouteRegistry
 	varz       varz.Varz
-	component  *vcap.VcapComponent
+	component  *common.VcapComponent
 
 	listener         net.Listener
 	tlsListener      net.Listener
@@ -58,16 +60,16 @@ type Router struct {
 }
 
 func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, logCounter *vcap.LogCounter, errChan chan error) (*Router, error) {
+	v varz.Varz, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
 	if cfg.Status.Port != 0 {
 		host = fmt.Sprintf("%s:%d", cfg.Ip, cfg.Status.Port)
 	}
 
-	varz := &vcap.Varz{
+	varz := &health.Varz{
 		UniqueVarz: v,
-		GenericVarz: vcap.GenericVarz{
+		GenericVarz: health.GenericVarz{
 			Type:        "Router",
 			Index:       cfg.Index,
 			Host:        host,
@@ -76,9 +78,9 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 		},
 	}
 
-	healthz := &vcap.Healthz{}
+	healthz := &health.Healthz{}
 
-	component := &vcap.VcapComponent{
+	component := &common.VcapComponent{
 		Config:  cfg,
 		Varz:    varz,
 		Healthz: healthz,
@@ -128,7 +130,7 @@ func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 }
 
 func setRequestXVcapRequestId(request *http.Request, logger lager.Logger) {
-	uuid, err := vcap.GenerateUUID()
+	uuid, err := common.GenerateUUID()
 	if err == nil {
 		request.Header.Set(router_http.VcapRequestIdHeader, uuid)
 		if logger != nil {
@@ -524,7 +526,7 @@ func (r *Router) greetMessage() ([]byte, error) {
 		return nil, err
 	}
 
-	d := vcap.RouterStart{
+	d := common.RouterStart{
 		Id:    r.component.Varz.UUID,
 		Hosts: []string{host},
 		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,

@@ -2,6 +2,7 @@ package common_test
 
 import (
 	. "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/health"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/nats-io/nats"
 
@@ -31,15 +32,15 @@ func (m *MarshalableValue) MarshalJSON() ([]byte, error) {
 var _ = Describe("Component", func() {
 	var (
 		component *VcapComponent
-		varz      *Varz
+		varz      *health.Varz
 	)
 
 	BeforeEach(func() {
 		port, err := localip.LocalPort()
 		Expect(err).ToNot(HaveOccurred())
 
-		varz = &Varz{
-			GenericVarz: GenericVarz{
+		varz = &health.Varz{
+			GenericVarz: health.GenericVarz{
 				Host:        fmt.Sprintf("127.0.0.1:%d", port),
 				Credentials: []string{"username", "password"},
 			},

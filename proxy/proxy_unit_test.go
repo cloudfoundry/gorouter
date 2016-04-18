@@ -7,8 +7,9 @@ import (
 	"time"
 
 	fakelogger "github.com/cloudfoundry/gorouter/access_log/fakes"
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 	"github.com/cloudfoundry/gorouter/proxy"
+	"github.com/cloudfoundry/gorouter/proxy/test_helpers"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test_util"
@@ -23,8 +24,6 @@ var _ = Describe("Proxy Unit tests", func() {
 		proxyObj         proxy.Proxy
 		fakeAccessLogger *fakelogger.FakeAccessLogger
 		logger           *lagertest.TestLogger
-
-		r *registry.RouteRegistry
 	)
 
 	Context("ServeHTTP", func() {
@@ -44,7 +43,7 @@ var _ = Describe("Proxy Unit tests", func() {
 				Ip:                  conf.Ip,
 				TraceKey:            conf.TraceKey,
 				Registry:            r,
-				Reporter:            nullVarz{},
+				Reporter:            test_helpers.NullVarz{},
 				Logger:              logger,
 				AccessLogger:        fakeAccessLogger,
 				SecureCookies:       conf.SecureCookies,

@@ -4,23 +4,76 @@ import (
 	"io"
 	"regexp"
 
+	"fmt"
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/pivotal-golang/lager"
+	"strconv"
+
+	"github.com/cloudfoundry/gorouter/access_log/schema"
+	"github.com/cloudfoundry/gorouter/config"
+
+	"os"
 )
+
+//go:generate counterfeiter -o fakes/fake_access_logger.go . AccessLogger
+type AccessLogger interface {
+	Run()
+	Stop()
+	Log(record schema.AccessLogRecord)
+}
+
+type NullAccessLogger struct {
+}
+
+func (x *NullAccessLogger) Run()                       {}
+func (x *NullAccessLogger) Stop()                      {}
+func (x *NullAccessLogger) Log(schema.AccessLogRecord) {}
 
 type FileAndLoggregatorAccessLogger struct {
 	dropsondeSourceInstance string
-	channel                 chan AccessLogRecord
+	channel                 chan schema.AccessLogRecord
 	stopCh                  chan struct{}
 	writer                  io.Writer
 	writerCount             int
 	logger                  lager.Logger
 }
 
+func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (AccessLogger, error) {
+
+	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
+		return &NullAccessLogger{}, nil
+	}
+
+	var err error
+	var file *os.File
+	var writers []io.Writer
+	if config.AccessLog.File != "" {
+		file, err = os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			logger.Error(fmt.Sprintf("Error creating accesslog file, %s", config.AccessLog.File), err)
+			return nil, err
+		}
+		writers = append(writers, file)
+	}
+
+	if config.AccessLog.EnableStreaming {
+		writers = append(writers, os.Stdout)
+	}
+
+	var dropsondeSourceInstance string
+	if config.Logging.LoggregatorEnabled {
+		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
+	}
+
+	accessLogger := NewFileAndLoggregatorAccessLogger(logger, dropsondeSourceInstance, writers...)
+	go accessLogger.Run()
+	return accessLogger, nil
+}
+
 func NewFileAndLoggregatorAccessLogger(logger lager.Logger, dropsondeSourceInstance string, ws ...io.Writer) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
-		channel:                 make(chan AccessLogRecord, 128),
+		channel:                 make(chan schema.AccessLogRecord, 128),
 		stopCh:                  make(chan struct{}),
 		logger:                  logger,
 	}
@@ -62,7 +115,7 @@ func (x *FileAndLoggregatorAccessLogger) Stop() {
 	close(x.stopCh)
 }
 
-func (x *FileAndLoggregatorAccessLogger) Log(r AccessLogRecord) {
+func (x *FileAndLoggregatorAccessLogger) Log(r schema.AccessLogRecord) {
 	x.channel <- r
 }
 

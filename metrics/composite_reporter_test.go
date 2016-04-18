@@ -1,7 +1,8 @@
 package metrics_test
 
 import (
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -16,7 +17,7 @@ var _ = Describe("CompositeReporter", func() {
 
 	var fakeReporter1 *fakes.FakeProxyReporter
 	var fakeReporter2 *fakes.FakeProxyReporter
-	var composite metrics.ProxyReporter
+	var composite reporter.ProxyReporter
 
 	var req *http.Request
 	var endpoint *route.Endpoint

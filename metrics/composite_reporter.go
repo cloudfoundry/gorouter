@@ -4,15 +4,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cloudfoundry/gorouter/metrics/reporter"
 	"github.com/cloudfoundry/gorouter/route"
 )
 
 type CompositeReporter struct {
-	first  ProxyReporter
-	second ProxyReporter
+	first  reporter.ProxyReporter
+	second reporter.ProxyReporter
 }
 
-func NewCompositeReporter(first, second ProxyReporter) ProxyReporter {
+func NewCompositeReporter(first, second reporter.ProxyReporter) reporter.ProxyReporter {
 	return &CompositeReporter{
 		first:  first,
 		second: second,

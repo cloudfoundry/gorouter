@@ -11,9 +11,10 @@ import (
 	uaa_config "github.com/cloudfoundry-incubator/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/access_log"
-	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/schema"
 	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/metrics/reporter"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route_fetcher"
@@ -51,7 +52,7 @@ func main() {
 	flag.Parse()
 
 	c := config.DefaultConfig()
-	logCounter := vcap.NewLogCounter()
+	logCounter := schema.NewLogCounter()
 
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
@@ -149,7 +150,7 @@ func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter reporter.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	args := proxy.ProxyArgs{
 		Logger:          logger,
 		EndpointTimeout: c.EndpointTimeout,
@@ -248,7 +249,7 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 	return natsClient
 }
 
-func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *vcap.LogCounter) {
+func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *schema.LogCounter) {
 	if c.Logging.File != "" {
 		file, err := os.OpenFile(c.Logging.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {

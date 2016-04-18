@@ -11,6 +11,7 @@ import (
 	"github.com/cloudfoundry/gorouter/common/secure"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
+	"github.com/cloudfoundry/gorouter/proxy/test_helpers"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/pivotal-golang/lager"
@@ -19,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -81,7 +82,7 @@ var _ = JustBeforeEach(func() {
 		TraceKey:                   conf.TraceKey,
 		Logger:                     logger,
 		Registry:                   r,
-		Reporter:                   nullVarz{},
+		Reporter:                   test_helpers.NullVarz{},
 		AccessLogger:               accessLog,
 		SecureCookies:              conf.SecureCookies,
 		TLSConfig:                  tlsConfig,

@@ -22,5 +22,21 @@ go get -v github.com/apcera/gnatsd
 #Install ginkgo from Godeps into Godeps workspace
 go install -v github.com/onsi/ginkgo/ginkgo
 
-#Run all tests
-ginkgo -r -failOnPending -keepGoing -randomizeAllSpecs -skipMeasurements=true -race "$@"
+echo -e "\n Formatting packages..."
+go fmt ./...
+
+echo -e "\n Installing packages for Vetting them..."
+for package in $(find {access_log,common,config,metrics,proxy,registry,route} -type d)
+do
+    export install_file="github.com/cloudfoundry/gorouter/$package"
+    go install $install_file
+done
+
+for file in $(find {access_log,common,config,metrics,proxy,registry,route} \( -name "*.go" -not -iname "*test.go" \))
+do
+    go tool vet -v -all -shadow=true $file
+done
+
+#Run all tests -keepGoing
+ginkgo -r -failOnPending -randomizeAllSpecs -skipMeasurements=true -race "$@"
+

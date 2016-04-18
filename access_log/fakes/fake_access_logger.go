@@ -5,19 +5,20 @@ import (
 	"sync"
 
 	"github.com/cloudfoundry/gorouter/access_log"
+	"github.com/cloudfoundry/gorouter/access_log/schema"
 )
 
 type FakeAccessLogger struct {
-	RunStub        func()
-	runMutex       sync.RWMutex
-	runArgsForCall []struct{}
+	RunStub         func()
+	runMutex        sync.RWMutex
+	runArgsForCall  []struct{}
 	StopStub        func()
 	stopMutex       sync.RWMutex
 	stopArgsForCall []struct{}
-	LogStub        func(record access_log.AccessLogRecord)
-	logMutex       sync.RWMutex
-	logArgsForCall []struct {
-		record access_log.AccessLogRecord
+	LogStub         func(record schema.AccessLogRecord)
+	logMutex        sync.RWMutex
+	logArgsForCall  []struct {
+		record schema.AccessLogRecord
 	}
 }
 
@@ -51,10 +52,10 @@ func (fake *FakeAccessLogger) StopCallCount() int {
 	return len(fake.stopArgsForCall)
 }
 
-func (fake *FakeAccessLogger) Log(record access_log.AccessLogRecord) {
+func (fake *FakeAccessLogger) Log(record schema.AccessLogRecord) {
 	fake.logMutex.Lock()
 	fake.logArgsForCall = append(fake.logArgsForCall, struct {
-		record access_log.AccessLogRecord
+		record schema.AccessLogRecord
 	}{record})
 	fake.logMutex.Unlock()
 	if fake.LogStub != nil {
@@ -68,7 +69,7 @@ func (fake *FakeAccessLogger) LogCallCount() int {
 	return len(fake.logArgsForCall)
 }
 
-func (fake *FakeAccessLogger) LogArgsForCall(i int) access_log.AccessLogRecord {
+func (fake *FakeAccessLogger) LogArgsForCall(i int) schema.AccessLogRecord {
 	fake.logMutex.RLock()
 	defer fake.logMutex.RUnlock()
 	return fake.logArgsForCall[i].record

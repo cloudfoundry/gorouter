@@ -7,20 +7,84 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"sync"
+	"syscall"
 	"time"
 
+	"github.com/cloudfoundry/gorouter/common/health"
 	. "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/common/schema"
 	"github.com/nats-io/nats"
+	"github.com/nu7hatch/gouuid"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/localip"
 )
+
+const RefreshInterval time.Duration = time.Second * 1
+
+var log lager.Logger
+
+type ProcessStatus struct {
+	sync.RWMutex
+	rusage      *syscall.Rusage
+	lastCpuTime int64
+	stopSignal  chan bool
+	stopped     bool
+
+	CpuUsage float64
+	MemRss   int64
+}
+
+func NewProcessStatus() *ProcessStatus {
+	p := new(ProcessStatus)
+	p.rusage = new(syscall.Rusage)
+
+	go func() {
+		timer := time.Tick(RefreshInterval)
+		for {
+			select {
+			case <-timer:
+				p.Update()
+			case <-p.stopSignal:
+				return
+			}
+		}
+	}()
+
+	return p
+}
+
+func (p *ProcessStatus) Update() {
+	e := syscall.Getrusage(syscall.RUSAGE_SELF, p.rusage)
+	if e != nil {
+		log.Fatal("failed-to-get-rusage", e)
+	}
+
+	p.Lock()
+	defer p.Unlock()
+	p.MemRss = int64(p.rusage.Maxrss)
+
+	t := p.rusage.Utime.Nano() + p.rusage.Stime.Nano()
+	p.CpuUsage = float64(t-p.lastCpuTime) / float64(RefreshInterval.Nanoseconds())
+	p.lastCpuTime = t
+}
+
+func (p *ProcessStatus) StopUpdate() {
+	p.Lock()
+	defer p.Unlock()
+	if !p.stopped {
+		p.stopped = true
+		p.stopSignal <- true
+		p.stopSignal = nil
+	}
+}
 
 var procStat *ProcessStatus
 
 type VcapComponent struct {
 	Config     interface{}               `json:"-"`
-	Varz       *Varz                     `json:"-"`
-	Healthz    *Healthz                  `json:"-"`
+	Varz       *health.Varz              `json:"-"`
+	Healthz    *health.Healthz           `json:"-"`
 	InfoRoutes map[string]json.Marshaler `json:"-"`
 	Logger     lager.Logger              `json:"-"`
 
@@ -55,7 +119,7 @@ func (c *VcapComponent) Start() error {
 	}
 
 	c.quitCh = make(chan struct{}, 1)
-	c.Varz.StartTime = Time(time.Now())
+	c.Varz.StartTime = schema.Time(time.Now())
 	uuid, err := GenerateUUID()
 	if err != nil {
 		return err
@@ -202,4 +266,12 @@ func (c *VcapComponent) ListenAndServe() {
 			c.statusCh <- err
 		}
 	}()
+}
+
+func GenerateUUID() (string, error) {
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	return uuid.String(), nil
 }

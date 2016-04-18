@@ -3,7 +3,6 @@ package proxy_test
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,10 +21,8 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/factories"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/gorouter/metrics"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/stats"
 	"github.com/cloudfoundry/gorouter/test_util"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/nu7hatch/gouuid"
@@ -37,16 +34,6 @@ import (
 const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
 type connHandler func(*test_util.HttpConn)
-
-type nullVarz struct{}
-
-func (_ nullVarz) MarshalJSON() ([]byte, error)                                                     { return json.Marshal(nil) }
-func (_ nullVarz) ActiveApps() *stats.ActiveApps                                                    { return stats.NewActiveApps() }
-func (_ nullVarz) CaptureBadRequest(*http.Request)                                                  {}
-func (_ nullVarz) CaptureBadGateway(*http.Request)                                                  {}
-func (_ nullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                       {}
-func (_ nullVarz) CaptureRoutingResponse(*route.Endpoint, *http.Response, time.Time, time.Duration) {}
-func (_ nullVarz) CaptureRegistryMessage(msg metrics.ComponentTagged)                               {}
 
 var _ = Describe("Proxy", func() {
 
@@ -248,7 +235,6 @@ var _ = Describe("Proxy", func() {
 		resp, _ := conn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
-
 
 	It("responds to http/1.1 with absolute-form request that has encoded characters in the path", func() {
 		ln := registerHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {

@@ -6,8 +6,10 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/gorouter/access_log"
-	vcap "github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common"
+	"github.com/cloudfoundry/gorouter/common/health"
 	router_http "github.com/cloudfoundry/gorouter/common/http"
+	"github.com/cloudfoundry/gorouter/common/schema"
 	cfg "github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/proxy"
 	rregistry "github.com/cloudfoundry/gorouter/registry"
@@ -34,7 +36,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/lager/lagertest"
 )
@@ -87,7 +89,7 @@ var _ = Describe("Router", func() {
 		logger = lagertest.NewTestLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-		logcounter := vcap.NewLogCounter()
+		logcounter := schema.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout: config.EndpointTimeout,
 			Logger:          logger,
@@ -145,7 +147,7 @@ var _ = Describe("Router", func() {
 				var msg []byte
 				Eventually(response).Should(Receive(&msg))
 
-				var message vcap.RouterStart
+				var message common.RouterStart
 				err := json.Unmarshal(msg, &message)
 
 				Expect(err).NotTo(HaveOccurred())
@@ -165,14 +167,14 @@ var _ = Describe("Router", func() {
 
 		It("discovers", func() {
 			// Test if router responses to discover message
-			sig := make(chan vcap.Varz)
+			sig := make(chan health.Varz)
 
 			// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
 			// sure that router has run at least for one second
 			time.Sleep(time.Second)
 
 			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *nats.Msg) {
-				var varz vcap.Varz
+				var varz health.Varz
 				_ = json.Unmarshal(msg.Data, &varz)
 				sig <- varz
 			})
@@ -183,11 +185,11 @@ var _ = Describe("Router", func() {
 				[]byte{},
 			)
 
-			var varz vcap.Varz
+			var varz health.Varz
 			Eventually(sig).Should(Receive(&varz))
 
 			var emptyTime time.Time
-			var emptyDuration vcap.Duration
+			var emptyDuration schema.Duration
 
 			Expect(varz.Type).To(Equal("Router"))
 			Expect(varz.Index).To(Equal(uint(2)))
