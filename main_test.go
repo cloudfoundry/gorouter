@@ -92,8 +92,8 @@ var _ = Describe("Router Integration", func() {
 		gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(session, 30).Should(Say("gorouter.starting"))
-		Eventually(session, 5).Should(Say("gorouter.started"))
+		Eventually(session, 30).Should(Say("starting"))
+		Eventually(session, 10).Should(Say("gorouter.started"))
 		gorouterSession = session
 		return session
 	}
