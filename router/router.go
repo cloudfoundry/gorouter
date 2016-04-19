@@ -178,6 +178,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	if r.config.StartResponseDelayInterval != 0 {
 		r.logger.Info(fmt.Sprintf("Waiting %s before listening...", r.config.StartResponseDelayInterval))
 		time.Sleep(r.config.StartResponseDelayInterval)
+		r.logger.Info("completed-wait")
 	}
 
 	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
