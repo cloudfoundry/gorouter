@@ -2,12 +2,14 @@ package access_log
 
 import (
 	"io"
+	"log/syslog"
 	"regexp"
 
 	"fmt"
+	"strconv"
+
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/pivotal-golang/lager"
-	"strconv"
 
 	"github.com/cloudfoundry/gorouter/access_log/schema"
 	"github.com/cloudfoundry/gorouter/config"
@@ -57,7 +59,12 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 	}
 
 	if config.AccessLog.EnableStreaming {
-		writers = append(writers, os.Stdout)
+		syslogWriter, err := syslog.Dial("", "", syslog.LOG_INFO, config.Logging.Syslog)
+		if err != nil {
+			logger.Error("Error creating syslog writer", err)
+			return nil, err
+		}
+		writers = append(writers, syslogWriter)
 	}
 
 	var dropsondeSourceInstance string
@@ -73,7 +80,7 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 func NewFileAndLoggregatorAccessLogger(logger lager.Logger, dropsondeSourceInstance string, ws ...io.Writer) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
-		channel:                 make(chan schema.AccessLogRecord, 128),
+		channel:                 make(chan schema.AccessLogRecord, 1024),
 		stopCh:                  make(chan struct{}),
 		logger:                  logger,
 	}
