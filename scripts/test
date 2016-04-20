@@ -25,20 +25,14 @@ go install -v github.com/onsi/ginkgo/ginkgo
 echo -e "\n Formatting packages..."
 go fmt ./...
 
-echo -e "\n Installing packages for Vetting them..."
-go install .
-go install github.com/cloudfoundry/gorouter/test
+ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"
 
-go install github.com/cloudfoundry/gorouter/test_util
-go install github.com/cloudfoundry/gorouter/test_util/rss/common
-go install github.com/cloudfoundry/gorouter/test_util/rss/commands
+# Installing dependencies needed by go vet
+go install .
 
 go tool vet -v -all -shadow=true main.go
 
-for file in $(find {access_log,common,config,metrics,proxy,registry,route,route_fetcher,route_service,router,stats,test,test_util,varz} \( -name "*.go" -not -iname "*test.go" \))
+for file in $(find {access_log,common,config,metrics,proxy,registry,route,route_fetcher,route_service,router,stats,varz} \( -name "*.go" -not -iname "*test.go" \))
 do
     go tool vet -v -all -shadow=true $file
 done
-
-#Run all tests -keepGoing
-ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"
