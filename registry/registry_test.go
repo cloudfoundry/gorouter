@@ -4,6 +4,8 @@ import (
 	. "github.com/cloudfoundry/gorouter/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/lager/lagertest"
 
 	"github.com/cloudfoundry/gorouter/config"
@@ -20,10 +22,11 @@ var _ = Describe("RouteRegistry", func() {
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
+	var logger lager.Logger
 
 	BeforeEach(func() {
 
-		logger := lagertest.NewTestLogger("test")
+		logger = lagertest.NewTestLogger("test")
 		configObj = config.DefaultConfig()
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 10 * time.Millisecond
@@ -138,6 +141,22 @@ var _ = Describe("RouteRegistry", func() {
 
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(1))
+			})
+		})
+
+		Context("when route registration message is received", func() {
+			BeforeEach(func() {
+				r.Register("a.route", fooEndpoint)
+			})
+
+			It("logs at info level", func() {
+				Expect(logger).To(gbytes.Say(`register.*"log_level":1.*a\.route`))
+			})
+
+			It("logs register message only for new routes", func() {
+				Expect(logger).To(gbytes.Say(`register.*"log_level":1.*a\.route`))
+				r.Register("a.route", fooEndpoint)
+				Expect(logger).NotTo(gbytes.Say(`register.*"log_level":1.*a\.route`))
 			})
 		})
 	})
@@ -259,6 +278,22 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumUris()).To(Equal(0))
 
 		})
+
+		Context("when route unregistration message is received", func() {
+			BeforeEach(func() {
+				r.Register("a.route", fooEndpoint)
+				r.Unregister("a.route", fooEndpoint)
+			})
+
+			It("logs at info level", func() {
+				Expect(logger).To(gbytes.Say(`unregister.*"log_level":1.*a\.route`))
+			})
+
+			It("only logs unregistration for existing routes", func() {
+				r.Unregister("non-existent-route", fooEndpoint)
+				Expect(logger).NotTo(gbytes.Say(`unregister.*"log_level":1.*a\.non-existent-route`))
+			})
+		})
 	})
 
 	Context("Lookup", func() {
@@ -361,6 +396,19 @@ var _ = Describe("RouteRegistry", func() {
 
 		AfterEach(func() {
 			r.StopPruningCycle()
+		})
+
+		It("logs the route info for stale routes", func() {
+			r.Register("bar.com/path1/path2/path3", barEndpoint)
+
+			Expect(r.NumUris()).To(Equal(1))
+
+			r.StartPruningCycle()
+			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+
+			Expect(r.NumUris()).To(Equal(0))
+			r.MarshalJSON()
+			Expect(logger).To(gbytes.Say(`prune.*"log_level":1.*bar.com/path1/path2/path3`))
 		})
 
 		It("removes stale droplets", func() {

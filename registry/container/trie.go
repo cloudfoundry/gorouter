@@ -238,9 +238,6 @@ func (r *Trie) Snip() {
 
 func (r *Trie) ToPath() string {
 	if r.Parent.isRoot() {
-		if len(r.ChildNodes) == 0 {
-			return r.Segment
-		}
 		return r.Segment
 	}
 	return r.Parent.ToPath() + "/" + r.Segment
