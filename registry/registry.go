@@ -29,6 +29,7 @@ type RouteRegistry struct {
 
 	logger lager.Logger
 
+	// Access to the Trie datastructure should be governed by the RWMutex of RouteRegistry
 	byUri *container.Trie
 
 	pruneStaleDropletsInterval time.Duration
