@@ -376,6 +376,21 @@ var _ = Describe("Trie", func() {
 		})
 	})
 
+	Describe(".ToPath", func() {
+		It("Returns full URI", func() {
+			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "")
+			p1 := route.NewPool(42, "")
+			p1.Put(e1)
+			node1 := r.Insert("foo.com", p1)
+			node2 := r.Insert("foo.io/bar/baz", p1)
+			node3 := r.Insert("foo.io/bar/foo", p1)
+
+			Expect(node1.ToPath()).To(Equal("foo.com"))
+			Expect(node2.ToPath()).To(Equal("foo.io/bar/baz"))
+			Expect(node3.ToPath()).To(Equal("foo.io/bar/foo"))
+		})
+	})
+
 	It("applies a function to each node with a pool", func() {
 		p1 := route.NewPool(42, "")
 		p2 := route.NewPool(42, "")

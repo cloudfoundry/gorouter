@@ -236,6 +236,16 @@ func (r *Trie) Snip() {
 	r.Parent.Snip()
 }
 
+func (r *Trie) ToPath() string {
+	if r.Parent.isRoot() {
+		if len(r.ChildNodes) == 0 {
+			return r.Segment
+		}
+		return r.Segment
+	}
+	return r.Parent.ToPath() + "/" + r.Segment
+}
+
 func (r *Trie) ToMap() map[route.Uri]*route.Pool {
 	return r.toMap(r.Segment, make(map[route.Uri]*route.Pool))
 }
