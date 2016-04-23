@@ -1,50 +1,62 @@
 {
 	"ImportPath": "github.com/cloudfoundry/gorouter",
 	"GoVersion": "go1.4.3",
+	"GodepVersion": "v62",
 	"Packages": [
-		"./..."
+		"github.com/cloudfoundry/dropsonde"
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/nats-io/nats",
-			"Comment": "v1.1.2-1-gef51659",
-			"Rev": "ef5165913ac88c53c2e2be39f73f8314490ea5dd"
-		},
-		{
-			"ImportPath": "github.com/bmizerany/pat",
-			"Rev": "b8a35001b773c267eb260a691f4e5499a3531600"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/candiedyaml",
-			"Rev": "5f3b3579b3dc360c8ad3f86fe9e59e58c5652d10"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/cf-debug-server",
-			"Rev": "6e8c6102596e3fb6a17511f9f39fae64c89144a7"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/cf-lager",
-			"Rev": "f28b321dda1184e439717f60b9265103c3cc5537"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/cf_http",
-			"Rev": "db1bf7202e706de8d7460c1b54494ac7ab481a59"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
-			"Rev": "af69cc990ecc0d56cafad34d0be2a0737a198fd7"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/trace-logger",
-			"Rev": "24964ef4dbb527a373d4db141cbbd41eb21a56f9"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry-incubator/uaa-go-client",
-			"Rev": "a04a6ef497ee2890465ef6b1c1b823c6ac59a8ab"
-		},
-		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde",
-			"Rev": "52fc7868133f9e6aff3eb7e1574d0ccbf6c53867"
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/emitter",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/envelope_sender",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/envelopes",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/factories",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/instrumented_handler",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/instrumented_round_tripper",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/log_sender",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/logs",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/metric_sender",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/metricbatcher",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/metrics",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/dropsonde/runtime_stats",
+			"Rev": "9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/gosteno",
@@ -52,31 +64,13 @@
 			"Rev": "5c1406e9ea0ab919f92e1b194169565def41147b"
 		},
 		{
-			"ImportPath": "github.com/cloudfoundry/gunk/workpool",
-			"Rev": "1e83496bd55b10dde3ac60f22ab5058eaa4042e0"
+			"ImportPath": "github.com/cloudfoundry/gosteno/syslog",
+			"Comment": "scotty_09012012-41-g5c1406e",
+			"Rev": "5c1406e9ea0ab919f92e1b194169565def41147b"
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/sonde-go/events",
 			"Rev": "3d364d9ed49fee2f9fdcba278199127462cae3c4"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/storeadapter",
-			"Rev": "57139702b98a42708276747b53fb999a02f1342b"
-		},
-		{
-			"ImportPath": "github.com/codegangsta/cli",
-			"Comment": "1.2.0-139-g142e6cd",
-			"Rev": "142e6cd241a4dfbf7f07a018f1f8225180018da4"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v2.0.0-7-g73a8ef7",
-			"Rev": "73a8ef737e8ea002281a28b4cb92a1de121ad4c6"
-		},
-		{
-			"ImportPath": "github.com/dgrijalva/jwt-go",
-			"Comment": "v2.3.0-6-gf62f64e",
-			"Rev": "f62f64ea222e5e6d6d86421b5507b0862a3ebf7f"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",

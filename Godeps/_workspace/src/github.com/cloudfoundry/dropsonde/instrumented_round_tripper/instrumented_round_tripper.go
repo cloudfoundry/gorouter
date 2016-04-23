@@ -22,7 +22,8 @@ type instrumentedCancelableRoundTripper struct {
 }
 
 /*
-Helper for creating an InstrumentedRoundTripper which will delegate to the given RoundTripper
+InstrumentedRoundTripper is a helper for creating a "net/http".RoundTripper
+which will delegate to the given RoundTripper
 */
 func InstrumentedRoundTripper(roundTripper http.RoundTripper, emitter emitter.EventEmitter) http.RoundTripper {
 	irt := &instrumentedRoundTripper{roundTripper, emitter}
@@ -38,21 +39,23 @@ func InstrumentedRoundTripper(roundTripper http.RoundTripper, emitter emitter.Ev
 }
 
 /*
-Wraps the RoundTrip function of the given RoundTripper.
+RoundTrip wraps the RoundTrip function of the given RoundTripper.
 Will provide accounting metrics for the http.Request / http.Response life-cycle
 Callers of RoundTrip are responsible for setting the ‘X-Vcap-Request-Id’ field in the request header if they have one.
 Callers are also responsible for setting the ‘X-CF-ApplicationID’ and ‘X-CF-InstanceIndex’ fields in the request header if they are known.
 */
 func (irt *instrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	requestId, err := GenerateUuid()
-	if err != nil {
-		log.Printf("failed to generated request ID: %v\n", err)
-		requestId = &uuid.UUID{}
+	startTime := time.Now()
+	requestId := req.Header.Get("X-Vcap-Request-Id")
+	if requestId == "" {
+		requestIdGuid, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		requestId = requestIdGuid.String()
 	}
 
-	startTime := time.Now()
-	parentRequestId := req.Header.Get("X-Vcap-Request-Id")
-	req.Header.Set("X-Vcap-Request-Id", requestId.String())
+	req.Header.Set("X-Vcap-Request-Id", requestId)
 
 	resp, roundTripErr := irt.roundTripper.RoundTrip(req)
 
@@ -63,12 +66,12 @@ func (irt *instrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		contentLength = resp.ContentLength
 	}
 
-	httpStartStop := factories.NewHttpStartStop(req, statusCode, contentLength, events.PeerType_Client, requestId)
-	if parentRequestId != "" {
-		if id, err := uuid.ParseHex(parentRequestId); err == nil {
-			httpStartStop.ParentRequestId = factories.NewUUID(id)
-		}
+	id, err := uuid.ParseHex(requestId)
+	if err != nil {
+		return nil, err
 	}
+
+	httpStartStop := factories.NewHttpStartStop(req, statusCode, contentLength, events.PeerType_Client, id)
 	httpStartStop.StartTimestamp = proto.Int64(startTime.UnixNano())
 
 	err = irt.emitter.Emit(httpStartStop)
@@ -87,8 +90,6 @@ func (icrt *instrumentedCancelableRoundTripper) CancelRequest(req *http.Request)
 	cancelableTransport := icrt.instrumentedRoundTripper.roundTripper.(canceler)
 	cancelableTransport.CancelRequest(req)
 }
-
-var GenerateUuid = uuid.NewV4
 
 type canceler interface {
 	CancelRequest(*http.Request)

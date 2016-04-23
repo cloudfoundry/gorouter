@@ -2,11 +2,10 @@ package instrumented_handler
 
 import (
 	"bufio"
+	"log"
 	"net"
 	"net/http"
 	"time"
-
-	"log"
 
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
@@ -36,7 +35,7 @@ func (ih *instrumentedHandler) ServeHTTP(rw http.ResponseWriter, req *http.Reque
 	if err != nil {
 		requestId, err = GenerateUuid()
 		if err != nil {
-			log.Printf("failed to generated request ID: %v\n", err)
+			log.Printf("failed to generate request ID: %v\n", err)
 			requestId = &uuid.UUID{}
 		}
 		req.Header.Set("X-Vcap-Request-Id", requestId.String())
