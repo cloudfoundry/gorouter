@@ -616,8 +616,8 @@ var _ = Describe("Proxy", func() {
 		}
 
 		Eventually(findStartStopEvent).ShouldNot(BeNil())
-		Expect(findStartStopEvent().GetParentRequestId()).To(Equal(factories.NewUUID(requestId)))
 
+		Expect(findStartStopEvent().RequestId).To(Equal(factories.NewUUID(requestId)))
 		conn.ReadResponse()
 	})
 
