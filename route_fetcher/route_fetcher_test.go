@@ -294,7 +294,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("on specified interval", func() {
 			It("it fetches routes", func() {
-				// to be consumed by by the eventSource.NextStub to avoid starvation
+				// to be consumed by the eventSource.NextStub to avoid starvation
 				eventChannel <- routing_api.Event{}
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))

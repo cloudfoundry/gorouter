@@ -349,7 +349,7 @@ nats:
     pass: pass2
 `)
 
-			It("returns a slice of of the configured NATS servers", func() {
+			It("returns a slice of the configured NATS servers", func() {
 				config.Initialize(b)
 
 				natsServers := config.NatsServers()
@@ -390,7 +390,7 @@ route_services_secret: my-route-service-secret
 					})
 				})
 
-				Context("when the route service secret and the decrypt only route service secret are are set", func() {
+				Context("when the route service secret and the decrypt only route service secret are set", func() {
 					BeforeEach(func() {
 						configYaml = []byte(`
 route_services_secret: my-route-service-secret
@@ -462,7 +462,7 @@ ssl_key_path: ../test/assets/private.pem
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
-				It("returns a valid valid certificate", func() {
+				It("returns a valid certificate", func() {
 					expectedCertificate, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
 					Expect(err).ToNot(HaveOccurred())
 
