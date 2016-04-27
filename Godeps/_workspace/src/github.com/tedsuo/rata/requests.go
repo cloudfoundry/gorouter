@@ -8,7 +8,7 @@ import (
 )
 
 // RequestGenerator creates http.Request objects with the correct path and method
-// pre-filled for the given route object.  You can also set the the host and,
+// pre-filled for the given route object.  You can also set the host and,
 // optionally, any headers you would like included with every request.
 type RequestGenerator struct {
 	Header http.Header
