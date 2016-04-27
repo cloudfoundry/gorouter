@@ -67,7 +67,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		contextPath := parseContextPath(uri)
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byUri.Insert(uri, pool)
-		r.logger.Info("register", lager.Data{"uri": uri})
+		r.logger.Debug("register", lager.Data{"uri": uri})
 	}
 
 	pool.Put(endpoint)
@@ -90,7 +90,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		if pool.IsEmpty() {
 			r.byUri.Delete(uri)
 		}
-		r.logger.Info("unregister", lager.Data{"uri": uri})
+		r.logger.Debug("unregister", lager.Data{"uri": uri})
 	}
 
 	r.Unlock()
@@ -176,7 +176,7 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 	r.byUri.EachNodeWithPool(func(t *container.Trie) {
 		t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
-		r.logger.Info("prune", lager.Data{"uri": t.ToPath()})
+		r.logger.Debug("prune", lager.Data{"uri": t.ToPath()})
 	})
 	r.Unlock()
 }

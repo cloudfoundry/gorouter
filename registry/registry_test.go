@@ -149,14 +149,14 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("a.route", fooEndpoint)
 			})
 
-			It("logs at info level", func() {
-				Expect(logger).To(gbytes.Say(`register.*"log_level":1.*a\.route`))
+			It("logs at debug level", func() {
+				Expect(logger).To(gbytes.Say(`register.*"log_level":0.*a\.route`))
 			})
 
 			It("logs register message only for new routes", func() {
-				Expect(logger).To(gbytes.Say(`register.*"log_level":1.*a\.route`))
+				Expect(logger).To(gbytes.Say(`register.*.*a\.route`))
 				r.Register("a.route", fooEndpoint)
-				Expect(logger).NotTo(gbytes.Say(`register.*"log_level":1.*a\.route`))
+				Expect(logger).NotTo(gbytes.Say(`register.*.*a\.route`))
 			})
 		})
 	})
@@ -285,13 +285,13 @@ var _ = Describe("RouteRegistry", func() {
 				r.Unregister("a.route", fooEndpoint)
 			})
 
-			It("logs at info level", func() {
-				Expect(logger).To(gbytes.Say(`unregister.*"log_level":1.*a\.route`))
+			It("logs at debug level", func() {
+				Expect(logger).To(gbytes.Say(`unregister.*"log_level":0.*a\.route`))
 			})
 
 			It("only logs unregistration for existing routes", func() {
 				r.Unregister("non-existent-route", fooEndpoint)
-				Expect(logger).NotTo(gbytes.Say(`unregister.*"log_level":1.*a\.non-existent-route`))
+				Expect(logger).NotTo(gbytes.Say(`unregister.*.*a\.non-existent-route`))
 			})
 		})
 	})
@@ -408,7 +408,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`prune.*"log_level":1.*bar.com/path1/path2/path3`))
+			Expect(logger).To(gbytes.Say(`prune.*"log_level":0.*bar.com/path1/path2/path3`))
 		})
 
 		It("removes stale droplets", func() {
