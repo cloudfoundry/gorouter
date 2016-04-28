@@ -15,7 +15,7 @@ trap printStatus EXIT
 . $(dirname $0)/gorequired
 
 #Download & Install gnatsd into GOPATH (or use pre-installed version)
-go get -v github.com/apcera/gnatsd
+go get -v github.com/nats-io/gnatsd
 
 . $(dirname $0)/godep-env
 
