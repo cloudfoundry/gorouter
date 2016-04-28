@@ -1268,6 +1268,61 @@ var _ = Describe("Proxy", func() {
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 		})
 	})
+
+	Context("when using standard and non-standard method in request line", func() {
+		It("responds with a 200", func() {
+			ln := registerHandler(r, "test/path", func(conn *test_util.HttpConn) {
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			valid := []string{
+				" /path HTTP/1.1", // empty method defaults to GET
+				"HEAD /path HTTP/1.1",
+				"GET /path HTTP/1.1",
+				"PUT /path HTTP/1.1",
+				"POST /path HTTP/1.1",
+				"DELETE /path HTTP/1.1",
+				"CONNECT /path HTTP/1.1",
+				"OPTIONS /path HTTP/1.1",
+				"TRACE /path HTTP/1.1",
+				fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("A", 10)),
+				fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("B", 25)),
+				fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("C", 50)),
+				fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("D", 64)),
+			}
+
+			for _, requestLine := range valid {
+				conn := dialProxy(proxyServer)
+				conn.WriteLines([]string{
+					requestLine,
+					"Host: test",
+				})
+				conn.CheckLine("HTTP/1.1 200 OK")
+			}
+		})
+
+		Context("when custom method is too long", func() {
+			It("responds with a 400", func() {
+				invalid := []string{
+					fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("X", 65)),
+					fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("X", 100)),
+					fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("X", 128)),
+					fmt.Sprintf("%s /path HTTP/1.1", strings.Repeat("X", 256)),
+				}
+
+				for _, requestLine := range invalid {
+					conn := dialProxy(proxyServer)
+					conn.WriteLines([]string{
+						requestLine,
+						"Host: test",
+					})
+					conn.CheckLine("HTTP/1.1 400 Bad Request")
+				}
+			})
+		})
+	})
+
 })
 
 // HACK: this is used to silence any http warnings in logs

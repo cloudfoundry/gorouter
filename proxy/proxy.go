@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	VcapCookieId    = "__VCAP_ID__"
-	StickyCookieKey = "JSESSIONID"
+	VcapCookieId        = "__VCAP_ID__"
+	StickyCookieKey     = "JSESSIONID"
+	MaxHttpMethodLength = 64
 )
 
 type LookupRegistry interface {
@@ -163,6 +164,11 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	if !isProtocolSupported(request) {
 		handler.HandleUnsupportedProtocol()
+		return
+	}
+
+	if !isValidMethod(request) {
+		handler.HandleInvalidMethod()
 		return
 	}
 
@@ -419,6 +425,15 @@ func hasBeenToRouteService(rsUrl, sigHeader string) bool {
 
 func isProtocolSupported(request *http.Request) bool {
 	return request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1)
+}
+
+// Does not validate against specific HTTP methods as defined in RFC 7231
+// (HEAD, GET, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE)
+// because we do not want to limit against custom HTTP methods
+// however we should add an optional max length check on method so we don't
+// forward these potentially malicious / invalid requests
+func isValidMethod(request *http.Request) bool {
+	return len(request.Method) <= MaxHttpMethodLength
 }
 
 func isLoadBalancerHeartbeat(request *http.Request) bool {
