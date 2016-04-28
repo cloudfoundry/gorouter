@@ -91,6 +91,7 @@ var _ = JustBeforeEach(func() {
 		Crypto:                     crypto,
 		CryptoPrev:                 cryptoPrev,
 		RouteServiceRecommendHttps: recommendHttps,
+		MaxHttpMethodLength:        conf.MaxHttpMethodLength,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

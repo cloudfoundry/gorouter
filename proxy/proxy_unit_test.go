@@ -52,6 +52,7 @@ var _ = Describe("Proxy Unit tests", func() {
 				RouteServiceTimeout: conf.RouteServiceTimeout,
 				Crypto:              crypto,
 				CryptoPrev:          cryptoPrev,
+				MaxHttpMethodLength: conf.MaxHttpMethodLength,
 			})
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})

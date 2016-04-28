@@ -1272,6 +1272,8 @@ var _ = Describe("Proxy", func() {
 	Context("when using standard and non-standard method in request line", func() {
 		It("responds with a 200", func() {
 			ln := registerHandler(r, "test/path", func(conn *test_util.HttpConn) {
+				_, err := conn.Reader.ReadString('\n')
+				Expect(err).NotTo(HaveOccurred())
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
 			defer ln.Close()

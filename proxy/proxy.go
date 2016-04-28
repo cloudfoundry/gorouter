@@ -28,7 +28,7 @@ import (
 const (
 	VcapCookieId        = "__VCAP_ID__"
 	StickyCookieKey     = "JSESSIONID"
-	MaxHttpMethodLength = 64
+	MinHttpMethodLength = 7
 )
 
 type LookupRegistry interface {
@@ -57,6 +57,7 @@ type ProxyArgs struct {
 	CryptoPrev                 secure.Crypto
 	ExtraHeadersToLog          []string
 	Logger                     lager.Logger
+	MaxHttpMethodLength        int
 }
 
 type proxy struct {
@@ -72,6 +73,7 @@ type proxy struct {
 	routeServiceConfig         *route_service.RouteServiceConfig
 	extraHeadersToLog          []string
 	routeServiceRecommendHttps bool
+	maxHttpMethodLength        int
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -104,9 +106,16 @@ func NewProxy(args ProxyArgs) Proxy {
 		routeServiceConfig:         routeServiceConfig,
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
+		maxHttpMethodLength:        min(args.MaxHttpMethodLength, MinHttpMethodLength),
 	}
-
 	return p
+}
+
+func min(val, min int) int {
+	if val < min {
+		return min
+	}
+	return val
 }
 
 func hostWithoutPort(req *http.Request) string {
@@ -167,7 +176,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	if !isValidMethod(request) {
+	if !isValidMethod(request, p.maxHttpMethodLength) {
 		handler.HandleInvalidMethod()
 		return
 	}
@@ -432,8 +441,8 @@ func isProtocolSupported(request *http.Request) bool {
 // because we do not want to limit against custom HTTP methods
 // however we should add an optional max length check on method so we don't
 // forward these potentially malicious / invalid requests
-func isValidMethod(request *http.Request) bool {
-	return len(request.Method) <= MaxHttpMethodLength
+func isValidMethod(request *http.Request, maxLength int) bool {
+	return len(request.Method) <= maxLength
 }
 
 func isLoadBalancerHeartbeat(request *http.Request) bool {

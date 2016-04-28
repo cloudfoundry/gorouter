@@ -31,3 +31,5 @@ extra_headers_to_log:
   - Span-Id
   - Trace-Id
   - Cache-Control
+
+max_http_method_length: 64
