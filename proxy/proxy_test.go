@@ -1064,9 +1064,12 @@ var _ = Describe("Proxy", func() {
 		registerAddr(r, "retries", "", ip, "instanceId")
 
 		for i := 0; i < 5; i++ {
+			body := &bytes.Buffer{}
+			body.WriteString("use an actual body")
+
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "retries", "/", nil)
+			req := test_util.NewRequest("GET", "retries", "/", ioutil.NopCloser(body))
 			conn.WriteRequest(req)
 			resp, _ := conn.ReadResponse()
 
