@@ -11,7 +11,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/routing-api"
 	fake_routing_api "github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
-	apimodels "github.com/cloudfoundry-incubator/routing-api/models"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	testUaaClient "github.com/cloudfoundry-incubator/uaa-go-client/fakes"
 	"github.com/cloudfoundry-incubator/uaa-go-client/schema"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
@@ -45,7 +45,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		token *schema.Token
 
-		response     []apimodels.Route
+		response     []models.Route
 		process      ifrit.Process
 		eventChannel chan routing_api.Event
 		errorChannel chan error
@@ -99,7 +99,7 @@ var _ = Describe("RouteFetcher", func() {
 		BeforeEach(func() {
 			uaaClient.FetchTokenReturns(token, nil)
 
-			response = []apimodels.Route{
+			response = []models.Route{
 				{
 					Route:   "foo",
 					Port:    1,
@@ -161,7 +161,7 @@ var _ = Describe("RouteFetcher", func() {
 		Context("when a cached token is invalid", func() {
 			BeforeEach(func() {
 				count := 0
-				client.RoutesStub = func() ([]apimodels.Route, error) {
+				client.RoutesStub = func() ([]models.Route, error) {
 					if count == 0 {
 						count++
 						return nil, errors.New("unauthorized")
@@ -182,7 +182,7 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		It("removes unregistered routes", func() {
-			secondResponse := []apimodels.Route{
+			secondResponse := []models.Route{
 				response[0],
 			}
 
@@ -199,7 +199,7 @@ var _ = Describe("RouteFetcher", func() {
 			Expect(registry.RegisterCallCount()).To(Equal(4))
 			Expect(registry.UnregisterCallCount()).To(Equal(2))
 
-			expectedUnregisteredRoutes := []apimodels.Route{
+			expectedUnregisteredRoutes := []models.Route{
 				response[1],
 				response[2],
 			}
@@ -264,6 +264,81 @@ var _ = Describe("RouteFetcher", func() {
 				}).Should(BeNumerically(">", currentTokenFetchErrors))
 			})
 		})
+
+		Context("when events are received", func() {
+			var (
+				syncChannel chan struct{}
+				doneChannel chan struct{}
+				routes      []models.Route
+			)
+
+			invokeFetchRoutes := func(doneChannel chan struct{}) {
+				defer GinkgoRecover()
+				fetcher.FetchRoutes()
+				close(doneChannel)
+			}
+
+			BeforeEach(func() {
+				routes = []models.Route{
+					{
+						Route:   "foo",
+						Port:    1,
+						IP:      "1.1.1.1",
+						TTL:     1,
+						LogGuid: "guid",
+					},
+				}
+
+				doneChannel = make(chan struct{})
+				syncChannel = make(chan struct{})
+
+				tmpSyncChannel := syncChannel
+				client.RoutesStub = func() ([]models.Route, error) {
+					select {
+					case <-tmpSyncChannel:
+						return routes, nil
+					}
+				}
+			})
+
+			It("caches events and then applies the events after it completes syncing", func() {
+				go invokeFetchRoutes(doneChannel)
+				Eventually(fetcher.Syncing).Should(BeTrue())
+
+				event := routing_api.Event{
+					Action: "Upsert",
+					Route: models.Route{
+						Route:   "foo",
+						Port:    1,
+						IP:      "2.2.2.2",
+						TTL:     1,
+						LogGuid: "guid2",
+					},
+				}
+				fetcher.HandleEvent(event)
+				Eventually(logger).Should(gbytes.Say("caching-event"))
+
+				close(syncChannel)
+				Eventually(fetcher.Syncing).Should(BeFalse())
+				Eventually(doneChannel).Should(BeClosed())
+				Eventually(logger).Should(gbytes.Say("applied-cached-events"))
+				Expect(registry.RegisterCallCount()).To(Equal(2))
+
+				route1 := routes[0]
+				expectedUri := route.Uri(route1.Route)
+				expectedEndpoint := route.NewEndpoint(route1.LogGuid, route1.IP, uint16(route1.Port), route1.LogGuid, nil, route1.TTL, route1.RouteServiceUrl)
+				actualuri, actualendpoint := registry.RegisterArgsForCall(0)
+				Expect(expectedEndpoint).To(Equal(actualendpoint))
+				Expect(expectedUri).To(Equal(actualuri))
+
+				expectedUri = route.Uri(event.Route.Route)
+				expectedEndpoint = route.NewEndpoint(event.Route.LogGuid, event.Route.IP, uint16(event.Route.Port), event.Route.LogGuid, nil, event.Route.TTL, event.Route.RouteServiceUrl)
+				actualuri, actualendpoint = registry.RegisterArgsForCall(1)
+				Expect(expectedEndpoint).To(Equal(actualendpoint))
+				Expect(expectedUri).To(Equal(actualuri))
+			})
+		})
+
 	})
 
 	Describe("Run", func() {
@@ -329,7 +404,7 @@ var _ = Describe("RouteFetcher", func() {
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
 					eventChannel <- routing_api.Event{
 						Action: "Delete",
-						Route: apimodels.Route{
+						Route: models.Route{
 							Route:           "z.a.k",
 							Port:            63,
 							IP:              "42.42.42.42",
@@ -412,7 +487,7 @@ var _ = Describe("RouteFetcher", func() {
 	Describe("HandleEvent", func() {
 		Context("When the event is an Upsert", func() {
 			It("registers the route from the registry", func() {
-				eventRoute := apimodels.Route{
+				eventRoute := models.Route{
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",
@@ -445,7 +520,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("When the event is a DELETE", func() {
 			It("unregisters the route from the registry", func() {
-				eventRoute := apimodels.Route{
+				eventRoute := models.Route{
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",
