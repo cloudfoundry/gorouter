@@ -22,6 +22,7 @@ func (args Args) ArgSlice() []string {
 		"-ip", args.IP,
 		"-systemDomain", args.SystemDomain,
 		"-config", args.ConfigPath,
+		"-logLevel=debug",
 		"-devMode=" + strconv.FormatBool(args.DevMode),
 		args.EtcdCluster,
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/routing-api"
-	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	uaa_client "github.com/cloudfoundry-incubator/uaa-go-client"
 	"github.com/cloudfoundry-incubator/uaa-go-client/schema"
 	"github.com/cloudfoundry/dropsonde/metrics"
@@ -24,7 +24,7 @@ type RouteFetcher struct {
 	SubscriptionRetryIntervalInSeconds int
 
 	logger          lager.Logger
-	endpoints       []db.Route
+	endpoints       []models.Route
 	client          routing_api.Client
 	stopEventSource int32
 	eventSource     atomic.Value
@@ -161,7 +161,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	defer r.logger.Debug("syncer-fetch-routes-completed")
 	forceUpdate := false
 	var err error
-	var routes []db.Route
+	var routes []models.Route
 	for count := 0; count < 2; count++ {
 		r.logger.Debug("syncer-fetching-token")
 		token, tokenErr := r.UaaClient.FetchToken(forceUpdate)
@@ -191,7 +191,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 	return err
 }
 
-func (r *RouteFetcher) refreshEndpoints(validRoutes []db.Route) {
+func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 	r.deleteEndpoints(validRoutes)
 
 	r.endpoints = validRoutes
@@ -211,8 +211,8 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []db.Route) {
 	}
 }
 
-func (r *RouteFetcher) deleteEndpoints(validRoutes []db.Route) {
-	var diff []db.Route
+func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
+	var diff []models.Route
 
 	for _, curRoute := range r.endpoints {
 		routeFound := false
@@ -245,7 +245,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []db.Route) {
 	}
 }
 
-func routeEquals(current, desired db.Route) bool {
+func routeEquals(current, desired models.Route) bool {
 	if current.Route == desired.Route && current.IP == desired.IP && current.Port == desired.Port {
 		return true
 	}

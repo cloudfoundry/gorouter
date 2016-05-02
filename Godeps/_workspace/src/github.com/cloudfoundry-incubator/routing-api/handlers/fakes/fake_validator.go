@@ -5,50 +5,52 @@ import (
 	"sync"
 
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
-	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry-incubator/routing-api/handlers"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 )
 
 type FakeRouteValidator struct {
-	ValidateCreateStub        func(routes []db.Route, maxTTL int) *routing_api.Error
+	ValidateCreateStub        func(routes []models.Route, maxTTL int) *routing_api.Error
 	validateCreateMutex       sync.RWMutex
 	validateCreateArgsForCall []struct {
-		routes []db.Route
+		routes []models.Route
 		maxTTL int
 	}
 	validateCreateReturns struct {
 		result1 *routing_api.Error
 	}
-	ValidateDeleteStub        func(routes []db.Route) *routing_api.Error
+	ValidateDeleteStub        func(routes []models.Route) *routing_api.Error
 	validateDeleteMutex       sync.RWMutex
 	validateDeleteArgsForCall []struct {
-		routes []db.Route
+		routes []models.Route
 	}
 	validateDeleteReturns struct {
 		result1 *routing_api.Error
 	}
-	ValidateCreateTcpRouteMappingStub        func(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
+	ValidateCreateTcpRouteMappingStub        func(tcpRouteMappings []models.TcpRouteMapping, routerGroups models.RouterGroups, maxTTL uint16) *routing_api.Error
 	validateCreateTcpRouteMappingMutex       sync.RWMutex
 	validateCreateTcpRouteMappingArgsForCall []struct {
-		tcpRouteMappings []db.TcpRouteMapping
+		tcpRouteMappings []models.TcpRouteMapping
+		routerGroups     models.RouterGroups
+		maxTTL           uint16
 	}
 	validateCreateTcpRouteMappingReturns struct {
 		result1 *routing_api.Error
 	}
-	ValidateDeleteTcpRouteMappingStub        func(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error
+	ValidateDeleteTcpRouteMappingStub        func(tcpRouteMappings []models.TcpRouteMapping) *routing_api.Error
 	validateDeleteTcpRouteMappingMutex       sync.RWMutex
 	validateDeleteTcpRouteMappingArgsForCall []struct {
-		tcpRouteMappings []db.TcpRouteMapping
+		tcpRouteMappings []models.TcpRouteMapping
 	}
 	validateDeleteTcpRouteMappingReturns struct {
 		result1 *routing_api.Error
 	}
 }
 
-func (fake *FakeRouteValidator) ValidateCreate(routes []db.Route, maxTTL int) *routing_api.Error {
+func (fake *FakeRouteValidator) ValidateCreate(routes []models.Route, maxTTL int) *routing_api.Error {
 	fake.validateCreateMutex.Lock()
 	fake.validateCreateArgsForCall = append(fake.validateCreateArgsForCall, struct {
-		routes []db.Route
+		routes []models.Route
 		maxTTL int
 	}{routes, maxTTL})
 	fake.validateCreateMutex.Unlock()
@@ -65,7 +67,7 @@ func (fake *FakeRouteValidator) ValidateCreateCallCount() int {
 	return len(fake.validateCreateArgsForCall)
 }
 
-func (fake *FakeRouteValidator) ValidateCreateArgsForCall(i int) ([]db.Route, int) {
+func (fake *FakeRouteValidator) ValidateCreateArgsForCall(i int) ([]models.Route, int) {
 	fake.validateCreateMutex.RLock()
 	defer fake.validateCreateMutex.RUnlock()
 	return fake.validateCreateArgsForCall[i].routes, fake.validateCreateArgsForCall[i].maxTTL
@@ -78,10 +80,10 @@ func (fake *FakeRouteValidator) ValidateCreateReturns(result1 *routing_api.Error
 	}{result1}
 }
 
-func (fake *FakeRouteValidator) ValidateDelete(routes []db.Route) *routing_api.Error {
+func (fake *FakeRouteValidator) ValidateDelete(routes []models.Route) *routing_api.Error {
 	fake.validateDeleteMutex.Lock()
 	fake.validateDeleteArgsForCall = append(fake.validateDeleteArgsForCall, struct {
-		routes []db.Route
+		routes []models.Route
 	}{routes})
 	fake.validateDeleteMutex.Unlock()
 	if fake.ValidateDeleteStub != nil {
@@ -97,7 +99,7 @@ func (fake *FakeRouteValidator) ValidateDeleteCallCount() int {
 	return len(fake.validateDeleteArgsForCall)
 }
 
-func (fake *FakeRouteValidator) ValidateDeleteArgsForCall(i int) []db.Route {
+func (fake *FakeRouteValidator) ValidateDeleteArgsForCall(i int) []models.Route {
 	fake.validateDeleteMutex.RLock()
 	defer fake.validateDeleteMutex.RUnlock()
 	return fake.validateDeleteArgsForCall[i].routes
@@ -110,14 +112,16 @@ func (fake *FakeRouteValidator) ValidateDeleteReturns(result1 *routing_api.Error
 	}{result1}
 }
 
-func (fake *FakeRouteValidator) ValidateCreateTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
+func (fake *FakeRouteValidator) ValidateCreateTcpRouteMapping(tcpRouteMappings []models.TcpRouteMapping, routerGroups models.RouterGroups, maxTTL uint16) *routing_api.Error {
 	fake.validateCreateTcpRouteMappingMutex.Lock()
 	fake.validateCreateTcpRouteMappingArgsForCall = append(fake.validateCreateTcpRouteMappingArgsForCall, struct {
-		tcpRouteMappings []db.TcpRouteMapping
-	}{tcpRouteMappings})
+		tcpRouteMappings []models.TcpRouteMapping
+		routerGroups     models.RouterGroups
+		maxTTL           uint16
+	}{tcpRouteMappings, routerGroups, maxTTL})
 	fake.validateCreateTcpRouteMappingMutex.Unlock()
 	if fake.ValidateCreateTcpRouteMappingStub != nil {
-		return fake.ValidateCreateTcpRouteMappingStub(tcpRouteMappings)
+		return fake.ValidateCreateTcpRouteMappingStub(tcpRouteMappings, routerGroups, maxTTL)
 	} else {
 		return fake.validateCreateTcpRouteMappingReturns.result1
 	}
@@ -129,10 +133,10 @@ func (fake *FakeRouteValidator) ValidateCreateTcpRouteMappingCallCount() int {
 	return len(fake.validateCreateTcpRouteMappingArgsForCall)
 }
 
-func (fake *FakeRouteValidator) ValidateCreateTcpRouteMappingArgsForCall(i int) []db.TcpRouteMapping {
+func (fake *FakeRouteValidator) ValidateCreateTcpRouteMappingArgsForCall(i int) ([]models.TcpRouteMapping, models.RouterGroups, uint16) {
 	fake.validateCreateTcpRouteMappingMutex.RLock()
 	defer fake.validateCreateTcpRouteMappingMutex.RUnlock()
-	return fake.validateCreateTcpRouteMappingArgsForCall[i].tcpRouteMappings
+	return fake.validateCreateTcpRouteMappingArgsForCall[i].tcpRouteMappings, fake.validateCreateTcpRouteMappingArgsForCall[i].routerGroups, fake.validateCreateTcpRouteMappingArgsForCall[i].maxTTL
 }
 
 func (fake *FakeRouteValidator) ValidateCreateTcpRouteMappingReturns(result1 *routing_api.Error) {
@@ -142,10 +146,10 @@ func (fake *FakeRouteValidator) ValidateCreateTcpRouteMappingReturns(result1 *ro
 	}{result1}
 }
 
-func (fake *FakeRouteValidator) ValidateDeleteTcpRouteMapping(tcpRouteMappings []db.TcpRouteMapping) *routing_api.Error {
+func (fake *FakeRouteValidator) ValidateDeleteTcpRouteMapping(tcpRouteMappings []models.TcpRouteMapping) *routing_api.Error {
 	fake.validateDeleteTcpRouteMappingMutex.Lock()
 	fake.validateDeleteTcpRouteMappingArgsForCall = append(fake.validateDeleteTcpRouteMappingArgsForCall, struct {
-		tcpRouteMappings []db.TcpRouteMapping
+		tcpRouteMappings []models.TcpRouteMapping
 	}{tcpRouteMappings})
 	fake.validateDeleteTcpRouteMappingMutex.Unlock()
 	if fake.ValidateDeleteTcpRouteMappingStub != nil {
@@ -161,7 +165,7 @@ func (fake *FakeRouteValidator) ValidateDeleteTcpRouteMappingCallCount() int {
 	return len(fake.validateDeleteTcpRouteMappingArgsForCall)
 }
 
-func (fake *FakeRouteValidator) ValidateDeleteTcpRouteMappingArgsForCall(i int) []db.TcpRouteMapping {
+func (fake *FakeRouteValidator) ValidateDeleteTcpRouteMappingArgsForCall(i int) []models.TcpRouteMapping {
 	fake.validateDeleteTcpRouteMappingMutex.RLock()
 	defer fake.validateDeleteTcpRouteMappingMutex.RUnlock()
 	return fake.validateDeleteTcpRouteMappingArgsForCall[i].tcpRouteMappings

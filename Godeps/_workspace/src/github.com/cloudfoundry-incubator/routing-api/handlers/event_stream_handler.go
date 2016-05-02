@@ -1,33 +1,30 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry-incubator/routing-api/metrics"
-	"github.com/cloudfoundry/storeadapter"
+	uaaclient "github.com/cloudfoundry-incubator/uaa-go-client"
 	"github.com/pivotal-golang/lager"
 	"github.com/vito/go-sse/sse"
 )
 
 type EventStreamHandler struct {
-	tokenValidator authentication.TokenValidator
-	db             db.DB
-	logger         lager.Logger
-	stats          metrics.PartialStatsdClient
-	stopChan       <-chan struct{}
+	uaaClient uaaclient.Client
+	db        db.DB
+	logger    lager.Logger
+	stats     metrics.PartialStatsdClient
+	stopChan  <-chan struct{}
 }
 
-func NewEventStreamHandler(tokenValidator authentication.TokenValidator, database db.DB, logger lager.Logger, stats metrics.PartialStatsdClient, stopChan <-chan struct{}) *EventStreamHandler {
+func NewEventStreamHandler(uaaClient uaaclient.Client, database db.DB, logger lager.Logger, stats metrics.PartialStatsdClient) *EventStreamHandler {
 	return &EventStreamHandler{
-		tokenValidator: tokenValidator,
-		db:             database,
-		logger:         logger,
-		stats:          stats,
-		stopChan:       stopChan,
+		uaaClient: uaaClient,
+		db:        database,
+		logger:    logger,
+		stats:     stats,
 	}
 }
 
@@ -48,7 +45,7 @@ func (h *EventStreamHandler) TcpEventStream(w http.ResponseWriter, req *http.Req
 func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey string,
 	w http.ResponseWriter, req *http.Request) {
 
-	err := h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
+	err := h.uaaClient.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -56,7 +53,7 @@ func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey strin
 	flusher := w.(http.Flusher)
 	closeNotifier := w.(http.CloseNotifier).CloseNotify()
 
-	resultChan, cancelChan, errChan := h.db.WatchRouteChanges(filterKey)
+	resultChan, errChan, cancelFunc := h.db.WatchRouteChanges(filterKey)
 
 	w.Header().Add("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -70,27 +67,26 @@ func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey strin
 	for {
 		select {
 		case event := <-resultChan:
-			eventType, err := stringifyEventType(event.Type)
-			if eventType == "Invalid" || err != nil {
+			eventType := event.Type
+			if eventType == db.InvalidEvent {
+				h.logger.Info("invalid-event", lager.Data{"event": event})
 				return
 			}
 
-			var nodeValue []byte
+			var nodeValue string
 			switch eventType {
-			case "Delete":
+			case db.DeleteEvent, db.ExpireEvent:
 				nodeValue = event.PrevNode.Value
-			case "Create":
+			case db.CreateEvent:
 				nodeValue = event.Node.Value
-				eventType = "Upsert"
-			case "Update":
+			case db.UpdateEvent:
 				nodeValue = event.Node.Value
-				eventType = "Upsert"
 			}
 
 			err = sse.Event{
 				ID:   strconv.Itoa(eventID),
-				Name: string(eventType),
-				Data: nodeValue,
+				Name: eventType.String(),
+				Data: []byte(nodeValue),
 			}.Write(w)
 
 			if err != nil {
@@ -103,28 +99,10 @@ func (h *EventStreamHandler) handleEventStream(log lager.Logger, filterKey strin
 		case err := <-errChan:
 			log.Error("watch-error", err)
 			return
-		case <-h.stopChan:
-			log.Info("event-stream-stopped")
-			cancelChan <- true
-			return
 		case <-closeNotifier:
 			log.Info("connection-closed")
+			cancelFunc()
 			return
 		}
-	}
-}
-
-func stringifyEventType(eventType storeadapter.EventType) (string, error) {
-	switch eventType {
-	case storeadapter.InvalidEvent:
-		return "Invalid", nil
-	case storeadapter.CreateEvent:
-		return "Create", nil
-	case storeadapter.UpdateEvent:
-		return "Update", nil
-	case storeadapter.DeleteEvent, storeadapter.ExpireEvent:
-		return "Delete", nil
-	default:
-		return "", errors.New("Unknown event type")
 	}
 }

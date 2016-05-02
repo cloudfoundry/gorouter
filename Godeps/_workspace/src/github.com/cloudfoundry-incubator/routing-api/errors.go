@@ -23,4 +23,5 @@ const (
 	DBCommunicationError        = "DBCommunicationError"
 	UnauthorizedError           = "UnauthorizedError"
 	TcpRouteMappingInvalidError = "TcpRouteMappingInvalidError"
+	DBConflictError             = "DBConflictError"
 )

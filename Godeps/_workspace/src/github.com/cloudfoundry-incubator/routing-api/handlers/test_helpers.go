@@ -3,10 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	. "github.com/onsi/gomega"
 	"io"
 	"net/http"
 	"strings"
+
+	. "github.com/onsi/gomega"
 )
 
 func NewTestRequest(body interface{}) *http.Request {

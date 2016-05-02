@@ -1,7 +1,7 @@
 package db
 
 type DBError struct {
-	Type string
+	Type    string
 	Message string
 }
 
@@ -10,5 +10,7 @@ func (err DBError) Error() string {
 }
 
 const (
-	KeyNotFound = "KeyNotFound"
+	KeyNotFound       = "KeyNotFound"
+	NonUpdatableField = "NonUpdatableField"
+	UniqueField       = "UniqueField"
 )

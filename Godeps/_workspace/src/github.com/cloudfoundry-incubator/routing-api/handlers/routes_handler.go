@@ -4,22 +4,23 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/models"
+	uaaclient "github.com/cloudfoundry-incubator/uaa-go-client"
 	"github.com/pivotal-golang/lager"
 )
 
 type RoutesHandler struct {
-	token     authentication.TokenValidator
+	uaaClient uaaclient.Client
 	maxTTL    int
 	validator RouteValidator
 	db        db.DB
 	logger    lager.Logger
 }
 
-func NewRoutesHandler(token authentication.TokenValidator, maxTTL int, validator RouteValidator, database db.DB, logger lager.Logger) *RoutesHandler {
+func NewRoutesHandler(uaaClient uaaclient.Client, maxTTL int, validator RouteValidator, database db.DB, logger lager.Logger) *RoutesHandler {
 	return &RoutesHandler{
-		token:     token,
+		uaaClient: uaaClient,
 		maxTTL:    maxTTL,
 		validator: validator,
 		db:        database,
@@ -30,7 +31,7 @@ func NewRoutesHandler(token authentication.TokenValidator, maxTTL int, validator
 func (h *RoutesHandler) List(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("list-routes")
 
-	err := h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
+	err := h.uaaClient.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -48,7 +49,7 @@ func (h *RoutesHandler) Upsert(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("create-route")
 	decoder := json.NewDecoder(req.Body)
 
-	var routes []db.Route
+	var routes []models.Route
 	err := decoder.Decode(&routes)
 	if err != nil {
 		handleProcessRequestError(w, err, log)
@@ -57,7 +58,7 @@ func (h *RoutesHandler) Upsert(w http.ResponseWriter, req *http.Request) {
 
 	log.Info("request", lager.Data{"route_creation": routes})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
+	err = h.uaaClient.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
@@ -72,7 +73,11 @@ func (h *RoutesHandler) Upsert(w http.ResponseWriter, req *http.Request) {
 	for _, route := range routes {
 		err = h.db.SaveRoute(route)
 		if err != nil {
-			handleDBCommunicationError(w, err, log)
+			if err == db.ErrorConflict {
+				handleDBConflictError(w, err, log)
+			} else {
+				handleDBCommunicationError(w, err, log)
+			}
 			return
 		}
 	}
@@ -84,7 +89,7 @@ func (h *RoutesHandler) Delete(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.Session("delete-route")
 	decoder := json.NewDecoder(req.Body)
 
-	var routes []db.Route
+	var routes []models.Route
 	err := decoder.Decode(&routes)
 	if err != nil {
 		handleProcessRequestError(w, err, log)
@@ -93,7 +98,7 @@ func (h *RoutesHandler) Delete(w http.ResponseWriter, req *http.Request) {
 
 	log.Info("request", lager.Data{"route_deletion": routes})
 
-	err = h.token.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
+	err = h.uaaClient.DecodeToken(req.Header.Get("Authorization"), RoutingRoutesWriteScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return

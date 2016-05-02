@@ -12,16 +12,20 @@ import (
 	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/cloudfoundry-incubator/cf-debug-server"
 	routing_api "github.com/cloudfoundry-incubator/routing-api"
-	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/config"
 	"github.com/cloudfoundry-incubator/routing-api/db"
 	"github.com/cloudfoundry-incubator/routing-api/handlers"
 	"github.com/cloudfoundry-incubator/routing-api/helpers"
 	"github.com/cloudfoundry-incubator/routing-api/metrics"
+	"github.com/cloudfoundry-incubator/routing-api/models"
+	uaaclient "github.com/cloudfoundry-incubator/uaa-go-client"
+	uaaconfig "github.com/cloudfoundry-incubator/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
+	"github.com/nu7hatch/gouuid"
 	"github.com/pivotal-golang/lager"
 
 	cf_lager "github.com/cloudfoundry-incubator/cf-lager"
+	"github.com/pivotal-golang/clock"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
@@ -31,7 +35,7 @@ import (
 
 const DEFAULT_ETCD_WORKERS = 25
 
-var maxTTL = flag.Int("maxTTL", 120, "Maximum TTL on the route")
+var maxTTL = flag.Duration("maxTTL", 2*time.Minute, "Maximum TTL on the route")
 var port = flag.Uint("port", 8080, "Port to run rounting-api server on")
 var configPath = flag.String("config", "", "Configuration for routing-api")
 var devMode = flag.Bool("devMode", false, "Disable authentication for easier development iteration")
@@ -43,8 +47,9 @@ func route(f func(w http.ResponseWriter, r *http.Request)) http.Handler {
 }
 
 func main() {
-	flag.Parse()
 	cf_lager.AddFlags(flag.CommandLine)
+	flag.Parse()
+
 	logger, reconfigurableSink := cf_lager.New("routing-api")
 
 	err := checkFlags()
@@ -69,7 +74,8 @@ func main() {
 		cf_debug_server.Run(cfg.DebugAddress, reconfigurableSink)
 	}
 
-	database, err := initializeDatabase(cfg, logger)
+	logger.Info("database", lager.Data{"etcd-addresses": flag.Args()})
+	database, err := db.NewETCD(flag.Args())
 	if err != nil {
 		logger.Error("failed to initialize database", err)
 		os.Exit(1)
@@ -80,7 +86,10 @@ func main() {
 		logger.Error("failed to connect to database", err)
 		os.Exit(1)
 	}
-	defer database.Disconnect()
+	defer database.CancelWatches()
+
+	// seed router groups (one time only)
+	seedRouterGroups(cfg, logger, database)
 
 	prefix := "routing_api"
 	statsdClient, err := statsd.NewBufferedClient(cfg.StatsdEndpoint, prefix, cfg.StatsdClientFlushInterval, 512)
@@ -90,19 +99,18 @@ func main() {
 	}
 	defer statsdClient.Close()
 
-	stopChan := make(chan struct{})
-	apiServer := constructApiServer(cfg, database, statsdClient, stopChan, logger)
-	stopper := constructStopper(stopChan)
+	apiServer := constructApiServer(cfg, database, statsdClient, logger.Session("api-server"))
+	stopper := constructStopper(database)
 
-	routerRegister := constructRouteRegister(cfg.LogGuid, database, logger)
+	routerRegister := constructRouteRegister(cfg.LogGuid, database, logger.Session("route-register"))
 
 	metricsTicker := time.NewTicker(cfg.MetricsReportingInterval)
 	metricsReporter := metrics.NewMetricsReporter(database, statsdClient, metricsTicker)
 
 	members := grouper.Members{
-		{"metrics", metricsReporter},
 		{"api-server", apiServer},
 		{"conn-stopper", stopper},
+		{"metrics", metricsReporter},
 		{"route-register", routerRegister},
 	}
 
@@ -121,12 +129,36 @@ func main() {
 	logger.Info("exited")
 }
 
-func constructStopper(stopChan chan struct{}) ifrit.Runner {
+func seedRouterGroups(cfg config.Config, logger lager.Logger, database db.DB) {
+	// seed router groups from config
+	if len(cfg.RouterGroups) > 0 {
+		routerGroups, _ := database.ReadRouterGroups()
+		// if config not empty and db is empty, seed
+		if len(routerGroups) == 0 {
+			for _, rg := range cfg.RouterGroups {
+				guid, err := uuid.NewV4()
+				if err != nil {
+					logger.Error("failed to generate a guid for router group", err)
+					os.Exit(1)
+				}
+				rg.Guid = guid.String()
+				logger.Info("seeding", lager.Data{"router-group": rg})
+				err = database.SaveRouterGroup(rg)
+				if err != nil {
+					logger.Error("failed to save router group from config", err)
+					os.Exit(1)
+				}
+			}
+		}
+	}
+}
+
+func constructStopper(database db.DB) ifrit.Runner {
 	return ifrit.RunFunc(func(signals <-chan os.Signal, ready chan<- struct{}) error {
 		close(ready)
 		select {
 		case <-signals:
-			close(stopChan)
+			database.CancelWatches()
 		}
 
 		return nil
@@ -135,45 +167,39 @@ func constructStopper(stopChan chan struct{}) ifrit.Runner {
 
 func constructRouteRegister(logGuid string, database db.DB, logger lager.Logger) ifrit.Runner {
 	host := fmt.Sprintf("api.%s/routing", *systemDomain)
-	route := db.Route{
+	route := models.Route{
 		Route:   host,
 		Port:    uint16(*port),
 		IP:      *ip,
-		TTL:     *maxTTL,
+		TTL:     int(maxTTL.Seconds()),
 		LogGuid: logGuid,
 	}
 
-	registerInterval := *maxTTL / 2
+	registerInterval := int(maxTTL.Seconds()) / 2
 	ticker := time.NewTicker(time.Duration(registerInterval) * time.Second)
 
 	return helpers.NewRouteRegister(database, route, ticker, logger)
 }
 
-func constructApiServer(cfg config.Config, database db.DB, statsdClient statsd.Statter, stopChan chan struct{}, logger lager.Logger) ifrit.Runner {
-	var tokenValidator authentication.TokenValidator
+func constructApiServer(cfg config.Config, database db.DB, statsdClient statsd.Statter, logger lager.Logger) ifrit.Runner {
 
-	if *devMode {
-		tokenValidator = authentication.NullTokenValidator{}
-	} else {
-		uaaKeyFetcher := authentication.NewUaaKeyFetcher(logger, cfg.UAAEndpoint+"/token_key")
-		uaaPublicKey, err := uaaKeyFetcher.FetchKey()
-		if err != nil {
-			logger.Error("Failed to get verification key from UAA", err)
-			os.Exit(1)
-		}
-		tokenValidator = authentication.NewAccessTokenValidator(logger, uaaPublicKey, uaaKeyFetcher)
-		err = tokenValidator.CheckPublicToken()
-		if err != nil {
-			logger.Error("Failed to check public token", err)
-			os.Exit(1)
-		}
+	uaaClient, err := newUaaClient(logger, cfg)
+	if err != nil {
+		logger.Error("Failed to create uaa client", err)
+		os.Exit(1)
+	}
+
+	_, err = uaaClient.FetchKey()
+	if err != nil {
+		logger.Error("Failed to get verification key from UAA", err)
+		os.Exit(1)
 	}
 
 	validator := handlers.NewValidator()
-	routesHandler := handlers.NewRoutesHandler(tokenValidator, *maxTTL, validator, database, logger)
-	eventStreamHandler := handlers.NewEventStreamHandler(tokenValidator, database, logger, statsdClient, stopChan)
-	routeGroupsHandler := handlers.NewRouteGroupsHandler(tokenValidator, logger)
-	tcpMappingsHandler := handlers.NewTcpRouteMappingsHandler(tokenValidator, validator, database, logger)
+	routesHandler := handlers.NewRoutesHandler(uaaClient, int(maxTTL.Seconds()), validator, database, logger)
+	eventStreamHandler := handlers.NewEventStreamHandler(uaaClient, database, logger, statsdClient)
+	routeGroupsHandler := handlers.NewRouteGroupsHandler(uaaClient, logger, database)
+	tcpMappingsHandler := handlers.NewTcpRouteMappingsHandler(uaaClient, validator, database, int(maxTTL.Seconds()), logger)
 
 	actions := rata.Handlers{
 		routing_api.UpsertRoute:           route(routesHandler.Upsert),
@@ -197,14 +223,23 @@ func constructApiServer(cfg config.Config, database db.DB, statsdClient statsd.S
 	return http_server.New(":"+strconv.Itoa(int(*port)), handler)
 }
 
-func initializeDatabase(cfg config.Config, logger lager.Logger) (db.DB, error) {
-	logger.Info("database", lager.Data{"etcd-addresses": flag.Args()})
-	maxWorkers := cfg.MaxConcurrentETCDRequests
-	if maxWorkers <= 0 {
-		maxWorkers = DEFAULT_ETCD_WORKERS
+func newUaaClient(logger lager.Logger, routingApiConfig config.Config) (uaaclient.Client, error) {
+	if *devMode {
+		return uaaclient.NewNoOpUaaClient(), nil
 	}
 
-	return db.NewETCD(flag.Args(), maxWorkers)
+	if routingApiConfig.OAuth.Port == -1 {
+		logger.Fatal("tls-not-enabled", errors.New("GoRouter requires TLS enabled to get OAuth token"), lager.Data{"token-endpoint": routingApiConfig.OAuth.TokenEndpoint, "port": routingApiConfig.OAuth.Port})
+	}
+
+	scheme := "https"
+	tokenURL := fmt.Sprintf("%s://%s:%d", scheme, routingApiConfig.OAuth.TokenEndpoint, routingApiConfig.OAuth.Port)
+
+	cfg := &uaaconfig.Config{
+		UaaEndpoint:      tokenURL,
+		SkipVerification: routingApiConfig.OAuth.SkipOAuthTLSVerification,
+	}
+	return uaaclient.NewClient(logger, cfg, clock.NewClock())
 }
 
 func checkFlags() error {

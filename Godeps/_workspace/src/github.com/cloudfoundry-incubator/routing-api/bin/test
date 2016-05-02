@@ -4,4 +4,4 @@ set -e -u -x
 
 go vet ./...
 
-ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"
+ginkgo -r -p -failOnPending -randomizeAllSpecs -race "$@"

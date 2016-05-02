@@ -11,14 +11,14 @@ type FakeTcpEventSource struct {
 	NextStub        func() (routing_api.TcpEvent, error)
 	nextMutex       sync.RWMutex
 	nextArgsForCall []struct{}
-	nextReturns struct {
+	nextReturns     struct {
 		result1 routing_api.TcpEvent
 		result2 error
 	}
 	CloseStub        func() error
 	closeMutex       sync.RWMutex
 	closeArgsForCall []struct{}
-	closeReturns struct {
+	closeReturns     struct {
 		result1 error
 	}
 }

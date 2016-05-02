@@ -3,7 +3,7 @@ package routing_api
 import (
 	"encoding/json"
 
-	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	trace "github.com/cloudfoundry-incubator/trace-logger"
 	"github.com/vito/go-sse/sse"
 )
@@ -24,7 +24,7 @@ type eventSource struct {
 }
 
 type Event struct {
-	Route  db.Route
+	Route  models.Route
 	Action string
 }
 
@@ -41,7 +41,7 @@ type TcpEventSource interface {
 }
 
 type TcpEvent struct {
-	TcpRouteMapping db.TcpRouteMapping
+	TcpRouteMapping models.TcpRouteMapping
 	Action          string
 }
 
@@ -105,7 +105,7 @@ func doClose(rawEventSource RawEventSource) error {
 }
 
 func convertRawEvent(event sse.Event) (Event, error) {
-	var route db.Route
+	var route models.Route
 
 	err := json.Unmarshal(event.Data, &route)
 	if err != nil {
@@ -116,7 +116,7 @@ func convertRawEvent(event sse.Event) (Event, error) {
 }
 
 func convertRawToTcpEvent(event sse.Event) (TcpEvent, error) {
-	var route db.TcpRouteMapping
+	var route models.TcpRouteMapping
 
 	err := json.Unmarshal(event.Data, &route)
 	if err != nil {

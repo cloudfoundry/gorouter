@@ -10,8 +10,8 @@ import (
 	"github.com/pivotal-golang/lager/lagertest"
 
 	"github.com/cloudfoundry-incubator/routing-api"
-	"github.com/cloudfoundry-incubator/routing-api/db"
 	fake_routing_api "github.com/cloudfoundry-incubator/routing-api/fake_routing_api"
+	apimodels "github.com/cloudfoundry-incubator/routing-api/models"
 	testUaaClient "github.com/cloudfoundry-incubator/uaa-go-client/fakes"
 	"github.com/cloudfoundry-incubator/uaa-go-client/schema"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
@@ -45,7 +45,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		token *schema.Token
 
-		response     []db.Route
+		response     []apimodels.Route
 		process      ifrit.Process
 		eventChannel chan routing_api.Event
 		errorChannel chan error
@@ -99,7 +99,7 @@ var _ = Describe("RouteFetcher", func() {
 		BeforeEach(func() {
 			uaaClient.FetchTokenReturns(token, nil)
 
-			response = []db.Route{
+			response = []apimodels.Route{
 				{
 					Route:   "foo",
 					Port:    1,
@@ -161,7 +161,7 @@ var _ = Describe("RouteFetcher", func() {
 		Context("when a cached token is invalid", func() {
 			BeforeEach(func() {
 				count := 0
-				client.RoutesStub = func() ([]db.Route, error) {
+				client.RoutesStub = func() ([]apimodels.Route, error) {
 					if count == 0 {
 						count++
 						return nil, errors.New("unauthorized")
@@ -182,7 +182,7 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		It("removes unregistered routes", func() {
-			secondResponse := []db.Route{
+			secondResponse := []apimodels.Route{
 				response[0],
 			}
 
@@ -199,7 +199,7 @@ var _ = Describe("RouteFetcher", func() {
 			Expect(registry.RegisterCallCount()).To(Equal(4))
 			Expect(registry.UnregisterCallCount()).To(Equal(2))
 
-			expectedUnregisteredRoutes := []db.Route{
+			expectedUnregisteredRoutes := []apimodels.Route{
 				response[1],
 				response[2],
 			}
@@ -329,7 +329,7 @@ var _ = Describe("RouteFetcher", func() {
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
 					eventChannel <- routing_api.Event{
 						Action: "Delete",
-						Route: db.Route{
+						Route: apimodels.Route{
 							Route:           "z.a.k",
 							Port:            63,
 							IP:              "42.42.42.42",
@@ -412,7 +412,7 @@ var _ = Describe("RouteFetcher", func() {
 	Describe("HandleEvent", func() {
 		Context("When the event is an Upsert", func() {
 			It("registers the route from the registry", func() {
-				eventRoute := db.Route{
+				eventRoute := apimodels.Route{
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",
@@ -445,7 +445,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("When the event is a DELETE", func() {
 			It("unregisters the route from the registry", func() {
-				eventRoute := db.Route{
+				eventRoute := apimodels.Route{
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",

@@ -5,23 +5,18 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/pivotal-golang/lager"
-)
-
-const (
-	DefaultRouterGroupGuid = "bad25cff-9332-48a6-8603-b619858e7992"
-	DefaultRouterGroupName = "default-tcp"
-	DefaultRouterGroupType = "tcp"
 )
 
 type RouteRegister struct {
 	database db.DB
-	route    db.Route
+	route    models.Route
 	ticker   *time.Ticker
 	logger   lager.Logger
 }
 
-func NewRouteRegister(database db.DB, route db.Route, ticker *time.Ticker, logger lager.Logger) *RouteRegister {
+func NewRouteRegister(database db.DB, route models.Route, ticker *time.Ticker, logger lager.Logger) *RouteRegister {
 	return &RouteRegister{
 		database: database,
 		route:    route,
@@ -33,7 +28,7 @@ func NewRouteRegister(database db.DB, route db.Route, ticker *time.Ticker, logge
 func (r *RouteRegister) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	err := r.database.SaveRoute(r.route)
 	if err != nil {
-		r.logger.Error("Error registering self", err)
+		r.logger.Error("registration-error", err)
 	}
 	close(ready)
 
@@ -45,18 +40,10 @@ func (r *RouteRegister) Run(signals <-chan os.Signal, ready chan<- struct{}) err
 		case <-signals:
 			err := r.database.DeleteRoute(r.route)
 			if err != nil {
-				r.logger.Error("Error deleting route registration", err)
+				r.logger.Error("unregistration-error", err)
 				return err
 			}
 			return nil
 		}
-	}
-}
-
-func GetDefaultRouterGroup() db.RouterGroup {
-	return db.RouterGroup{
-		Guid: DefaultRouterGroupGuid,
-		Name: DefaultRouterGroupName,
-		Type: DefaultRouterGroupType,
 	}
 }

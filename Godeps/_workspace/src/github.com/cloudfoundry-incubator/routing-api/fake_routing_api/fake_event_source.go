@@ -11,14 +11,14 @@ type FakeEventSource struct {
 	NextStub        func() (routing_api.Event, error)
 	nextMutex       sync.RWMutex
 	nextArgsForCall []struct{}
-	nextReturns struct {
+	nextReturns     struct {
 		result1 routing_api.Event
 		result2 error
 	}
 	CloseStub        func() error
 	closeMutex       sync.RWMutex
 	closeArgsForCall []struct{}
-	closeReturns struct {
+	closeReturns     struct {
 		result1 error
 	}
 }

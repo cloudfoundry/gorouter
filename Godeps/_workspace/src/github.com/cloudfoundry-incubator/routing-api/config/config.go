@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/candiedyaml"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 )
 
 type MetronConfig struct {
@@ -13,17 +14,25 @@ type MetronConfig struct {
 	Port    string
 }
 
+type OAuthConfig struct {
+	TokenEndpoint            string `yaml:"token_endpoint"`
+	Port                     int    `yaml:"port"`
+	SkipOAuthTLSVerification bool   `yaml:"skip_oauth_tls_verification"`
+	ClientName               string `yaml:"client_name"`
+	ClientSecret             string `yaml:"client_secret"`
+}
+
 type Config struct {
-	UAAEndpoint                     string        `yaml:"uaa_url"`
-	DebugAddress                    string        `yaml:"debug_address"`
-	LogGuid                         string        `yaml:"log_guid"`
-	MetronConfig                    MetronConfig  `yaml:"metron_config"`
-	MetricsReportingIntervalString  string        `yaml:"metrics_reporting_interval"`
-	MetricsReportingInterval        time.Duration `yaml:"-"`
-	StatsdEndpoint                  string        `yaml:"statsd_endpoint"`
-	StatsdClientFlushIntervalString string        `yaml:"statsd_client_flush_interval"`
-	StatsdClientFlushInterval       time.Duration `yaml:"-"`
-	MaxConcurrentETCDRequests       uint          `yaml:"max_concurrent_etcd_requests"`
+	DebugAddress                    string              `yaml:"debug_address"`
+	LogGuid                         string              `yaml:"log_guid"`
+	MetronConfig                    MetronConfig        `yaml:"metron_config"`
+	MetricsReportingIntervalString  string              `yaml:"metrics_reporting_interval"`
+	MetricsReportingInterval        time.Duration       `yaml:"-"`
+	StatsdEndpoint                  string              `yaml:"statsd_endpoint"`
+	StatsdClientFlushIntervalString string              `yaml:"statsd_client_flush_interval"`
+	StatsdClientFlushInterval       time.Duration       `yaml:"-"`
+	OAuth                           OAuthConfig         `yaml:"oauth"`
+	RouterGroups                    models.RouterGroups `yaml:"router_groups"`
 }
 
 func NewConfigFromFile(configFile string, authDisabled bool) (Config, error) {
@@ -51,8 +60,12 @@ func (cfg *Config) Initialize(file []byte, authDisabled bool) error {
 		return errors.New("No log_guid specified")
 	}
 
-	if !authDisabled && cfg.UAAEndpoint == "" {
-		return errors.New("No UAA url specified")
+	if !authDisabled && cfg.OAuth.TokenEndpoint == "" {
+		return errors.New("No token endpoint specified")
+	}
+
+	if !authDisabled && cfg.OAuth.TokenEndpoint != "" && cfg.OAuth.Port == -1 {
+		return errors.New("Routing API requires TLS enabled to get OAuth token")
 	}
 
 	err = cfg.process()
@@ -76,6 +89,10 @@ func (cfg *Config) process() error {
 		return err
 	}
 	cfg.StatsdClientFlushInterval = statsdClientFlushInterval
+
+	if err := cfg.RouterGroups.Validate(); err != nil {
+		return err
+	}
 
 	return nil
 }

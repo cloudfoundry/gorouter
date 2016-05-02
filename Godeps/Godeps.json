@@ -73,6 +73,10 @@
 			"Rev": "3d364d9ed49fee2f9fdcba278199127462cae3c4"
 		},
 		{
+			"ImportPath": "github.com/cloudfoundry-incubator/routing-api",
+			"Rev": "7f2ae70666f243d5888e6e234d959b7944efa38d"
+		},
+		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
 			"Comment": "v0.1-55-g2093b57",
 			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"

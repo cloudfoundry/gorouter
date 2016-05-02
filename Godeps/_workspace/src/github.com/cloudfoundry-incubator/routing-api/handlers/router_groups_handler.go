@@ -5,21 +5,22 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/cloudfoundry-incubator/routing-api/authentication"
 	"github.com/cloudfoundry-incubator/routing-api/db"
-	"github.com/cloudfoundry-incubator/routing-api/helpers"
+	uaaclient "github.com/cloudfoundry-incubator/uaa-go-client"
 	"github.com/pivotal-golang/lager"
 )
 
 type RouterGroupsHandler struct {
-	tokenValidator authentication.TokenValidator
-	logger         lager.Logger
+	uaaClient uaaclient.Client
+	logger    lager.Logger
+	db        db.DB
 }
 
-func NewRouteGroupsHandler(tokenValidator authentication.TokenValidator, logger lager.Logger) *RouterGroupsHandler {
+func NewRouteGroupsHandler(uaaClient uaaclient.Client, logger lager.Logger, db db.DB) *RouterGroupsHandler {
 	return &RouterGroupsHandler{
-		tokenValidator: tokenValidator,
-		logger:         logger,
+		uaaClient: uaaClient,
+		logger:    logger,
+		db:        db,
 	}
 }
 
@@ -28,15 +29,18 @@ func (h *RouterGroupsHandler) ListRouterGroups(w http.ResponseWriter, req *http.
 	log.Debug("started")
 	defer log.Debug("completed")
 
-	err := h.tokenValidator.DecodeToken(req.Header.Get("Authorization"), RouterGroupsReadScope)
+	err := h.uaaClient.DecodeToken(req.Header.Get("Authorization"), RouterGroupsReadScope)
 	if err != nil {
 		handleUnauthorizedError(w, err, log)
 		return
 	}
 
-	defaultRouterGroup := helpers.GetDefaultRouterGroup()
+	routerGroups, err := h.db.ReadRouterGroups()
+	if err != nil {
+		handleDBCommunicationError(w, err, log)
+	}
 
-	jsonBytes, err := json.Marshal([]db.RouterGroup{defaultRouterGroup})
+	jsonBytes, err := json.Marshal(routerGroups)
 	if err != nil {
 		log.Error("failed-to-marshal", err)
 	}

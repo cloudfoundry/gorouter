@@ -2,6 +2,8 @@
 # for production systems
 log_guid: "my_logs"
 debug_address: "1.2.3.4:1234"
+oauth:
+  skip_oauth_tls_verification: true
 metron_config:
   address: "1.2.3.4"
   port: "4567"

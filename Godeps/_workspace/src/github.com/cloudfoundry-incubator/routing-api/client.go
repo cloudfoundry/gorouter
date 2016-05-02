@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/cf_http"
-	"github.com/cloudfoundry-incubator/routing-api/db"
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	trace "github.com/cloudfoundry-incubator/trace-logger"
 	"github.com/tedsuo/rata"
 	"github.com/vito/go-sse/sse"
@@ -22,13 +22,13 @@ const (
 //go:generate counterfeiter -o fake_routing_api/fake_client.go . Client
 type Client interface {
 	SetToken(string)
-	UpsertRoutes([]db.Route) error
-	Routes() ([]db.Route, error)
-	DeleteRoutes([]db.Route) error
-	RouterGroups() ([]db.RouterGroup, error)
-	UpsertTcpRouteMappings([]db.TcpRouteMapping) error
-	DeleteTcpRouteMappings([]db.TcpRouteMapping) error
-	TcpRouteMappings() ([]db.TcpRouteMapping, error)
+	UpsertRoutes([]models.Route) error
+	Routes() ([]models.Route, error)
+	DeleteRoutes([]models.Route) error
+	RouterGroups() ([]models.RouterGroup, error)
+	UpsertTcpRouteMappings([]models.TcpRouteMapping) error
+	DeleteTcpRouteMappings([]models.TcpRouteMapping) error
+	TcpRouteMappings() ([]models.TcpRouteMapping, error)
 
 	SubscribeToEvents() (EventSource, error)
 	SubscribeToEventsWithMaxRetries(retries uint16) (EventSource, error)
@@ -63,37 +63,37 @@ func (c *client) SetToken(token string) {
 	c.authToken = token
 }
 
-func (c *client) UpsertRoutes(routes []db.Route) error {
+func (c *client) UpsertRoutes(routes []models.Route) error {
 	return c.doRequest(UpsertRoute, nil, nil, routes, nil)
 }
 
-func (c *client) Routes() ([]db.Route, error) {
-	var routes []db.Route
+func (c *client) Routes() ([]models.Route, error) {
+	var routes []models.Route
 	err := c.doRequest(ListRoute, nil, nil, nil, &routes)
 	return routes, err
 }
 
-func (c *client) RouterGroups() ([]db.RouterGroup, error) {
-	var routerGroups []db.RouterGroup
+func (c *client) RouterGroups() ([]models.RouterGroup, error) {
+	var routerGroups []models.RouterGroup
 	err := c.doRequest(ListRouterGroups, nil, nil, nil, &routerGroups)
 	return routerGroups, err
 }
 
-func (c *client) DeleteRoutes(routes []db.Route) error {
+func (c *client) DeleteRoutes(routes []models.Route) error {
 	return c.doRequest(DeleteRoute, nil, nil, routes, nil)
 }
 
-func (c *client) UpsertTcpRouteMappings(tcpRouteMappings []db.TcpRouteMapping) error {
+func (c *client) UpsertTcpRouteMappings(tcpRouteMappings []models.TcpRouteMapping) error {
 	return c.doRequest(UpsertTcpRouteMapping, nil, nil, tcpRouteMappings, nil)
 }
 
-func (c *client) TcpRouteMappings() ([]db.TcpRouteMapping, error) {
-	var tcpRouteMappings []db.TcpRouteMapping
+func (c *client) TcpRouteMappings() ([]models.TcpRouteMapping, error) {
+	var tcpRouteMappings []models.TcpRouteMapping
 	err := c.doRequest(ListTcpRouteMapping, nil, nil, nil, &tcpRouteMappings)
 	return tcpRouteMappings, err
 }
 
-func (c *client) DeleteTcpRouteMappings(tcpRouteMappings []db.TcpRouteMapping) error {
+func (c *client) DeleteTcpRouteMappings(tcpRouteMappings []models.TcpRouteMapping) error {
 	return c.doRequest(DeleteTcpRouteMapping, nil, nil, tcpRouteMappings, nil)
 }
 

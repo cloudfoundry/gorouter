@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudfoundry-incubator/routing-api/db"
-	"github.com/cloudfoundry/storeadapter"
 )
 
 const (
@@ -41,8 +40,8 @@ func NewMetricsReporter(database db.DB, stats PartialStatsdClient, ticker *time.
 }
 
 func (r *MetricsReporter) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
-	httpEventChan, _, httpErrChan := r.db.WatchRouteChanges(db.HTTP_ROUTE_BASE_KEY)
-	tcpEventChan, _, tcpErrChan := r.db.WatchRouteChanges(db.TCP_MAPPING_BASE_KEY)
+	httpEventChan, httpErrChan, _ := r.db.WatchRouteChanges(db.HTTP_ROUTE_BASE_KEY)
+	tcpEventChan, tcpErrChan, _ := r.db.WatchRouteChanges(db.TCP_MAPPING_BASE_KEY)
 	close(ready)
 	ready = nil
 
@@ -85,10 +84,10 @@ func (r MetricsReporter) getTotalTcpRoutes() int64 {
 	return int64(len(routes))
 }
 
-func getStatsEventType(event storeadapter.WatchEvent) int64 {
-	if event.PrevNode == nil && event.Type == storeadapter.UpdateEvent {
+func getStatsEventType(event db.Event) int64 {
+	if event.PrevNode == nil && (event.Type == db.UpdateEvent || event.Type == db.CreateEvent) {
 		return 1
-	} else if event.Type == storeadapter.ExpireEvent || event.Type == storeadapter.DeleteEvent {
+	} else if event.Type == db.ExpireEvent || event.Type == db.DeleteEvent {
 		return -1
 	} else {
 		return 0
