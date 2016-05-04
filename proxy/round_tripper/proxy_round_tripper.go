@@ -1,7 +1,7 @@
 package round_tripper
 
 import (
-	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 
@@ -42,11 +42,10 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 	var endpoint *route.Endpoint
 
 	if request.Body != nil {
-		originalReqBody := request.Body
-		request.Body = NoOpCloseBody{Body: originalReqBody}
+		closer := request.Body
+		request.Body = ioutil.NopCloser(request.Body)
 		defer func() {
-			request.Body = originalReqBody
-			originalReqBody.Close()
+			closer.Close()
 		}()
 	}
 
@@ -140,17 +139,4 @@ func newRouteServiceEndpoint() *route.Endpoint {
 	return &route.Endpoint{
 		Tags: map[string]string{},
 	}
-}
-
-type NoOpCloseBody struct {
-	Body io.ReadCloser
-}
-
-func (w NoOpCloseBody) Read(p []byte) (n int, err error) {
-	return w.Body.Read(p)
-}
-
-func (w NoOpCloseBody) Close() error {
-	// no op close function because between retries we do not want to close request body
-	return nil
 }
