@@ -134,6 +134,8 @@ type Config struct {
 	TokenFetcherRetryIntervalInSeconds        int    `yaml:"token_fetcher_retry_interval"`
 	TokenFetcherExpirationBufferTimeInSeconds int64  `yaml:"token_fetcher_expiration_buffer_time"`
 
+	MaxHttpMethodLength int `yaml:"max_http_method_length"`
+
 	PidFile string `yaml:"pid_file"`
 }
 
@@ -159,6 +161,8 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryIntervalInSeconds:        5,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
+
+	MaxHttpMethodLength: 64,
 }
 
 func DefaultConfig() *Config {

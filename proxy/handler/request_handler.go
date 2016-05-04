@@ -92,6 +92,12 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 	conn.Close()
 }
 
+func (h *RequestHandler) HandleInvalidMethod() {
+	h.logger.Info("invalid-http-method")
+	h.writeStatus(http.StatusBadRequest, "invalid http method")
+	h.response.Done()
+}
+
 func (h *RequestHandler) HandleMissingRoute() {
 	h.logger.Info("unknown-route")
 

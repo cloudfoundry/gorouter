@@ -265,6 +265,11 @@ token_fetcher_expiration_buffer_time: 40
 			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(5))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(30)))
 		})
+
+		It("sets the default max http method length", func() {
+			Expect(config.MaxHttpMethodLength).To(Equal(64))
+		})
+
 	})
 
 	Describe("Process", func() {

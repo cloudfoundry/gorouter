@@ -92,13 +92,14 @@ var _ = Describe("Router", func() {
 		varz = vvarz.NewVarz(registry)
 		logcounter := schema.NewLogCounter()
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
-			EndpointTimeout: config.EndpointTimeout,
-			Logger:          logger,
-			Ip:              config.Ip,
-			TraceKey:        config.TraceKey,
-			Registry:        registry,
-			Reporter:        varz,
-			AccessLogger:    &access_log.NullAccessLogger{},
+			EndpointTimeout:     config.EndpointTimeout,
+			Logger:              logger,
+			Ip:                  config.Ip,
+			TraceKey:            config.TraceKey,
+			Registry:            registry,
+			Reporter:            varz,
+			AccessLogger:        &access_log.NullAccessLogger{},
+			MaxHttpMethodLength: config.MaxHttpMethodLength,
 		})
 
 		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, nil)
