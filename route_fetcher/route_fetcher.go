@@ -72,10 +72,12 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 	for {
 		select {
 		case <-ticker.C():
-			err := r.FetchRoutes()
-			if err != nil {
-				r.logger.Error("Failed to fetch routes: ", err)
-			}
+			go func() {
+				err := r.FetchRoutes()
+				if err != nil {
+					r.logger.Error("Failed to fetch routes: ", err)
+				}
+			}()
 
 		case e := <-r.eventChannel:
 			r.HandleEvent(e)

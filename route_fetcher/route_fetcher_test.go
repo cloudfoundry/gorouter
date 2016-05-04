@@ -56,7 +56,7 @@ var _ = Describe("RouteFetcher", func() {
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("test")
 		cfg = config.DefaultConfig()
-		cfg.PruneStaleDropletsInterval = 2 * time.Second
+		cfg.PruneStaleDropletsInterval = 2 * time.Millisecond
 
 		retryInterval := 0
 		uaaClient = &testUaaClient.FakeClient{}
@@ -265,20 +265,36 @@ var _ = Describe("RouteFetcher", func() {
 			})
 		})
 
+	})
+
+	Describe("Run", func() {
+		BeforeEach(func() {
+			uaaClient.FetchTokenReturns(token, nil)
+			client.RoutesReturns(response, nil)
+		})
+
+		JustBeforeEach(func() {
+			fetcher.FetchRoutesInterval = 10 * time.Millisecond
+			process = ifrit.Invoke(fetcher)
+		})
+
+		AfterEach(func() {
+			process.Signal(os.Interrupt)
+			Eventually(process.Wait(), 5*time.Second).Should(Receive())
+		})
+
+		It("subscribes for events", func() {
+			Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
+		})
+
 		Context("when events are received", func() {
 			var (
 				syncChannel chan struct{}
-				doneChannel chan struct{}
 				routes      []models.Route
 			)
 
-			invokeFetchRoutes := func(doneChannel chan struct{}) {
-				defer GinkgoRecover()
-				fetcher.FetchRoutes()
-				close(doneChannel)
-			}
-
 			BeforeEach(func() {
+
 				routes = []models.Route{
 					{
 						Route:   "foo",
@@ -289,7 +305,6 @@ var _ = Describe("RouteFetcher", func() {
 					},
 				}
 
-				doneChannel = make(chan struct{})
 				syncChannel = make(chan struct{})
 
 				tmpSyncChannel := syncChannel
@@ -302,7 +317,7 @@ var _ = Describe("RouteFetcher", func() {
 			})
 
 			It("caches events and then applies the events after it completes syncing", func() {
-				go invokeFetchRoutes(doneChannel)
+				clock.Increment(10 * time.Millisecond)
 				Eventually(fetcher.Syncing).Should(BeTrue())
 
 				event := routing_api.Event{
@@ -315,12 +330,11 @@ var _ = Describe("RouteFetcher", func() {
 						LogGuid: "guid2",
 					},
 				}
-				fetcher.HandleEvent(event)
+				eventChannel <- event
 				Eventually(logger).Should(gbytes.Say("caching-event"))
 
 				close(syncChannel)
 				Eventually(fetcher.Syncing).Should(BeFalse())
-				Eventually(doneChannel).Should(BeClosed())
 				Eventually(logger).Should(gbytes.Say("applied-cached-events"))
 				Expect(registry.RegisterCallCount()).To(Equal(2))
 
@@ -337,27 +351,6 @@ var _ = Describe("RouteFetcher", func() {
 				Expect(expectedEndpoint).To(Equal(actualendpoint))
 				Expect(expectedUri).To(Equal(actualuri))
 			})
-		})
-
-	})
-
-	Describe("Run", func() {
-		BeforeEach(func() {
-			uaaClient.FetchTokenReturns(token, nil)
-			client.RoutesReturns(response, nil)
-		})
-
-		JustBeforeEach(func() {
-			process = ifrit.Invoke(fetcher)
-		})
-
-		AfterEach(func() {
-			process.Signal(os.Interrupt)
-			Eventually(process.Wait(), 5*time.Second).Should(Receive())
-		})
-
-		It("subscribes for events", func() {
-			Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
 		})
 
 		Context("on specified interval", func() {
