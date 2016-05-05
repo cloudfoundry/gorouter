@@ -188,40 +188,59 @@ var _ = Describe("RouteRegistry", func() {
 					endpoint2 *route.Endpoint
 				)
 
-				BeforeEach(func() {
-					modTag.Increment()
-					endpoint2 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag)
-					r.Register("foo.com", endpoint2)
-				})
-
-				It("adds a new entry to the routing table", func() {
-					Expect(r.NumUris()).To(Equal(1))
-					Expect(r.NumEndpoints()).To(Equal(1))
-
-					p := r.Lookup("foo.com")
-					Expect(p.Endpoints("").Next().ModificationTag).To(Equal(modTag))
-				})
-
-				Context("updating an existing route with an older modification tag", func() {
-					var (
-						endpoint3 *route.Endpoint
-						modTag2   models.ModificationTag
-					)
+				Context("when modification tag index changes", func() {
 
 					BeforeEach(func() {
-						modTag2 = models.ModificationTag{Guid: "abc", Index: 0}
-						endpoint3 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag2)
-						r.Register("foo.com", endpoint3)
+						modTag.Increment()
+						endpoint2 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag)
+						r.Register("foo.com", endpoint2)
 					})
 
-					It("doesn't update endpoint with older mod tag", func() {
+					It("adds a new entry to the routing table", func() {
 						Expect(r.NumUris()).To(Equal(1))
 						Expect(r.NumEndpoints()).To(Equal(1))
 
 						p := r.Lookup("foo.com")
-						ep := p.Endpoints("").Next()
-						Expect(ep.ModificationTag).To(Equal(modTag))
-						Expect(ep).To(Equal(endpoint))
+						Expect(p.Endpoints("").Next().ModificationTag).To(Equal(modTag))
+					})
+
+					Context("updating an existing route with an older modification tag", func() {
+						var (
+							endpoint3 *route.Endpoint
+							modTag2   models.ModificationTag
+						)
+
+						BeforeEach(func() {
+							modTag2 = models.ModificationTag{Guid: "abc", Index: 0}
+							endpoint3 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag2)
+							r.Register("foo.com", endpoint3)
+						})
+
+						It("doesn't update endpoint with older mod tag", func() {
+							Expect(r.NumUris()).To(Equal(1))
+							Expect(r.NumEndpoints()).To(Equal(1))
+
+							p := r.Lookup("foo.com")
+							ep := p.Endpoints("").Next()
+							Expect(ep.ModificationTag).To(Equal(modTag))
+							Expect(ep).To(Equal(endpoint2))
+						})
+					})
+				})
+
+				Context("when modification tag guid changes", func() {
+					BeforeEach(func() {
+						modTag.Guid = "def"
+						endpoint2 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag)
+						r.Register("foo.com", endpoint2)
+					})
+
+					It("adds a new entry to the routing table", func() {
+						Expect(r.NumUris()).To(Equal(1))
+						Expect(r.NumEndpoints()).To(Equal(1))
+
+						p := r.Lookup("foo.com")
+						Expect(p.Endpoints("").Next().ModificationTag).To(Equal(modTag))
 					})
 				})
 			})
@@ -360,6 +379,38 @@ var _ = Describe("RouteRegistry", func() {
 			It("only logs unregistration for existing routes", func() {
 				r.Unregister("non-existent-route", fooEndpoint)
 				Expect(logger).NotTo(gbytes.Say(`unregister.*.*a\.non-existent-route`))
+			})
+		})
+
+		Context("with modification tags", func() {
+			var (
+				endpoint *route.Endpoint
+				modTag   models.ModificationTag
+			)
+
+			BeforeEach(func() {
+				modTag = models.ModificationTag{
+					Guid:  "abc",
+					Index: 10,
+				}
+				endpoint = route.NewEndpointWithModificationTag("", "192.168.1.1", 1234, "", nil, -1, "", modTag)
+				r.Register("foo.com", endpoint)
+				Expect(r.NumEndpoints()).To(Equal(1))
+			})
+
+			It("unregisters route with same modification tag", func() {
+				r.Unregister("foo.com", endpoint)
+				Expect(r.NumEndpoints()).To(Equal(0))
+			})
+
+			It("does not unregister route if modification tag older", func() {
+				modTag2 := models.ModificationTag{
+					Guid:  "abc",
+					Index: 8,
+				}
+				endpoint2 := route.NewEndpointWithModificationTag("", "192.168.1.1", 1234, "", nil, -1, "", modTag2)
+				r.Unregister("foo.com", endpoint2)
+				Expect(r.NumEndpoints()).To(Equal(1))
 			})
 		})
 	})

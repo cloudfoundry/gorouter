@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -37,7 +38,39 @@ var _ = Describe("Pool", func() {
 			endpoint2 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
 
 			pool.Put(endpoint1)
-			Expect(pool.Put(endpoint2)).To(BeFalse())
+			Expect(pool.Put(endpoint2)).To(BeTrue())
+		})
+
+		Context("with modification tags", func() {
+			var modTag models.ModificationTag
+
+			BeforeEach(func() {
+				modTag = models.ModificationTag{Guid: "abc"}
+				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+				Expect(pool.Put(endpoint1)).To(BeTrue())
+			})
+
+			It("updates an endpoint with modification tag", func() {
+				endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+				Expect(pool.Put(endpoint)).To(BeTrue())
+				Expect(pool.Endpoints("").Next().ModificationTag).To(Equal(modTag))
+			})
+
+			Context("when modification_tag is older", func() {
+				BeforeEach(func() {
+					modTag.Increment()
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+					pool.Put(endpoint)
+				})
+
+				It("doesnt update an endpoint", func() {
+					olderModTag := models.ModificationTag{Guid: "abc"}
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", olderModTag)
+
+					Expect(pool.Put(endpoint)).To(BeFalse())
+					Expect(pool.Endpoints("").Next().ModificationTag).To(Equal(modTag))
+				})
+			})
 		})
 	})
 
@@ -52,7 +85,7 @@ var _ = Describe("Pool", func() {
 			Expect(url).To(BeEmpty())
 
 			b = pool.Put(endpointRS)
-			Expect(b).To(BeFalse())
+			Expect(b).To(BeTrue())
 			url = pool.RouteServiceUrl()
 			Expect(url).To(Equal("my-url"))
 		})
@@ -80,6 +113,53 @@ var _ = Describe("Pool", func() {
 
 			b := pool.Remove(endpoint)
 			Expect(b).To(BeFalse())
+		})
+
+		Context("with modification tags", func() {
+
+			var modTag models.ModificationTag
+
+			BeforeEach(func() {
+				modTag = models.ModificationTag{Guid: "abc"}
+				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "")
+				Expect(pool.Put(endpoint1)).To(BeTrue())
+			})
+
+			It("removes an endpoint with modification tag", func() {
+				endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+				Expect(pool.Remove(endpoint)).To(BeTrue())
+				Expect(pool.IsEmpty()).To(BeTrue())
+			})
+
+			Context("when modification_tag is the same", func() {
+				BeforeEach(func() {
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+					pool.Put(endpoint)
+				})
+
+				It("removes an endpoint", func() {
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+
+					Expect(pool.Remove(endpoint)).To(BeTrue())
+					Expect(pool.IsEmpty()).To(BeTrue())
+				})
+			})
+
+			Context("when modification_tag is older", func() {
+				BeforeEach(func() {
+					modTag.Increment()
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+					pool.Put(endpoint)
+				})
+
+				It("doesnt remove an endpoint", func() {
+					olderModTag := models.ModificationTag{Guid: "abc"}
+					endpoint := route.NewEndpointWithModificationTag("", "1.2.3.4", 5678, "", nil, -1, "", olderModTag)
+
+					Expect(pool.Remove(endpoint)).To(BeFalse())
+					Expect(pool.IsEmpty()).To(BeFalse())
+				})
+			})
 		})
 	})
 

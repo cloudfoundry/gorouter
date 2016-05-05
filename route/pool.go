@@ -87,6 +87,7 @@ func (p *Pool) ContextPath() string {
 	return p.contextPath
 }
 
+// Returns true if endpoint was added or updated, false otherwise
 func (p *Pool) Put(endpoint *Endpoint) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -94,6 +95,11 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
 		if e.endpoint == endpoint {
+			return false
+		}
+
+		// check modification tag
+		if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
 			return false
 		}
 
@@ -118,7 +124,7 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 
 	e.updated = time.Now()
 
-	return !found
+	return true
 }
 
 func (p *Pool) RouteServiceUrl() string {
@@ -158,20 +164,22 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
 	p.lock.Unlock()
 }
 
+// Returns true if the endpoint was removed from the Pool, false otherwise.
 func (p *Pool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 
 	p.lock.Lock()
+	defer p.lock.Unlock()
 	l := len(p.endpoints)
 	if l > 0 {
 		e = p.index[endpoint.CanonicalAddr()]
-		if e != nil {
+		if e != nil && e.endpoint.modificationTagSameOrNewer(endpoint) {
 			p.removeEndpoint(e)
+			return true
 		}
 	}
-	p.lock.Unlock()
 
-	return e != nil
+	return false
 }
 
 func (p *Pool) removeEndpoint(e *endpointElem) {
@@ -363,4 +371,7 @@ func (e *Endpoint) ToLogData() interface{} {
 		e.Tags,
 		e.RouteServiceUrl,
 	}
+}
+func (e *Endpoint) modificationTagSameOrNewer(other *Endpoint) bool {
+	return e.ModificationTag == other.ModificationTag || e.ModificationTag.SucceededBy(&other.ModificationTag)
 }
