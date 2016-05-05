@@ -1,6 +1,7 @@
 package registry_test
 
 import (
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	. "github.com/cloudfoundry/gorouter/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -158,6 +159,73 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("a.route", fooEndpoint)
 				Expect(logger).NotTo(gbytes.Say(`register.*.*a\.route`))
 			})
+		})
+
+		Context("Modification Tags", func() {
+			var (
+				endpoint *route.Endpoint
+				modTag   models.ModificationTag
+			)
+
+			BeforeEach(func() {
+				modTag = models.ModificationTag{Guid: "abc"}
+				endpoint = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag)
+				r.Register("foo.com", endpoint)
+			})
+
+			Context("registering a new route", func() {
+				It("adds a new entry to the routing table", func() {
+					Expect(r.NumUris()).To(Equal(1))
+					Expect(r.NumEndpoints()).To(Equal(1))
+
+					p := r.Lookup("foo.com")
+					Expect(p.Endpoints("").Next().ModificationTag).To(Equal(modTag))
+				})
+			})
+
+			Context("updating an existing route", func() {
+				var (
+					endpoint2 *route.Endpoint
+				)
+
+				BeforeEach(func() {
+					modTag.Increment()
+					endpoint2 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag)
+					r.Register("foo.com", endpoint2)
+				})
+
+				It("adds a new entry to the routing table", func() {
+					Expect(r.NumUris()).To(Equal(1))
+					Expect(r.NumEndpoints()).To(Equal(1))
+
+					p := r.Lookup("foo.com")
+					Expect(p.Endpoints("").Next().ModificationTag).To(Equal(modTag))
+				})
+
+				Context("updating an existing route with an older modification tag", func() {
+					var (
+						endpoint3 *route.Endpoint
+						modTag2   models.ModificationTag
+					)
+
+					BeforeEach(func() {
+						modTag2 = models.ModificationTag{Guid: "abc", Index: 0}
+						endpoint3 = route.NewEndpointWithModificationTag("", "1.1.1.1", 1234, "", nil, -1, "", modTag2)
+						r.Register("foo.com", endpoint3)
+					})
+
+					It("doesn't update endpoint with older mod tag", func() {
+						Expect(r.NumUris()).To(Equal(1))
+						Expect(r.NumEndpoints()).To(Equal(1))
+
+						p := r.Lookup("foo.com")
+						ep := p.Endpoints("").Next()
+						Expect(ep.ModificationTag).To(Equal(modTag))
+						Expect(ep).To(Equal(endpoint))
+					})
+				})
+			})
+
 		})
 	})
 

@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/cloudfoundry-incubator/routing-api/models"
 )
 
 var random = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -17,6 +19,7 @@ type Endpoint struct {
 	PrivateInstanceId string
 	staleThreshold    time.Duration
 	RouteServiceUrl   string
+	ModificationTag   models.ModificationTag
 }
 
 type EndpointIterator interface {
@@ -60,6 +63,14 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
 		staleThreshold:    time.Duration(staleThresholdInSeconds) * time.Second,
 		RouteServiceUrl:   routeServiceUrl,
 	}
+}
+
+func NewEndpointWithModificationTag(appId, host string, port uint16, privateInstanceId string,
+	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string,
+	modificationTag models.ModificationTag) *Endpoint {
+	endpoint := NewEndpoint(appId, host, port, privateInstanceId, tags, staleThresholdInSeconds, routeServiceUrl)
+	endpoint.ModificationTag = modificationTag
+	return endpoint
 }
 
 func NewPool(retryAfterFailure time.Duration, contextPath string) *Pool {
