@@ -231,7 +231,7 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 		options.Servers = natsServers
 		options.PingInterval = c.NatsClientPingInterval
 		options.ClosedCB = func(conn *nats.Conn) {
-			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"connection": *conn})
+			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
 		}
 		natsClient, err = options.Connect()
 		if err == nil {
