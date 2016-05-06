@@ -63,12 +63,13 @@ func NewRouteFetcher(logger lager.Logger, uaaClient uaa_client.Client, routeRegi
 }
 
 func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
-	close(ready)
 	r.startEventCycle()
 
 	ticker := r.clock.NewTicker(r.FetchRoutesInterval)
 	r.logger.Debug("created-ticker", lager.Data{"interval": r.FetchRoutesInterval})
 	r.logger.Info("syncer-started")
+
+	close(ready)
 	for {
 		select {
 		case <-ticker.C():
