@@ -151,13 +151,13 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("logs at debug level", func() {
-				Expect(logger).To(gbytes.Say(`register.*"log_level":0.*a\.route`))
+				Expect(logger).To(gbytes.Say(`uri-added.*"log_level":0.*a\.route`))
 			})
 
 			It("logs register message only for new routes", func() {
-				Expect(logger).To(gbytes.Say(`register.*.*a\.route`))
+				Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
 				r.Register("a.route", fooEndpoint)
-				Expect(logger).NotTo(gbytes.Say(`register.*.*a\.route`))
+				Expect(logger).NotTo(gbytes.Say(`uri-added.*.*a\.route`))
 			})
 		})
 

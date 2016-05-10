@@ -149,7 +149,7 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 			r.logger.Error("Failed to get next event: ", err)
 			break
 		}
-		r.logger.Debug("Handling event: ", lager.Data{"event": event})
+		r.logger.Debug("received-event", lager.Data{"event": event})
 		r.eventChannel <- event
 	}
 	return err
@@ -160,7 +160,7 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 	defer r.lock.Unlock()
 
 	if r.syncing {
-		r.logger.Debug("caching-events")
+		r.logger.Debug("caching-events", lager.Data{"event": e})
 		r.cachedEvents = append(r.cachedEvents, e)
 	} else {
 		r.handleEvent(e)
@@ -170,7 +170,15 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 func (r *RouteFetcher) handleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
-	endpoint := route.NewEndpoint(eventRoute.LogGuid, eventRoute.IP, uint16(eventRoute.Port), eventRoute.LogGuid, nil, eventRoute.TTL, eventRoute.RouteServiceUrl)
+	endpoint := route.NewEndpointWithModificationTag(
+		eventRoute.LogGuid,
+		eventRoute.IP,
+		uint16(eventRoute.Port),
+		eventRoute.LogGuid,
+		nil,
+		eventRoute.TTL,
+		eventRoute.RouteServiceUrl,
+		eventRoute.ModificationTag)
 	switch e.Action {
 	case "Delete":
 		r.RouteRegistry.Unregister(uri, endpoint)
@@ -251,7 +259,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range r.endpoints {
 		r.RouteRegistry.Register(
 			route.Uri(aRoute.Route),
-			route.NewEndpoint(
+			route.NewEndpointWithModificationTag(
 				aRoute.LogGuid,
 				aRoute.IP,
 				uint16(aRoute.Port),
@@ -259,6 +267,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 				nil,
 				aRoute.TTL,
 				aRoute.RouteServiceUrl,
+				aRoute.ModificationTag,
 			))
 	}
 }
@@ -285,7 +294,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range diff {
 		r.RouteRegistry.Unregister(
 			route.Uri(aRoute.Route),
-			route.NewEndpoint(
+			route.NewEndpointWithModificationTag(
 				aRoute.LogGuid,
 				aRoute.IP,
 				uint16(aRoute.Port),
@@ -293,6 +302,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 				nil,
 				aRoute.TTL,
 				aRoute.RouteServiceUrl,
+				aRoute.ModificationTag,
 			))
 	}
 }

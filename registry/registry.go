@@ -55,6 +55,7 @@ func NewRouteRegistry(logger lager.Logger, c *config.Config, reporter reporter.R
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
+	data := lager.Data{"uri": uri, "backend": endpoint.CanonicalAddr(), "modification_tag": endpoint.ModificationTag}
 
 	r.reporter.CaptureRegistryMessage(endpoint)
 
@@ -67,16 +68,23 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		contextPath := parseContextPath(uri)
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byUri.Insert(uri, pool)
-		r.logger.Debug("register", lager.Data{"uri": uri})
+		r.logger.Debug("uri-added", lager.Data{"uri": uri})
 	}
 
-	pool.Put(endpoint)
+	endpointAdded := pool.Put(endpoint)
 
 	r.timeOfLastUpdate = t
 	r.Unlock()
+
+	if endpointAdded {
+		r.logger.Debug("endpoint-registered", data)
+	} else {
+		r.logger.Debug("endpoint-not-registered", data)
+	}
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+	data := lager.Data{"uri": uri, "backend": endpoint.CanonicalAddr(), "modification_tag": endpoint.ModificationTag}
 	r.reporter.CaptureRegistryMessage(endpoint)
 
 	r.Lock()
@@ -85,12 +93,16 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 
 	pool, found := r.byUri.Find(uri)
 	if found {
-		pool.Remove(endpoint)
+		endpointRemoved := pool.Remove(endpoint)
+		if endpointRemoved {
+			r.logger.Debug("endpoint-unregistered", data)
+		} else {
+			r.logger.Debug("endpoint-not-unregistered", data)
+		}
 
 		if pool.IsEmpty() {
 			r.byUri.Delete(uri)
 		}
-		r.logger.Debug("unregister", lager.Data{"uri": uri})
 	}
 
 	r.Unlock()
