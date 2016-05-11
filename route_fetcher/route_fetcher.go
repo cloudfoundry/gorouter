@@ -2,7 +2,6 @@ package route_fetcher
 
 import (
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,10 +22,6 @@ type RouteFetcher struct {
 	RouteRegistry                      registry.RegistryInterface
 	FetchRoutesInterval                time.Duration
 	SubscriptionRetryIntervalInSeconds int
-
-	lock         *sync.Mutex
-	syncing      bool
-	cachedEvents []routing_api.Event
 
 	logger          lager.Logger
 	endpoints       []models.Route
@@ -53,11 +48,8 @@ func NewRouteFetcher(logger lager.Logger, uaaClient uaa_client.Client, routeRegi
 		SubscriptionRetryIntervalInSeconds: subscriptionRetryInterval,
 
 		client:       client,
-		lock:         new(sync.Mutex),
-		syncing:      false,
-		cachedEvents: nil,
 		logger:       logger,
-		eventChannel: make(chan routing_api.Event),
+		eventChannel: make(chan routing_api.Event, 1024),
 		clock:        clock,
 	}
 }
@@ -73,13 +65,10 @@ func (r *RouteFetcher) Run(signals <-chan os.Signal, ready chan<- struct{}) erro
 	for {
 		select {
 		case <-ticker.C():
-			go func() {
-				err := r.FetchRoutes()
-				if err != nil {
-					r.logger.Error("Failed to fetch routes: ", err)
-				}
-			}()
-
+			err := r.FetchRoutes()
+			if err != nil {
+				r.logger.Error("Failed to fetch routes: ", err)
+			}
 		case e := <-r.eventChannel:
 			r.HandleEvent(e)
 
@@ -156,18 +145,6 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 }
 
 func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	if r.syncing {
-		r.logger.Debug("caching-events", lager.Data{"event": e})
-		r.cachedEvents = append(r.cachedEvents, e)
-	} else {
-		r.handleEvent(e)
-	}
-}
-
-func (r *RouteFetcher) handleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
 	endpoint := route.NewEndpointWithModificationTag(
@@ -190,19 +167,7 @@ func (r *RouteFetcher) handleEvent(e routing_api.Event) {
 func (r *RouteFetcher) FetchRoutes() error {
 	r.logger.Debug("syncer-fetch-routes-started")
 
-	defer func() {
-		r.logger.Debug("syncer-fetch-routes-completed")
-		r.lock.Lock()
-		r.applyCachedEvents()
-		r.syncing = false
-		r.cachedEvents = nil
-		r.lock.Unlock()
-	}()
-
-	r.lock.Lock()
-	r.syncing = true
-	r.cachedEvents = []routing_api.Event{}
-	r.lock.Unlock()
+	defer r.logger.Debug("syncer-fetch-routes-completed")
 
 	forceUpdate := false
 	var err error
@@ -234,21 +199,6 @@ func (r *RouteFetcher) FetchRoutes() error {
 	}
 
 	return err
-}
-
-func (r *RouteFetcher) applyCachedEvents() {
-	r.logger.Debug("applying-cached-events", lager.Data{"cache_size": len(r.cachedEvents)})
-	defer r.logger.Debug("applied-cached-events")
-
-	for _, e := range r.cachedEvents {
-		r.handleEvent(e)
-	}
-}
-
-func (r *RouteFetcher) Syncing() bool {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	return r.syncing
 }
 
 func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {

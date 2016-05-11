@@ -289,8 +289,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("when events are received", func() {
 			var (
-				syncChannel chan struct{}
-				routes      []models.Route
+				routes []models.Route
 			)
 
 			BeforeEach(func() {
@@ -305,20 +304,11 @@ var _ = Describe("RouteFetcher", func() {
 					},
 				}
 
-				syncChannel = make(chan struct{})
-
-				tmpSyncChannel := syncChannel
-				client.RoutesStub = func() ([]models.Route, error) {
-					select {
-					case <-tmpSyncChannel:
-						return routes, nil
-					}
-				}
+				client.RoutesReturns(routes, nil)
 			})
 
 			It("caches events and then applies the events after it completes syncing", func() {
 				clock.Increment(10 * time.Millisecond)
-				Eventually(fetcher.Syncing).Should(BeTrue())
 
 				event := routing_api.Event{
 					Action: "Upsert",
@@ -331,12 +321,8 @@ var _ = Describe("RouteFetcher", func() {
 					},
 				}
 				eventChannel <- event
-				Eventually(logger).Should(gbytes.Say("caching-event"))
 
-				close(syncChannel)
-				Eventually(fetcher.Syncing).Should(BeFalse())
-				Eventually(logger).Should(gbytes.Say("applied-cached-events"))
-				Expect(registry.RegisterCallCount()).To(Equal(2))
+				Eventually(registry.RegisterCallCount()).Should(Equal(2))
 
 				route1 := routes[0]
 				expectedUri := route.Uri(route1.Route)
