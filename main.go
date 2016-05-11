@@ -62,7 +62,7 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, _ := cf_lager.New(prefix)
+	logger, reconfigurableSink := cf_lager.New(prefix)
 	InitLoggerFromConfig(logger, c, logCounter)
 
 	logger.Info("starting")
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		cf_debug_server.Run(c.DebugAddr)
+		cf_debug_server.Run(c.DebugAddr, reconfigurableSink)
 	}
 
 	logger.Info("setting-up-nats-connection")

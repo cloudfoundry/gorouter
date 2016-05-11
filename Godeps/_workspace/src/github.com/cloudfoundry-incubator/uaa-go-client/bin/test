@@ -1,9 +1,0 @@
-#!/bin/bash
-
-set -e -u -x
-
-. $(dirname $0)/godep-env
-
-go install -v github.com/onsi/ginkgo/ginkgo
-
-ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"
