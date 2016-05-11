@@ -145,6 +145,7 @@ var _ = Describe("RouteFetcher", func() {
 						nil,
 						expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
+						expectedRoute.ModificationTag,
 					)))
 			}
 		})
@@ -216,6 +217,7 @@ var _ = Describe("RouteFetcher", func() {
 						nil,
 						expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
+						expectedRoute.ModificationTag,
 					)))
 			}
 		})
@@ -285,58 +287,6 @@ var _ = Describe("RouteFetcher", func() {
 
 		It("subscribes for events", func() {
 			Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
-		})
-
-		Context("when events are received", func() {
-			var (
-				routes []models.Route
-			)
-
-			BeforeEach(func() {
-
-				routes = []models.Route{
-					{
-						Route:   "foo",
-						Port:    1,
-						IP:      "1.1.1.1",
-						TTL:     1,
-						LogGuid: "guid",
-					},
-				}
-
-				client.RoutesReturns(routes, nil)
-			})
-
-			It("caches events and then applies the events after it completes syncing", func() {
-				clock.Increment(10 * time.Millisecond)
-
-				event := routing_api.Event{
-					Action: "Upsert",
-					Route: models.Route{
-						Route:   "foo",
-						Port:    1,
-						IP:      "2.2.2.2",
-						TTL:     1,
-						LogGuid: "guid2",
-					},
-				}
-				eventChannel <- event
-
-				Eventually(registry.RegisterCallCount()).Should(Equal(2))
-
-				route1 := routes[0]
-				expectedUri := route.Uri(route1.Route)
-				expectedEndpoint := route.NewEndpoint(route1.LogGuid, route1.IP, uint16(route1.Port), route1.LogGuid, nil, route1.TTL, route1.RouteServiceUrl)
-				actualuri, actualendpoint := registry.RegisterArgsForCall(0)
-				Expect(expectedEndpoint).To(Equal(actualendpoint))
-				Expect(expectedUri).To(Equal(actualuri))
-
-				expectedUri = route.Uri(event.Route.Route)
-				expectedEndpoint = route.NewEndpoint(event.Route.LogGuid, event.Route.IP, uint16(event.Route.Port), event.Route.LogGuid, nil, event.Route.TTL, event.Route.RouteServiceUrl)
-				actualuri, actualendpoint = registry.RegisterArgsForCall(1)
-				Expect(expectedEndpoint).To(Equal(actualendpoint))
-				Expect(expectedUri).To(Equal(actualuri))
-			})
 		})
 
 		Context("on specified interval", func() {
@@ -493,6 +443,7 @@ var _ = Describe("RouteFetcher", func() {
 						nil,
 						eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
+						eventRoute.ModificationTag,
 					)))
 			})
 		})
@@ -526,6 +477,7 @@ var _ = Describe("RouteFetcher", func() {
 						nil,
 						eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
+						eventRoute.ModificationTag,
 					)))
 			})
 		})

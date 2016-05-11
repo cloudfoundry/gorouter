@@ -147,7 +147,7 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
-	endpoint := route.NewEndpointWithModificationTag(
+	endpoint := route.NewEndpoint(
 		eventRoute.LogGuid,
 		eventRoute.IP,
 		uint16(eventRoute.Port),
@@ -209,7 +209,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range r.endpoints {
 		r.RouteRegistry.Register(
 			route.Uri(aRoute.Route),
-			route.NewEndpointWithModificationTag(
+			route.NewEndpoint(
 				aRoute.LogGuid,
 				aRoute.IP,
 				uint16(aRoute.Port),
@@ -244,7 +244,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range diff {
 		r.RouteRegistry.Unregister(
 			route.Uri(aRoute.Route),
-			route.NewEndpointWithModificationTag(
+			route.NewEndpoint(
 				aRoute.LogGuid,
 				aRoute.IP,
 				uint16(aRoute.Port),

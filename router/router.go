@@ -8,6 +8,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/common"
 	"github.com/cloudfoundry/gorouter/common/health"
@@ -403,8 +404,6 @@ func (r *Router) RegisterComponent() {
 
 func (r *Router) SubscribeRegister() {
 	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
-		//r.logger.Debug("Got router.register:", lager.Data{"registry Message": registryMessage})
-
 		for _, uri := range registryMessage.Uris {
 			r.registry.Register(
 				uri,
@@ -416,8 +415,6 @@ func (r *Router) SubscribeRegister() {
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *RegistryMessage) {
-		r.logger.Debug("Got router.unregister:", lager.Data{"registry Message": registryMessage})
-
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(
 				uri,
@@ -563,9 +560,6 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 			return
 		}
 
-		//logMessage := fmt.Sprintf("%s: Received message", subject)
-		//r.logger.Debug(logMessage, lager.Data{"message": msg})
-
 		if !msg.ValidateMessage() {
 			logMessage := fmt.Sprintf("%s: Unable to validate message. route_service_url must be https", subject)
 			r.logger.Info(logMessage, lager.Data{"message": msg})
@@ -582,7 +576,15 @@ func (r *Router) subscribeRegistry(subject string, successCallback func(*Registr
 }
 
 func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
-	return route.NewEndpoint(rm.App, rm.Host, rm.Port, rm.PrivateInstanceId, rm.Tags, rm.StaleThresholdInSeconds, rm.RouteServiceUrl)
+	return route.NewEndpoint(
+		rm.App,
+		rm.Host,
+		rm.Port,
+		rm.PrivateInstanceId,
+		rm.Tags,
+		rm.StaleThresholdInSeconds,
+		rm.RouteServiceUrl,
+		models.ModificationTag{})
 }
 
 func (rm *RegistryMessage) ValidateMessage() bool {

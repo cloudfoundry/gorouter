@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	"github.com/cloudfoundry/dropsonde/logs"
 	. "github.com/cloudfoundry/gorouter/access_log"
@@ -61,7 +62,7 @@ var _ = Describe("AccessLog", func() {
 
 				accessLogger := NewFileAndLoggregatorAccessLogger(logger, "43")
 
-				routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "")
+				routeEndpoint := route.NewEndpoint("", "127.0.0.1", 4567, "", nil, -1, "", models.ModificationTag{})
 
 				accessLogRecord := CreateAccessLogRecord()
 				accessLogRecord.RouteEndpoint = routeEndpoint
@@ -231,7 +232,7 @@ func CreateAccessLogRecord() *schema.AccessLogRecord {
 		StatusCode: http.StatusOK,
 	}
 
-	b := route.NewEndpoint("my_awesome_id", "127.0.0.1", 4567, "", nil, -1, "")
+	b := route.NewEndpoint("my_awesome_id", "127.0.0.1", 4567, "", nil, -1, "", models.ModificationTag{})
 
 	r := schema.AccessLogRecord{
 		Request:       req,

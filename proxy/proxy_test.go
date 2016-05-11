@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/factories"
@@ -1289,7 +1290,7 @@ func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl stri
 	port, err := strconv.Atoi(portStr)
 	Expect(err).NotTo(HaveOccurred())
 
-	reg.Register(route.Uri(path), route.NewEndpoint("", host, uint16(port), instanceId, nil, -1, routeServiceUrl))
+	reg.Register(route.Uri(path), route.NewEndpoint("", host, uint16(port), instanceId, nil, -1, routeServiceUrl, models.ModificationTag{}))
 }
 
 func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {

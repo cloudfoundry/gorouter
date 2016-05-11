@@ -54,7 +54,7 @@ type Pool struct {
 }
 
 func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
-	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string) *Endpoint {
+	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string, modificationTag models.ModificationTag) *Endpoint {
 	return &Endpoint{
 		ApplicationId:     appId,
 		addr:              fmt.Sprintf("%s:%d", host, port),
@@ -62,15 +62,8 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
 		PrivateInstanceId: privateInstanceId,
 		staleThreshold:    time.Duration(staleThresholdInSeconds) * time.Second,
 		RouteServiceUrl:   routeServiceUrl,
+		ModificationTag:   modificationTag,
 	}
-}
-
-func NewEndpointWithModificationTag(appId, host string, port uint16, privateInstanceId string,
-	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string,
-	modificationTag models.ModificationTag) *Endpoint {
-	endpoint := NewEndpoint(appId, host, port, privateInstanceId, tags, staleThresholdInSeconds, routeServiceUrl)
-	endpoint.ModificationTag = modificationTag
-	return endpoint
 }
 
 func NewPool(retryAfterFailure time.Duration, contextPath string) *Pool {
