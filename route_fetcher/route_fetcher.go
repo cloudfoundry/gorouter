@@ -153,7 +153,7 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 		uint16(eventRoute.Port),
 		eventRoute.LogGuid,
 		nil,
-		eventRoute.TTL,
+		eventRoute.GetTTL(),
 		eventRoute.RouteServiceUrl,
 		eventRoute.ModificationTag)
 	switch e.Action {
@@ -215,7 +215,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 				uint16(aRoute.Port),
 				aRoute.LogGuid,
 				nil,
-				aRoute.TTL,
+				aRoute.GetTTL(),
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
 			))
@@ -250,7 +250,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 				uint16(aRoute.Port),
 				aRoute.LogGuid,
 				nil,
-				aRoute.TTL,
+				aRoute.GetTTL(),
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
 			))

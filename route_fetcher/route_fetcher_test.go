@@ -104,14 +104,14 @@ var _ = Describe("RouteFetcher", func() {
 					Route:   "foo",
 					Port:    1,
 					IP:      "1.1.1.1",
-					TTL:     1,
+					TTL:     new(int),
 					LogGuid: "guid",
 				},
 				{
 					Route:           "foo",
 					Port:            2,
 					IP:              "2.2.2.2",
-					TTL:             1,
+					TTL:             new(int),
 					LogGuid:         "guid",
 					RouteServiceUrl: "route-service-url",
 				},
@@ -119,11 +119,14 @@ var _ = Describe("RouteFetcher", func() {
 					Route:   "bar",
 					Port:    3,
 					IP:      "3.3.3.3",
-					TTL:     1,
+					TTL:     new(int),
 					LogGuid: "guid",
 				},
 			}
 
+			*response[0].TTL = 1
+			*response[1].TTL = 1
+			*response[2].TTL = 1
 		})
 
 		It("updates the route registry", func() {
@@ -143,7 +146,7 @@ var _ = Describe("RouteFetcher", func() {
 						expectedRoute.IP, uint16(expectedRoute.Port),
 						expectedRoute.LogGuid,
 						nil,
-						expectedRoute.TTL,
+						*expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
 					)))
@@ -215,7 +218,7 @@ var _ = Describe("RouteFetcher", func() {
 						uint16(expectedRoute.Port),
 						expectedRoute.LogGuid,
 						nil,
-						expectedRoute.TTL,
+						*expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
 					)))
@@ -331,16 +334,11 @@ var _ = Describe("RouteFetcher", func() {
 			Context("and the event source successfully subscribes", func() {
 				It("responds to events", func() {
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
+					route := models.NewRoute("z.a.k", 63, "42.42.42.42", "Tomato", "route-service-url", 1)
 					eventChannel <- routing_api.Event{
 						Action: "Delete",
-						Route: models.Route{
-							Route:           "z.a.k",
-							Port:            63,
-							IP:              "42.42.42.42",
-							TTL:             1,
-							LogGuid:         "Tomato",
-							RouteServiceUrl: "route-service-url",
-						}}
+						Route:  route,
+					}
 					Eventually(registry.UnregisterCallCount).Should(BeNumerically(">=", 1))
 				})
 
@@ -420,10 +418,11 @@ var _ = Describe("RouteFetcher", func() {
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",
-					TTL:             1,
+					TTL:             new(int),
 					LogGuid:         "Tomato",
 					RouteServiceUrl: "route-service-url",
 				}
+				*eventRoute.TTL = 1
 
 				event := routing_api.Event{
 					Action: "Upsert",
@@ -441,7 +440,7 @@ var _ = Describe("RouteFetcher", func() {
 						uint16(eventRoute.Port),
 						eventRoute.LogGuid,
 						nil,
-						eventRoute.TTL,
+						*eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
 					)))
@@ -454,10 +453,11 @@ var _ = Describe("RouteFetcher", func() {
 					Route:           "z.a.k",
 					Port:            63,
 					IP:              "42.42.42.42",
-					TTL:             1,
+					TTL:             new(int),
 					LogGuid:         "Tomato",
 					RouteServiceUrl: "route-service-url",
 				}
+				*eventRoute.TTL = 1
 
 				event := routing_api.Event{
 					Action: "Delete",
@@ -475,7 +475,7 @@ var _ = Describe("RouteFetcher", func() {
 						uint16(eventRoute.Port),
 						eventRoute.LogGuid,
 						nil,
-						eventRoute.TTL,
+						*eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
 					)))
