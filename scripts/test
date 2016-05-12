@@ -17,8 +17,6 @@ trap printStatus EXIT
 #Download & Install gnatsd into GOPATH (or use pre-installed version)
 go get -v github.com/nats-io/gnatsd
 
-. $(dirname $0)/godep-env
-
 #Install ginkgo from Godeps into Godeps workspace
 go install -v github.com/onsi/ginkgo/ginkgo
 
