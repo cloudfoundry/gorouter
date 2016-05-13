@@ -8,6 +8,7 @@ matrix:
     - go: tip
 
 install:
+  - go get -d -v -t ./...
   - export PATH=$HOME/gopath/bin:$PATH
 
 script:
