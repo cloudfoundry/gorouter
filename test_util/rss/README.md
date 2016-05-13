@@ -4,10 +4,7 @@ Command line tool for reading and writing route service signatures.
 ## Building
 
 ```
-cd gorouter
-godep restore
-direnv allow || source .envrc # Setup the correct GOPATH.
-cd test_util/rss
+cd ./test_util/rss
 go build
 ```
 

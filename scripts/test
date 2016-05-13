@@ -14,10 +14,10 @@ trap printStatus EXIT
 
 . $(dirname $0)/gorequired
 
-#Download & Install gnatsd into GOPATH (or use pre-installed version)
+# install gnatsd
 go get -v github.com/nats-io/gnatsd
 
-#Install ginkgo from Godeps into Godeps workspace
+# install ginkgo
 go install -v github.com/onsi/ginkgo/ginkgo
 
 echo -e "\n Formatting packages..."

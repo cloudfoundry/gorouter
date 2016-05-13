@@ -1,54 +1,32 @@
 [![Build Status](https://travis-ci.org/cloudfoundry/gorouter.svg?branch=master)](https://travis-ci.org/cloudfoundry/gorouter)
 
 # GoRouter
-
 This repository contains the source code for a Go implementation of the Cloud
 Foundry router.
+GoRouter is a part of the Cloud Foundry [routing-release](https://github.com/cloudfoundry-incubator/cf-routing-release).
 
 You can find the old router [here](http://github.com/cloudfoundry-attic/router)
 
 ## Getting started
 
-The following instructions may help you get started with gorouter in a
-standalone environment.
+The following instructions may help you get started with gorouter.
 
-### External Dependencies
+### Prerequisites
 
 - Go should be installed and in the PATH
 - GOPATH should be set as described in http://golang.org/doc/code.html
 - [gnatsd](https://github.com/apcera/gnatsd) installed and in the PATH
-- [godep](https://github.com/tools/godep) installed and in the PATH
-- Install [direnv](http://direnv.net/) if you are planning to do gorouter
-development as part of cf-release.
+- Install [direnv](http://direnv.net/)
 
 ### Development Setup
 
-Download gorouter:
-
-Option 1: GoRouter (standalone)
 ```bash
-go get -d github.com/cloudfoundry/gorouter
-cd $GOPATH/src/github.com/cloudfoundry/gorouter
+git clone https://github.com/cloudfoundry-incubator/cf-routing-release
+cd cf-routing-release
+./scripts/update
+cd src/github.com/cloudfoundry/gorouter
 ```
-
-Option 2: GoRouter (as part of [cf-release](https://github.com/cloudfoundry/cf-release))
-```bash
-git clone https://github.com/cloudfoundry/cf-release
-cd cf-release
-./update
-cd cf-release/src/github.com/cloudfoundry/gorouter
-```
- *Note: direnv will automatically set your GOPATH when you cd into the gorouter directory. You will need to run `direnv allow` the first time.*
-
-
-To install exactly the dependencies vendored with gorouter, use [godep](https://github.com/tools/godep):
-
-```bash
-go get -v github.com/tools/godep
-godep restore ./...
-```
-
-
+ *Note: direnv will automatically set your GOPATH when you cd into the cf-routing-release directory. You will need to run `direnv allow` the first time.*
 
 
 ### Running Tests
@@ -56,12 +34,10 @@ godep restore ./...
 We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
 
 Running `scripts/test` will:
-- Check for Go
-- Check that GOPATH is set
-- Download & Install gnatsd (or use the one already downloaded into the GOPATH)
-- Update the PATH to prepend the godep workspace
-- Install ginkgo (from the godep vendored sources into the godep workspace bin)
-- Run all the tests with ginkgo (in random order, without benchmarks, using the vendored godep dependencies)
+- Checks for Go
+- Checks that GOPATH is set
+- Installs gnatsd and ginkgo (or use the one already downloaded into the GOPATH)
+- Runs all the tests with ginkgo (in random order, without benchmarks)
 
 Any flags passed into `scripts/test` will be passed into ginkgo.
 
@@ -76,11 +52,6 @@ scripts/test -focus=Registry
 scripts/test registry
 ```
 
-To run the tests using GOPATH dependency sources (bypassing vendored dependencies):
-
-```bash
-ginkgo -r
-```
 
 ### Building
 Building creates an executable in the gorouter/ dir:
@@ -181,14 +152,14 @@ Hello!
 
 ### Instrumentation
 
-The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication. 
+The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication.
 
 ```
 $ curl "http://someuser:somepass@10.0.32.15:8080/varz"
 {"bad_gateways":0,"bad_requests":20,"cpu":0,"credentials":["user","pass"],"droplets":26,"host":"10.0.32.15:8080","index":0,"latency":{"50":0.001418144,"75":0.00180639025,"90":0.0070607187,"95":0.009561058849999996,"99":0.01523927838000001,"samples":1,"value":5e-07},"log_counts":{"info":9,"warn":40},"mem":19672,"ms_since_last_registry_update":1547,"num_cores":2,"rate":[1.1361328993362565,1.1344545494448148,1.1365784133171992],"requests":13832,"requests_per_sec":1.1361328993362565,"responses_2xx":13814,"responses_3xx":0,"responses_4xx":9,"responses_5xx":0,"responses_xxx":0,"start":"2016-01-07 19:04:40 +0000","tags":{"component":{"CloudController":{"latency":{"50":0.009015199,"75":0.0107408015,"90":0.015104917100000005,"95":0.01916497394999999,"99":0.034486261410000024,"samples":1,"value":5e-07},"rate":[0.13613289933245148,0.13433569936308343,0.13565885617276216],"requests":1686,"responses_2xx":1684,"responses_3xx":0,"responses_4xx":2,"responses_5xx":0,"responses_xxx":0},"HM9K":{"latency":{"50":0.0033354,"75":0.00751815875,"90":0.011916812100000005,"95":0.013760064,"99":0.013760064,"samples":1,"value":5e-07},"rate":[1.6850238803894876e-12,5.816129919395257e-05,0.00045864309255845694],"requests":12,"responses_2xx":6,"responses_3xx":0,"responses_4xx":6,"responses_5xx":0,"responses_xxx":0},"dea-0":{"latency":{"50":0.001354994,"75":0.001642107,"90":0.0020699939000000003,"95":0.0025553900499999996,"99":0.003677146940000006,"samples":1,"value":5e-07},"rate":[1.0000000000000013,1.0000000002571303,0.9999994853579043],"requests":12103,"responses_2xx":12103,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0},"uaa":{"latency":{"50":0.038288465,"75":0.245610809,"90":0.2877324668,"95":0.311816554,"99":0.311816554,"samples":1,"value":5e-07},"rate":[8.425119401947438e-13,2.9080649596976205e-05,0.00022931374141467497],"requests":17,"responses_2xx":17,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0}}},"top10_app_requests":[{"application_id":"063f95f9-492c-456f-b569-737f69c04899","rpm":60,"rps":1}],"type":"Router","uptime":"0d:3h:22m:31s","urls":21,"uuid":"0-c7fd7d76-f8d8-46b7-7a1c-7a59bcf7e286"}
 ```
 
-Specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` returns the current health of the router. Use this method for healthchecks from a load balancer. This endpoint does not require credentials and should be done against port 80. The *deprecated* `/healthz` endpoint provides a similar response but requires basic authentication. 
+Specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` returns the current health of the router. Use this method for healthchecks from a load balancer. This endpoint does not require credentials and should be done against port 80. The *deprecated* `/healthz` endpoint provides a similar response but requires basic authentication.
 
 ```
 $ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
