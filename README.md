@@ -15,7 +15,7 @@ The following instructions may help you get started with gorouter.
 
 - Go should be installed and in the PATH
 - GOPATH should be set as described in http://golang.org/doc/code.html
-- [gnatsd](https://github.com/apcera/gnatsd) installed and in the PATH
+- [gnatsd](https://github.com/nats-io/gnatsd) installed and in the PATH
 - Install [direnv](http://direnv.net/)
 
 ### Development Setup
