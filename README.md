@@ -3,7 +3,7 @@
 # GoRouter
 This repository contains the source code for a Go implementation of the Cloud
 Foundry router.
-GoRouter is a part of the Cloud Foundry [routing-release](https://github.com/cloudfoundry-incubator/cf-routing-release).
+GoRouter is a part of the Cloud Foundry [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
 
 You can find the old router [here](http://github.com/cloudfoundry-attic/router)
 
@@ -27,15 +27,15 @@ go get -d -v -t github.com/cloudfoundry/gorouter
 cd $GOPATH/src/github.com/cloudfoundry/gorouter
 ```
 
-Option 2: GoRouter (as part of [cf-routing-release](https://github.com/cloudfoundry-incubator/cf-routing-release)
+Option 2: GoRouter (as part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release)
 
 ```bash
-git clone https://github.com/cloudfoundry-incubator/cf-routing-release
-cd cf-routing-release
+git clone https://github.com/cloudfoundry-incubator/routing-release
+cd routing-release
 ./scripts/update
 cd src/github.com/cloudfoundry/gorouter
 ```
- *Note: direnv will automatically set your GOPATH when you cd into the cf-routing-release directory. You will need to run `direnv allow` the first time.*
+ *Note: direnv will automatically set your GOPATH when you cd into the routing-release directory. You will need to run `direnv allow` the first time.*
 
 
 ### Running Tests
