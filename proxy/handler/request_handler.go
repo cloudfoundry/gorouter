@@ -34,9 +34,9 @@ type RequestHandler struct {
 	response utils.ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r reporter.ProxyReporter, alr *schema.AccessLogRecord, logger lager.Logger) RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r reporter.ProxyReporter, alr *schema.AccessLogRecord, logger lager.Logger) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
-	return RequestHandler{
+	return &RequestHandler{
 		logger:    requestLogger,
 		reporter:  r,
 		logrecord: alr,

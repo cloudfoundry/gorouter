@@ -12,18 +12,18 @@ import (
 type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
 func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIterator route.EndpointIterator,
-	handler handler.RequestHandler, afterRoundTrip AfterRoundTrip) http.RoundTripper {
+	handler *handler.RequestHandler, afterRoundTrip AfterRoundTrip) http.RoundTripper {
 	if backend {
 		return &BackendRoundTripper{
 			transport: transport,
 			iter:      endpointIterator,
-			handler:   &handler,
+			handler:   handler,
 			after:     afterRoundTrip,
 		}
 	} else {
 		return &RouteServiceRoundTripper{
 			transport: transport,
-			handler:   &handler,
+			handler:   handler,
 			after:     afterRoundTrip,
 		}
 	}

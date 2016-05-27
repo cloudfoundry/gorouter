@@ -30,7 +30,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			proxyRoundTripper http.RoundTripper
 			endpointIterator  *routefakes.FakeEndpointIterator
 			transport         *roundtripperfakes.FakeRoundTripper
-			handler           reqhandler.RequestHandler
+			handler           *reqhandler.RequestHandler
 			logger            lager.Logger
 			req               *http.Request
 			resp              *proxyfakes.FakeProxyResponseWriter
