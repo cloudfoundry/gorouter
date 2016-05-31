@@ -200,8 +200,9 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now().Add(-updateTime))
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
 					Expect(pool.IsEmpty()).To(Equal(true))
+					Expect(prunedEndpoints).To(ConsistOf(e1))
 				})
 			})
 
@@ -213,8 +214,9 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
 					Expect(pool.IsEmpty()).To(Equal(true))
+					Expect(prunedEndpoints).To(ConsistOf(e1))
 				})
 			})
 
@@ -226,10 +228,45 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now())
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
 					Expect(pool.IsEmpty()).To(Equal(false))
+					Expect(prunedEndpoints).To(BeEmpty())
 				})
 
+			})
+		})
+
+		Context("when multiple endpoints are added to the pool", func() {
+			Context("and they both pass the stale threshold", func() {
+				It("prunes the endpoints", func() {
+					customThreshold := int(30 * time.Second)
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", nil, customThreshold, "", modTag)
+
+					pool.Put(e1)
+					pool.Put(e2)
+					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
+
+					Expect(pool.IsEmpty()).To(Equal(false))
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					Expect(pool.IsEmpty()).To(Equal(true))
+					Expect(prunedEndpoints).To(ConsistOf(e1, e2))
+				})
+			})
+			Context("and only one passes the stale threshold", func() {
+				It("prunes the endpoints", func() {
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", nil, -1, "", modTag)
+					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", nil, 30, "", modTag)
+
+					pool.Put(e1)
+					pool.Put(e2)
+					pool.MarkUpdated(time.Now().Add(-31 * time.Second))
+
+					Expect(pool.IsEmpty()).To(Equal(false))
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					Expect(pool.IsEmpty()).To(Equal(false))
+					Expect(prunedEndpoints).To(ConsistOf(e2))
+				})
 			})
 		})
 
@@ -242,8 +279,9 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
 					Expect(pool.IsEmpty()).To(Equal(true))
+					Expect(prunedEndpoints).To(ConsistOf(e1))
 				})
 			})
 
@@ -255,8 +293,9 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now())
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
 					Expect(pool.IsEmpty()).To(Equal(false))
+					Expect(prunedEndpoints).To(BeEmpty())
 				})
 			})
 		})
@@ -273,11 +312,13 @@ var _ = Describe("Pool", func() {
 			Expect(pool.IsEmpty()).To(BeFalse())
 
 			pool.MarkUpdated(time.Now())
-			pool.PruneEndpoints(threshold)
+			prunedEndpoints := pool.PruneEndpoints(threshold)
 			Expect(pool.IsEmpty()).To(BeFalse())
+			Expect(prunedEndpoints).To(BeEmpty())
 
-			pool.PruneEndpoints(0)
+			prunedEndpoints = pool.PruneEndpoints(0)
 			Expect(pool.IsEmpty()).To(BeTrue())
+			Expect(prunedEndpoints).To(ConsistOf(e1))
 		})
 	})
 

@@ -132,11 +132,13 @@ func (p *Pool) RouteServiceUrl() string {
 	}
 }
 
-func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
+func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) []*Endpoint {
 	p.lock.Lock()
 
 	last := len(p.endpoints)
 	now := time.Now()
+
+	prunedEndpoints := []*Endpoint{}
 
 	for i := 0; i < last; {
 		e := p.endpoints[i]
@@ -148,6 +150,7 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
 
 		if e.updated.Before(staleTime) {
 			p.removeEndpoint(e)
+			prunedEndpoints = append(prunedEndpoints, e.endpoint)
 			last--
 		} else {
 			i++
@@ -155,6 +158,7 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) {
 	}
 
 	p.lock.Unlock()
+	return prunedEndpoints
 }
 
 // Returns true if the endpoint was removed from the Pool, false otherwise.

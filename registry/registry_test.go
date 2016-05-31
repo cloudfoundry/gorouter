@@ -521,6 +521,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		It("logs the route info for stale routes", func() {
 			r.Register("bar.com/path1/path2/path3", barEndpoint)
+			r.Register("bar.com/path1/path2/path3", fooEndpoint)
 
 			Expect(r.NumUris()).To(Equal(1))
 
@@ -529,7 +530,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`prune.*"log_level":0.*bar.com/path1/path2/path3`))
+			Expect(logger).To(gbytes.Say(`prune.*"log_level":0.*endpoints.*bar.com/path1/path2/path3`))
 		})
 
 		It("removes stale droplets", func() {
@@ -607,6 +608,29 @@ var _ = Describe("RouteRegistry", func() {
 			totalRoutes, timeSinceLastUpdate := reporter.CaptureRouteStatsArgsForCall(0)
 			Expect(totalRoutes).To(Equal(2))
 			Expect(timeSinceLastUpdate).To(BeNumerically("~", 5, 5))
+		})
+
+		Context("when stale threshold is greater than pruning cycle", func() {
+			BeforeEach(func() {
+				configObj = config.DefaultConfig()
+				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
+				configObj.DropletStaleThreshold = 100 * time.Millisecond
+				reporter = new(fakes.FakeRouteRegistryReporter)
+				r = NewRouteRegistry(logger, configObj, reporter)
+			})
+
+			It("does not log the route info for fresh routes when pruning", func() {
+				endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, 60, "", modTag)
+				r.Register("foo.com/bar", endpoint)
+				Expect(r.NumUris()).To(Equal(1))
+
+				r.StartPruningCycle()
+				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+
+				Expect(r.NumUris()).To(Equal(1))
+				r.MarshalJSON()
+				Expect(logger).ToNot(gbytes.Say(`prune.*"log_level":0.*foo.com/bar`))
+			})
 		})
 	})
 

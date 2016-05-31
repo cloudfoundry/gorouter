@@ -186,9 +186,15 @@ func (r *RouteRegistry) MarshalJSON() ([]byte, error) {
 func (r *RouteRegistry) pruneStaleDroplets() {
 	r.Lock()
 	r.byUri.EachNodeWithPool(func(t *container.Trie) {
-		t.Pool.PruneEndpoints(r.dropletStaleThreshold)
+		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
-		r.logger.Debug("prune", lager.Data{"uri": t.ToPath()})
+		if len(endpoints) > 0 {
+			addresses := []string{}
+			for _, e := range endpoints {
+				addresses = append(addresses, e.CanonicalAddr())
+			}
+			r.logger.Debug("prune", lager.Data{"uri": t.ToPath(), "endpoints": addresses})
+		}
 	})
 	r.Unlock()
 }
