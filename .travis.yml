@@ -8,8 +8,9 @@ matrix:
     - go: tip
 
 install:
-  - go get -d -v -t ./...
-  - export PATH=$HOME/gopath/bin:$PATH
+  - git clone --branch=develop --recurse-submodules https://github.com/cloudfoundry-incubator/routing-release.git $HOME/routing-release
+  - export PATH=$HOME/routing-release/bin:$PATH
+  - export GOPATH=$GOPATH:$HOME/routing-release
 
 script:
   - ./scripts/test
