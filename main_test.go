@@ -68,11 +68,11 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(cfg, pruneInterval, pruneThreshold)
 
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint:            "non-existent-oauth.com",
-			Port:                     8443,
-			ClientName:               "client-id",
-			ClientSecret:             "client-secret",
-			SkipOAuthTLSVerification: true,
+			TokenEndpoint:     "non-existent-oauth.com",
+			Port:              8443,
+			ClientName:        "client-id",
+			ClientSecret:      "client-secret",
+			SkipSSLValidation: true,
 		}
 
 		writeConfig(cfg, cfgFile)

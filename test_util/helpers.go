@@ -75,9 +75,9 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 	}
 
 	c.OAuth = config.OAuthConfig{
-		TokenEndpoint: "uaa.cf.service.internal",
-		Port:          8443,
-		SkipOAuthTLSVerification: true,
+		TokenEndpoint:     "uaa.cf.service.internal",
+		Port:              8443,
+		SkipSSLValidation: true,
 	}
 
 	c.RouteServiceSecret = "kCvXxNMB0JO2vinxoru9Hg=="

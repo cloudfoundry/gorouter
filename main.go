@@ -162,7 +162,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		SecureCookies:   c.SecureCookies,
 		TLSConfig: &tls.Config{
 			CipherSuites:       c.CipherSuites,
-			InsecureSkipVerify: c.SSLSkipValidation,
+			InsecureSkipVerify: c.SkipSSLValidation,
 		},
 		RouteServiceEnabled:        c.RouteServiceEnabled,
 		RouteServiceTimeout:        c.RouteServiceTimeout,
@@ -205,7 +205,7 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 
 	cfg := &uaa_config.Config{
 		UaaEndpoint:           tokenURL,
-		SkipVerification:      c.OAuth.SkipOAuthTLSVerification,
+		SkipVerification:      c.OAuth.SkipSSLValidation,
 		ClientName:            c.OAuth.ClientName,
 		ClientSecret:          c.OAuth.ClientSecret,
 		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,

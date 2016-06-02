@@ -30,7 +30,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		BeforeEach(func() {
 			tlsConfig := &tls.Config{
 				CipherSuites:       conf.CipherSuites,
-				InsecureSkipVerify: conf.SSLSkipValidation,
+				InsecureSkipVerify: conf.SkipSSLValidation,
 			}
 
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}

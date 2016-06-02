@@ -73,7 +73,7 @@ var _ = JustBeforeEach(func() {
 
 	tlsConfig := &tls.Config{
 		CipherSuites:       conf.CipherSuites,
-		InsecureSkipVerify: conf.SSLSkipValidation,
+		InsecureSkipVerify: conf.SkipSSLValidation,
 	}
 
 	p = proxy.NewProxy(proxy.ProxyArgs{

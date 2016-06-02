@@ -76,7 +76,7 @@ var _ = Describe("Route Services", func() {
 	Context("with Route Services disabled", func() {
 		BeforeEach(func() {
 			conf.RouteServiceEnabled = false
-			conf.SSLSkipValidation = true
+			conf.SkipSSLValidation = true
 			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				Fail("Should not get here into Route Service")
 			})
@@ -103,7 +103,7 @@ var _ = Describe("Route Services", func() {
 	Context("with Route Services enabled", func() {
 		BeforeEach(func() {
 			conf.RouteServiceEnabled = true
-			conf.SSLSkipValidation = true
+			conf.SkipSSLValidation = true
 		})
 
 		Context("when recommendHttps is set to false", func() {
@@ -146,9 +146,9 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	Context("with SSLSkipValidation enabled", func() {
+	Context("with SkipSSLValidation enabled", func() {
 		BeforeEach(func() {
-			conf.SSLSkipValidation = true
+			conf.SkipSSLValidation = true
 		})
 
 		Context("when a request does not have a valid Route service signature header", func() {

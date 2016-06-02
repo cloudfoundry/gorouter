@@ -194,7 +194,7 @@ routing_api:
 oauth:
   token_endpoint: uaa.internal
   port: 8443
-  skip_oauth_tls_verification: true
+  skip_ssl_validation: true
   client_name: client-name
   client_secret: client-secret
 `)
@@ -203,23 +203,23 @@ oauth:
 
 			Expect(config.OAuth.TokenEndpoint).To(Equal("uaa.internal"))
 			Expect(config.OAuth.Port).To(Equal(8443))
-			Expect(config.OAuth.SkipOAuthTLSVerification).To(Equal(true))
+			Expect(config.OAuth.SkipSSLValidation).To(Equal(true))
 			Expect(config.OAuth.ClientName).To(Equal("client-name"))
 			Expect(config.OAuth.ClientSecret).To(Equal("client-secret"))
 		})
 
 		It("sets the SkipSSLValidation config", func() {
 			var b = []byte(`
-ssl_skip_validation: true
+skip_ssl_validation: true
 `)
 			config.Initialize(b)
-			Expect(config.SSLSkipValidation).To(BeTrue())
+			Expect(config.SkipSSLValidation).To(BeTrue())
 		})
 
 		It("defaults the SkipSSLValidation config to false", func() {
 			var b = []byte(``)
 			config.Initialize(b)
-			Expect(config.SSLSkipValidation).To(BeFalse())
+			Expect(config.SkipSSLValidation).To(BeFalse())
 		})
 
 		It("sets the route service recommend https config", func() {
