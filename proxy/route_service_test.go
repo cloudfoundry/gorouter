@@ -225,6 +225,34 @@ var _ = Describe("Route Services", func() {
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
 
+			Context("when request has Host header with a port", func() {
+				It("routes to backend instance and disregards port in Host header", func() {
+					ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+						out := &bytes.Buffer{}
+						out.WriteString("backend instance")
+						res := &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       ioutil.NopCloser(out),
+						}
+						conn.WriteResponse(res)
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+					req.Host = "my_host.com:4444"
+					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(route_service.RouteServiceForwardedUrl, "http://some-backend-url")
+					conn.WriteRequest(req)
+
+					res, body := conn.ReadResponse()
+					Expect(body).To(ContainSubstring("backend instance"))
+					Expect(res.StatusCode).To(Equal(http.StatusOK))
+				})
+			})
+
 			Context("and is forwarding to a route service on CF", func() {
 				It("does not strip the signature header", func() {
 					ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {

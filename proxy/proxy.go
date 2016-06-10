@@ -224,7 +224,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			recommendedScheme = "http"
 		}
 
-		forwardedUrlRaw := recommendedScheme + "://" + request.Host + request.RequestURI
+		forwardedUrlRaw := recommendedScheme + "://" + hostWithoutPort(request) + request.RequestURI
 		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
 			// A request from a route service destined for a backend instances
 			routeServiceArgs.UrlString = routeServiceUrl
