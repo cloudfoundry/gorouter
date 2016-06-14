@@ -596,7 +596,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("handles the PROXY protocol", func() {
-		app := test.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
 
 		rCh := make(chan string)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
