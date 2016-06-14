@@ -228,6 +228,7 @@ var _ = Describe("Route Services", func() {
 			Context("when request has Host header with a port", func() {
 				It("routes to backend instance and disregards port in Host header", func() {
 					ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+						conn.ReadRequest()
 						out := &bytes.Buffer{}
 						out.WriteString("backend instance")
 						res := &http.Response{
