@@ -16,6 +16,7 @@ import (
 	router_http "github.com/cloudfoundry/gorouter/common/http"
 	"github.com/cloudfoundry/gorouter/common/schema"
 	"github.com/cloudfoundry/gorouter/config"
+	"github.com/cloudfoundry/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/gorouter/proxy"
 	"github.com/cloudfoundry/gorouter/registry"
 	"github.com/cloudfoundry/gorouter/route"
@@ -36,6 +37,10 @@ import (
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
+
+const (
+	emitInterval = 1 * time.Second
+)
 
 var noDeadline = time.Time{}
 
@@ -58,6 +63,7 @@ type Router struct {
 	tlsServeDone     chan struct{}
 	stopping         bool
 	stopLock         sync.Mutex
+	uptimeMonitor    *monitor.Uptime
 
 	logger  lager.Logger
 	errChan chan error
@@ -130,6 +136,7 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 		return nil, err
 	}
 
+	router.uptimeMonitor = monitor.NewUptime(emitInterval)
 	return router, nil
 }
 
@@ -208,7 +215,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	}
 
 	r.logger.Info("gorouter.started")
-
+	go r.uptimeMonitor.Start()
 	close(ready)
 
 	r.OnErrOrSignal(signals, r.errChan)
@@ -251,6 +258,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 			r.Stop()
 		}
 	}
+	r.uptimeMonitor.Stop()
 	r.logger.Info("gorouter.exited")
 }
 
