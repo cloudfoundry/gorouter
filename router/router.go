@@ -258,7 +258,6 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 			r.Stop()
 		}
 	}
-	r.uptimeMonitor.Stop()
 	r.logger.Info("gorouter.exited")
 }
 
@@ -383,6 +382,7 @@ func (r *Router) Stop() {
 	r.connLock.Unlock()
 
 	r.component.Stop()
+	r.uptimeMonitor.Stop()
 	r.logger.Info(
 		"gorouter.stopped",
 		lager.Data{
