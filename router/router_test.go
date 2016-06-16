@@ -72,7 +72,7 @@ var _ = Describe("Router", func() {
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
 
-		cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 		Expect(err).ToNot(HaveOccurred())
 
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)

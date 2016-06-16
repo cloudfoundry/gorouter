@@ -3,6 +3,7 @@ package main_test
 import (
 	"crypto/tls"
 	"errors"
+	"path"
 	"strconv"
 	"strings"
 
@@ -67,12 +68,14 @@ var _ = Describe("Router Integration", func() {
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold)
 
+		caCertsPath := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs", "uaa-ca.pem")
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint:     "non-existent-oauth.com",
+			TokenEndpoint:     "127.0.0.1",
 			Port:              8443,
 			ClientName:        "client-id",
 			ClientSecret:      "client-secret",
-			SkipSSLValidation: true,
+			SkipSSLValidation: false,
+			CACerts:           caCertsPath,
 		}
 
 		writeConfig(cfg, cfgFile)
@@ -731,8 +734,9 @@ func setupTlsServer() net.Listener {
 }
 
 func newTlsListener(listener net.Listener) net.Listener {
-	public := "test/assets/public.pem"
-	private := "test/assets/private.pem"
+	caCertsPath := path.Join(os.Getenv("GOPATH"), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs")
+	public := filepath.Join(caCertsPath, "server.pem")
+	private := filepath.Join(caCertsPath, "server.key")
 	cert, err := tls.LoadX509KeyPair(public, private)
 	Expect(err).ToNot(HaveOccurred())
 

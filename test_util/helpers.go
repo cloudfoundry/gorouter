@@ -24,8 +24,8 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *
 	testPath, err := filepath.Abs(filepath.Join(filename, "..", "..", "test", "assets"))
 	Expect(err).NotTo(HaveOccurred())
 
-	c.SSLKeyPath = filepath.Join(testPath, "private.pem")
-	c.SSLCertPath = filepath.Join(testPath, "public.pem")
+	c.SSLKeyPath = filepath.Join(testPath, "certs", "server.key")
+	c.SSLCertPath = filepath.Join(testPath, "certs", "server.pem")
 	c.SSLPort = SSLPort
 	c.CipherString = "TLS_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
 

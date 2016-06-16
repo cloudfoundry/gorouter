@@ -197,6 +197,7 @@ oauth:
   skip_ssl_validation: true
   client_name: client-name
   client_secret: client-secret
+  ca_certs: ca-cert
 `)
 
 			config.Initialize(b)
@@ -206,6 +207,7 @@ oauth:
 			Expect(config.OAuth.SkipSSLValidation).To(Equal(true))
 			Expect(config.OAuth.ClientName).To(Equal("client-name"))
 			Expect(config.OAuth.ClientSecret).To(Equal("client-secret"))
+			Expect(config.OAuth.CACerts).To(Equal("ca-cert"))
 		})
 
 		It("sets the SkipSSLValidation config", func() {
@@ -467,13 +469,13 @@ routing_api:
 			Context("When it is given valid values for a certificate", func() {
 				var b = []byte(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/public.pem
-ssl_key_path: ../test/assets/private.pem
+ssl_cert_path: ../test/assets/certs/server.pem
+ssl_key_path: ../test/assets/certs/server.key
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
 				It("returns a valid certificate", func() {
-					expectedCertificate, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+					expectedCertificate, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 					Expect(err).ToNot(HaveOccurred())
 
 					config.Initialize(b)
@@ -503,8 +505,8 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 			Context("When it is given valid cipher suites", func() {
 				var b = []byte(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/public.pem
-ssl_key_path: ../test/assets/private.pem
+ssl_cert_path: ../test/assets/certs/server.pem
+ssl_key_path: ../test/assets/certs/server.key
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_RSA_WITH_AES_128_CBC_SHA:TLS_RSA_WITH_AES_256_CBC_SHA
 `)
 
@@ -530,8 +532,8 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_12
 			Context("When it is given invalid cipher suites", func() {
 				var b = []byte(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/public.pem
-ssl_key_path: ../test/assets/private.pem
+ssl_cert_path: ../test/assets/certs/server.pem
+ssl_key_path: ../test/assets/certs/server.key
 cipher_suites: potato
 `)
 
@@ -545,8 +547,8 @@ cipher_suites: potato
 			Context("When it is given an unsupported cipher suite", func() {
 				var b = []byte(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/public.pem
-ssl_key_path: ../test/assets/private.pem
+ssl_cert_path: ../test/assets/certs/server.pem
+ssl_key_path: ../test/assets/certs/server.key
 cipher_suites: TLS_RSA_WITH_RC4_128_SHA
 `)
 
@@ -562,8 +564,8 @@ cipher_suites: TLS_RSA_WITH_RC4_128_SHA
 		Context("When given no cipher suites", func() {
 			var b = []byte(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/public.pem
-ssl_key_path: ../test/assets/private.pem
+ssl_cert_path: ../test/assets/certs/server.pem
+ssl_key_path: ../test/assets/certs/server.key
 `)
 
 			It("panics", func() {

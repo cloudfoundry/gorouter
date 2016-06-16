@@ -1347,7 +1347,7 @@ func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
 }
 
 func newTlsListener(listener net.Listener) net.Listener {
-	cert, err := tls.LoadX509KeyPair("../test/assets/public.pem", "../test/assets/private.pem")
+	cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 	Expect(err).ToNot(HaveOccurred())
 
 	tlsConfig := &tls.Config{

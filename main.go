@@ -208,6 +208,7 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 		SkipVerification:      c.OAuth.SkipSSLValidation,
 		ClientName:            c.OAuth.ClientName,
 		ClientSecret:          c.OAuth.ClientSecret,
+		CACerts:               c.OAuth.CACerts,
 		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,
 		RetryInterval:         c.TokenFetcherRetryInterval,
 		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
