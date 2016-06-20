@@ -514,7 +514,6 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Prunes Stale Droplets", func() {
-
 		AfterEach(func() {
 			r.StopPruningCycle()
 		})
@@ -598,13 +597,20 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("sends route metrics to the reporter", func() {
-			r.StartPruningCycle()
-
-			time.Sleep(configObj.PruneStaleDropletsInterval - configObj.DropletStaleThreshold/2)
 			r.Register("foo", fooEndpoint)
 			r.Register("fooo", fooEndpoint)
 
-			Eventually(reporter.CaptureRouteStatsCallCount).Should(Equal(1))
+			r.StartPruningCycle()
+
+			Eventually(func() int {
+				e := *fooEndpoint
+				r.Register("foo", &e)
+				r.Register("fooo", &e)
+				return reporter.CaptureRouteStatsCallCount()
+			},
+				2*configObj.PruneStaleDropletsInterval,
+			).Should(Equal(1))
+
 			totalRoutes, timeSinceLastUpdate := reporter.CaptureRouteStatsArgsForCall(0)
 			Expect(totalRoutes).To(Equal(2))
 			Expect(timeSinceLastUpdate).To(BeNumerically("~", 5, 5))
