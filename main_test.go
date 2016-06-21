@@ -68,7 +68,7 @@ var _ = Describe("Router Integration", func() {
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold)
 
-		caCertsPath := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs", "uaa-ca.pem")
+		caCertsPath := filepath.Join(lastGoPath(), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs", "uaa-ca.pem")
 		cfg.OAuth = config.OAuthConfig{
 			TokenEndpoint:     "127.0.0.1",
 			Port:              8443,
@@ -733,8 +733,13 @@ func setupTlsServer() net.Listener {
 	return tlsListener
 }
 
+func lastGoPath() string {
+	goPaths := strings.Split(os.Getenv("GOPATH"), ":")
+	return goPaths[len(goPaths)-1]
+}
+
 func newTlsListener(listener net.Listener) net.Listener {
-	caCertsPath := path.Join(os.Getenv("GOPATH"), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs")
+	caCertsPath := path.Join(lastGoPath(), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs")
 	public := filepath.Join(caCertsPath, "server.pem")
 	private := filepath.Join(caCertsPath, "server.key")
 	cert, err := tls.LoadX509KeyPair(public, private)
