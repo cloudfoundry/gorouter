@@ -33,22 +33,18 @@ var _ = Describe("Uptime", func() {
 
 		It("returns a value metric containing uptime after specified time", func() {
 			Eventually(fakeEventEmitter.GetMessages).Should(HaveLen(1))
-			Expect(fakeEventEmitter.GetMessages()[0].Event.(*events.ValueMetric)).To(Equal(&events.ValueMetric{
-				Name:  proto.String("Uptime"),
-				Value: proto.Float64(0),
-				Unit:  proto.String("seconds"),
-			}))
+
+			metric := fakeEventEmitter.GetMessages()[0].Event.(*events.ValueMetric)
+			Expect(metric.Name).To(Equal(proto.String("Uptime")))
+			Expect(metric.Unit).To(Equal(proto.String("seconds")))
 		})
 
 		It("reports increasing uptime value", func() {
 			Eventually(fakeEventEmitter.GetMessages).Should(HaveLen(1))
-			Expect(fakeEventEmitter.GetMessages()[0].Event.(*events.ValueMetric)).To(Equal(&events.ValueMetric{
-				Name:  proto.String("Uptime"),
-				Value: proto.Float64(0),
-				Unit:  proto.String("seconds"),
-			}))
+			metric := fakeEventEmitter.GetMessages()[0].Event.(*events.ValueMetric)
+			uptime := *(metric.Value)
 
-			Eventually(getLatestUptime).Should(Equal(1.0))
+			Eventually(getLatestUptime, "2s").Should(BeNumerically(">", uptime))
 		})
 	})
 
