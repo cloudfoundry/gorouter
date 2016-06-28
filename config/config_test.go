@@ -20,6 +20,31 @@ var _ = Describe("Config", func() {
 
 	Describe("Initialize", func() {
 
+		Context("load balance config", func() {
+			It("sets default load balance strategy", func() {
+				Expect(config.LoadBalance).To(Equal(LOAD_BALANCE_RR))
+			})
+
+			It("can override the load balance strategy", func() {
+				cfg := DefaultConfig()
+				var b = []byte(`
+default_balancing_algorithm: least-connection
+`)
+				cfg.Initialize(b)
+				cfg.Process()
+				Expect(cfg.LoadBalance).To(Equal(LOAD_BALANCE_LC))
+			})
+
+			It("does not allow an invalid load balance strategy", func() {
+				cfg := DefaultConfig()
+				var b = []byte(`
+default_balancing_algorithm: foo-bar
+`)
+				cfg.Initialize(b)
+				Expect(cfg.Process).To(Panic())
+			})
+		})
+
 		It("sets status config", func() {
 			var b = []byte(`
 status:

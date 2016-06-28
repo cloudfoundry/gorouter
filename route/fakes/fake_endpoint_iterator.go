@@ -17,6 +17,16 @@ type FakeEndpointIterator struct {
 	EndpointFailedStub        func()
 	endpointFailedMutex       sync.RWMutex
 	endpointFailedArgsForCall []struct{}
+	PreRequestStub            func(e *route.Endpoint)
+	preRequestMutex           sync.RWMutex
+	preRequestArgsForCall     []struct {
+		e *route.Endpoint
+	}
+	PostRequestStub        func(e *route.Endpoint)
+	postRequestMutex       sync.RWMutex
+	postRequestArgsForCall []struct {
+		e *route.Endpoint
+	}
 }
 
 func (fake *FakeEndpointIterator) Next() *route.Endpoint {
@@ -56,6 +66,52 @@ func (fake *FakeEndpointIterator) EndpointFailedCallCount() int {
 	fake.endpointFailedMutex.RLock()
 	defer fake.endpointFailedMutex.RUnlock()
 	return len(fake.endpointFailedArgsForCall)
+}
+
+func (fake *FakeEndpointIterator) PreRequest(e *route.Endpoint) {
+	fake.preRequestMutex.Lock()
+	fake.preRequestArgsForCall = append(fake.preRequestArgsForCall, struct {
+		e *route.Endpoint
+	}{e})
+	fake.preRequestMutex.Unlock()
+	if fake.PreRequestStub != nil {
+		fake.PreRequestStub(e)
+	}
+}
+
+func (fake *FakeEndpointIterator) PreRequestCallCount() int {
+	fake.preRequestMutex.RLock()
+	defer fake.preRequestMutex.RUnlock()
+	return len(fake.preRequestArgsForCall)
+}
+
+func (fake *FakeEndpointIterator) PreRequestArgsForCall(i int) *route.Endpoint {
+	fake.preRequestMutex.RLock()
+	defer fake.preRequestMutex.RUnlock()
+	return fake.preRequestArgsForCall[i].e
+}
+
+func (fake *FakeEndpointIterator) PostRequest(e *route.Endpoint) {
+	fake.postRequestMutex.Lock()
+	fake.postRequestArgsForCall = append(fake.postRequestArgsForCall, struct {
+		e *route.Endpoint
+	}{e})
+	fake.postRequestMutex.Unlock()
+	if fake.PostRequestStub != nil {
+		fake.PostRequestStub(e)
+	}
+}
+
+func (fake *FakeEndpointIterator) PostRequestCallCount() int {
+	fake.postRequestMutex.RLock()
+	defer fake.postRequestMutex.RUnlock()
+	return len(fake.postRequestArgsForCall)
+}
+
+func (fake *FakeEndpointIterator) PostRequestArgsForCall(i int) *route.Endpoint {
+	fake.postRequestMutex.RLock()
+	defer fake.postRequestMutex.RUnlock()
+	return fake.postRequestArgsForCall[i].e
 }
 
 var _ route.EndpointIterator = new(FakeEndpointIterator)

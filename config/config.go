@@ -14,6 +14,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const LOAD_BALANCE_RR string = "round-robin"
+const LOAD_BALANCE_LC string = "least-connection"
+
+var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
+
 type StatusConfig struct {
 	Port uint16 `yaml:"port"`
 	User string `yaml:"user"`
@@ -137,7 +142,8 @@ type Config struct {
 	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval"`
 	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time"`
 
-	PidFile string `yaml:"pid_file"`
+	PidFile     string `yaml:"pid_file"`
+	LoadBalance string `yaml:"default_balancing_algorithm"`
 }
 
 var defaultConfig = Config{
@@ -165,6 +171,7 @@ var defaultConfig = Config{
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
+	LoadBalance:          LOAD_BALANCE_RR,
 }
 
 func DefaultConfig() *Config {
@@ -218,6 +225,18 @@ func (c *Config) Process() {
 	c.ExtraHeadersToLog = make(map[string]struct{})
 	for _, header := range c.ExtraHeadersToLogArray {
 		c.ExtraHeadersToLog[header] = struct{}{}
+	}
+
+	// check if valid load balancing strategy
+	validLb := false
+	for _, lb := range LoadBalancingStrategies {
+		if c.LoadBalance == lb {
+			validLb = true
+			break
+		}
+	}
+	if !validLb {
+		panic("Invalid load balancing strategy")
 	}
 }
 
