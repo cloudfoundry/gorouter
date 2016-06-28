@@ -3,14 +3,41 @@ package route
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/routing-api/models"
 )
 
-var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+type Counter struct {
+	value int64
+}
+
+func NewCounter(initial int64) *Counter {
+	return &Counter{initial}
+}
+
+func (c *Counter) Increment() {
+	atomic.AddInt64(&c.value, 1)
+}
+func (c *Counter) Decrement() {
+	atomic.AddInt64(&c.value, -1)
+}
+func (c *Counter) Count() int64 {
+	return atomic.LoadInt64(&c.value)
+}
+
+type Stats struct {
+	NumberConnections *Counter
+}
+
+func NewStats() *Stats {
+	return &Stats{
+		NumberConnections: &Counter{},
+	}
+}
 
 type Endpoint struct {
 	ApplicationId        string
@@ -21,11 +48,15 @@ type Endpoint struct {
 	RouteServiceUrl      string
 	PrivateInstanceIndex string
 	ModificationTag      models.ModificationTag
+	Stats                *Stats
 }
 
+//go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
 	Next() *Endpoint
 	EndpointFailed()
+	PreRequest(e *Endpoint)
+	PostRequest(e *Endpoint)
 }
 
 type endpointElem struct {
@@ -58,6 +89,7 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string, priv
 		staleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
 		RouteServiceUrl:      routeServiceUrl,
 		ModificationTag:      modificationTag,
+		Stats:                NewStats(),
 	}
 }
 
@@ -189,55 +221,12 @@ func (p *Pool) removeEndpoint(e *endpointElem) {
 	delete(p.index, e.endpoint.PrivateInstanceId)
 }
 
-func (p *Pool) Endpoints(initial string) EndpointIterator {
-	// default to round robin
-	return NewRoundRobin(p, initial)
-}
-
-func (p *Pool) next() *Endpoint {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	last := len(p.endpoints)
-	if last == 0 {
-		return nil
-	}
-
-	if p.nextIdx == -1 {
-		p.nextIdx = random.Intn(last)
-	} else if p.nextIdx >= last {
-		p.nextIdx = 0
-	}
-
-	startIdx := p.nextIdx
-	curIdx := startIdx
-	for {
-		e := p.endpoints[curIdx]
-
-		curIdx++
-		if curIdx == last {
-			curIdx = 0
-		}
-
-		if e.failedAt != nil {
-			curTime := time.Now()
-			if curTime.Sub(*e.failedAt) > p.retryAfterFailure {
-				// exipired failure window
-				e.failedAt = nil
-			}
-		}
-
-		if e.failedAt == nil {
-			p.nextIdx = curIdx
-			return e.endpoint
-		}
-
-		if curIdx == startIdx {
-			// all endpoints are marked failed so reset everything to available
-			for _, e2 := range p.endpoints {
-				e2.failedAt = nil
-			}
-		}
+func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
+	switch defaultLoadBalance {
+	case config.LOAD_BALANCE_LC:
+		return NewLeastConnection(p, initial)
+	default:
+		return NewRoundRobin(p, initial)
 	}
 }
 
@@ -336,6 +325,7 @@ func (e *Endpoint) ToLogData() interface{} {
 		e.RouteServiceUrl,
 	}
 }
+
 func (e *Endpoint) modificationTagSameOrNewer(other *Endpoint) bool {
 	return e.ModificationTag == other.ModificationTag || e.ModificationTag.SucceededBy(&other.ModificationTag)
 }

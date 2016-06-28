@@ -1,5 +1,12 @@
 package route
 
+import (
+	"math/rand"
+	"time"
+)
+
+var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 type RoundRobin struct {
 	pool *Pool
 
@@ -22,7 +29,7 @@ func (r *RoundRobin) Next() *Endpoint {
 	}
 
 	if e == nil {
-		e = r.pool.next()
+		e = r.next()
 	}
 
 	r.lastEndpoint = e
@@ -30,8 +37,61 @@ func (r *RoundRobin) Next() *Endpoint {
 	return e
 }
 
+func (r *RoundRobin) next() *Endpoint {
+	r.pool.lock.Lock()
+	defer r.pool.lock.Unlock()
+
+	last := len(r.pool.endpoints)
+	if last == 0 {
+		return nil
+	}
+
+	if r.pool.nextIdx == -1 {
+		r.pool.nextIdx = random.Intn(last)
+	} else if r.pool.nextIdx >= last {
+		r.pool.nextIdx = 0
+	}
+
+	startIdx := r.pool.nextIdx
+	curIdx := startIdx
+	for {
+		e := r.pool.endpoints[curIdx]
+
+		curIdx++
+		if curIdx == last {
+			curIdx = 0
+		}
+
+		if e.failedAt != nil {
+			curTime := time.Now()
+			if curTime.Sub(*e.failedAt) > r.pool.retryAfterFailure {
+				// exipired failure window
+				e.failedAt = nil
+			}
+		}
+
+		if e.failedAt == nil {
+			r.pool.nextIdx = curIdx
+			return e.endpoint
+		}
+
+		if curIdx == startIdx {
+			// all endpoints are marked failed so reset everything to available
+			for _, e2 := range r.pool.endpoints {
+				e2.failedAt = nil
+			}
+		}
+	}
+}
+
 func (r *RoundRobin) EndpointFailed() {
 	if r.lastEndpoint != nil {
 		r.pool.endpointFailed(r.lastEndpoint)
 	}
+}
+
+func (r *RoundRobin) PreRequest(e *Endpoint) {
+}
+
+func (r *RoundRobin) PostRequest(e *Endpoint) {
 }
