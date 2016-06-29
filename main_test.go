@@ -152,6 +152,18 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 		})
 
+		It("responds to healthcheck", func() {
+			req := test_util.NewRequest("GET", "", "/", nil)
+			req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+			conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", proxyPort))
+			Expect(err).ToNot(HaveOccurred())
+			http_conn := test_util.NewHttpConn(conn)
+			http_conn.WriteRequest(req)
+			resp, body := http_conn.ReadResponse()
+			Expect(resp.Status).To(Equal("200 OK"))
+			Expect(body).To(Equal("ok\n"))
+		})
+
 		It("waits for all requests to finish", func() {
 			mbusClient, err := newMessageBus(config)
 			Expect(err).ToNot(HaveOccurred())
