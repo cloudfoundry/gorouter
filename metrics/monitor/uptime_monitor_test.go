@@ -35,7 +35,7 @@ var _ = Describe("Uptime", func() {
 			Eventually(fakeEventEmitter.GetMessages).Should(HaveLen(1))
 
 			metric := fakeEventEmitter.GetMessages()[0].Event.(*events.ValueMetric)
-			Expect(metric.Name).To(Equal(proto.String("Uptime")))
+			Expect(metric.Name).To(Equal(proto.String("uptime")))
 			Expect(metric.Unit).To(Equal(proto.String("seconds")))
 		})
 
