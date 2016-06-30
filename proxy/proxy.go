@@ -169,7 +169,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	if isLoadBalancerHeartbeat(request, p.healthCheckUserAgent) {
+	if p.isLoadBalancerHeartbeat(request) {
 		handler.HandleHeartbeat(atomic.LoadInt32(&p.heartbeatOK) != 0)
 		return
 	}
@@ -286,6 +286,10 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = proxyWriter.Size()
+}
+
+func (p *proxy) isLoadBalancerHeartbeat(request *http.Request) bool {
+	return request.UserAgent() == p.healthCheckUserAgent
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
@@ -422,10 +426,6 @@ func hasBeenToRouteService(rsUrl, sigHeader string) bool {
 
 func isProtocolSupported(request *http.Request) bool {
 	return request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1)
-}
-
-func isLoadBalancerHeartbeat(request *http.Request, healthCheckUserAgent string) bool {
-	return request.UserAgent() == healthCheckUserAgent
 }
 
 func isWebSocketUpgrade(request *http.Request) bool {
