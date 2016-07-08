@@ -819,6 +819,38 @@ var _ = Describe("Router", func() {
 		})
 	})
 
+	Context("multiple open connections", func() {
+		It("does not hang any connections", func() {
+			app := testcommon.NewTestApp([]route.Uri{"app.vcap.me"}, config.Port, mbusClient, nil, "")
+
+			rCh := make(chan string)
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				rCh <- r.Header.Get("X-Forwarded-For")
+			})
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			host := fmt.Sprintf("app.vcap.me:%d", config.Port)
+			existingConn, err := net.DialTimeout("tcp", host, 10*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer existingConn.Close()
+
+			newConn, err := net.DialTimeout("tcp", host, 10*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer newConn.Close()
+
+			fmt.Fprintf(newConn, "GET / HTTP/1.0\r\n"+
+				"Host: %s\r\n"+
+				"\r\n", host)
+
+			var rr string
+			Eventually(rCh).Should(Receive(&rr))
+			Expect(rr).ToNot(BeNil())
+		})
+	})
+
 	Context("serving https", func() {
 		It("serves ssl traffic", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
