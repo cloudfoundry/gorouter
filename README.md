@@ -251,6 +251,10 @@ Access logs provide information for the following fields when recieving a reques
 
 Access logs are also redirected to syslog.
 
+## Known Limitations
+
+- If an operator enables proxy protocol, Gorouter only accepts only one connection at a time.
+
 ## Contributing
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
