@@ -87,6 +87,9 @@ func main() {
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
+	if c.SuspendPruningIfNatsUnavailable {
+		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
+	}
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
@@ -233,6 +236,11 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 		options.PingInterval = c.NatsClientPingInterval
 		options.ClosedCB = func(conn *nats.Conn) {
 			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
+		}
+
+		// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
+		if c.SuspendPruningIfNatsUnavailable {
+			options.MaxReconnect = -1
 		}
 		natsClient, err = options.Connect()
 		if err == nil {

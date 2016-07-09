@@ -73,6 +73,20 @@ nats:
 			Expect(config.Nats[0].Pass).To(Equal("pass"))
 		})
 
+		Context("Suspend Pruning option", func() {
+			It("sets default suspend_pruning_if_nats_unavailable", func() {
+				Expect(config.SuspendPruningIfNatsUnavailable).To(BeFalse())
+			})
+
+			It("sets default suspend_pruning_if_nats_unavailable", func() {
+				var b = []byte(`
+suspend_pruning_if_nats_unavailable: true
+`)
+				config.Initialize(b)
+				Expect(config.SuspendPruningIfNatsUnavailable).To(BeTrue())
+			})
+		})
+
 		It("sets default logging configs", func() {
 			Expect(config.Logging.File).To(Equal(""))
 			Expect(config.Logging.Syslog).To(Equal(""))

@@ -99,13 +99,14 @@ type Config struct {
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16
 
-	PublishStartMessageIntervalInSeconds int `yaml:"publish_start_message_interval"`
-	PruneStaleDropletsIntervalInSeconds  int `yaml:"prune_stale_droplets_interval"`
-	DropletStaleThresholdInSeconds       int `yaml:"droplet_stale_threshold"`
-	PublishActiveAppsIntervalInSeconds   int `yaml:"publish_active_apps_interval"`
-	StartResponseDelayIntervalInSeconds  int `yaml:"start_response_delay_interval"`
-	EndpointTimeoutInSeconds             int `yaml:"endpoint_timeout"`
-	RouteServiceTimeoutInSeconds         int `yaml:"route_services_timeout"`
+	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
+	SuspendPruningIfNatsUnavailable      bool `yaml:"suspend_pruning_if_nats_unavailable"`
+	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
+	DropletStaleThresholdInSeconds       int  `yaml:"droplet_stale_threshold"`
+	PublishActiveAppsIntervalInSeconds   int  `yaml:"publish_active_apps_interval"`
+	StartResponseDelayIntervalInSeconds  int  `yaml:"start_response_delay_interval"`
+	EndpointTimeoutInSeconds             int  `yaml:"endpoint_timeout"`
+	RouteServiceTimeoutInSeconds         int  `yaml:"route_services_timeout"`
 
 	DrainWaitInSeconds    int  `yaml:"drain_wait,omitempty"`
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
