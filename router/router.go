@@ -39,7 +39,8 @@ import (
 var DrainTimeout = errors.New("router: Drain timeout")
 
 const (
-	emitInterval = 1 * time.Second
+	emitInterval               = 1 * time.Second
+	proxyProtocolHeaderTimeout = 100 * time.Millisecond
 )
 
 var noDeadline = time.Time{}
@@ -292,7 +293,10 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		r.tlsListener = tlsListener
 		if r.config.EnablePROXY {
-			r.tlsListener = &proxyproto.Listener{tlsListener}
+			r.tlsListener = &proxyproto.Listener{
+				Listener:           tlsListener,
+				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+			}
 		}
 
 		r.logger.Info(fmt.Sprintf("Listening on %s", r.tlsListener.Addr()))
@@ -319,7 +323,10 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 
 	r.listener = listener
 	if r.config.EnablePROXY {
-		r.listener = &proxyproto.Listener{listener}
+		r.listener = &proxyproto.Listener{
+			Listener:           listener,
+			ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+		}
 	}
 
 	r.logger.Info(fmt.Sprintf("Listening on %s", r.listener.Addr()))
