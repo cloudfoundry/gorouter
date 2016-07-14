@@ -20,14 +20,7 @@ The following instructions may help you get started with gorouter.
 
 ### Development Setup
 
-Option 1: GoRouter (standalone)
-
-```bash
-go get -d -v -t github.com/cloudfoundry/gorouter
-cd $GOPATH/src/github.com/cloudfoundry/gorouter
-```
-
-Option 2: GoRouter (as part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release)
+GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release). 
 
 ```bash
 git clone https://github.com/cloudfoundry-incubator/routing-release
