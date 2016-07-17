@@ -1,6 +1,7 @@
 package router
 
 import (
+	"crypto/tls"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -8,7 +9,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/armon/go-proxyproto"
+	proxyproto "github.com/armon/go-proxyproto"
 	"github.com/cloudfoundry-incubator/routing-api/models"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/gorouter/common"
@@ -27,7 +28,6 @@ import (
 
 	"bytes"
 	"compress/zlib"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,16 +53,13 @@ type Router struct {
 	varz       varz.Varz
 	component  *common.VcapComponent
 
-	listener         net.Listener
-	tlsListener      net.Listener
 	closeConnections bool
 	connLock         sync.Mutex
 	idleConns        map[net.Conn]struct{}
 	activeConns      map[net.Conn]struct{}
 	drainDone        chan struct{}
-	serveDone        chan struct{}
-	tlsServeDone     chan struct{}
 	stopping         bool
+	stopFunc         []func()
 	stopLock         sync.Mutex
 	uptimeMonitor    *monitor.Uptime
 
@@ -118,19 +115,17 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 	}
 
 	router := &Router{
-		config:       cfg,
-		proxy:        p,
-		mbusClient:   mbusClient,
-		registry:     r,
-		varz:         v,
-		component:    component,
-		serveDone:    make(chan struct{}),
-		tlsServeDone: make(chan struct{}),
-		idleConns:    make(map[net.Conn]struct{}),
-		activeConns:  make(map[net.Conn]struct{}),
-		logger:       logger,
-		errChan:      routerErrChan,
-		stopping:     false,
+		config:      cfg,
+		proxy:       p,
+		mbusClient:  mbusClient,
+		registry:    r,
+		varz:        v,
+		component:   component,
+		idleConns:   make(map[net.Conn]struct{}),
+		activeConns: make(map[net.Conn]struct{}),
+		logger:      logger,
+		errChan:     routerErrChan,
+		stopping:    false,
 	}
 
 	if err := router.component.Start(); err != nil {
@@ -198,20 +193,13 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		ConnState: r.HandleConnState,
 	}
 
-	err := r.serveHTTP(server, r.errChan)
-	if err != nil {
-		r.errChan <- err
-		return err
-	}
-	err = r.serveHTTPS(server, r.errChan)
-	if err != nil {
+	if err := r.startListening(server, r.errChan); err != nil {
 		r.errChan <- err
 		return err
 	}
 
 	// create pid file
-	err = r.writePidFile(r.config.PidFile)
-	if err != nil {
+	if err := r.writePidFile(r.config.PidFile); err != nil {
 		return err
 	}
 
@@ -278,69 +266,49 @@ func (r *Router) DrainAndStop() {
 	r.Stop()
 }
 
-func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
-	if r.config.EnableSSL {
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{r.config.SSLCertificate},
-			CipherSuites: r.config.CipherSuites,
-		}
-
-		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
-		if err != nil {
-			r.logger.Fatal("tls.Listen: %s", err)
-			return err
-		}
-
-		r.tlsListener = tlsListener
-		if r.config.EnablePROXY {
-			r.tlsListener = &proxyproto.Listener{
-				Listener:           tlsListener,
-				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
-			}
-		}
-
-		r.logger.Info(fmt.Sprintf("Listening on %s", r.tlsListener.Addr()))
-
-		go func() {
-			err := server.Serve(r.tlsListener)
-			r.stopLock.Lock()
-			if !r.stopping {
-				errChan <- err
-			}
-			r.stopLock.Unlock()
-			close(r.tlsServeDone)
-		}()
+func (r *Router) listen(network, laddr string, TLS bool) (net.Listener, error) {
+	if !TLS {
+		return net.Listen(network, laddr)
 	}
-	return nil
+
+	return tls.Listen(network, laddr, &tls.Config{
+		Certificates: []tls.Certificate{r.config.SSLCertificate},
+		CipherSuites: r.config.CipherSuites,
+	})
 }
 
-func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+func (r *Router) serve(server *http.Server, TLS bool, proto, addr string, errChan chan error) error {
+	listener, err := r.listen(proto, addr, TLS)
 	if err != nil {
-		r.logger.Fatal("net.Listen: %s", err)
+		r.logger.Fatal(fmt.Sprintf("listen failed (proto=%s, addr=%s, TLS=%t): %%s", proto, addr, TLS), err)
 		return err
 	}
 
-	r.listener = listener
 	if r.config.EnablePROXY {
-		r.listener = &proxyproto.Listener{
+		listener = &proxyproto.Listener{
 			Listener:           listener,
 			ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
 		}
 	}
 
-	r.logger.Info(fmt.Sprintf("Listening on %s", r.listener.Addr()))
+	done := make(chan struct{})
 
 	go func() {
-		err := server.Serve(r.listener)
+		err := server.Serve(listener)
 		r.stopLock.Lock()
 		if !r.stopping {
 			errChan <- err
 		}
 		r.stopLock.Unlock()
-
-		close(r.serveDone)
+		close(done)
 	}()
+
+	stopFunc := func() {
+		listener.Close()
+		<-done
+	}
+	r.stopFunc = append(r.stopFunc, stopFunc)
+
 	return nil
 }
 
@@ -407,19 +375,34 @@ func (r *Router) closeIdleConns() {
 	}
 }
 
+func (r *Router) startListening(server *http.Server, errChan chan error) error {
+	if err := r.serve(server, false, "tcp", fmt.Sprintf(":%d", r.config.Port), errChan); err != nil {
+		return err
+	}
+
+	if r.config.EnableSSL {
+		if err := r.serve(server, true, "tcp", fmt.Sprintf(":%d", r.config.SSLPort), errChan); err != nil {
+			return err
+		}
+	}
+
+	if r.config.UnixAddr != "" {
+		if err := r.serve(server, false, "unix", r.config.UnixAddr, errChan); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (r *Router) stopListening() {
 	r.stopLock.Lock()
 	r.stopping = true
 	r.stopLock.Unlock()
 
-	r.listener.Close()
-
-	if r.tlsListener != nil {
-		r.tlsListener.Close()
-		<-r.tlsServeDone
+	for _, stopFunc := range r.stopFunc {
+		stopFunc()
 	}
-
-	<-r.serveDone
 }
 
 func (r *Router) RegisterComponent() {
