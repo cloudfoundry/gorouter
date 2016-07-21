@@ -820,7 +820,7 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("multiple open connections", func() {
-		It("does not hang any connections", func() {
+		It("does not return an error handling connections", func() {
 			app := testcommon.NewTestApp([]route.Uri{"app.vcap.me"}, config.Port, mbusClient, nil, "")
 
 			rCh := make(chan string)
@@ -851,6 +851,38 @@ var _ = Describe("Router", func() {
 
 			var rr string
 			Eventually(rCh).Should(Receive(&rr))
+			Expect(rr).ToNot(BeNil())
+		})
+
+		It("does not hang while handling new connection", func() {
+			app := testcommon.NewTestApp([]route.Uri{"app.vcap.me"}, config.Port, mbusClient, nil, "")
+
+			rCh := make(chan string)
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				rCh <- r.Header.Get("X-Forwarded-For")
+			})
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			host := fmt.Sprintf("app.vcap.me:%d", config.Port)
+			existingConn, err := net.DialTimeout("tcp", host, 10*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer existingConn.Close()
+
+			fmt.Fprintf(existingConn, "")
+
+			newConn, err := net.DialTimeout("tcp", host, 10*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer newConn.Close()
+
+			fmt.Fprintf(newConn, "GET / HTTP/1.1\r\n"+
+				"Host: %s\r\n"+
+				"\r\n", host)
+
+			var rr string
+			Eventually(rCh, 1*time.Second).Should(Receive(&rr))
 			Expect(rr).ToNot(BeNil())
 		})
 	})
