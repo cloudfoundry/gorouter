@@ -20,7 +20,7 @@ The following instructions may help you get started with gorouter.
 
 ### Development Setup
 
-GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release). 
+GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
 
 ```bash
 git clone https://github.com/cloudfoundry-incubator/routing-release
@@ -243,10 +243,6 @@ Access logs provide information for the following fields when recieving a reques
 * The absence of Status Code, Response Time or Application ID will result in a "-" in the corresponding field
 
 Access logs are also redirected to syslog.
-
-## Known Limitations
-
-- If an operator enables proxy protocol, Gorouter only accepts only one connection at a time.
 
 ## Contributing
 
