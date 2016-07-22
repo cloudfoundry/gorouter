@@ -185,7 +185,7 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	}
 
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
-	routingApiClient := routing_api.NewClient(routingApiUri)
+	routingApiClient := routing_api.NewClient(routingApiUri, false)
 
 	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingApiClient, 1, clock)
 	return routeFetcher
