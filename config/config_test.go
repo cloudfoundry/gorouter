@@ -89,7 +89,7 @@ nats:
 		It("sets access log config to file only", func() {
 			var b = []byte(`
 access_log:
-    file: "/var/vcap/sys/log/gorouter/access.log"
+  file: "/var/vcap/sys/log/gorouter/access.log"
 `)
 			config.Initialize(b)
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
@@ -99,8 +99,8 @@ access_log:
 		It("sets access log config to file and no streaming", func() {
 			var b = []byte(`
 access_log:
-    file: "/var/vcap/sys/log/gorouter/access.log"
-		enable_streaming: false
+  file: "/var/vcap/sys/log/gorouter/access.log"
+  enable_streaming: false
 `)
 			config.Initialize(b)
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
@@ -110,8 +110,8 @@ access_log:
 		It("sets access log config to file and streaming", func() {
 			var b = []byte(`
 access_log:
-    file: "/var/vcap/sys/log/gorouter/access.log"
-    enable_streaming: true
+  file: "/var/vcap/sys/log/gorouter/access.log"
+  enable_streaming: true
 `)
 			config.Initialize(b)
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/candiedyaml"
 	"github.com/pivotal-golang/localip"
+	"gopkg.in/yaml.v2"
 )
 
 type StatusConfig struct {
@@ -294,7 +294,7 @@ func (c *Config) RoutingApiEnabled() bool {
 
 func (c *Config) Initialize(configYAML []byte) error {
 	c.Nats = []NatsConfig{}
-	return candiedyaml.Unmarshal(configYAML, &c)
+	return yaml.Unmarshal(configYAML, &c)
 }
 
 func InitConfigFromFile(path string) *Config {

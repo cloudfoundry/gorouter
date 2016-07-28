@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudfoundry-incubator/candiedyaml"
 	"github.com/cloudfoundry/gorouter/config"
 	"github.com/cloudfoundry/gorouter/route"
 	"github.com/cloudfoundry/gorouter/test"
@@ -19,6 +18,7 @@ import (
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
 	"github.com/pivotal-golang/localip"
+	"gopkg.in/yaml.v2"
 
 	"net"
 	"net/http/httptest"
@@ -47,7 +47,7 @@ var _ = Describe("Router Integration", func() {
 	var gorouterSession *Session
 
 	writeConfig := func(config *config.Config, cfgFile string) {
-		cfgBytes, err := candiedyaml.Marshal(config)
+		cfgBytes, err := yaml.Marshal(config)
 		Expect(err).ToNot(HaveOccurred())
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
