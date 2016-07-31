@@ -88,6 +88,7 @@ type Config struct {
 	AccessLog                AccessLog     `yaml:"access_log"`
 	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
 	DebugAddr                string        `yaml:"debug_addr"`
+	UnixAddr                 string        `yaml:"unix_addr"`
 	EnablePROXY              bool          `yaml:"enable_proxy"`
 	EnableSSL                bool          `yaml:"enable_ssl"`
 	SSLPort                  uint16        `yaml:"ssl_port"`

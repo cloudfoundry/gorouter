@@ -81,6 +81,7 @@ var _ = Describe("Router", func() {
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 		config.EnablePROXY = true
+		config.UnixAddr = "gorouter.sock"
 
 		// set pid file
 		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
@@ -884,6 +885,164 @@ var _ = Describe("Router", func() {
 			var rr string
 			Eventually(rCh, 1*time.Second).Should(Receive(&rr))
 			Expect(rr).ToNot(BeNil())
+		})
+	})
+
+	Context("serving http over unix socket", func() {
+		It("serves HTTP traffic", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			tr := &http.Transport{
+				Dial: func(_, _ string) (net.Conn, error) {
+					return net.DialTimeout("unix", config.UnixAddr, 2*time.Second)
+				},
+			}
+			client := http.Client{Transport: tr}
+
+			req, _ := http.NewRequest("GET", "http://test.vcap.me", nil)
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("supports socket reuse for HTTP keep-alive", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			dialCount := 0
+			tr := &http.Transport{
+				Dial: func(_, _ string) (net.Conn, error) {
+					dialCount = dialCount + 1
+					return net.DialTimeout("unix", config.UnixAddr, 2*time.Second)
+				},
+			}
+			client := http.Client{Transport: tr}
+
+			req, _ := http.NewRequest("GET", "http://test.vcap.me", nil)
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			req, _ = http.NewRequest("GET", "http://test.vcap.me", nil)
+			resp, err = client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			Expect(dialCount).To(Equal(1))
+		})
+
+		It("supports switching protocols (websocket)", func() {
+			app := test.NewWebSocketApp(
+				[]route.Uri{"ws-app.vcap.me"},
+				config.Port,
+				mbusClient,
+				1*time.Second,
+			)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			conn, err := net.DialTimeout("unix", config.UnixAddr, 2*time.Second)
+			Expect(err).NotTo(HaveOccurred())
+
+			x := test_util.NewHttpConn(conn)
+
+			req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+			req.Header.Set("Upgrade", "websocket")
+			req.Header.Set("Connection", "upgrade")
+
+			x.WriteRequest(req)
+
+			resp, _ := x.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+
+			x.WriteLine("hello from client")
+			x.CheckLine("hello from server")
+
+			x.Close()
+		})
+
+		It("handles the PROXY protocol", func() {
+			app := testcommon.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
+
+			rCh := make(chan string)
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				rCh <- r.Header.Get("X-Forwarded-For")
+			})
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			host := fmt.Sprintf("proxy.vcap.me:%d", config.Port)
+			conn, err := net.DialTimeout("unix", config.UnixAddr, 2*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer conn.Close()
+
+			fmt.Fprintf(conn, "PROXY TCP4 192.168.0.1 192.168.0.2 12345 80\r\n"+
+				"GET / HTTP/1.0\r\n"+
+				"Host: %s\r\n"+
+				"\r\n", host)
+
+			var rr string
+			Eventually(rCh).Should(Receive(&rr))
+			Expect(rr).ToNot(BeNil())
+			Expect(rr).To(Equal("192.168.0.1"))
+		})
+
+		Context("Stop", func() {
+			It("no longer proxies http", func() {
+				app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+
+				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+					_, err := ioutil.ReadAll(r.Body)
+					defer r.Body.Close()
+					Expect(err).ToNot(HaveOccurred())
+					w.WriteHeader(http.StatusNoContent)
+				})
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				tr := &http.Transport{
+					Dial: func(_, _ string) (net.Conn, error) {
+						return net.Dial("unix", config.UnixAddr)
+					},
+				}
+				client := http.Client{Transport: tr}
+
+				req, err := http.NewRequest("GET", app.Endpoint(), nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+
+				router.Stop()
+				router = nil
+
+				req, err = http.NewRequest("GET", app.Endpoint(), nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = client.Do(req)
+				Expect(err).To(HaveOccurred())
+			})
 		})
 	})
 
