@@ -309,22 +309,21 @@ var _ = Describe("Proxy", func() {
 		Expect(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
 	})
 
-	It("responds to host with malicious script with 404", func() {
+	It("responds to host with malicious script with 400", func() {
 		conn := dialProxy(proxyServer)
 
 		req := test_util.NewRequest("GET", "<html><header><script>alert(document.cookie);</script></header><body/></html>", "/", nil)
 		conn.WriteRequest(req)
 
 		resp, body := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		Expect(body).To(Equal("404 Not Found: Requested route does not exist.\n"))
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+		Expect(body).To(ContainSubstring("malformed Host header"))
 	})
 
 	It("responds with 404 for a not found host name with only valid characters", func() {
 		conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ ", "/", nil)
+		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ", "/", nil)
 		conn.WriteRequest(req)
 
 		resp, body := conn.ReadResponse()
