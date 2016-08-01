@@ -287,7 +287,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
 		if err != nil {
-			r.logger.Fatal("tls.Listen: %s", err)
+			r.logger.Fatal("tls-listener-error", err)
 			return err
 		}
 
@@ -299,7 +299,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 			}
 		}
 
-		r.logger.Info(fmt.Sprintf("Listening on %s", r.tlsListener.Addr()))
+		r.logger.Info("tls-listener-started", lager.Data{"address": r.tlsListener.Addr()})
 
 		go func() {
 			err := server.Serve(r.tlsListener)
@@ -317,7 +317,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
-		r.logger.Fatal("net.Listen: %s", err)
+		r.logger.Fatal("tcp-listener-error", err)
 		return err
 	}
 
@@ -329,7 +329,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.logger.Info(fmt.Sprintf("Listening on %s", r.listener.Addr()))
+	r.logger.Info("tcp-listener-started", lager.Data{"address": r.listener.Addr()})
 
 	go func() {
 		err := server.Serve(r.listener)

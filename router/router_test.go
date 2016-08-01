@@ -33,7 +33,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"strings"
 	"time"
 
 	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
@@ -524,12 +523,11 @@ var _ = Describe("Router", func() {
 		buf := bufio.NewReader(conn)
 		line, err := buf.ReadString('\n')
 		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.Contains(line, "100 Continue")).To(BeTrue())
+		Expect(line).To(ContainSubstring("100 Continue"))
 
 		var rr *http.Request
 		Eventually(rCh).Should(Receive(&rr))
 		Expect(rr).ToNot(BeNil())
-		Expect(rr.Header.Get("Expect")).To(Equal(""))
 	})
 
 	It("X-Vcap-Request-Id header is overwritten", func() {

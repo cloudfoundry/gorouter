@@ -237,7 +237,6 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 
 		if !routeFound {
 			diff = append(diff, curRoute)
-			r.endpoints = r.endpoints
 		}
 	}
 

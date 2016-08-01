@@ -120,11 +120,11 @@ func main() {
 		routeFetcher := setupRouteFetcher(logger.Session("route-fetcher"), c, registry)
 
 		// check connectivity to routing api
-		err := routeFetcher.FetchRoutes()
+		err = routeFetcher.FetchRoutes()
 		if err != nil {
 			logger.Fatal("routing-api-connection-failed", err)
 		}
-		members = append(members, grouper.Member{"router-fetcher", routeFetcher})
+		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
 
 	group := grouper.NewOrdered(os.Interrupt, members)
