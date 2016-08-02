@@ -31,6 +31,7 @@ func NewHttpConn(x net.Conn) *HttpConn {
 func (x *HttpConn) ReadRequest() (*http.Request, string) {
 	req, err := http.ReadRequest(x.Reader)
 	Expect(err).NotTo(HaveOccurred())
+	defer req.Body.Close()
 
 	b, err := ioutil.ReadAll(req.Body)
 	Expect(err).NotTo(HaveOccurred())
@@ -47,6 +48,7 @@ func (x *HttpConn) WriteRequest(req *http.Request) {
 func (x *HttpConn) ReadResponse() (*http.Response, string) {
 	resp, err := http.ReadResponse(x.Reader, &http.Request{})
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())

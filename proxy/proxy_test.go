@@ -1052,7 +1052,9 @@ var _ = Describe("Proxy", func() {
 
 	It("retries when failed endpoints exist", func() {
 		ln := registerHandler(r, "retries", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
+			req, _ := conn.ReadRequest()
+			Expect(req.Method).To(Equal("GET"))
+			Expect(req.Host).To(Equal("retries"))
 			resp := test_util.NewResponse(http.StatusOK)
 			conn.WriteResponse(resp)
 			conn.Close()
