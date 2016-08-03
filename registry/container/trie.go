@@ -230,7 +230,11 @@ func NewTrie() *Trie {
 	return &Trie{ChildNodes: make(map[string]*Trie), Segment: ""}
 }
 
+// Snip removes an empty Pool from a node and trims empty leaf nodes from the Trie
 func (r *Trie) Snip() {
+	if r.Pool != nil && r.Pool.IsEmpty() {
+		r.Pool = nil
+	}
 	if (r.Pool != nil && !r.Pool.IsEmpty()) || r.isRoot() || !r.isLeaf() {
 		return
 	}

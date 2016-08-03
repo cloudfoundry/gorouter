@@ -320,6 +320,21 @@ var _ = Describe("Trie", func() {
 			bazNode.Snip()
 			Expect(fooNode.ChildNodes).To(HaveLen(0))
 		})
+
+		It("deletes empty pools", func() {
+			p1 := route.NewPool(42, "")
+			p2 := route.NewPool(42, "")
+			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "", modTag)
+			p2.Put(e1)
+
+			fooNode := r.Insert("/foo", p1)
+			_ = r.Insert("/foo/bar", p2)
+
+			fooNode.Snip()
+			Expect(r.ChildNodes).To(HaveLen(1))
+			Expect(fooNode.Pool).To(BeNil())
+			Expect(fooNode.ChildNodes).To(HaveLen(1))
+		})
 	})
 
 	Describe(".EndpointCount", func() {

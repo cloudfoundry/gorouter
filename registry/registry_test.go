@@ -553,6 +553,36 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(string(marshalled)).To(Equal(`{}`))
 		})
 
+		It("removes stale droplets that have children", func() {
+			doneChan := make(chan struct{})
+			defer close(doneChan)
+			r.Register("foo/path", barEndpoint)
+			r.Register("foo", fooEndpoint)
+
+			Expect(r.NumUris()).To(Equal(2))
+			Expect(r.NumEndpoints()).To(Equal(2))
+
+			go func() {
+				for {
+					select {
+					case <-doneChan:
+						return
+					default:
+						r.Register("foo/path", barEndpoint)
+						time.Sleep(15 * time.Millisecond)
+					}
+				}
+			}()
+			r.StartPruningCycle()
+			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+
+			Expect(r.NumUris()).To(Equal(1))
+			Expect(r.NumEndpoints()).To(Equal(1))
+
+			Expect(r.Lookup("foo")).To(BeNil())
+			Expect(r.Lookup("foo/path")).NotTo(BeNil())
+		})
+
 		It("skips fresh droplets", func() {
 			endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "", modTag)
 
