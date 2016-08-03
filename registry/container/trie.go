@@ -14,7 +14,8 @@ type Trie struct {
 	Parent     *Trie
 }
 
-func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
+// Find returns a *route.Pool that matches exactly the URI parameter, nil if no match was found.
+func (r *Trie) Find(uri route.Uri) *route.Pool {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 
@@ -24,7 +25,7 @@ func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
 
 		matchingChild, ok := node.ChildNodes[SegmentValue]
 		if !ok {
-			return nil, false
+			return nil
 		}
 
 		node = matchingChild
@@ -37,13 +38,14 @@ func (r *Trie) Find(uri route.Uri) (*route.Pool, bool) {
 	}
 
 	if nil != node.Pool {
-		return node.Pool, true
+		return node.Pool
 	}
 
-	return nil, false
+	return nil
 }
 
-func (r *Trie) MatchUri(uri route.Uri) (*route.Pool, bool) {
+// MatchUri returns the longest route that matches the URI parameter, nil if nothing matches.
+func (r *Trie) MatchUri(uri route.Uri) *route.Pool {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 	var lastPool *route.Pool
@@ -71,14 +73,14 @@ func (r *Trie) MatchUri(uri route.Uri) (*route.Pool, bool) {
 	}
 
 	if nil != node.Pool {
-		return node.Pool, true
+		return node.Pool
 	}
 
 	if nil != lastPool {
-		return lastPool, true
+		return lastPool
 	}
 
-	return nil, false
+	return nil
 }
 
 func (r *Trie) Insert(uri route.Uri, value *route.Pool) *Trie {

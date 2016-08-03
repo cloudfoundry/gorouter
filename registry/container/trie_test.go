@@ -25,33 +25,29 @@ var _ = Describe("Trie", func() {
 		It("works for the root node", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/", p)
-			node, ok := r.Find("/")
+			node := r.Find("/")
 			Expect(node).To(Equal(p))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("finds an exact match to an existing key", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar", p)
-			node, ok := r.Find("/foo/bar")
+			node := r.Find("/foo/bar")
 			Expect(node).To(Equal(p))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("returns nil when no exact match is found", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar/baz", p)
-			node, ok := r.Find("/foo/bar")
+			node := r.Find("/foo/bar")
 			Expect(node).To(BeNil())
-			Expect(ok).To(BeFalse())
 		})
 
 		It("returns nil if a shorter path exists", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar", p)
-			node, ok := r.Find("/foo/bar/baz")
+			node := r.Find("/foo/bar/baz")
 			Expect(node).To(BeNil())
-			Expect(ok).To(BeFalse())
 		})
 	})
 
@@ -59,33 +55,29 @@ var _ = Describe("Trie", func() {
 		It("works for the root node", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/", p)
-			node, ok := r.MatchUri("/")
+			node := r.MatchUri("/")
 			Expect(node).To(Equal(p))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("finds a existing key", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar", p)
-			node, ok := r.MatchUri("/foo/bar")
+			node := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("finds a matching shorter key", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar", p)
-			node, ok := r.MatchUri("/foo/bar/baz")
+			node := r.MatchUri("/foo/bar/baz")
 			Expect(node).To(Equal(p))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("returns nil when no match found", func() {
 			p := route.NewPool(42, "")
 			r.Insert("/foo/bar/baz", p)
-			node, ok := r.MatchUri("/foo/bar")
+			node := r.MatchUri("/foo/bar")
 			Expect(node).To(BeNil())
-			Expect(ok).To(BeFalse())
 		})
 
 		It("returns the longest found match when routes overlap", func() {
@@ -93,9 +85,8 @@ var _ = Describe("Trie", func() {
 			p2 := route.NewPool(42, "")
 			r.Insert("/foo", p1)
 			r.Insert("/foo/bar/baz", p2)
-			node, ok := r.MatchUri("/foo/bar")
+			node := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p1))
-			Expect(ok).To(BeTrue())
 		})
 
 		It("returns the longest found match when routes overlap and longer path created first", func() {
@@ -103,9 +94,8 @@ var _ = Describe("Trie", func() {
 			p2 := route.NewPool(42, "")
 			r.Insert("/foo/bar/baz", p2)
 			r.Insert("/foo", p1)
-			node, ok := r.MatchUri("/foo/bar")
+			node := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p1))
-			Expect(ok).To(BeTrue())
 		})
 	})
 
@@ -154,10 +144,10 @@ var _ = Describe("Trie", func() {
 
 			ok := r.Delete("/foo")
 			Expect(ok).To(BeTrue())
-			_, ok = r.MatchUri("/foo")
-			Expect(ok).To(BeFalse())
-			_, ok = r.MatchUri("/foo/bar")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo")
+			Expect(pool).To(BeNil())
+			pool = r.MatchUri("/foo/bar")
+			Expect(pool).NotTo(BeNil())
 		})
 
 		It("cleans up the node", func() {
@@ -183,8 +173,8 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/something/baz", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.MatchUri("/foo/something/baz")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo/something/baz")
+			Expect(pool).NotTo(BeNil())
 		})
 
 		It("does not prune nodes with pools", func() {
@@ -194,8 +184,8 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/bar", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.MatchUri("/foo/bar")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo/bar")
+			Expect(pool).NotTo(BeNil())
 		})
 
 		It("Returns the number of pools after deleting one", func() {
@@ -216,10 +206,10 @@ var _ = Describe("Trie", func() {
 
 			ok := r.Delete("/foo")
 			Expect(ok).To(BeTrue())
-			_, ok = r.MatchUri("/foo")
-			Expect(ok).To(BeFalse())
-			_, ok = r.MatchUri("/foo/bar")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo")
+			Expect(pool).To(BeNil())
+			pool = r.MatchUri("/foo/bar")
+			Expect(pool).NotTo(BeNil())
 		})
 
 		It("cleans up the node", func() {
@@ -245,8 +235,8 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/something/baz", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.MatchUri("/foo/something/baz")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo/something/baz")
+			Expect(pool).NotTo(BeNil())
 		})
 
 		It("does not prune nodes with pools", func() {
@@ -256,8 +246,8 @@ var _ = Describe("Trie", func() {
 			r.Insert("/foo/bar", p2)
 
 			r.Delete("/foo/bar/baz")
-			_, ok := r.MatchUri("/foo/bar")
-			Expect(ok).To(BeTrue())
+			pool := r.MatchUri("/foo/bar")
+			Expect(pool).NotTo(BeNil())
 		})
 	})
 
