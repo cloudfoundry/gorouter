@@ -1,8 +1,8 @@
 package health
 
 import (
+	"code.cloudfoundry.org/gorouter/common/schema"
 	"encoding/json"
-	"github.com/cloudfoundry/gorouter/common/schema"
 	"sync"
 )
 

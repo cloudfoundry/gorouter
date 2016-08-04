@@ -5,8 +5,8 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/cloudfoundry/gorouter/proxy/handler"
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/proxy/handler"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)

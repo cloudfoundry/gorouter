@@ -1,7 +1,7 @@
 package secure_test
 
 import (
-	"github.com/cloudfoundry/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/secure"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

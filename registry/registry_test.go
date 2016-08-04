@@ -3,17 +3,17 @@ package registry_test
 import (
 	"fmt"
 
+	. "code.cloudfoundry.org/gorouter/registry"
 	"github.com/cloudfoundry-incubator/routing-api/models"
-	. "github.com/cloudfoundry/gorouter/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/pivotal-golang/lager"
 	"github.com/pivotal-golang/lager/lagertest"
 
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/route"
 
 	"encoding/json"
 	"time"

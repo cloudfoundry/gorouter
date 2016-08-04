@@ -11,8 +11,8 @@ import (
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/pivotal-golang/lager"
 
-	"github.com/cloudfoundry/gorouter/access_log/schema"
-	"github.com/cloudfoundry/gorouter/config"
+	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/config"
 
 	"os"
 )

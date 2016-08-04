@@ -3,9 +3,9 @@ package metrics
 import (
 	"net/http"
 
+	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/route"
 	dropsondeMetrics "github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/cloudfoundry/gorouter/metrics/reporter"
-	"github.com/cloudfoundry/gorouter/route"
 
 	"fmt"
 	"strings"

@@ -1,7 +1,7 @@
 package route_test
 
 import (
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/cloudfoundry/gorouter/config"
+	"code.cloudfoundry.org/gorouter/config"
 
 	"time"
 

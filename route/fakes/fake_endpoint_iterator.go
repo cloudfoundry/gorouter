@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 type FakeEndpointIterator struct {

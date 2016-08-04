@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/access_log/schema"
-	router_http "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/gorouter/metrics/reporter"
-	"github.com/cloudfoundry/gorouter/proxy/utils"
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/access_log/schema"
+	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/route"
 	"github.com/pivotal-golang/lager"
 )
 

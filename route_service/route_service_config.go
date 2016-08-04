@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/common/secure"
-	"github.com/cloudfoundry/gorouter/route_service/header"
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/route_service/header"
 	"github.com/pivotal-golang/lager"
 )
 

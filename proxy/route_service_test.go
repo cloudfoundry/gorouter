@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/common/secure"
-	"github.com/cloudfoundry/gorouter/route_service"
-	"github.com/cloudfoundry/gorouter/route_service/header"
-	"github.com/cloudfoundry/gorouter/test_util"
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/route_service"
+	"code.cloudfoundry.org/gorouter/route_service/header"
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

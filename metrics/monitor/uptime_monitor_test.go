@@ -3,7 +3,7 @@ package monitor_test
 import (
 	"time"
 
-	"github.com/cloudfoundry/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
 	. "github.com/onsi/ginkgo"

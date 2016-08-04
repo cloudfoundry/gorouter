@@ -1,8 +1,8 @@
 package common
 
 import (
-	"github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/route"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-golang/localip"

@@ -1,9 +1,9 @@
 package common_test
 
 import (
-	. "github.com/cloudfoundry/gorouter/common"
-	"github.com/cloudfoundry/gorouter/common/health"
-	"github.com/cloudfoundry/gorouter/test_util"
+	. "code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats"
 
 	. "github.com/onsi/ginkgo"

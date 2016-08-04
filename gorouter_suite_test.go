@@ -18,7 +18,7 @@ func TestGorouter(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	path, err := gexec.Build("github.com/cloudfoundry/gorouter", "-race")
+	path, err := gexec.Build("code.cloudfoundry.org/gorouter", "-race")
 	Expect(err).ToNot(HaveOccurred())
 	gorouterPath = path
 	SetDefaultEventuallyTimeout(15 * time.Second)

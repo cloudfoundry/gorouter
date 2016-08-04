@@ -3,7 +3,7 @@ package router_test
 import (
 	"encoding/json"
 
-	. "github.com/cloudfoundry/gorouter/router"
+	. "code.cloudfoundry.org/gorouter/router"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

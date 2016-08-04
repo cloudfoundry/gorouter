@@ -1,13 +1,13 @@
 package main_test
 
 import (
+	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/proxy"
+	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/varz"
 	"github.com/cloudfoundry-incubator/routing-api/models"
-	"github.com/cloudfoundry/gorouter/access_log"
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/proxy"
-	"github.com/cloudfoundry/gorouter/registry"
-	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/varz"
 	"github.com/pivotal-golang/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
@@ -15,7 +15,7 @@ import (
 
 	"strconv"
 
-	"github.com/cloudfoundry/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 )
 
 var _ = Describe("AccessLogRecord", func() {

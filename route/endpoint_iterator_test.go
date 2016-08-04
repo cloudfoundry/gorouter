@@ -3,8 +3,8 @@ package route_test
 import (
 	"time"
 
+	"code.cloudfoundry.org/gorouter/route"
 	"github.com/cloudfoundry-incubator/routing-api/models"
-	"github.com/cloudfoundry/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/metrics/reporter"
-	"github.com/cloudfoundry/gorouter/registry/container"
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/registry/container"
+	"code.cloudfoundry.org/gorouter/route"
 	"github.com/pivotal-golang/lager"
 )
 

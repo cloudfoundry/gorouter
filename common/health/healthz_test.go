@@ -1,7 +1,7 @@
 package health_test
 
 import (
-	"github.com/cloudfoundry/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/common/health"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

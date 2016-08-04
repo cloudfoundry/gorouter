@@ -5,14 +5,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/route"
 	"github.com/cloudfoundry-incubator/routing-api"
 	"github.com/cloudfoundry-incubator/routing-api/models"
 	uaa_client "github.com/cloudfoundry-incubator/uaa-go-client"
 	"github.com/cloudfoundry-incubator/uaa-go-client/schema"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/registry"
-	"github.com/cloudfoundry/gorouter/route"
 	"github.com/pivotal-golang/clock"
 	"github.com/pivotal-golang/lager"
 )

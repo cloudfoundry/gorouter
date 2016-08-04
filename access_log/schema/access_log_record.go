@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 type AccessLogRecord struct {

@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudfoundry/gorouter/config"
-	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/test"
-	"github.com/cloudfoundry/gorouter/test/common"
-	"github.com/cloudfoundry/gorouter/test_util"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test"
+	"code.cloudfoundry.org/gorouter/test/common"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -70,8 +70,10 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
 
 		cfg.SuspendPruningIfNatsUnavailable = suspendPruning
+		caCertsPath := filepath.Join("test", "assets", "certs", "uaa-ca.pem")
+		caCertsPath, err := filepath.Abs(caCertsPath)
+		Expect(err).ToNot(HaveOccurred())
 
-		caCertsPath := filepath.Join(lastGoPath(), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs", "uaa-ca.pem")
 		cfg.OAuth = config.OAuthConfig{
 			TokenEndpoint:     "127.0.0.1",
 			Port:              8443,
@@ -815,13 +817,11 @@ func setupTlsServer() net.Listener {
 	return tlsListener
 }
 
-func lastGoPath() string {
-	goPaths := strings.Split(os.Getenv("GOPATH"), ":")
-	return goPaths[len(goPaths)-1]
-}
-
 func newTlsListener(listener net.Listener) net.Listener {
-	caCertsPath := path.Join(lastGoPath(), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs")
+	caCertsPath := path.Join("test", "assets", "certs")
+	caCertsPath, err := filepath.Abs(caCertsPath)
+	Expect(err).ToNot(HaveOccurred())
+
 	public := filepath.Join(caCertsPath, "server.pem")
 	private := filepath.Join(caCertsPath, "server.key")
 	cert, err := tls.LoadX509KeyPair(public, private)

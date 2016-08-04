@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudfoundry/gorouter/route_service/header"
-	"github.com/cloudfoundry/gorouter/test_util/rss/common"
+	"code.cloudfoundry.org/gorouter/route_service/header"
+	"code.cloudfoundry.org/gorouter/test_util/rss/common"
 	"github.com/codegangsta/cli"
 )
 

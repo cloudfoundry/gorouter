@@ -29,7 +29,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	createDefaultKey()
 
-	cliPath, err := gexec.Build("github.com/cloudfoundry/gorouter/test_util/rss")
+	cliPath, err := gexec.Build("code.cloudfoundry.org/gorouter/test_util/rss")
 	Expect(err).NotTo(HaveOccurred())
 	return []byte(cliPath)
 }, func(cliPath []byte) {

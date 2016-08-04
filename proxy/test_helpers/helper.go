@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/metrics/reporter"
-	"github.com/cloudfoundry/gorouter/route"
-	"github.com/cloudfoundry/gorouter/stats"
+	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/stats"
 )
 
 type NullVarz struct{}

@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cloudfoundry/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics/reporter"
 )
 
 type FakeRouteRegistryReporter struct {

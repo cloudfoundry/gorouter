@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/common/health"
-	. "github.com/cloudfoundry/gorouter/common/http"
-	"github.com/cloudfoundry/gorouter/common/schema"
+	"code.cloudfoundry.org/gorouter/common/health"
+	. "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/common/schema"
 	"github.com/nats-io/nats"
 	"github.com/nu7hatch/gouuid"
 	"github.com/pivotal-golang/lager"

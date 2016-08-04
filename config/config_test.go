@@ -3,7 +3,7 @@ package config_test
 import (
 	"crypto/tls"
 
-	. "github.com/cloudfoundry/gorouter/config"
+	. "code.cloudfoundry.org/gorouter/config"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

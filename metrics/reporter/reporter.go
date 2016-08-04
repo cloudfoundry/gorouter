@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudfoundry/gorouter/route"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 //go:generate counterfeiter -o fakes/fake_reporter.go . ProxyReporter

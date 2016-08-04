@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/cloudfoundry/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type FakeProxyResponseWriter struct {

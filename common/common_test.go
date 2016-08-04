@@ -1,7 +1,7 @@
 package common_test
 
 import (
-	. "github.com/cloudfoundry/gorouter/common"
+	. "code.cloudfoundry.org/gorouter/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
