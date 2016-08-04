@@ -64,10 +64,12 @@ var _ = Describe("Router Integration", func() {
 		cfg.DrainWaitInSeconds = drainWait
 	}
 
-	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, natsPorts ...uint16) *config.Config {
+	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
+
+		cfg.SuspendPruningIfNatsUnavailable = suspendPruning
 
 		caCertsPath := filepath.Join(lastGoPath(), "src", "github.com", "cloudfoundry", "gorouter", "test", "assets", "certs", "uaa-ca.pem")
 		cfg.OAuth = config.OAuthConfig{
@@ -146,7 +148,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 1, natsPort)
+			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 1, false, natsPort)
 		})
 
 		JustBeforeEach(func() {
@@ -329,7 +331,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.Logging.MetronAddress = ""
 			writeConfig(config, cfgFile)
 
@@ -343,7 +345,7 @@ var _ = Describe("Router Integration", func() {
 		statusPort := test_util.NextAvailPort()
 		proxyPort := test_util.NextAvailPort()
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+		createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
@@ -358,7 +360,7 @@ var _ = Describe("Router Integration", func() {
 		proxyPort := test_util.NextAvailPort()
 
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+		config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
@@ -439,7 +441,7 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			pruneInterval = 2
 			pruneThreshold = 10
-			config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, natsPort, natsPort2)
+			config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, false, natsPort, natsPort2)
 		})
 
 		AfterEach(func() {
@@ -495,6 +497,66 @@ var _ = Describe("Router Integration", func() {
 			natsRunner.Start()
 
 		})
+
+		Context("when suspend_pruning_if_nats_unavailable enabled", func() {
+
+			BeforeEach(func() {
+				natsPort2 = test_util.NextAvailPort()
+				natsRunner2 = test_util.NewNATSRunner(int(natsPort2))
+
+				statusPort = test_util.NextAvailPort()
+				proxyPort = test_util.NextAvailPort()
+
+				cfgFile = filepath.Join(tmpdir, "config.yml")
+				pruneInterval = 2
+				pruneThreshold = 10
+				suspendPruningIfNatsUnavailable := true
+				config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, natsPort, natsPort2)
+			})
+
+			It("does not prune routes when nats is unavailable", func() {
+				localIP, err := localip.LocalIP()
+				Expect(err).ToNot(HaveOccurred())
+
+				mbusClient, err := newMessageBus(config)
+
+				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+				runningApp.Listen()
+
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+
+				heartbeatInterval := 200 * time.Millisecond
+				runningTicker := time.NewTicker(heartbeatInterval)
+
+				go func() {
+					for {
+						select {
+						case <-runningTicker.C:
+							runningApp.Register()
+						}
+					}
+				}()
+
+				runningApp.VerifyAppStatus(200)
+
+				// Give enough time to register multiple times
+				time.Sleep(heartbeatInterval * 3)
+
+				natsRunner.Stop()
+
+				staleCheckInterval := config.PruneStaleDropletsIntervalInSeconds
+				staleThreshold := config.DropletStaleThresholdInSeconds
+
+				// Give router time to make a bad decision (i.e. prune routes)
+				sleepTime := time.Duration((2*staleCheckInterval)+(2*staleThreshold)) * time.Second
+				time.Sleep(sleepTime)
+
+				// Expect not to have pruned the routes after nats goes away
+				runningApp.VerifyAppStatus(200)
+			})
+		})
 	})
 
 	Context("when the route_services_secret and the route_services_secret_decrypt_only are valid", func() {
@@ -503,7 +565,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.RouteServiceSecret = "route-service-secret"
 			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
 			writeConfig(config, cfgFile)
@@ -521,7 +583,7 @@ var _ = Describe("Router Integration", func() {
 				proxyPort := test_util.NextAvailPort()
 
 				cfgFile := filepath.Join(tmpdir, "config.yml")
-				cfg := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+				cfg := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 				cfg.OAuth = config.OAuthConfig{}
 				writeConfig(cfg, cfgFile)
 
@@ -544,7 +606,7 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 
-			cfg = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+			cfg = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			writeConfig(cfg, cfgFile)
 		})
 
@@ -569,7 +631,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 			routingApi = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
@@ -660,7 +722,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, natsPort)
+			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.Logging.File = "nonExistentDir/file"
 			writeConfig(config, cfgFile)
 		})

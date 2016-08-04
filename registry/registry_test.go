@@ -1,6 +1,9 @@
 package registry_test
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/cloudfoundry-incubator/routing-api/models"
 	. "github.com/cloudfoundry/gorouter/registry"
 	. "github.com/onsi/ginkgo"
@@ -652,6 +655,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 				configObj.DropletStaleThreshold = 100 * time.Millisecond
 				reporter = new(fakes.FakeRouteRegistryReporter)
+
 				r = NewRouteRegistry(logger, configObj, reporter)
 			})
 
@@ -668,6 +672,51 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(logger).ToNot(gbytes.Say(`prune.*"log_level":0.*foo.com/bar`))
 			})
 		})
+
+		Context("when suspend pruning is triggered (i.e. nats offline)", func() {
+			var totalRoutes int
+
+			BeforeEach(func() {
+				totalRoutes = 1000
+				Expect(r.NumUris()).To(Equal(0))
+				Expect(r.NumEndpoints()).To(Equal(0))
+
+				// add endpoints
+				for i := 0; i < totalRoutes; i++ {
+					e := route.NewEndpoint("12345", "192.168.1.1", uint16(1024+i), "id1", nil, -1, "", modTag)
+					r.Register(route.Uri(fmt.Sprintf("foo-%d", i)), e)
+				}
+
+				r.StartPruningCycle()
+				r.SuspendPruning(func() bool { return true })
+				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+			})
+
+			It("does not remove any routes", func() {
+				Expect(r.NumUris()).To(Equal(totalRoutes))
+				Expect(r.NumEndpoints()).To(Equal(totalRoutes))
+
+				time.Sleep(configObj.PruneStaleDropletsInterval + 50*time.Millisecond)
+
+				Expect(r.NumUris()).To(Equal(totalRoutes))
+				Expect(r.NumEndpoints()).To(Equal(totalRoutes))
+			})
+
+			Context("when suspend pruning is turned off (i.e. nats back online)", func() {
+				It("marks all routes as updated and does not remove routes", func() {
+					Expect(r.NumUris()).To(Equal(totalRoutes))
+					Expect(r.NumEndpoints()).To(Equal(totalRoutes))
+
+					r.SuspendPruning(func() bool { return false })
+
+					time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+
+					Expect(r.NumUris()).To(Equal(totalRoutes))
+					Expect(r.NumEndpoints()).To(Equal(totalRoutes))
+				})
+			})
+		})
+
 	})
 
 	Context("Varz data", func() {
@@ -717,3 +766,13 @@ var _ = Describe("RouteRegistry", func() {
 		Expect(string(marshalled)).To(Equal(`{}`))
 	})
 })
+
+func portListening(addr string) bool {
+	var ok bool
+	conn, err := net.Dial("tcp", addr)
+	if err == nil {
+		ok = true
+		defer conn.Close()
+	}
+	return ok
+}

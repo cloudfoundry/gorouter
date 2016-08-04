@@ -24,6 +24,13 @@ type RegistryInterface interface {
 	MarshalJSON() ([]byte, error)
 }
 
+type PruneStatus int
+
+const (
+	CONNECTED = PruneStatus(iota)
+	DISCONNECTED
+)
+
 type RouteRegistry struct {
 	sync.RWMutex
 
@@ -31,6 +38,10 @@ type RouteRegistry struct {
 
 	// Access to the Trie datastructure should be governed by the RWMutex of RouteRegistry
 	byUri *container.Trie
+
+	// used for ability to suspend pruning
+	suspendPruning func() bool
+	pruningStatus  PruneStatus
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
@@ -48,6 +59,7 @@ func NewRouteRegistry(logger lager.Logger, c *config.Config, reporter reporter.R
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
+	r.suspendPruning = func() bool { return false }
 
 	r.reporter = reporter
 	return r
@@ -185,6 +197,24 @@ func (r *RouteRegistry) MarshalJSON() ([]byte, error) {
 
 func (r *RouteRegistry) pruneStaleDroplets() {
 	r.Lock()
+	defer r.Unlock()
+
+	// suspend pruning if option enabled and if NATS is unavailable
+	if r.suspendPruning() {
+		r.logger.Debug("prune-suspended")
+		r.pruningStatus = DISCONNECTED
+		return
+	} else {
+		if r.pruningStatus == DISCONNECTED {
+			// if we are coming back from being disconnected from source,
+			// bulk update routes / mark updated to avoid pruning right away
+			r.logger.Debug("prune-unsuspended-refresh-routes-start")
+			r.freshenRoutes()
+			r.logger.Debug("prune-unsuspended-refresh-routes-complete")
+		}
+		r.pruningStatus = CONNECTED
+	}
+
 	r.byUri.EachNodeWithPool(func(t *container.Trie) {
 		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
@@ -196,7 +226,20 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 			r.logger.Debug("prune", lager.Data{"uri": t.ToPath(), "endpoints": addresses})
 		}
 	})
+}
+
+func (r *RouteRegistry) SuspendPruning(f func() bool) {
+	r.Lock()
+	r.suspendPruning = f
 	r.Unlock()
+}
+
+// bulk update to mark pool / endpoints as updated
+func (r *RouteRegistry) freshenRoutes() {
+	now := time.Now()
+	r.byUri.EachNodeWithPool(func(t *container.Trie) {
+		t.Pool.MarkUpdated(now)
+	})
 }
 
 func parseContextPath(uri route.Uri) string {
