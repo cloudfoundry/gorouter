@@ -2,7 +2,6 @@ package registry_test
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/cloudfoundry-incubator/routing-api/models"
 	. "github.com/cloudfoundry/gorouter/registry"
@@ -766,13 +765,3 @@ var _ = Describe("RouteRegistry", func() {
 		Expect(string(marshalled)).To(Equal(`{}`))
 	})
 })
-
-func portListening(addr string) bool {
-	var ok bool
-	conn, err := net.Dial("tcp", addr)
-	if err == nil {
-		ok = true
-		defer conn.Close()
-	}
-	return ok
-}
