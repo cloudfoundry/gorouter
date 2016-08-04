@@ -2,7 +2,7 @@ package container_test
 
 import (
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/cloudfoundry-incubator/routing-api/models"
+	"code.cloudfoundry.org/routing-api/models"
 
 	"code.cloudfoundry.org/gorouter/registry/container"
 	. "github.com/onsi/ginkgo"

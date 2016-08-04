@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/cloudfoundry-incubator/routing-api/models"
+	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

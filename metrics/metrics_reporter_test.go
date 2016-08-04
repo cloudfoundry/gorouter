@@ -2,7 +2,7 @@ package metrics_test
 
 import (
 	"code.cloudfoundry.org/gorouter/metrics"
-	"github.com/cloudfoundry-incubator/routing-api/models"
+	"code.cloudfoundry.org/routing-api/models"
 	"github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	dropsondeMetrics "github.com/cloudfoundry/dropsonde/metrics"
 
