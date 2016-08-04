@@ -165,6 +165,22 @@ var _ = Describe("MetricsReporter", func() {
 			Eventually(func() uint64 { return sender.GetCounter("responses.xxx") }).Should(BeEquivalentTo(2))
 		})
 
+		It("increments the response metrics for the given component", func() {
+			response := http.Response{
+				StatusCode: 504,
+			}
+
+			endpoint.Tags["component"] = "CloudController"
+
+			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.CloudController") }).Should(BeEquivalentTo(1))
+			Eventually(func() uint64 { return sender.GetCounter("responses.5xx.CloudController") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.CloudController") }).Should(BeEquivalentTo(2))
+			Eventually(func() uint64 { return sender.GetCounter("responses.5xx.CloudController") }).Should(BeEquivalentTo(2))
+		})
+
 		It("increments the total responses", func() {
 			response2xx := http.Response{
 				StatusCode: 205,
