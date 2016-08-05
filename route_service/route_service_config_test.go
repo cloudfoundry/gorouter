@@ -9,10 +9,10 @@ import (
 	"code.cloudfoundry.org/gorouter/route_service"
 	"code.cloudfoundry.org/gorouter/route_service/header"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
 )
 
 var _ = Describe("Route Service Config", func() {

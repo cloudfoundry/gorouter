@@ -13,10 +13,10 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/lager/lagertest"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
-	"github.com/pivotal-golang/lager/lagertest"
 )
 
 var _ = Describe("Proxy Unit tests", func() {

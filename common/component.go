@@ -14,10 +14,10 @@ import (
 	"code.cloudfoundry.org/gorouter/common/health"
 	. "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	"github.com/nu7hatch/gouuid"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/localip"
 )
 
 const RefreshInterval time.Duration = time.Second * 1

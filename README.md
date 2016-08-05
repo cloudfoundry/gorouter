@@ -215,7 +215,7 @@ status:
 
 ### Profiling the Server
 
-The GoRouter runs the [cf_debug_server](https://github.com/cloudfoundry-incubator/cf-debug-server), which is a wrapper around the go pprof tool. In order to generate this profile, do the following:
+The GoRouter runs the [debugserver](https://github.com/cloudfoundry/debugserver), which is a wrapper around the go pprof tool. In order to generate this profile, do the following:
 
 ```bash
 # Establish a SSH tunnel to your server (not necessary if you can connect directly)

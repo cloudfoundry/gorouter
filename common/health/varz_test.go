@@ -6,9 +6,9 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
+	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/lager"
 
 	"encoding/json"
 )

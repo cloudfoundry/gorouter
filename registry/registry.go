@@ -10,7 +10,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/registry/container"
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 )
 
 type RegistryInterface interface {

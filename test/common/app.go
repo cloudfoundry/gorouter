@@ -3,9 +3,9 @@ package common
 import (
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/localip"
 
 	"encoding/json"
 	"errors"

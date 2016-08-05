@@ -5,16 +5,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/models"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	"code.cloudfoundry.org/uaa-go-client/schema"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/pivotal-golang/clock"
-	"github.com/pivotal-golang/lager"
 )
 
 type RouteFetcher struct {

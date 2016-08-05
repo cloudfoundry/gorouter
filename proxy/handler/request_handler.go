@@ -16,7 +16,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 )
 
 const (

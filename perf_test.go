@@ -7,8 +7,8 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/varz"
+	"code.cloudfoundry.org/lager/lagertest"
 	"code.cloudfoundry.org/routing-api/models"
-	"github.com/pivotal-golang/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

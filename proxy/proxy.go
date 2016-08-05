@@ -21,8 +21,8 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/route_service"
+	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry/dropsonde"
-	"github.com/pivotal-golang/lager"
 )
 
 const (

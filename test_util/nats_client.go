@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pivotal-golang/localip"
+	"code.cloudfoundry.org/localip"
 )
 
 type Nats struct {

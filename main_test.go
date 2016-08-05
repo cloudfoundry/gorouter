@@ -12,12 +12,12 @@ import (
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
-	"github.com/pivotal-golang/localip"
 	"gopkg.in/yaml.v2"
 
 	"net"

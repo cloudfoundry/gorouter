@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry/dropsonde/logs"
-	"github.com/pivotal-golang/lager"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/config"

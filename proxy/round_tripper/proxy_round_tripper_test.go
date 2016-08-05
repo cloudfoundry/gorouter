@@ -15,8 +15,8 @@ import (
 	routefakes "code.cloudfoundry.org/gorouter/route/fakes"
 	"code.cloudfoundry.org/gorouter/route_service"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

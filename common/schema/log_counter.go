@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 )
 
 type LogCounter struct {

@@ -6,12 +6,12 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats"
 
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
+	"code.cloudfoundry.org/localip"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
-	"github.com/pivotal-golang/localip"
 
 	"encoding/json"
 	"fmt"

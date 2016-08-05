@@ -8,7 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/route_service/header"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 )
 
 const (

@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"code.cloudfoundry.org/gorouter/common/schema"
+	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/lager"
 )
 
 var _ = Describe("LogCounter", func() {

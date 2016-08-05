@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	. "code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"

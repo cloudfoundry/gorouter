@@ -12,10 +12,10 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/test_helpers"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
 
 	"testing"
 	"time"

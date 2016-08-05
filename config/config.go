@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pivotal-golang/localip"
+	"code.cloudfoundry.org/localip"
 	"gopkg.in/yaml.v2"
 )
 

@@ -4,6 +4,9 @@ import (
 	"crypto/tls"
 	"errors"
 
+	"code.cloudfoundry.org/cflager"
+	"code.cloudfoundry.org/clock"
+	"code.cloudfoundry.org/debugserver"
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -14,15 +17,12 @@ import (
 	"code.cloudfoundry.org/gorouter/route_fetcher"
 	"code.cloudfoundry.org/gorouter/router"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
+	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/routing-api"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
-	cf_debug_server "github.com/cloudfoundry-incubator/cf-debug-server"
-	"github.com/cloudfoundry-incubator/cf-lager"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/nats-io/nats"
-	"github.com/pivotal-golang/clock"
-	"github.com/pivotal-golang/lager"
 
 	"flag"
 	"fmt"
@@ -48,7 +48,7 @@ const (
 
 func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
-	cf_lager.AddFlags(flag.CommandLine)
+	cflager.AddFlags(flag.CommandLine)
 	flag.Parse()
 
 	c := config.DefaultConfig()
@@ -62,7 +62,7 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, reconfigurableSink := cf_lager.New(prefix)
+	logger, reconfigurableSink := cflager.New(prefix)
 	InitLoggerFromConfig(logger, c, logCounter)
 
 	logger.Info("starting")
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		cf_debug_server.Run(c.DebugAddr, reconfigurableSink)
+		debugserver.Run(c.DebugAddr, reconfigurableSink)
 	}
 
 	logger.Info("setting-up-nats-connection")

@@ -37,8 +37,8 @@ import (
 
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
-	"github.com/pivotal-golang/lager"
-	"github.com/pivotal-golang/lager/lagertest"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagertest"
 )
 
 var _ = Describe("Router", func() {
