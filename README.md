@@ -248,7 +248,7 @@ You should see in the access logs on the GoRouter that the `X-Forwarded-For` hea
 
 ## HTTP/2 Support
 
-The GoRouter does not currently support proxying HTTP/2 connections. Requests to backends will be made with HTTP/1.1.
+The GoRouter does not currently support proxying HTTP/2 connections, even over TLS. Connections made using HTTP/1.1, either by TLS or cleartext, will be proxied to backends over cleartext.
 
 ## Logs
 
