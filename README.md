@@ -134,7 +134,7 @@ The format of the `router.register` message is as follows:
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
 
-###Example
+### Example
 
 Create a simple app
 ```
@@ -224,6 +224,10 @@ ssh -L localhost:8080:[INTERNAL_SERVER_IP]:17001 vcap@[BOSH_DIRECTOR]
 go tool pprof http://localhost:8080/debug/pprof/profile
 ```
 
+## Load Balancing
+
+The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection.
+
 ## PROXY Protocol
 
 To enable the PROXY Protocol on the GoRouter, first make sure your ELB has PROXY Protocol enabled. Then, configure your cf-release manifest as follows:
@@ -242,9 +246,9 @@ echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.
 
 You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt). 
 
-## Load Balancing
+## HTTP/2 Support
 
-The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection.
+The GoRouter does not currently support proxying HTTP/2 connections. Requests to backends will be made with HTTP/1.1.
 
 ## Logs
 
