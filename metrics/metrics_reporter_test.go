@@ -24,7 +24,7 @@ var _ = Describe("MetricsReporter", func() {
 	BeforeEach(func() {
 		metricsReporter = metrics.NewMetricsReporter()
 		req, _ = http.NewRequest("GET", "https://example.com", nil)
-		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", map[string]string{}, 30, "", models.ModificationTag{})
+		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{})
 		sender = fake.NewFakeMetricSender()
 		batcher := metricbatcher.New(sender, time.Millisecond)
 		dropsondeMetrics.Initialize(sender, batcher)

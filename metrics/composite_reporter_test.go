@@ -32,7 +32,7 @@ var _ = Describe("CompositeReporter", func() {
 
 		composite = metrics.NewCompositeReporter(fakeReporter1, fakeReporter2)
 		req, _ = http.NewRequest("GET", "https://example.com", nil)
-		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", map[string]string{}, 30, "", models.ModificationTag{})
+		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{})
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
 		responseDuration = time.Second

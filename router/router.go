@@ -79,6 +79,7 @@ type RegistryMessage struct {
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 	RouteServiceUrl         string            `json:"route_service_url"`
 	PrivateInstanceId       string            `json:"private_instance_id"`
+	PrivateInstanceIndex    string            `json:"private_instance_index"`
 }
 
 func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
@@ -605,6 +606,7 @@ func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
 		rm.Host,
 		rm.Port,
 		rm.PrivateInstanceId,
+		rm.PrivateInstanceIndex,
 		rm.Tags,
 		rm.StaleThresholdInSeconds,
 		rm.RouteServiceUrl,

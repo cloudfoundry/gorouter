@@ -287,7 +287,7 @@ var _ = Describe("Route Services", func() {
 				Expect(err).To(BeNil())
 
 				// register route service, should NOT route to it
-				registerAddr(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId")
+				registerAddr(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId", "1")
 
 				conn := dialProxy(proxyServer)
 

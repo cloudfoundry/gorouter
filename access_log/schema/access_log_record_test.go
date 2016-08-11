@@ -36,7 +36,8 @@ var _ = Describe("AccessLogRecord", func() {
 			BodyBytesSent: 23,
 			StatusCode:    200,
 			RouteEndpoint: &route.Endpoint{
-				ApplicationId: "FakeApplicationId",
+				ApplicationId:        "FakeApplicationId",
+				PrivateInstanceIndex: "3",
 			},
 			StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
@@ -56,7 +57,8 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_proto:\"FakeOriginalRequestProto\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60 " +
-			"app_id:FakeApplicationId" +
+			"app_id:FakeApplicationId " +
+			"index:3" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
@@ -75,7 +77,8 @@ var _ = Describe("AccessLogRecord", func() {
 				RemoteAddr: "FakeRemoteAddr",
 			},
 			RouteEndpoint: &route.Endpoint{
-				ApplicationId: "FakeApplicationId",
+				ApplicationId:        "FakeApplicationId",
+				PrivateInstanceIndex: "",
 			},
 			StartedAt: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 		}
@@ -93,7 +96,8 @@ var _ = Describe("AccessLogRecord", func() {
 			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
 			"response_time:- " +
-			"app_id:FakeApplicationId" +
+			"app_id:FakeApplicationId " +
+			"index:" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
@@ -141,6 +145,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:- " +
 			"response_time:- " +
 			"app_id:FakeApplicationId " +
+			"index: " +
 			"cache_control:\"no-cache\" " +
 			"accept_encoding:\"gzip, deflate\" " +
 			"if_match:\"\\\"737060cd8c284d8af7ad3082f209582d\\\"\" " +

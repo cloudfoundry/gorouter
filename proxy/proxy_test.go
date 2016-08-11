@@ -1063,7 +1063,7 @@ var _ = Describe("Proxy", func() {
 
 		ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
 		Expect(err).To(BeNil())
-		registerAddr(r, "retries", "", ip, "instanceId")
+		registerAddr(r, "retries", "", ip, "instanceId", "2")
 
 		for i := 0; i < 5; i++ {
 			body := &bytes.Buffer{}
@@ -1284,14 +1284,14 @@ func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
 	return res, body
 }
 
-func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId string) {
+func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId string, instanceIndex string) {
 	host, portStr, err := net.SplitHostPort(addr.String())
 	Expect(err).NotTo(HaveOccurred())
 
 	port, err := strconv.Atoi(portStr)
 	Expect(err).NotTo(HaveOccurred())
 
-	reg.Register(route.Uri(path), route.NewEndpoint("", host, uint16(port), instanceId, nil, -1, routeServiceUrl, models.ModificationTag{}))
+	reg.Register(route.Uri(path), route.NewEndpoint("", host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}))
 }
 
 func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {
@@ -1308,7 +1308,7 @@ func registerHandlerWithInstanceId(reg *registry.RouteRegistry, path string, rou
 
 	go runBackendInstance(ln, handler)
 
-	registerAddr(reg, path, routeServiceUrl, ln.Addr(), instanceId)
+	registerAddr(reg, path, routeServiceUrl, ln.Addr(), instanceId, "2")
 
 	return ln
 }

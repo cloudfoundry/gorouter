@@ -51,7 +51,7 @@ func (r *AccessLogRecord) getRecord() string {
 }
 
 func (r *AccessLogRecord) makeRecord() string {
-	statusCode, responseTime, appId, extraHeaders := "-", "-", "-", ""
+	statusCode, responseTime, appId, extraHeaders, appIndex := "-", "-", "-", "", ""
 
 	if r.StatusCode != 0 {
 		statusCode = strconv.Itoa(r.StatusCode)
@@ -63,13 +63,14 @@ func (r *AccessLogRecord) makeRecord() string {
 
 	if r.RouteEndpoint != nil {
 		appId = r.RouteEndpoint.ApplicationId
+		appIndex = r.RouteEndpoint.PrivateInstanceIndex
 	}
 
 	if r.ExtraHeadersToLog != nil && len(r.ExtraHeadersToLog) > 0 {
 		extraHeaders = r.ExtraHeaders()
 	}
 
-	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s%s`+"\n",
+	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s index:%s%s`+"\n",
 		r.Request.Host,
 		r.FormatStartedAt(),
 		r.Request.Method,
@@ -86,6 +87,7 @@ func (r *AccessLogRecord) makeRecord() string {
 		r.FormatRequestHeader("X-Vcap-Request-Id"),
 		responseTime,
 		appId,
+		appIndex,
 		extraHeaders)
 }
 

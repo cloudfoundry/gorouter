@@ -574,7 +574,7 @@ var _ = Describe("Router", func() {
 		var resp *http.Response
 		var err error
 
-		mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id"}`))
+		mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id", "private_instance_index": "2"}`))
 		time.Sleep(250 * time.Millisecond)
 
 		host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)

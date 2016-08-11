@@ -13,13 +13,14 @@ import (
 var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type Endpoint struct {
-	ApplicationId     string
-	addr              string
-	Tags              map[string]string
-	PrivateInstanceId string
-	staleThreshold    time.Duration
-	RouteServiceUrl   string
-	ModificationTag   models.ModificationTag
+	ApplicationId        string
+	addr                 string
+	Tags                 map[string]string
+	PrivateInstanceId    string
+	staleThreshold       time.Duration
+	RouteServiceUrl      string
+	PrivateInstanceIndex string
+	ModificationTag      models.ModificationTag
 }
 
 type EndpointIterator interface {
@@ -53,16 +54,17 @@ type Pool struct {
 	nextIdx           int
 }
 
-func NewEndpoint(appId, host string, port uint16, privateInstanceId string,
+func NewEndpoint(appId, host string, port uint16, privateInstanceId string, privateInstanceIndex string,
 	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string, modificationTag models.ModificationTag) *Endpoint {
 	return &Endpoint{
-		ApplicationId:     appId,
-		addr:              fmt.Sprintf("%s:%d", host, port),
-		Tags:              tags,
-		PrivateInstanceId: privateInstanceId,
-		staleThreshold:    time.Duration(staleThresholdInSeconds) * time.Second,
-		RouteServiceUrl:   routeServiceUrl,
-		ModificationTag:   modificationTag,
+		ApplicationId:        appId,
+		addr:                 fmt.Sprintf("%s:%d", host, port),
+		Tags:                 tags,
+		PrivateInstanceId:    privateInstanceId,
+		PrivateInstanceIndex: privateInstanceIndex,
+		staleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
+		RouteServiceUrl:      routeServiceUrl,
+		ModificationTag:      modificationTag,
 	}
 }
 
