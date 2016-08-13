@@ -201,7 +201,7 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 
 	// suspend pruning if option enabled and if NATS is unavailable
 	if r.suspendPruning() {
-		r.logger.Debug("prune-suspended")
+		r.logger.Info("prune-suspended")
 		r.pruningStatus = DISCONNECTED
 		return
 	} else {

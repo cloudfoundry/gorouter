@@ -696,7 +696,8 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(r.NumUris()).To(Equal(totalRoutes))
 				Expect(r.NumEndpoints()).To(Equal(totalRoutes))
 
-				time.Sleep(configObj.PruneStaleDropletsInterval + 50*time.Millisecond)
+				interval := configObj.PruneStaleDropletsInterval + 50*time.Millisecond
+				Eventually(logger, interval).Should(gbytes.Say("prune-suspended"))
 
 				Expect(r.NumUris()).To(Equal(totalRoutes))
 				Expect(r.NumEndpoints()).To(Equal(totalRoutes))
