@@ -268,6 +268,10 @@ Access logs provide information for the following fields when recieving a reques
 
 Access logs are also redirected to syslog.
 
+## Docs
+
+There is a separate [docs](docs) folder which contains more advanced topics.
+
 ## Contributing
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
