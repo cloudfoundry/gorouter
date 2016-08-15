@@ -26,11 +26,13 @@ Default behavior will remain as pruning routes.
 
 ### Definitions:
 
-DropletStaleThreshold: Time after which `gorouter` considers the route
+`DropletStaleThreshold`: Time after which `gorouter` considers the route
 information as stale.
-NATS PingInterval: Interval configured by NATS client to
+
+`NATS PingInterval`: Interval configured by NATS client to
 ping configured NATS servers.
-MinimumRegistrationInterval: Expect interval for
+
+`MinimumRegistrationInterval`: Expect interval for
 gorouter clients to send the routing info. (eg: [Route
 Registrar](https://github.com/cloudfoundry-incubator/route-registrar))
 
@@ -46,6 +48,7 @@ minimumRegistrationInterval) - (NATS Timeout * NumberOfNatsServers))/3
  `(StartResponseDelayInterval + minimumRegistrationInterval)` : This part of the
  equation accounts for the startup delay during which `gorouter` doesn't accept
  any requests and the registration interval from `gorouter` clients.
+ 
  `(NATS Timeout * NumberOfNatsServers)` : This part of the equation takes number of
  NATS servers configured into account. Default connection timeout for NATS
  clients is 2 seconds.
