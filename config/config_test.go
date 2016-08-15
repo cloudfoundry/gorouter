@@ -314,38 +314,8 @@ token_fetcher_retry_interval: 10
 			Expect(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
 			Expect(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
 			Expect(config.TokenFetcherRetryInterval).To(Equal(10 * time.Second))
-			Expect(config.NatsClientPingInterval).To(Equal(15 * time.Second))
+			Expect(config.NatsClientPingInterval).To(Equal(20 * time.Second))
 			Expect(config.SecureCookies).To(BeTrue())
-		})
-
-		Context("When StartResponseDelayInterval is lesser than DropletStaleThreshold", func() {
-			It("set NatsClientPingInterval to (DropletStaleThreshold/2 - StartResponseDelayInterval)", func() {
-				var b = []byte(`
-droplet_stale_threshold: 120
-start_response_delay_interval: 20
-`)
-
-				config.Initialize(b)
-				config.Process()
-				Expect(config.NatsClientPingInterval).To(Equal(40 * time.Second))
-				Expect(config.DropletStaleThreshold).To(Equal(120 * time.Second))
-				Expect(config.StartResponseDelayInterval).To(Equal(20 * time.Second))
-			})
-		})
-
-		Context("When StartResponseDelayInterval is greater than DropletStaleThreshold", func() {
-			It("set DropletStaleThreshold equal to StartResponseDelayInterval", func() {
-				var b = []byte(`
-droplet_stale_threshold: 14
-start_response_delay_interval: 15
-`)
-
-				config.Initialize(b)
-				config.Process()
-				Expect(config.NatsClientPingInterval).To(Equal(7 * time.Second))
-				Expect(config.DropletStaleThreshold).To(Equal(15 * time.Second))
-				Expect(config.StartResponseDelayInterval).To(Equal(15 * time.Second))
-			})
 		})
 
 		Context("When secure cookies is set to false", func() {
