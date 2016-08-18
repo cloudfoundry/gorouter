@@ -440,6 +440,7 @@ func (r *Router) SubscribeRegister() {
 
 func (r *Router) SubscribeUnregister() {
 	r.subscribeRegistry("router.unregister", func(registryMessage *RegistryMessage) {
+		r.logger.Info("unregister-route", lager.Data{"message": registryMessage})
 		for _, uri := range registryMessage.Uris {
 			r.registry.Unregister(
 				uri,

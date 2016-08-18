@@ -223,7 +223,7 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 			for _, e := range endpoints {
 				addresses = append(addresses, e.CanonicalAddr())
 			}
-			r.logger.Debug("prune", lager.Data{"uri": t.ToPath(), "endpoints": addresses})
+			r.logger.Info("pruned-route", lager.Data{"uri": t.ToPath(), "endpoints": addresses})
 		}
 	})
 }
