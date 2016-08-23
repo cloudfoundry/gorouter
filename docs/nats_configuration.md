@@ -1,26 +1,14 @@
 ## Consistency over Availability:
 
-In the event that a NATS cluster goes down or becomes unavailable, `gorouter`
-will attempt to reconnect to all configured NATS servers. If its unable to do
-so within [`droplet_stale_threshold`](../config/config.go#L105) value, it will
-drop the routes from its routing table. This strategy supports consistency over
-availability.
+In the context of Cloud Foundry, when an application instance crashes or is stopped as a result of the app being stopped or scaled down, the allocated IP and port are released to the pool. The same IP and port may then be assigned to a new instance of another application, as when a new app is started, scaled up, or a crashed instance is recreated. Under normal operation, each of these events will result in a change to Gorouter's routing table. Updates to the routing table depend on a message being sent by a client to NATS (e.g. Route Emitter is responsible for sending changes to routing data for apps running on Diego), and on Gorouter fetching the message from NATS. 
 
-In a catastrophic scenario where none of the configured NATS servers are
-responding, gorouter will not retain any routing information and applications
-will not be routable. However if an operator would prefer to keep applications
-routable in the event of a NATS cluster outage, there is an option.
+If Gorouter loses its connection to NATS, it will attempt to reconnect to all servers in the NATS cluster. If it is unable to reconnect to any NATS server, and so is unable to receive changes to the routing table, connections for one application may be routed to an unintended one. We called these "stale routes," or say that the routing table is "stale." 
 
-Opt-in config [`suspend_pruning_if_nats_unavailable`](../config/config.go#L103)
-to suspend route pruning if `gorouter` cannot connect to NATS servers. This
-config option will set max reconnect in NATS client to -1 (no limit) which
-ensures at any point if NATS is reachable, `gorouter` does not prune the routes.
-This strategy favors availability over consistency.
+To prevent stale routes, Gorouter is by default optimized for consistency over availability. Each route has a TTL of 120 seconds ([see `droplet_stale_threshold`](../config/config.go#L105)), and clients are responsible for heartbeating registration of their routes. Each time Gorouter receives a heartbeat for a route, the TTL is reset. If Gorouter does not receive a heartbeat within the TTL, the route is pruned from the routing table. If all backends for a route are pruned, Gorouter will respond with a 404 to requests for the route. If Gorouter can't reach NATS, then all routes are pruned and Gorouter will respond with a 404 to all requests. This constitutes a total application outage.
 
-Default behavior will remain as pruning routes.
+If an operator would prefer to favor availability over consistency, the configuration property [`suspend_pruning_if_nats_unavailable`](../config/config.go#L103) can be used to ignore route TTL and prevent pruning in the event that Gorouter cannot connect to NATS. This config option will also set max reconnect in the NATS client to -1 (no limit) which prevents Gorouter from crashing and losing its in-memory routing table. This configuration option is set to false by default. 
 
->**Warning**: There is a possibility of routing to an incorrect endpoint in the case
->of port re-use. To be used with caution.
+>**Warning**: There is a significant probability of routing to an incorrect backend endpoint in the case of port re-use. Suspending route pruning should be used with caution.
 
 ## Relation between DropletStaleThreshold, NATs PingInterval and MinimumRegistrationInterval
 
