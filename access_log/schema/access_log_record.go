@@ -70,7 +70,7 @@ func (r *AccessLogRecord) makeRecord() string {
 		extraHeaders = r.ExtraHeaders()
 	}
 
-	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s index:%s%s`+"\n",
+	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s app_index:%s%s`+"\n",
 		r.Request.Host,
 		r.FormatStartedAt(),
 		r.Request.Method,

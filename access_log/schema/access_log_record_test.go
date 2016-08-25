@@ -58,7 +58,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60 " +
 			"app_id:FakeApplicationId " +
-			"index:3" +
+			"app_index:3" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
@@ -97,7 +97,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:- " +
 			"response_time:- " +
 			"app_id:FakeApplicationId " +
-			"index:" +
+			"app_index:" +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
@@ -145,7 +145,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"vcap_request_id:- " +
 			"response_time:- " +
 			"app_id:FakeApplicationId " +
-			"index: " +
+			"app_index: " +
 			"cache_control:\"no-cache\" " +
 			"accept_encoding:\"gzip, deflate\" " +
 			"if_match:\"\\\"737060cd8c284d8af7ad3082f209582d\\\"\" " +
