@@ -56,6 +56,7 @@ type ProxyArgs struct {
 	CryptoPrev                 secure.Crypto
 	ExtraHeadersToLog          []string
 	Logger                     lager.Logger
+	HealthCheckUserAgent       string
 }
 
 type proxy struct {
@@ -71,6 +72,7 @@ type proxy struct {
 	routeServiceConfig         *route_service.RouteServiceConfig
 	extraHeadersToLog          []string
 	routeServiceRecommendHttps bool
+	healthCheckUserAgent       string
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -103,6 +105,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		routeServiceConfig:         routeServiceConfig,
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
+		healthCheckUserAgent:       args.HealthCheckUserAgent,
 	}
 
 	return p
@@ -166,7 +169,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	if isLoadBalancerHeartbeat(request) {
+	if p.isLoadBalancerHeartbeat(request) {
 		handler.HandleHeartbeat(atomic.LoadInt32(&p.heartbeatOK) != 0)
 		return
 	}
@@ -283,6 +286,10 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	accessLog.FinishedAt = time.Now()
 	accessLog.BodyBytesSent = proxyWriter.Size()
+}
+
+func (p *proxy) isLoadBalancerHeartbeat(request *http.Request) bool {
+	return request.UserAgent() == p.healthCheckUserAgent
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
@@ -419,10 +426,6 @@ func hasBeenToRouteService(rsUrl, sigHeader string) bool {
 
 func isProtocolSupported(request *http.Request) bool {
 	return request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1)
-}
-
-func isLoadBalancerHeartbeat(request *http.Request) bool {
-	return request.UserAgent() == "HTTP-Monitor/1.1"
 }
 
 func isWebSocketUpgrade(request *http.Request) bool {

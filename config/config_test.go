@@ -291,6 +291,19 @@ enable_proxy: true
 
 			Expect(config.EnablePROXY).To(Equal(true))
 		})
+
+		It("sets the healthcheck User-Agent", func() {
+			var b = []byte("healthcheck_user_agent: ELB-HealthChecker/1.0")
+			config.Initialize(b)
+			Expect(config.HealthCheckUserAgent).To(Equal("ELB-HealthChecker/1.0"))
+		})
+
+		It("defaults the healthcheck User-Agent", func() {
+			var b = []byte(``)
+			config.Initialize(b)
+			Expect(config.HealthCheckUserAgent).To(Equal("HTTP-Monitor/1.1"))
+		})
+
 	})
 
 	Describe("Process", func() {

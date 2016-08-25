@@ -112,6 +112,8 @@ type Config struct {
 	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
 	SecureCookies         bool `yaml:"secure_cookies"`
 
+	HealthCheckUserAgent string `yaml:"healthcheck_user_agent,omitempty"`
+
 	OAuth                      OAuthConfig      `yaml:"oauth"`
 	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
 	RouteServiceSecret         string           `yaml:"route_services_secret"`
@@ -163,6 +165,8 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryIntervalInSeconds:        5,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
+
+	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 }
 
 func DefaultConfig() *Config {
