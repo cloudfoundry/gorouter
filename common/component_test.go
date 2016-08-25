@@ -196,7 +196,7 @@ var _ = Describe("Component", func() {
 			_, err = mbusClient.Subscribe("subject", func(msg *nats.Msg) {
 				defer GinkgoRecover()
 				data := make(map[string]interface{})
-				err := json.Unmarshal(msg.Data, &data)
+				err = json.Unmarshal(msg.Data, &data)
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, key := range members {
@@ -239,7 +239,7 @@ var _ = Describe("Component", func() {
 			_, err = mbusClient.Subscribe("vcap.component.announce", func(msg *nats.Msg) {
 				defer GinkgoRecover()
 				data := make(map[string]interface{})
-				err := json.Unmarshal(msg.Data, &data)
+				err = json.Unmarshal(msg.Data, &data)
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, key := range members {

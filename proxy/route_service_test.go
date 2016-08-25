@@ -45,8 +45,8 @@ var _ = Describe("Route Services", func() {
 		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
-			signatureHeader := r.Header.Get(route_service.RouteServiceSignature)
+			metadataHeader = r.Header.Get(route_service.RouteServiceMetadata)
+			signatureHeader = r.Header.Get(route_service.RouteServiceSignature)
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
@@ -111,8 +111,8 @@ var _ = Describe("Route Services", func() {
 				furl := "http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 				recommendHttps = false
 				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					metadataHeader := r.Header.Get(route_service.RouteServiceMetadata)
-					signatureHeader := r.Header.Get(route_service.RouteServiceSignature)
+					metadataHeader = r.Header.Get(route_service.RouteServiceMetadata)
+					signatureHeader = r.Header.Get(route_service.RouteServiceSignature)
 
 					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())

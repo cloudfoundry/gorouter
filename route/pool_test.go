@@ -118,9 +118,6 @@ var _ = Describe("Pool", func() {
 		})
 
 		Context("with modification tags", func() {
-
-			var modTag models.ModificationTag
-
 			BeforeEach(func() {
 				modTag = models.ModificationTag{Guid: "abc"}
 				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag)

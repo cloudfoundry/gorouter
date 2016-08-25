@@ -169,7 +169,6 @@ var _ = Describe("RouteRegistry", func() {
 		Context("Modification Tags", func() {
 			var (
 				endpoint *route.Endpoint
-				modTag   models.ModificationTag
 			)
 
 			BeforeEach(func() {
@@ -390,7 +389,6 @@ var _ = Describe("RouteRegistry", func() {
 		Context("with modification tags", func() {
 			var (
 				endpoint *route.Endpoint
-				modTag   models.ModificationTag
 			)
 
 			BeforeEach(func() {
