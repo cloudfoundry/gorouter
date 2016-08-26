@@ -42,10 +42,10 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 	// Hardcode the IP to localhost to avoid leaving the machine while running tests
 	c.Ip = "127.0.0.1"
 
-	c.StartResponseDelayInterval = 10 * time.Millisecond
-	c.PublishStartMessageIntervalInSeconds = 10
+	c.StartResponseDelayInterval = 1 * time.Second
+	c.PublishStartMessageInterval = 10 * time.Second
 	c.PruneStaleDropletsInterval = 0
-	c.DropletStaleThreshold = 0
+	c.DropletStaleThreshold = 10 * time.Second
 	c.PublishActiveAppsInterval = 0
 	c.Zone = "z1"
 

@@ -153,8 +153,8 @@ var _ = Describe("Router", func() {
 				err := json.Unmarshal(msg, &message)
 
 				Expect(err).NotTo(HaveOccurred())
-				Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(5))
-				Expect(message.PruneThresholdInSeconds).To(Equal(120))
+				Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(1))
+				Expect(message.PruneThresholdInSeconds).To(Equal(10))
 			})
 
 			It("handles a empty reply on greet", func() {

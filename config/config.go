@@ -99,18 +99,18 @@ type Config struct {
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16
 
-	PublishStartMessageIntervalInSeconds int  `yaml:"publish_start_message_interval"`
-	SuspendPruningIfNatsUnavailable      bool `yaml:"suspend_pruning_if_nats_unavailable"`
-	PruneStaleDropletsIntervalInSeconds  int  `yaml:"prune_stale_droplets_interval"`
-	DropletStaleThresholdInSeconds       int  `yaml:"droplet_stale_threshold"`
-	PublishActiveAppsIntervalInSeconds   int  `yaml:"publish_active_apps_interval"`
-	StartResponseDelayIntervalInSeconds  int  `yaml:"start_response_delay_interval"`
-	EndpointTimeoutInSeconds             int  `yaml:"endpoint_timeout"`
-	RouteServiceTimeoutInSeconds         int  `yaml:"route_services_timeout"`
+	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval"`
+	SuspendPruningIfNatsUnavailable bool          `yaml:"suspend_pruning_if_nats_unavailable"`
+	PruneStaleDropletsInterval      time.Duration `yaml:"prune_stale_droplets_interval"`
+	DropletStaleThreshold           time.Duration `yaml:"droplet_stale_threshold"`
+	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval"`
+	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval"`
+	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
+	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 
-	DrainWaitInSeconds    int  `yaml:"drain_wait,omitempty"`
-	DrainTimeoutInSeconds int  `yaml:"drain_timeout,omitempty"`
-	SecureCookies         bool `yaml:"secure_cookies"`
+	DrainWait     time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout  time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies bool          `yaml:"secure_cookies"`
 
 	HealthCheckUserAgent string `yaml:"healthcheck_user_agent,omitempty"`
 
@@ -120,24 +120,15 @@ type Config struct {
 	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only"`
 	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https"`
 	// These fields are populated by the `Process` function.
-	PruneStaleDropletsInterval time.Duration `yaml:"-"`
-	DropletStaleThreshold      time.Duration `yaml:"-"`
-	PublishActiveAppsInterval  time.Duration `yaml:"-"`
-	StartResponseDelayInterval time.Duration `yaml:"-"`
-	EndpointTimeout            time.Duration `yaml:"-"`
-	RouteServiceTimeout        time.Duration `yaml:"-"`
-	DrainWait                  time.Duration `yaml:"-"`
-	DrainTimeout               time.Duration `yaml:"-"`
-	Ip                         string        `yaml:"-"`
-	RouteServiceEnabled        bool          `yaml:"-"`
-	TokenFetcherRetryInterval  time.Duration `yaml:"-"`
-	NatsClientPingInterval     time.Duration `yaml:"-"`
+	Ip                     string        `yaml:"-"`
+	RouteServiceEnabled    bool          `yaml:"-"`
+	NatsClientPingInterval time.Duration `yaml:"-"`
 
 	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
 
-	TokenFetcherMaxRetries                    uint32 `yaml:"token_fetcher_max_retries"`
-	TokenFetcherRetryIntervalInSeconds        int    `yaml:"token_fetcher_retry_interval"`
-	TokenFetcherExpirationBufferTimeInSeconds int64  `yaml:"token_fetcher_expiration_buffer_time"`
+	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries"`
+	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval"`
+	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time"`
 
 	PidFile string `yaml:"pid_file"`
 }
@@ -154,16 +145,16 @@ var defaultConfig = Config{
 	EnableSSL:   false,
 	SSLPort:     443,
 
-	EndpointTimeoutInSeconds:     60,
-	RouteServiceTimeoutInSeconds: 60,
+	EndpointTimeout:     60 * time.Second,
+	RouteServiceTimeout: 60 * time.Second,
 
-	PublishStartMessageIntervalInSeconds:      30,
-	PruneStaleDropletsIntervalInSeconds:       30,
-	DropletStaleThresholdInSeconds:            120,
-	PublishActiveAppsIntervalInSeconds:        0,
-	StartResponseDelayIntervalInSeconds:       5,
+	PublishStartMessageInterval:               30 * time.Second,
+	PruneStaleDropletsInterval:                30 * time.Second,
+	DropletStaleThreshold:                     120 * time.Second,
+	PublishActiveAppsInterval:                 0 * time.Second,
+	StartResponseDelayInterval:                5 * time.Second,
 	TokenFetcherMaxRetries:                    3,
-	TokenFetcherRetryIntervalInSeconds:        5,
+	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
@@ -183,13 +174,6 @@ func (c *Config) Process() {
 		c.GoMaxProcs = runtime.NumCPU()
 	}
 
-	c.PruneStaleDropletsInterval = time.Duration(c.PruneStaleDropletsIntervalInSeconds) * time.Second
-	c.DropletStaleThreshold = time.Duration(c.DropletStaleThresholdInSeconds) * time.Second
-	c.PublishActiveAppsInterval = time.Duration(c.PublishActiveAppsIntervalInSeconds) * time.Second
-	c.StartResponseDelayInterval = time.Duration(c.StartResponseDelayIntervalInSeconds) * time.Second
-	c.EndpointTimeout = time.Duration(c.EndpointTimeoutInSeconds) * time.Second
-	c.RouteServiceTimeout = time.Duration(c.RouteServiceTimeoutInSeconds) * time.Second
-	c.TokenFetcherRetryInterval = time.Duration(c.TokenFetcherRetryIntervalInSeconds) * time.Second
 	c.Logging.JobName = "gorouter"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
@@ -202,13 +186,8 @@ func (c *Config) Process() {
 	// ping_interval = ((DropletStaleThreshold- StartResponseDelayInterval)-minimumRegistrationInterval+(2 * number_of_nats_servers))/3
 	c.NatsClientPingInterval = 20 * time.Second
 
-	c.DrainTimeout = c.EndpointTimeout
-	if c.DrainTimeoutInSeconds > 0 {
-		c.DrainTimeout = time.Duration(c.DrainTimeoutInSeconds) * time.Second
-	}
-
-	if c.DrainWaitInSeconds > 0 {
-		c.DrainWait = time.Duration(c.DrainWaitInSeconds) * time.Second
+	if c.DrainTimeout == 0 || c.DrainTimeout == defaultConfig.EndpointTimeout {
+		c.DrainTimeout = c.EndpointTimeout
 	}
 
 	c.Ip, err = localip.LocalIP()

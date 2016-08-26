@@ -38,22 +38,12 @@ status:
 
 		It("sets endpoint timeout", func() {
 			var b = []byte(`
-endpoint_timeout: 10
+endpoint_timeout: 10s
 `)
 
 			config.Initialize(b)
 
-			Expect(config.EndpointTimeoutInSeconds).To(Equal(10))
-		})
-
-		It("sets drain timeout", func() {
-			var b = []byte(`
-drain_timeout: 10
-`)
-
-			config.Initialize(b)
-
-			Expect(config.DrainTimeoutInSeconds).To(Equal(10))
+			Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 		})
 
 		It("sets nats config", func() {
@@ -265,12 +255,12 @@ route_services_secret_decrypt_only: decrypt-only-super-route-service-secret
 		It("sets the token fetcher config", func() {
 			var b = []byte(`
 token_fetcher_max_retries: 4
-token_fetcher_retry_interval: 10
+token_fetcher_retry_interval: 10s
 token_fetcher_expiration_buffer_time: 40
 `)
 			config.Initialize(b)
 			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(4)))
-			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(10))
+			Expect(config.TokenFetcherRetryInterval).To(Equal(10 * time.Second))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(40)))
 		})
 
@@ -278,7 +268,7 @@ token_fetcher_expiration_buffer_time: 40
 			var b = []byte(``)
 			config.Initialize(b)
 			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(3)))
-			Expect(config.TokenFetcherRetryIntervalInSeconds).To(Equal(5))
+			Expect(config.TokenFetcherRetryInterval).To(Equal(5 * time.Second))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(30)))
 		})
 
@@ -309,19 +299,19 @@ enable_proxy: true
 	Describe("Process", func() {
 		It("converts intervals to durations", func() {
 			var b = []byte(`
-publish_start_message_interval: 1
-prune_stale_droplets_interval: 2
-droplet_stale_threshold: 30
-publish_active_apps_interval: 4
-start_response_delay_interval: 15
+publish_start_message_interval: 1s
+prune_stale_droplets_interval: 2s
+droplet_stale_threshold: 30s
+publish_active_apps_interval: 4s
+start_response_delay_interval: 15s
 secure_cookies: true
-token_fetcher_retry_interval: 10
+token_fetcher_retry_interval: 10s
 `)
 
 			config.Initialize(b)
 			config.Process()
 
-			Expect(config.PublishStartMessageIntervalInSeconds).To(Equal(1))
+			Expect(config.PublishStartMessageInterval).To(Equal(1 * time.Second))
 			Expect(config.PruneStaleDropletsInterval).To(Equal(2 * time.Second))
 			Expect(config.DropletStaleThreshold).To(Equal(30 * time.Second))
 			Expect(config.PublishActiveAppsInterval).To(Equal(4 * time.Second))
@@ -575,9 +565,9 @@ ssl_key_path: ../test/assets/certs/server.key
 		Describe("Timeout", func() {
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`
-endpoint_timeout: 10
-route_services_timeout: 10
-drain_timeout: 15
+endpoint_timeout: 10s
+route_services_timeout: 10s
+drain_timeout: 15s
 `)
 
 				config.Initialize(b)
@@ -590,7 +580,7 @@ drain_timeout: 15
 
 			It("defaults to the EndpointTimeout when not set", func() {
 				var b = []byte(`
-endpoint_timeout: 10
+endpoint_timeout: 10s
 `)
 
 				config.Initialize(b)

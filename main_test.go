@@ -56,12 +56,12 @@ var _ = Describe("Router Integration", func() {
 		// ensure the threshold is longer than the interval that we check,
 		// because we set the route's timestamp to time.Now() on the interval
 		// as part of pausing
-		cfg.PruneStaleDropletsIntervalInSeconds = pruneInterval
-		cfg.DropletStaleThresholdInSeconds = pruneThreshold
-		cfg.StartResponseDelayIntervalInSeconds = 1
-		cfg.EndpointTimeoutInSeconds = 5
-		cfg.DrainTimeoutInSeconds = 1
-		cfg.DrainWaitInSeconds = drainWait
+		cfg.PruneStaleDropletsInterval = time.Duration(pruneInterval) * time.Second
+		cfg.DropletStaleThreshold = time.Duration(pruneThreshold) * time.Second
+		cfg.StartResponseDelayInterval = 1 * time.Second
+		cfg.EndpointTimeout = 5 * time.Second
+		cfg.DrainTimeout = 1 * time.Second
+		cfg.DrainWait = time.Duration(drainWait) * time.Second
 	}
 
 	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, natsPorts ...uint16) *config.Config {
@@ -499,10 +499,10 @@ var _ = Describe("Router Integration", func() {
 			natsRunner.Stop()
 			natsRunner2.Start()
 
-			staleCheckInterval := config.PruneStaleDropletsIntervalInSeconds
-			staleThreshold := config.DropletStaleThresholdInSeconds
+			staleCheckInterval := config.PruneStaleDropletsInterval
+			staleThreshold := config.DropletStaleThreshold
 			// Give router time to make a bad decision (i.e. prune routes)
-			sleepTime := time.Duration((2*staleCheckInterval)+(2*staleThreshold)) * time.Second
+			sleepTime := (2 * staleCheckInterval) + (2 * staleThreshold)
 			time.Sleep(sleepTime)
 
 			// Expect not to have pruned the routes as it fails over to next NAT server
@@ -560,11 +560,11 @@ var _ = Describe("Router Integration", func() {
 
 				natsRunner.Stop()
 
-				staleCheckInterval := config.PruneStaleDropletsIntervalInSeconds
-				staleThreshold := config.DropletStaleThresholdInSeconds
+				staleCheckInterval := config.PruneStaleDropletsInterval
+				staleThreshold := config.DropletStaleThreshold
 
 				// Give router time to make a bad decision (i.e. prune routes)
-				sleepTime := time.Duration((2*staleCheckInterval)+(2*staleThreshold)) * time.Second
+				sleepTime := (2 * staleCheckInterval) + (2 * staleThreshold)
 				time.Sleep(sleepTime)
 
 				// Expect not to have pruned the routes after nats goes away

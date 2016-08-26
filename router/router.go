@@ -566,10 +566,9 @@ func (r *Router) greetMessage() ([]byte, error) {
 	d := common.RouterStart{
 		Id:    r.component.Varz.UUID,
 		Hosts: []string{host},
-		MinimumRegisterIntervalInSeconds: r.config.StartResponseDelayIntervalInSeconds,
-		PruneThresholdInSeconds:          r.config.DropletStaleThresholdInSeconds,
+		MinimumRegisterIntervalInSeconds: int(r.config.StartResponseDelayInterval.Seconds()),
+		PruneThresholdInSeconds:          int(r.config.DropletStaleThreshold.Seconds()),
 	}
-
 	return json.Marshal(d)
 }
 
