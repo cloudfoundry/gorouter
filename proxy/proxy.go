@@ -57,6 +57,7 @@ type ProxyArgs struct {
 	ExtraHeadersToLog          []string
 	Logger                     lager.Logger
 	HealthCheckUserAgent       string
+	EnableZipkin               bool
 }
 
 type proxy struct {
@@ -73,6 +74,7 @@ type proxy struct {
 	extraHeadersToLog          []string
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
+	enableZipkin               bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -106,6 +108,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
+		enableZipkin:               args.EnableZipkin,
 	}
 
 	return p
@@ -145,8 +148,17 @@ func (p *proxy) Drain() {
 	atomic.StoreInt32(&(p.heartbeatOK), 0)
 }
 
+func (p *proxy) setZipkinHeader(request *http.Request) {
+	if p.enableZipkin {
+		router_http.SetB3TraceIdHeader(request, p.logger)
+	}
+}
+
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
+
+	p.setZipkinHeader(request)
+
 	accessLog := schema.AccessLogRecord{
 		Request:           request,
 		StartedAt:         startedAt,
@@ -255,7 +267,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		}
 
 		if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
-			setTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
+			router_http.SetTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
 		}
 
 		latency := time.Since(startedAt)
@@ -447,12 +459,6 @@ func upgradeHeader(request *http.Request) string {
 	}
 
 	return ""
-}
-
-func setTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) {
-	responseWriter.Header().Set(router_http.VcapRouterHeader, routerIp)
-	responseWriter.Header().Set(router_http.VcapBackendHeader, addr)
-	responseWriter.Header().Set(router_http.CfRouteEndpointHeader, addr)
 }
 
 type countingReadCloser struct {

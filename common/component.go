@@ -14,10 +14,10 @@ import (
 	"code.cloudfoundry.org/gorouter/common/health"
 	. "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
+	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
-	"github.com/nu7hatch/gouuid"
 )
 
 const RefreshInterval time.Duration = time.Second * 1
@@ -120,11 +120,11 @@ func (c *VcapComponent) Start() error {
 
 	c.quitCh = make(chan struct{}, 1)
 	c.Varz.StartTime = schema.Time(time.Now())
-	uuid, err := GenerateUUID()
+	guid, err := uuid.GenerateUUID()
 	if err != nil {
 		return err
 	}
-	c.Varz.UUID = fmt.Sprintf("%d-%s", c.Varz.Index, uuid)
+	c.Varz.UUID = fmt.Sprintf("%d-%s", c.Varz.Index, guid)
 
 	if c.Varz.Host == "" {
 		host, err := localip.LocalIP()
@@ -143,11 +143,11 @@ func (c *VcapComponent) Start() error {
 	}
 
 	if c.Varz.Credentials == nil || len(c.Varz.Credentials) != 2 {
-		user, err := GenerateUUID()
+		user, err := uuid.GenerateUUID()
 		if err != nil {
 			return err
 		}
-		password, err := GenerateUUID()
+		password, err := uuid.GenerateUUID()
 		if err != nil {
 			return err
 		}
@@ -266,12 +266,4 @@ func (c *VcapComponent) ListenAndServe() {
 			c.statusCh <- err
 		}
 	}()
-}
-
-func GenerateUUID() (string, error) {
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-	return uuid.String(), nil
 }

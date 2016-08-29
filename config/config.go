@@ -71,6 +71,10 @@ type AccessLog struct {
 	EnableStreaming bool   `yaml:"enable_streaming"`
 }
 
+type Tracing struct {
+	EnableZipkin bool `yaml:"enable_zipkin"`
+}
+
 var defaultLoggingConfig = LoggingConfig{
 	Level:         "debug",
 	MetronAddress: "localhost:3457",
@@ -84,6 +88,7 @@ type Config struct {
 	Index                    uint          `yaml:"index"`
 	Zone                     string        `yaml:"zone"`
 	GoMaxProcs               int           `yaml:"go_max_procs,omitempty"`
+	Tracing                  Tracing       `yaml:"tracing"`
 	TraceKey                 string        `yaml:"trace_key"`
 	AccessLog                AccessLog     `yaml:"access_log"`
 	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`

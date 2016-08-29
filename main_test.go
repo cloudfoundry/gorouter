@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
@@ -384,6 +385,13 @@ var _ = Describe("Router Integration", func() {
 		zombieApp.Listen()
 
 		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
+			defer GinkgoRecover()
+			traceHeader := r.Header.Get(router_http.B3TraceIdHeader)
+			Expect(traceHeader).ToNot(BeEmpty())
+			w.WriteHeader(http.StatusOK)
+		})
+
 		runningApp.Listen()
 
 		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -431,6 +439,10 @@ var _ = Describe("Router Integration", func() {
 		// After NATS starts up the zombie should stay gone
 		zombieApp.VerifyAppStatus(404)
 		runningApp.VerifyAppStatus(200)
+
+		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander.vcap.me", proxyPort, "some-path")
+		_, err = http.Get(uri)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("multiple nats server", func() {

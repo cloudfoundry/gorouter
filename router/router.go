@@ -148,19 +148,11 @@ type gorouterHandler struct {
 }
 
 func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	setRequestXVcapRequestId(req, h.logger)
+	// The X-Vcap-Request-Id must be set before the request is passed into the
+	// dropsonde InstrumentedHandler
+	router_http.SetVcapRequestIdHeader(req, h.logger)
 
 	h.handler.ServeHTTP(res, req)
-}
-
-func setRequestXVcapRequestId(request *http.Request, logger lager.Logger) {
-	uuid, err := common.GenerateUUID()
-	if err == nil {
-		request.Header.Set(router_http.VcapRequestIdHeader, uuid)
-		if logger != nil {
-			logger.Debug("vcap-request-id-header-set", lager.Data{router_http.VcapRequestIdHeader: uuid})
-		}
-	}
 }
 
 func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {

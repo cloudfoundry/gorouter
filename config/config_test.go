@@ -302,6 +302,18 @@ enable_proxy: true
 			Expect(config.HealthCheckUserAgent).To(Equal("HTTP-Monitor/1.1"))
 		})
 
+		It("sets Tracing.EnableZipkin", func() {
+			var b = []byte("tracing:\n  enable_zipkin: true")
+			config.Initialize(b)
+			Expect(config.Tracing.EnableZipkin).To(BeTrue())
+
+		})
+
+		It("defaults Tracing.EnableZipkin", func() {
+			var b = []byte(``)
+			config.Initialize(b)
+			Expect(config.Tracing.EnableZipkin).To(BeFalse())
+		})
 	})
 
 	Describe("Process", func() {

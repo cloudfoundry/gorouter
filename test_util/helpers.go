@@ -82,5 +82,9 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 
 	c.RouteServiceSecret = "kCvXxNMB0JO2vinxoru9Hg=="
 
+	c.Tracing = config.Tracing{
+		EnableZipkin: true,
+	}
+
 	return c
 }

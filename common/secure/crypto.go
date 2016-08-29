@@ -59,10 +59,10 @@ func NewPbkdf2(input []byte, keyLen int) []byte {
 }
 
 func (gcm *AesGCM) generateNonce() ([]byte, error) {
-	return randomBytes(uint(gcm.NonceSize()))
+	return RandomBytes(uint(gcm.NonceSize()))
 }
 
-func randomBytes(size uint) ([]byte, error) {
+func RandomBytes(size uint) ([]byte, error) {
 	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {

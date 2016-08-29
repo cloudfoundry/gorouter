@@ -1,7 +1,7 @@
 package common
 
 import (
-	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
@@ -82,7 +82,7 @@ func (a *TestApp) Port() uint16 {
 }
 
 func (a *TestApp) Register() {
-	uuid, _ := common.GenerateUUID()
+	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host: "localhost",
 		Port: a.port,
