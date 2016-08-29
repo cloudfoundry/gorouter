@@ -90,6 +90,14 @@ suspend_pruning_if_nats_unavailable: true
 			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
 		})
 
+		It("sets the load_balancer_healthy_threshold configuration", func() {
+			var b = []byte(`
+load_balancer_healthy_threshold: 20s
+`)
+			config.Initialize(b)
+			Expect(config.LoadBalancerHealthyThreshold).To(Equal(20 * time.Second))
+		})
+
 		It("sets access log config to file only", func() {
 			var b = []byte(`
 access_log:

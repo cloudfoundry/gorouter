@@ -99,6 +99,7 @@ type Config struct {
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16
 
+	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold"`
 	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval"`
 	SuspendPruningIfNatsUnavailable bool          `yaml:"suspend_pruning_if_nats_unavailable"`
 	PruneStaleDropletsInterval      time.Duration `yaml:"prune_stale_droplets_interval"`

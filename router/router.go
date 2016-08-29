@@ -210,6 +210,13 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
+	//Wait for load balancer threshold value to consider go router instance as healthy
+	if r.config.LoadBalancerHealthyThreshold != 0 {
+		r.logger.Info(fmt.Sprintf("Waiting for load balancer threshold value %s", r.config.LoadBalancerHealthyThreshold))
+		time.Sleep(r.config.LoadBalancerHealthyThreshold)
+		r.logger.Info("Completed wait for load balancer threshold")
+	}
+
 	// create pid file
 	err = r.writePidFile(r.config.PidFile)
 	if err != nil {

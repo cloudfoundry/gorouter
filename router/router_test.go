@@ -90,7 +90,11 @@ var _ = Describe("Router", func() {
 		logger = lagertest.NewTestLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-		logcounter := schema.NewLogCounter()
+
+	})
+
+	JustBeforeEach(func() {
+		var err error
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout:      config.EndpointTimeout,
 			Logger:               logger,
@@ -101,7 +105,7 @@ var _ = Describe("Router", func() {
 			AccessLogger:         &access_log.NullAccessLogger{},
 			HealthCheckUserAgent: "HTTP-Monitor/1.1",
 		})
-
+		logcounter := schema.NewLogCounter()
 		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, nil)
 
 		Expect(err).ToNot(HaveOccurred())
@@ -225,7 +229,7 @@ var _ = Describe("Router", func() {
 			}
 
 			Describe("app with no route service", func() {
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					app = test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 				})
 
@@ -235,7 +239,7 @@ var _ = Describe("Router", func() {
 			})
 
 			Describe("app with an http route service", func() {
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					app = test.NewRouteServiceApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, "http://my-insecure-service.me")
 				})
 
@@ -284,6 +288,24 @@ var _ = Describe("Router", func() {
 			_, err := os.Stat(config.PidFile)
 			return err == nil
 		}).Should(BeTrue())
+	})
+
+	Context("when LoadBalancerHealthyThreshold is set to non-zero value", func() {
+		BeforeEach(func() {
+			config.LoadBalancerHealthyThreshold = 1 * time.Second
+		})
+		It("should log LoadBalancerHealthyThreshold value", func() {
+			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
+		})
+	})
+
+	Context("when LoadBalancerHealthyThreshold is set to zero", func() {
+		BeforeEach(func() {
+			config.LoadBalancerHealthyThreshold = 0
+		})
+		It("should not log LoadBalancerHealthyThreshold value", func() {
+			Expect(logger).ShouldNot(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
+		})
 	})
 
 	It("registry contains last updated varz", func() {
@@ -741,7 +763,7 @@ var _ = Describe("Router", func() {
 
 	Context("long requests", func() {
 		Context("http", func() {
-			BeforeEach(func() {
+			JustBeforeEach(func() {
 				app := test.NewSlowApp(
 					[]route.Uri{"slow-app.vcap.me"},
 					config.Port,
@@ -930,7 +952,7 @@ var _ = Describe("Router", func() {
 
 	Describe("SubscribeRegister", func() {
 		Context("when the register message JSON fails to unmarshall", func() {
-			BeforeEach(func() {
+			JustBeforeEach(func() {
 				// the port is too high
 				mbusClient.Publish("router.register", []byte(`
 {
