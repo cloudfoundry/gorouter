@@ -38,16 +38,20 @@ func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 	existingTraceId := request.Header.Get(B3TraceIdHeader)
 	if existingTraceId != "" {
-		logger.Debug("b3-trace-id-header-exists", lager.Data{B3TraceIdHeader: existingTraceId})
+		if logger != nil {
+			logger.Debug("b3-trace-id-header-exists", lager.Data{B3TraceIdHeader: existingTraceId})
+		}
 		return
 	}
 
 	randBytes, err := secure.RandomBytes(64)
-	if err == nil {
-		id := hex.EncodeToString(randBytes)
-		request.Header.Set(B3TraceIdHeader, id)
-		if logger != nil {
-			logger.Debug("b3-trace-id-header-set", lager.Data{B3TraceIdHeader: id})
-		}
+	if err != nil {
+		logger.Debug("failed-to-create-b3-trace-id")
+		return
+	}
+	id := hex.EncodeToString(randBytes)
+	request.Header.Set(B3TraceIdHeader, id)
+	if logger != nil {
+		logger.Debug("b3-trace-id-header-set", lager.Data{B3TraceIdHeader: id})
 	}
 }

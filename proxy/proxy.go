@@ -149,9 +149,18 @@ func (p *proxy) Drain() {
 }
 
 func (p *proxy) setZipkinHeader(request *http.Request) {
-	if p.enableZipkin {
-		router_http.SetB3TraceIdHeader(request, p.logger)
+	if !p.enableZipkin {
+		return
 	}
+	router_http.SetB3TraceIdHeader(request, p.logger)
+
+	for _, header := range p.extraHeadersToLog {
+		if header == router_http.B3TraceIdHeader {
+			return
+		}
+	}
+
+	p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3TraceIdHeader)
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
