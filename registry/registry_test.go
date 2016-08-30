@@ -577,7 +577,7 @@ var _ = Describe("RouteRegistry", func() {
 				}
 			}()
 			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+			time.Sleep(2*configObj.PruneStaleDropletsInterval + 5*time.Millisecond)
 
 			Expect(r.NumUris()).To(Equal(1))
 			Expect(r.NumEndpoints()).To(Equal(1))
