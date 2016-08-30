@@ -23,7 +23,7 @@ go install -v github.com/onsi/ginkgo/ginkgo
 echo -e "\n Formatting packages..."
 go fmt ./...
 
-ginkgo -r -failOnPending -randomizeAllSpecs -race "$@"
+ginkgo -keepGoing -trace -p -progress -r -failOnPending -randomizeAllSpecs -race "$@"
 
 # Installing dependencies needed by go vet
 go install .

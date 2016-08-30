@@ -33,7 +33,7 @@ var _ = Describe("RouteRegistry", func() {
 		logger = lagertest.NewTestLogger("test")
 		configObj = config.DefaultConfig()
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
-		configObj.DropletStaleThreshold = 10 * time.Millisecond
+		configObj.DropletStaleThreshold = 24 * time.Millisecond
 
 		reporter = new(fakes.FakeRouteRegistryReporter)
 
@@ -528,7 +528,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumUris()).To(Equal(1))
 
 			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+			time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
@@ -546,7 +546,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(2))
 
 			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+			time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
 
 			Expect(r.NumUris()).To(Equal(0))
 			Expect(r.NumEndpoints()).To(Equal(0))
@@ -598,7 +598,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(1))
 
 			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+			time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
 
 			r.Register("foo", endpoint)
 
@@ -629,24 +629,32 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(p).ToNot(BeNil())
 		})
 
-		It("sends route metrics to the reporter", func() {
-			r.Register("foo", fooEndpoint)
-			r.Register("fooo", fooEndpoint)
+		Context("when stale threshold is less than pruning cycle", func() {
+			BeforeEach(func() {
+				configObj = config.DefaultConfig()
+				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
+				configObj.DropletStaleThreshold = 49 * time.Millisecond
+				reporter = new(fakes.FakeRouteRegistryReporter)
 
-			r.StartPruningCycle()
+				r = NewRouteRegistry(logger, configObj, reporter)
+			})
 
-			Eventually(func() int {
-				e := *fooEndpoint
-				r.Register("foo", &e)
-				r.Register("fooo", &e)
-				return reporter.CaptureRouteStatsCallCount()
-			},
-				2*configObj.PruneStaleDropletsInterval,
-			).Should(Equal(1))
+			It("sends route metrics to the reporter", func() {
+				r.StartPruningCycle()
 
-			totalRoutes, timeSinceLastUpdate := reporter.CaptureRouteStatsArgsForCall(0)
-			Expect(totalRoutes).To(Equal(2))
-			Expect(timeSinceLastUpdate).To(BeNumerically("~", 5, 5))
+				Eventually(func() int {
+					e := *fooEndpoint
+					r.Register("foo", &e)
+					r.Register("fooo", &e)
+					return reporter.CaptureRouteStatsCallCount()
+				},
+					2*configObj.PruneStaleDropletsInterval,
+					10*time.Millisecond,
+				).Should(Equal(1))
+
+				totalRoutes, _ := reporter.CaptureRouteStatsArgsForCall(0)
+				Expect(totalRoutes).To(Equal(2))
+			})
 		})
 
 		Context("when stale threshold is greater than pruning cycle", func() {
@@ -665,6 +673,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(r.NumUris()).To(Equal(1))
 
 				r.StartPruningCycle()
+
 				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
 
 				Expect(r.NumUris()).To(Equal(1))
@@ -689,7 +698,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				r.StartPruningCycle()
 				r.SuspendPruning(func() bool { return true })
-				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+				time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
 			})
 
 			It("does not remove any routes", func() {
@@ -710,10 +719,10 @@ var _ = Describe("RouteRegistry", func() {
 
 					r.SuspendPruning(func() bool { return false })
 
-					time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
+					time.Sleep(configObj.PruneStaleDropletsInterval)
 
-					Expect(r.NumUris()).To(Equal(totalRoutes))
-					Expect(r.NumEndpoints()).To(Equal(totalRoutes))
+					Eventually(r.NumUris).Should(Equal(0))
+					Eventually(r.NumEndpoints).Should(Equal(0))
 				})
 			})
 		})
