@@ -74,7 +74,7 @@ var _ = Describe("Router Integration", func() {
 		caCertsPath := filepath.Join("test", "assets", "certs", "uaa-ca.pem")
 		caCertsPath, err := filepath.Abs(caCertsPath)
 		Expect(err).ToNot(HaveOccurred())
-
+		cfg.LoadBalancerHealthyThreshold = 0
 		cfg.OAuth = config.OAuthConfig{
 			TokenEndpoint:     "127.0.0.1",
 			Port:              8443,

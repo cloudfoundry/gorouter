@@ -50,17 +50,18 @@ var _ = Describe("Router", func() {
 		natsPort   uint16
 		config     *cfg.Config
 
-		mbusClient   *nats.Conn
-		registry     *rregistry.RouteRegistry
-		varz         vvarz.Varz
-		router       *Router
-		signals      chan os.Signal
-		closeChannel chan struct{}
-		readyChan    chan struct{}
-		logger       lager.Logger
+		mbusClient                   *nats.Conn
+		registry                     *rregistry.RouteRegistry
+		varz                         vvarz.Varz
+		router                       *Router
+		signals                      chan os.Signal
+		closeChannel                 chan struct{}
+		readyChan                    chan struct{}
+		logger                       lager.Logger
+		LoadBalancerHealthyThreshold time.Duration
 	)
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		natsPort = test_util.NextAvailPort()
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
@@ -80,6 +81,7 @@ var _ = Describe("Router", func() {
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 		config.EnablePROXY = true
+		config.LoadBalancerHealthyThreshold = LoadBalancerHealthyThreshold
 
 		// set pid file
 		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
@@ -90,11 +92,6 @@ var _ = Describe("Router", func() {
 		logger = lagertest.NewTestLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-
-	})
-
-	JustBeforeEach(func() {
-		var err error
 		proxy := proxy.NewProxy(proxy.ProxyArgs{
 			EndpointTimeout:      config.EndpointTimeout,
 			Logger:               logger,
@@ -292,7 +289,7 @@ var _ = Describe("Router", func() {
 
 	Context("when LoadBalancerHealthyThreshold is set to non-zero value", func() {
 		BeforeEach(func() {
-			config.LoadBalancerHealthyThreshold = 1 * time.Second
+			LoadBalancerHealthyThreshold = 1 * time.Second
 		})
 		It("should log LoadBalancerHealthyThreshold value", func() {
 			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
@@ -301,7 +298,7 @@ var _ = Describe("Router", func() {
 
 	Context("when LoadBalancerHealthyThreshold is set to zero", func() {
 		BeforeEach(func() {
-			config.LoadBalancerHealthyThreshold = 0
+			LoadBalancerHealthyThreshold = 0
 		})
 		It("should not log LoadBalancerHealthyThreshold value", func() {
 			Expect(logger).ShouldNot(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
