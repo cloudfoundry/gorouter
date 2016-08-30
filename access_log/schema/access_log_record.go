@@ -51,7 +51,7 @@ func (r *AccessLogRecord) getRecord() string {
 }
 
 func (r *AccessLogRecord) makeRecord() string {
-	statusCode, responseTime, appId, extraHeaders, appIndex := "-", "-", "-", "", ""
+	statusCode, responseTime, appId, extraHeaders, appIndex := "-", "-", "-", "", "-"
 
 	if r.StatusCode != 0 {
 		statusCode = strconv.Itoa(r.StatusCode)
@@ -63,7 +63,9 @@ func (r *AccessLogRecord) makeRecord() string {
 
 	if r.RouteEndpoint != nil {
 		appId = r.RouteEndpoint.ApplicationId
-		appIndex = r.RouteEndpoint.PrivateInstanceIndex
+		if r.RouteEndpoint.PrivateInstanceIndex != "" {
+			appIndex = r.RouteEndpoint.PrivateInstanceIndex
+		}
 	}
 
 	if r.ExtraHeadersToLog != nil && len(r.ExtraHeadersToLog) > 0 {
