@@ -28,9 +28,5 @@ ginkgo -keepGoing -trace -p -progress -r -failOnPending -randomizeAllSpecs -race
 # Installing dependencies needed by go vet
 go install .
 
-go tool vet -v -all -shadow=true main.go
-
-for file in $(find {access_log,common,config,metrics,proxy,registry,route,route_fetcher,route_service,router,stats,varz} \( -name "*.go" -not -iname "*test.go" \))
-do
-    go tool vet -v -all -shadow=true $file
-done
+go vet ./...
+go tool vet --shadow .

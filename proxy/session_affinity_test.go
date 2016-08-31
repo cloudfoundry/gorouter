@@ -263,7 +263,7 @@ var _ = Describe("Session Affinity", func() {
 			req = test_util.NewRequest("GET", host, "/", nil)
 			req.AddCookie(cookie)
 
-			jSessionIdCookie := &http.Cookie{
+			jSessionIdCookie = &http.Cookie{
 				Name:  proxy.StickyCookieKey,
 				Value: "xxx",
 			}
