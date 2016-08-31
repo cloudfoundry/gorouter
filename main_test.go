@@ -102,6 +102,7 @@ var _ = Describe("Router Integration", func() {
 		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(session, 30).Should(Say("starting"))
+		Eventually(session, 15).Should(Say("Successfully-connected-to-nats.*localhost:\\d+"))
 		Eventually(session, 15).Should(Say("gorouter.started"))
 		gorouterSession = session
 		return session

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"net/url"
 
 	"code.cloudfoundry.org/cflager"
 	"code.cloudfoundry.org/clock"
@@ -83,7 +84,13 @@ func main() {
 
 	logger.Info("setting-up-nats-connection")
 	natsClient := connectToNatsServer(logger.Session("nats"), c)
-	logger.Info("Successfully-connected-to-nats")
+	natsHost := ""
+	natsUrl, err := url.Parse(natsClient.ConnectedUrl())
+	if err == nil {
+		natsHost = natsUrl.Host
+	}
+
+	logger.Info("Successfully-connected-to-nats", lager.Data{"host": natsHost})
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)

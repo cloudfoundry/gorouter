@@ -33,6 +33,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
@@ -277,6 +278,15 @@ var _ = Describe("Router", func() {
 
 		Eventually(started, 4).Should(Receive())
 		Eventually(cb, 4).Should(Receive())
+	})
+
+	It("logs the nats host ip on nats reconnect", func() {
+		natsRunner.Stop()
+		natsRunner.Start()
+
+		natsUrl, err := url.Parse(natsRunner.MessageBus.ConnectedUrl())
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(logger).Should(gbytes.Say(fmt.Sprintf("Reconnecting to NATS server %s...", natsUrl.Host)))
 	})
 
 	It("creates a pidfile on startup", func() {

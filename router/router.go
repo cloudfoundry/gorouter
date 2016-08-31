@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -169,7 +170,15 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.SendStartMessage()
 
 	r.mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
-		r.logger.Info(fmt.Sprintf("Reconnecting to NATS server %s...", conn.Opts.Url))
+		natsUrl, err := url.Parse(conn.ConnectedUrl())
+		natsHost := ""
+		if err != nil {
+			r.logger.Fatal("nats-url-parse-error", err)
+		} else {
+			natsHost = natsUrl.Host
+		}
+
+		r.logger.Info(fmt.Sprintf("Reconnecting to NATS server %s...", natsHost))
 		r.SendStartMessage()
 	}
 
