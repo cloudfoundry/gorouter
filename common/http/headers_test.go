@@ -14,6 +14,9 @@ import (
 
 const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
+// 64-bit random hexadecimal string
+const b3_id_regex = `^[[:xdigit:]]{16}$`
+
 var _ = Describe("Headers", func() {
 	Describe("SetVcapRequestIdHeader", func() {
 		var (
@@ -102,8 +105,10 @@ var _ = Describe("Headers", func() {
 				logger = lagertest.NewTestLogger("headers-test")
 			})
 			Context("when X-B3-TraceId is not set", func() {
-				It("generates a new b3 id and sets the X-B3-TraceId header", func() {
-					Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).ToNot(BeEmpty())
+				It("generates a new b3 id and sets the X-B3-TraceId header with a random 64-bit hexadecimal string", func() {
+					reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
+					Expect(reqID).ToNot(BeEmpty())
+					Expect(reqID).To(MatchRegexp(b3_id_regex))
 				})
 
 				It("logs the header", func() {
@@ -132,7 +137,9 @@ var _ = Describe("Headers", func() {
 
 		Context("when logger is nil", func() {
 			It("does not fail when X-B3-TraceId is not set", func() {
-				Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).ToNot(BeEmpty())
+				reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
+				Expect(reqID).ToNot(BeEmpty())
+				Expect(reqID).To(MatchRegexp(b3_id_regex))
 			})
 			Context("when X-B3-TraceId is set", func() {
 				BeforeEach(func() {

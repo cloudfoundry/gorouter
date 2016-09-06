@@ -44,7 +44,7 @@ func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 		return
 	}
 
-	randBytes, err := secure.RandomBytes(64)
+	randBytes, err := secure.RandomBytes(8)
 	if err != nil {
 		logger.Debug("failed-to-create-b3-trace-id")
 		return
