@@ -389,7 +389,9 @@ var _ = Describe("Router Integration", func() {
 		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
 			traceHeader := r.Header.Get(router_http.B3TraceIdHeader)
+			spanIDHeader := r.Header.Get(router_http.B3SpanIdHeader)
 			Expect(traceHeader).ToNot(BeEmpty())
+			Expect(spanIDHeader).ToNot(BeEmpty())
 			w.WriteHeader(http.StatusOK)
 		})
 

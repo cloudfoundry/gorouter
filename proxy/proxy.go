@@ -152,16 +152,26 @@ func (p *proxy) setZipkinHeader(request *http.Request) {
 	if !p.enableZipkin {
 		return
 	}
-	router_http.SetB3TraceIdHeader(request, p.logger)
-	router_http.SetB3SpanIdHeader(request, p.logger)
+	router_http.SetB3Headers(request, p.logger)
 
+	var (
+		addSpanIdHeader  = true
+		addTraceIdHeader = true
+	)
 	for _, header := range p.extraHeadersToLog {
+		if header == router_http.B3SpanIdHeader {
+			addSpanIdHeader = false
+		}
 		if header == router_http.B3TraceIdHeader {
-			return
+			addTraceIdHeader = false
 		}
 	}
-
-	p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3TraceIdHeader)
+	if addSpanIdHeader {
+		p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3SpanIdHeader)
+	}
+	if addTraceIdHeader {
+		p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3TraceIdHeader)
+	}
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {

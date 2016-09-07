@@ -425,7 +425,7 @@ var _ = Describe("Proxy", func() {
 			conn.ReadResponse()
 		})
 
-		FIt("X-B3-SpanId is added", func() {
+		It("X-B3-SpanId is added", func() {
 			done := make(chan string)
 			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)

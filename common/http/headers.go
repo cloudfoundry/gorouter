@@ -47,6 +47,10 @@ func SetB3SpanIdHeader(request *http.Request, logger lager.Logger) {
 		logger.Debug("b3-span-id-header-set", lager.Data{B3SpanIdHeader: id})
 	}
 }
+func SetB3Headers(request *http.Request, logger lager.Logger) {
+	SetB3TraceIdHeader(request, logger)
+	SetB3SpanIdHeader(request, logger)
+}
 func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 	existingTraceId := request.Header.Get(B3TraceIdHeader)
 	if existingTraceId != "" {

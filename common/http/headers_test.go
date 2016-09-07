@@ -177,11 +177,11 @@ var _ = Describe("Headers", func() {
 					Expect(reqID).To(MatchRegexp(b3_id_regex))
 				})
 
-				// It("logs the header", func() {
-				// 	reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
-				// 	Expect(logger).To(gbytes.Say("b3-trace-id-header-set"))
-				// 	Expect(logger).To(gbytes.Say(reqID))
-				// })
+				It("logs the header", func() {
+					reqID := req.Header.Get(commonhttp.B3SpanIdHeader)
+					Expect(logger).To(gbytes.Say("b3-span-id-header-set"))
+					Expect(logger).To(gbytes.Say(reqID))
+				})
 
 			})
 		})
