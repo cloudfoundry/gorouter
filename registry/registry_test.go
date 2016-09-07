@@ -570,7 +570,7 @@ var _ = Describe("RouteRegistry", func() {
 						return
 					default:
 						r.Register("foo/path", barEndpoint)
-						time.Sleep(5 * time.Millisecond)
+						time.Sleep(2 * time.Millisecond)
 					}
 				}
 			}()
