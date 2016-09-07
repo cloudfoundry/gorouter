@@ -153,6 +153,7 @@ func (p *proxy) setZipkinHeader(request *http.Request) {
 		return
 	}
 	router_http.SetB3TraceIdHeader(request, p.logger)
+	router_http.SetB3SpanIdHeader(request, p.logger)
 
 	for _, header := range p.extraHeadersToLog {
 		if header == router_http.B3TraceIdHeader {

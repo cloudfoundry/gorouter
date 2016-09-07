@@ -17,6 +17,7 @@ const (
 	VcapTraceHeader       = "X-Vcap-Trace"
 	CfInstanceIdHeader    = "X-CF-InstanceID"
 	B3TraceIdHeader       = "X-B3-TraceId"
+	B3SpanIdHeader        = "X-B3-SpanId"
 )
 
 func SetVcapRequestIdHeader(request *http.Request, logger lager.Logger) {
@@ -34,7 +35,18 @@ func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 	responseWriter.Header().Set(VcapBackendHeader, addr)
 	responseWriter.Header().Set(CfRouteEndpointHeader, addr)
 }
-
+func SetB3SpanIdHeader(request *http.Request, logger lager.Logger) {
+	randBytes, err := secure.RandomBytes(8)
+	if err != nil {
+		logger.Debug("failed-to-create-b3-span-id")
+		return
+	}
+	id := hex.EncodeToString(randBytes)
+	request.Header.Set(B3SpanIdHeader, id)
+	if logger != nil {
+		logger.Debug("b3-span-id-header-set", lager.Data{B3SpanIdHeader: id})
+	}
+}
 func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 	existingTraceId := request.Header.Get(B3TraceIdHeader)
 	if existingTraceId != "" {

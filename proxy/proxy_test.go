@@ -425,6 +425,31 @@ var _ = Describe("Proxy", func() {
 			conn.ReadResponse()
 		})
 
+		FIt("X-B3-SpanId is added", func() {
+			done := make(chan string)
+			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
+				req, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+
+				done <- req.Header.Get(router_http.B3SpanIdHeader)
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+			req := test_util.NewRequest("GET", "app", "/", nil)
+			conn.WriteRequest(req)
+
+			var answer string
+			Eventually(done).Should(Receive(&answer))
+			Expect(answer).ToNot(BeEmpty())
+
+			conn.ReadResponse()
+		})
+
 		It("x_b3_traceid does show up in the access log", func() {
 			done := make(chan string)
 			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {

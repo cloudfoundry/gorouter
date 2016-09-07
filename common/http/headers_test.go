@@ -151,4 +151,55 @@ var _ = Describe("Headers", func() {
 			})
 		})
 	})
+
+	Describe("SetB3SpanIdHeader", func() {
+		var (
+			logger lager.Logger
+			req    *http.Request
+		)
+		BeforeEach(func() {
+			var err error
+			req, err = http.NewRequest("GET", "test.endpoint", nil)
+			Expect(err).ToNot(HaveOccurred())
+		})
+		JustBeforeEach(func() {
+			commonhttp.SetB3SpanIdHeader(req, logger)
+		})
+
+		Context("when logger is set", func() {
+			BeforeEach(func() {
+				logger = lagertest.NewTestLogger("headers-test")
+			})
+			Context("when tracing is enabled", func() {
+				It("generates a new b3 span id", func() {
+					reqID := req.Header.Get(commonhttp.B3SpanIdHeader)
+					Expect(reqID).ToNot(BeEmpty())
+					Expect(reqID).To(MatchRegexp(b3_id_regex))
+				})
+
+				// It("logs the header", func() {
+				// 	reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
+				// 	Expect(logger).To(gbytes.Say("b3-trace-id-header-set"))
+				// 	Expect(logger).To(gbytes.Say(reqID))
+				// })
+
+			})
+		})
+
+		Context("when logger is nil", func() {
+			It("does not fail when X-B3-Span is not set", func() {
+				reqID := req.Header.Get(commonhttp.B3SpanIdHeader)
+				Expect(reqID).ToNot(BeEmpty())
+				Expect(reqID).To(MatchRegexp(b3_id_regex))
+			})
+			Context("when X-B3-SpanId header is set", func() {
+				BeforeEach(func() {
+					req.Header.Set(commonhttp.B3TraceIdHeader, "sample-span-id")
+				})
+				It("sets a new X-B3-SpanId", func() {
+					Expect(req.Header.Get(commonhttp.B3SpanIdHeader)).ToNot(Equal("sample-span-id"))
+				})
+			})
+		})
+	})
 })
