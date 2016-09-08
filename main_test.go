@@ -101,9 +101,17 @@ var _ = Describe("Router Integration", func() {
 		gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(session, 30).Should(Say("starting"))
-		Eventually(session, 15).Should(Say("Successfully-connected-to-nats.*localhost:\\d+"))
-		Eventually(session, 15).Should(Say("gorouter.started"))
+		var eventsSessionLogs []byte
+		Eventually(func() string {
+			logAdd, err := ioutil.ReadAll(session.Out)
+			Expect(err).ToNot(HaveOccurred())
+			eventsSessionLogs = append(eventsSessionLogs, logAdd...)
+			return string(eventsSessionLogs)
+		}, 70*time.Second).Should(SatisfyAll(
+			ContainSubstring(`starting`),
+			MatchRegexp(`Successfully-connected-to-nats.*localhost:\d+`),
+			ContainSubstring(`gorouter.started`),
+		))
 		gorouterSession = session
 		return session
 	}
