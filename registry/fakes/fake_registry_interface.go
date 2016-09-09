@@ -29,6 +29,16 @@ type FakeRegistryInterface struct {
 	lookupReturns struct {
 		result1 *route.Pool
 	}
+	LookupWithInstanceStub        func(uri route.Uri, appId, appIndex string) *route.Pool
+	lookupWithInstanceMutex       sync.RWMutex
+	lookupWithInstanceArgsForCall []struct {
+		uri      route.Uri
+		appId    string
+		appIndex string
+	}
+	lookupWithInstanceReturns struct {
+		result1 *route.Pool
+	}
 	StartPruningCycleStub        func()
 	startPruningCycleMutex       sync.RWMutex
 	startPruningCycleArgsForCall []struct{}
@@ -132,6 +142,40 @@ func (fake *FakeRegistryInterface) LookupArgsForCall(i int) route.Uri {
 func (fake *FakeRegistryInterface) LookupReturns(result1 *route.Pool) {
 	fake.LookupStub = nil
 	fake.lookupReturns = struct {
+		result1 *route.Pool
+	}{result1}
+}
+
+func (fake *FakeRegistryInterface) LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool {
+	fake.lookupWithInstanceMutex.Lock()
+	fake.lookupWithInstanceArgsForCall = append(fake.lookupWithInstanceArgsForCall, struct {
+		uri      route.Uri
+		appId    string
+		appIndex string
+	}{uri, appId, appIndex})
+	fake.lookupWithInstanceMutex.Unlock()
+	if fake.LookupWithInstanceStub != nil {
+		return fake.LookupWithInstanceStub(uri, appId, appIndex)
+	} else {
+		return fake.lookupWithInstanceReturns.result1
+	}
+}
+
+func (fake *FakeRegistryInterface) LookupWithInstanceCallCount() int {
+	fake.lookupWithInstanceMutex.RLock()
+	defer fake.lookupWithInstanceMutex.RUnlock()
+	return len(fake.lookupWithInstanceArgsForCall)
+}
+
+func (fake *FakeRegistryInterface) LookupWithInstanceArgsForCall(i int) (route.Uri, string, string) {
+	fake.lookupWithInstanceMutex.RLock()
+	defer fake.lookupWithInstanceMutex.RUnlock()
+	return fake.lookupWithInstanceArgsForCall[i].uri, fake.lookupWithInstanceArgsForCall[i].appId, fake.lookupWithInstanceArgsForCall[i].appIndex
+}
+
+func (fake *FakeRegistryInterface) LookupWithInstanceReturns(result1 *route.Pool) {
+	fake.LookupWithInstanceStub = nil
+	fake.lookupWithInstanceReturns = struct {
 		result1 *route.Pool
 	}{result1}
 }

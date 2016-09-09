@@ -202,4 +202,44 @@ var _ = Describe("Headers", func() {
 			})
 		})
 	})
+
+	Describe("ValidateCfAppInstance", func() {
+		var (
+			appInstanceHeader string
+		)
+
+		Context("when given a complete app instance header", func() {
+			BeforeEach(func() {
+				appInstanceHeader = "app-id:1"
+			})
+
+			It("returns the app id and app index", func() {
+				appID, appIndex, err := commonhttp.ValidateCfAppInstance(appInstanceHeader)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(appID).To(Equal("app-id"))
+				Expect(appIndex).To(Equal("1"))
+			})
+		})
+
+		Context("when given an incomplete app instance header", func() {
+			BeforeEach(func() {
+				appInstanceHeader = "app-id:"
+			})
+
+			It("returns an error", func() {
+				_, _, err := commonhttp.ValidateCfAppInstance(appInstanceHeader)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Context("when only the app id is given", func() {
+			BeforeEach(func() {
+				appInstanceHeader = "app-id"
+			})
+
+			It("returns an error", func() {
+				_, _, err := commonhttp.ValidateCfAppInstance(appInstanceHeader)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
 })

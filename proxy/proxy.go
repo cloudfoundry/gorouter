@@ -32,6 +32,7 @@ const (
 
 type LookupRegistry interface {
 	Lookup(uri route.Uri) *route.Pool
+	LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool
 }
 
 type Proxy interface {
@@ -140,6 +141,18 @@ func (p *proxy) lookup(request *http.Request) *route.Pool {
 	requestPath := request.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(request) + requestPath)
+	appInstanceHeader := request.Header.Get(router_http.CfAppInstance)
+	if appInstanceHeader != "" {
+		appId, appIndex, err := router_http.ValidateCfAppInstance(appInstanceHeader)
+
+		if err != nil {
+			p.logger.Error("invalid-app-instance-header", err)
+			return nil
+		} else {
+			return p.registry.LookupWithInstance(uri, appId, appIndex)
+		}
+	}
+
 	return p.registry.Lookup(uri)
 }
 

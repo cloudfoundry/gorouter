@@ -89,12 +89,12 @@ var _ = Describe("Router Integration", func() {
 	}
 
 	createSSLConfig := func(cfgFile string, statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
-		config := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
+		cfg := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
 
-		configDrainSetup(config, defaultPruneInterval, defaultPruneThreshold, 0)
+		configDrainSetup(cfg, defaultPruneInterval, defaultPruneThreshold, 0)
 
-		writeConfig(config, cfgFile)
-		return config
+		writeConfig(cfg, cfgFile)
+		return cfg
 	}
 
 	startGorouterSession := func(cfgFile string) *Session {

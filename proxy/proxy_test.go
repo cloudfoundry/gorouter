@@ -1281,7 +1281,7 @@ var _ = Describe("Proxy", func() {
 
 		ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
 		Expect(err).To(BeNil())
-		registerAddr(r, "retries", "", ip, "instanceId", "2")
+		registerAddr(r, "retries", "", ip, "instanceId", "2", "")
 
 		for i := 0; i < 5; i++ {
 			body := &bytes.Buffer{}
@@ -1361,6 +1361,62 @@ var _ = Describe("Proxy", func() {
 			}).ShouldNot(BeZero())
 
 			Expect(string(payload)).To(MatchRegexp("^test.*\n"))
+		})
+
+		Context("when the request has X-CF-APP-INSTANCE", func() {
+			It("lookups the route to that specific app index and id", func() {
+				done := make(chan string)
+				// app handler for app.vcap.me
+				ln := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, "", "app-1-id")
+				defer ln.Close()
+
+				ln2 := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
+					conn.WriteResponse(resp)
+
+					conn.Close()
+
+					done <- req.Header.Get("X-CF-APP-INSTANCE")
+				}, "", "app-2-id")
+				defer ln2.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/chat", nil)
+				req.Header.Set("X-CF-APP-INSTANCE", "app-2-id:2")
+
+				Consistently(func() string {
+					conn.WriteRequest(req)
+
+					var instanceID string
+					Eventually(done).Should(Receive(&instanceID))
+					_, b := conn.ReadResponse()
+					return b
+				}).Should(Equal("Hellow World: App2"))
+			})
+
+			It("returns a 404 if it cannot find the specified instance", func() {
+				ln := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, "", "app-1-id")
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
+				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
+				conn.WriteRequest(req)
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
 		})
 
 		Context("when the request is a TCP Upgrade", func() {
@@ -1502,14 +1558,13 @@ func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
 	return res, body
 }
 
-func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId string, instanceIndex string) {
+func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr net.Addr, instanceId, instanceIndex, appId string) {
 	host, portStr, err := net.SplitHostPort(addr.String())
 	Expect(err).NotTo(HaveOccurred())
 
 	port, err := strconv.Atoi(portStr)
 	Expect(err).NotTo(HaveOccurred())
-
-	reg.Register(route.Uri(path), route.NewEndpoint("", host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}))
+	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}))
 }
 
 func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {
@@ -1521,12 +1576,16 @@ func registerHandlerWithRouteService(reg *registry.RouteRegistry, path string, r
 }
 
 func registerHandlerWithInstanceId(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId string) net.Listener {
+	return registerHandlerWithAppId(reg, path, routeServiceUrl, handler, instanceId, "")
+}
+
+func registerHandlerWithAppId(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId, appId string) net.Listener {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())
 
 	go runBackendInstance(ln, handler)
 
-	registerAddr(reg, path, routeServiceUrl, ln.Addr(), instanceId, "2")
+	registerAddr(reg, path, routeServiceUrl, ln.Addr(), instanceId, "2", appId)
 
 	return ln
 }

@@ -514,6 +514,66 @@ var _ = Describe("RouteRegistry", func() {
 		})
 	})
 
+	Context("LookupWithInstance", func() {
+		var (
+			appId    string
+			appIndex string
+		)
+
+		BeforeEach(func() {
+			m1 := route.NewEndpoint("app-1-ID", "192.168.1.1", 1234, "", "0", nil, -1, "", modTag)
+			m2 := route.NewEndpoint("app-2-ID", "192.168.1.2", 1235, "", "0", nil, -1, "", modTag)
+
+			r.Register("bar", m1)
+			r.Register("bar", m2)
+
+			appId = "app-1-ID"
+			appIndex = "0"
+		})
+
+		It("selects the route with the matching instance id", func() {
+			Expect(r.NumUris()).To(Equal(1))
+			Expect(r.NumEndpoints()).To(Equal(2))
+
+			p := r.LookupWithInstance("bar", appId, appIndex)
+			e := p.Endpoints("").Next()
+
+			Expect(e).ToNot(BeNil())
+			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:1234"))
+
+			Expect(r.NumUris()).To(Equal(1))
+			Expect(r.NumEndpoints()).To(Equal(2))
+		})
+
+		Context("when given an incorrect app index", func() {
+			BeforeEach(func() {
+				appId = "app-2-ID"
+				appIndex = "94"
+			})
+
+			It("returns a nil pool", func() {
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(2))
+				p := r.LookupWithInstance("bar", appId, appIndex)
+				Expect(p).To(BeNil())
+			})
+		})
+
+		Context("when given an incorrect app id", func() {
+			BeforeEach(func() {
+				appId = "app-3-ID"
+				appIndex = "0"
+			})
+
+			It("returns a nil pool ", func() {
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(2))
+				p := r.LookupWithInstance("bar", appId, appIndex)
+				Expect(p).To(BeNil())
+			})
+		})
+	})
+
 	Context("Prunes Stale Droplets", func() {
 		AfterEach(func() {
 			r.StopPruningCycle()

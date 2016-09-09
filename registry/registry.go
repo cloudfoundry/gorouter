@@ -13,10 +13,12 @@ import (
 	"code.cloudfoundry.org/lager"
 )
 
+//go:generate counterfeiter -o fakes/fake_registry_interface.go . RegistryInterface
 type RegistryInterface interface {
 	Register(uri route.Uri, endpoint *route.Endpoint)
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
 	Lookup(uri route.Uri) *route.Pool
+	LookupWithInstance(uri route.Uri, appId, appIndex string) *route.Pool
 	StartPruningCycle()
 	StopPruningCycle()
 	NumUris() int
@@ -134,6 +136,21 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	r.RUnlock()
 
 	return pool
+}
+
+func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool {
+	uri = uri.RouteKey()
+	p := r.Lookup(uri)
+
+	var surgicalPool *route.Pool
+
+	p.Each(func(e *route.Endpoint) {
+		if (e.ApplicationId == appId) && (e.PrivateInstanceIndex == appIndex) {
+			surgicalPool = route.NewPool(0, "")
+			surgicalPool.Put(e)
+		}
+	})
+	return surgicalPool
 }
 
 func (r *RouteRegistry) StartPruningCycle() {
