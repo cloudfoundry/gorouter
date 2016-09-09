@@ -17,7 +17,7 @@ var _ = Describe("RSS Cli", func() {
 		It("displays help", func() {
 			command := rssCommand()
 			session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-			Eventually(session).Should(gexec.Exit(0))
+			Eventually(session, "2s").Should(gexec.Exit(0))
 			Eventually(session.Out).Should(gbytes.Say("rss - A CLI for generating"))
 		})
 	})
@@ -38,7 +38,7 @@ var _ = Describe("RSS Cli", func() {
 				It("generates a signature with the current time", func() {
 					command := rssCommand("generate", "-u", "http://some-url.com")
 					session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-					Eventually(session).Should(gexec.Exit(0))
+					Eventually(session, "2s").Should(gexec.Exit(0))
 					Eventually(session.Out).Should(gbytes.Say("Encoded Signature:"))
 					Eventually(session.Out).Should(gbytes.Say("Encoded Metadata:"))
 				})
@@ -47,7 +47,7 @@ var _ = Describe("RSS Cli", func() {
 					It("generates a signature with the provided time", func() {
 						command := rssCommand("generate", "-u", "http://some-url.com", "-t", "1439416554")
 						session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-						Eventually(session).Should(gexec.Exit(0))
+						Eventually(session, "2s").Should(gexec.Exit(0))
 						Eventually(session.Out).Should(gbytes.Say("Encoded Signature:"))
 						Eventually(session.Out).Should(gbytes.Say("Encoded Metadata:"))
 					})
@@ -69,7 +69,7 @@ var _ = Describe("RSS Cli", func() {
 						It("generates a signature with the current time", func() {
 							command := rssCommand("generate", "-u", "http://some-url.com", "-k", "fixtures/key")
 							session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
-							Eventually(session).Should(gexec.Exit(0))
+							Eventually(session, "2s").Should(gexec.Exit(0))
 							Eventually(session.Out).Should(gbytes.Say("Encoded Signature:"))
 							Eventually(session.Out).Should(gbytes.Say("Encoded Metadata:"))
 						})
@@ -108,7 +108,7 @@ var _ = Describe("RSS Cli", func() {
 					command := rssCommand("read", "-s", sig, "-m", meta)
 					session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
 					Expect(err).NotTo(HaveOccurred())
-					Eventually(session).Should(gexec.Exit(0))
+					Eventually(session, "2s").Should(gexec.Exit(0))
 					Eventually(session.Out).Should(gbytes.Say("Decoded Signature"))
 				})
 			})
@@ -119,7 +119,7 @@ var _ = Describe("RSS Cli", func() {
 						command := rssCommand("read", "-k", "fixtures/key", "-s", sig, "-m", meta)
 						session, err = gexec.Start(command, GinkgoWriter, GinkgoWriter)
 						Expect(err).NotTo(HaveOccurred())
-						Eventually(session).Should(gexec.Exit(0))
+						Eventually(session, "2s").Should(gexec.Exit(0))
 						Eventually(session.Out).Should(gbytes.Say("Decoded Signature"))
 					})
 				})
@@ -133,9 +133,7 @@ var _ = Describe("RSS Cli", func() {
 						Eventually(session.Out).Should(gbytes.Say("Failed to read signature"))
 					})
 				})
-
 			})
 		})
 	})
-
 })
