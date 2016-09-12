@@ -586,7 +586,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumUris()).To(Equal(1))
 
 			r.StartPruningCycle()
-			time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
+			time.Sleep(2 * configObj.PruneStaleDropletsInterval)
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
@@ -691,7 +691,7 @@ var _ = Describe("RouteRegistry", func() {
 			BeforeEach(func() {
 				configObj = config.DefaultConfig()
 				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
-				configObj.DropletStaleThreshold = 49 * time.Millisecond
+				configObj.DropletStaleThreshold = 45 * time.Millisecond
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
 				r = NewRouteRegistry(logger, configObj, reporter)
