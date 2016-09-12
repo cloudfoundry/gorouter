@@ -342,7 +342,8 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 	routeServiceConfig *route_service.RouteServiceConfig) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
-			SetupProxyRequest(req, request, routeServiceArgs, routeServiceConfig)
+			setupProxyRequest(req, request)
+			handleRouteServiceIntegration(request, routeServiceArgs, routeServiceConfig)
 		},
 		Transport:     proxyTransport,
 		FlushInterval: 50 * time.Millisecond,
@@ -351,9 +352,24 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 	return rproxy
 }
 
-func SetupProxyRequest(source *http.Request, target *http.Request,
+func handleRouteServiceIntegration(
+	target *http.Request,
 	routeServiceArgs route_service.RouteServiceArgs,
-	routeServiceConfig *route_service.RouteServiceConfig) {
+	routeServiceConfig *route_service.RouteServiceConfig,
+) {
+	sig := target.Header.Get(route_service.RouteServiceSignature)
+	if forwardingToRouteService(routeServiceArgs.UrlString, sig) {
+		// An endpoint has a route service and this request did not come from the service
+		routeServiceConfig.SetupRouteServiceRequest(target, routeServiceArgs)
+	} else if hasBeenToRouteService(routeServiceArgs.UrlString, sig) {
+		// Remove the headers since the backend should not see it
+		target.Header.Del(route_service.RouteServiceSignature)
+		target.Header.Del(route_service.RouteServiceMetadata)
+		target.Header.Del(route_service.RouteServiceForwardedUrl)
+	}
+}
+
+func setupProxyRequest(source *http.Request, target *http.Request) {
 	if source.Header.Get("X-Forwarded-Proto") == "" {
 		scheme := "http"
 		if source.TLS != nil {
@@ -368,17 +384,7 @@ func SetupProxyRequest(source *http.Request, target *http.Request,
 	target.URL.RawQuery = ""
 
 	handler.SetRequestXRequestStart(source)
-
-	sig := target.Header.Get(route_service.RouteServiceSignature)
-	if forwardingToRouteService(routeServiceArgs.UrlString, sig) {
-		// An endpoint has a route service and this request did not come from the service
-		routeServiceConfig.SetupRouteServiceRequest(target, routeServiceArgs)
-	} else if hasBeenToRouteService(routeServiceArgs.UrlString, sig) {
-		// Remove the headers since the backend should not see it
-		target.Header.Del(route_service.RouteServiceSignature)
-		target.Header.Del(route_service.RouteServiceMetadata)
-		target.Header.Del(route_service.RouteServiceForwardedUrl)
-	}
+	target.Header.Del(router_http.CfAppInstance)
 }
 
 type wrappedIterator struct {

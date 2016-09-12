@@ -1365,7 +1365,7 @@ var _ = Describe("Proxy", func() {
 
 		Context("when the request has X-CF-APP-INSTANCE", func() {
 			It("lookups the route to that specific app index and id", func() {
-				done := make(chan string)
+				done := make(chan struct{})
 				// app handler for app.vcap.me
 				ln := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
@@ -1376,26 +1376,27 @@ var _ = Describe("Proxy", func() {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
+					Expect(req.Header.Get(router_http.CfAppInstance)).To(BeEmpty())
+
 					resp := test_util.NewResponse(http.StatusOK)
 					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
 					conn.WriteResponse(resp)
 
 					conn.Close()
 
-					done <- req.Header.Get("X-CF-APP-INSTANCE")
+					done <- struct{}{}
 				}, "", "app-2-id")
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "app.vcap.me", "/chat", nil)
-				req.Header.Set("X-CF-APP-INSTANCE", "app-2-id:2")
+				req.Header.Set(router_http.CfAppInstance, "app-2-id:2")
 
 				Consistently(func() string {
 					conn.WriteRequest(req)
 
-					var instanceID string
-					Eventually(done).Should(Receive(&instanceID))
+					Eventually(done).Should(Receive())
 					_, b := conn.ReadResponse()
 					return b
 				}).Should(Equal("Hellow World: App2"))
