@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
@@ -23,6 +24,7 @@ import (
 	"code.cloudfoundry.org/gorouter/route_service"
 	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry/dropsonde"
+	"github.com/urfave/negroni"
 )
 
 const (
@@ -55,10 +57,23 @@ type ProxyArgs struct {
 	RouteServiceRecommendHttps bool
 	Crypto                     secure.Crypto
 	CryptoPrev                 secure.Crypto
-	ExtraHeadersToLog          []string
+	ExtraHeadersToLog          map[string]struct{}
 	Logger                     lager.Logger
 	HealthCheckUserAgent       string
 	EnableZipkin               bool
+}
+
+type proxyHandler struct {
+	handlers *negroni.Negroni
+	proxy    *proxy
+}
+
+func (p *proxyHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+	p.handlers.ServeHTTP(responseWriter, request)
+}
+
+func (p *proxyHandler) Drain() {
+	p.proxy.Drain()
 }
 
 type proxy struct {
@@ -72,13 +87,15 @@ type proxy struct {
 	secureCookies              bool
 	heartbeatOK                int32
 	routeServiceConfig         *route_service.RouteServiceConfig
-	extraHeadersToLog          []string
+	extraHeadersToLog          map[string]struct{}
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
-	enableZipkin               bool
 }
 
 func NewProxy(args ProxyArgs) Proxy {
+	n := negroni.New()
+	n.Use(handlers.NewZipkin(args.EnableZipkin, args.ExtraHeadersToLog, args.Logger))
+
 	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
 
 	p := &proxy{
@@ -109,10 +126,15 @@ func NewProxy(args ProxyArgs) Proxy {
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
-		enableZipkin:               args.EnableZipkin,
 	}
 
-	return p
+	n.UseHandler(p)
+	handlers := &proxyHandler{
+		handlers: n,
+		proxy:    p,
+	}
+
+	return handlers
 }
 
 func hostWithoutPort(req *http.Request) string {
@@ -161,36 +183,8 @@ func (p *proxy) Drain() {
 	atomic.StoreInt32(&(p.heartbeatOK), 0)
 }
 
-func (p *proxy) setZipkinHeader(request *http.Request) {
-	if !p.enableZipkin {
-		return
-	}
-	router_http.SetB3Headers(request, p.logger)
-
-	var (
-		addSpanIdHeader  = true
-		addTraceIdHeader = true
-	)
-	for _, header := range p.extraHeadersToLog {
-		if header == router_http.B3SpanIdHeader {
-			addSpanIdHeader = false
-		}
-		if header == router_http.B3TraceIdHeader {
-			addTraceIdHeader = false
-		}
-	}
-	if addSpanIdHeader {
-		p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3SpanIdHeader)
-	}
-	if addTraceIdHeader {
-		p.extraHeadersToLog = append(p.extraHeadersToLog, router_http.B3TraceIdHeader)
-	}
-}
-
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	startedAt := time.Now()
-
-	p.setZipkinHeader(request)
 
 	accessLog := schema.AccessLogRecord{
 		Request:           request,

@@ -30,7 +30,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 )
 
 type connHandler func(*test_util.HttpConn)
@@ -400,56 +399,6 @@ var _ = Describe("Proxy", func() {
 			conf.Tracing.EnableZipkin = true
 		})
 
-		It("X-B3-TraceId is added", func() {
-			done := make(chan string)
-			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-
-				done <- req.Header.Get(router_http.B3TraceIdHeader)
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-			req := test_util.NewRequest("GET", "app", "/", nil)
-			conn.WriteRequest(req)
-
-			var answer string
-			Eventually(done).Should(Receive(&answer))
-			Expect(answer).ToNot(BeEmpty())
-
-			conn.ReadResponse()
-		})
-
-		It("X-B3-SpanId is added", func() {
-			done := make(chan string)
-			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-
-				done <- req.Header.Get(router_http.B3SpanIdHeader)
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-			req := test_util.NewRequest("GET", "app", "/", nil)
-			conn.WriteRequest(req)
-
-			var answer string
-			Eventually(done).Should(Receive(&answer))
-			Expect(answer).ToNot(BeEmpty())
-
-			conn.ReadResponse()
-		})
-
 		It("x_b3_traceid does show up in the access log", func() {
 			done := make(chan string)
 			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
@@ -481,136 +430,6 @@ var _ = Describe("Proxy", func() {
 			}).ShouldNot(BeZero())
 
 			Expect(string(payload)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
-		})
-
-		Context("with X-B3-TraceId already in ExtraHeadersToLog", func() {
-			BeforeEach(func() {
-				conf.ExtraHeadersToLog = []string{"X-B3-TraceId"}
-			})
-			It("x_b3_traceid does not show up twice in the access log", func() {
-				done := make(chan string)
-				ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get(router_http.B3TraceIdHeader)
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).ToNot(BeEmpty())
-
-				conn.ReadResponse()
-
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
-				}).ShouldNot(BeZero())
-
-				buffer := gbytes.NewBuffer()
-				_, err := buffer.Write(payload)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(buffer).To(gbytes.Say(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
-				Expect(buffer).ToNot(gbytes.Say(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
-			})
-		})
-	})
-
-	Context("with EnableZipkin set to false", func() {
-		BeforeEach(func() {
-			conf.Tracing.EnableZipkin = false
-		})
-
-		It("X-B3-TraceId is not added", func() {
-			done := make(chan string)
-			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-
-				done <- req.Header.Get(router_http.B3TraceIdHeader)
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-			req := test_util.NewRequest("GET", "app", "/", nil)
-			conn.WriteRequest(req)
-
-			var answer string
-			Eventually(done).Should(Receive(&answer))
-			Expect(answer).To(BeEmpty())
-
-			conn.ReadResponse()
-		})
-
-		It("x_b3_traceid does not show up in the access log", func() {
-			ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-				_, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-			req := test_util.NewRequest("GET", "app", "/", nil)
-			conn.WriteRequest(req)
-
-			conn.ReadResponse()
-
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
-			}).ShouldNot(BeZero())
-
-			Expect(string(payload)).ToNot(ContainSubstring(`x_b3_traceid:`))
-		})
-
-		Context("with X-B3-TraceId already in ExtraHeadersToLog", func() {
-			BeforeEach(func() {
-				conf.ExtraHeadersToLog = []string{"X-B3-TraceId"}
-			})
-			It("x_b3_traceid does show up in the access log", func() {
-				ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
-					_, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				conn.ReadResponse()
-
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
-				}).ShouldNot(BeZero())
-
-				Expect(string(payload)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"-"`)))
-			})
 		})
 	})
 

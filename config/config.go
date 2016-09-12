@@ -130,7 +130,8 @@ type Config struct {
 	RouteServiceEnabled    bool          `yaml:"-"`
 	NatsClientPingInterval time.Duration `yaml:"-"`
 
-	ExtraHeadersToLog []string `yaml:"extra_headers_to_log"`
+	ExtraHeadersToLogArray []string `yaml:"extra_headers_to_log"`
+	ExtraHeadersToLog      map[string]struct{}
 
 	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries"`
 	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval"`
@@ -212,6 +213,11 @@ func (c *Config) Process() {
 
 	if c.RouteServiceSecret != "" {
 		c.RouteServiceEnabled = true
+	}
+
+	c.ExtraHeadersToLog = make(map[string]struct{})
+	for _, header := range c.ExtraHeadersToLogArray {
+		c.ExtraHeadersToLog[header] = struct{}{}
 	}
 }
 

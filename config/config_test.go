@@ -28,7 +28,8 @@ status:
   pass: pass
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.Status.Port).To(Equal(uint16(1234)))
 			Expect(config.Status.User).To(Equal("user"))
@@ -41,7 +42,8 @@ status:
 endpoint_timeout: 10s
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 		})
@@ -54,7 +56,8 @@ nats:
     user: user
     pass: pass
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.Nats).To(HaveLen(1))
 			Expect(config.Nats[0].Host).To(Equal("remotehost"))
@@ -72,7 +75,9 @@ nats:
 				var b = []byte(`
 suspend_pruning_if_nats_unavailable: true
 `)
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
 				Expect(config.SuspendPruningIfNatsUnavailable).To(BeTrue())
 			})
 		})
@@ -94,7 +99,9 @@ suspend_pruning_if_nats_unavailable: true
 			var b = []byte(`
 load_balancer_healthy_threshold: 20s
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.LoadBalancerHealthyThreshold).To(Equal(20 * time.Second))
 		})
 
@@ -103,7 +110,9 @@ load_balancer_healthy_threshold: 20s
 access_log:
   file: "/var/vcap/sys/log/gorouter/access.log"
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
 			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
 		})
@@ -114,7 +123,9 @@ access_log:
   file: "/var/vcap/sys/log/gorouter/access.log"
   enable_streaming: false
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
 			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
 		})
@@ -125,7 +136,9 @@ access_log:
   file: "/var/vcap/sys/log/gorouter/access.log"
   enable_streaming: true
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.AccessLog.File).To(Equal("/var/vcap/sys/log/gorouter/access.log"))
 			Expect(config.AccessLog.EnableStreaming).To(BeTrue())
 		})
@@ -138,7 +151,8 @@ logging:
   level: debug2
   loggregator_enabled: true
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.Logging.File).To(Equal("/tmp/file"))
 			Expect(config.Logging.Syslog).To(Equal("syslog"))
@@ -159,7 +173,8 @@ ssl_port: 4443
 enable_ssl: true
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.Port).To(Equal(uint16(8082)))
 			Expect(config.Index).To(Equal(uint(1)))
@@ -179,7 +194,8 @@ routing_api:
   port: 1234
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
 			Expect(config.RoutingApi.Port).To(Equal(1234))
@@ -194,7 +210,8 @@ routing_api:
   auth_disabled: true
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
 			Expect(config.RoutingApi.Port).To(Equal(1234))
@@ -212,7 +229,8 @@ oauth:
   ca_certs: ca-cert
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.OAuth.TokenEndpoint).To(Equal("uaa.internal"))
 			Expect(config.OAuth.Port).To(Equal(8443))
@@ -226,13 +244,17 @@ oauth:
 			var b = []byte(`
 skip_ssl_validation: true
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.SkipSSLValidation).To(BeTrue())
 		})
 
 		It("defaults the SkipSSLValidation config to false", func() {
 			var b = []byte(``)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.SkipSSLValidation).To(BeFalse())
 		})
 
@@ -240,7 +262,9 @@ skip_ssl_validation: true
 			var b = []byte(`
 route_services_recommend_https: true
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.RouteServiceRecommendHttps).To(BeTrue())
 		})
 
@@ -248,7 +272,9 @@ route_services_recommend_https: true
 			var b = []byte(`
 route_services_secret: super-route-service-secret
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.RouteServiceSecret).To(Equal("super-route-service-secret"))
 		})
 
@@ -256,7 +282,9 @@ route_services_secret: super-route-service-secret
 			var b = []byte(`
 route_services_secret_decrypt_only: decrypt-only-super-route-service-secret
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.RouteServiceSecretPrev).To(Equal("decrypt-only-super-route-service-secret"))
 		})
 
@@ -266,7 +294,9 @@ token_fetcher_max_retries: 4
 token_fetcher_retry_interval: 10s
 token_fetcher_expiration_buffer_time: 40
 `)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(4)))
 			Expect(config.TokenFetcherRetryInterval).To(Equal(10 * time.Second))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(40)))
@@ -274,7 +304,9 @@ token_fetcher_expiration_buffer_time: 40
 
 		It("default the token fetcher config", func() {
 			var b = []byte(``)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.TokenFetcherMaxRetries).To(Equal(uint32(3)))
 			Expect(config.TokenFetcherRetryInterval).To(Equal(5 * time.Second))
 			Expect(config.TokenFetcherExpirationBufferTimeInSeconds).To(Equal(int64(30)))
@@ -285,33 +317,42 @@ token_fetcher_expiration_buffer_time: 40
 enable_proxy: true
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.EnablePROXY).To(Equal(true))
 		})
 
 		It("sets the healthcheck User-Agent", func() {
 			var b = []byte("healthcheck_user_agent: ELB-HealthChecker/1.0")
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.HealthCheckUserAgent).To(Equal("ELB-HealthChecker/1.0"))
 		})
 
 		It("defaults the healthcheck User-Agent", func() {
 			var b = []byte(``)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.HealthCheckUserAgent).To(Equal("HTTP-Monitor/1.1"))
 		})
 
 		It("sets Tracing.EnableZipkin", func() {
 			var b = []byte("tracing:\n  enable_zipkin: true")
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.Tracing.EnableZipkin).To(BeTrue())
 
 		})
 
 		It("defaults Tracing.EnableZipkin", func() {
 			var b = []byte(``)
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(config.Tracing.EnableZipkin).To(BeFalse())
 		})
 	})
@@ -328,7 +369,9 @@ secure_cookies: true
 token_fetcher_retry_interval: 10s
 `)
 
-			config.Initialize(b)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
 			config.Process()
 
 			Expect(config.PublishStartMessageInterval).To(Equal(1 * time.Second))
@@ -341,13 +384,31 @@ token_fetcher_retry_interval: 10s
 			Expect(config.SecureCookies).To(BeTrue())
 		})
 
+		It("converts extra headers to log into a map", func() {
+			var b = []byte(`
+extra_headers_to_log:
+  - x-b3-trace-id
+  - something
+  - something
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			config.Process()
+
+			Expect(config.ExtraHeadersToLog).To(HaveKey("something"))
+			Expect(config.ExtraHeadersToLog).To(HaveKey("x-b3-trace-id"))
+		})
+
 		Context("When secure cookies is set to false", func() {
 			It("set DropletStaleThreshold equal to StartResponseDelayInterval", func() {
 				var b = []byte(`
 secure_cookies: false
 `)
 
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
 				config.Process()
 
 				Expect(config.SecureCookies).To(BeFalse())
@@ -369,7 +430,8 @@ nats:
 `)
 
 			It("returns a slice of the configured NATS servers", func() {
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
 
 				natsServers := config.NatsServers()
 				Expect(natsServers[0]).To(Equal("nats://user:pass@remotehost:4223"))
@@ -384,7 +446,8 @@ nats:
 					configYaml = []byte(`other_key: other_value`)
 				})
 				It("disables route services", func() {
-					config.Initialize(configYaml)
+					err := config.Initialize(configYaml)
+					Expect(err).ToNot(HaveOccurred())
 					config.Process()
 					Expect(config.RouteServiceEnabled).To(BeFalse())
 				})
@@ -396,7 +459,8 @@ nats:
 						configYaml = []byte(`
 route_services_secret: my-route-service-secret
 `)
-						config.Initialize(configYaml)
+						err := config.Initialize(configYaml)
+						Expect(err).ToNot(HaveOccurred())
 						config.Process()
 					})
 
@@ -415,7 +479,8 @@ route_services_secret: my-route-service-secret
 route_services_secret: my-route-service-secret
 route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
 `)
-						config.Initialize(configYaml)
+						err := config.Initialize(configYaml)
+						Expect(err).ToNot(HaveOccurred())
 						config.Process()
 					})
 
@@ -437,7 +502,8 @@ route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
 						configYaml = []byte(`
 route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 `)
-						config.Initialize(configYaml)
+						err := config.Initialize(configYaml)
+						Expect(err).ToNot(HaveOccurred())
 						config.Process()
 					})
 
@@ -456,7 +522,8 @@ routing_api:
 `)
 			Context("when the routing api is properly configured", func() {
 				It("reports the routing api as enabled", func() {
-					config.Initialize(b)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 					config.Process()
 					Expect(config.RoutingApiEnabled()).To(BeTrue())
 				})
@@ -464,7 +531,8 @@ routing_api:
 
 			Context("when the routing api is not properly configured", func() {
 				It("reports the routing api as disabled", func() {
-					config.Initialize([]byte{})
+					err := config.Initialize([]byte{})
+					Expect(err).ToNot(HaveOccurred())
 					config.Process()
 					Expect(config.RoutingApiEnabled()).To(BeFalse())
 				})
@@ -485,7 +553,9 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 					expectedCertificate, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 					Expect(err).ToNot(HaveOccurred())
 
-					config.Initialize(b)
+					err = config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
 					Expect(config.EnableSSL).To(Equal(true))
 
 					config.Process()
@@ -503,7 +573,8 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
 				It("fails to create the certificate and panics", func() {
-					config.Initialize(b)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process).To(Panic())
 				})
@@ -529,7 +600,9 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_12
 						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 					}
 
-					config.Initialize(b)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
 					config.Process()
 
 					Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
@@ -545,7 +618,8 @@ cipher_suites: potato
 `)
 
 				It("panics", func() {
-					config.Initialize(b)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process).To(Panic())
 				})
@@ -560,7 +634,8 @@ cipher_suites: TLS_RSA_WITH_RC4_128_SHA
 `)
 
 				It("panics", func() {
-					config.Initialize(b)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process).To(Panic())
 				})
@@ -576,7 +651,8 @@ ssl_key_path: ../test/assets/certs/server.key
 `)
 
 			It("panics", func() {
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
 
 				Expect(config.Process).To(Panic())
 			})
@@ -590,7 +666,9 @@ route_services_timeout: 10s
 drain_timeout: 15s
 `)
 
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
 				config.Process()
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
@@ -603,7 +681,9 @@ drain_timeout: 15s
 endpoint_timeout: 10s
 `)
 
-				config.Initialize(b)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
 				config.Process()
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
