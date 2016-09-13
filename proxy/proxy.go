@@ -57,7 +57,7 @@ type ProxyArgs struct {
 	RouteServiceRecommendHttps bool
 	Crypto                     secure.Crypto
 	CryptoPrev                 secure.Crypto
-	ExtraHeadersToLog          map[string]struct{}
+	ExtraHeadersToLog          *[]string
 	Logger                     lager.Logger
 	HealthCheckUserAgent       string
 	EnableZipkin               bool
@@ -87,7 +87,7 @@ type proxy struct {
 	secureCookies              bool
 	heartbeatOK                int32
 	routeServiceConfig         *route_service.RouteServiceConfig
-	extraHeadersToLog          map[string]struct{}
+	extraHeadersToLog          *[]string
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
 }

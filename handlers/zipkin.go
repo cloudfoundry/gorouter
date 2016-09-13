@@ -12,10 +12,10 @@ import (
 type zipkin struct {
 	zipkinEnabled bool
 	logger        lager.Logger
-	headersToLog  map[string]struct{} // Shared state with proxy for access logs
+	headersToLog  *[]string // Shared state with proxy for access logs
 }
 
-func NewZipkin(enabled bool, headersToLog map[string]struct{}, logger lager.Logger) negroni.Handler {
+func NewZipkin(enabled bool, headersToLog *[]string, logger lager.Logger) negroni.Handler {
 	return &zipkin{
 		zipkinEnabled: enabled,
 		headersToLog:  headersToLog,
@@ -30,6 +30,20 @@ func (z *zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	}
 	router_http.SetB3Headers(r, z.logger)
 
-	z.headersToLog[router_http.B3TraceIdHeader] = struct{}{}
-	z.headersToLog[router_http.B3SpanIdHeader] = struct{}{}
+	if !contains(*z.headersToLog, router_http.B3TraceIdHeader) {
+		*z.headersToLog = append(*z.headersToLog, router_http.B3TraceIdHeader)
+	}
+
+	if !contains(*z.headersToLog, router_http.B3SpanIdHeader) {
+		*z.headersToLog = append(*z.headersToLog, router_http.B3SpanIdHeader)
+	}
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }

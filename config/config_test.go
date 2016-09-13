@@ -396,8 +396,8 @@ extra_headers_to_log:
 			Expect(err).ToNot(HaveOccurred())
 			config.Process()
 
-			Expect(config.ExtraHeadersToLog).To(HaveKey("something"))
-			Expect(config.ExtraHeadersToLog).To(HaveKey("x-b3-trace-id"))
+			Expect(config.ExtraHeadersToLog).To(ContainElement("something"))
+			Expect(config.ExtraHeadersToLog).To(ContainElement("x-b3-trace-id"))
 		})
 
 		Context("When secure cookies is set to false", func() {

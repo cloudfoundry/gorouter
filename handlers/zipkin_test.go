@@ -19,7 +19,7 @@ import (
 var _ = Describe("Zipkin", func() {
 	var (
 		handler      negroni.Handler
-		headersToLog map[string]struct{}
+		headersToLog *[]string
 		logger       lager.Logger
 		resp         http.ResponseWriter
 		req          *http.Request
@@ -31,7 +31,7 @@ var _ = Describe("Zipkin", func() {
 	})
 
 	BeforeEach(func() {
-		headersToLog = make(map[string]struct{})
+		headersToLog = &[]string{}
 		logger = lagertest.NewTestLogger("zipkin")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
@@ -55,8 +55,8 @@ var _ = Describe("Zipkin", func() {
 
 		It("adds zipkin headers to access log record", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(headersToLog).To(HaveKey(router_http.B3SpanIdHeader))
-			Expect(headersToLog).To(HaveKey(router_http.B3TraceIdHeader))
+			Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
+			Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
 		})
 
 		Context("with B3TraceIdHeader already set", func() {
@@ -72,13 +72,13 @@ var _ = Describe("Zipkin", func() {
 
 		Context("when X-B3-* headers are already set to be logged", func() {
 			BeforeEach(func() {
-				headersToLog[router_http.B3SpanIdHeader] = struct{}{}
-				headersToLog[router_http.B3TraceIdHeader] = struct{}{}
+				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader}
+				headersToLog = &newSlice
 			})
 			It("adds zipkin headers to access log record", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
-				Expect(headersToLog).To(HaveKey(router_http.B3SpanIdHeader))
-				Expect(headersToLog).To(HaveKey(router_http.B3TraceIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
 			})
 		})
 	})
@@ -96,19 +96,19 @@ var _ = Describe("Zipkin", func() {
 
 		It("does not add zipkin headers to access log record", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(headersToLog).NotTo(HaveKey(router_http.B3SpanIdHeader))
-			Expect(headersToLog).NotTo(HaveKey(router_http.B3TraceIdHeader))
+			Expect(*headersToLog).NotTo(ContainElement(router_http.B3SpanIdHeader))
+			Expect(*headersToLog).NotTo(ContainElement(router_http.B3TraceIdHeader))
 		})
 
 		Context("when X-B3-* headers are already set to be logged", func() {
 			BeforeEach(func() {
-				headersToLog[router_http.B3SpanIdHeader] = struct{}{}
-				headersToLog[router_http.B3TraceIdHeader] = struct{}{}
+				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader}
+				headersToLog = &newSlice
 			})
 			It("adds zipkin headers to access log record", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
-				Expect(headersToLog).To(HaveKey(router_http.B3SpanIdHeader))
-				Expect(headersToLog).To(HaveKey(router_http.B3TraceIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
 			})
 		})
 	})

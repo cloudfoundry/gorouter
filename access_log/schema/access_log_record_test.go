@@ -127,12 +127,8 @@ var _ = Describe("AccessLogRecord", func() {
 			RouteEndpoint: &route.Endpoint{
 				ApplicationId: "FakeApplicationId",
 			},
-			StartedAt: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-			ExtraHeadersToLog: map[string]struct{}{
-				"Cache-Control":   struct{}{},
-				"Accept-Encoding": struct{}{},
-				"If-Match":        struct{}{},
-				"Doesnt-Exist":    struct{}{}},
+			StartedAt:         time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			ExtraHeadersToLog: &[]string{"Cache-Control", "Accept-Encoding", "If-Match", "Doesnt-Exist"},
 		}
 
 		recordString := "FakeRequestHost - " +

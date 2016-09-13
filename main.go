@@ -179,7 +179,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		RouteServiceRecommendHttps: c.RouteServiceRecommendHttps,
 		Crypto:               crypto,
 		CryptoPrev:           cryptoPrev,
-		ExtraHeadersToLog:    c.ExtraHeadersToLog,
+		ExtraHeadersToLog:    &c.ExtraHeadersToLog,
 		HealthCheckUserAgent: c.HealthCheckUserAgent,
 		EnableZipkin:         c.Tracing.EnableZipkin,
 	}

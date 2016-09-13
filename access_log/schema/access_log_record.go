@@ -21,7 +21,7 @@ type AccessLogRecord struct {
 	FinishedAt           time.Time
 	BodyBytesSent        int
 	RequestBytesReceived int
-	ExtraHeadersToLog    map[string]struct{}
+	ExtraHeadersToLog    *[]string
 	record               string
 }
 
@@ -68,7 +68,7 @@ func (r *AccessLogRecord) makeRecord() string {
 		}
 	}
 
-	if r.ExtraHeadersToLog != nil && len(r.ExtraHeadersToLog) > 0 {
+	if r.ExtraHeadersToLog != nil && len(*r.ExtraHeadersToLog) > 0 {
 		extraHeaders = r.ExtraHeaders()
 	}
 
@@ -115,9 +115,9 @@ func (r *AccessLogRecord) LogMessage() string {
 }
 
 func (r *AccessLogRecord) ExtraHeaders() string {
-	extraHeaders := make([]string, 0, len(r.ExtraHeadersToLog)*4)
+	extraHeaders := make([]string, 0, len(*r.ExtraHeadersToLog)*4)
 
-	for header := range r.ExtraHeadersToLog {
+	for _, header := range *r.ExtraHeadersToLog {
 		// X-Something-Cool -> x_something_cool
 		headerName := strings.Replace(strings.ToLower(header), "-", "_", -1)
 		headerValue := strconv.Quote(r.FormatRequestHeader(header))
