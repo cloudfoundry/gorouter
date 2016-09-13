@@ -57,7 +57,14 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 
 		rt.setupRequest(request, endpoint)
 
+		// increment connection stats
+		rt.iter.PreRequest(endpoint)
+
 		res, err = rt.transport.RoundTrip(request)
+
+		// decrement connection stats
+		rt.iter.PostRequest(endpoint)
+
 		if err == nil || !retryableError(err) {
 			break
 		}

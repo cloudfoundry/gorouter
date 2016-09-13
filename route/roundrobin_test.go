@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("EndpointIterator", func() {
+var _ = Describe("RoundRobin", func() {
 	var pool *route.Pool
 	var modTag models.ModificationTag
 
@@ -31,7 +31,7 @@ var _ = Describe("EndpointIterator", func() {
 
 			counts := make([]int, len(endpoints))
 
-			iter := pool.Endpoints("")
+			iter := route.NewRoundRobin(pool, "")
 
 			loops := 50
 			for i := 0; i < len(endpoints)*loops; i += 1 {
@@ -50,7 +50,7 @@ var _ = Describe("EndpointIterator", func() {
 		})
 
 		It("returns nil when no endpoints exist", func() {
-			iter := pool.Endpoints("")
+			iter := route.NewRoundRobin(pool, "")
 			e := iter.Next()
 			Expect(e).To(BeNil())
 		})
@@ -63,7 +63,7 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag))
 
 			for i := 0; i < 10; i++ {
-				iter := pool.Endpoints(b.PrivateInstanceId)
+				iter := route.NewRoundRobin(pool, b.PrivateInstanceId)
 				e := iter.Next()
 				Expect(e).ToNot(BeNil())
 				Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
@@ -78,7 +78,7 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag))
 
 			for i := 0; i < 10; i++ {
-				iter := pool.Endpoints(b.CanonicalAddr())
+				iter := route.NewRoundRobin(pool, b.CanonicalAddr())
 				e := iter.Next()
 				Expect(e).ToNot(BeNil())
 				Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
@@ -92,12 +92,12 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(endpointFoo)
 			pool.Put(endpointBar)
 
-			iter := pool.Endpoints(endpointFoo.PrivateInstanceId)
+			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
 			foundEndpoint := iter.Next()
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
 
-			iter = pool.Endpoints(endpointBar.PrivateInstanceId)
+			iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId)
 			foundEndpoint = iter.Next()
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointBar))
@@ -107,7 +107,7 @@ var _ = Describe("EndpointIterator", func() {
 			eFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag)
 			pool.Put(eFoo)
 
-			iter := pool.Endpoints("bogus")
+			iter := route.NewRoundRobin(pool, "bogus")
 			e := iter.Next()
 			Expect(e).ToNot(BeNil())
 			Expect(e).To(Equal(eFoo))
@@ -117,7 +117,7 @@ var _ = Describe("EndpointIterator", func() {
 			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag)
 			pool.Put(endpointFoo)
 
-			iter := pool.Endpoints(endpointFoo.PrivateInstanceId)
+			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
 			foundEndpoint := iter.Next()
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
@@ -125,11 +125,11 @@ var _ = Describe("EndpointIterator", func() {
 			endpointBar := route.NewEndpoint("", "1.2.3.4", 1234, "bar", "", nil, -1, "", modTag)
 			pool.Put(endpointBar)
 
-			iter = pool.Endpoints("foo")
+			iter = route.NewRoundRobin(pool, "foo")
 			foundEndpoint = iter.Next()
 			Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
-			iter = pool.Endpoints("bar")
+			iter = route.NewRoundRobin(pool, "bar")
 			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
 	})
@@ -141,7 +141,7 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := pool.Endpoints("")
+			iter := route.NewRoundRobin(pool, "")
 			n := iter.Next()
 			Expect(n).ToNot(BeNil())
 
@@ -161,7 +161,7 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := pool.Endpoints("")
+			iter := route.NewRoundRobin(pool, "")
 			n1 := iter.Next()
 			iter.EndpointFailed()
 			n2 := iter.Next()
@@ -181,7 +181,7 @@ var _ = Describe("EndpointIterator", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := pool.Endpoints("")
+			iter := route.NewRoundRobin(pool, "")
 			n1 := iter.Next()
 			n2 := iter.Next()
 			Expect(n1).ToNot(Equal(n2))

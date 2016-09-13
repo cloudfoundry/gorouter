@@ -61,6 +61,7 @@ type ProxyArgs struct {
 	Logger                     lager.Logger
 	HealthCheckUserAgent       string
 	EnableZipkin               bool
+	DefaultLoadBalance         string
 }
 
 type proxyHandler struct {
@@ -90,6 +91,7 @@ type proxy struct {
 	extraHeadersToLog          map[string]struct{}
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
+	defaultLoadBalance         string
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -126,6 +128,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		extraHeadersToLog:          args.ExtraHeadersToLog,
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
+		defaultLoadBalance:         args.DefaultLoadBalance,
 	}
 
 	n.UseHandler(p)
@@ -222,7 +225,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	stickyEndpointId := p.getStickySession(request)
 	iter := &wrappedIterator{
-		nested: routePool.Endpoints(stickyEndpointId),
+		nested: routePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
@@ -396,6 +399,12 @@ func (i *wrappedIterator) Next() *route.Endpoint {
 
 func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
+}
+func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
+	i.nested.PreRequest(e)
+}
+func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
+	i.nested.PostRequest(e)
 }
 
 func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl, forwardedUrlRaw string) (route_service.RouteServiceArgs, error) {
