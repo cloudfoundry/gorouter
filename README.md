@@ -173,7 +173,7 @@ ok
 * Connection #0 to host 10.0.32.15 left intact
 ```
 
-The *deprecated* `/healthz` endpoint provides a similar response but requires basic authentication.
+The *deprecated* `/healthz` endpoint provides a similar response.
 
 ## Instrumentation
 
