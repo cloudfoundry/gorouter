@@ -40,14 +40,14 @@ func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 }
 
 func SetB3Headers(request *http.Request, logger lager.Logger) {
-	SetB3TraceIdHeader(request, logger)
-	SetB3SpanIdHeader(request, logger)
+	setB3TraceIdHeader(request, logger)
 }
 
-func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
+func setB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 	existingTraceId := request.Header.Get(B3TraceIdHeader)
 	existingSpanId := request.Header.Get(B3SpanIdHeader)
 	if existingTraceId != "" && existingSpanId != "" {
+		setB3SpanIdHeader(request, logger)
 		if logger != nil {
 			logger.Debug("b3-trace-id-header-exists", lager.Data{B3TraceIdHeader: existingTraceId})
 		}
@@ -56,27 +56,23 @@ func SetB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 
 	randBytes, err := secure.RandomBytes(8)
 	if err != nil {
-		logger.Debug("failed-to-create-b3-trace-id")
+		logger.Info("failed-to-create-b3-trace-id", lager.Data{"error": err.Error()})
 		return
 	}
+
 	id := hex.EncodeToString(randBytes)
 	request.Header.Set(B3TraceIdHeader, id)
-	if logger != nil {
-		logger.Debug("b3-trace-id-header-set", lager.Data{B3TraceIdHeader: id})
-	}
+	request.Header.Set(B3SpanIdHeader, request.Header.Get(B3TraceIdHeader))
 }
 
-func SetB3SpanIdHeader(request *http.Request, logger lager.Logger) {
+func setB3SpanIdHeader(request *http.Request, logger lager.Logger) {
 	randBytes, err := secure.RandomBytes(8)
 	if err != nil {
-		logger.Debug("failed-to-create-b3-span-id")
+		logger.Info("failed-to-create-b3-span-id", lager.Data{"error": err.Error()})
 		return
 	}
 	id := hex.EncodeToString(randBytes)
 	request.Header.Set(B3SpanIdHeader, id)
-	if logger != nil {
-		logger.Debug("b3-span-id-header-set", lager.Data{B3SpanIdHeader: id})
-	}
 }
 
 func ValidateCfAppInstance(appInstanceHeader string) (string, string, error) {
