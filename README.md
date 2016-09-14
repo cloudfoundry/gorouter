@@ -148,7 +148,7 @@ Hello!
 
 ## Healthchecking from a Load Balancer
 
-Specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` returns the current health of the router. Use this method for healthchecks from a load balancer. This endpoint does not require credentials and should be done against port 80. Alternate user agents may be configured using the `healthcheck_user_agent` property, such as `ELB-HealthChecker/1.0` for AWS ELBs. 
+To scale Gorouter horizontally for high-availability or throughput capacity, you must deploy it behind a highly-available load balancer (F5, AWS ELB, etc). Your load balancer must be configured to send an HTTP healthcheck on port 80 with the `User-Agent` HTTP header set to `HTTP-Monitor/1.1`. A 200 response indicates the Gorouter instance is healthy; any other response indicates unhealthy. Gorouter can be configured to accept alternate values for the User Agent header using the `healthcheck_user_agent` configuration property; as an example, AWS ELBS send `User-Agent: ELB-HealthChecker/1.0`. 
 
 ```
 $ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
