@@ -123,6 +123,8 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
+	started := time.Now()
+
 	r.RLock()
 
 	uri = uri.RouteKey()
@@ -134,7 +136,8 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	}
 
 	r.RUnlock()
-
+	endLookup := time.Now()
+	r.reporter.CaptureLookupTime(endLookup.Sub(started))
 	return pool
 }
 
@@ -163,8 +166,9 @@ func (r *RouteRegistry) StartPruningCycle() {
 			for {
 				select {
 				case <-r.ticker.C:
-					r.logger.Debug("start-pruning-droplets")
+					r.logger.Info("start-pruning-droplets")
 					r.pruneStaleDroplets()
+					r.logger.Info("finished-pruning-droplets")
 					msSinceLastUpdate := uint64(time.Since(r.TimeOfLastUpdate()) / time.Millisecond)
 					r.reporter.CaptureRouteStats(r.NumUris(), msSinceLastUpdate)
 				}

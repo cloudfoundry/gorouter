@@ -3,6 +3,7 @@ package fakes
 
 import (
 	"sync"
+	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 )
@@ -13,6 +14,11 @@ type FakeRouteRegistryReporter struct {
 	captureRouteStatsArgsForCall []struct {
 		totalRoutes       int
 		msSinceLastUpdate uint64
+	}
+	CaptureLookupTimeStub        func(t time.Duration)
+	captureLookupTimeMutex       sync.RWMutex
+	captureLookupTimeArgsForCall []struct {
+		t time.Duration
 	}
 	CaptureRegistryMessageStub        func(msg reporter.ComponentTagged)
 	captureRegistryMessageMutex       sync.RWMutex
@@ -43,6 +49,29 @@ func (fake *FakeRouteRegistryReporter) CaptureRouteStatsArgsForCall(i int) (int,
 	fake.captureRouteStatsMutex.RLock()
 	defer fake.captureRouteStatsMutex.RUnlock()
 	return fake.captureRouteStatsArgsForCall[i].totalRoutes, fake.captureRouteStatsArgsForCall[i].msSinceLastUpdate
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureLookupTime(t time.Duration) {
+	fake.captureLookupTimeMutex.Lock()
+	fake.captureLookupTimeArgsForCall = append(fake.captureLookupTimeArgsForCall, struct {
+		t time.Duration
+	}{t})
+	fake.captureLookupTimeMutex.Unlock()
+	if fake.CaptureLookupTimeStub != nil {
+		fake.CaptureLookupTimeStub(t)
+	}
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureLookupTimeCallCount() int {
+	fake.captureLookupTimeMutex.RLock()
+	defer fake.captureLookupTimeMutex.RUnlock()
+	return len(fake.captureLookupTimeArgsForCall)
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureLookupTimeArgsForCall(i int) time.Duration {
+	fake.captureLookupTimeMutex.RLock()
+	defer fake.captureLookupTimeMutex.RUnlock()
+	return fake.captureLookupTimeArgsForCall[i].t
 }
 
 func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {

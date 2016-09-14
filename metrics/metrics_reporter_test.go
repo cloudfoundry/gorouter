@@ -244,5 +244,14 @@ var _ = Describe("MetricsReporter", func() {
 					Unit:  "ms",
 				}))
 		})
+
+		It("sends the lookup time for routing table", func() {
+			metricsReporter.CaptureLookupTime(time.Duration(9) * time.Second)
+			Eventually(func() fake.Metric { return sender.GetValue("route_lookup_time") }).Should(Equal(
+				fake.Metric{
+					Value: 9000,
+					Unit:  "ms",
+				}))
+		})
 	})
 })

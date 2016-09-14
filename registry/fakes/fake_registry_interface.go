@@ -42,25 +42,25 @@ type FakeRegistryInterface struct {
 	StartPruningCycleStub        func()
 	startPruningCycleMutex       sync.RWMutex
 	startPruningCycleArgsForCall []struct{}
-	StopPruningCycleStub         func()
-	stopPruningCycleMutex        sync.RWMutex
-	stopPruningCycleArgsForCall  []struct{}
-	NumUrisStub                  func() int
-	numUrisMutex                 sync.RWMutex
-	numUrisArgsForCall           []struct{}
-	numUrisReturns               struct {
+	StopPruningCycleStub        func()
+	stopPruningCycleMutex       sync.RWMutex
+	stopPruningCycleArgsForCall []struct{}
+	NumUrisStub        func() int
+	numUrisMutex       sync.RWMutex
+	numUrisArgsForCall []struct{}
+	numUrisReturns struct {
 		result1 int
 	}
 	NumEndpointsStub        func() int
 	numEndpointsMutex       sync.RWMutex
 	numEndpointsArgsForCall []struct{}
-	numEndpointsReturns     struct {
+	numEndpointsReturns struct {
 		result1 int
 	}
 	MarshalJSONStub        func() ([]byte, error)
 	marshalJSONMutex       sync.RWMutex
 	marshalJSONArgsForCall []struct{}
-	marshalJSONReturns     struct {
+	marshalJSONReturns struct {
 		result1 []byte
 		result2 error
 	}

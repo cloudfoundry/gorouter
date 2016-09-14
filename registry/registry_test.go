@@ -486,6 +486,20 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
+		It("sends lookup metrics to the reporter", func() {
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag)
+
+			r.Register("not.wild.card", app1)
+			r.Register("*.wild.card", app2)
+
+			r.Lookup("not.wild.card")
+
+			Expect(reporter.CaptureLookupTimeCallCount()).To(Equal(1))
+			lookupTime := reporter.CaptureLookupTimeArgsForCall(0)
+			Expect(lookupTime).To(BeNumerically(">", 0))
+		})
+
 		Context("has context path", func() {
 
 			var m *route.Endpoint
