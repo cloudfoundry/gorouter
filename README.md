@@ -228,7 +228,7 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 
 ## Load Balancing
 
-The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection.
+The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection. The proxy will retry a request up to 3 times before returning a `Bad Gateway` error.
 
 ## PROXY Protocol
 
