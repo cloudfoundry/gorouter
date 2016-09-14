@@ -16,6 +16,9 @@ import (
 	"github.com/urfave/negroni"
 )
 
+// 64-bit random hexadecimal string
+const b3_id_regex = `^[[:xdigit:]]{16}$`
+
 var _ = Describe("Zipkin", func() {
 	var (
 		handler      negroni.Handler
@@ -59,14 +62,40 @@ var _ = Describe("Zipkin", func() {
 			Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
 		})
 
-		Context("with B3TraceIdHeader already set", func() {
+		Context("with B3TraceIdHeader and B3SpanIdHeader already set", func() {
 			BeforeEach(func() {
 				req.Header.Set(router_http.B3TraceIdHeader, "Bogus Value")
+				req.Header.Set(router_http.B3SpanIdHeader, "Span Value")
 			})
 
 			It("doesn't overwrite the B3TraceIdHeader", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(Equal("Bogus Value"))
+				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
+			})
+		})
+
+		Context("with only B3SpanIdHeader set", func() {
+			BeforeEach(func() {
+				req.Header.Set(router_http.B3SpanIdHeader, "Span Value")
+			})
+
+			It("adds the B3TraceIdHeader and overwrites the SpanId", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
+				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
+			})
+		})
+
+		Context("with only B3TraceIdHeader set", func() {
+			BeforeEach(func() {
+				req.Header.Set(router_http.B3TraceIdHeader, "Bogus Value")
+			})
+
+			It("overwrites the B3TraceIdHeader and adds a SpanId", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
+				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
 			})
 		})
 

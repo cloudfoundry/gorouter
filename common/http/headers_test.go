@@ -91,11 +91,13 @@ var _ = Describe("Headers", func() {
 			logger lager.Logger
 			req    *http.Request
 		)
+
 		BeforeEach(func() {
 			var err error
 			req, err = http.NewRequest("GET", "test.endpoint", nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
 		JustBeforeEach(func() {
 			commonhttp.SetB3TraceIdHeader(req, logger)
 		})
@@ -104,6 +106,7 @@ var _ = Describe("Headers", func() {
 			BeforeEach(func() {
 				logger = lagertest.NewTestLogger("headers-test")
 			})
+
 			Context("when X-B3-TraceId is not set", func() {
 				It("generates a new b3 id and sets the X-B3-TraceId header with a random 64-bit hexadecimal string", func() {
 					reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
@@ -116,7 +119,6 @@ var _ = Describe("Headers", func() {
 					Expect(logger).To(gbytes.Say("b3-trace-id-header-set"))
 					Expect(logger).To(gbytes.Say(reqID))
 				})
-
 			})
 
 			Context("when X-B3-TraceId is set", func() {
@@ -124,13 +126,24 @@ var _ = Describe("Headers", func() {
 					req.Header.Set(commonhttp.B3TraceIdHeader, "BOGUS-HEADER")
 				})
 
-				It("should not override the X-B3-TraceId header", func() {
-					Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).To(Equal("BOGUS-HEADER"))
+				It("should override the X-B3-TraceId header", func() {
+					reqID := req.Header.Get(commonhttp.B3TraceIdHeader)
+					Expect(reqID).ToNot(BeEmpty())
+					Expect(reqID).To(MatchRegexp(b3_id_regex))
 				})
 
-				It("logs the header", func() {
-					Expect(logger).To(gbytes.Say("b3-trace-id-header-exists"))
-					Expect(logger).To(gbytes.Say("BOGUS-HEADER"))
+				Context("when X-B3-SpanId is set", func() {
+					BeforeEach(func() {
+						req.Header.Set(commonhttp.B3SpanIdHeader, "BOGUS-SpanId-HEADER")
+					})
+					It("should not override the X-B3-TraceId header", func() {
+						Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).To(Equal("BOGUS-HEADER"))
+					})
+
+					It("logs the header", func() {
+						Expect(logger).To(gbytes.Say("b3-trace-id-header-exists"))
+						Expect(logger).To(gbytes.Say("BOGUS-HEADER"))
+					})
 				})
 			})
 		})
@@ -141,10 +154,13 @@ var _ = Describe("Headers", func() {
 				Expect(reqID).ToNot(BeEmpty())
 				Expect(reqID).To(MatchRegexp(b3_id_regex))
 			})
-			Context("when X-B3-TraceId is set", func() {
+
+			Context("when X-B3-TraceId and X-B3-SpanId are set", func() {
 				BeforeEach(func() {
 					req.Header.Set(commonhttp.B3TraceIdHeader, "BOGUS-HEADER")
+					req.Header.Set(commonhttp.B3SpanIdHeader, "SPAN-HEADER")
 				})
+
 				It("does not fail when X-B3-TraceId is set", func() {
 					Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).To(Equal("BOGUS-HEADER"))
 				})
