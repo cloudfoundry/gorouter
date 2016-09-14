@@ -1,15 +1,13 @@
 [![Build Status](https://travis-ci.org/cloudfoundry/gorouter.svg?branch=master)](https://travis-ci.org/cloudfoundry/gorouter)
 
 # GoRouter
-This repository contains the source code for a Go implementation of the Cloud
-Foundry router.
-GoRouter is a part of the Cloud Foundry [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
+This repository contains the source code for the Cloud Foundry router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
 
 **Note**: This repository should be imported as `code.cloudfoundry.org/gorouter`.
 
 You can find the old router [here](http://github.com/cloudfoundry-attic/router)
 
-## Getting started
+## Development
 
 The following instructions may help you get started with gorouter.
 
@@ -20,7 +18,7 @@ The following instructions may help you get started with gorouter.
 - [gnatsd](https://github.com/nats-io/gnatsd) installed and in the PATH
 - Install [direnv](http://direnv.net/)
 
-### Development Setup
+### Setup
 
 GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
 
@@ -31,7 +29,6 @@ cd routing-release
 cd src/code.cloudfoundry.org/gorouter
 ```
  *Note: direnv will automatically set your GOPATH when you cd into the routing-release directory. You will need to run `direnv allow` the first time.*
-
 
 ### Running Tests
 
@@ -55,7 +52,6 @@ scripts/test -focus=Registry
 # run only the tests in the registry package
 scripts/test registry
 ```
-
 
 ### Building
 Building creates an executable in the gorouter/ dir:
@@ -82,15 +78,9 @@ gnatsd &
 gorouter
 ```
 
-### Usage
+## Dynamic Configuration of the Routing Table
 
-When the gorouter starts, it sends a `router.start` message.
-This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`.
-It is recommended that clients should send `router.register` messages on this interval.
-This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration value.
-The gorouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds.
-The gorouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds.
-All of these values are represented in seconds and will always be integers.
+When the gorouter starts, it sends a `router.start` message. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
 
 The format of the `router.start` message is as follows:
 
@@ -102,11 +92,10 @@ The format of the `router.start` message is as follows:
   "prunteThresholdInSeconds": 120,
 }
 ```
+
 After a `router.start` message is received by a client, the client should send `router.register` messages. This ensures that the new router can update its routing table and synchronize with existing routers.
 
-If a component comes online after the router, it must make a NATS request
-called `router.greet` in order to determine the interval. The response to this
-message will be the same format as `router.start`.
+If a component comes online after the router, it must make a NATS request called `router.greet` in order to determine the interval. The response to this message will be the same format as `router.start`.
 
 The format of the `router.register` message is as follows:
 
@@ -127,9 +116,12 @@ The format of the `router.register` message is as follows:
   "private_instance_id": "some_app_instance_id"
 }
 ```
-`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold.
-`app` is a unique identifier for an application that the route is registered for. It is used to emit router access logs associated with the app through dropsonde.
-`private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. `X-CF-InstanceID` is set to this value on the request to the endpoint registered.
+
+`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold. 
+
+`app` is a unique identifier for an application that the endpoint is registered for. This value will be included in router access logs with the label `app_id`, as well as being sent with requests to the endpoint in an HTTP header `X-CF-ApplicationId`.
+
+`private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceID` set to this value with requests to the registered endpoint.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
@@ -154,7 +146,7 @@ $ curl my_first_url.vcap.me:8081
 Hello!
 ```
 
-### Healthchecking from a Load Balancer
+## Healthchecking from a Load Balancer
 
 Specifying the `User-Agent` header with a value of `HTTP-Monitor/1.1` returns the current health of the router. Use this method for healthchecks from a load balancer. This endpoint does not require credentials and should be done against port 80. Alternate user agents may be configured using the `healthcheck_user_agent` property, such as `ELB-HealthChecker/1.0` for AWS ELBs. 
 
@@ -183,14 +175,9 @@ ok
 
 The *deprecated* `/healthz` endpoint provides a similar response but requires basic authentication.
 
-### Instrumentation
+## Instrumentation
 
-The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication.
-
-```
-$ curl "http://someuser:somepass@10.0.32.15:8080/varz"
-{"bad_gateways":0,"bad_requests":20,"cpu":0,"credentials":["user","pass"],"droplets":26,"host":"10.0.32.15:8080","index":0,"latency":{"50":0.001418144,"75":0.00180639025,"90":0.0070607187,"95":0.009561058849999996,"99":0.01523927838000001,"samples":1,"value":5e-07},"log_counts":{"info":9,"warn":40},"mem":19672,"ms_since_last_registry_update":1547,"num_cores":2,"rate":[1.1361328993362565,1.1344545494448148,1.1365784133171992],"requests":13832,"requests_per_sec":1.1361328993362565,"responses_2xx":13814,"responses_3xx":0,"responses_4xx":9,"responses_5xx":0,"responses_xxx":0,"start":"2016-01-07 19:04:40 +0000","tags":{"component":{"CloudController":{"latency":{"50":0.009015199,"75":0.0107408015,"90":0.015104917100000005,"95":0.01916497394999999,"99":0.034486261410000024,"samples":1,"value":5e-07},"rate":[0.13613289933245148,0.13433569936308343,0.13565885617276216],"requests":1686,"responses_2xx":1684,"responses_3xx":0,"responses_4xx":2,"responses_5xx":0,"responses_xxx":0},"HM9K":{"latency":{"50":0.0033354,"75":0.00751815875,"90":0.011916812100000005,"95":0.013760064,"99":0.013760064,"samples":1,"value":5e-07},"rate":[1.6850238803894876e-12,5.816129919395257e-05,0.00045864309255845694],"requests":12,"responses_2xx":6,"responses_3xx":0,"responses_4xx":6,"responses_5xx":0,"responses_xxx":0},"dea-0":{"latency":{"50":0.001354994,"75":0.001642107,"90":0.0020699939000000003,"95":0.0025553900499999996,"99":0.003677146940000006,"samples":1,"value":5e-07},"rate":[1.0000000000000013,1.0000000002571303,0.9999994853579043],"requests":12103,"responses_2xx":12103,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0},"uaa":{"latency":{"50":0.038288465,"75":0.245610809,"90":0.2877324668,"95":0.311816554,"99":0.311816554,"samples":1,"value":5e-07},"rate":[8.425119401947438e-13,2.9080649596976205e-05,0.00022931374141467497],"requests":17,"responses_2xx":17,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0}}},"top10_app_requests":[{"application_id":"063f95f9-492c-456f-b569-737f69c04899","rpm":60,"rps":1}],"type":"Router","uptime":"0d:3h:22m:31s","urls":21,"uuid":"0-c7fd7d76-f8d8-46b7-7a1c-7a59bcf7e286"}
-```
+### The Routing Table
 
 The `/routes` endpoint returns the entire routing table as JSON. This endpoint requires basic authentication and is served on port 8080. Each route has an associated array of host:port entries.
 
@@ -217,6 +204,15 @@ status:
   port: 8080
   user: some_user
   pass: some_password
+```
+
+### Metrics
+
+The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication.
+
+```
+$ curl "http://someuser:somepass@10.0.32.15:8080/varz"
+{"bad_gateways":0,"bad_requests":20,"cpu":0,"credentials":["user","pass"],"droplets":26,"host":"10.0.32.15:8080","index":0,"latency":{"50":0.001418144,"75":0.00180639025,"90":0.0070607187,"95":0.009561058849999996,"99":0.01523927838000001,"samples":1,"value":5e-07},"log_counts":{"info":9,"warn":40},"mem":19672,"ms_since_last_registry_update":1547,"num_cores":2,"rate":[1.1361328993362565,1.1344545494448148,1.1365784133171992],"requests":13832,"requests_per_sec":1.1361328993362565,"responses_2xx":13814,"responses_3xx":0,"responses_4xx":9,"responses_5xx":0,"responses_xxx":0,"start":"2016-01-07 19:04:40 +0000","tags":{"component":{"CloudController":{"latency":{"50":0.009015199,"75":0.0107408015,"90":0.015104917100000005,"95":0.01916497394999999,"99":0.034486261410000024,"samples":1,"value":5e-07},"rate":[0.13613289933245148,0.13433569936308343,0.13565885617276216],"requests":1686,"responses_2xx":1684,"responses_3xx":0,"responses_4xx":2,"responses_5xx":0,"responses_xxx":0},"HM9K":{"latency":{"50":0.0033354,"75":0.00751815875,"90":0.011916812100000005,"95":0.013760064,"99":0.013760064,"samples":1,"value":5e-07},"rate":[1.6850238803894876e-12,5.816129919395257e-05,0.00045864309255845694],"requests":12,"responses_2xx":6,"responses_3xx":0,"responses_4xx":6,"responses_5xx":0,"responses_xxx":0},"dea-0":{"latency":{"50":0.001354994,"75":0.001642107,"90":0.0020699939000000003,"95":0.0025553900499999996,"99":0.003677146940000006,"samples":1,"value":5e-07},"rate":[1.0000000000000013,1.0000000002571303,0.9999994853579043],"requests":12103,"responses_2xx":12103,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0},"uaa":{"latency":{"50":0.038288465,"75":0.245610809,"90":0.2877324668,"95":0.311816554,"99":0.311816554,"samples":1,"value":5e-07},"rate":[8.425119401947438e-13,2.9080649596976205e-05,0.00022931374141467497],"requests":17,"responses_2xx":17,"responses_3xx":0,"responses_4xx":0,"responses_5xx":0,"responses_xxx":0}}},"top10_app_requests":[{"application_id":"063f95f9-492c-456f-b569-737f69c04899","rpm":60,"rps":1}],"type":"Router","uptime":"0d:3h:22m:31s","urls":21,"uuid":"0-c7fd7d76-f8d8-46b7-7a1c-7a59bcf7e286"}
 ```
 
 ### Profiling the Server
