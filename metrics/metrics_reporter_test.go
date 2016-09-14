@@ -249,8 +249,8 @@ var _ = Describe("MetricsReporter", func() {
 			metricsReporter.CaptureLookupTime(time.Duration(9) * time.Second)
 			Eventually(func() fake.Metric { return sender.GetValue("route_lookup_time") }).Should(Equal(
 				fake.Metric{
-					Value: 9000,
-					Unit:  "ms",
+					Value: 9000000000,
+					Unit:  "ns",
 				}))
 		})
 	})

@@ -54,9 +54,8 @@ func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Re
 }
 
 func (c *MetricsReporter) CaptureLookupTime(t time.Duration) {
-	lookup := float64(t / time.Millisecond)
-	unit := "ms"
-	dropsondeMetrics.SendValue("route_lookup_time", lookup, unit)
+	unit := "ns"
+	dropsondeMetrics.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
 }
 
 func (c *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64) {
