@@ -37,6 +37,10 @@ func (z *zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	if !contains(*z.headersToLog, router_http.B3SpanIdHeader) {
 		*z.headersToLog = append(*z.headersToLog, router_http.B3SpanIdHeader)
 	}
+
+	if !contains(*z.headersToLog, router_http.B3ParentSpanIdHeader) {
+		*z.headersToLog = append(*z.headersToLog, router_http.B3ParentSpanIdHeader)
+	}
 }
 
 func contains(s []string, e string) bool {

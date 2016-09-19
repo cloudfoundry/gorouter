@@ -54,12 +54,14 @@ var _ = Describe("Zipkin", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(req.Header.Get(router_http.B3SpanIdHeader)).ToNot(BeEmpty())
 			Expect(req.Header.Get(router_http.B3TraceIdHeader)).ToNot(BeEmpty())
+			Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).ToNot(BeEmpty())
 		})
 
 		It("adds zipkin headers to access log record", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
 			Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
+			Expect(*headersToLog).To(ContainElement(router_http.B3ParentSpanIdHeader))
 		})
 
 		Context("with B3TraceIdHeader and B3SpanIdHeader already set", func() {
@@ -72,6 +74,7 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(Equal("Bogus Value"))
 				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
+				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(Equal("Span Value"))
 			})
 		})
 
@@ -84,6 +87,7 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
 				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
+				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(Equal("-"))
 			})
 		})
 
@@ -96,18 +100,20 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
 				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
+				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(Equal("-"))
 			})
 		})
 
 		Context("when X-B3-* headers are already set to be logged", func() {
 			BeforeEach(func() {
-				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader}
+				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader, router_http.B3ParentSpanIdHeader}
 				headersToLog = &newSlice
 			})
 			It("adds zipkin headers to access log record", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
 				Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3ParentSpanIdHeader))
 			})
 		})
 	})
@@ -121,22 +127,25 @@ var _ = Describe("Zipkin", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(BeEmpty())
 			Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(BeEmpty())
+			Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(BeEmpty())
 		})
 
 		It("does not add zipkin headers to access log record", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(*headersToLog).NotTo(ContainElement(router_http.B3SpanIdHeader))
+			Expect(*headersToLog).NotTo(ContainElement(router_http.B3ParentSpanIdHeader))
 			Expect(*headersToLog).NotTo(ContainElement(router_http.B3TraceIdHeader))
 		})
 
 		Context("when X-B3-* headers are already set to be logged", func() {
 			BeforeEach(func() {
-				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader}
+				newSlice := []string{router_http.B3TraceIdHeader, router_http.B3SpanIdHeader, router_http.B3ParentSpanIdHeader}
 				headersToLog = &newSlice
 			})
 			It("adds zipkin headers to access log record", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(*headersToLog).To(ContainElement(router_http.B3SpanIdHeader))
+				Expect(*headersToLog).To(ContainElement(router_http.B3ParentSpanIdHeader))
 				Expect(*headersToLog).To(ContainElement(router_http.B3TraceIdHeader))
 			})
 		})

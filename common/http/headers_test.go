@@ -117,8 +117,10 @@ var _ = Describe("Headers", func() {
 				It("generates a new b3 id and sets the X-B3-TraceId header and X-B3-SpanId to the same value", func() {
 					traceID := req.Header.Get(commonhttp.B3TraceIdHeader)
 					spanID := req.Header.Get(commonhttp.B3SpanIdHeader)
+					parentSpanID := req.Header.Get(commonhttp.B3ParentSpanIdHeader)
 					Expect(traceID).ToNot(BeEmpty())
 					Expect(spanID).ToNot(BeEmpty())
+					Expect(parentSpanID).ToNot(BeEmpty())
 
 					Expect(traceID).To(MatchRegexp(b3_id_regex))
 
@@ -141,6 +143,9 @@ var _ = Describe("Headers", func() {
 					BeforeEach(func() {
 						req.Header.Set(commonhttp.B3SpanIdHeader, "BOGUS-SpanId-HEADER")
 					})
+					It("should set the X-B3-ParentSpanId header", func() {
+						Expect(req.Header.Get(commonhttp.B3ParentSpanIdHeader)).To(Equal("BOGUS-SpanId-HEADER"))
+					})
 					It("should not override the X-B3-TraceId header", func() {
 						Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).To(Equal("BOGUS-HEADER"))
 					})
@@ -148,6 +153,15 @@ var _ = Describe("Headers", func() {
 					It("logs the header", func() {
 						Expect(logger).To(gbytes.Say("b3-trace-id-header-exists"))
 						Expect(logger).To(gbytes.Say("BOGUS-HEADER"))
+					})
+				})
+
+				Context("when X-B3-SpanId is not set", func() {
+					BeforeEach(func() {
+						req.Header.Set(commonhttp.B3SpanIdHeader, "")
+					})
+					It("should set the X-B3-ParentSpanId header", func() {
+						Expect(req.Header.Get(commonhttp.B3ParentSpanIdHeader)).To(Equal("-"))
 					})
 				})
 			})
@@ -174,6 +188,9 @@ var _ = Describe("Headers", func() {
 
 				It("does not fail when X-B3-TraceId is set", func() {
 					Expect(req.Header.Get(commonhttp.B3TraceIdHeader)).To(Equal("BOGUS-HEADER"))
+				})
+				It("should set the X-B3-ParentSpanId header", func() {
+					Expect(req.Header.Get(commonhttp.B3ParentSpanIdHeader)).To(Equal("SPAN-HEADER"))
 				})
 			})
 		})
