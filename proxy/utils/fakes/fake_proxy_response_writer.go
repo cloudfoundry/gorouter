@@ -14,13 +14,13 @@ type FakeProxyResponseWriter struct {
 	HeaderStub        func() http.Header
 	headerMutex       sync.RWMutex
 	headerArgsForCall []struct{}
-	headerReturns struct {
+	headerReturns     struct {
 		result1 http.Header
 	}
 	HijackStub        func() (net.Conn, *bufio.ReadWriter, error)
 	hijackMutex       sync.RWMutex
 	hijackArgsForCall []struct{}
-	hijackReturns struct {
+	hijackReturns     struct {
 		result1 net.Conn
 		result2 *bufio.ReadWriter
 		result3 error
@@ -39,28 +39,28 @@ type FakeProxyResponseWriter struct {
 	writeHeaderArgsForCall []struct {
 		s int
 	}
-	DoneStub        func()
-	doneMutex       sync.RWMutex
-	doneArgsForCall []struct{}
-	FlushStub        func()
-	flushMutex       sync.RWMutex
-	flushArgsForCall []struct{}
+	DoneStub          func()
+	doneMutex         sync.RWMutex
+	doneArgsForCall   []struct{}
+	FlushStub         func()
+	flushMutex        sync.RWMutex
+	flushArgsForCall  []struct{}
 	StatusStub        func() int
 	statusMutex       sync.RWMutex
 	statusArgsForCall []struct{}
-	statusReturns struct {
+	statusReturns     struct {
 		result1 int
 	}
 	SizeStub        func() int
 	sizeMutex       sync.RWMutex
 	sizeArgsForCall []struct{}
-	sizeReturns struct {
+	sizeReturns     struct {
 		result1 int
 	}
 	ContextStub        func() utils.Context
 	contextMutex       sync.RWMutex
 	contextArgsForCall []struct{}
-	contextReturns struct {
+	contextReturns     struct {
 		result1 utils.Context
 	}
 	AddToContextStub        func(key, value interface{})

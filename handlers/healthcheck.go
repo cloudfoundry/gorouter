@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"sync/atomic"
 
@@ -30,26 +31,33 @@ func NewHealthcheck(userAgent string, heartbeatOK *int32, logger lager.Logger) n
 }
 
 func (h *healthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	proxyWriter := rw.(utils.ProxyResponseWriter)
-	alr := proxyWriter.Context().Value("AccessLogRecord")
-	if alr == nil {
-		panic("AccessLogRecord not set on context")
+	proxyWriter, ok := rw.(utils.ProxyResponseWriter)
+	var accessLogRecord *schema.AccessLogRecord
+	if ok {
+		alr := proxyWriter.Context().Value("AccessLogRecord")
+		if alr == nil {
+			h.logger.Error("AccessLogRecord not set on context", errors.New("failed-to-access-log-record"))
+		}
+		accessLogRecord = alr.(*schema.AccessLogRecord)
 	}
-	accessLogRecord := alr.(*schema.AccessLogRecord)
 	if h.userAgent == "" || r.Header.Get("User-Agent") == h.userAgent {
 		rw.Header().Set("Cache-Control", "private, max-age=0")
 		rw.Header().Set("Expires", "0")
 
-		ok := atomic.LoadInt32(h.heartbeatOK) != 0
-		if ok {
+		draining := atomic.LoadInt32(h.heartbeatOK) == 0
+		if !draining {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte("ok\n"))
 			r.Close = true
-			accessLogRecord.StatusCode = http.StatusOK
+			if ok {
+				accessLogRecord.StatusCode = http.StatusOK
+			}
 		} else {
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			r.Close = true
-			accessLogRecord.StatusCode = http.StatusServiceUnavailable
+			if ok {
+				accessLogRecord.StatusCode = http.StatusServiceUnavailable
+			}
 		}
 		return
 	}

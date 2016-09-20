@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -279,8 +280,8 @@ var _ = Describe("Proxy", func() {
 		Expect(body).To(Equal("ok\n"))
 	})
 
-	It("responds with failure to load balancer check after StopHeartbeat() has been called", func() {
-		p.Drain()
+	It("responds with failure to load balancer check if heartbeatOK is false", func() {
+		atomic.StoreInt32(&heartbeatOK, 0)
 
 		conn := dialProxy(proxyServer)
 

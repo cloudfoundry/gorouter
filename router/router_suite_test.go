@@ -3,6 +3,8 @@ package router_test
 import (
 	"time"
 
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -14,7 +16,11 @@ func TestRouter(t *testing.T) {
 	RunSpecs(t, "Router Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
+	fakeEmitter := fake.NewFakeEventEmitter("fake")
+	dropsonde.InitializeWithEmitter(fakeEmitter)
+	return nil
+}, func([]byte) {
 	SetDefaultEventuallyTimeout(15 * time.Second)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)

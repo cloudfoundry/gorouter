@@ -36,6 +36,7 @@ var (
 	logger         lager.Logger
 	cryptoPrev     secure.Crypto
 	recommendHttps bool
+	heartbeatOK    int32
 )
 
 func TestProxy(t *testing.T) {
@@ -75,7 +76,7 @@ var _ = JustBeforeEach(func() {
 		CipherSuites:       conf.CipherSuites,
 		InsecureSkipVerify: conf.SkipSSLValidation,
 	}
-
+	heartbeatOK = 1
 	p = proxy.NewProxy(proxy.ProxyArgs{
 		EndpointTimeout:            conf.EndpointTimeout,
 		Ip:                         conf.Ip,
@@ -92,6 +93,7 @@ var _ = JustBeforeEach(func() {
 		CryptoPrev:                 cryptoPrev,
 		RouteServiceRecommendHttps: recommendHttps,
 		HealthCheckUserAgent:       "HTTP-Monitor/1.1",
+		HeartbeatOK:                &heartbeatOK,
 		EnableZipkin:               conf.Tracing.EnableZipkin,
 		ExtraHeadersToLog:          &conf.ExtraHeadersToLog,
 	})

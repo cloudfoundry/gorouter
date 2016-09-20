@@ -57,6 +57,12 @@ var _ = Describe("Healthcheck", func() {
 			Expect(resp.Header().Get("Cache-Control")).To(Equal("private, max-age=0"))
 			Expect(resp.Header().Get("Expires")).To(Equal("0"))
 		})
+
+		It("does not fail when the ResponseWriter is not a ProxyResponseWriter", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(resp.Code).To(Equal(200))
+			Expect(alr.StatusCode).To(Equal(0))
+		})
 	}
 
 	TestHealthcheckServiceUnavailable := func() {
@@ -79,6 +85,11 @@ var _ = Describe("Healthcheck", func() {
 			handler.ServeHTTP(proxyWriter, req, nextHandler)
 			Expect(resp.Header().Get("Cache-Control")).To(Equal("private, max-age=0"))
 			Expect(resp.Header().Get("Expires")).To(Equal("0"))
+		})
+		It("does not fail when the ResponseWriter is not a ProxyResponseWriter", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(resp.Code).To(Equal(503))
+			Expect(alr.StatusCode).To(Equal(0))
 		})
 	}
 

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	. "code.cloudfoundry.org/gorouter/router"
+	"code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
@@ -33,12 +34,14 @@ var _ = Describe("Router", func() {
 		logger     lager.Logger
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
+		p          proxy.Proxy
 
-		mbusClient *nats.Conn
-		registry   *rregistry.RouteRegistry
-		varz       vvarz.Varz
-		router     *Router
-		natsPort   uint16
+		mbusClient  *nats.Conn
+		registry    *rregistry.RouteRegistry
+		varz        vvarz.Varz
+		rtr         *router.Router
+		natsPort    uint16
+		healthCheck int32
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
@@ -94,7 +97,7 @@ var _ = Describe("Router", func() {
 		blocker <- false
 	}
 
-	runRouter := func(r *Router) (chan os.Signal, chan struct{}) {
+	runRouter := func(r *router.Router) (chan os.Signal, chan struct{}) {
 		signals := make(chan os.Signal)
 		readyChan := make(chan struct{})
 		closeChannel := make(chan struct{})
@@ -117,6 +120,17 @@ var _ = Describe("Router", func() {
 		resp, err := client.Do(req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp).ToNot(BeNil())
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	healthCheckWithEndpointReceives := func() int {
+		url := fmt.Sprintf("http://%s:%d/health", config.Ip, config.Status.Port)
+		req, _ := http.NewRequest("GET", url, nil)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		Expect(err).ToNot(HaveOccurred())
 		defer resp.Body.Close()
 		return resp.StatusCode
 	}
@@ -205,7 +219,8 @@ var _ = Describe("Router", func() {
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 		logcounter := schema.NewLogCounter()
-		proxy := proxy.NewProxy(proxy.ProxyArgs{
+		atomic.StoreInt32(&healthCheck, 0)
+		p = proxy.NewProxy(proxy.ProxyArgs{
 			Logger:               logger,
 			EndpointTimeout:      config.EndpointTimeout,
 			Ip:                   config.Ip,
@@ -214,10 +229,11 @@ var _ = Describe("Router", func() {
 			Reporter:             varz,
 			AccessLogger:         &access_log.NullAccessLogger{},
 			HealthCheckUserAgent: "HTTP-Monitor/1.1",
+			HeartbeatOK:          &healthCheck,
 		})
 
 		errChan := make(chan error, 2)
-		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, errChan)
+		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -229,12 +245,12 @@ var _ = Describe("Router", func() {
 
 	Context("Drain", func() {
 		BeforeEach(func() {
-			runRouter(router)
+			runRouter(rtr)
 		})
 
 		AfterEach(func() {
-			if router != nil {
-				router.Stop()
+			if rtr != nil {
+				rtr.Stop()
 			}
 		})
 
@@ -282,7 +298,7 @@ var _ = Describe("Router", func() {
 			<-blocker
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(0, drainTimeout)
+				err := rtr.Drain(0, drainTimeout)
 				Expect(err).ToNot(HaveOccurred())
 				close(drainDone)
 			}()
@@ -331,13 +347,13 @@ var _ = Describe("Router", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				err := router.Drain(0, 500*time.Millisecond)
+				err := rtr.Drain(0, 500*time.Millisecond)
 				resultCh <- err
 			}()
 
 			var result error
 			Eventually(resultCh).Should(Receive(&result))
-			Expect(result).To(Equal(DrainTimeout))
+			Expect(result).To(Equal(router.DrainTimeout))
 		})
 
 		Context("with http and https servers", func() {
@@ -423,7 +439,7 @@ var _ = Describe("Router", func() {
 				// trigger drain
 				go func() {
 					defer GinkgoRecover()
-					err := router.Drain(drainWait, drainTimeout)
+					err := rtr.Drain(drainWait, drainTimeout)
 					Expect(err).ToNot(HaveOccurred())
 					close(drainDone)
 				}()
@@ -439,12 +455,108 @@ var _ = Describe("Router", func() {
 		})
 	})
 
+	Context("health check", func() {
+		var errChan chan error
+
+		BeforeEach(func() {
+			var err error
+			logcounter := schema.NewLogCounter()
+
+			errChan = make(chan error, 2)
+			config.LoadBalancerHealthyThreshold = 2 * time.Second
+			config.Port = 8347
+			rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
+			Expect(err).ToNot(HaveOccurred())
+			runRouterHealthcheck := func(r *router.Router) {
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+				go func() {
+					r.Run(signals, readyChan)
+				}()
+				Eventually(func() int {
+					return healthCheckWithEndpointReceives()
+				}, 100*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+				select {
+				case <-readyChan:
+				}
+			}
+			runRouterHealthcheck(rtr)
+		})
+
+		It("should return valid healthchecks ", func() {
+			app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+			blocker := make(chan bool)
+			serviceUnavailable := make(chan bool)
+
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				blocker <- true
+
+				_, err := ioutil.ReadAll(r.Body)
+				defer r.Body.Close()
+				Expect(err).ToNot(HaveOccurred())
+
+				<-blocker
+
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			app.Listen()
+
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			drainWait := 1 * time.Second
+			drainTimeout := 2 * time.Second
+
+			go func() {
+				defer GinkgoRecover()
+				req, err := http.NewRequest("GET", app.Endpoint(), nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				client := http.Client{}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				defer resp.Body.Close()
+			}()
+
+			// check for ok health
+			Consistently(func() int {
+				return healthCheckWithEndpointReceives()
+			}, 2*time.Second, 100*time.Millisecond).Should(Equal(http.StatusOK))
+
+			// wait for app to receive request
+			<-blocker
+
+			go func() {
+				err := rtr.Drain(drainWait, drainTimeout)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+			blocker <- false
+			// check drain makes gorouter returns service unavailable
+			go func() {
+				defer GinkgoRecover()
+				Eventually(func() int {
+					result := healthCheckWithEndpointReceives()
+					if result == http.StatusServiceUnavailable {
+						serviceUnavailable <- true
+					}
+					return result
+				}, 100*time.Millisecond, drainTimeout).Should(Equal(http.StatusServiceUnavailable))
+			}()
+
+		})
+	})
+
 	Context("OnErrOrSignal", func() {
 		Context("when an error is received in the error channel", func() {
 			var errChan chan error
 
 			BeforeEach(func() {
 				logcounter := schema.NewLogCounter()
+				var healthCheck int32
+				healthCheck = 0
 				proxy := proxy.NewProxy(proxy.ProxyArgs{
 					Logger:               logger,
 					EndpointTimeout:      config.EndpointTimeout,
@@ -454,13 +566,14 @@ var _ = Describe("Router", func() {
 					Reporter:             varz,
 					AccessLogger:         &access_log.NullAccessLogger{},
 					HealthCheckUserAgent: "HTTP-Moniter/1.1",
+					HeartbeatOK:          &healthCheck,
 				})
 
 				errChan = make(chan error, 2)
 				var err error
-				router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, errChan)
+				rtr, err = router.NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
 				Expect(err).ToNot(HaveOccurred())
-				runRouter(router)
+				runRouter(rtr)
 			})
 
 			It("it drains existing connections and stops the router", func() {
@@ -476,7 +589,7 @@ var _ = Describe("Router", func() {
 			)
 
 			BeforeEach(func() {
-				signals, _ = runRouter(router)
+				signals, _ = runRouter(rtr)
 			})
 
 			It("it drains and stops the router", func() {
@@ -488,14 +601,14 @@ var _ = Describe("Router", func() {
 
 		Context("when a SIGTERM signal is sent", func() {
 			It("it drains and stops the router", func() {
-				signals, closeChannel := runRouter(router)
+				signals, closeChannel := runRouter(rtr)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGTERM)
 			})
 		})
 
 		Context("when a SIGINT signal is sent", func() {
 			It("it drains and stops the router", func() {
-				signals, closeChannel := runRouter(router)
+				signals, closeChannel := runRouter(rtr)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGINT)
 			})
 		})
@@ -506,7 +619,7 @@ var _ = Describe("Router", func() {
 			)
 
 			BeforeEach(func() {
-				signals, _ = runRouter(router)
+				signals, _ = runRouter(rtr)
 			})
 
 			It("it drains and stops the router", func() {
@@ -520,14 +633,14 @@ var _ = Describe("Router", func() {
 
 		Context("when USR1 is not the first of multiple signals sent", func() {
 			It("it does not drain and stops the router", func() {
-				signals, closeChannel := runRouter(router)
+				signals, closeChannel := runRouter(rtr)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGINT, syscall.SIGUSR1)
 			})
 		})
 
 		Context("when a non handlded signal is sent", func() {
 			It("it drains and stops the router", func() {
-				signals, closeChannel := runRouter(router)
+				signals, closeChannel := runRouter(rtr)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGUSR2)
 			})
 		})

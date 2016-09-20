@@ -18,6 +18,7 @@ import (
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
+	"github.com/urfave/negroni"
 )
 
 const RefreshInterval time.Duration = time.Second * 1
@@ -82,9 +83,10 @@ func (p *ProcessStatus) StopUpdate() {
 var procStat *ProcessStatus
 
 type VcapComponent struct {
-	Config     interface{}               `json:"-"`
-	Varz       *health.Varz              `json:"-"`
-	Healthz    *health.Healthz           `json:"-"`
+	Config     interface{}     `json:"-"`
+	Varz       *health.Varz    `json:"-"`
+	Healthz    *health.Healthz `json:"-"`
+	Health     negroni.Handler
 	InfoRoutes map[string]json.Marshaler `json:"-"`
 	Logger     lager.Logger              `json:"-"`
 
@@ -206,6 +208,10 @@ func (c *VcapComponent) Stop() {
 
 func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
+
+	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
+		c.Health.ServeHTTP(w, req, nil)
+	})
 
 	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Connection", "close")

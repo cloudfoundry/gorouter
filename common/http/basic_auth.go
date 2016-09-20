@@ -33,10 +33,14 @@ func extractCredentials(req *http.Request) []string {
 	return z
 }
 
+func authenticatedEndpoint(path string) bool {
+	return path != "/healthz" && path != "/health"
+
+}
 func (x *BasicAuth) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	y := extractCredentials(req)
 	// Beware of the hack
-	if req.URL.Path != "/healthz" && (y == nil || !x.Authenticator(y[0], y[1])) {
+	if authenticatedEndpoint(req.URL.Path) && (y == nil || !x.Authenticator(y[0], y[1])) {
 		w.Header().Set("WWW-Authenticate", "Basic")
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(fmt.Sprintf("%d Unauthorized\n", http.StatusUnauthorized)))

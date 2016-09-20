@@ -16,8 +16,6 @@ import (
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	gConfig "github.com/onsi/ginkgo/config"
@@ -67,12 +65,8 @@ var _ = Describe("Router", func() {
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
 
-		fakeEmitter := fake.NewFakeEventEmitter("fake")
-		dropsonde.InitializeWithEmitter(fakeEmitter)
-
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
-
 		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -103,8 +97,10 @@ var _ = Describe("Router", func() {
 			AccessLogger:         &access_log.NullAccessLogger{},
 			HealthCheckUserAgent: "HTTP-Monitor/1.1",
 		})
+		var healthCheck int32
+		healthCheck = 0
 		logcounter := schema.NewLogCounter()
-		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, logcounter, nil)
+		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, nil)
 
 		Expect(err).ToNot(HaveOccurred())
 

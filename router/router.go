@@ -6,24 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
-
-	"code.cloudfoundry.org/gorouter/common"
-	"code.cloudfoundry.org/gorouter/common/health"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/common/schema"
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/metrics/monitor"
-	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/localip"
-	"code.cloudfoundry.org/routing-api/models"
-	"github.com/armon/go-proxyproto"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/nats-io/nats"
 
 	"bytes"
 	"compress/zlib"
@@ -35,6 +19,24 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/common/health"
+	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/common/schema"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/proxy"
+	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/varz"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/localip"
+	"code.cloudfoundry.org/routing-api/models"
+	"github.com/armon/go-proxyproto"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/nats-io/nats"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
@@ -66,9 +68,9 @@ type Router struct {
 	stopping         bool
 	stopLock         sync.Mutex
 	uptimeMonitor    *monitor.Uptime
-
-	logger  lager.Logger
-	errChan chan error
+	HeartbeatOK      *int32
+	logger           lager.Logger
+	errChan          chan error
 }
 
 type RegistryMessage struct {
@@ -84,11 +86,11 @@ type RegistryMessage struct {
 }
 
 func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
+	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
 	if cfg.Status.Port != 0 {
-		host = fmt.Sprintf("%s:%d", cfg.Ip, cfg.Status.Port)
+		host = fmt.Sprintf(":%d", cfg.Status.Port)
 	}
 
 	varz := &health.Varz{
@@ -103,11 +105,12 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 	}
 
 	healthz := &health.Healthz{}
-
+	health := handlers.NewHealthcheck("", heartbeatOK, logger)
 	component := &common.VcapComponent{
 		Config:  cfg,
 		Varz:    varz,
 		Healthz: healthz,
+		Health:  health,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
@@ -132,6 +135,7 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 		activeConns:  make(map[net.Conn]struct{}),
 		logger:       logger,
 		errChan:      routerErrChan,
+		HeartbeatOK:  heartbeatOK,
 		stopping:     false,
 	}
 
@@ -226,6 +230,8 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
+	atomic.StoreInt32(r.HeartbeatOK, 1)
+
 	close(ready)
 
 	r.OnErrOrSignal(signals, r.errChan)
@@ -354,7 +360,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 }
 
 func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
-	r.proxy.Drain()
+	atomic.StoreInt32(r.HeartbeatOK, 0)
 
 	<-time.After(drainWait)
 

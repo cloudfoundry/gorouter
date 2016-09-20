@@ -40,6 +40,8 @@ import (
 
 var configFile string
 
+var healthCheck int32
+
 const (
 	DEBUG = "debug"
 	INFO  = "info"
@@ -116,8 +118,8 @@ func main() {
 	}
 
 	proxy := buildProxy(logger.Session("proxy"), c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
-
-	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, logCounter, nil)
+	healthCheck = 0
+	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil)
 	if err != nil {
 		logger.Fatal("initialize-router-error", err)
 	}
@@ -181,6 +183,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		CryptoPrev:           cryptoPrev,
 		ExtraHeadersToLog:    &c.ExtraHeadersToLog,
 		HealthCheckUserAgent: c.HealthCheckUserAgent,
+		HeartbeatOK:          &healthCheck,
 		EnableZipkin:         c.Tracing.EnableZipkin,
 	}
 	return proxy.NewProxy(args)
