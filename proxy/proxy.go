@@ -76,6 +76,14 @@ func (p *proxyHandler) Drain() {
 	p.proxy.Drain()
 }
 
+type proxyWriterHandler struct{}
+
+// ServeHTTP wraps the responseWriter in a ProxyResponseWriter
+func (p *proxyWriterHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
+	proxyWriter := utils.NewProxyResponseWriter(responseWriter)
+	next(proxyWriter, request)
+}
+
 type proxy struct {
 	ip                         string
 	traceKey                   string
@@ -93,9 +101,6 @@ type proxy struct {
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	n := negroni.New()
-	n.Use(handlers.NewZipkin(args.EnableZipkin, args.ExtraHeadersToLog, args.Logger))
-
 	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
 
 	p := &proxy{
@@ -127,6 +132,12 @@ func NewProxy(args ProxyArgs) Proxy {
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
 	}
+
+	n := negroni.New()
+	n.Use(&proxyWriterHandler{})
+	n.Use(handlers.NewAccessLog(args.AccessLogger, args.ExtraHeadersToLog))
+	n.Use(handlers.NewHealthcheck(args.HealthCheckUserAgent, &p.heartbeatOK, args.Logger))
+	n.Use(handlers.NewZipkin(args.EnableZipkin, args.ExtraHeadersToLog, args.Logger))
 
 	n.UseHandler(p)
 	handlers := &proxyHandler{
@@ -184,32 +195,18 @@ func (p *proxy) Drain() {
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
-	startedAt := time.Now()
+	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 
-	accessLog := schema.AccessLogRecord{
-		Request:           request,
-		StartedAt:         startedAt,
-		ExtraHeadersToLog: p.extraHeadersToLog,
+	alr := proxyWriter.Context().Value("AccessLogRecord")
+	if alr == nil {
+		panic("AccessLogRecord not set on context")
 	}
+	accessLog := alr.(*schema.AccessLogRecord)
 
-	requestBodyCounter := &countingReadCloser{delegate: request.Body}
-	request.Body = requestBodyCounter
-
-	proxyWriter := utils.NewProxyResponseWriter(responseWriter)
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, &accessLog, p.logger)
-
-	defer func() {
-		accessLog.RequestBytesReceived = requestBodyCounter.GetCount()
-		p.accessLogger.Log(accessLog)
-	}()
+	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, accessLog, p.logger)
 
 	if !isProtocolSupported(request) {
 		handler.HandleUnsupportedProtocol()
-		return
-	}
-
-	if p.isLoadBalancerHeartbeat(request) {
-		handler.HandleHeartbeat(atomic.LoadInt32(&p.heartbeatOK) != 0)
 		return
 	}
 
@@ -235,13 +232,11 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	if isTcpUpgrade(request) {
 		handler.HandleTcpRequest(iter)
-		accessLog.FinishedAt = time.Now()
 		return
 	}
 
 	if isWebSocketUpgrade(request) {
 		handler.HandleWebSocketRequest(iter)
-		accessLog.FinishedAt = time.Now()
 		return
 	}
 
@@ -297,9 +292,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 			router_http.SetTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
 		}
 
-		latency := time.Since(startedAt)
+		latency := time.Since(accessLog.StartedAt)
 
-		p.reporter.CaptureRoutingResponse(endpoint, rsp, startedAt, latency)
+		p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
 
 		if err != nil {
 			p.reporter.CaptureBadGateway(request)
@@ -322,9 +317,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler, after)
 
 	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig).ServeHTTP(proxyWriter, request)
-
-	accessLog.FinishedAt = time.Now()
-	accessLog.BodyBytesSent = proxyWriter.Size()
 }
 
 func (p *proxy) isLoadBalancerHeartbeat(request *http.Request) bool {

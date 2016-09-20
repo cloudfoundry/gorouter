@@ -446,13 +446,14 @@ var _ = Describe("Router", func() {
 			BeforeEach(func() {
 				logcounter := schema.NewLogCounter()
 				proxy := proxy.NewProxy(proxy.ProxyArgs{
-					Logger:          logger,
-					EndpointTimeout: config.EndpointTimeout,
-					Ip:              config.Ip,
-					TraceKey:        config.TraceKey,
-					Registry:        registry,
-					Reporter:        varz,
-					AccessLogger:    &access_log.NullAccessLogger{},
+					Logger:               logger,
+					EndpointTimeout:      config.EndpointTimeout,
+					Ip:                   config.Ip,
+					TraceKey:             config.TraceKey,
+					Registry:             registry,
+					Reporter:             varz,
+					AccessLogger:         &access_log.NullAccessLogger{},
+					HealthCheckUserAgent: "HTTP-Moniter/1.1",
 				})
 
 				errChan = make(chan error, 2)

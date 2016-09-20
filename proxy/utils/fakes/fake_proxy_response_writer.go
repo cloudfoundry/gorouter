@@ -14,13 +14,13 @@ type FakeProxyResponseWriter struct {
 	HeaderStub        func() http.Header
 	headerMutex       sync.RWMutex
 	headerArgsForCall []struct{}
-	headerReturns     struct {
+	headerReturns struct {
 		result1 http.Header
 	}
 	HijackStub        func() (net.Conn, *bufio.ReadWriter, error)
 	hijackMutex       sync.RWMutex
 	hijackArgsForCall []struct{}
-	hijackReturns     struct {
+	hijackReturns struct {
 		result1 net.Conn
 		result2 *bufio.ReadWriter
 		result3 error
@@ -39,23 +39,35 @@ type FakeProxyResponseWriter struct {
 	writeHeaderArgsForCall []struct {
 		s int
 	}
-	DoneStub          func()
-	doneMutex         sync.RWMutex
-	doneArgsForCall   []struct{}
-	FlushStub         func()
-	flushMutex        sync.RWMutex
-	flushArgsForCall  []struct{}
+	DoneStub        func()
+	doneMutex       sync.RWMutex
+	doneArgsForCall []struct{}
+	FlushStub        func()
+	flushMutex       sync.RWMutex
+	flushArgsForCall []struct{}
 	StatusStub        func() int
 	statusMutex       sync.RWMutex
 	statusArgsForCall []struct{}
-	statusReturns     struct {
+	statusReturns struct {
 		result1 int
 	}
 	SizeStub        func() int
 	sizeMutex       sync.RWMutex
 	sizeArgsForCall []struct{}
-	sizeReturns     struct {
+	sizeReturns struct {
 		result1 int
+	}
+	ContextStub        func() utils.Context
+	contextMutex       sync.RWMutex
+	contextArgsForCall []struct{}
+	contextReturns struct {
+		result1 utils.Context
+	}
+	AddToContextStub        func(key, value interface{})
+	addToContextMutex       sync.RWMutex
+	addToContextArgsForCall []struct {
+		key   interface{}
+		value interface{}
 	}
 }
 
@@ -241,6 +253,54 @@ func (fake *FakeProxyResponseWriter) SizeReturns(result1 int) {
 	fake.sizeReturns = struct {
 		result1 int
 	}{result1}
+}
+
+func (fake *FakeProxyResponseWriter) Context() utils.Context {
+	fake.contextMutex.Lock()
+	fake.contextArgsForCall = append(fake.contextArgsForCall, struct{}{})
+	fake.contextMutex.Unlock()
+	if fake.ContextStub != nil {
+		return fake.ContextStub()
+	} else {
+		return fake.contextReturns.result1
+	}
+}
+
+func (fake *FakeProxyResponseWriter) ContextCallCount() int {
+	fake.contextMutex.RLock()
+	defer fake.contextMutex.RUnlock()
+	return len(fake.contextArgsForCall)
+}
+
+func (fake *FakeProxyResponseWriter) ContextReturns(result1 utils.Context) {
+	fake.ContextStub = nil
+	fake.contextReturns = struct {
+		result1 utils.Context
+	}{result1}
+}
+
+func (fake *FakeProxyResponseWriter) AddToContext(key interface{}, value interface{}) {
+	fake.addToContextMutex.Lock()
+	fake.addToContextArgsForCall = append(fake.addToContextArgsForCall, struct {
+		key   interface{}
+		value interface{}
+	}{key, value})
+	fake.addToContextMutex.Unlock()
+	if fake.AddToContextStub != nil {
+		fake.AddToContextStub(key, value)
+	}
+}
+
+func (fake *FakeProxyResponseWriter) AddToContextCallCount() int {
+	fake.addToContextMutex.RLock()
+	defer fake.addToContextMutex.RUnlock()
+	return len(fake.addToContextArgsForCall)
+}
+
+func (fake *FakeProxyResponseWriter) AddToContextArgsForCall(i int) (interface{}, interface{}) {
+	fake.addToContextMutex.RLock()
+	defer fake.addToContextMutex.RUnlock()
+	return fake.addToContextArgsForCall[i].key, fake.addToContextArgsForCall[i].value
 }
 
 var _ utils.ProxyResponseWriter = new(FakeProxyResponseWriter)
