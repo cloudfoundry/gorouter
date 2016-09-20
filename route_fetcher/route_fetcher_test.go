@@ -100,28 +100,30 @@ var _ = Describe("RouteFetcher", func() {
 			uaaClient.FetchTokenReturns(token, nil)
 
 			response = []models.Route{
-				{
-					Route:   "foo",
-					Port:    1,
-					IP:      "1.1.1.1",
-					TTL:     new(int),
-					LogGuid: "guid",
-				},
-				{
-					Route:           "foo",
-					Port:            2,
-					IP:              "2.2.2.2",
-					TTL:             new(int),
-					LogGuid:         "guid",
-					RouteServiceUrl: "route-service-url",
-				},
-				{
-					Route:   "bar",
-					Port:    3,
-					IP:      "3.3.3.3",
-					TTL:     new(int),
-					LogGuid: "guid",
-				},
+				models.NewRoute(
+					"foo",
+					1,
+					"1.1.1.1",
+					"guid",
+					"rs",
+					0,
+				),
+				models.NewRoute(
+					"foo",
+					2,
+					"2.2.2.2",
+					"guid",
+					"route-service-url",
+					0,
+				),
+				models.NewRoute(
+					"bar",
+					3,
+					"3.3.3.3",
+					"guid",
+					"rs",
+					0,
+				),
 			}
 
 			*response[0].TTL = 1
@@ -416,15 +418,14 @@ var _ = Describe("RouteFetcher", func() {
 	Describe("HandleEvent", func() {
 		Context("When the event is an Upsert", func() {
 			It("registers the route from the registry", func() {
-				eventRoute := models.Route{
-					Route:           "z.a.k",
-					Port:            63,
-					IP:              "42.42.42.42",
-					TTL:             new(int),
-					LogGuid:         "Tomato",
-					RouteServiceUrl: "route-service-url",
-				}
-				*eventRoute.TTL = 1
+				eventRoute := models.NewRoute(
+					"z.a.k",
+					63,
+					"42.42.42.42",
+					"Tomato",
+					"route-service-url",
+					1,
+				)
 
 				event := routing_api.Event{
 					Action: "Upsert",
@@ -452,15 +453,14 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("When the event is a DELETE", func() {
 			It("unregisters the route from the registry", func() {
-				eventRoute := models.Route{
-					Route:           "z.a.k",
-					Port:            63,
-					IP:              "42.42.42.42",
-					TTL:             new(int),
-					LogGuid:         "Tomato",
-					RouteServiceUrl: "route-service-url",
-				}
-				*eventRoute.TTL = 1
+				eventRoute := models.NewRoute(
+					"z.a.k",
+					63,
+					"42.42.42.42",
+					"Tomato",
+					"route-service-url",
+					1,
+				)
 
 				event := routing_api.Event{
 					Action: "Delete",
