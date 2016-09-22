@@ -117,7 +117,7 @@ The format of the `router.register` message is as follows:
 }
 ```
 
-`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold. 
+`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold.
 
 `app` is a unique identifier for an application that the endpoint is registered for. This value will be included in router access logs with the label `app_id`, as well as being sent with requests to the endpoint in an HTTP header `X-CF-ApplicationId`.
 
@@ -148,7 +148,42 @@ Hello!
 
 ## Healthchecking from a Load Balancer
 
-To scale Gorouter horizontally for high-availability or throughput capacity, you must deploy it behind a highly-available load balancer (F5, AWS ELB, etc). Your load balancer must be configured to send an HTTP healthcheck on port 80 with the `User-Agent` HTTP header set to `HTTP-Monitor/1.1`. A 200 response indicates the Gorouter instance is healthy; any other response indicates unhealthy. Gorouter can be configured to accept alternate values for the User Agent header using the `healthcheck_user_agent` configuration property; as an example, AWS ELBS send `User-Agent: ELB-HealthChecker/1.0`. 
+To scale GoRouter horizontally for high-availability or throughput capacity, you
+must deploy it behind a highly-available load balancer (F5, AWS ELB, etc).
+
+GoRouter has a health endpoint on port 8080 that returns a 200 OK that indicates
+the GoRouter instance is healthy; any other response indicates unhealthy.
+This port can be configured via the `router.status.port` property in the BOSH
+deployment manifest or via the `status.port` property under
+`/var/vcap/jobs/gorouter/config/gorouter.yml`
+
+```
+$ curl -v http://10.0.32.15:8080/health
+*   Trying 10.0.32.15..
+* Connected to 10.0.32.15 (10.0.32.15) port 8080 (#0)
+> GET /health HTTP/1.1
+> Host: 10.0.32.15:8080
+> User-Agent: curl/7.43.0
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Cache-Control: private, max-age=0
+< Expires: 0
+< Date: Thu, 22 Sep 2016 00:13:54 GMT
+< Content-Length: 3
+< Content-Type: text/plain; charset=utf-8
+<
+ok
+* Connection #0 to host 10.0.32.15 left intact
+```
+
+**DEPRECATED:**
+Your load balancer can be configured to send an HTTP healthcheck on
+port 80 with the `User-Agent` HTTP header set to `HTTP-Monitor/1.1`. A 200
+response indicates the GoRouter instance is healthy; any other response
+indicates unhealthy. GoRouter can be configured to accept alternate values for
+the User Agent header using the `healthcheck_user_agent` configuration
+property; as an example, AWS ELBS send `User-Agent: ELB-HealthChecker/1.0`.
 
 ```
 $ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
@@ -164,7 +199,7 @@ $ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
 < HTTP/1.1 200 OK
 < Cache-Control: private, max-age=0
 < Expires: 0
-< X-Cf-Requestid: 04ad84c6-43dd-4d20-7818-7c47595d9442
+< X-Vcap-Request-Id: 04ad84c6-43dd-4d20-7818-7c47595d9442
 < Date: Thu, 07 Jan 2016 22:30:02 GMT
 < Content-Length: 3
 < Content-Type: text/plain; charset=utf-8
@@ -173,7 +208,9 @@ ok
 * Connection #0 to host 10.0.32.15 left intact
 ```
 
-The *deprecated* `/healthz` endpoint provides a similar response.
+**DEPRECATED:**
+The `/healthz` endpoint provides a similar response, but it always returns a 200
+response regardless of whether or not the GoRouter instance is healthy.
 
 ## Instrumentation
 
@@ -246,7 +283,7 @@ You can test this feature manually:
 echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.1\r\nHost: [APP URL]\r\n" | nc [GOROUTER IP] [GOROUTER PORT]
 ```
 
-You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt). 
+You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
 
 ## HTTP/2 Support
 
