@@ -189,13 +189,27 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	// Wait for one start message send interval, such that the router's registry
-	// can be populated before serving requests.
-	if r.config.StartResponseDelayInterval != 0 {
-		r.logger.Info(fmt.Sprintf("Waiting %s before listening...", r.config.StartResponseDelayInterval))
-		time.Sleep(r.config.StartResponseDelayInterval)
-		r.logger.Info("completed-wait")
+	lbOKDelay := r.config.StartResponseDelayInterval - r.config.LoadBalancerHealthyThreshold
+
+	totalWaitDelay := r.config.LoadBalancerHealthyThreshold
+	if lbOKDelay > 0 {
+		totalWaitDelay = r.config.StartResponseDelayInterval
 	}
+
+	r.logger.Info(fmt.Sprintf("Waiting %s before listening...", totalWaitDelay),
+		lager.Data{"route_registration_interval": r.config.StartResponseDelayInterval.String(),
+			"load_balancer_healthy_threshold": r.config.LoadBalancerHealthyThreshold.String()})
+
+	if lbOKDelay > 0 {
+		r.logger.Debug(fmt.Sprintf("Sleeping for %d, before enabling /health endpoint", lbOKDelay))
+		time.Sleep(lbOKDelay)
+	}
+
+	atomic.StoreInt32(r.HeartbeatOK, 1)
+	r.logger.Debug("Gorouter reporting healthy")
+	time.Sleep(r.config.LoadBalancerHealthyThreshold)
+
+	r.logger.Info("completed-wait")
 
 	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
 
@@ -215,13 +229,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
-	//Wait for load balancer threshold value to consider go router instance as healthy
-	if r.config.LoadBalancerHealthyThreshold != 0 {
-		r.logger.Info(fmt.Sprintf("Waiting for load balancer threshold value %s", r.config.LoadBalancerHealthyThreshold))
-		time.Sleep(r.config.LoadBalancerHealthyThreshold)
-		r.logger.Info("Completed wait for load balancer threshold")
-	}
-
 	// create pid file
 	err = r.writePidFile(r.config.PidFile)
 	if err != nil {
@@ -230,7 +237,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
-	atomic.StoreInt32(r.HeartbeatOK, 1)
 
 	close(ready)
 
@@ -273,8 +279,8 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 		} else {
 			r.Stop()
 		}
+		r.logger.Info("gorouter.exited")
 	}
-	r.logger.Info("gorouter.exited")
 }
 
 func (r *Router) DrainAndStop() {

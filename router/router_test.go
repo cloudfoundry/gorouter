@@ -58,6 +58,7 @@ var _ = Describe("Router", func() {
 		readyChan                    chan struct{}
 		logger                       lager.Logger
 		LoadBalancerHealthyThreshold time.Duration
+		statusPort                   uint16
 	)
 
 	JustBeforeEach(func() {
@@ -66,7 +67,7 @@ var _ = Describe("Router", func() {
 		natsRunner.Start()
 
 		proxyPort := test_util.NextAvailPort()
-		statusPort := test_util.NextAvailPort()
+		statusPort = test_util.NextAvailPort()
 		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -198,7 +199,7 @@ var _ = Describe("Router", func() {
 			Expect(varz.Uptime).ToNot(Equal(emptyDuration))
 
 			verify_var_z(varz.Host, varz.Credentials[0], varz.Credentials[1])
-			verify_health_z(varz.Host, registry)
+			verify_health_z(varz.Host)
 		})
 
 		Context("Register and Unregister", func() {
@@ -293,21 +294,13 @@ var _ = Describe("Router", func() {
 		}).Should(BeTrue())
 	})
 
-	Context("when LoadBalancerHealthyThreshold is set to non-zero value", func() {
+	Context("when LoadBalancerHealthyThreshold is greater than the start response delay", func() {
 		BeforeEach(func() {
-			LoadBalancerHealthyThreshold = 1 * time.Second
+			LoadBalancerHealthyThreshold = 2 * time.Second
 		})
-		It("should log LoadBalancerHealthyThreshold value", func() {
-			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
-		})
-	})
-
-	Context("when LoadBalancerHealthyThreshold is set to zero", func() {
-		BeforeEach(func() {
-			LoadBalancerHealthyThreshold = 0
-		})
-		It("should not log LoadBalancerHealthyThreshold value", func() {
-			Expect(logger).ShouldNot(gbytes.Say(fmt.Sprintf("Waiting for load balancer threshold value %s", config.LoadBalancerHealthyThreshold)))
+		It("should log waiting delay value", func() {
+			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting %s before listening", config.LoadBalancerHealthyThreshold)))
+			verify_health(fmt.Sprintf("localhost:%d", statusPort))
 		})
 	})
 
@@ -1002,7 +995,16 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	return x
 }
 
-func verify_health_z(host string, r *rregistry.RouteRegistry) {
+func verify_health(host string) {
+	var req *http.Request
+	path := "/health"
+
+	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
+	bytes := verify_success(req)
+	Expect(string(bytes)).To(ContainSubstring("ok"))
+}
+
+func verify_health_z(host string) {
 	var req *http.Request
 	path := "/healthz"
 
