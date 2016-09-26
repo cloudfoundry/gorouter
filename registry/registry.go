@@ -81,14 +81,14 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	r.Lock()
 
-	uri = uri.RouteKey()
+	routekey := uri.RouteKey()
 
-	pool := r.byUri.Find(uri)
+	pool := r.byUri.Find(routekey)
 	if pool == nil {
 		contextPath := parseContextPath(uri)
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
-		r.byUri.Insert(uri, pool)
-		r.logger.Debug("uri-added", zap.Stringer("uri", uri))
+		r.byUri.Insert(routekey, pool)
+		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
 
 	endpointAdded := pool.Put(endpoint)
