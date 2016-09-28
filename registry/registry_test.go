@@ -141,7 +141,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("remembers the context path properly with case (RFC 3986, Section 6.2.2.1)", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", nil, -1, "", modTag)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
 
 				r.Register("dora.app.com/app/UP/we/Go", m1)
 
