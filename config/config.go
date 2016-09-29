@@ -100,6 +100,7 @@ type Config struct {
 	SSLKeyPath               string        `yaml:"ssl_key_path"`
 	SSLCertificate           tls.Certificate
 	SkipSSLValidation        bool `yaml:"skip_ssl_validation"`
+	ForceForwardedProtoHttps bool `yaml:"force_forwarded_proto_https"`
 
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16

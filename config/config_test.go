@@ -355,6 +355,12 @@ enable_proxy: true
 
 			Expect(config.Tracing.EnableZipkin).To(BeFalse())
 		})
+
+		It("sets the proxy forwarded proto header", func() {
+			var b = []byte("force_forwarded_proto_https: true")
+			config.Initialize(b)
+			Expect(config.ForceForwardedProtoHttps).To(Equal(true))
+		})
 	})
 
 	Describe("Process", func() {

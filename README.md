@@ -285,6 +285,18 @@ echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.
 
 You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
 
+## SSL termination & X-Forwarded-Proto
+
+If you terminate SSL before passing traffic to gorouter it will incorrectly set the `X-Forwarded-Proto` header to `http` instead of `https`, which results in applications incorrectly detecting they are using an insecure connection.
+
+To force the `X-Forwarded-Proto` header to `https` you can configure your cf-release manifest as follows:
+
+```
+properties:
+  router:
+    force_forwarded_proto_https: true
+```
+
 ## HTTP/2 Support
 
 The GoRouter does not currently support proxying HTTP/2 connections, even over TLS. Connections made using HTTP/1.1, either by TLS or cleartext, will be proxied to backends over cleartext.

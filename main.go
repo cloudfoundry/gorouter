@@ -185,6 +185,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		HealthCheckUserAgent: c.HealthCheckUserAgent,
 		HeartbeatOK:          &healthCheck,
 		EnableZipkin:         c.Tracing.EnableZipkin,
+		ForceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 	}
 	return proxy.NewProxy(args)
 }
