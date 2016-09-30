@@ -265,7 +265,22 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 
 ## Load Balancing
 
-The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The implementation currently uses simple round-robin load balancing and will retry a request if the chosen backend does not accept the TCP connection. The proxy will retry a request up to 3 times before returning a `Bad Gateway` error.
+The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The default load balancing algorithm that GoRouter will use is a simple **round-robin** strategy. GoRouter will retry a request if the chosen backend does not accept the TCP connection.
+
+### Round-Robin
+Default load balancing algorithm that gorouter will use or may be explicity set in **gorouter.yml**
+```yaml
+default_balancing_algorithm: round-robin
+```
+
+### Least-Connection
+The GoRouter also supports least connection based routing and this can be enabled in **gorouter.yml**
+```yaml
+default_balancing_algorithm: least-connection
+```
+Least connection based load balancing will select the endpoint with the least number of connections. If multiple endpoints match with the same number of least connections, it will select a random one within those least connections.
+
+_NOTE: GoRouter currently only supports changing the load balancing strategy at the gorouter level and does not yet support a finer-grained level such as route-level. Therefore changing the load balancing algorithm from the default (round-robin) should be proceeded with caution._
 
 ## PROXY Protocol
 

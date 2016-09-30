@@ -55,7 +55,7 @@ var _ = Describe("Pool", func() {
 			It("updates an endpoint with modification tag", func() {
 				endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag2)
 				Expect(pool.Put(endpoint)).To(BeTrue())
-				Expect(pool.Endpoints("").Next().ModificationTag).To(Equal(modTag2))
+				Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
 			})
 
 			Context("when modification_tag is older", func() {
@@ -70,7 +70,7 @@ var _ = Describe("Pool", func() {
 					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", olderModTag)
 
 					Expect(pool.Put(endpoint)).To(BeFalse())
-					Expect(pool.Endpoints("").Next().ModificationTag).To(Equal(modTag2))
+					Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
 				})
 			})
 		})
@@ -333,6 +333,36 @@ var _ = Describe("Pool", func() {
 			Expect(endpoints).To(HaveLen(2))
 			Expect(endpoints[e1.CanonicalAddr()]).To(Equal(e1))
 			Expect(endpoints[e2.CanonicalAddr()]).To(Equal(e2))
+		})
+	})
+
+	Context("Stats", func() {
+		Context("NumberConnections", func() {
+			It("increments number of connections", func() {
+				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag)
+				e2 := route.NewEndpoint("", "5.6.7.8", 5678, "", "", nil, -1, "", modTag)
+
+				// endpoint 1
+				e1.Stats.NumberConnections.Increment()
+				Expect(e1.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+				e1.Stats.NumberConnections.Increment()
+				Expect(e1.Stats.NumberConnections.Count()).To(Equal(int64(2)))
+
+				// endpoint 2
+				for i := 0; i < 10; i++ {
+					e2.Stats.NumberConnections.Increment()
+					Expect(e2.Stats.NumberConnections.Count()).To(Equal(int64(i + 1)))
+				}
+			})
+
+			It("decrements number of connections", func() {
+				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag)
+
+				e1.Stats.NumberConnections.Increment()
+				Expect(e1.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+				e1.Stats.NumberConnections.Decrement()
+				Expect(e1.Stats.NumberConnections.Count()).To(Equal(int64(0)))
+			})
 		})
 	})
 

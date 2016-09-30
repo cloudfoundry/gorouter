@@ -60,6 +60,7 @@ type ProxyArgs struct {
 	HeartbeatOK                *int32
 	EnableZipkin               bool
 	ForceForwardedProtoHttps   bool
+	DefaultLoadBalance         string
 }
 
 type proxyHandler struct {
@@ -94,6 +95,7 @@ type proxy struct {
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
 	forceForwardedProtoHttps   bool
+	defaultLoadBalance         string
 }
 
 func NewProxy(args ProxyArgs) Proxy {
@@ -128,6 +130,7 @@ func NewProxy(args ProxyArgs) Proxy {
 		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
 		healthCheckUserAgent:       args.HealthCheckUserAgent,
 		forceForwardedProtoHttps:   args.ForceForwardedProtoHttps,
+		defaultLoadBalance:         args.DefaultLoadBalance,
 	}
 
 	n := negroni.New()
@@ -211,7 +214,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	stickyEndpointId := p.getStickySession(request)
 	iter := &wrappedIterator{
-		nested: routePool.Endpoints(stickyEndpointId),
+		nested: routePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
@@ -380,6 +383,12 @@ func (i *wrappedIterator) Next() *route.Endpoint {
 
 func (i *wrappedIterator) EndpointFailed() {
 	i.nested.EndpointFailed()
+}
+func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
+	i.nested.PreRequest(e)
+}
+func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
+	i.nested.PostRequest(e)
 }
 
 func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl, forwardedUrlRaw string) (route_service.RouteServiceArgs, error) {
