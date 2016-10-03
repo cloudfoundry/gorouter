@@ -28,7 +28,7 @@ var _ = Describe("Config", func() {
 			It("can override the load balance strategy", func() {
 				cfg := DefaultConfig()
 				var b = []byte(`
-default_balancing_algorithm: least-connection
+balancing_algorithm: least-connection
 `)
 				cfg.Initialize(b)
 				cfg.Process()
@@ -38,7 +38,7 @@ default_balancing_algorithm: least-connection
 			It("does not allow an invalid load balance strategy", func() {
 				cfg := DefaultConfig()
 				var b = []byte(`
-default_balancing_algorithm: foo-bar
+balancing_algorithm: foo-bar
 `)
 				cfg.Initialize(b)
 				Expect(cfg.Process).To(Panic())

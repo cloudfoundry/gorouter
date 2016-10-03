@@ -143,7 +143,7 @@ type Config struct {
 	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time"`
 
 	PidFile     string `yaml:"pid_file"`
-	LoadBalance string `yaml:"default_balancing_algorithm"`
+	LoadBalance string `yaml:"balancing_algorithm"`
 }
 
 var defaultConfig = Config{
@@ -231,7 +231,8 @@ func (c *Config) Process() {
 		}
 	}
 	if !validLb {
-		panic("Invalid load balancing strategy")
+		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
+		panic(errMsg)
 	}
 }
 
