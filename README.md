@@ -151,11 +151,12 @@ Hello!
 To scale GoRouter horizontally for high-availability or throughput capacity, you
 must deploy it behind a highly-available load balancer (F5, AWS ELB, etc).
 
-GoRouter has a health endpoint on port 8080 that returns a 200 OK that indicates
+GoRouter has a health endpoint `/health` on port 8080 that returns a 200 OK which indicates
 the GoRouter instance is healthy; any other response indicates unhealthy.
 This port can be configured via the `router.status.port` property in the BOSH
 deployment manifest or via the `status.port` property under
 `/var/vcap/jobs/gorouter/config/gorouter.yml`
+
 
 ```
 $ curl -v http://10.0.32.15:8080/health
