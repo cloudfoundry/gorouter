@@ -111,19 +111,6 @@ var _ = Describe("Router", func() {
 		return signals, closeChannel
 	}
 
-	healthCheckReceives := func() int {
-		url := fmt.Sprintf("http://%s:%d/", config.Ip, config.Port)
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
-
-		client := http.Client{}
-		resp, err := client.Do(req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp).ToNot(BeNil())
-		defer resp.Body.Close()
-		return resp.StatusCode
-	}
-
 	healthCheckWithEndpointReceives := func() int {
 		url := fmt.Sprintf("http://%s:%d/health", config.Ip, config.Status.Port)
 		req, _ := http.NewRequest("GET", url, nil)
@@ -409,7 +396,7 @@ var _ = Describe("Router", func() {
 
 				// check for ok health
 				Consistently(func() int {
-					return healthCheckReceives()
+					return healthCheckWithEndpointReceives()
 				}, 100*time.Millisecond).Should(Equal(http.StatusOK))
 
 				// wait for app to receive request
@@ -419,7 +406,7 @@ var _ = Describe("Router", func() {
 				go func() {
 					defer GinkgoRecover()
 					Eventually(func() int {
-						result := healthCheckReceives()
+						result := healthCheckWithEndpointReceives()
 						if result == http.StatusServiceUnavailable {
 							serviceUnavailable <- true
 						}
@@ -432,7 +419,7 @@ var _ = Describe("Router", func() {
 					defer GinkgoRecover()
 					<-serviceUnavailable
 					Consistently(func() int {
-						return healthCheckReceives()
+						return healthCheckWithEndpointReceives()
 					}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
 				}()
 
