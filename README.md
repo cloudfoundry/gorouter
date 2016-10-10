@@ -301,11 +301,11 @@ echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.
 
 You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
 
-## SSL termination & X-Forwarded-Proto
+## When terminatin TLS in front of Gorouter with a component that does not support sending HTTP headers
 
-If you terminate SSL before passing traffic to gorouter it will incorrectly set the `X-Forwarded-Proto` header to `http` instead of `https`, which results in applications incorrectly detecting they are using an insecure connection.
+If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. For example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
 
-To force the `X-Forwarded-Proto` header to `https` you can configure your cf-release manifest as follows:
+If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
 
 ```
 properties:
