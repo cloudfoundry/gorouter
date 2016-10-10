@@ -287,7 +287,7 @@ _NOTE: GoRouter currently only supports changing the load balancing strategy at 
 
 ## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
 
-### Enabling apps and CF to detect that request was encrypted using `X-Forwarded-Proto` 
+### Enabling apps and CF to detect that request was encrypted using X-Forwarded-Proto 
 If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. As an example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
 
 If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
