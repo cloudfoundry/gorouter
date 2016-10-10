@@ -283,9 +283,28 @@ Least connection based load balancing will select the endpoint with the least nu
 
 _NOTE: GoRouter currently only supports changing the load balancing strategy at the gorouter level and does not yet support a finer-grained level such as route-level. Therefore changing the load balancing algorithm from the default (round-robin) should be proceeded with caution._
 
-## PROXY Protocol
 
-To enable the PROXY Protocol on the GoRouter, first make sure your ELB has PROXY Protocol enabled. Then, configure your cf-release manifest as follows:
+
+## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
+
+### Enabling apps and CF to detect that request was encrypted using `X-Forwarded-Proto` 
+If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. As an example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
+
+If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
+
+```
+properties:
+  router:
+    force_forwarded_proto_https: true
+```
+
+### Enabling apps to detect the requestor's IP address uing PROXY Protocol
+
+If you terminate TLS in front of Gorouter, your component should also send the `X-Forwarded-Proto` HTTP header in order for  `X-Forwarded-For` header to applications can detect the requestor's IP address.
+
+If your TLS-terminating component does not support sending HTTP headers, you can use the PROXY protocol to send Gorouter the requestor's IP address.
+
+If your TLS-terminating component supports the PROXY protocol, enable the PROXY protocol on Gorouter using the following cf-release manifest property:
 
 ```
 properties:
@@ -300,18 +319,6 @@ echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.
 ```
 
 You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
-
-## When terminatin TLS in front of Gorouter with a component that does not support sending HTTP headers
-
-If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. For example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
-
-If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
-
-```
-properties:
-  router:
-    force_forwarded_proto_https: true
-```
 
 ## HTTP/2 Support
 
