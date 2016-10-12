@@ -49,23 +49,19 @@ var _ = Describe("Router", func() {
 		natsPort   uint16
 		config     *cfg.Config
 
-		mbusClient                   *nats.Conn
-		registry                     *rregistry.RouteRegistry
-		varz                         vvarz.Varz
-		router                       *Router
-		signals                      chan os.Signal
-		closeChannel                 chan struct{}
-		readyChan                    chan struct{}
-		logger                       lager.Logger
-		LoadBalancerHealthyThreshold time.Duration
-		statusPort                   uint16
+		mbusClient   *nats.Conn
+		registry     *rregistry.RouteRegistry
+		varz         vvarz.Varz
+		router       *Router
+		signals      chan os.Signal
+		closeChannel chan struct{}
+		readyChan    chan struct{}
+		logger       lager.Logger
+		statusPort   uint16
 	)
 
-	JustBeforeEach(func() {
+	BeforeEach(func() {
 		natsPort = test_util.NextAvailPort()
-		natsRunner = test_util.NewNATSRunner(int(natsPort))
-		natsRunner.Start()
-
 		proxyPort := test_util.NextAvailPort()
 		statusPort = test_util.NextAvailPort()
 		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
@@ -76,8 +72,11 @@ var _ = Describe("Router", func() {
 		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-		config.EnablePROXY = true
-		config.LoadBalancerHealthyThreshold = LoadBalancerHealthyThreshold
+	})
+
+	JustBeforeEach(func() {
+		natsRunner = test_util.NewNATSRunner(int(natsPort))
+		natsRunner.Start()
 
 		// set pid file
 		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
@@ -296,7 +295,7 @@ var _ = Describe("Router", func() {
 
 	Context("when LoadBalancerHealthyThreshold is greater than the start response delay", func() {
 		BeforeEach(func() {
-			LoadBalancerHealthyThreshold = 2 * time.Second
+			config.LoadBalancerHealthyThreshold = 2 * time.Second
 		})
 		It("should log waiting delay value", func() {
 			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting %s before listening", config.LoadBalancerHealthyThreshold)))
@@ -612,32 +611,63 @@ var _ = Describe("Router", func() {
 		Expect(string(body)).To(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
 	})
 
-	It("handles the PROXY protocol", func() {
-		app := testcommon.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
-
-		rCh := make(chan string)
-		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-			rCh <- r.Header.Get("X-Forwarded-For")
+	Context("when proxy proto is enabled", func() {
+		BeforeEach(func() {
+			config.EnablePROXY = true
 		})
-		app.Listen()
-		Eventually(func() bool {
-			return appRegistered(registry, app)
-		}).Should(BeTrue())
 
-		host := fmt.Sprintf("proxy.vcap.me:%d", config.Port)
-		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
-		Expect(err).ToNot(HaveOccurred())
-		defer conn.Close()
+		It("sets the X-Forwarded-For header", func() {
+			app := testcommon.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
 
-		fmt.Fprintf(conn, "PROXY TCP4 192.168.0.1 192.168.0.2 12345 80\r\n"+
-			"GET / HTTP/1.0\r\n"+
-			"Host: %s\r\n"+
-			"\r\n", host)
+			rCh := make(chan string)
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				rCh <- r.Header.Get("X-Forwarded-For")
+			})
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
 
-		var rr string
-		Eventually(rCh).Should(Receive(&rr))
-		Expect(rr).ToNot(BeNil())
-		Expect(rr).To(Equal("192.168.0.1"))
+			host := fmt.Sprintf("proxy.vcap.me:%d", config.Port)
+			conn, err := net.DialTimeout("tcp", host, 10*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			defer conn.Close()
+
+			fmt.Fprintf(conn, "PROXY TCP4 192.168.0.1 192.168.0.2 12345 80\r\n"+
+				"GET / HTTP/1.0\r\n"+
+				"Host: %s\r\n"+
+				"\r\n", host)
+
+			var rr string
+			Eventually(rCh).Should(Receive(&rr))
+			Expect(rr).ToNot(BeNil())
+			Expect(rr).To(Equal("192.168.0.1"))
+		})
+
+		It("sets the x-Forwarded-Proto header to https", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
+			req, _ := http.NewRequest("GET", uri, nil)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := http.Client{Transport: tr}
+
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			bytes, err := ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(bytes)).To(Equal("https"))
+			resp.Body.Close()
+		})
 	})
 
 	Context("HTTP keep-alive", func() {
@@ -912,17 +942,24 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+			uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
+
 			client := http.Client{Transport: tr}
+
 			resp, err := client.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
-			resp.Body.Close()
+
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			bytes, err := ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(bytes).To(ContainSubstring("Hello"))
+			defer resp.Body.Close()
 		})
 
 		It("fails when the client uses an unsupported cipher suite", func() {
@@ -944,6 +981,32 @@ var _ = Describe("Router", func() {
 			_, err := client.Do(req)
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("sets the x-Forwarded-Proto header to https", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
+			req, _ := http.NewRequest("GET", uri, nil)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := http.Client{Transport: tr}
+
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			bytes, err := ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(bytes)).To(Equal("https"))
+			resp.Body.Close()
+		})
+
 	})
 
 	Describe("SubscribeRegister", func() {

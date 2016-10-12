@@ -306,19 +306,20 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 			CipherSuites: r.config.CipherSuites,
 		}
 
-		tlsListener, err := tls.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort), tlsConfig)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 		if err != nil {
-			r.logger.Fatal("tls-listener-error", err)
+			r.logger.Fatal("tcp-listener-error", err)
 			return err
 		}
 
-		r.tlsListener = tlsListener
 		if r.config.EnablePROXY {
-			r.tlsListener = &proxyproto.Listener{
-				Listener:           tlsListener,
+			listener = &proxyproto.Listener{
+				Listener:           listener,
 				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
 			}
 		}
+
+		r.tlsListener = tls.NewListener(listener, tlsConfig)
 
 		r.logger.Info("tls-listener-started", lager.Data{"address": r.tlsListener.Addr()})
 
