@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"log"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
@@ -13,6 +14,7 @@ import (
 
 func TestRouter(t *testing.T) {
 	RegisterFailHandler(Fail)
+	log.SetOutput(GinkgoWriter)
 	RunSpecs(t, "Router Suite")
 }
 
