@@ -2,6 +2,7 @@ package schema_test
 
 import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/routing-api/models"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/route"
@@ -14,6 +15,10 @@ import (
 )
 
 var _ = Describe("AccessLogRecord", func() {
+	var endpoint *route.Endpoint
+	BeforeEach(func() {
+		endpoint = route.NewEndpoint("FakeApplicationId", "1.2.3.4", 1234, "", "3", nil, 0, "", models.ModificationTag{})
+	})
 
 	It("Makes a record with all values", func() {
 		record := schema.AccessLogRecord{
@@ -33,12 +38,9 @@ var _ = Describe("AccessLogRecord", func() {
 				},
 				RemoteAddr: "FakeRemoteAddr",
 			},
-			BodyBytesSent: 23,
-			StatusCode:    200,
-			RouteEndpoint: &route.Endpoint{
-				ApplicationId:        "FakeApplicationId",
-				PrivateInstanceIndex: "3",
-			},
+			BodyBytesSent:        23,
+			StatusCode:           200,
+			RouteEndpoint:        endpoint,
 			StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
 			RequestBytesReceived: 30,
@@ -53,6 +55,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"FakeReferer\" " +
 			"\"FakeUserAgent\" " +
 			"FakeRemoteAddr " +
+			"1.2.3.4:1234 " +
 			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
 			"x_forwarded_proto:\"FakeOriginalRequestProto\" " +
 			"vcap_request_id:abc-123-xyz-pdq " +
@@ -92,6 +95,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"-\" " +
 			"\"-\" " +
 			"FakeRemoteAddr " +
+			"- " +
 			"x_forwarded_for:\"-\" " +
 			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +
@@ -140,6 +144,7 @@ var _ = Describe("AccessLogRecord", func() {
 			"\"-\" " +
 			"\"-\" " +
 			"FakeRemoteAddr " +
+			"- " +
 			"x_forwarded_for:\"-\" " +
 			"x_forwarded_proto:\"-\" " +
 			"vcap_request_id:- " +

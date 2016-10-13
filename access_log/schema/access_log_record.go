@@ -51,7 +51,7 @@ func (r *AccessLogRecord) getRecord() string {
 }
 
 func (r *AccessLogRecord) makeRecord() string {
-	statusCode, responseTime, appId, extraHeaders, appIndex := "-", "-", "-", "", "-"
+	statusCode, responseTime, appId, extraHeaders, appIndex, destIPandPort := "-", "-", "-", "", "-", "-"
 
 	if r.StatusCode != 0 {
 		statusCode = strconv.Itoa(r.StatusCode)
@@ -66,13 +66,16 @@ func (r *AccessLogRecord) makeRecord() string {
 		if r.RouteEndpoint.PrivateInstanceIndex != "" {
 			appIndex = r.RouteEndpoint.PrivateInstanceIndex
 		}
+		if r.RouteEndpoint.CanonicalAddr() != "" {
+			destIPandPort = r.RouteEndpoint.CanonicalAddr()
+		}
 	}
 
 	if r.ExtraHeadersToLog != nil && len(*r.ExtraHeadersToLog) > 0 {
 		extraHeaders = r.ExtraHeaders()
 	}
 
-	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s app_index:%s%s`+"\n",
+	return fmt.Sprintf(`%s - [%s] "%s %s %s" %s %d %d "%s" "%s" %s %s x_forwarded_for:"%s" x_forwarded_proto:"%s" vcap_request_id:%s response_time:%s app_id:%s app_index:%s%s`+"\n",
 		r.Request.Host,
 		r.FormatStartedAt(),
 		r.Request.Method,
@@ -84,6 +87,7 @@ func (r *AccessLogRecord) makeRecord() string {
 		r.FormatRequestHeader("Referer"),
 		r.FormatRequestHeader("User-Agent"),
 		r.Request.RemoteAddr,
+		destIPandPort,
 		r.FormatRequestHeader("X-Forwarded-For"),
 		r.FormatRequestHeader("X-Forwarded-Proto"),
 		r.FormatRequestHeader("X-Vcap-Request-Id"),
