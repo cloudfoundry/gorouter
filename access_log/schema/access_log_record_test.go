@@ -48,16 +48,16 @@ var _ = Describe("AccessLogRecord", func() {
 
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00.000 +0000] " +
-			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
+			`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 			"200 " +
 			"30 " +
 			"23 " +
-			"\"FakeReferer\" " +
-			"\"FakeUserAgent\" " +
+			`"FakeReferer" ` +
+			`"FakeUserAgent" ` +
 			"FakeRemoteAddr " +
 			"1.2.3.4:1234 " +
-			"x_forwarded_for:\"FakeProxy1, FakeProxy2\" " +
-			"x_forwarded_proto:\"FakeOriginalRequestProto\" " +
+			`x_forwarded_for:"FakeProxy1, FakeProxy2" ` +
+			`x_forwarded_proto:"FakeOriginalRequestProto" ` +
 			"vcap_request_id:abc-123-xyz-pdq " +
 			"response_time:60 " +
 			"app_id:FakeApplicationId " +
@@ -88,16 +88,16 @@ var _ = Describe("AccessLogRecord", func() {
 
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00.000 +0000] " +
-			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
+			`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 			"- " +
 			"0 " +
 			"0 " +
-			"\"-\" " +
-			"\"-\" " +
+			`"-" ` +
+			`"-" ` +
 			"FakeRemoteAddr " +
-			"- " +
-			"x_forwarded_for:\"-\" " +
-			"x_forwarded_proto:\"-\" " +
+			`"-" ` +
+			`x_forwarded_for:"-" ` +
+			`x_forwarded_proto:"-" ` +
 			"vcap_request_id:- " +
 			"response_time:- " +
 			"app_id:FakeApplicationId " +
@@ -124,7 +124,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Header: http.Header{
 					"Cache-Control":   []string{"no-cache"},
 					"Accept-Encoding": []string{"gzip, deflate"},
-					"If-Match":        []string{"\"737060cd8c284d8af7ad3082f209582d\""},
+					"If-Match":        []string{"737060cd8c284d8af7ad3082f209582d"},
 				},
 				RemoteAddr: "FakeRemoteAddr",
 			},
@@ -137,24 +137,24 @@ var _ = Describe("AccessLogRecord", func() {
 
 		recordString := "FakeRequestHost - " +
 			"[01/01/2000:00:00:00.000 +0000] " +
-			"\"FakeRequestMethod http://example.com/request FakeRequestProto\" " +
+			`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 			"- " +
 			"0 " +
 			"0 " +
-			"\"-\" " +
-			"\"-\" " +
+			`"-" ` +
+			`"-" ` +
 			"FakeRemoteAddr " +
-			"- " +
-			"x_forwarded_for:\"-\" " +
-			"x_forwarded_proto:\"-\" " +
+			`"-" ` +
+			`x_forwarded_for:"-" ` +
+			`x_forwarded_proto:"-" ` +
 			"vcap_request_id:- " +
 			"response_time:- " +
 			"app_id:FakeApplicationId " +
 			"app_index:- " +
-			"cache_control:\"no-cache\" " +
-			"accept_encoding:\"gzip, deflate\" " +
-			"if_match:\"\\\"737060cd8c284d8af7ad3082f209582d\\\"\" " +
-			"doesnt_exist:\"-\"" +
+			`cache_control:"no-cache" ` +
+			`accept_encoding:"gzip, deflate" ` +
+			`if_match:"737060cd8c284d8af7ad3082f209582d" ` +
+			`doesnt_exist:"-"` +
 			"\n"
 
 		Expect(record.LogMessage()).To(Equal(recordString))
