@@ -41,10 +41,6 @@ func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 }
 
 func SetB3Headers(request *http.Request, logger lager.Logger) {
-	setB3TraceIdHeader(request, logger)
-}
-
-func setB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 	existingTraceId := request.Header.Get(B3TraceIdHeader)
 	existingSpanId := request.Header.Get(B3SpanIdHeader)
 	if existingTraceId != "" && existingSpanId != "" {
@@ -61,11 +57,10 @@ func setB3TraceIdHeader(request *http.Request, logger lager.Logger) {
 		logger.Info("failed-to-create-b3-trace-id", lager.Data{"error": err.Error()})
 		return
 	}
-	parentSpanID := "-"
+
 	id := hex.EncodeToString(randBytes)
 	request.Header.Set(B3TraceIdHeader, id)
 	request.Header.Set(B3SpanIdHeader, request.Header.Get(B3TraceIdHeader))
-	request.Header.Set(B3ParentSpanIdHeader, parentSpanID)
 }
 
 func setB3ParentSpanIdHeader(request *http.Request, parentSpanID string) {

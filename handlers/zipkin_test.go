@@ -54,7 +54,7 @@ var _ = Describe("Zipkin", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(req.Header.Get(router_http.B3SpanIdHeader)).ToNot(BeEmpty())
 			Expect(req.Header.Get(router_http.B3TraceIdHeader)).ToNot(BeEmpty())
-			Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).ToNot(BeEmpty())
+			Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(BeEmpty())
 		})
 
 		It("adds zipkin headers to access log record", func() {
@@ -87,7 +87,7 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
 				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
-				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(Equal("-"))
+				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(BeEmpty())
 			})
 		})
 
@@ -100,7 +100,7 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(router_http.B3TraceIdHeader)).To(MatchRegexp(b3_id_regex))
 				Expect(req.Header.Get(router_http.B3SpanIdHeader)).To(MatchRegexp(b3_id_regex))
-				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(Equal("-"))
+				Expect(req.Header.Get(router_http.B3ParentSpanIdHeader)).To(BeEmpty())
 			})
 		})
 

@@ -120,7 +120,7 @@ var _ = Describe("Headers", func() {
 					parentSpanID := req.Header.Get(commonhttp.B3ParentSpanIdHeader)
 					Expect(traceID).ToNot(BeEmpty())
 					Expect(spanID).ToNot(BeEmpty())
-					Expect(parentSpanID).ToNot(BeEmpty())
+					Expect(parentSpanID).To(BeEmpty())
 
 					Expect(traceID).To(MatchRegexp(b3_id_regex))
 
@@ -153,15 +153,6 @@ var _ = Describe("Headers", func() {
 					It("logs the header", func() {
 						Expect(logger).To(gbytes.Say("b3-trace-id-header-exists"))
 						Expect(logger).To(gbytes.Say("BOGUS-HEADER"))
-					})
-				})
-
-				Context("when X-B3-SpanId is not set", func() {
-					BeforeEach(func() {
-						req.Header.Set(commonhttp.B3SpanIdHeader, "")
-					})
-					It("should set the X-B3-ParentSpanId header", func() {
-						Expect(req.Header.Get(commonhttp.B3ParentSpanIdHeader)).To(Equal("-"))
 					})
 				})
 			})
