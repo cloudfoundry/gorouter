@@ -170,6 +170,17 @@ func (r *RouteFetcher) FetchRoutes() error {
 
 	defer r.logger.Debug("syncer-fetch-routes-completed")
 
+	routes, err := r.fetchRoutesWithTokenRefresh()
+	if err != nil {
+		return err
+	}
+
+	r.logger.Debug("syncer-refreshing-endpoints", lager.Data{"number-of-routes": len(routes)})
+	r.refreshEndpoints(routes)
+	return nil
+}
+
+func (r *RouteFetcher) fetchRoutesWithTokenRefresh() ([]models.Route, error) {
 	forceUpdate := false
 	var err error
 	var routes []models.Route
@@ -178,7 +189,7 @@ func (r *RouteFetcher) FetchRoutes() error {
 		token, tokenErr := r.UaaClient.FetchToken(forceUpdate)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
-			return tokenErr
+			return []models.Route{}, tokenErr
 		}
 		r.client.SetToken(token.AccessToken)
 		r.logger.Debug("syncer-fetching-routes")
@@ -187,19 +198,14 @@ func (r *RouteFetcher) FetchRoutes() error {
 			if err.Error() == "unauthorized" {
 				forceUpdate = true
 			} else {
-				return err
+				return []models.Route{}, err
 			}
 		} else {
 			break
 		}
 	}
 
-	if err == nil {
-		r.logger.Debug("syncer-refreshing-endpoints")
-		r.refreshEndpoints(routes)
-	}
-
-	return err
+	return routes, err
 }
 
 func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
