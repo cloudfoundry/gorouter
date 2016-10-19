@@ -280,10 +280,10 @@ var _ = Describe("RouteFetcher", func() {
 		BeforeEach(func() {
 			uaaClient.FetchTokenReturns(token, nil)
 			client.RoutesReturns(response, nil)
+			fetcher.FetchRoutesInterval = 10 * time.Millisecond
 		})
 
 		JustBeforeEach(func() {
-			fetcher.FetchRoutesInterval = 10 * time.Millisecond
 			process = ifrit.Invoke(fetcher)
 		})
 
@@ -297,9 +297,11 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		Context("on specified interval", func() {
-			It("it fetches routes", func() {
-				// to be consumed by the eventSource.NextStub to avoid starvation
-				eventChannel <- routing_api.Event{}
+			BeforeEach(func() {
+				client.SubscribeToEventsWithMaxRetriesReturns(&fake_routing_api.FakeEventSource{}, errors.New("not used"))
+			})
+
+			It("fetches routes", func() {
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
@@ -307,7 +309,6 @@ var _ = Describe("RouteFetcher", func() {
 			})
 
 			It("uses cache when fetching token from uaa", func() {
-				eventChannel <- routing_api.Event{}
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
 				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
@@ -335,6 +336,10 @@ var _ = Describe("RouteFetcher", func() {
 		})
 
 		Describe("Event cycle", func() {
+			BeforeEach(func() {
+				fetcher.FetchRoutesInterval = 5 * time.Minute // Ignore syncing cycle
+			})
+
 			Context("and the event source successfully subscribes", func() {
 				It("responds to events", func() {
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
@@ -344,6 +349,10 @@ var _ = Describe("RouteFetcher", func() {
 						Route:  route,
 					}
 					Eventually(registry.UnregisterCallCount).Should(BeNumerically(">=", 1))
+				})
+
+				It("refreshes all routes", func() {
+					Eventually(client.RoutesCallCount).Should(Equal(1))
 				})
 
 				It("responds to errors, and retries subscribing", func() {

@@ -128,6 +128,11 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	}
 	r.logger.Info("Successfully-subscribed-to-routing-api-event-stream")
 
+	err = r.FetchRoutes()
+	if err != nil {
+		r.logger.Error("failed-to-refresh-routes", err)
+	}
+
 	r.eventSource.Store(source)
 	var event routing_api.Event
 
