@@ -36,12 +36,13 @@ func init() {
 
 var _ = Describe("RouteFetcher", func() {
 	var (
-		cfg       *config.Config
-		uaaClient *testUaaClient.FakeClient
-		registry  *testRegistry.FakeRegistryInterface
-		fetcher   *RouteFetcher
-		logger    lager.Logger
-		client    *fake_routing_api.FakeClient
+		cfg         *config.Config
+		uaaClient   *testUaaClient.FakeClient
+		registry    *testRegistry.FakeRegistryInterface
+		fetcher     *RouteFetcher
+		logger      lager.Logger
+		client      *fake_routing_api.FakeClient
+		eventSource *fake_routing_api.FakeEventSource
 
 		token *schema.Token
 
@@ -70,8 +71,8 @@ var _ = Describe("RouteFetcher", func() {
 
 		eventChannel = make(chan routing_api.Event)
 		errorChannel = make(chan error)
-		eventSource := fake_routing_api.FakeEventSource{}
-		client.SubscribeToEventsWithMaxRetriesReturns(&eventSource, nil)
+		eventSource = &fake_routing_api.FakeEventSource{}
+		client.SubscribeToEventsWithMaxRetriesReturns(eventSource, nil)
 
 		localEventChannel := eventChannel
 		localErrorChannel := errorChannel
@@ -353,6 +354,11 @@ var _ = Describe("RouteFetcher", func() {
 
 				It("refreshes all routes", func() {
 					Eventually(client.RoutesCallCount).Should(Equal(1))
+				})
+
+				It("responds to errors and closes the old subscription", func() {
+					errorChannel <- errors.New("beep boop im a robot")
+					Eventually(eventSource.CloseCallCount).Should(Equal(1))
 				})
 
 				It("responds to errors, and retries subscribing", func() {

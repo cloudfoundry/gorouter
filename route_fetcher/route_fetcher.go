@@ -141,6 +141,11 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 		if err != nil {
 			metrics.IncrementCounter(SubscribeEventsErrors)
 			r.logger.Error("Failed to get next event: ", err)
+
+			closeErr := source.Close()
+			if closeErr != nil {
+				r.logger.Error("failed-to-close-event-source", closeErr)
+			}
 			break
 		}
 		r.logger.Debug("received-event", lager.Data{"event": event})
