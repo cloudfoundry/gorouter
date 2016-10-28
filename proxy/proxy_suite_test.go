@@ -2,6 +2,7 @@ package proxy_test
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"net"
 	"net/http"
 
@@ -35,6 +36,7 @@ var (
 	crypto         secure.Crypto
 	logger         lager.Logger
 	cryptoPrev     secure.Crypto
+	caCertPool     *x509.CertPool
 	recommendHttps bool
 	heartbeatOK    int32
 )
@@ -75,6 +77,7 @@ var _ = JustBeforeEach(func() {
 	tlsConfig := &tls.Config{
 		CipherSuites:       conf.CipherSuites,
 		InsecureSkipVerify: conf.SkipSSLValidation,
+		RootCAs:            caCertPool,
 	}
 	heartbeatOK = 1
 	p = proxy.NewProxy(proxy.ProxyArgs{
@@ -109,6 +112,7 @@ var _ = JustBeforeEach(func() {
 var _ = AfterEach(func() {
 	proxyServer.Close()
 	accessLog.Stop()
+	caCertPool = nil
 })
 
 func shouldEcho(input string, expected string) {

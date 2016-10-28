@@ -2,9 +2,11 @@ package proxy_test
 
 import (
 	"bytes"
+	"crypto/x509"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -513,21 +515,32 @@ var _ = Describe("Route Services", func() {
 		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 	})
 
-	It("returns a 200 when we route to a route service that has a valid cert", func() {
-		// sorry google we are using you
-		ln := registerHandlerWithRouteService(r, "my_host.com", "https://www.google.com", func(conn *test_util.HttpConn) {
-			Fail("Should not get here")
+	Context("with a valid certificate", func() {
+		BeforeEach(func() {
+			caCertsPath := filepath.Join("..", "test", "assets", "certs", "uaa-ca.pem")
+			certBytes, err := ioutil.ReadFile(caCertsPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			caCertPool = x509.NewCertPool()
+			ok := caCertPool.AppendCertsFromPEM(certBytes)
+			Expect(ok).To(BeTrue())
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
+		It("returns a 200 when we route to a route service", func() {
+			ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				Fail("Should not get here")
+			})
+			defer ln.Close()
 
-		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-		conn.WriteRequest(req)
+			conn := dialProxy(proxyServer)
 
-		res, _ := readResponse(conn)
+			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+			conn.WriteRequest(req)
 
-		okCodes := []int{http.StatusOK, http.StatusFound}
-		Expect(okCodes).Should(ContainElement(res.StatusCode))
+			res, _ := readResponse(conn)
+
+			okCodes := []int{http.StatusOK, http.StatusFound}
+			Expect(okCodes).Should(ContainElement(res.StatusCode))
+		})
 	})
 })
