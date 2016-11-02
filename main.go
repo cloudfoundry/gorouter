@@ -252,6 +252,18 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
 		}
 
+		options.DisconnectedCB = func(conn *nats.Conn) {
+			natsUrl, natsErr := url.Parse(conn.ConnectedUrl())
+			natsHost := ""
+			if natsErr != nil {
+				logger.Error("nats-url-parse-error", natsErr)
+			} else {
+				natsHost = natsUrl.Host
+			}
+
+			logger.Info("nats-connection-disconnected", lager.Data{"nats-host": natsHost})
+		}
+
 		// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
 		if c.SuspendPruningIfNatsUnavailable {
 			options.MaxReconnect = -1

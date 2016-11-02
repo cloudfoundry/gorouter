@@ -177,12 +177,12 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		natsUrl, err := url.Parse(conn.ConnectedUrl())
 		natsHost := ""
 		if err != nil {
-			r.logger.Fatal("nats-url-parse-error", err)
+			r.logger.Error("nats-url-parse-error", err)
 		} else {
 			natsHost = natsUrl.Host
 		}
 
-		r.logger.Info(fmt.Sprintf("Reconnecting to NATS server %s...", natsHost))
+		r.logger.Info("nats-connection-reconnected", lager.Data{"nats-host": natsHost})
 		r.SendStartMessage()
 	}
 

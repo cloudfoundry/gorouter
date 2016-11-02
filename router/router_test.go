@@ -282,7 +282,8 @@ var _ = Describe("Router", func() {
 
 		natsUrl, err := url.Parse(natsRunner.MessageBus.ConnectedUrl())
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(logger).Should(gbytes.Say(fmt.Sprintf("Reconnecting to NATS server %s...", natsUrl.Host)))
+		Eventually(logger).Should(gbytes.Say("nats-connection-reconnected"))
+		Eventually(logger).Should(gbytes.Say(natsUrl.Host))
 	})
 
 	It("creates a pidfile on startup", func() {
