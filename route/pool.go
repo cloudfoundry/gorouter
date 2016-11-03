@@ -114,21 +114,18 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
-		if e.endpoint == endpoint {
-			return false
-		}
+		if e.endpoint != endpoint {
+			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
+				return false
+			}
 
-		// check modification tag
-		if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
-			return false
-		}
+			oldEndpoint := e.endpoint
+			e.endpoint = endpoint
 
-		oldEndpoint := e.endpoint
-		e.endpoint = endpoint
-
-		if oldEndpoint.PrivateInstanceId != endpoint.PrivateInstanceId {
-			delete(p.index, oldEndpoint.PrivateInstanceId)
-			p.index[endpoint.PrivateInstanceId] = e
+			if oldEndpoint.PrivateInstanceId != endpoint.PrivateInstanceId {
+				delete(p.index, oldEndpoint.PrivateInstanceId)
+				p.index[endpoint.PrivateInstanceId] = e
+			}
 		}
 	} else {
 		e = &endpointElem{

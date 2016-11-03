@@ -28,11 +28,15 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles duplicate endpoints", func() {
-			endpoint := &route.Endpoint{}
-
+			endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 1, "", modTag)
 			pool.Put(endpoint)
+			pool.MarkUpdated(time.Now().Add(-(10 * time.Minute)))
+
 			b := pool.Put(endpoint)
-			Expect(b).To(BeFalse())
+			Expect(b).To(BeTrue())
+
+			prunedEndpoints := pool.PruneEndpoints(time.Second)
+			Expect(prunedEndpoints).To(BeEmpty())
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
