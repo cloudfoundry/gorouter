@@ -20,12 +20,14 @@ const LOAD_BALANCE_LC string = "least-connection"
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 
 type StatusConfig struct {
+	Host string `yaml:"host"`
 	Port uint16 `yaml:"port"`
 	User string `yaml:"user"`
 	Pass string `yaml:"pass"`
 }
 
 var defaultStatusConfig = StatusConfig{
+	Host: "0.0.0.0",
 	Port: 8082,
 	User: "",
 	Pass: "",

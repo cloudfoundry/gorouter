@@ -74,7 +74,7 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 
 	var host string
 	if cfg.Status.Port != 0 {
-		host = fmt.Sprintf(":%d", cfg.Status.Port)
+		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
 	}
 
 	varz := &health.Varz{
