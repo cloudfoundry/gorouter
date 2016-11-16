@@ -47,12 +47,12 @@ var _ = Describe("Route Services", func() {
 		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			metadataHeader = r.Header.Get(route_service.RouteServiceMetadata)
-			signatureHeader = r.Header.Get(route_service.RouteServiceSignature)
+			metaHeader := r.Header.Get(route_service.RouteServiceMetadata)
+			sigHeader := r.Header.Get(route_service.RouteServiceSignature)
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
-			_, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			_, err = header.SignatureFromHeaders(sigHeader, metaHeader, crypto)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
@@ -66,12 +66,15 @@ var _ = Describe("Route Services", func() {
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 
-		signature := &header.Signature{
-			RequestedTime: time.Now(),
-			ForwardedUrl:  forwardedUrl,
-		}
-
-		signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
+		config := route_service.NewRouteServiceConfig(
+			logger,
+			conf.RouteServiceEnabled,
+			1*time.Hour,
+			crypto,
+			nil,
+			recommendHttps,
+		)
+		signatureHeader, metadataHeader, err = config.GenerateSignatureAndMetadata(forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

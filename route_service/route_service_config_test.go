@@ -1,11 +1,14 @@
 package route_service_test
 
 import (
+	"Fmt"
+	"errors"
 	"net/http"
 	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/secure/fakes"
 	"code.cloudfoundry.org/gorouter/route_service"
 	"code.cloudfoundry.org/gorouter/route_service/header"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -37,6 +40,62 @@ var _ = Describe("Route Service Config", func() {
 		crypto = nil
 		cryptoPrev = nil
 		config = nil
+	})
+
+	Describe("GenerateSignatureAndMetadata", func() {
+		It("decodes an encoded URL", func() {
+			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
+
+			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+			Expect(err).ToNot(HaveOccurred())
+
+			signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(signature.ForwardedUrl).ToNot(BeEmpty())
+		})
+
+		It("sets the requested time", func() {
+			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
+			now := time.Now()
+
+			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+			Expect(err).ToNot(HaveOccurred())
+
+			signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(signature.RequestedTime).To(BeTemporally(">=", now))
+		})
+
+		It("returns an error if given an invalid encoded URL", func() {
+			encodedForwardedURL := "test.app.com?query=sample%"
+
+			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+			Expect(err).To(HaveOccurred())
+
+			Expect(signatureHeader).To(BeEmpty())
+			Expect(metadataHeader).To(BeEmpty())
+		})
+
+		Context("when encryption fails", func() {
+			BeforeEach(func() {
+				fakeCrypto := &fakes.FakeCrypto{}
+				fakeCrypto.EncryptReturns([]byte{}, []byte{}, errors.New("test failed"))
+
+				config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, fakeCrypto, cryptoPrev, recommendHttps)
+			})
+
+			It("returns an error", func() {
+				encodedForwardedURL := "test.app.com"
+
+				signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+				Expect(err).To(HaveOccurred())
+
+				Expect(signatureHeader).To(BeEmpty())
+				Expect(metadataHeader).To(BeEmpty())
+			})
+		})
 	})
 
 	Describe("SetupRouteServiceRequest", func() {
@@ -160,6 +219,53 @@ var _ = Describe("Route Service Config", func() {
 				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
+			})
+		})
+
+		Context("when there is a url encoded character in the request", func() {
+			encodedCharacters := make(map[string]string)
+			encodedCharacters["%2C"] = ","
+			encodedCharacters["%20"] = " "
+			encodedCharacters["%41"] = "A"
+
+			for encoded, decoded := range encodedCharacters {
+				forwardedUrl := fmt.Sprintf("some-forwarded-url?fields=foo%sbar", decoded)
+				url := fmt.Sprintf("?fields=foo%sbar", encoded)
+
+				Context("with character "+decoded, func() {
+					BeforeEach(func() {
+						signature = &header.Signature{
+							RequestedTime: time.Now(),
+							ForwardedUrl:  forwardedUrl,
+						}
+						var err error
+						signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
+						Expect(err).ToNot(HaveOccurred())
+						requestUrl = requestUrl + url
+					})
+
+					It("decrypts the valid signature with character "+encoded, func() {
+						err := config.ValidateSignature(headers, requestUrl)
+						Expect(err).NotTo(HaveOccurred())
+					})
+				})
+			}
+		})
+
+		Context("when there is a percent without two hexadec following in the url", func() {
+			BeforeEach(func() {
+				signature = &header.Signature{
+					RequestedTime: time.Now(),
+					ForwardedUrl:  "random%",
+				}
+				var err error
+				signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("request url does not match forwarded url", func() {
+				err := config.ValidateSignature(headers, "random%")
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
