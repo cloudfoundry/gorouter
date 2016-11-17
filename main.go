@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net/url"
+	"sync/atomic"
 
 	"code.cloudfoundry.org/cflager"
 	"code.cloudfoundry.org/clock"
@@ -85,14 +86,7 @@ func main() {
 	}
 
 	logger.Info("setting-up-nats-connection")
-	natsClient := connectToNatsServer(logger.Session("nats"), c)
-	natsHost := ""
-	natsUrl, err := url.Parse(natsClient.ConnectedUrl())
-	if err == nil {
-		natsHost = natsUrl.Host
-	}
-
-	logger.Info("Successfully-connected-to-nats", lager.Data{"host": natsHost})
+	natsClient, natsHost := connectToNatsServer(logger.Session("nats"), c)
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
@@ -123,6 +117,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("initialize-router-error", err)
 	}
+	router.NatsHost = natsHost
 
 	members := grouper.Members{
 		{"router", router},
@@ -238,8 +233,9 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 	return uaaClient
 }
 
-func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
+func connectToNatsServer(logger lager.Logger, c *config.Config) (*nats.Conn, *atomic.Value) {
 	var natsClient *nats.Conn
+	var natsHost atomic.Value
 	var err error
 
 	natsServers := c.NatsServers()
@@ -253,15 +249,8 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 		}
 
 		options.DisconnectedCB = func(conn *nats.Conn) {
-			natsUrl, natsErr := url.Parse(conn.ConnectedUrl())
-			natsHost := ""
-			if natsErr != nil {
-				logger.Error("nats-url-parse-error", natsErr)
-			} else {
-				natsHost = natsUrl.Host
-			}
-
-			logger.Info("nats-connection-disconnected", lager.Data{"nats-host": natsHost})
+			hostStr := natsHost.Load().(string)
+			logger.Info("nats-connection-disconnected", lager.Data{"nats-host": hostStr})
 		}
 
 		// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
@@ -281,7 +270,16 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) *nats.Conn {
 		logger.Fatal("nats-connection-error", err)
 	}
 
-	return natsClient
+	var natsHostStr string
+	natsUrl, err := url.Parse(natsClient.ConnectedUrl())
+	if err == nil {
+		natsHostStr = natsUrl.Host
+	}
+
+	logger.Info("Successfully-connected-to-nats", lager.Data{"host": natsHostStr})
+
+	natsHost.Store(natsHostStr)
+	return natsClient, &natsHost
 }
 
 func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *schema.LogCounter) {

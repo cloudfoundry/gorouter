@@ -71,6 +71,7 @@ type Router struct {
 	HeartbeatOK      *int32
 	logger           lager.Logger
 	errChan          chan error
+	NatsHost         *atomic.Value
 }
 
 type RegistryMessage struct {
@@ -175,14 +176,17 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	r.mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
 		natsUrl, err := url.Parse(conn.ConnectedUrl())
-		natsHost := ""
+		natsHostStr := ""
 		if err != nil {
 			r.logger.Error("nats-url-parse-error", err)
 		} else {
-			natsHost = natsUrl.Host
+			natsHostStr = natsUrl.Host
+		}
+		if r.NatsHost != nil {
+			r.NatsHost.Store(natsHostStr)
 		}
 
-		r.logger.Info("nats-connection-reconnected", lager.Data{"nats-host": natsHost})
+		r.logger.Info("nats-connection-reconnected", lager.Data{"nats-host": natsHostStr})
 		r.SendStartMessage()
 	}
 
