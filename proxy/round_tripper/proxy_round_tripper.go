@@ -7,23 +7,24 @@ import (
 
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/lager"
 )
 
 type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
 func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIterator route.EndpointIterator,
-	handler *handler.RequestHandler, afterRoundTrip AfterRoundTrip) http.RoundTripper {
+	logger lager.Logger, afterRoundTrip AfterRoundTrip) http.RoundTripper {
 	if backend {
 		return &BackendRoundTripper{
 			transport: transport,
 			iter:      endpointIterator,
-			handler:   handler,
+			logger:    logger,
 			after:     afterRoundTrip,
 		}
 	} else {
 		return &RouteServiceRoundTripper{
 			transport: transport,
-			handler:   handler,
+			logger:    logger,
 			after:     afterRoundTrip,
 		}
 	}
@@ -32,8 +33,8 @@ func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIte
 type BackendRoundTripper struct {
 	iter      route.EndpointIterator
 	transport http.RoundTripper
+	logger    lager.Logger
 	after     AfterRoundTrip
-	handler   *handler.RequestHandler
 }
 
 func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -52,7 +53,7 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 	for retry := 0; retry < handler.MaxRetries; retry++ {
 		endpoint, err = rt.selectEndpoint(request)
 		if err != nil {
-			return nil, err
+			break
 		}
 
 		rt.setupRequest(request, endpoint)
@@ -72,6 +73,10 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 		rt.reportError(err)
 	}
 
+	if err != nil {
+		rt.logger.Error("endpoint-failed", err)
+	}
+
 	if rt.after != nil {
 		rt.after(res, endpoint, err)
 	}
@@ -81,17 +86,16 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 
 func (rt *BackendRoundTripper) selectEndpoint(request *http.Request) (*route.Endpoint, error) {
 	endpoint := rt.iter.Next()
-
 	if endpoint == nil {
-		err := handler.NoEndpointsAvailable
-		rt.handler.HandleBadGateway(err, request)
-		return nil, err
+		return nil, handler.NoEndpointsAvailable
 	}
+
+	rt.logger = rt.logger.WithData(lager.Data{"route-endpoint": endpoint.ToLogData()})
 	return endpoint, nil
 }
 
 func (rt *BackendRoundTripper) setupRequest(request *http.Request, endpoint *route.Endpoint) {
-	rt.handler.Logger().Debug("backend")
+	rt.logger.Debug("backend")
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	handler.SetRequestXCfInstanceId(request, endpoint)
@@ -99,13 +103,13 @@ func (rt *BackendRoundTripper) setupRequest(request *http.Request, endpoint *rou
 
 func (rt *BackendRoundTripper) reportError(err error) {
 	rt.iter.EndpointFailed()
-	rt.handler.Logger().Error("backend-endpoint-failed", err)
+	rt.logger.Error("backend-endpoint-failed", err)
 }
 
 type RouteServiceRoundTripper struct {
 	transport http.RoundTripper
 	after     AfterRoundTrip
-	handler   *handler.RequestHandler
+	logger    lager.Logger
 }
 
 func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -130,7 +134,7 @@ func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 }
 
 func (rs *RouteServiceRoundTripper) reportError(err error) {
-	rs.handler.Logger().Error("route-service-failed", err)
+	rs.logger.Error("route-service-failed", err)
 }
 
 func retryableError(err error) bool {

@@ -1368,6 +1368,16 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Context("when the endpoint is nil", func() {
+		removeAllEndpoints := func(pool *route.Pool) {
+			endpoints := make([]*route.Endpoint, 0)
+			pool.Each(func(e *route.Endpoint) {
+				endpoints = append(endpoints, e)
+			})
+			for _, e := range endpoints {
+				pool.Remove(e)
+			}
+		}
+
 		It("responds with a 502 BadGateway", func() {
 			ln := registerHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
@@ -1377,15 +1387,7 @@ var _ = Describe("Proxy", func() {
 			})
 			defer ln.Close()
 
-			pool := r.Lookup(route.Uri("nil-endpoint"))
-			endpoints := make([]*route.Endpoint, 0)
-			pool.Each(func(e *route.Endpoint) {
-				endpoints = append(endpoints, e)
-			})
-			for _, e := range endpoints {
-				pool.Remove(e)
-			}
-
+			removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
@@ -1398,6 +1400,27 @@ var _ = Describe("Proxy", func() {
 			log.SetOutput(os.Stderr)
 			Expect(buf).NotTo(ContainSubstring("multiple response.WriteHeader calls"))
 			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+		})
+
+		It("does not capture routing response", func() {
+			ln := registerHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
+			conn.WriteRequest(req)
+
+			res, _ := conn.ReadResponse()
+			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 		})
 	})
 })

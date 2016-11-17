@@ -10,7 +10,6 @@ import (
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/proxy/test_helpers"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager"
@@ -29,6 +28,7 @@ import (
 var (
 	r              *registry.RouteRegistry
 	p              proxy.Proxy
+	fakeReporter   *fakes.FakeProxyReporter
 	conf           *config.Config
 	proxyServer    net.Listener
 	accessLog      access_log.AccessLogger
@@ -58,6 +58,7 @@ var _ = BeforeEach(func() {
 	conf = config.DefaultConfig()
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
+	fakeReporter = &fakes.FakeProxyReporter{}
 })
 
 var _ = JustBeforeEach(func() {
@@ -86,7 +87,7 @@ var _ = JustBeforeEach(func() {
 		TraceKey:                   conf.TraceKey,
 		Logger:                     logger,
 		Registry:                   r,
-		Reporter:                   test_helpers.NullVarz{},
+		Reporter:                   fakeReporter,
 		AccessLogger:               accessLog,
 		SecureCookies:              conf.SecureCookies,
 		TLSConfig:                  tlsConfig,

@@ -59,11 +59,6 @@ func (h *RequestHandler) Logger() lager.Logger {
 	return h.logger
 }
 
-func (h *RequestHandler) AddLoggingData(data lager.Data) {
-	withData := h.logger.WithData(data)
-	h.logger = withData
-}
-
 func (h *RequestHandler) HandleHeartbeat(ok bool) {
 	h.response.Header().Set("Cache-Control", "private, max-age=0")
 	h.response.Header().Set("Expires", "0")
@@ -93,6 +88,7 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 }
 
 func (h *RequestHandler) HandleMissingRoute() {
+	h.reporter.CaptureBadRequest(h.request)
 	h.logger.Info("unknown-route")
 
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
@@ -102,7 +98,6 @@ func (h *RequestHandler) HandleMissingRoute() {
 
 func (h *RequestHandler) HandleBadGateway(err error, request *http.Request) {
 	h.reporter.CaptureBadGateway(request)
-	h.logger.Error("endpoint-failed", err)
 
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")

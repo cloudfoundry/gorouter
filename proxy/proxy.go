@@ -207,7 +207,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	routePool := p.lookup(request)
 	if routePool == nil {
-		p.reporter.CaptureBadRequest(request)
 		handler.HandleMissingRoute()
 		return
 	}
@@ -218,7 +217,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
-				handler.AddLoggingData(lager.Data{"route-endpoint": endpoint.ToLogData()})
 				accessLog.RouteEndpoint = endpoint
 				p.reporter.CaptureRoutingRequest(endpoint, request)
 			}
@@ -278,12 +276,17 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	after := func(rsp *http.Response, endpoint *route.Endpoint, err error) {
+		if endpoint == nil {
+			handler.HandleBadGateway(err, request)
+			return
+		}
+
 		accessLog.FirstByteAt = time.Now()
 		if rsp != nil {
 			accessLog.StatusCode = rsp.StatusCode
 		}
 
-		if p.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
+		if p.traceKey != "" && endpoint != nil && request.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
 			router_http.SetTraceHeaders(responseWriter, p.ip, endpoint.CanonicalAddr())
 		}
 
@@ -292,7 +295,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
 
 		if err != nil {
-			p.reporter.CaptureBadGateway(request)
 			handler.HandleBadGateway(err, request)
 			return
 		}
@@ -305,14 +307,12 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		if _, ok := rsp.Header["Content-Type"]; !ok {
 			responseWriter.Header()["Content-Type"] = nil
 		}
-
 	}
 
 	roundTripper := round_tripper.NewProxyRoundTripper(backend,
-		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler, after)
+		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler.Logger(), after)
 
 	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps).ServeHTTP(proxyWriter, request)
-
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
