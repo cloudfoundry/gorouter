@@ -1,4 +1,4 @@
-package route_service_test
+package routeservice_test
 
 import (
 	"Fmt"
@@ -9,9 +9,8 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/common/secure/fakes"
-	"code.cloudfoundry.org/gorouter/route_service"
-	"code.cloudfoundry.org/gorouter/route_service/header"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/routeservice/header"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
 	. "github.com/onsi/ginkgo"
@@ -20,7 +19,7 @@ import (
 
 var _ = Describe("Route Service Config", func() {
 	var (
-		config         *route_service.RouteServiceConfig
+		config         *routeservice.RouteServiceConfig
 		crypto         secure.Crypto
 		cryptoPrev     secure.Crypto
 		cryptoKey      = "ABCDEFGHIJKLMNOP"
@@ -33,7 +32,7 @@ var _ = Describe("Route Service Config", func() {
 		crypto, err = secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 		logger = lagertest.NewTestLogger("test")
-		config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
+		config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
 	})
 
 	AfterEach(func() {
@@ -42,14 +41,15 @@ var _ = Describe("Route Service Config", func() {
 		config = nil
 	})
 
-	Describe("GenerateSignatureAndMetadata", func() {
+	Describe("Request", func() {
 		It("decodes an encoded URL", func() {
 			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
+			rsUrl := "https://example.com"
 
-			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
-			Expect(err).ToNot(HaveOccurred())
+			args, err := config.Request(rsUrl, encodedForwardedURL)
+			Expect(err).NotTo(HaveOccurred())
 
-			signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			signature, err := header.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(signature.ForwardedUrl).ToNot(BeEmpty())
@@ -58,11 +58,12 @@ var _ = Describe("Route Service Config", func() {
 		It("sets the requested time", func() {
 			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
 			now := time.Now()
+			rsUrl := "https://example.com"
 
-			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
-			Expect(err).ToNot(HaveOccurred())
+			args, err := config.Request(rsUrl, encodedForwardedURL)
+			Expect(err).NotTo(HaveOccurred())
 
-			signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+			signature, err := header.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(signature.RequestedTime).To(BeTemporally(">=", now))
@@ -70,12 +71,13 @@ var _ = Describe("Route Service Config", func() {
 
 		It("returns an error if given an invalid encoded URL", func() {
 			encodedForwardedURL := "test.app.com?query=sample%"
+			rsUrl := "https://example.com"
 
-			signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+			args, err := config.Request(rsUrl, encodedForwardedURL)
 			Expect(err).To(HaveOccurred())
 
-			Expect(signatureHeader).To(BeEmpty())
-			Expect(metadataHeader).To(BeEmpty())
+			Expect(args.Metadata).To(BeEmpty())
+			Expect(args.Signature).To(BeEmpty())
 		})
 
 		Context("when encryption fails", func() {
@@ -83,67 +85,34 @@ var _ = Describe("Route Service Config", func() {
 				fakeCrypto := &fakes.FakeCrypto{}
 				fakeCrypto.EncryptReturns([]byte{}, []byte{}, errors.New("test failed"))
 
-				config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, fakeCrypto, cryptoPrev, recommendHttps)
+				config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour, fakeCrypto, cryptoPrev, recommendHttps)
 			})
 
 			It("returns an error", func() {
 				encodedForwardedURL := "test.app.com"
+				rsUrl := "https://example.com"
 
-				signatureHeader, metadataHeader, err := config.GenerateSignatureAndMetadata(encodedForwardedURL)
+				args, err := config.Request(rsUrl, encodedForwardedURL)
 				Expect(err).To(HaveOccurred())
 
-				Expect(signatureHeader).To(BeEmpty())
-				Expect(metadataHeader).To(BeEmpty())
+				Expect(args.Metadata).To(BeEmpty())
+				Expect(args.Signature).To(BeEmpty())
 			})
 		})
-	})
 
-	Describe("SetupRouteServiceRequest", func() {
-		var (
-			request *http.Request
-			rsArgs  route_service.RouteServiceArgs
-		)
-
-		BeforeEach(func() {
-			request = test_util.NewRequest("GET", "test.com", "/path/", nil)
-			str := "https://example-route-service.com"
-			parsed, err := url.Parse(str)
+		It("returns route service request information", func() {
+			rsUrl := "https://example.com"
+			forwardedUrl := "https://forwarded.example.com"
+			args, err := config.Request(rsUrl, forwardedUrl)
 			Expect(err).NotTo(HaveOccurred())
-			rsArgs = route_service.RouteServiceArgs{
-				UrlString:       str,
-				ParsedUrl:       parsed,
-				Signature:       "signature",
-				Metadata:        "metadata",
-				ForwardedUrlRaw: "http://test.com/path/",
-				RecommendHttps:  true,
-			}
+
+			rsURL, err := url.Parse(rsUrl)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(args.ParsedUrl).To(Equal(rsURL))
+			Expect(args.URLString).To(Equal(rsUrl))
+			Expect(args.ForwardedURL).To(Equal(fmt.Sprintf("%s", forwardedUrl)))
 		})
-
-		It("sets the signature and metadata headers", func() {
-			Expect(request.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
-			Expect(request.Header.Get(route_service.RouteServiceMetadata)).To(Equal(""))
-
-			config.SetupRouteServiceRequest(request, rsArgs)
-
-			Expect(request.Header.Get(route_service.RouteServiceSignature)).To(Equal("signature"))
-			Expect(request.Header.Get(route_service.RouteServiceMetadata)).To(Equal("metadata"))
-		})
-
-		It("sets the forwarded URL header", func() {
-			Expect(request.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal(""))
-
-			config.SetupRouteServiceRequest(request, rsArgs)
-
-			Expect(request.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal("http://test.com/path/"))
-		})
-
-		It("changes the request host and URL", func() {
-			config.SetupRouteServiceRequest(request, rsArgs)
-
-			Expect(request.URL.Host).To(Equal("example-route-service.com"))
-			Expect(request.URL.Scheme).To(Equal("https"))
-		})
-
 	})
 
 	Describe("ValidateSignature", func() {
@@ -167,12 +136,12 @@ var _ = Describe("Route Service Config", func() {
 			signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
 
-			headers.Set(route_service.RouteServiceForwardedUrl, "some-forwarded-url")
+			headers.Set(routeservice.RouteServiceForwardedURL, "some-forwarded-url")
 		})
 
 		JustBeforeEach(func() {
-			headers.Set(route_service.RouteServiceSignature, signatureHeader)
-			headers.Set(route_service.RouteServiceMetadata, metadataHeader)
+			headers.Set(routeservice.RouteServiceSignature, signatureHeader)
+			headers.Set(routeservice.RouteServiceMetadata, metadataHeader)
 		})
 
 		It("decrypts a valid signature", func() {
@@ -194,7 +163,7 @@ var _ = Describe("Route Service Config", func() {
 			It("returns an route service request expired error", func() {
 				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
+				Expect(err).To(BeAssignableToTypeOf(routeservice.RouteServiceExpired))
 				Expect(err.Error()).To(ContainSubstring("request expired"))
 			})
 		})
@@ -218,7 +187,7 @@ var _ = Describe("Route Service Config", func() {
 			It("returns a route service request bad forwarded url error", func() {
 				err := config.ValidateSignature(headers, requestUrl)
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceForwardedUrlMismatch))
+				Expect(err).To(BeAssignableToTypeOf(routeservice.RouteServiceForwardedURLMismatch))
 			})
 		})
 
@@ -274,7 +243,7 @@ var _ = Describe("Route Service Config", func() {
 				var err error
 				crypto, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 				Expect(err).NotTo(HaveOccurred())
-				config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
+				config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
 			})
 
 			Context("when there is no previous key in the configuration", func() {
@@ -290,7 +259,7 @@ var _ = Describe("Route Service Config", func() {
 					var err error
 					cryptoPrev, err = secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())
-					config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
+					config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
 				})
 
 				It("validates the signature", func() {
@@ -312,7 +281,7 @@ var _ = Describe("Route Service Config", func() {
 					It("returns an route service request expired error", func() {
 						err := config.ValidateSignature(headers, requestUrl)
 						Expect(err).To(HaveOccurred())
-						Expect(err).To(BeAssignableToTypeOf(route_service.RouteServiceExpired))
+						Expect(err).To(BeAssignableToTypeOf(routeservice.RouteServiceExpired))
 					})
 				})
 			})
@@ -322,7 +291,7 @@ var _ = Describe("Route Service Config", func() {
 					var err error
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
-					config = route_service.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
+					config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour, crypto, cryptoPrev, recommendHttps)
 				})
 
 				It("rejects the signature", func() {

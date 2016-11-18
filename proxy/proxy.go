@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/route_service"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/urfave/negroni"
@@ -90,7 +89,7 @@ type proxy struct {
 	transport                  *http.Transport
 	secureCookies              bool
 	heartbeatOK                *int32
-	routeServiceConfig         *route_service.RouteServiceConfig
+	routeServiceConfig         *routeservice.RouteServiceConfig
 	extraHeadersToLog          *[]string
 	routeServiceRecommendHttps bool
 	healthCheckUserAgent       string
@@ -99,7 +98,7 @@ type proxy struct {
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	routeServiceConfig := route_service.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
+	routeServiceConfig := routeservice.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
 
 	p := &proxy{
 		accessLogger: args.AccessLogger,
@@ -242,9 +241,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	var routeServiceArgs route_service.RouteServiceArgs
+	var routeServiceArgs routeservice.RouteServiceRequest
 	if routeServiceUrl != "" {
-		rsSignature := request.Header.Get(route_service.RouteServiceSignature)
+		rsSignature := request.Header.Get(routeservice.RouteServiceSignature)
 
 		var recommendedScheme string
 
@@ -257,7 +256,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		forwardedUrlRaw := recommendedScheme + "://" + hostWithoutPort(request) + request.RequestURI
 		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
 			// A request from a route service destined for a backend instances
-			routeServiceArgs.UrlString = routeServiceUrl
+			routeServiceArgs.URLString = routeServiceUrl
 			err := p.routeServiceConfig.ValidateSignature(&request.Header, forwardedUrlRaw)
 			if err != nil {
 				handler.HandleBadSignature(err)
@@ -266,7 +265,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		} else {
 			var err error
 			// should not hardcode http, will be addressed by #100982038
-			routeServiceArgs, err = buildRouteServiceArgs(p.routeServiceConfig, routeServiceUrl, forwardedUrlRaw)
+			routeServiceArgs, err = p.routeServiceConfig.Request(routeServiceUrl, forwardedUrlRaw)
 			backend = false
 			if err != nil {
 				handler.HandleRouteServiceFailure(err)
@@ -316,8 +315,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
-	routeServiceArgs route_service.RouteServiceArgs,
-	routeServiceConfig *route_service.RouteServiceConfig,
+	routeServiceArgs routeservice.RouteServiceRequest,
+	routeServiceConfig *routeservice.RouteServiceConfig,
 	forceForwardedProtoHttps bool) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
@@ -333,18 +332,23 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 
 func handleRouteServiceIntegration(
 	target *http.Request,
-	routeServiceArgs route_service.RouteServiceArgs,
-	routeServiceConfig *route_service.RouteServiceConfig,
+	routeServiceArgs routeservice.RouteServiceRequest,
+	routeServiceConfig *routeservice.RouteServiceConfig,
 ) {
-	sig := target.Header.Get(route_service.RouteServiceSignature)
-	if forwardingToRouteService(routeServiceArgs.UrlString, sig) {
+	sig := target.Header.Get(routeservice.RouteServiceSignature)
+	if forwardingToRouteService(routeServiceArgs.URLString, sig) {
 		// An endpoint has a route service and this request did not come from the service
-		routeServiceConfig.SetupRouteServiceRequest(target, routeServiceArgs)
-	} else if hasBeenToRouteService(routeServiceArgs.UrlString, sig) {
+		target.Header.Set(routeservice.RouteServiceSignature, routeServiceArgs.Signature)
+		target.Header.Set(routeservice.RouteServiceMetadata, routeServiceArgs.Metadata)
+		target.Header.Set(routeservice.RouteServiceForwardedURL, routeServiceArgs.ForwardedURL)
+
+		target.Host = routeServiceArgs.ParsedUrl.Host
+		target.URL = routeServiceArgs.ParsedUrl
+	} else if hasBeenToRouteService(routeServiceArgs.URLString, sig) {
 		// Remove the headers since the backend should not see it
-		target.Header.Del(route_service.RouteServiceSignature)
-		target.Header.Del(route_service.RouteServiceMetadata)
-		target.Header.Del(route_service.RouteServiceForwardedUrl)
+		target.Header.Del(routeservice.RouteServiceSignature)
+		target.Header.Del(routeservice.RouteServiceMetadata)
+		target.Header.Del(routeservice.RouteServiceForwardedURL)
 	}
 }
 
@@ -389,27 +393,6 @@ func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
 }
 func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
 	i.nested.PostRequest(e)
-}
-
-func buildRouteServiceArgs(routeServiceConfig *route_service.RouteServiceConfig, routeServiceUrl, forwardedUrlRaw string) (route_service.RouteServiceArgs, error) {
-	var routeServiceArgs route_service.RouteServiceArgs
-	sig, metadata, err := routeServiceConfig.GenerateSignatureAndMetadata(forwardedUrlRaw)
-	if err != nil {
-		return routeServiceArgs, err
-	}
-
-	routeServiceArgs.UrlString = routeServiceUrl
-	routeServiceArgs.Signature = sig
-	routeServiceArgs.Metadata = metadata
-	routeServiceArgs.ForwardedUrlRaw = forwardedUrlRaw
-
-	rsURL, err := url.Parse(routeServiceUrl)
-	if err != nil {
-		return routeServiceArgs, err
-	}
-	routeServiceArgs.ParsedUrl = rsURL
-
-	return routeServiceArgs, nil
 }
 
 func setupStickySession(responseWriter http.ResponseWriter, response *http.Response,

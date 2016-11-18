@@ -1,4 +1,4 @@
-package route_service_test
+package routeservice_test
 
 import (
 	. "github.com/onsi/ginkgo"

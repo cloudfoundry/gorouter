@@ -11,7 +11,7 @@ import (
 	proxyfakes "code.cloudfoundry.org/gorouter/proxy/utils/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	routefakes "code.cloudfoundry.org/gorouter/route/fakes"
-	"code.cloudfoundry.org/gorouter/route_service"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
@@ -119,7 +119,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Tags:            map[string]string{},
 				}
 				endpointIterator.NextReturns(endpoint)
-				req.Header.Set(route_service.RouteServiceForwardedUrl, "http://myapp.com/")
+				req.Header.Set(routeservice.RouteServiceForwardedURL, "http://myapp.com/")
 				servingBackend := false
 
 				after = func(rsp *http.Response, endpoint *route.Endpoint, err error) {
@@ -155,7 +155,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("does not set X-CF-Forwarded-Url to the route service URL", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(req.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal("http://myapp.com/"))
+					Expect(req.Header.Get(routeservice.RouteServiceForwardedURL)).To(Equal("http://myapp.com/"))
 				})
 
 			})

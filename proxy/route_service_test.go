@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/route_service"
-	"code.cloudfoundry.org/gorouter/route_service/header"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/routeservice/header"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,8 +47,8 @@ var _ = Describe("Route Services", func() {
 		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
 		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			metaHeader := r.Header.Get(route_service.RouteServiceMetadata)
-			sigHeader := r.Header.Get(route_service.RouteServiceSignature)
+			metaHeader := r.Header.Get(routeservice.RouteServiceMetadata)
+			sigHeader := r.Header.Get(routeservice.RouteServiceSignature)
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
@@ -66,7 +66,7 @@ var _ = Describe("Route Services", func() {
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
 
-		config := route_service.NewRouteServiceConfig(
+		config := routeservice.NewRouteServiceConfig(
 			logger,
 			conf.RouteServiceEnabled,
 			1*time.Hour,
@@ -74,8 +74,9 @@ var _ = Describe("Route Services", func() {
 			nil,
 			recommendHttps,
 		)
-		signatureHeader, metadataHeader, err = config.GenerateSignatureAndMetadata(forwardedUrl)
+		reqArgs, err := config.Request("", forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())
+		signatureHeader, metadataHeader = reqArgs.Signature, reqArgs.Metadata
 	})
 
 	Context("with Route Services disabled", func() {
@@ -113,21 +114,9 @@ var _ = Describe("Route Services", func() {
 
 		Context("when recommendHttps is set to false", func() {
 			BeforeEach(func() {
-				furl := "http://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 				recommendHttps = false
 				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					metadataHeader = r.Header.Get(route_service.RouteServiceMetadata)
-					signatureHeader = r.Header.Get(route_service.RouteServiceSignature)
-
-					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
-					Expect(err).ToNot(HaveOccurred())
-					_, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
-
-					Expect(err).ToNot(HaveOccurred())
-					Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
-
-					// validate client request header
-					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal(furl))
+					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(ContainSubstring("http://"))
 
 					w.Write([]byte("My Special Snowflake Route Service\n"))
 				})
@@ -203,9 +192,9 @@ var _ = Describe("Route Services", func() {
 			It("routes to the backend instance and strips headers", func() {
 				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
-					Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal(""))
-					Expect(req.Header.Get(route_service.RouteServiceMetadata)).To(Equal(""))
-					Expect(req.Header.Get(route_service.RouteServiceForwardedUrl)).To(Equal(""))
+					Expect(req.Header.Get(routeservice.RouteServiceSignature)).To(Equal(""))
+					Expect(req.Header.Get(routeservice.RouteServiceMetadata)).To(Equal(""))
+					Expect(req.Header.Get(routeservice.RouteServiceForwardedURL)).To(Equal(""))
 
 					out := &bytes.Buffer{}
 					out.WriteString("backend instance")
@@ -220,9 +209,9 @@ var _ = Describe("Route Services", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-				req.Header.Set(route_service.RouteServiceForwardedUrl, "http://some-backend-url")
+				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(routeservice.RouteServiceForwardedURL, "http://some-backend-url")
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -248,9 +237,9 @@ var _ = Describe("Route Services", func() {
 
 					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 					req.Host = "my_host.com:4444"
-					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-					req.Header.Set(route_service.RouteServiceForwardedUrl, "http://some-backend-url")
+					req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+					req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(routeservice.RouteServiceForwardedURL, "http://some-backend-url")
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -263,7 +252,7 @@ var _ = Describe("Route Services", func() {
 				It("does not strip the signature header", func() {
 					ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 						req, _ := conn.ReadRequest()
-						Expect(req.Header.Get(route_service.RouteServiceSignature)).To(Equal("some-signature"))
+						Expect(req.Header.Get(routeservice.RouteServiceSignature)).To(Equal("some-signature"))
 
 						out := &bytes.Buffer{}
 						out.WriteString("route service instance")
@@ -278,7 +267,7 @@ var _ = Describe("Route Services", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-					req.Header.Set(route_service.RouteServiceSignature, "some-signature")
+					req.Header.Set(routeservice.RouteServiceSignature, "some-signature")
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -297,8 +286,8 @@ var _ = Describe("Route Services", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 				resp, _ := conn.ReadResponse()
 
@@ -316,7 +305,7 @@ var _ = Describe("Route Services", func() {
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
+			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
 			conn.WriteRequest(req)
 
 			res, body := conn.ReadResponse()
@@ -339,8 +328,8 @@ var _ = Describe("Route Services", func() {
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+			req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 			conn.WriteRequest(req)
 
 			res, body := conn.ReadResponse()
@@ -359,8 +348,8 @@ var _ = Describe("Route Services", func() {
 
 			req := test_util.NewRequest("GET", "no-match.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 			// Generate a bad signature
-			req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-			req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+			req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 			conn.WriteRequest(req)
 
 			res, body := conn.ReadResponse()
@@ -386,8 +375,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -420,8 +409,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
@@ -446,9 +435,9 @@ var _ = Describe("Route Services", func() {
 					conn := dialProxy(proxyServer)
 
 					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-					req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-					req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
-					req.Header.Set(route_service.RouteServiceForwardedUrl, forwardedUrl)
+					req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+					req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(routeservice.RouteServiceForwardedURL, forwardedUrl)
 					conn.WriteRequest(req)
 
 					res, body := conn.ReadResponse()
@@ -473,8 +462,8 @@ var _ = Describe("Route Services", func() {
 
 				conn := dialProxy(proxyServer)
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(route_service.RouteServiceSignature, signatureHeader)
-				req.Header.Set(route_service.RouteServiceMetadata, metadataHeader)
+				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
+				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
