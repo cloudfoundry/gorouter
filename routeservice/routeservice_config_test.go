@@ -1,8 +1,8 @@
 package routeservice_test
 
 import (
-	"Fmt"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
