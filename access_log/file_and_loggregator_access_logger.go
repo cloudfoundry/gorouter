@@ -98,8 +98,8 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 					x.logger.Error("Error when emiting access log to writers ", err)
 				}
 			}
-			if x.dropsondeSourceInstance != "" && record.ApplicationId() != "" {
-				logs.SendAppLog(record.ApplicationId(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
+			if x.dropsondeSourceInstance != "" && record.ApplicationID() != "" {
+				logs.SendAppLog(record.ApplicationID(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
 			}
 		case <-x.stopCh:
 			return
