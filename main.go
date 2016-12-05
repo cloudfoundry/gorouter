@@ -12,7 +12,9 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
@@ -86,13 +88,16 @@ func main() {
 	}
 
 	logger.Info("setting-up-nats-connection")
-	natsClient, natsHost := connectToNatsServer(logger.Session("nats"), c)
+	startMsgChan := make(chan struct{})
+	natsClient := connectToNatsServer(logger.Session("nats"), c, startMsgChan)
 
 	metricsReporter := metrics.NewMetricsReporter()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
+
+	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan)
 
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
@@ -117,9 +122,9 @@ func main() {
 	if err != nil {
 		logger.Fatal("initialize-router-error", err)
 	}
-	router.NatsHost = natsHost
 
 	members := grouper.Members{
+		{"subscriber", subscriber},
 		{"router", router},
 	}
 	if c.RoutingApiEnabled() {
@@ -233,30 +238,52 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 	return uaaClient
 }
 
-func connectToNatsServer(logger lager.Logger, c *config.Config) (*nats.Conn, *atomic.Value) {
+func natsOptions(logger lager.Logger, c *config.Config, natsHost *atomic.Value, startMsg chan<- struct{}) nats.Options {
+	natsServers := c.NatsServers()
+
+	options := nats.DefaultOptions
+	options.Servers = natsServers
+	options.PingInterval = c.NatsClientPingInterval
+	options.ClosedCB = func(conn *nats.Conn) {
+		logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
+	}
+
+	options.DisconnectedCB = func(conn *nats.Conn) {
+		hostStr := natsHost.Load().(string)
+		logger.Info("nats-connection-disconnected", lager.Data{"nats-host": hostStr})
+	}
+
+	options.ReconnectedCB = func(conn *nats.Conn) {
+		natsURL, err := url.Parse(conn.ConnectedUrl())
+		natsHostStr := ""
+		if err != nil {
+			logger.Error("nats-url-parse-error", err)
+		} else {
+			natsHostStr = natsURL.Host
+		}
+		natsHost.Store(natsHostStr)
+
+		data := lager.Data{"nats-host": natsHostStr}
+		logger.Info("nats-connection-reconnected", data)
+		startMsg <- struct{}{}
+	}
+
+	// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
+	if c.SuspendPruningIfNatsUnavailable {
+		options.MaxReconnect = -1
+	}
+
+	return options
+}
+
+func connectToNatsServer(logger lager.Logger, c *config.Config, startMsg chan<- struct{}) *nats.Conn {
 	var natsClient *nats.Conn
 	var natsHost atomic.Value
 	var err error
 
-	natsServers := c.NatsServers()
+	options := natsOptions(logger, c, &natsHost, startMsg)
 	attempts := 3
 	for attempts > 0 {
-		options := nats.DefaultOptions
-		options.Servers = natsServers
-		options.PingInterval = c.NatsClientPingInterval
-		options.ClosedCB = func(conn *nats.Conn) {
-			logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
-		}
-
-		options.DisconnectedCB = func(conn *nats.Conn) {
-			hostStr := natsHost.Load().(string)
-			logger.Info("nats-connection-disconnected", lager.Data{"nats-host": hostStr})
-		}
-
-		// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
-		if c.SuspendPruningIfNatsUnavailable {
-			options.MaxReconnect = -1
-		}
 		natsClient, err = options.Connect()
 		if err == nil {
 			break
@@ -279,7 +306,7 @@ func connectToNatsServer(logger lager.Logger, c *config.Config) (*nats.Conn, *at
 	logger.Info("Successfully-connected-to-nats", lager.Data{"host": natsHostStr})
 
 	natsHost.Store(natsHostStr)
-	return natsClient, &natsHost
+	return natsClient
 }
 
 func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *schema.LogCounter) {
@@ -305,4 +332,25 @@ func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *sch
 	}
 
 	logger.RegisterSink(logCounter)
+}
+
+func createSubscriber(
+	logger lager.Logger,
+	c *config.Config,
+	natsClient *nats.Conn,
+	registry rregistry.RegistryInterface,
+	startMsgChan chan struct{},
+) ifrit.Runner {
+
+	guid, err := uuid.GenerateUUID()
+	if err != nil {
+		logger.Fatal("failed-to-generate-uuid", err)
+	}
+
+	opts := &mbus.SubscriberOpts{
+		ID: fmt.Sprintf("%d-%s", c.Index, guid),
+		MinimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
+		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
+	}
+	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts)
 }

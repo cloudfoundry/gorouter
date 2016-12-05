@@ -2,13 +2,13 @@ package router_test
 
 import (
 	"os"
+	"syscall"
 
 	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/common"
-	"code.cloudfoundry.org/gorouter/common/health"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
@@ -21,6 +21,9 @@ import (
 	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
 
 	"bufio"
 	"bytes"
@@ -31,7 +34,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
@@ -49,15 +51,12 @@ var _ = Describe("Router", func() {
 		natsPort   uint16
 		config     *cfg.Config
 
-		mbusClient   *nats.Conn
-		registry     *rregistry.RouteRegistry
-		varz         vvarz.Varz
-		router       *Router
-		signals      chan os.Signal
-		closeChannel chan struct{}
-		readyChan    chan struct{}
-		logger       lager.Logger
-		statusPort   uint16
+		mbusClient *nats.Conn
+		registry   *rregistry.RouteRegistry
+		varz       vvarz.Varz
+		router     *Router
+		logger     lager.Logger
+		statusPort uint16
 	)
 
 	BeforeEach(func() {
@@ -104,16 +103,20 @@ var _ = Describe("Router", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 
-		readyChan = make(chan struct{})
-		closeChannel = make(chan struct{})
-		go func() {
-			router.Run(signals, readyChan)
-			close(closeChannel)
-		}()
-		select {
-		case <-readyChan:
+		opts := &mbus.SubscriberOpts{
+			ID: "test",
+			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
+			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
 		}
+		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts)
 
+		members := grouper.Members{
+			{Name: "subscriber", Runner: subscriber},
+			{Name: "router", Runner: router},
+		}
+		group := grouper.NewOrdered(os.Interrupt, members)
+		monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
+		<-monitor.Ready()
 	})
 
 	AfterEach(func() {
@@ -131,159 +134,6 @@ var _ = Describe("Router", func() {
 			}
 		}
 
-	})
-
-	Context("NATS", func() {
-		Context("Router Greetings", func() {
-			It("RouterGreets", func() {
-				response := make(chan []byte)
-
-				mbusClient.Subscribe("router.greet.test.response", func(msg *nats.Msg) {
-					response <- msg.Data
-				})
-
-				mbusClient.PublishRequest("router.greet", "router.greet.test.response", []byte{})
-
-				var msg []byte
-				Eventually(response).Should(Receive(&msg))
-
-				var message common.RouterStart
-				err := json.Unmarshal(msg, &message)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(1))
-				Expect(message.PruneThresholdInSeconds).To(Equal(10))
-			})
-
-			It("handles a empty reply on greet", func() {
-				err := mbusClient.PublishRequest("router.greet", "", []byte{})
-				Expect(err).NotTo(HaveOccurred())
-
-				Consistently(func() error {
-					return mbusClient.PublishRequest("router.greet", "test", []byte{})
-				}).ShouldNot(HaveOccurred())
-			})
-		})
-
-		It("discovers", func() {
-			// Test if router responses to discover message
-			sig := make(chan health.Varz)
-
-			// Since the form of uptime is xxd:xxh:xxm:xxs, we should make
-			// sure that router has run at least for one second
-			time.Sleep(time.Second)
-
-			mbusClient.Subscribe("vcap.component.discover.test.response", func(msg *nats.Msg) {
-				var varz health.Varz
-				_ = json.Unmarshal(msg.Data, &varz)
-				sig <- varz
-			})
-
-			mbusClient.PublishRequest(
-				"vcap.component.discover",
-				"vcap.component.discover.test.response",
-				[]byte{},
-			)
-
-			var varz health.Varz
-			Eventually(sig).Should(Receive(&varz))
-
-			var emptyTime time.Time
-			var emptyDuration schema.Duration
-
-			Expect(varz.Type).To(Equal("Router"))
-			Expect(varz.Index).To(Equal(uint(2)))
-			Expect(varz.UUID).ToNot(Equal(""))
-			Expect(varz.StartTime).ToNot(Equal(emptyTime))
-			Expect(varz.Uptime).ToNot(Equal(emptyDuration))
-
-			verify_var_z(varz.Host, varz.Credentials[0], varz.Credentials[1])
-			verify_health_z(varz.Host)
-		})
-
-		Context("Register and Unregister", func() {
-			var app *testcommon.TestApp
-
-			assertRegisterUnregister := func() {
-				app.Listen()
-
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				app.VerifyAppStatus(200)
-
-				app.Unregister()
-
-				Eventually(func() bool {
-					return appUnregistered(registry, app)
-				}).Should(BeTrue())
-
-				app.VerifyAppStatus(404)
-			}
-
-			Describe("app with no route service", func() {
-				JustBeforeEach(func() {
-					app = test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				})
-
-				It("registers and unregisters", func() {
-					assertRegisterUnregister()
-				})
-			})
-
-			Describe("app with an http route service", func() {
-				JustBeforeEach(func() {
-					app = test.NewRouteServiceApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, "http://my-insecure-service.me")
-				})
-
-				It("does not register", func() {
-					app.Listen()
-
-					Consistently(func() bool {
-						return appRegistered(registry, app)
-					}).Should(BeFalse())
-
-					app.VerifyAppStatus(404)
-				})
-			})
-		})
-	})
-
-	It("sends start on a nats connect", func() {
-		started := make(chan bool)
-		cb := make(chan bool)
-
-		mbusClient.Subscribe("router.start", func(*nats.Msg) {
-			started <- true
-		})
-
-		reconnectedCbs := make([]func(*nats.Conn), 0)
-		reconnectedCbs = append(reconnectedCbs, mbusClient.Opts.ReconnectedCB)
-		reconnectedCbs = append(reconnectedCbs, func(_ *nats.Conn) {
-			cb <- true
-		})
-		mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
-			for _, rcb := range reconnectedCbs {
-				rcb(conn)
-			}
-		}
-
-		natsRunner.Stop()
-		natsRunner.Start()
-
-		Eventually(started, 4).Should(Receive())
-		Eventually(cb, 4).Should(Receive())
-	})
-
-	It("logs the nats host ip on nats reconnect", func() {
-		natsRunner.Stop()
-		natsRunner.Start()
-
-		natsUrl, err := url.Parse(natsRunner.MessageBus.ConnectedUrl())
-		Expect(err).ToNot(HaveOccurred())
-		Eventually(logger).Should(gbytes.Say("nats-connection-reconnected"))
-		Eventually(logger).Should(gbytes.Say(natsUrl.Host))
 	})
 
 	It("creates a pidfile on startup", func() {
@@ -466,6 +316,7 @@ var _ = Describe("Router", func() {
 			router = nil
 
 			req, err = http.NewRequest("GET", host, nil)
+			Expect(err).NotTo(HaveOccurred())
 			_, err = client.Do(req)
 			Expect(err).To(HaveOccurred())
 		})
@@ -593,12 +444,16 @@ var _ = Describe("Router", func() {
 		var resp *http.Response
 		var err error
 
-		mbusClient.Publish("router.register", []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id", "private_instance_index": "2"}`))
+		err = mbusClient.Publish("router.register",
+			[]byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id",
+		"private_instance_index": "2"}`))
+		Expect(err).ToNot(HaveOccurred())
 		time.Sleep(250 * time.Millisecond)
 
 		host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
 
 		req, err = http.NewRequest("GET", host, nil)
+		Expect(err).ToNot(HaveOccurred())
 		req.SetBasicAuth("user", "pass")
 
 		resp, err = client.Do(req)
@@ -1009,31 +864,6 @@ var _ = Describe("Router", func() {
 		})
 
 	})
-
-	Describe("SubscribeRegister", func() {
-		Context("when the register message JSON fails to unmarshall", func() {
-			JustBeforeEach(func() {
-				// the port is too high
-				mbusClient.Publish("router.register", []byte(`
-{
-  "dea": "dea1",
-  "app": "app1",
-  "uris": [
-    "test.com"
-  ],
-  "host": "1.2.3.4",
-  "port": 65536,
-  "private_instance_id": "private_instance_id"
-}
-`))
-			})
-
-			It("does not add the route to the route table", func() {
-				// Pool.IsEmpty() is better but the pool is not intialized yet
-				Consistently(func() *route.Pool { return registry.Lookup("test.com") }).Should(BeZero())
-			})
-		})
-	})
 })
 
 func readVarz(v vvarz.Varz) map[string]interface{} {
@@ -1182,6 +1012,7 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	Expect(err).ToNot(HaveOccurred())
 
 	port, err = ioutil.ReadAll(resp.Body)
+	Expect(err).ToNot(HaveOccurred())
 
 	return string(port)
 }

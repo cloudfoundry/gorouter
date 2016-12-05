@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
@@ -27,6 +28,7 @@ import (
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/tedsuo/ifrit"
 )
 
 var _ = Describe("Router", func() {
@@ -40,6 +42,7 @@ var _ = Describe("Router", func() {
 		registry    *rregistry.RouteRegistry
 		varz        vvarz.Varz
 		rtr         *router.Router
+		subscriber  ifrit.Process
 		natsPort    uint16
 		healthCheck int32
 	)
@@ -222,11 +225,23 @@ var _ = Describe("Router", func() {
 		errChan := make(chan error, 2)
 		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
 		Expect(err).ToNot(HaveOccurred())
+
+		opts := &mbus.SubscriberOpts{
+			ID: "test",
+			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
+			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
+		}
+		subscriber = ifrit.Background(mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts))
+		<-subscriber.Ready()
 	})
 
 	AfterEach(func() {
 		if natsRunner != nil {
 			natsRunner.Stop()
+		}
+		if subscriber != nil {
+			subscriber.Signal(os.Interrupt)
+			<-subscriber.Wait()
 		}
 	})
 

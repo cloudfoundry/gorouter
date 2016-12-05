@@ -1,9 +1,9 @@
-package router_test
+package mbus_test
 
 import (
 	"encoding/json"
 
-	. "code.cloudfoundry.org/gorouter/router"
+	. "code.cloudfoundry.org/gorouter/mbus"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

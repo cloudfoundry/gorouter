@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -17,7 +16,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common"
@@ -29,11 +27,8 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/localip"
-	"code.cloudfoundry.org/routing-api/models"
 	"github.com/armon/go-proxyproto"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/nats-io/nats"
@@ -72,18 +67,6 @@ type Router struct {
 	logger           lager.Logger
 	errChan          chan error
 	NatsHost         *atomic.Value
-}
-
-type RegistryMessage struct {
-	Host                    string            `json:"host"`
-	Port                    uint16            `json:"port"`
-	Uris                    []route.Uri       `json:"uris"`
-	Tags                    map[string]string `json:"tags"`
-	App                     string            `json:"app"`
-	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
-	RouteServiceUrl         string            `json:"route_service_url"`
-	PrivateInstanceId       string            `json:"private_instance_id"`
-	PrivateInstanceIndex    string            `json:"private_instance_index"`
 }
 
 func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
@@ -165,30 +148,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
 	r.RegisterComponent()
-
-	// Subscribe register/unregister router
-	r.SubscribeRegister()
-	r.HandleGreetings()
-	r.SubscribeUnregister()
-
-	// Kickstart sending start messages
-	r.SendStartMessage()
-
-	r.mbusClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
-		natsUrl, err := url.Parse(conn.ConnectedUrl())
-		natsHostStr := ""
-		if err != nil {
-			r.logger.Error("nats-url-parse-error", err)
-		} else {
-			natsHostStr = natsUrl.Host
-		}
-		if r.NatsHost != nil {
-			r.NatsHost.Store(natsHostStr)
-		}
-
-		r.logger.Info("nats-connection-reconnected", lager.Data{"nats-host": natsHostStr})
-		r.SendStartMessage()
-	}
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
@@ -452,54 +411,6 @@ func (r *Router) RegisterComponent() {
 	r.component.Register(r.mbusClient)
 }
 
-func (r *Router) SubscribeRegister() {
-	r.subscribeRegistry("router.register", func(registryMessage *RegistryMessage) {
-		for _, uri := range registryMessage.Uris {
-			r.registry.Register(
-				uri,
-				registryMessage.makeEndpoint(),
-			)
-		}
-	})
-}
-
-func (r *Router) SubscribeUnregister() {
-	r.subscribeRegistry("router.unregister", func(registryMessage *RegistryMessage) {
-		r.logger.Info("unregister-route", lager.Data{"message": registryMessage})
-		for _, uri := range registryMessage.Uris {
-			r.registry.Unregister(
-				uri,
-				registryMessage.makeEndpoint(),
-			)
-		}
-	})
-}
-
-func (r *Router) HandleGreetings() {
-	r.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
-		if msg.Reply == "" {
-			r.logger.Info(fmt.Sprintf("Received message with empty reply on subject %s", msg.Subject))
-			return
-		}
-
-		response, _ := r.greetMessage()
-		r.mbusClient.Publish(msg.Reply, response)
-	})
-}
-
-func (r *Router) SendStartMessage() {
-	b, err := r.greetMessage()
-	if err != nil {
-		panic(err)
-	}
-
-	// Send start message once at start
-	err = r.mbusClient.Publish("router.start", b)
-	if err != nil {
-		r.logger.Error("failed-to-publish-greet-message", err)
-	}
-}
-
 func (r *Router) ScheduleFlushApps() {
 	if r.config.PublishActiveAppsInterval == 0 {
 		return
@@ -580,64 +491,4 @@ func (r *Router) flushApps(t time.Time) {
 	r.logger.Debug("Debug Info", lager.Data{"Active apps": len(x), "message size:": len(z)})
 
 	r.mbusClient.Publish("router.active_apps", z)
-}
-
-func (r *Router) greetMessage() ([]byte, error) {
-	host, err := localip.LocalIP()
-	if err != nil {
-		return nil, err
-	}
-
-	d := common.RouterStart{
-		Id:    r.component.Varz.UUID,
-		Hosts: []string{host},
-		MinimumRegisterIntervalInSeconds: int(r.config.StartResponseDelayInterval.Seconds()),
-		PruneThresholdInSeconds:          int(r.config.DropletStaleThreshold.Seconds()),
-	}
-	return json.Marshal(d)
-}
-
-func (r *Router) subscribeRegistry(subject string, successCallback func(*RegistryMessage)) {
-	callback := func(message *nats.Msg) {
-		payload := message.Data
-
-		var msg RegistryMessage
-
-		err := json.Unmarshal(payload, &msg)
-		if err != nil {
-			logMessage := fmt.Sprintf("%s: Error unmarshalling JSON (%d; %s): %s", subject, len(payload), payload, err)
-			r.logger.Info(logMessage, lager.Data{"payload": string(payload)})
-			return
-		}
-
-		if !msg.ValidateMessage() {
-			logMessage := fmt.Sprintf("%s: Unable to validate message. route_service_url must be https", subject)
-			r.logger.Info(logMessage, lager.Data{"message": msg})
-			return
-		}
-
-		successCallback(&msg)
-	}
-
-	_, err := r.mbusClient.Subscribe(subject, callback)
-	if err != nil {
-		r.logger.Error(fmt.Sprintf("Error subscribing to %s ", subject), err)
-	}
-}
-
-func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
-	return route.NewEndpoint(
-		rm.App,
-		rm.Host,
-		rm.Port,
-		rm.PrivateInstanceId,
-		rm.PrivateInstanceIndex,
-		rm.Tags,
-		rm.StaleThresholdInSeconds,
-		rm.RouteServiceUrl,
-		models.ModificationTag{})
-}
-
-func (rm *RegistryMessage) ValidateMessage() bool {
-	return rm.RouteServiceUrl == "" || strings.HasPrefix(rm.RouteServiceUrl, "https")
 }
