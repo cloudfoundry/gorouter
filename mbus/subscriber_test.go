@@ -266,6 +266,65 @@ var _ = Describe("Subscriber", func() {
 			Eventually(process.Ready()).Should(BeClosed())
 		})
 
+		It("does not race against registrations", func() {
+			racingURI := route.Uri("test3.example.com")
+			racingMsg := mbus.RegistryMessage{
+				Host:                 "host",
+				App:                  "app",
+				RouteServiceURL:      "https://url.example.com",
+				PrivateInstanceID:    "id",
+				PrivateInstanceIndex: "index",
+				Port:                 1111,
+				StaleThresholdInSeconds: 120,
+				Uris: []route.Uri{racingURI},
+				Tags: map[string]string{"key": "value"},
+			}
+
+			racingData, err := json.Marshal(racingMsg)
+			Expect(err).NotTo(HaveOccurred())
+
+			msg := mbus.RegistryMessage{
+				Host:                 "host",
+				App:                  "app1",
+				PrivateInstanceID:    "id",
+				PrivateInstanceIndex: "index",
+				Port:                 1112,
+				StaleThresholdInSeconds: 120,
+				Uris: []route.Uri{"test.example.com", "test2.example.com"},
+				Tags: map[string]string{"key": "value"},
+			}
+
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			var alreadyUnregistered uint32
+			registry.RegisterStub = func(uri route.Uri, e *route.Endpoint) {
+				defer GinkgoRecover()
+				if uri == racingURI {
+					Expect(atomic.LoadUint32(&alreadyUnregistered)).To(Equal(uint32(0)))
+				}
+			}
+			registry.UnregisterStub = func(uri route.Uri, e *route.Endpoint) {
+				if uri == racingURI {
+					atomic.StoreUint32(&alreadyUnregistered, 1)
+				}
+			}
+
+			for i := 0; i < 100; i++ {
+				err = natsClient.Publish("router.register", data)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			err = natsClient.Publish("router.register", racingData)
+			Expect(err).ToNot(HaveOccurred())
+			err = natsClient.Publish("router.unregister", racingData)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() uint32 {
+				return atomic.LoadUint32(&alreadyUnregistered)
+			}).Should(Equal(uint32(1)))
+		})
+
 		It("unregisters the route", func() {
 			msg := mbus.RegistryMessage{
 				Host:                 "host",

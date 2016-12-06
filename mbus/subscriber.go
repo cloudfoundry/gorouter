@@ -91,11 +91,7 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 	if err != nil {
 		return err
 	}
-	err = s.subscribeRegister()
-	if err != nil {
-		return err
-	}
-	err = s.subscribeUnregister()
+	err = s.subscribeRoutes()
 	if err != nil {
 		return err
 	}
@@ -125,44 +121,51 @@ func (s *Subscriber) subscribeToGreetMessage() error {
 	return err
 }
 
-func (s *Subscriber) subscribeRegister() error {
-	_, err := s.natsClient.Subscribe("router.register", func(message *nats.Msg) {
-		msg, regErr := createRegistryMessage(message.Data)
-		if regErr != nil {
-			s.logger.Error("validation-error", regErr, lager.Data{
-				"payload": string(message.Data),
-				"subject": message.Subject,
-			})
-			return
-		}
-
-		endpoint := msg.makeEndpoint()
-		for _, uri := range msg.Uris {
-			s.routeRegistry.Register(uri, endpoint)
+func (s *Subscriber) subscribeRoutes() error {
+	_, err := s.natsClient.Subscribe("router.*", func(message *nats.Msg) {
+		switch message.Subject {
+		case "router.register":
+			s.registerRoute(message)
+		case "router.unregister":
+			s.unregisterRoute(message)
+		default:
 		}
 	})
 	return err
 }
 
-func (s *Subscriber) subscribeUnregister() error {
-	_, err := s.natsClient.Subscribe("router.unregister", func(message *nats.Msg) {
-		s.logger.Info("unregister-route", lager.Data{"message": string(message.Data)})
+func (s *Subscriber) unregisterRoute(message *nats.Msg) {
+	s.logger.Info("unregister-route", lager.Data{"message": string(message.Data)})
 
-		msg, regErr := createRegistryMessage(message.Data)
-		if regErr != nil {
-			s.logger.Error("validation-error", regErr, lager.Data{
-				"payload": string(message.Data),
-				"subject": message.Subject,
-			})
-			return
-		}
+	msg, regErr := createRegistryMessage(message.Data)
+	if regErr != nil {
+		s.logger.Error("validation-error", regErr, lager.Data{
+			"payload": string(message.Data),
+			"subject": message.Subject,
+		})
+		return
+	}
 
-		endpoint := msg.makeEndpoint()
-		for _, uri := range msg.Uris {
-			s.routeRegistry.Unregister(uri, endpoint)
-		}
-	})
-	return err
+	endpoint := msg.makeEndpoint()
+	for _, uri := range msg.Uris {
+		s.routeRegistry.Unregister(uri, endpoint)
+	}
+}
+
+func (s *Subscriber) registerRoute(message *nats.Msg) {
+	msg, regErr := createRegistryMessage(message.Data)
+	if regErr != nil {
+		s.logger.Error("validation-error", regErr, lager.Data{
+			"payload": string(message.Data),
+			"subject": message.Subject,
+		})
+		return
+	}
+
+	endpoint := msg.makeEndpoint()
+	for _, uri := range msg.Uris {
+		s.routeRegistry.Register(uri, endpoint)
+	}
 }
 
 func (s *Subscriber) startMessage() ([]byte, error) {
@@ -172,7 +175,6 @@ func (s *Subscriber) startMessage() ([]byte, error) {
 	}
 
 	d := common.RouterStart{
-		// Id:    r.component.Varz.UUID,
 		Id:    s.opts.ID,
 		Hosts: []string{host},
 		MinimumRegisterIntervalInSeconds: s.opts.MinimumRegisterIntervalInSeconds,
