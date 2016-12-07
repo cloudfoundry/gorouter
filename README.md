@@ -71,7 +71,7 @@ go install
 
 ```bash
 # Start NATS server in daemon mode
-go get github.com/apcera/gnatsd
+go get github.com/nats-io/gnatsd
 gnatsd &
 
 # Start gorouter
