@@ -61,7 +61,7 @@ var _ = Describe("TopApps", func() {
 		}
 
 		g := func(x string, y int64) TopAppsTopEntry {
-			return TopAppsTopEntry{x, y}
+			return TopAppsTopEntry{ApplicationId: x, Requests: y}
 		}
 
 		x := []string{"a", "b", "c"}

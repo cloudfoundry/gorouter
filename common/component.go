@@ -249,7 +249,7 @@ func (c *VcapComponent) ListenAndServe() {
 
 	s := &http.Server{
 		Addr:         c.Varz.Host,
-		Handler:      &BasicAuth{hs, f},
+		Handler:      &BasicAuth{Handler: hs, Authenticator: f},
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}

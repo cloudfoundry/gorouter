@@ -25,7 +25,7 @@ var _ = Describe("http", func() {
 			w.WriteHeader(http.StatusOK)
 		}
 
-		y := &BasicAuth{http.HandlerFunc(h), x}
+		y := &BasicAuth{Handler: http.HandlerFunc(h), Authenticator: x}
 
 		z := &http.Server{Handler: y}
 

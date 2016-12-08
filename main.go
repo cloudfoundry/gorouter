@@ -124,8 +124,8 @@ func main() {
 	}
 
 	members := grouper.Members{
-		{"subscriber", subscriber},
-		{"router", router},
+		grouper.Member{Name: "subscriber", Runner: subscriber},
+		grouper.Member{Name: "router", Runner: router},
 	}
 	if c.RoutingApiEnabled() {
 		logger.Info("setting-up-routing-api")
