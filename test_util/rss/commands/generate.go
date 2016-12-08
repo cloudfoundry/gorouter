@@ -8,7 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/routeservice/header"
 	"code.cloudfoundry.org/gorouter/test_util/rss/common"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 func GenerateSignature(c *cli.Context) {

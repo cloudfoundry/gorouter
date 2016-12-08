@@ -7,7 +7,7 @@ import (
 	"os/user"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 func CreateCrypto(c *cli.Context) (*secure.AesGCM, error) {
