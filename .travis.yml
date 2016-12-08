@@ -1,7 +1,7 @@
 language: go
 go_import_path: code.cloudfoundry.org/gorouter
 go:
-  - 1.6
+  - 1.7
   - tip
 
 matrix:
