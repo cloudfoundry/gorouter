@@ -35,7 +35,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Err: errors.New("error"),
 				Op:  "dial",
 			}
-			after round_tripper.AfterRoundTrip
 		)
 
 		BeforeEach(func() {
@@ -56,6 +55,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				endpointIterator.NextReturns(endpoint)
 
+				var after round_tripper.AfterRoundTrip
 				servingBackend := true
 				proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 					servingBackend, transport, endpointIterator, logger, after)
@@ -122,7 +122,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				req.Header.Set(routeservice.RouteServiceForwardedURL, "http://myapp.com/")
 				servingBackend := false
 
-				after = func(rsp *http.Response, endpoint *route.Endpoint, err error) {
+				after := func(rsp *http.Response, endpoint *route.Endpoint, err error) {
 					Expect(endpoint.Tags).ShouldNot(BeNil())
 				}
 				proxyRoundTripper = round_tripper.NewProxyRoundTripper(
