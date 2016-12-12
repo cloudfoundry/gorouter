@@ -750,28 +750,6 @@ var _ = Describe("Router Integration", func() {
 			})
 		})
 	})
-
-	Context("when failing to open configured logging file", func() {
-		var cfgFile string
-
-		BeforeEach(func() {
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
-			config.Logging.File = "nonExistentDir/file"
-			writeConfig(config, cfgFile)
-		})
-
-		It("exits with non-zero code", func() {
-			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Expect(err).ToNot(HaveOccurred())
-			Eventually(session, 30*time.Second).Should(Say("error-opening-log-file"))
-			Eventually(session, 5*time.Second).Should(Exit(2))
-		})
-	})
 })
 
 func uriAndPort(url string) (string, int) {

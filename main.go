@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"code.cloudfoundry.org/cflager"
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	"code.cloudfoundry.org/gorouter/access_log"
@@ -22,6 +21,7 @@ import (
 	"code.cloudfoundry.org/gorouter/router"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagerflags"
 	"code.cloudfoundry.org/routing-api"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
@@ -45,16 +45,8 @@ var configFile string
 
 var healthCheck int32
 
-const (
-	DEBUG = "debug"
-	INFO  = "info"
-	ERROR = "error"
-	FATAL = "fatal"
-)
-
 func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
-	cflager.AddFlags(flag.CommandLine)
 	flag.Parse()
 
 	c := config.DefaultConfig()
@@ -68,8 +60,8 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, reconfigurableSink := cflager.New(prefix)
-	InitLoggerFromConfig(logger, c, logCounter)
+	logger, reconfigurableSink := lagerflags.NewFromConfig(prefix,
+		lagerflags.LagerConfig{LogLevel: c.Logging.Level})
 
 	logger.Info("starting")
 
@@ -307,31 +299,6 @@ func connectToNatsServer(logger lager.Logger, c *config.Config, startMsg chan<- 
 
 	natsHost.Store(natsHostStr)
 	return natsClient
-}
-
-func InitLoggerFromConfig(logger lager.Logger, c *config.Config, logCounter *schema.LogCounter) {
-	if c.Logging.File != "" {
-		file, err := os.OpenFile(c.Logging.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-		if err != nil {
-			logger.Fatal("error-opening-log-file", err, lager.Data{"file": c.Logging.File})
-		}
-		var logLevel lager.LogLevel
-		switch c.Logging.Level {
-		case DEBUG:
-			logLevel = lager.DEBUG
-		case INFO:
-			logLevel = lager.INFO
-		case ERROR:
-			logLevel = lager.ERROR
-		case FATAL:
-			logLevel = lager.FATAL
-		default:
-			panic(fmt.Errorf("unknown log level: %s", c.Logging.Level))
-		}
-		logger.RegisterSink(lager.NewWriterSink(file, logLevel))
-	}
-
-	logger.RegisterSink(logCounter)
 }
 
 func createSubscriber(

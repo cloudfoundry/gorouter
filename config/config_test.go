@@ -108,7 +108,6 @@ suspend_pruning_if_nats_unavailable: true
 		})
 
 		It("sets default logging configs", func() {
-			Expect(config.Logging.File).To(Equal(""))
 			Expect(config.Logging.Syslog).To(Equal(""))
 			Expect(config.Logging.Level).To(Equal("debug"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
@@ -171,7 +170,6 @@ access_log:
 		It("sets logging config", func() {
 			var b = []byte(`
 logging:
-  file: /tmp/file
   syslog: syslog
   level: debug2
   loggregator_enabled: true
@@ -179,7 +177,6 @@ logging:
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(config.Logging.File).To(Equal("/tmp/file"))
 			Expect(config.Logging.Syslog).To(Equal("syslog"))
 			Expect(config.Logging.Level).To(Equal("debug2"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(true))
