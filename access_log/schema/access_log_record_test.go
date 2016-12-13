@@ -229,26 +229,26 @@ var _ = Describe("AccessLogRecord", func() {
 	})
 
 	Describe("ApplicationID", func() {
-		var record schema.AccessLogRecord
+		var emptyRecord schema.AccessLogRecord
 		Context("when RouteEndpoint is nil", func() {
 			It("returns empty string", func() {
-				Expect(record.ApplicationID()).To(Equal(""))
+				Expect(emptyRecord.ApplicationID()).To(Equal(""))
 			})
 		})
 		Context("when RouteEndpoint.ApplicationId is empty", func() {
 			BeforeEach(func() {
-				record.RouteEndpoint = new(route.Endpoint)
+				emptyRecord.RouteEndpoint = new(route.Endpoint)
 			})
 			It("returns empty string", func() {
-				Expect(record.ApplicationID()).To(Equal(""))
+				Expect(emptyRecord.ApplicationID()).To(Equal(""))
 			})
 		})
 		Context("when RouteEndpoint.ApplicationId is set", func() {
 			BeforeEach(func() {
-				record.RouteEndpoint = endpoint
+				emptyRecord.RouteEndpoint = endpoint
 			})
 			It("returns the application ID", func() {
-				Expect(record.ApplicationID()).To(Equal("FakeApplicationId"))
+				Expect(emptyRecord.ApplicationID()).To(Equal("FakeApplicationId"))
 			})
 		})
 	})
