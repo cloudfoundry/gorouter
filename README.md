@@ -350,6 +350,10 @@ If an user wants to send requests to a specific app instance, the header `X-CF-A
 
 There is a separate [docs](docs) folder which contains more advanced topics.
 
+## Troubleshooting
+
+Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slow_requests.html) to learn more troubleshooting slow requests. 
+
 ## Contributing
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
