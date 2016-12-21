@@ -52,7 +52,7 @@ var _ = Describe("AccessLogRecord", func() {
 	Describe("LogMessage", func() {
 		It("Makes a record with all values", func() {
 			recordString := "FakeRequestHost - " +
-				"[01/01/2000:00:00:00.000 +0000] " +
+				"[2000-01-01T00:00:00.000+0000] " +
 				`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 				"200 " +
 				"30 " +
@@ -86,7 +86,7 @@ var _ = Describe("AccessLogRecord", func() {
 			})
 			It("makes a record", func() {
 				recordString := "FakeRequestHost - " +
-					"[01/01/2000:00:00:00.000 +0000] " +
+					"[2000-01-01T00:00:00.000+0000] " +
 					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 					`"-" ` +
 					"0 " +
@@ -125,7 +125,7 @@ var _ = Describe("AccessLogRecord", func() {
 			})
 			It("appends extra headers", func() {
 				recordString := "FakeRequestHost - " +
-					"[01/01/2000:00:00:00.000 +0000] " +
+					"[2000-01-01T00:00:00.000+0000] " +
 					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 					`200 ` +
 					"30 " +
@@ -179,7 +179,7 @@ var _ = Describe("AccessLogRecord", func() {
 				}
 
 				recordString := "FakeRequestHost - " +
-					"[01/01/2000:00:00:00.000 +0000] " +
+					"[2000-01-01T00:00:00.000+0000] " +
 					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 					"200 " +
 					"30 " +
@@ -204,7 +204,7 @@ var _ = Describe("AccessLogRecord", func() {
 	Describe("WriteTo", func() {
 		It("writes the correct log line to the io.Writer", func() {
 			recordString := "FakeRequestHost - " +
-				"[01/01/2000:00:00:00.000 +0000] " +
+				"[2000-01-01T00:00:00.000+0000] " +
 				`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
 				"200 " +
 				"30 " +
