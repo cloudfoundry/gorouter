@@ -40,7 +40,9 @@ func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint, req *http.Req
 }
 
 func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
-	dropsondeMetrics.BatchIncrementCounter(getResponseCounterName(res))
+	responseCounterName := getResponseCounterName(res)
+
+	dropsondeMetrics.BatchIncrementCounter(responseCounterName)
 	dropsondeMetrics.BatchIncrementCounter("responses")
 
 	latency := float64(d / time.Millisecond)
@@ -49,6 +51,8 @@ func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Re
 
 	componentName, ok := b.Tags["component"]
 	if ok && len(componentName) > 0 {
+		dropsondeMetrics.BatchIncrementCounter(fmt.Sprintf("responses.%s", componentName))
+		dropsondeMetrics.BatchIncrementCounter(fmt.Sprintf("%s.%s", responseCounterName, componentName))
 		dropsondeMetrics.SendValue(fmt.Sprintf("latency.%s", componentName), latency, unit)
 	}
 }
