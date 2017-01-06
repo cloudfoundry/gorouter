@@ -166,9 +166,9 @@ func (r *RouteRegistry) StartPruningCycle() {
 			for {
 				select {
 				case <-r.ticker.C:
-					r.logger.Info("start-pruning-droplets")
+					r.logger.Info("start-pruning-routes")
 					r.pruneStaleDroplets()
-					r.logger.Info("finished-pruning-droplets")
+					r.logger.Info("finished-pruning-routes")
 					msSinceLastUpdate := uint64(time.Since(r.TimeOfLastUpdate()) / time.Millisecond)
 					r.reporter.CaptureRouteStats(r.NumUris(), msSinceLastUpdate)
 				}
