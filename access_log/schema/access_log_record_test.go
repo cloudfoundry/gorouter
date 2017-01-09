@@ -231,6 +231,9 @@ var _ = Describe("AccessLogRecord", func() {
 	Describe("ApplicationID", func() {
 		var emptyRecord schema.AccessLogRecord
 		Context("when RouteEndpoint is nil", func() {
+			BeforeEach(func() {
+				emptyRecord.RouteEndpoint = new(route.Endpoint)
+			})
 			It("returns empty string", func() {
 				Expect(emptyRecord.ApplicationID()).To(Equal(""))
 			})
