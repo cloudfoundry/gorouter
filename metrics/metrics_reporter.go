@@ -39,8 +39,13 @@ func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint, req *http.Req
 	}
 }
 
+func (m *MetricsReporter) CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+	dropsondeMetrics.BatchIncrementCounter(fmt.Sprintf("responses.route_services.%s", getResponseCounterName(res)))
+	dropsondeMetrics.BatchIncrementCounter("responses.route_services")
+}
+
 func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
-	dropsondeMetrics.BatchIncrementCounter(getResponseCounterName(res))
+	dropsondeMetrics.BatchIncrementCounter(fmt.Sprintf("responses.%s", getResponseCounterName(res)))
 	dropsondeMetrics.BatchIncrementCounter("responses")
 
 	latency := float64(d / time.Millisecond)
@@ -74,7 +79,7 @@ func getResponseCounterName(res *http.Response) string {
 		statusCode = res.StatusCode / 100
 	}
 	if statusCode >= 2 && statusCode <= 5 {
-		return fmt.Sprintf("responses.%dxx", statusCode)
+		return fmt.Sprintf("%dxx", statusCode)
 	}
-	return "responses.xxx"
+	return "xxx"
 }

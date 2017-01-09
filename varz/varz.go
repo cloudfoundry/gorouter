@@ -166,6 +166,7 @@ type Varz interface {
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
+	CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
 }
 
 type RealVarz struct {
@@ -260,6 +261,10 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 	x.varz.All.CaptureRequest()
 
 	x.Unlock()
+}
+
+// do not emit route service through varz
+func (x *RealVarz) CaptureRouteServiceResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
 }
 
 func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {

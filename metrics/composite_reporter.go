@@ -35,6 +35,11 @@ func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint, req *http.R
 	c.second.CaptureRoutingRequest(b, req)
 }
 
+func (c *CompositeReporter) CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+	c.first.CaptureRouteServiceResponse(b, res, t, d)
+	c.second.CaptureRouteServiceResponse(b, res, t, d)
+}
+
 func (c *CompositeReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
 	c.first.CaptureRoutingResponse(b, res, t, d)
 	c.second.CaptureRoutingResponse(b, res, t, d)

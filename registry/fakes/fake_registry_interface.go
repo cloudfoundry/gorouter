@@ -64,6 +64,8 @@ type FakeRegistryInterface struct {
 		result1 []byte
 		result2 error
 	}
+	invocations      map[string][][]interface{}
+	invocationsMutex sync.RWMutex
 }
 
 func (fake *FakeRegistryInterface) Register(uri route.Uri, endpoint *route.Endpoint) {
@@ -72,6 +74,7 @@ func (fake *FakeRegistryInterface) Register(uri route.Uri, endpoint *route.Endpo
 		uri      route.Uri
 		endpoint *route.Endpoint
 	}{uri, endpoint})
+	fake.recordInvocation("Register", []interface{}{uri, endpoint})
 	fake.registerMutex.Unlock()
 	if fake.RegisterStub != nil {
 		fake.RegisterStub(uri, endpoint)
@@ -96,6 +99,7 @@ func (fake *FakeRegistryInterface) Unregister(uri route.Uri, endpoint *route.End
 		uri      route.Uri
 		endpoint *route.Endpoint
 	}{uri, endpoint})
+	fake.recordInvocation("Unregister", []interface{}{uri, endpoint})
 	fake.unregisterMutex.Unlock()
 	if fake.UnregisterStub != nil {
 		fake.UnregisterStub(uri, endpoint)
@@ -119,12 +123,12 @@ func (fake *FakeRegistryInterface) Lookup(uri route.Uri) *route.Pool {
 	fake.lookupArgsForCall = append(fake.lookupArgsForCall, struct {
 		uri route.Uri
 	}{uri})
+	fake.recordInvocation("Lookup", []interface{}{uri})
 	fake.lookupMutex.Unlock()
 	if fake.LookupStub != nil {
 		return fake.LookupStub(uri)
-	} else {
-		return fake.lookupReturns.result1
 	}
+	return fake.lookupReturns.result1
 }
 
 func (fake *FakeRegistryInterface) LookupCallCount() int {
@@ -153,12 +157,12 @@ func (fake *FakeRegistryInterface) LookupWithInstance(uri route.Uri, appId strin
 		appId    string
 		appIndex string
 	}{uri, appId, appIndex})
+	fake.recordInvocation("LookupWithInstance", []interface{}{uri, appId, appIndex})
 	fake.lookupWithInstanceMutex.Unlock()
 	if fake.LookupWithInstanceStub != nil {
 		return fake.LookupWithInstanceStub(uri, appId, appIndex)
-	} else {
-		return fake.lookupWithInstanceReturns.result1
 	}
+	return fake.lookupWithInstanceReturns.result1
 }
 
 func (fake *FakeRegistryInterface) LookupWithInstanceCallCount() int {
@@ -183,6 +187,7 @@ func (fake *FakeRegistryInterface) LookupWithInstanceReturns(result1 *route.Pool
 func (fake *FakeRegistryInterface) StartPruningCycle() {
 	fake.startPruningCycleMutex.Lock()
 	fake.startPruningCycleArgsForCall = append(fake.startPruningCycleArgsForCall, struct{}{})
+	fake.recordInvocation("StartPruningCycle", []interface{}{})
 	fake.startPruningCycleMutex.Unlock()
 	if fake.StartPruningCycleStub != nil {
 		fake.StartPruningCycleStub()
@@ -198,6 +203,7 @@ func (fake *FakeRegistryInterface) StartPruningCycleCallCount() int {
 func (fake *FakeRegistryInterface) StopPruningCycle() {
 	fake.stopPruningCycleMutex.Lock()
 	fake.stopPruningCycleArgsForCall = append(fake.stopPruningCycleArgsForCall, struct{}{})
+	fake.recordInvocation("StopPruningCycle", []interface{}{})
 	fake.stopPruningCycleMutex.Unlock()
 	if fake.StopPruningCycleStub != nil {
 		fake.StopPruningCycleStub()
@@ -213,12 +219,12 @@ func (fake *FakeRegistryInterface) StopPruningCycleCallCount() int {
 func (fake *FakeRegistryInterface) NumUris() int {
 	fake.numUrisMutex.Lock()
 	fake.numUrisArgsForCall = append(fake.numUrisArgsForCall, struct{}{})
+	fake.recordInvocation("NumUris", []interface{}{})
 	fake.numUrisMutex.Unlock()
 	if fake.NumUrisStub != nil {
 		return fake.NumUrisStub()
-	} else {
-		return fake.numUrisReturns.result1
 	}
+	return fake.numUrisReturns.result1
 }
 
 func (fake *FakeRegistryInterface) NumUrisCallCount() int {
@@ -237,12 +243,12 @@ func (fake *FakeRegistryInterface) NumUrisReturns(result1 int) {
 func (fake *FakeRegistryInterface) NumEndpoints() int {
 	fake.numEndpointsMutex.Lock()
 	fake.numEndpointsArgsForCall = append(fake.numEndpointsArgsForCall, struct{}{})
+	fake.recordInvocation("NumEndpoints", []interface{}{})
 	fake.numEndpointsMutex.Unlock()
 	if fake.NumEndpointsStub != nil {
 		return fake.NumEndpointsStub()
-	} else {
-		return fake.numEndpointsReturns.result1
 	}
+	return fake.numEndpointsReturns.result1
 }
 
 func (fake *FakeRegistryInterface) NumEndpointsCallCount() int {
@@ -261,12 +267,12 @@ func (fake *FakeRegistryInterface) NumEndpointsReturns(result1 int) {
 func (fake *FakeRegistryInterface) MarshalJSON() ([]byte, error) {
 	fake.marshalJSONMutex.Lock()
 	fake.marshalJSONArgsForCall = append(fake.marshalJSONArgsForCall, struct{}{})
+	fake.recordInvocation("MarshalJSON", []interface{}{})
 	fake.marshalJSONMutex.Unlock()
 	if fake.MarshalJSONStub != nil {
 		return fake.MarshalJSONStub()
-	} else {
-		return fake.marshalJSONReturns.result1, fake.marshalJSONReturns.result2
 	}
+	return fake.marshalJSONReturns.result1, fake.marshalJSONReturns.result2
 }
 
 func (fake *FakeRegistryInterface) MarshalJSONCallCount() int {
@@ -281,6 +287,42 @@ func (fake *FakeRegistryInterface) MarshalJSONReturns(result1 []byte, result2 er
 		result1 []byte
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakeRegistryInterface) Invocations() map[string][][]interface{} {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	fake.registerMutex.RLock()
+	defer fake.registerMutex.RUnlock()
+	fake.unregisterMutex.RLock()
+	defer fake.unregisterMutex.RUnlock()
+	fake.lookupMutex.RLock()
+	defer fake.lookupMutex.RUnlock()
+	fake.lookupWithInstanceMutex.RLock()
+	defer fake.lookupWithInstanceMutex.RUnlock()
+	fake.startPruningCycleMutex.RLock()
+	defer fake.startPruningCycleMutex.RUnlock()
+	fake.stopPruningCycleMutex.RLock()
+	defer fake.stopPruningCycleMutex.RUnlock()
+	fake.numUrisMutex.RLock()
+	defer fake.numUrisMutex.RUnlock()
+	fake.numEndpointsMutex.RLock()
+	defer fake.numEndpointsMutex.RUnlock()
+	fake.marshalJSONMutex.RLock()
+	defer fake.marshalJSONMutex.RUnlock()
+	return fake.invocations
+}
+
+func (fake *FakeRegistryInterface) recordInvocation(key string, args []interface{}) {
+	fake.invocationsMutex.Lock()
+	defer fake.invocationsMutex.Unlock()
+	if fake.invocations == nil {
+		fake.invocations = map[string][][]interface{}{}
+	}
+	if fake.invocations[key] == nil {
+		fake.invocations[key] = [][]interface{}{}
+	}
+	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
 var _ registry.RegistryInterface = new(FakeRegistryInterface)

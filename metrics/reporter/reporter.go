@@ -13,6 +13,7 @@ type ProxyReporter interface {
 	CaptureBadGateway(req *http.Request)
 	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
+	CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
 }
 
 type ComponentTagged interface {

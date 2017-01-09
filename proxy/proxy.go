@@ -291,7 +291,11 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		latency := time.Since(accessLog.StartedAt)
 
-		p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
+		if backend {
+			p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
+		} else {
+			p.reporter.CaptureRouteServiceResponse(endpoint, rsp, accessLog.StartedAt, latency)
+		}
 
 		if err != nil {
 			handler.HandleBadGateway(err, request)

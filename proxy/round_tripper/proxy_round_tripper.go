@@ -22,9 +22,10 @@ func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIte
 			after:     afterRoundTrip,
 		}
 	} else {
+		rlogger := logger.Session("route-service")
 		return &RouteServiceRoundTripper{
 			transport: transport,
-			logger:    logger,
+			logger:    rlogger,
 			after:     afterRoundTrip,
 		}
 	}
@@ -124,6 +125,7 @@ func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 
 		rt.reportError(err)
 	}
+	rt.reportResponseError(request, res)
 
 	if rt.after != nil {
 		endpoint := newRouteServiceEndpoint()
@@ -133,8 +135,15 @@ func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	return res, err
 }
 
+// log route service response errors for status code < 200 || >300
+func (rs *RouteServiceRoundTripper) reportResponseError(req *http.Request, resp *http.Response) {
+	if resp != nil && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+		rs.logger.Info("response", lager.Data{"endpoint": req.URL.String(), "status-code": resp.StatusCode})
+	}
+}
+
 func (rs *RouteServiceRoundTripper) reportError(err error) {
-	rs.logger.Error("route-service-failed", err)
+	rs.logger.Error("connection-failed", err)
 }
 
 func retryableError(err error) bool {

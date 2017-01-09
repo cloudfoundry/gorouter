@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Route Services", func() {
@@ -292,6 +293,36 @@ var _ = Describe("Route Services", func() {
 				resp, _ := conn.ReadResponse()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+			})
+		})
+
+		Context("when route service throws an error", func() {
+			BeforeEach(func() {
+				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusBadGateway)
+				})
+			})
+
+			It("does not routes to backend instance and logs bad Gateway errors", func() {
+				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+					conn.ReadRequest()
+					res := &http.Response{
+						StatusCode: http.StatusBadGateway,
+					}
+					conn.WriteResponse(res)
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+				req.Host = "my_host.com"
+				conn.WriteRequest(req)
+
+				res, body := conn.ReadResponse()
+				Expect(body).ToNot(ContainSubstring("backend instance"))
+				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(logger).Should(gbytes.Say("response.*status-code\":502"))
 			})
 		})
 	})

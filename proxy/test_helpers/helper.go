@@ -18,4 +18,6 @@ func (_ NullVarz) CaptureBadRequest(*http.Request)                              
 func (_ NullVarz) CaptureBadGateway(*http.Request)                                                  {}
 func (_ NullVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request)                       {}
 func (_ NullVarz) CaptureRoutingResponse(*route.Endpoint, *http.Response, time.Time, time.Duration) {}
-func (_ NullVarz) CaptureRegistryMessage(msg reporter.ComponentTagged)                              {}
+func (_ NullVarz) CaptureRouteServiceResponse(*route.Endpoint, *http.Response, time.Time, time.Duration) {
+}
+func (_ NullVarz) CaptureRegistryMessage(msg reporter.ComponentTagged) {}

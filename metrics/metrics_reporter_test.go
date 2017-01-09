@@ -96,6 +96,92 @@ var _ = Describe("MetricsReporter", func() {
 		})
 	})
 
+	Context("increments the response metrics for route services", func() {
+		It("increments the 2XX route services response metrics", func() {
+			response := http.Response{
+				StatusCode: 200,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.2xx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.2xx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the 3XX response metrics", func() {
+			response := http.Response{
+				StatusCode: 304,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.3xx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.3xx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the 4XX response metrics", func() {
+			response := http.Response{
+				StatusCode: 401,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.4xx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.4xx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the 5XX response metrics", func() {
+			response := http.Response{
+				StatusCode: 504,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.5xx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.5xx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the XXX response metrics", func() {
+			response := http.Response{
+				StatusCode: 100,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the XXX response metrics with null response", func() {
+			metricsReporter.CaptureRouteServiceResponse(endpoint, nil, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, nil, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(2))
+		})
+
+		It("increments the total responses", func() {
+			response2xx := http.Response{
+				StatusCode: 205,
+			}
+			response4xx := http.Response{
+				StatusCode: 401,
+			}
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response2xx, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services") }).Should(BeEquivalentTo(1))
+
+			metricsReporter.CaptureRouteServiceResponse(endpoint, &response4xx, time.Now(), time.Millisecond)
+			Eventually(func() uint64 { return sender.GetCounter("responses.route_services") }).Should(BeEquivalentTo(2))
+
+		})
+	})
+
 	Context("increments the response metrics", func() {
 		It("increments the 2XX response metrics", func() {
 			response := http.Response{

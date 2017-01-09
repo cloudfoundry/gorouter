@@ -25,6 +25,8 @@ type FakeRouteRegistryReporter struct {
 	captureRegistryMessageArgsForCall []struct {
 		msg reporter.ComponentTagged
 	}
+	invocations      map[string][][]interface{}
+	invocationsMutex sync.RWMutex
 }
 
 func (fake *FakeRouteRegistryReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64) {
@@ -33,6 +35,7 @@ func (fake *FakeRouteRegistryReporter) CaptureRouteStats(totalRoutes int, msSinc
 		totalRoutes       int
 		msSinceLastUpdate uint64
 	}{totalRoutes, msSinceLastUpdate})
+	fake.recordInvocation("CaptureRouteStats", []interface{}{totalRoutes, msSinceLastUpdate})
 	fake.captureRouteStatsMutex.Unlock()
 	if fake.CaptureRouteStatsStub != nil {
 		fake.CaptureRouteStatsStub(totalRoutes, msSinceLastUpdate)
@@ -56,6 +59,7 @@ func (fake *FakeRouteRegistryReporter) CaptureLookupTime(t time.Duration) {
 	fake.captureLookupTimeArgsForCall = append(fake.captureLookupTimeArgsForCall, struct {
 		t time.Duration
 	}{t})
+	fake.recordInvocation("CaptureLookupTime", []interface{}{t})
 	fake.captureLookupTimeMutex.Unlock()
 	if fake.CaptureLookupTimeStub != nil {
 		fake.CaptureLookupTimeStub(t)
@@ -79,6 +83,7 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(msg reporter.Compo
 	fake.captureRegistryMessageArgsForCall = append(fake.captureRegistryMessageArgsForCall, struct {
 		msg reporter.ComponentTagged
 	}{msg})
+	fake.recordInvocation("CaptureRegistryMessage", []interface{}{msg})
 	fake.captureRegistryMessageMutex.Unlock()
 	if fake.CaptureRegistryMessageStub != nil {
 		fake.CaptureRegistryMessageStub(msg)
@@ -95,6 +100,30 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) 
 	fake.captureRegistryMessageMutex.RLock()
 	defer fake.captureRegistryMessageMutex.RUnlock()
 	return fake.captureRegistryMessageArgsForCall[i].msg
+}
+
+func (fake *FakeRouteRegistryReporter) Invocations() map[string][][]interface{} {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	fake.captureRouteStatsMutex.RLock()
+	defer fake.captureRouteStatsMutex.RUnlock()
+	fake.captureLookupTimeMutex.RLock()
+	defer fake.captureLookupTimeMutex.RUnlock()
+	fake.captureRegistryMessageMutex.RLock()
+	defer fake.captureRegistryMessageMutex.RUnlock()
+	return fake.invocations
+}
+
+func (fake *FakeRouteRegistryReporter) recordInvocation(key string, args []interface{}) {
+	fake.invocationsMutex.Lock()
+	defer fake.invocationsMutex.Unlock()
+	if fake.invocations == nil {
+		fake.invocations = map[string][][]interface{}{}
+	}
+	if fake.invocations[key] == nil {
+		fake.invocations[key] = [][]interface{}{}
+	}
+	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
 var _ reporter.RouteRegistryReporter = new(FakeRouteRegistryReporter)
