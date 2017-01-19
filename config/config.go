@@ -145,6 +145,10 @@ type Config struct {
 
 	PidFile     string `yaml:"pid_file"`
 	LoadBalance string `yaml:"balancing_algorithm"`
+
+	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
+	MaxIdleConns        int  `yaml:"max_idle_conns"`
+	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host"`
 }
 
 var defaultConfig = Config{
@@ -173,6 +177,10 @@ var defaultConfig = Config{
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,
+
+	DisableKeepAlives:   true,
+	MaxIdleConns:        100,
+	MaxIdleConnsPerHost: 2,
 }
 
 func DefaultConfig() *Config {

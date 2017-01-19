@@ -383,6 +383,54 @@ enable_proxy: true
 			config.Initialize(b)
 			Expect(config.ForceForwardedProtoHttps).To(Equal(true))
 		})
+
+		It("defaults DisableKeepAlives to true", func() {
+			var b = []byte("")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.DisableKeepAlives).To(BeTrue())
+		})
+
+		It("defaults MaxIdleConns to 100", func() {
+			var b = []byte("")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.MaxIdleConns).To(Equal(100))
+		})
+
+		It("defaults MaxIdleConnsPerHost to 2", func() {
+			var b = []byte("")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.MaxIdleConnsPerHost).To(Equal(2))
+		})
+
+		It("sets DisableKeepAlives", func() {
+			var b = []byte("disable_keep_alives: false")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.DisableKeepAlives).To(BeFalse())
+		})
+
+		It("sets MaxIdleConns", func() {
+			var b = []byte("max_idle_conns: 200")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.MaxIdleConns).To(Equal(200))
+		})
+
+		It("sets MaxIdleConnsPerHost", func() {
+			var b = []byte("max_idle_conns_per_host: 10")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.MaxIdleConnsPerHost).To(Equal(10))
+		})
 	})
 
 	Describe("Process", func() {

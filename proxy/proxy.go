@@ -60,6 +60,9 @@ type ProxyArgs struct {
 	EnableZipkin               bool
 	ForceForwardedProtoHttps   bool
 	DefaultLoadBalance         string
+	DisableKeepAlives          bool
+	MaxIdleConns               int
+	MaxIdleConnsPerHost        int
 }
 
 type proxyHandler struct {
@@ -118,9 +121,11 @@ func NewProxy(args ProxyArgs) Proxy {
 				}
 				return conn, err
 			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			TLSClientConfig:    args.TLSConfig,
+			DisableKeepAlives:   args.DisableKeepAlives,
+			MaxIdleConns:        args.MaxIdleConns,
+			MaxIdleConnsPerHost: args.MaxIdleConnsPerHost,
+			DisableCompression:  true,
+			TLSClientConfig:     args.TLSConfig,
 		},
 		secureCookies:              args.SecureCookies,
 		heartbeatOK:                args.HeartbeatOK, // 1->true, 0->false
