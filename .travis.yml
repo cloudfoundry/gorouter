@@ -14,4 +14,4 @@ install:
   - export GOPATH=$GOPATH:$HOME/routing-release
 
 script:
-  - ./scripts/test
+  - ./bin/test
