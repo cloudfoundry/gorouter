@@ -379,6 +379,6 @@ var _ = Describe("Pool", func() {
 		json, err := pool.MarshalJSON()
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com"},{"address":"5.6.7.8:5678","ttl":-1}]`))
+		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com","tags":{}},{"address":"5.6.7.8:5678","ttl":-1,"tags":{}}]`))
 	})
 })
