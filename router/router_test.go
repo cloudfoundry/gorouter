@@ -13,6 +13,7 @@ import (
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	. "code.cloudfoundry.org/gorouter/router"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
@@ -86,16 +87,10 @@ var _ = Describe("Router", func() {
 		logger = lagertest.NewTestLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-		proxy := proxy.NewProxy(proxy.ProxyArgs{
-			EndpointTimeout:      config.EndpointTimeout,
-			Logger:               logger,
-			Ip:                   config.Ip,
-			TraceKey:             config.TraceKey,
-			Registry:             registry,
-			Reporter:             varz,
-			AccessLogger:         &access_log.NullAccessLogger{},
-			HealthCheckUserAgent: "HTTP-Monitor/1.1",
-		})
+
+		proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, nil)
+
 		var healthCheck int32
 		healthCheck = 0
 		logcounter := schema.NewLogCounter()

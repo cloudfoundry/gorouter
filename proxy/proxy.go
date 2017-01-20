@@ -12,6 +12,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
@@ -36,28 +37,6 @@ type LookupRegistry interface {
 
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
-}
-
-type ProxyArgs struct {
-	EndpointTimeout          time.Duration
-	Ip                       string
-	TraceKey                 string
-	Registry                 LookupRegistry
-	Reporter                 reporter.ProxyReporter
-	AccessLogger             access_log.AccessLogger
-	SecureCookies            bool
-	TLSConfig                *tls.Config
-	RouteServiceConfig       *routeservice.RouteServiceConfig
-	ExtraHeadersToLog        *[]string
-	Logger                   lager.Logger
-	HealthCheckUserAgent     string
-	HeartbeatOK              *int32
-	EnableZipkin             bool
-	ForceForwardedProtoHttps bool
-	DefaultLoadBalance       string
-	DisableKeepAlives        bool
-	MaxIdleConns             int
-	MaxIdleConnsPerHost      int
 }
 
 type proxyHandler struct {
@@ -94,46 +73,55 @@ type proxy struct {
 	defaultLoadBalance       string
 }
 
-func NewProxy(args ProxyArgs) Proxy {
+func NewProxy(
+	logger lager.Logger,
+	accessLogger access_log.AccessLogger,
+	c *config.Config,
+	registry LookupRegistry,
+	reporter reporter.ProxyReporter,
+	routeServiceConfig *routeservice.RouteServiceConfig,
+	tlsConfig *tls.Config,
+	heartbeatOK *int32,
+) Proxy {
 
 	p := &proxy{
-		accessLogger: args.AccessLogger,
-		traceKey:     args.TraceKey,
-		ip:           args.Ip,
-		logger:       args.Logger,
-		registry:     args.Registry,
-		reporter:     args.Reporter,
+		accessLogger: accessLogger,
+		traceKey:     c.TraceKey,
+		ip:           c.Ip,
+		logger:       logger,
+		registry:     registry,
+		reporter:     reporter,
 		transport: &http.Transport{
 			Dial: func(network, addr string) (net.Conn, error) {
 				conn, err := net.DialTimeout(network, addr, 5*time.Second)
 				if err != nil {
 					return conn, err
 				}
-				if args.EndpointTimeout > 0 {
-					err = conn.SetDeadline(time.Now().Add(args.EndpointTimeout))
+				if c.EndpointTimeout > 0 {
+					err = conn.SetDeadline(time.Now().Add(c.EndpointTimeout))
 				}
 				return conn, err
 			},
-			DisableKeepAlives:   args.DisableKeepAlives,
-			MaxIdleConns:        args.MaxIdleConns,
-			MaxIdleConnsPerHost: args.MaxIdleConnsPerHost,
+			DisableKeepAlives:   c.DisableKeepAlives,
+			MaxIdleConns:        c.MaxIdleConns,
+			MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
 			DisableCompression:  true,
-			TLSClientConfig:     args.TLSConfig,
+			TLSClientConfig:     tlsConfig,
 		},
-		secureCookies:            args.SecureCookies,
-		heartbeatOK:              args.HeartbeatOK, // 1->true, 0->false
-		routeServiceConfig:       args.RouteServiceConfig,
-		extraHeadersToLog:        args.ExtraHeadersToLog,
-		healthCheckUserAgent:     args.HealthCheckUserAgent,
-		forceForwardedProtoHttps: args.ForceForwardedProtoHttps,
-		defaultLoadBalance:       args.DefaultLoadBalance,
+		secureCookies:            c.SecureCookies,
+		heartbeatOK:              heartbeatOK, // 1->true, 0->false
+		routeServiceConfig:       routeServiceConfig,
+		extraHeadersToLog:        &c.ExtraHeadersToLog,
+		healthCheckUserAgent:     c.HealthCheckUserAgent,
+		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
+		defaultLoadBalance:       c.LoadBalance,
 	}
 
 	n := negroni.New()
 	n.Use(&proxyWriterHandler{})
-	n.Use(handlers.NewAccessLog(args.AccessLogger, args.ExtraHeadersToLog))
-	n.Use(handlers.NewHealthcheck(args.HealthCheckUserAgent, p.heartbeatOK, args.Logger))
-	n.Use(handlers.NewZipkin(args.EnableZipkin, args.ExtraHeadersToLog, args.Logger))
+	n.Use(handlers.NewAccessLog(accessLogger, &c.ExtraHeadersToLog))
+	n.Use(handlers.NewHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
+	n.Use(handlers.NewZipkin(c.Tracing.EnableZipkin, &c.ExtraHeadersToLog, logger))
 
 	n.UseHandler(p)
 	handlers := &proxyHandler{

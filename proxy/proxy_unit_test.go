@@ -47,20 +47,9 @@ var _ = Describe("Proxy Unit tests", func() {
 				cryptoPrev,
 				false,
 			)
-
-			proxyObj = proxy.NewProxy(proxy.ProxyArgs{
-				EndpointTimeout:      conf.EndpointTimeout,
-				Ip:                   conf.Ip,
-				TraceKey:             conf.TraceKey,
-				Registry:             r,
-				Reporter:             test_helpers.NullVarz{},
-				Logger:               logger,
-				AccessLogger:         fakeAccessLogger,
-				SecureCookies:        conf.SecureCookies,
-				TLSConfig:            tlsConfig,
-				HealthCheckUserAgent: "HTTP-Monitor/1.1",
-				RouteServiceConfig:   routeServiceConfig,
-			})
+			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, test_helpers.NullVarz{},
+				routeServiceConfig, tlsConfig, nil)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})
 		})

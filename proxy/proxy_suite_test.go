@@ -91,24 +91,7 @@ var _ = JustBeforeEach(func() {
 		cryptoPrev,
 		recommendHttps,
 	)
-
-	p = proxy.NewProxy(proxy.ProxyArgs{
-		EndpointTimeout:          conf.EndpointTimeout,
-		Ip:                       conf.Ip,
-		TraceKey:                 conf.TraceKey,
-		Logger:                   logger,
-		Registry:                 r,
-		Reporter:                 fakeReporter,
-		AccessLogger:             accessLog,
-		SecureCookies:            conf.SecureCookies,
-		TLSConfig:                tlsConfig,
-		RouteServiceConfig:       routeServiceConfig,
-		HealthCheckUserAgent:     "HTTP-Monitor/1.1",
-		HeartbeatOK:              &heartbeatOK,
-		EnableZipkin:             conf.Tracing.EnableZipkin,
-		ExtraHeadersToLog:        &conf.ExtraHeadersToLog,
-		ForceForwardedProtoHttps: conf.ForceForwardedProtoHttps,
-	})
+	p = proxy.NewProxy(logger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK)
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())

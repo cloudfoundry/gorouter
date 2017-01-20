@@ -165,28 +165,13 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		c.RouteServiceRecommendHttps,
 	)
 
-	args := proxy.ProxyArgs{
-		Logger:          logger,
-		EndpointTimeout: c.EndpointTimeout,
-		Ip:              c.Ip,
-		TraceKey:        c.TraceKey,
-		Registry:        registry,
-		Reporter:        reporter,
-		AccessLogger:    accessLogger,
-		SecureCookies:   c.SecureCookies,
-		TLSConfig: &tls.Config{
-			CipherSuites:       c.CipherSuites,
-			InsecureSkipVerify: c.SkipSSLValidation,
-		},
-		RouteServiceConfig:       routeServiceConfig,
-		ExtraHeadersToLog:        &c.ExtraHeadersToLog,
-		HealthCheckUserAgent:     c.HealthCheckUserAgent,
-		HeartbeatOK:              &healthCheck,
-		EnableZipkin:             c.Tracing.EnableZipkin,
-		ForceForwardedProtoHttps: c.ForceForwardedProtoHttps,
-		DefaultLoadBalance:       c.LoadBalance,
+	tlsConfig := &tls.Config{
+		CipherSuites:       c.CipherSuites,
+		InsecureSkipVerify: c.SkipSSLValidation,
 	}
-	return proxy.NewProxy(args)
+
+	return proxy.NewProxy(logger, accessLogger, c, registry,
+		reporter, routeServiceConfig, tlsConfig, &healthCheck)
 }
 
 func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {

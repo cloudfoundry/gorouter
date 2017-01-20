@@ -1,11 +1,14 @@
 package main_test
 
 import (
+	"crypto/tls"
+
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager/lagertest"
 	"code.cloudfoundry.org/routing-api/models"
@@ -27,14 +30,8 @@ var _ = Describe("AccessLogRecord", func() {
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())
 
-		proxy.NewProxy(proxy.ProxyArgs{
-			EndpointTimeout: c.EndpointTimeout,
-			Ip:              c.Ip,
-			TraceKey:        c.TraceKey,
-			Registry:        r,
-			Reporter:        varz.NewVarz(r),
-			AccessLogger:    accesslog,
-		})
+		proxy.NewProxy(logger, accesslog, c, r, varz.NewVarz(r), &routeservice.RouteServiceConfig{},
+			&tls.Config{}, nil)
 
 		b.Time("RegisterTime", func() {
 			for i := 0; i < 1000; i++ {

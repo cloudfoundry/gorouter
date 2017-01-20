@@ -20,6 +20,7 @@ import (
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/router"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
@@ -210,17 +211,10 @@ var _ = Describe("Router", func() {
 		varz = vvarz.NewVarz(registry)
 		logcounter := schema.NewLogCounter()
 		atomic.StoreInt32(&healthCheck, 0)
-		p = proxy.NewProxy(proxy.ProxyArgs{
-			Logger:               logger,
-			EndpointTimeout:      config.EndpointTimeout,
-			Ip:                   config.Ip,
-			TraceKey:             config.TraceKey,
-			Registry:             registry,
-			Reporter:             varz,
-			AccessLogger:         &access_log.NullAccessLogger{},
-			HealthCheckUserAgent: "HTTP-Monitor/1.1",
-			HeartbeatOK:          &healthCheck,
-		})
+
+		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
 
 		errChan := make(chan error, 2)
 		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
@@ -593,17 +587,9 @@ var _ = Describe("Router", func() {
 				logcounter := schema.NewLogCounter()
 				var healthCheck int32
 				healthCheck = 0
-				proxy := proxy.NewProxy(proxy.ProxyArgs{
-					Logger:               logger,
-					EndpointTimeout:      config.EndpointTimeout,
-					Ip:                   config.Ip,
-					TraceKey:             config.TraceKey,
-					Registry:             registry,
-					Reporter:             varz,
-					AccessLogger:         &access_log.NullAccessLogger{},
-					HealthCheckUserAgent: "HTTP-Moniter/1.1",
-					HeartbeatOK:          &healthCheck,
-				})
+				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
 
 				errChan = make(chan error, 2)
 				var err error
