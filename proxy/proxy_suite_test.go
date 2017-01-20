@@ -11,6 +11,7 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
@@ -81,26 +82,32 @@ var _ = JustBeforeEach(func() {
 		RootCAs:            caCertPool,
 	}
 	heartbeatOK = 1
+
+	routeServiceConfig := routeservice.NewRouteServiceConfig(
+		logger,
+		conf.RouteServiceEnabled,
+		conf.RouteServiceTimeout,
+		crypto,
+		cryptoPrev,
+		recommendHttps,
+	)
+
 	p = proxy.NewProxy(proxy.ProxyArgs{
-		EndpointTimeout:            conf.EndpointTimeout,
-		Ip:                         conf.Ip,
-		TraceKey:                   conf.TraceKey,
-		Logger:                     logger,
-		Registry:                   r,
-		Reporter:                   fakeReporter,
-		AccessLogger:               accessLog,
-		SecureCookies:              conf.SecureCookies,
-		TLSConfig:                  tlsConfig,
-		RouteServiceEnabled:        conf.RouteServiceEnabled,
-		RouteServiceTimeout:        conf.RouteServiceTimeout,
-		Crypto:                     crypto,
-		CryptoPrev:                 cryptoPrev,
-		RouteServiceRecommendHttps: recommendHttps,
-		HealthCheckUserAgent:       "HTTP-Monitor/1.1",
-		HeartbeatOK:                &heartbeatOK,
-		EnableZipkin:               conf.Tracing.EnableZipkin,
-		ExtraHeadersToLog:          &conf.ExtraHeadersToLog,
-		ForceForwardedProtoHttps:   conf.ForceForwardedProtoHttps,
+		EndpointTimeout:          conf.EndpointTimeout,
+		Ip:                       conf.Ip,
+		TraceKey:                 conf.TraceKey,
+		Logger:                   logger,
+		Registry:                 r,
+		Reporter:                 fakeReporter,
+		AccessLogger:             accessLog,
+		SecureCookies:            conf.SecureCookies,
+		TLSConfig:                tlsConfig,
+		RouteServiceConfig:       routeServiceConfig,
+		HealthCheckUserAgent:     "HTTP-Monitor/1.1",
+		HeartbeatOK:              &heartbeatOK,
+		EnableZipkin:             conf.Tracing.EnableZipkin,
+		ExtraHeadersToLog:        &conf.ExtraHeadersToLog,
+		ForceForwardedProtoHttps: conf.ForceForwardedProtoHttps,
 	})
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

@@ -12,7 +12,6 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
@@ -40,29 +39,25 @@ type Proxy interface {
 }
 
 type ProxyArgs struct {
-	EndpointTimeout            time.Duration
-	Ip                         string
-	TraceKey                   string
-	Registry                   LookupRegistry
-	Reporter                   reporter.ProxyReporter
-	AccessLogger               access_log.AccessLogger
-	SecureCookies              bool
-	TLSConfig                  *tls.Config
-	RouteServiceEnabled        bool
-	RouteServiceTimeout        time.Duration
-	RouteServiceRecommendHttps bool
-	Crypto                     secure.Crypto
-	CryptoPrev                 secure.Crypto
-	ExtraHeadersToLog          *[]string
-	Logger                     lager.Logger
-	HealthCheckUserAgent       string
-	HeartbeatOK                *int32
-	EnableZipkin               bool
-	ForceForwardedProtoHttps   bool
-	DefaultLoadBalance         string
-	DisableKeepAlives          bool
-	MaxIdleConns               int
-	MaxIdleConnsPerHost        int
+	EndpointTimeout          time.Duration
+	Ip                       string
+	TraceKey                 string
+	Registry                 LookupRegistry
+	Reporter                 reporter.ProxyReporter
+	AccessLogger             access_log.AccessLogger
+	SecureCookies            bool
+	TLSConfig                *tls.Config
+	RouteServiceConfig       *routeservice.RouteServiceConfig
+	ExtraHeadersToLog        *[]string
+	Logger                   lager.Logger
+	HealthCheckUserAgent     string
+	HeartbeatOK              *int32
+	EnableZipkin             bool
+	ForceForwardedProtoHttps bool
+	DefaultLoadBalance       string
+	DisableKeepAlives        bool
+	MaxIdleConns             int
+	MaxIdleConnsPerHost      int
 }
 
 type proxyHandler struct {
@@ -83,25 +78,23 @@ func (p *proxyWriterHandler) ServeHTTP(responseWriter http.ResponseWriter, reque
 }
 
 type proxy struct {
-	ip                         string
-	traceKey                   string
-	logger                     lager.Logger
-	registry                   LookupRegistry
-	reporter                   reporter.ProxyReporter
-	accessLogger               access_log.AccessLogger
-	transport                  *http.Transport
-	secureCookies              bool
-	heartbeatOK                *int32
-	routeServiceConfig         *routeservice.RouteServiceConfig
-	extraHeadersToLog          *[]string
-	routeServiceRecommendHttps bool
-	healthCheckUserAgent       string
-	forceForwardedProtoHttps   bool
-	defaultLoadBalance         string
+	ip                       string
+	traceKey                 string
+	logger                   lager.Logger
+	registry                 LookupRegistry
+	reporter                 reporter.ProxyReporter
+	accessLogger             access_log.AccessLogger
+	transport                *http.Transport
+	secureCookies            bool
+	heartbeatOK              *int32
+	routeServiceConfig       *routeservice.RouteServiceConfig
+	extraHeadersToLog        *[]string
+	healthCheckUserAgent     string
+	forceForwardedProtoHttps bool
+	defaultLoadBalance       string
 }
 
 func NewProxy(args ProxyArgs) Proxy {
-	routeServiceConfig := routeservice.NewRouteServiceConfig(args.Logger, args.RouteServiceEnabled, args.RouteServiceTimeout, args.Crypto, args.CryptoPrev, args.RouteServiceRecommendHttps)
 
 	p := &proxy{
 		accessLogger: args.AccessLogger,
@@ -127,14 +120,13 @@ func NewProxy(args ProxyArgs) Proxy {
 			DisableCompression:  true,
 			TLSClientConfig:     args.TLSConfig,
 		},
-		secureCookies:              args.SecureCookies,
-		heartbeatOK:                args.HeartbeatOK, // 1->true, 0->false
-		routeServiceConfig:         routeServiceConfig,
-		extraHeadersToLog:          args.ExtraHeadersToLog,
-		routeServiceRecommendHttps: args.RouteServiceRecommendHttps,
-		healthCheckUserAgent:       args.HealthCheckUserAgent,
-		forceForwardedProtoHttps:   args.ForceForwardedProtoHttps,
-		defaultLoadBalance:         args.DefaultLoadBalance,
+		secureCookies:            args.SecureCookies,
+		heartbeatOK:              args.HeartbeatOK, // 1->true, 0->false
+		routeServiceConfig:       args.RouteServiceConfig,
+		extraHeadersToLog:        args.ExtraHeadersToLog,
+		healthCheckUserAgent:     args.HealthCheckUserAgent,
+		forceForwardedProtoHttps: args.ForceForwardedProtoHttps,
+		defaultLoadBalance:       args.DefaultLoadBalance,
 	}
 
 	n := negroni.New()
@@ -252,7 +244,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		var recommendedScheme string
 
-		if p.routeServiceRecommendHttps {
+		if p.routeServiceConfig.RouteServiceRecommendHttps() {
 			recommendedScheme = "https"
 		} else {
 			recommendedScheme = "http"

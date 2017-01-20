@@ -12,6 +12,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/test_helpers"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager/lagertest"
 	. "github.com/onsi/ginkgo"
@@ -38,6 +39,15 @@ var _ = Describe("Proxy Unit tests", func() {
 			logger = lagertest.NewTestLogger("test")
 			r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
 
+			routeServiceConfig := routeservice.NewRouteServiceConfig(
+				logger,
+				conf.RouteServiceEnabled,
+				conf.RouteServiceTimeout,
+				crypto,
+				cryptoPrev,
+				false,
+			)
+
 			proxyObj = proxy.NewProxy(proxy.ProxyArgs{
 				EndpointTimeout:      conf.EndpointTimeout,
 				Ip:                   conf.Ip,
@@ -48,11 +58,8 @@ var _ = Describe("Proxy Unit tests", func() {
 				AccessLogger:         fakeAccessLogger,
 				SecureCookies:        conf.SecureCookies,
 				TLSConfig:            tlsConfig,
-				RouteServiceEnabled:  conf.RouteServiceEnabled,
-				RouteServiceTimeout:  conf.RouteServiceTimeout,
-				Crypto:               crypto,
-				CryptoPrev:           cryptoPrev,
 				HealthCheckUserAgent: "HTTP-Monitor/1.1",
+				RouteServiceConfig:   routeServiceConfig,
 			})
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})

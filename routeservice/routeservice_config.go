@@ -61,6 +61,10 @@ func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
 	return rs.routeServiceEnabled
 }
 
+func (rs *RouteServiceConfig) RouteServiceRecommendHttps() bool {
+	return rs.recommendHttps
+}
+
 func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceRequest, error) {
 	var routeServiceArgs RouteServiceRequest
 	sig, metadata, err := rs.generateSignatureAndMetadata(forwardedUrl)

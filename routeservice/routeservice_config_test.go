@@ -302,4 +302,56 @@ var _ = Describe("Route Service Config", func() {
 			})
 		})
 	})
+
+	Describe("RouteServiceEnabled", func() {
+		Context("when rs recommendHttps is set to true", func() {
+			BeforeEach(func() {
+				recommendHttps = true
+				config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour,
+					crypto, cryptoPrev, recommendHttps)
+			})
+
+			It("returns the routeServiceEnabled to be true", func() {
+				Expect(config.RouteServiceRecommendHttps()).To(BeTrue())
+			})
+		})
+
+		Context("when rs recommendHttps is set to false", func() {
+			BeforeEach(func() {
+				recommendHttps = false
+				config = routeservice.NewRouteServiceConfig(logger, true, 1*time.Hour,
+					crypto, cryptoPrev, recommendHttps)
+			})
+
+			It("returns the routeServiceEnabled to be false", func() {
+				Expect(config.RouteServiceRecommendHttps()).To(BeFalse())
+			})
+		})
+	})
+
+	Describe("RouteServiceEnabled", func() {
+		Context("when  RouteService is Enabled", func() {
+			BeforeEach(func() {
+				routeServiceEnabled := true
+				config = routeservice.NewRouteServiceConfig(logger, routeServiceEnabled, 1*time.Hour,
+					crypto, cryptoPrev, recommendHttps)
+			})
+
+			It("returns the routeServiceEnabled to be true", func() {
+				Expect(config.RouteServiceEnabled()).To(BeTrue())
+			})
+		})
+
+		Context("when  RouteService is not Enabled", func() {
+			BeforeEach(func() {
+				routeServiceEnabled := false
+				config = routeservice.NewRouteServiceConfig(logger, routeServiceEnabled, 1*time.Hour,
+					crypto, cryptoPrev, recommendHttps)
+			})
+
+			It("returns the routeServiceEnabled to be false", func() {
+				Expect(config.RouteServiceEnabled()).To(BeFalse())
+			})
+		})
+	})
 })

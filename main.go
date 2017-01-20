@@ -19,6 +19,7 @@ import (
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route_fetcher"
 	"code.cloudfoundry.org/gorouter/router"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagerflags"
@@ -155,6 +156,15 @@ func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
 }
 
 func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter reporter.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+	routeServiceConfig := routeservice.NewRouteServiceConfig(
+		logger,
+		c.RouteServiceEnabled,
+		c.RouteServiceTimeout,
+		crypto,
+		cryptoPrev,
+		c.RouteServiceRecommendHttps,
+	)
+
 	args := proxy.ProxyArgs{
 		Logger:          logger,
 		EndpointTimeout: c.EndpointTimeout,
@@ -168,11 +178,7 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 			CipherSuites:       c.CipherSuites,
 			InsecureSkipVerify: c.SkipSSLValidation,
 		},
-		RouteServiceEnabled:        c.RouteServiceEnabled,
-		RouteServiceTimeout:        c.RouteServiceTimeout,
-		RouteServiceRecommendHttps: c.RouteServiceRecommendHttps,
-		Crypto:                   crypto,
-		CryptoPrev:               cryptoPrev,
+		RouteServiceConfig:       routeServiceConfig,
 		ExtraHeadersToLog:        &c.ExtraHeadersToLog,
 		HealthCheckUserAgent:     c.HealthCheckUserAgent,
 		HeartbeatOK:              &healthCheck,
