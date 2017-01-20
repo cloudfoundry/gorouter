@@ -12,7 +12,8 @@ type ProxyReporter interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
+	CaptureRoutingResponse(res *http.Response)
+	CaptureRoutingResponseLatency(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration)
 	CaptureRouteServiceResponse(res *http.Response)
 }
 

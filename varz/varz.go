@@ -165,7 +165,8 @@ type Varz interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
+	CaptureRoutingResponse(res *http.Response)
+	CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
 	CaptureRouteServiceResponse(res *http.Response)
 }
 
@@ -264,10 +265,11 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint) {
 }
 
 // do not emit route service through varz
-func (x *RealVarz) CaptureRouteServiceResponse(res *http.Response) {
-}
+func (x *RealVarz) CaptureRouteServiceResponse(res *http.Response) {}
 
-func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponse(response *http.Response) {}
+
+func (x *RealVarz) CaptureRoutingResponseLatency(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
 	x.Lock()
 
 	var tags string

@@ -303,7 +303,8 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		latency := time.Since(accessLog.StartedAt)
 
 		if backend {
-			p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
+			p.reporter.CaptureRoutingResponse(rsp)
+			p.reporter.CaptureRoutingResponseLatency(endpoint, rsp, accessLog.StartedAt, latency)
 		} else {
 			p.reporter.CaptureRouteServiceResponse(rsp)
 		}

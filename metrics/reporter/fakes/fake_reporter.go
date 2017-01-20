@@ -22,13 +22,18 @@ type FakeProxyReporter struct {
 	captureRoutingRequestArgsForCall []struct {
 		b *route.Endpoint
 	}
-	CaptureRoutingResponseStub        func(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
+	CaptureRoutingResponseStub        func(res *http.Response)
 	captureRoutingResponseMutex       sync.RWMutex
 	captureRoutingResponseArgsForCall []struct {
-		b   *route.Endpoint
 		res *http.Response
-		t   time.Time
-		d   time.Duration
+	}
+	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration)
+	captureRoutingResponseLatencyMutex       sync.RWMutex
+	captureRoutingResponseLatencyArgsForCall []struct {
+		b *route.Endpoint
+		r *http.Response
+		t time.Time
+		d time.Duration
 	}
 	CaptureRouteServiceResponseStub        func(res *http.Response)
 	captureRouteServiceResponseMutex       sync.RWMutex
@@ -95,18 +100,15 @@ func (fake *FakeProxyReporter) CaptureRoutingRequestArgsForCall(i int) *route.En
 	return fake.captureRoutingRequestArgsForCall[i].b
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponse(res *http.Response) {
 	fake.captureRoutingResponseMutex.Lock()
 	fake.captureRoutingResponseArgsForCall = append(fake.captureRoutingResponseArgsForCall, struct {
-		b   *route.Endpoint
 		res *http.Response
-		t   time.Time
-		d   time.Duration
-	}{b, res, t, d})
-	fake.recordInvocation("CaptureRoutingResponse", []interface{}{b, res, t, d})
+	}{res})
+	fake.recordInvocation("CaptureRoutingResponse", []interface{}{res})
 	fake.captureRoutingResponseMutex.Unlock()
 	if fake.CaptureRoutingResponseStub != nil {
-		fake.CaptureRoutingResponseStub(b, res, t, d)
+		fake.CaptureRoutingResponseStub(res)
 	}
 }
 
@@ -116,10 +118,37 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseCallCount() int {
 	return len(fake.captureRoutingResponseArgsForCall)
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponseArgsForCall(i int) (*route.Endpoint, *http.Response, time.Time, time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponseArgsForCall(i int) *http.Response {
 	fake.captureRoutingResponseMutex.RLock()
 	defer fake.captureRoutingResponseMutex.RUnlock()
-	return fake.captureRoutingResponseArgsForCall[i].b, fake.captureRoutingResponseArgsForCall[i].res, fake.captureRoutingResponseArgsForCall[i].t, fake.captureRoutingResponseArgsForCall[i].d
+	return fake.captureRoutingResponseArgsForCall[i].res
+}
+
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration) {
+	fake.captureRoutingResponseLatencyMutex.Lock()
+	fake.captureRoutingResponseLatencyArgsForCall = append(fake.captureRoutingResponseLatencyArgsForCall, struct {
+		b *route.Endpoint
+		r *http.Response
+		t time.Time
+		d time.Duration
+	}{b, r, t, d})
+	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, r, t, d})
+	fake.captureRoutingResponseLatencyMutex.Unlock()
+	if fake.CaptureRoutingResponseLatencyStub != nil {
+		fake.CaptureRoutingResponseLatencyStub(b, r, t, d)
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyCallCount() int {
+	fake.captureRoutingResponseLatencyMutex.RLock()
+	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
+	return len(fake.captureRoutingResponseLatencyArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, *http.Response, time.Time, time.Duration) {
+	fake.captureRoutingResponseLatencyMutex.RLock()
+	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
+	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].r, fake.captureRoutingResponseLatencyArgsForCall[i].t, fake.captureRoutingResponseLatencyArgsForCall[i].d
 }
 
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(res *http.Response) {
@@ -157,6 +186,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureRoutingRequestMutex.RUnlock()
 	fake.captureRoutingResponseMutex.RLock()
 	defer fake.captureRoutingResponseMutex.RUnlock()
+	fake.captureRoutingResponseLatencyMutex.RLock()
+	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
 	fake.captureRouteServiceResponseMutex.RLock()
 	defer fake.captureRouteServiceResponseMutex.RUnlock()
 	return fake.invocations

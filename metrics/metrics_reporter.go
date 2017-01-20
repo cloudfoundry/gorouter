@@ -48,10 +48,12 @@ func (m *MetricsReporter) CaptureRouteServiceResponse(res *http.Response) {
 	m.batcher.BatchIncrementCounter("responses.route_services")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+func (m *MetricsReporter) CaptureRoutingResponse(res *http.Response) {
 	m.batcher.BatchIncrementCounter(fmt.Sprintf("responses.%s", getResponseCounterName(res)))
 	m.batcher.BatchIncrementCounter("responses")
+}
 
+func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
 	latency := float64(d / time.Millisecond)
 	unit := "ms"
 	m.sender.SendValue("latency", latency, unit)

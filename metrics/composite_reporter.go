@@ -40,7 +40,12 @@ func (c *CompositeReporter) CaptureRouteServiceResponse(res *http.Response) {
 	c.second.CaptureRouteServiceResponse(res)
 }
 
-func (c *CompositeReporter) CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
-	c.first.CaptureRoutingResponse(b, res, t, d)
-	c.second.CaptureRoutingResponse(b, res, t, d)
+func (c *CompositeReporter) CaptureRoutingResponse(res *http.Response) {
+	c.first.CaptureRoutingResponse(res)
+	c.second.CaptureRoutingResponse(res)
+}
+
+func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+	c.first.CaptureRoutingResponseLatency(b, res, t, d)
+	c.second.CaptureRoutingResponseLatency(b, res, t, d)
 }

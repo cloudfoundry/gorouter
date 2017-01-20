@@ -214,11 +214,11 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 200,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.2xx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.2xx"))
 		})
@@ -228,11 +228,11 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 304,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.3xx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.3xx"))
 		})
@@ -242,11 +242,11 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.4xx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.4xx"))
 		})
@@ -256,11 +256,11 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 504,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.5xx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.5xx"))
 		})
@@ -270,21 +270,21 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 100,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
 
 		It("increments the XXX response metrics with null response", func() {
-			metricReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(nil)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(nil)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
@@ -297,11 +297,11 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response2xx, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response2xx)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("responses"))
 
-			metricReporter.CaptureRoutingResponse(endpoint, &response4xx, time.Now(), time.Millisecond)
+			metricReporter.CaptureRoutingResponse(&response4xx)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("responses"))
 		})
@@ -312,7 +312,7 @@ var _ = Describe("MetricsReporter", func() {
 			StatusCode: 401,
 		}
 
-		metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, &response, time.Now(), 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(1))
 		name, value, unit := sender.SendValueArgsForCall(0)
@@ -328,7 +328,7 @@ var _ = Describe("MetricsReporter", func() {
 		}
 
 		endpoint.Tags["component"] = "CloudController"
-		metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, &response, time.Now(), 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(2))
 		name, value, unit := sender.SendValueArgsForCall(1)

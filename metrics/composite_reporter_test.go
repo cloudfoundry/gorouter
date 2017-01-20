@@ -61,22 +61,35 @@ var _ = Describe("CompositeReporter", func() {
 		Expect(callEndpoint).To(Equal(endpoint))
 	})
 
+	It("forwards CaptureRoutingResponseLatency to both reporters", func() {
+		composite.CaptureRoutingResponseLatency(endpoint, response, responseTime, responseDuration)
+
+		Expect(fakeReporter1.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+		Expect(fakeReporter2.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+
+		callEndpoint, callResponse, callTime, callDuration := fakeReporter1.CaptureRoutingResponseLatencyArgsForCall(0)
+		Expect(callEndpoint).To(Equal(endpoint))
+		Expect(callResponse).To(Equal(response))
+		Expect(callTime).To(Equal(responseTime))
+		Expect(callDuration).To(Equal(responseDuration))
+
+		callEndpoint, callResponse, callTime, callDuration = fakeReporter2.CaptureRoutingResponseLatencyArgsForCall(0)
+		Expect(callEndpoint).To(Equal(endpoint))
+		Expect(callResponse).To(Equal(response))
+		Expect(callTime).To(Equal(responseTime))
+		Expect(callDuration).To(Equal(responseDuration))
+	})
+
 	It("forwards CaptureRoutingResponse to both reporters", func() {
-		composite.CaptureRoutingResponse(endpoint, response, responseTime, responseDuration)
+		composite.CaptureRoutingResponse(response)
 
 		Expect(fakeReporter1.CaptureRoutingResponseCallCount()).To(Equal(1))
 		Expect(fakeReporter2.CaptureRoutingResponseCallCount()).To(Equal(1))
 
-		callEndpoint, callResponse, callTime, callDuration := fakeReporter1.CaptureRoutingResponseArgsForCall(0)
-		Expect(callEndpoint).To(Equal(endpoint))
+		callResponse := fakeReporter1.CaptureRoutingResponseArgsForCall(0)
 		Expect(callResponse).To(Equal(response))
-		Expect(callTime).To(Equal(responseTime))
-		Expect(callDuration).To(Equal(responseDuration))
 
-		callEndpoint, callResponse, callTime, callDuration = fakeReporter2.CaptureRoutingResponseArgsForCall(0)
-		Expect(callEndpoint).To(Equal(endpoint))
+		callResponse = fakeReporter2.CaptureRoutingResponseArgsForCall(0)
 		Expect(callResponse).To(Equal(response))
-		Expect(callTime).To(Equal(responseTime))
-		Expect(callDuration).To(Equal(responseDuration))
 	})
 })
