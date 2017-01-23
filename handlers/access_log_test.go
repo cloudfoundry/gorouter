@@ -11,8 +11,6 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -22,7 +20,6 @@ import (
 var _ = Describe("AccessLog", func() {
 	var (
 		handler negroni.Handler
-		logger  lager.Logger
 
 		resp        http.ResponseWriter
 		proxyWriter utils.ProxyResponseWriter
@@ -45,7 +42,6 @@ var _ = Describe("AccessLog", func() {
 	})
 
 	BeforeEach(func() {
-		logger = lagertest.NewTestLogger("zipkin")
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()

@@ -3,9 +3,9 @@ package registry_test
 import (
 	"fmt"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	. "code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -25,12 +25,12 @@ var _ = Describe("RouteRegistry", func() {
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
-	var logger lager.Logger
+	var logger logger.Logger
 	var modTag models.ModificationTag
 
 	BeforeEach(func() {
 
-		logger = lagertest.NewTestLogger("test")
+		logger = test_util.NewTestZapLogger("test")
 		configObj = config.DefaultConfig()
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 24 * time.Millisecond
@@ -156,7 +156,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("logs at debug level", func() {
-				Expect(logger).To(gbytes.Say(`uri-added.*"log_level":0.*a\.route`))
+				Expect(logger).To(gbytes.Say(`"log_level":0.*uri-added.*a\.route`))
 			})
 
 			It("logs register message only for new routes", func() {
@@ -377,7 +377,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("logs at debug level", func() {
-				Expect(logger).To(gbytes.Say(`unregister.*"log_level":0.*a\.route`))
+				Expect(logger).To(gbytes.Say(`"log_level":0.*unregister.*a\.route`))
 			})
 
 			It("only logs unregistration for existing routes", func() {
@@ -604,7 +604,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`prune.*"log_level":1.*endpoints.*bar.com/path1/path2/path3`))
+			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints`))
 		})
 
 		It("removes stale droplets", func() {

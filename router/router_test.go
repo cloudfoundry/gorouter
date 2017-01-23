@@ -37,10 +37,9 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 )
 
 var _ = Describe("Router", func() {
@@ -56,7 +55,7 @@ var _ = Describe("Router", func() {
 		registry   *rregistry.RouteRegistry
 		varz       vvarz.Varz
 		router     *Router
-		logger     lager.Logger
+		logger     logger.Logger
 		statusPort uint16
 	)
 
@@ -84,7 +83,7 @@ var _ = Describe("Router", func() {
 		config.PidFile = f.Name()
 
 		mbusClient = natsRunner.MessageBus
-		logger = lagertest.NewTestLogger("router-test")
+		logger = test_util.NewTestZapLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 
@@ -144,7 +143,8 @@ var _ = Describe("Router", func() {
 			config.LoadBalancerHealthyThreshold = 2 * time.Second
 		})
 		It("should log waiting delay value", func() {
-			Expect(logger).Should(gbytes.Say(fmt.Sprintf("Waiting %s before listening", config.LoadBalancerHealthyThreshold)))
+
+			Eventually(logger).Should(gbytes.Say("Waiting before listening"))
 			verify_health(fmt.Sprintf("localhost:%d", statusPort))
 		})
 	})

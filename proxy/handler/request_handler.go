@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/uber-go/zap"
+
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/lager"
 )
 
 const (
@@ -26,7 +28,7 @@ const (
 var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
-	logger    lager.Logger
+	logger    logger.Logger
 	reporter  reporter.ProxyReporter
 	logrecord *schema.AccessLogRecord
 
@@ -34,7 +36,7 @@ type RequestHandler struct {
 	response utils.ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r reporter.ProxyReporter, alr *schema.AccessLogRecord, logger lager.Logger) *RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r reporter.ProxyReporter, alr *schema.AccessLogRecord, logger logger.Logger) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
 	return &RequestHandler{
 		logger:    requestLogger,
@@ -45,17 +47,18 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 	}
 }
 
-func setupLogger(request *http.Request, logger lager.Logger) lager.Logger {
-	return logger.Session("request-handler", lager.Data{
-		"RemoteAddr":        request.RemoteAddr,
-		"Host":              request.Host,
-		"Path":              request.URL.Path,
-		"X-Forwarded-For":   request.Header["X-Forwarded-For"],
-		"X-Forwarded-Proto": request.Header["X-Forwarded-Proto"],
-	})
+func setupLogger(request *http.Request, logger logger.Logger) logger.Logger {
+	tmpLogger := logger.Session("request-handler")
+	return tmpLogger.With(
+		zap.String("RemoteAddr", request.RemoteAddr),
+		zap.String("Host", request.Host),
+		zap.String("Path", request.URL.Path),
+		zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"]),
+		zap.Object("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"]),
+	)
 }
 
-func (h *RequestHandler) Logger() lager.Logger {
+func (h *RequestHandler) Logger() logger.Logger {
 	return h.logger
 }
 
@@ -105,14 +108,14 @@ func (h *RequestHandler) HandleBadGateway(err error, request *http.Request) {
 }
 
 func (h *RequestHandler) HandleBadSignature(err error) {
-	h.logger.Error("signature-validation-failed", err)
+	h.logger.Error("signature-validation-failed", zap.Error(err))
 
 	h.writeStatus(http.StatusBadRequest, "Failed to validate Route Service Signature")
 	h.response.Done()
 }
 
 func (h *RequestHandler) HandleRouteServiceFailure(err error) {
-	h.logger.Error("route-service-failed", err)
+	h.logger.Error("route-service-failed", zap.Error(err))
 
 	h.writeStatus(http.StatusInternalServerError, "Route service request failed.")
 	h.response.Done()
@@ -127,25 +130,25 @@ func (h *RequestHandler) HandleUnsupportedRouteService() {
 }
 
 func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
-	h.logger.Info("handling-tcp-request", lager.Data{"Upgrade": "tcp"})
+	h.logger.Info("handling-tcp-request", zap.String("Upgrade", "tcp"))
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
 	err := h.serveTcp(iter)
 	if err != nil {
-		h.logger.Error("tcp-request-failed", err)
+		h.logger.Error("tcp-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadRequest, "TCP forwarding to endpoint failed.")
 	}
 }
 
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
-	h.logger.Info("handling-websocket-request", lager.Data{"Upgrade": "websocket"})
+	h.logger.Info("handling-websocket-request", zap.String("Upgrade", "websocket"))
 
 	h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
 	err := h.serveWebSocket(iter)
 	if err != nil {
-		h.logger.Error("websocket-request-failed", err)
+		h.logger.Error("websocket-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
 	}
 }
@@ -153,7 +156,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 func (h *RequestHandler) writeStatus(code int, message string) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
-	h.logger.Info("status", lager.Data{"body": body})
+	h.logger.Info("status", zap.String("body", body))
 	h.logrecord.StatusCode = code
 
 	http.Error(h.response, body, code)
@@ -193,7 +196,7 @@ func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
 		}
 
 		iter.EndpointFailed()
-		h.logger.Error("tcp-connection-failed", err)
+		h.logger.Error("tcp-connection-failed", zap.Error(err))
 
 		retry++
 		if retry == MaxRetries {
@@ -240,7 +243,7 @@ func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
 		}
 
 		iter.EndpointFailed()
-		h.logger.Error("websocket-connection-failed", err)
+		h.logger.Error("websocket-connection-failed", zap.Error(err))
 
 		retry++
 		if retry == MaxRetries {

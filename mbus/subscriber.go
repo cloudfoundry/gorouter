@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
 
 	"github.com/nats-io/nats"
+	"github.com/uber-go/zap"
 )
 
 // RegistryMessage defines the format of a route registration/unregistration
@@ -49,7 +50,7 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
 type Subscriber struct {
-	logger        lager.Logger
+	logger        logger.Logger
 	natsClient    *nats.Conn
 	startMsgChan  <-chan struct{}
 	opts          *SubscriberOpts
@@ -65,7 +66,7 @@ type SubscriberOpts struct {
 
 // NewSubscriber returns a new Subscriber
 func NewSubscriber(
-	logger lager.Logger,
+	logger logger.Logger,
 	natsClient *nats.Conn,
 	routeRegistry registry.RegistryInterface,
 	startMsgChan <-chan struct{},
@@ -103,7 +104,7 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 		case <-s.startMsgChan:
 			err := s.sendStartMessage()
 			if err != nil {
-				s.logger.Error("failed-to-send-start-message", err)
+				s.logger.Error("failed-to-send-start-message", zap.Error(err))
 			}
 		case <-signals:
 			s.logger.Info("exited")
@@ -135,14 +136,15 @@ func (s *Subscriber) subscribeRoutes() error {
 }
 
 func (s *Subscriber) unregisterRoute(message *nats.Msg) {
-	s.logger.Info("unregister-route", lager.Data{"message": string(message.Data)})
+	s.logger.Info("unregister-route", zap.String("message", string(message.Data)))
 
 	msg, regErr := createRegistryMessage(message.Data)
 	if regErr != nil {
-		s.logger.Error("validation-error", regErr, lager.Data{
-			"payload": string(message.Data),
-			"subject": message.Subject,
-		})
+		s.logger.Error("validation-error",
+			zap.Error(regErr),
+			zap.String("payload", string(message.Data)),
+			zap.String("subject", message.Subject),
+		)
 		return
 	}
 
@@ -155,10 +157,11 @@ func (s *Subscriber) unregisterRoute(message *nats.Msg) {
 func (s *Subscriber) registerRoute(message *nats.Msg) {
 	msg, regErr := createRegistryMessage(message.Data)
 	if regErr != nil {
-		s.logger.Error("validation-error", regErr, lager.Data{
-			"payload": string(message.Data),
-			"subject": message.Subject,
-		})
+		s.logger.Error("validation-error",
+			zap.Error(regErr),
+			zap.String("payload", string(message.Data)),
+			zap.String("subject", message.Subject),
+		)
 		return
 	}
 

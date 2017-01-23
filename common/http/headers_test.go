@@ -5,8 +5,8 @@ import (
 
 	commonhttp "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/http/fakes"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
+	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -20,11 +20,11 @@ const b3_id_regex = `^[[:xdigit:]]{16}$`
 var _ = Describe("Headers", func() {
 	Describe("SetVcapRequestIdHeader", func() {
 		var (
-			logger lager.Logger
+			logger logger.Logger
 			req    *http.Request
 		)
 		BeforeEach(func() {
-			logger = lagertest.NewTestLogger("headers-test")
+			logger = test_util.NewTestZapLogger("headers-test")
 			var err error
 			req, err = http.NewRequest("GET", "test.endpoint", nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -88,7 +88,7 @@ var _ = Describe("Headers", func() {
 
 	Describe("SetB3Headers", func() {
 		var (
-			logger lager.Logger
+			logger logger.Logger
 			req    *http.Request
 		)
 
@@ -104,7 +104,7 @@ var _ = Describe("Headers", func() {
 
 		Context("when logger is set", func() {
 			BeforeEach(func() {
-				logger = lagertest.NewTestLogger("headers-test")
+				logger = test_util.NewTestZapLogger("headers-test")
 			})
 
 			It("generates a new b3 span id", func() {

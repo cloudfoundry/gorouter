@@ -7,9 +7,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/uber-go/zap"
+
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/routeservice/header"
-	"code.cloudfoundry.org/lager"
 )
 
 const (
@@ -26,7 +28,7 @@ type RouteServiceConfig struct {
 	routeServiceTimeout time.Duration
 	crypto              secure.Crypto
 	cryptoPrev          secure.Crypto
-	logger              lager.Logger
+	logger              logger.Logger
 	recommendHttps      bool
 }
 
@@ -40,7 +42,7 @@ type RouteServiceRequest struct {
 }
 
 func NewRouteServiceConfig(
-	logger lager.Logger,
+	logger logger.Logger,
 	enabled bool,
 	timeout time.Duration,
 	crypto secure.Crypto,
@@ -95,14 +97,14 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl
 
 	signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
 	if err != nil {
-		rs.logger.Error("proxy.route-service.current_key", err)
+		rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
 		// Decrypt the head again trying to use the old key.
 		if rs.cryptoPrev != nil {
-			rs.logger.Error("proxy.route-service.current_key", err)
+			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
 			signature, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
 
 			if err != nil {
-				rs.logger.Error("proxy.route-service.previous_key", err)
+				rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
 			}
 		}
 
@@ -120,7 +122,7 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl
 func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw string) (string, string, error) {
 	decodedURL, err := url.QueryUnescape(forwardedUrlRaw)
 	if err != nil {
-		rs.logger.Error("proxy.route-service.invalidForwardedURL", err)
+		rs.logger.Error("proxy-route-service-invalidForwardedURL", zap.Error(err))
 		return "", "", err
 	}
 	signature := &header.Signature{
@@ -137,8 +139,11 @@ func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw strin
 
 func (rs *RouteServiceConfig) validateSignatureTimeout(signature header.Signature) error {
 	if time.Since(signature.RequestedTime) > rs.routeServiceTimeout {
-		data := lager.Data{"forwarded-url": signature.ForwardedUrl, "requested-time": signature.RequestedTime}
-		rs.logger.Error("proxy.route-service.timeout", RouteServiceExpired, data)
+		rs.logger.Error("proxy-route-service-timeout",
+			zap.Error(RouteServiceExpired),
+			zap.String("forwarded-url", signature.ForwardedUrl),
+			zap.Time("request-time", signature.RequestedTime),
+		)
 		return RouteServiceExpired
 	}
 	return nil
@@ -150,13 +155,16 @@ func (rs *RouteServiceConfig) validateForwardedURL(signature header.Signature, r
 	requestUrl, err = url.QueryUnescape(requestUrl)
 	if err != nil {
 		rsErr := fmt.Errorf("%s: %s", RouteServiceForwardedURLMismatch, err)
-		rs.logger.Error("proxy.route-service.forwarded-url.mismatch", rsErr)
+		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(rsErr))
 		return err
 	}
 
 	if requestUrl != forwardedUrl {
 		var err = RouteServiceForwardedURLMismatch
-		rs.logger.Error("proxy.route-service.forwarded-url.mismatch", err, lager.Data{"request-url": requestUrl, "forwarded-url": forwardedUrl})
+		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(err),
+			zap.String("request-url", requestUrl),
+			zap.String("forwarded-url", forwardedUrl),
+		)
 		return err
 	}
 	return nil

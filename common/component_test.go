@@ -3,11 +3,10 @@ package common_test
 import (
 	. "code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats"
 
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 	"code.cloudfoundry.org/localip"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -153,7 +152,7 @@ var _ = Describe("Component", func() {
 	Describe("Register", func() {
 		var mbusClient *nats.Conn
 		var natsRunner *test_util.NATSRunner
-		var logger lager.Logger
+		var logger logger.Logger
 
 		BeforeEach(func() {
 			natsPort := test_util.NextAvailPort()
@@ -161,7 +160,7 @@ var _ = Describe("Component", func() {
 			natsRunner.Start()
 			mbusClient = natsRunner.MessageBus
 
-			logger = lagertest.NewTestLogger("test")
+			logger = test_util.NewTestZapLogger("test")
 		})
 
 		AfterEach(func() {
@@ -270,7 +269,7 @@ var _ = Describe("Component", func() {
 			err = mbusClient.PublishRequest("vcap.component.discover", "", []byte(""))
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(logger).Should(gbytes.Say("Received message with empty reply on subject"))
+			Eventually(logger).Should(gbytes.Say("Received message with empty reply"))
 
 			err = mbusClient.PublishRequest("vcap.component.discover", "reply", []byte("hi"))
 			Expect(err).ToNot(HaveOccurred())

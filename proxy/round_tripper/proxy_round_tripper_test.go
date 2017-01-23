@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
@@ -13,8 +14,6 @@ import (
 	routefakes "code.cloudfoundry.org/gorouter/route/fakes"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -28,7 +27,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			proxyRoundTripper http.RoundTripper
 			endpointIterator  *routefakes.FakeEndpointIterator
 			transport         *roundtripperfakes.FakeRoundTripper
-			logger            lager.Logger
+			logger            logger.Logger
 			req               *http.Request
 			resp              *proxyfakes.FakeProxyResponseWriter
 			dialError         = &net.OpError{
@@ -43,7 +42,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			req.URL.Scheme = "http"
 			resp = &proxyfakes.FakeProxyResponseWriter{}
 
-			logger = lagertest.NewTestLogger("test")
+			logger = test_util.NewTestZapLogger("test")
 			transport = &roundtripperfakes.FakeRoundTripper{}
 		})
 

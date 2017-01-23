@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -24,8 +25,6 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -34,7 +33,7 @@ import (
 
 var _ = Describe("Router", func() {
 	var (
-		logger     lager.Logger
+		logger     logger.Logger
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 		p          proxy.Proxy
@@ -186,7 +185,7 @@ var _ = Describe("Router", func() {
 	}
 
 	BeforeEach(func() {
-		logger = lagertest.NewTestLogger("test")
+		logger = test_util.NewTestZapLogger("test")
 		natsPort = test_util.NextAvailPort()
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()

@@ -13,6 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
+	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -22,7 +23,6 @@ import (
 	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagerflags"
 	"code.cloudfoundry.org/routing-api"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
@@ -30,6 +30,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/nats"
+	"github.com/uber-go/zap"
 
 	"flag"
 	"fmt"
@@ -63,14 +64,13 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, reconfigurableSink := lagerflags.NewFromConfig(prefix,
-		lagerflags.LagerConfig{LogLevel: c.Logging.Level})
+	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level)
 
 	logger.Info("starting")
 
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Fatal("dropsonde-initialize-error", err)
+		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
 	}
 
 	// setup number of procs
@@ -79,6 +79,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
+		reconfigurableSink := lager.NewReconfigurableSink(lager.NewWriterSink(os.Stdout, lager.DEBUG), minLagerLogLevel)
 		debugserver.Run(c.DebugAddr, reconfigurableSink)
 	}
 
@@ -103,7 +104,7 @@ func main() {
 
 	accessLogger, err := access_log.CreateRunningAccessLogger(logger.Session("access-log"), c)
 	if err != nil {
-		logger.Fatal("error-creating-access-logger", err)
+		logger.Fatal("error-creating-access-logger", zap.Error(err))
 	}
 
 	var crypto secure.Crypto
@@ -119,7 +120,7 @@ func main() {
 	healthCheck = 0
 	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil)
 	if err != nil {
-		logger.Fatal("initialize-router-error", err)
+		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
 
 	members := grouper.Members{
@@ -133,7 +134,7 @@ func main() {
 		// check connectivity to routing api
 		err = routeFetcher.FetchRoutes()
 		if err != nil {
-			logger.Fatal("routing-api-connection-failed", err)
+			logger.Fatal("routing-api-connection-failed", zap.Error(err))
 		}
 		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
@@ -144,24 +145,24 @@ func main() {
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Error("gorouter.exited-with-failure", err)
+		logger.Error("gorouter.exited-with-failure", zap.Error(err))
 		os.Exit(1)
 	}
 
 	os.Exit(0)
 }
 
-func createCrypto(logger lager.Logger, secret string) *secure.AesGCM {
+func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 	// generate secure encryption key using key derivation function (pbkdf2)
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
 	if err != nil {
-		logger.Fatal("error-creating-route-service-crypto", err)
+		logger.Fatal("error-creating-route-service-crypto", zap.Error(err))
 	}
 	return crypto
 }
 
-func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter reporter.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter reporter.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger,
 		c.RouteServiceEnabled,
@@ -180,14 +181,14 @@ func buildProxy(logger lager.Logger, c *config.Config, registry rregistry.Regist
 		reporter, routeServiceConfig, tlsConfig, &healthCheck)
 }
 
-func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 
 	uaaClient := newUaaClient(logger, clock, c)
 
 	_, err := uaaClient.FetchToken(true)
 	if err != nil {
-		logger.Fatal("unable-to-fetch-token", err)
+		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
 
 	routingApiUri := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
@@ -197,14 +198,19 @@ func setupRouteFetcher(logger lager.Logger, c *config.Config, registry rregistry
 	return routeFetcher
 }
 
-func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
+func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
 	if c.RoutingApi.AuthDisabled {
 		logger.Info("using-noop-token-fetcher")
 		return uaa_client.NewNoOpUaaClient()
 	}
 
 	if c.OAuth.Port == -1 {
-		logger.Fatal("tls-not-enabled", errors.New("GoRouter requires TLS enabled to get OAuth token"), lager.Data{"token-endpoint": c.OAuth.TokenEndpoint, "port": c.OAuth.Port})
+		logger.Fatal(
+			"tls-not-enabled",
+			zap.Error(errors.New("GoRouter requires TLS enabled to get OAuth token")),
+			zap.String("token-endpoint", c.OAuth.TokenEndpoint),
+			zap.Int("port", c.OAuth.Port),
+		)
 	}
 
 	tokenURL := fmt.Sprintf("https://%s:%d", c.OAuth.TokenEndpoint, c.OAuth.Port)
@@ -220,40 +226,43 @@ func newUaaClient(logger lager.Logger, clock clock.Clock, c *config.Config) uaa_
 		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
 
-	uaaClient, err := uaa_client.NewClient(logger, cfg, clock)
+	uaaClient, err := uaa_client.NewClient(goRouterLogger.NewLagerAdapter(logger), cfg, clock)
 	if err != nil {
-		logger.Fatal("initialize-token-fetcher-error", err)
+		logger.Fatal("initialize-token-fetcher-error", zap.Error(err))
 	}
 	return uaaClient
 }
 
-func natsOptions(logger lager.Logger, c *config.Config, natsHost *atomic.Value, startMsg chan<- struct{}) nats.Options {
+func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomic.Value, startMsg chan<- struct{}) nats.Options {
 	natsServers := c.NatsServers()
 
 	options := nats.DefaultOptions
 	options.Servers = natsServers
 	options.PingInterval = c.NatsClientPingInterval
 	options.ClosedCB = func(conn *nats.Conn) {
-		logger.Fatal("nats-connection-closed", errors.New("unexpected close"), lager.Data{"last_error": conn.LastError()})
+		logger.Fatal(
+			"nats-connection-closed",
+			zap.Error(errors.New("unexpected close")),
+			zap.Object("last_error", conn.LastError()),
+		)
 	}
 
 	options.DisconnectedCB = func(conn *nats.Conn) {
 		hostStr := natsHost.Load().(string)
-		logger.Info("nats-connection-disconnected", lager.Data{"nats-host": hostStr})
+		logger.Info("nats-connection-disconnected", zap.String("nats-host", hostStr))
 	}
 
 	options.ReconnectedCB = func(conn *nats.Conn) {
 		natsURL, err := url.Parse(conn.ConnectedUrl())
 		natsHostStr := ""
 		if err != nil {
-			logger.Error("nats-url-parse-error", err)
+			logger.Error("nats-url-parse-error", zap.Error(err))
 		} else {
 			natsHostStr = natsURL.Host
 		}
 		natsHost.Store(natsHostStr)
 
-		data := lager.Data{"nats-host": natsHostStr}
-		logger.Info("nats-connection-reconnected", data)
+		logger.Info("nats-connection-reconnected", zap.String("nats-host", natsHostStr))
 		startMsg <- struct{}{}
 	}
 
@@ -265,7 +274,7 @@ func natsOptions(logger lager.Logger, c *config.Config, natsHost *atomic.Value, 
 	return options
 }
 
-func connectToNatsServer(logger lager.Logger, c *config.Config, startMsg chan<- struct{}) *nats.Conn {
+func connectToNatsServer(logger goRouterLogger.Logger, c *config.Config, startMsg chan<- struct{}) *nats.Conn {
 	var natsClient *nats.Conn
 	var natsHost atomic.Value
 	var err error
@@ -283,7 +292,7 @@ func connectToNatsServer(logger lager.Logger, c *config.Config, startMsg chan<- 
 	}
 
 	if err != nil {
-		logger.Fatal("nats-connection-error", err)
+		logger.Fatal("nats-connection-error", zap.Error(err))
 	}
 
 	var natsHostStr string
@@ -292,14 +301,14 @@ func connectToNatsServer(logger lager.Logger, c *config.Config, startMsg chan<- 
 		natsHostStr = natsUrl.Host
 	}
 
-	logger.Info("Successfully-connected-to-nats", lager.Data{"host": natsHostStr})
+	logger.Info("Successfully-connected-to-nats", zap.String("host", natsHostStr))
 
 	natsHost.Store(natsHostStr)
 	return natsClient
 }
 
 func createSubscriber(
-	logger lager.Logger,
+	logger goRouterLogger.Logger,
 	c *config.Config,
 	natsClient *nats.Conn,
 	registry rregistry.RegistryInterface,
@@ -308,7 +317,7 @@ func createSubscriber(
 
 	guid, err := uuid.GenerateUUID()
 	if err != nil {
-		logger.Fatal("failed-to-generate-uuid", err)
+		logger.Fatal("failed-to-generate-uuid", zap.Error(err))
 	}
 
 	opts := &mbus.SubscriberOpts{
@@ -317,4 +326,26 @@ func createSubscriber(
 		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
 	}
 	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts)
+}
+
+func createLogger(component string, level string) (goRouterLogger.Logger, lager.LogLevel) {
+	var logLevel zap.Level
+	logLevel.UnmarshalText([]byte(level))
+
+	var minLagerLogLevel lager.LogLevel
+	switch minLagerLogLevel {
+	case lager.DEBUG:
+		minLagerLogLevel = lager.DEBUG
+	case lager.INFO:
+		minLagerLogLevel = lager.INFO
+	case lager.ERROR:
+		minLagerLogLevel = lager.ERROR
+	case lager.FATAL:
+		minLagerLogLevel = lager.FATAL
+	default:
+		panic(fmt.Errorf("unknown log level: %s", level))
+	}
+
+	lggr := goRouterLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
+	return lggr, minLagerLogLevel
 }

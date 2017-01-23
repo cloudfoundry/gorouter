@@ -8,9 +8,8 @@ import (
 
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"
@@ -23,7 +22,7 @@ var _ = Describe("Zipkin", func() {
 	var (
 		handler      negroni.Handler
 		headersToLog *[]string
-		logger       lager.Logger
+		logger       logger.Logger
 		resp         http.ResponseWriter
 		req          *http.Request
 		nextCalled   bool
@@ -35,7 +34,7 @@ var _ = Describe("Zipkin", func() {
 
 	BeforeEach(func() {
 		headersToLog = &[]string{}
-		logger = lagertest.NewTestLogger("zipkin")
+		logger = test_util.NewTestZapLogger("zipkin")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		nextCalled = false

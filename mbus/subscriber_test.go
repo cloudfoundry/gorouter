@@ -6,12 +6,11 @@ import (
 	"sync/atomic"
 
 	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/lager/lagertest"
 
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
@@ -32,7 +31,7 @@ var _ = Describe("Subscriber", func() {
 		natsClient   *nats.Conn
 		startMsgChan chan struct{}
 
-		logger lager.Logger
+		logger logger.Logger
 	)
 
 	BeforeEach(func() {
@@ -44,7 +43,7 @@ var _ = Describe("Subscriber", func() {
 
 		registry = new(fakes.FakeRegistryInterface)
 
-		logger = lagertest.NewTestLogger("mbus-test")
+		logger = test_util.NewTestZapLogger("mbus-test")
 
 		startMsgChan = make(chan struct{})
 

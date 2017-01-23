@@ -24,14 +24,15 @@ import (
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager"
 	"github.com/armon/go-proxyproto"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/nats-io/nats"
+	"github.com/uber-go/zap"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
@@ -64,12 +65,12 @@ type Router struct {
 	stopLock         sync.Mutex
 	uptimeMonitor    *monitor.Uptime
 	HeartbeatOK      *int32
-	logger           lager.Logger
+	logger           logger.Logger
 	errChan          chan error
 	NatsHost         *atomic.Value
 }
 
-func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
+func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
 	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
 
 	var host string
@@ -133,7 +134,7 @@ func NewRouter(logger lager.Logger, cfg *config.Config, p proxy.Proxy, mbusClien
 
 type gorouterHandler struct {
 	handler http.Handler
-	logger  lager.Logger
+	logger  logger.Logger
 }
 
 func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -159,12 +160,13 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		totalWaitDelay = r.config.StartResponseDelayInterval
 	}
 
-	r.logger.Info(fmt.Sprintf("Waiting %s before listening...", totalWaitDelay),
-		lager.Data{"route_registration_interval": r.config.StartResponseDelayInterval.String(),
-			"load_balancer_healthy_threshold": r.config.LoadBalancerHealthyThreshold.String()})
-
+	r.logger.Info("Waiting before listening",
+		zap.Float64("total_wait_delay_seconds", totalWaitDelay.Seconds()),
+		zap.Float64("route_registration_interval_seconds", r.config.StartResponseDelayInterval.Seconds()),
+		zap.Float64("load_balancer_healthy_threshold_seconds", r.config.LoadBalancerHealthyThreshold.Seconds()),
+	)
 	if lbOKDelay > 0 {
-		r.logger.Debug(fmt.Sprintf("Sleeping for %d, before enabling /health endpoint", lbOKDelay))
+		r.logger.Debug("Sleeping before enabled /health endpoint", zap.Float64("sleep_time_seconds", lbOKDelay.Seconds()))
 		time.Sleep(lbOKDelay)
 	}
 
@@ -223,7 +225,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 	select {
 	case err := <-errChan:
 		if err != nil {
-			r.logger.Error("Error occurred: ", err)
+			r.logger.Error("Error occurred", zap.Error(err))
 			r.DrainAndStop()
 		}
 	case sig := <-signals:
@@ -231,9 +233,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 			for sig := range signals {
 				r.logger.Info(
 					"gorouter.signal.ignored",
-					lager.Data{
-						"signal": sig.String(),
-					},
+					zap.String("signal", sig.String()),
 				)
 			}
 		}()
@@ -250,11 +250,9 @@ func (r *Router) DrainAndStop() {
 	drainWait := r.config.DrainWait
 	drainTimeout := r.config.DrainTimeout
 	r.logger.Info(
-		"gorouter.draining",
-		lager.Data{
-			"wait":    (drainWait).String(),
-			"timeout": (drainTimeout).String(),
-		},
+		"gorouter-draining",
+		zap.Float64("wait_seconds", drainWait.Seconds()),
+		zap.Float64("timeout_seconds", drainTimeout.Seconds()),
 	)
 
 	r.Drain(drainWait, drainTimeout)
@@ -271,7 +269,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 		if err != nil {
-			r.logger.Fatal("tcp-listener-error", err)
+			r.logger.Fatal("tcp-listener-error", zap.Error(err))
 			return err
 		}
 
@@ -284,7 +282,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		r.tlsListener = tls.NewListener(listener, tlsConfig)
 
-		r.logger.Info("tls-listener-started", lager.Data{"address": r.tlsListener.Addr()})
+		r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
 
 		go func() {
 			err := server.Serve(r.tlsListener)
@@ -302,7 +300,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
-		r.logger.Fatal("tcp-listener-error", err)
+		r.logger.Fatal("tcp-listener-error", zap.Error(err))
 		return err
 	}
 
@@ -314,7 +312,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.logger.Info("tcp-listener-started", lager.Data{"address": r.listener.Addr()})
+	r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
 
 	go func() {
 		err := server.Serve(r.listener)
@@ -377,9 +375,7 @@ func (r *Router) Stop() {
 	r.uptimeMonitor.Stop()
 	r.logger.Info(
 		"gorouter.stopped",
-		lager.Data{
-			"took": time.Since(stoppingAt).String(),
-		},
+		zap.Duration("took", time.Since(stoppingAt)),
 	)
 }
 
@@ -488,7 +484,7 @@ func (r *Router) flushApps(t time.Time) {
 
 	z := b.Bytes()
 
-	r.logger.Debug("Debug Info", lager.Data{"Active apps": len(x), "message size:": len(z)})
+	r.logger.Debug("Debug Info", zap.Int("Active apps", len(x)), zap.Int("message size:", len(z)))
 
 	r.mbusClient.Publish("router.active_apps", z)
 }

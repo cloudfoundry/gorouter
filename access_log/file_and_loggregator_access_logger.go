@@ -5,14 +5,14 @@ import (
 	"log/syslog"
 	"regexp"
 
-	"fmt"
 	"strconv"
 
-	"code.cloudfoundry.org/lager"
 	"github.com/cloudfoundry/dropsonde/logs"
+	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 
 	"os"
 )
@@ -37,10 +37,10 @@ type FileAndLoggregatorAccessLogger struct {
 	stopCh                  chan struct{}
 	writer                  io.Writer
 	writerCount             int
-	logger                  lager.Logger
+	logger                  logger.Logger
 }
 
-func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (AccessLogger, error) {
+func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (AccessLogger, error) {
 
 	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
@@ -52,7 +52,7 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 	if config.AccessLog.File != "" {
 		file, err = os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			logger.Error(fmt.Sprintf("Error creating accesslog file, %s", config.AccessLog.File), err)
+			logger.Error("error-creating-accesslog-file", zap.String("filename", config.AccessLog.File), zap.Error(err))
 			return nil, err
 		}
 		writers = append(writers, file)
@@ -61,7 +61,7 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 	if config.AccessLog.EnableStreaming {
 		syslogWriter, err := syslog.Dial("", "", syslog.LOG_INFO, config.Logging.Syslog)
 		if err != nil {
-			logger.Error("Error creating syslog writer", err)
+			logger.Error("error-creating-syslog-writer", zap.Error(err))
 			return nil, err
 		}
 		writers = append(writers, syslogWriter)
@@ -77,7 +77,7 @@ func CreateRunningAccessLogger(logger lager.Logger, config *config.Config) (Acce
 	return accessLogger, nil
 }
 
-func NewFileAndLoggregatorAccessLogger(logger lager.Logger, dropsondeSourceInstance string, ws ...io.Writer) *FileAndLoggregatorAccessLogger {
+func NewFileAndLoggregatorAccessLogger(logger logger.Logger, dropsondeSourceInstance string, ws ...io.Writer) *FileAndLoggregatorAccessLogger {
 	a := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
 		channel:                 make(chan schema.AccessLogRecord, 1024),
@@ -95,7 +95,7 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 			if x.writer != nil {
 				_, err := record.WriteTo(x.writer)
 				if err != nil {
-					x.logger.Error("Error when emiting access log to writers ", err)
+					x.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
 				}
 			}
 			if x.dropsondeSourceInstance != "" && record.ApplicationID() != "" {

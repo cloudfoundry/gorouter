@@ -361,7 +361,7 @@ var _ = Describe("Router Integration", func() {
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Eventually(gorouterSession, 5*time.Second).Should(Exit(2))
+			Eventually(gorouterSession, 5*time.Second).Should(Exit(1))
 		})
 	})
 
@@ -715,7 +715,7 @@ var _ = Describe("Router Integration", func() {
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(session, 30*time.Second).Should(Say("unable-to-fetch-token"))
-					Eventually(session, 5*time.Second).Should(Exit(2))
+					Eventually(session, 5*time.Second).Should(Exit(1))
 				})
 			})
 
@@ -732,7 +732,7 @@ var _ = Describe("Router Integration", func() {
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(session, 30*time.Second).Should(Say("routing-api-connection-failed"))
-					Eventually(session, 5*time.Second).Should(Exit(2))
+					Eventually(session, 5*time.Second).Should(Exit(1))
 				})
 			})
 		})
@@ -746,7 +746,7 @@ var _ = Describe("Router Integration", func() {
 				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
-				Eventually(session, 5*time.Second).Should(Exit(2))
+				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
 		})
 	})

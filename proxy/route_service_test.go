@@ -68,7 +68,7 @@ var _ = Describe("Route Services", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		config := routeservice.NewRouteServiceConfig(
-			logger,
+			testLogger,
 			conf.RouteServiceEnabled,
 			1*time.Hour,
 			crypto,
@@ -322,7 +322,7 @@ var _ = Describe("Route Services", func() {
 				res, body := conn.ReadResponse()
 				Expect(body).ToNot(ContainSubstring("backend instance"))
 				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-				Expect(logger).Should(gbytes.Say("response.*status-code\":502"))
+				Expect(testLogger).Should(gbytes.Say("response.*status-code\":502"))
 			})
 		})
 	})

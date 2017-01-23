@@ -6,11 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber-go/zap"
+
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/registry/container"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/lager"
 )
 
 //go:generate counterfeiter -o fakes/fake_registry_interface.go . RegistryInterface
@@ -36,7 +38,7 @@ const (
 type RouteRegistry struct {
 	sync.RWMutex
 
-	logger lager.Logger
+	logger logger.Logger
 
 	// Access to the Trie datastructure should be governed by the RWMutex of RouteRegistry
 	byUri *container.Trie
@@ -54,7 +56,7 @@ type RouteRegistry struct {
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(logger lager.Logger, c *config.Config, reporter reporter.RouteRegistryReporter) *RouteRegistry {
+func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter reporter.RouteRegistryReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byUri = container.NewTrie()
@@ -69,7 +71,11 @@ func NewRouteRegistry(logger lager.Logger, c *config.Config, reporter reporter.R
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
-	data := lager.Data{"uri": uri, "backend": endpoint.CanonicalAddr(), "modification_tag": endpoint.ModificationTag}
+	zapData := []zap.Field{
+		zap.Stringer("uri", uri),
+		zap.String("backend", endpoint.CanonicalAddr()),
+		zap.Object("modification_tag", endpoint.ModificationTag),
+	}
 
 	r.reporter.CaptureRegistryMessage(endpoint)
 
@@ -82,7 +88,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		contextPath := parseContextPath(uri)
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byUri.Insert(uri, pool)
-		r.logger.Debug("uri-added", lager.Data{"uri": uri})
+		r.logger.Debug("uri-added", zap.Stringer("uri", uri))
 	}
 
 	endpointAdded := pool.Put(endpoint)
@@ -91,14 +97,18 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	r.Unlock()
 
 	if endpointAdded {
-		r.logger.Debug("endpoint-registered", data)
+		r.logger.Debug("endpoint-registered", zapData...)
 	} else {
-		r.logger.Debug("endpoint-not-registered", data)
+		r.logger.Debug("endpoint-not-registered", zapData...)
 	}
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
-	data := lager.Data{"uri": uri, "backend": endpoint.CanonicalAddr(), "modification_tag": endpoint.ModificationTag}
+	zapData := []zap.Field{
+		zap.Stringer("uri", uri),
+		zap.String("backend", endpoint.CanonicalAddr()),
+		zap.Object("modification_tag", endpoint.ModificationTag),
+	}
 	r.reporter.CaptureRegistryMessage(endpoint)
 
 	r.Lock()
@@ -109,9 +119,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Debug("endpoint-unregistered", data)
+			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
-			r.logger.Debug("endpoint-not-unregistered", data)
+			r.logger.Debug("endpoint-not-unregistered", zapData...)
 		}
 
 		if pool.IsEmpty() {
@@ -244,7 +254,10 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 			for _, e := range endpoints {
 				addresses = append(addresses, e.CanonicalAddr())
 			}
-			r.logger.Info("pruned-route", lager.Data{"uri": t.ToPath(), "endpoints": addresses})
+			r.logger.Info("pruned-route",
+				zap.String("uri", t.ToPath()),
+				zap.Object("endpoints", addresses),
+			)
 		}
 	})
 }

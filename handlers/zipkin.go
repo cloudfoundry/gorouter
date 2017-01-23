@@ -3,19 +3,19 @@ package handlers
 import (
 	"net/http"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/lager"
 )
 
 type zipkin struct {
 	zipkinEnabled bool
-	logger        lager.Logger
+	logger        logger.Logger
 	headersToLog  *[]string // Shared state with proxy for access logs
 }
 
-func NewZipkin(enabled bool, headersToLog *[]string, logger lager.Logger) negroni.Handler {
+func NewZipkin(enabled bool, headersToLog *[]string, logger logger.Logger) negroni.Handler {
 	return &zipkin{
 		zipkinEnabled: enabled,
 		headersToLog:  headersToLog,

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/uber-go/zap"
+
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/routing-api/models"
 )
@@ -309,17 +311,12 @@ func (rm *Endpoint) Component() string {
 	return rm.Tags["component"]
 }
 
-func (e *Endpoint) ToLogData() interface{} {
-	return struct {
-		ApplicationId   string
-		Addr            string
-		Tags            map[string]string
-		RouteServiceUrl string
-	}{
-		e.ApplicationId,
-		e.addr,
-		e.Tags,
-		e.RouteServiceUrl,
+func (e *Endpoint) ToLogData() []zap.Field {
+	return []zap.Field{
+		zap.String("ApplicationId", e.ApplicationId),
+		zap.String("Addr", e.addr),
+		zap.Object("Tags", e.Tags),
+		zap.String("RouteServiceUrl", e.RouteServiceUrl),
 	}
 }
 
