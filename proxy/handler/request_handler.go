@@ -88,7 +88,7 @@ func (h *RequestHandler) HandleUnsupportedProtocol() {
 }
 
 func (h *RequestHandler) HandleMissingRoute() {
-	h.reporter.CaptureBadRequest(h.request)
+	h.reporter.CaptureBadRequest()
 	h.logger.Info("unknown-route")
 
 	h.response.Header().Set("X-Cf-RouterError", "unknown_route")
@@ -97,7 +97,7 @@ func (h *RequestHandler) HandleMissingRoute() {
 }
 
 func (h *RequestHandler) HandleBadGateway(err error, request *http.Request) {
-	h.reporter.CaptureBadGateway(request)
+	h.reporter.CaptureBadGateway()
 
 	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")

@@ -27,6 +27,8 @@ import (
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/nats"
 
 	"flag"
@@ -84,7 +86,11 @@ func main() {
 	startMsgChan := make(chan struct{})
 	natsClient := connectToNatsServer(logger.Session("nats"), c, startMsgChan)
 
-	metricsReporter := metrics.NewMetricsReporter()
+	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	// 5 sec is dropsonde default batching interval
+	batcher := metricbatcher.New(sender, 5*time.Second)
+	metricsReporter := metrics.NewMetricsReporter(sender, batcher)
+
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })

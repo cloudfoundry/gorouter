@@ -202,7 +202,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
 				accessLog.RouteEndpoint = endpoint
-				p.reporter.CaptureRoutingRequest(endpoint, request)
+				p.reporter.CaptureRoutingRequest(endpoint)
 			}
 		},
 	}
@@ -279,7 +279,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		if backend {
 			p.reporter.CaptureRoutingResponse(endpoint, rsp, accessLog.StartedAt, latency)
 		} else {
-			p.reporter.CaptureRouteServiceResponse(endpoint, rsp, accessLog.StartedAt, latency)
+			p.reporter.CaptureRouteServiceResponse(rsp)
 		}
 
 		if err != nil {

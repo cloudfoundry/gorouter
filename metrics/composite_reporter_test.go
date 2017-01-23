@@ -20,7 +20,6 @@ var _ = Describe("CompositeReporter", func() {
 	var fakeReporter2 *fakes.FakeProxyReporter
 	var composite reporter.ProxyReporter
 
-	var req *http.Request
 	var endpoint *route.Endpoint
 	var response *http.Response
 	var responseTime time.Time
@@ -31,7 +30,6 @@ var _ = Describe("CompositeReporter", func() {
 		fakeReporter2 = new(fakes.FakeProxyReporter)
 
 		composite = metrics.NewCompositeReporter(fakeReporter1, fakeReporter2)
-		req, _ = http.NewRequest("GET", "https://example.com", nil)
 		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{})
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
@@ -39,36 +37,28 @@ var _ = Describe("CompositeReporter", func() {
 	})
 
 	It("forwards CaptureBadRequest to both reporters", func() {
-		composite.CaptureBadRequest(req)
+		composite.CaptureBadRequest()
 
 		Expect(fakeReporter1.CaptureBadRequestCallCount()).To(Equal(1))
 		Expect(fakeReporter2.CaptureBadRequestCallCount()).To(Equal(1))
-
-		Expect(fakeReporter1.CaptureBadRequestArgsForCall(0)).To(Equal(req))
-		Expect(fakeReporter2.CaptureBadRequestArgsForCall(0)).To(Equal(req))
 	})
 
 	It("forwards CaptureBadGateway to both reporters", func() {
-		composite.CaptureBadGateway(req)
+		composite.CaptureBadGateway()
 		Expect(fakeReporter1.CaptureBadGatewayCallCount()).To(Equal(1))
 		Expect(fakeReporter2.CaptureBadGatewayCallCount()).To(Equal(1))
-
-		Expect(fakeReporter1.CaptureBadGatewayArgsForCall(0)).To(Equal(req))
-		Expect(fakeReporter2.CaptureBadGatewayArgsForCall(0)).To(Equal(req))
 	})
 
 	It("forwards CaptureRoutingRequest to both reporters", func() {
-		composite.CaptureRoutingRequest(endpoint, req)
+		composite.CaptureRoutingRequest(endpoint)
 		Expect(fakeReporter1.CaptureRoutingRequestCallCount()).To(Equal(1))
 		Expect(fakeReporter2.CaptureRoutingRequestCallCount()).To(Equal(1))
 
-		callEndpoint, callReq := fakeReporter1.CaptureRoutingRequestArgsForCall(0)
+		callEndpoint := fakeReporter1.CaptureRoutingRequestArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
-		Expect(callReq).To(Equal(req))
 
-		callEndpoint, callReq = fakeReporter2.CaptureRoutingRequestArgsForCall(0)
+		callEndpoint = fakeReporter2.CaptureRoutingRequestArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
-		Expect(callReq).To(Equal(req))
 	})
 
 	It("forwards CaptureRoutingResponse to both reporters", func() {

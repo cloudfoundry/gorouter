@@ -1,98 +1,111 @@
 package metrics_test
 
 import (
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/routing-api/models"
-	"github.com/cloudfoundry/dropsonde/metric_sender/fake"
-	dropsondeMetrics "github.com/cloudfoundry/dropsonde/metrics"
-
 	"net/http"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/routing-api/models"
+
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("MetricsReporter", func() {
-	var metricsReporter *metrics.MetricsReporter
-	var req *http.Request
-	var endpoint *route.Endpoint
-	var sender *fake.FakeMetricSender
+	var (
+		endpoint       *route.Endpoint
+		sender         *fakes.MetricSender
+		batcher        *fakes.MetricBatcher
+		metricReporter *metrics.MetricsReporter
+	)
 
 	BeforeEach(func() {
-		metricsReporter = metrics.NewMetricsReporter()
-		req, _ = http.NewRequest("GET", "https://example.com", nil)
 		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{})
-		sender = fake.NewFakeMetricSender()
-		batcher := metricbatcher.New(sender, time.Millisecond)
-		dropsondeMetrics.Initialize(sender, batcher)
+		sender = new(fakes.MetricSender)
+		batcher = new(fakes.MetricBatcher)
+		metricReporter = metrics.NewMetricsReporter(sender, batcher)
 	})
 
 	It("increments the bad_requests metric", func() {
-		metricsReporter.CaptureBadRequest(req)
-		Eventually(func() uint64 { return sender.GetCounter("rejected_requests") }).Should(BeEquivalentTo(1))
+		metricReporter.CaptureBadRequest()
 
-		metricsReporter.CaptureBadRequest(req)
-		Eventually(func() uint64 { return sender.GetCounter("rejected_requests") }).Should(BeEquivalentTo(2))
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("rejected_requests"))
+
+		metricReporter.CaptureBadRequest()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("rejected_requests"))
 	})
 
 	It("increments the bad_gateway metric", func() {
-		metricsReporter.CaptureBadGateway(req)
-		Eventually(func() uint64 { return sender.GetCounter("bad_gateways") }).Should(BeEquivalentTo(1))
+		metricReporter.CaptureBadGateway()
 
-		metricsReporter.CaptureBadGateway(req)
-		Eventually(func() uint64 { return sender.GetCounter("bad_gateways") }).Should(BeEquivalentTo(2))
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("bad_gateways"))
+
+		metricReporter.CaptureBadGateway()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("bad_gateways"))
 	})
 
 	Context("increments the request metrics", func() {
 		It("increments the total requests metric", func() {
-			metricsReporter.CaptureRoutingRequest(&route.Endpoint{}, req)
-			Eventually(func() uint64 { return sender.GetCounter("total_requests") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingRequest(&route.Endpoint{})
 
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("total_requests") }).Should(BeEquivalentTo(2))
-		})
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("total_requests"))
 
-		It("should not emit a request metric for a component when no tags exist", func() {
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Consistently(func() uint64 { return sender.GetCounter("requests.") }).Should(BeEquivalentTo(0))
+			metricReporter.CaptureRoutingRequest(&route.Endpoint{})
 
-			endpoint.Tags["component"] = ""
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Consistently(func() uint64 { return sender.GetCounter("requests.") }).Should(BeEquivalentTo(0))
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("total_requests"))
 		})
 
 		It("increments the requests metric for the given component", func() {
 			endpoint.Tags["component"] = "CloudController"
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("requests.CloudController") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingRequest(endpoint)
 
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("requests.CloudController") }).Should(BeEquivalentTo(2))
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("requests.CloudController"))
+
+			metricReporter.CaptureRoutingRequest(endpoint)
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("requests.CloudController"))
 
 			endpoint.Tags["component"] = "UAA"
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("requests.UAA") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingRequest(endpoint)
 
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("requests.UAA") }).Should(BeEquivalentTo(2))
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(6))
+			Expect(batcher.BatchIncrementCounterArgsForCall(5)).To(Equal("requests.UAA"))
 
+			metricReporter.CaptureRoutingRequest(endpoint)
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(8))
+			Expect(batcher.BatchIncrementCounterArgsForCall(7)).To(Equal("requests.UAA"))
 		})
 
 		It("increments the routed_app_requests metric", func() {
 			endpoint.Tags["component"] = "dea-1"
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("routed_app_requests") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingRequest(endpoint)
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(3))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("routed_app_requests"))
 
 			endpoint.Tags["component"] = "dea-3"
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Eventually(func() uint64 { return sender.GetCounter("routed_app_requests") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingRequest(endpoint)
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(6))
+			Expect(batcher.BatchIncrementCounterArgsForCall(5)).To(Equal("routed_app_requests"))
 
 			endpoint.Tags["component"] = "CloudController"
-			metricsReporter.CaptureRoutingRequest(endpoint, req)
-			Consistently(func() uint64 { return sender.GetCounter("routed_app_requests") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingRequest(endpoint)
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(8))
 		})
 	})
 
@@ -102,11 +115,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 200,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.2xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.2xx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.2xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.2xx"))
 		})
 
 		It("increments the 3XX response metrics", func() {
@@ -114,11 +129,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 304,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.3xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.3xx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.3xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.3xx"))
 		})
 
 		It("increments the 4XX response metrics", func() {
@@ -126,11 +143,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.4xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.4xx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.4xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.4xx"))
 		})
 
 		It("increments the 5XX response metrics", func() {
@@ -138,11 +157,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 504,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.5xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.5xx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.5xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.5xx"))
 		})
 
 		It("increments the XXX response metrics", func() {
@@ -150,19 +171,23 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 100,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.xxx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(&response)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.xxx"))
 		})
 
 		It("increments the XXX response metrics with null response", func() {
-			metricsReporter.CaptureRouteServiceResponse(endpoint, nil, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(nil)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.route_services.xxx"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, nil, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services.xxx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRouteServiceResponse(nil)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.route_services.xxx"))
 		})
 
 		It("increments the total responses", func() {
@@ -173,12 +198,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response2xx, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRouteServiceResponse(&response2xx)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("responses.route_services"))
 
-			metricsReporter.CaptureRouteServiceResponse(endpoint, &response4xx, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.route_services") }).Should(BeEquivalentTo(2))
-
+			metricReporter.CaptureRouteServiceResponse(&response4xx)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("responses.route_services"))
 		})
 	})
 
@@ -188,11 +214,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 200,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.2xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.2xx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.2xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.2xx"))
 		})
 
 		It("increments the 3XX response metrics", func() {
@@ -200,11 +228,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 304,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.3xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.3xx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.3xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.3xx"))
 		})
 
 		It("increments the 4XX response metrics", func() {
@@ -212,11 +242,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.4xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.4xx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.4xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.4xx"))
 		})
 
 		It("increments the 5XX response metrics", func() {
@@ -224,11 +256,13 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 504,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.5xx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.5xx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.5xx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.5xx"))
 		})
 
 		It("increments the XXX response metrics", func() {
@@ -236,19 +270,23 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 100,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.xxx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.xxx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
 
 		It("increments the XXX response metrics with null response", func() {
-			metricsReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.xxx") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses.xxx") }).Should(BeEquivalentTo(2))
+			metricReporter.CaptureRoutingResponse(endpoint, nil, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
 
 		It("increments the total responses", func() {
@@ -259,40 +297,44 @@ var _ = Describe("MetricsReporter", func() {
 				StatusCode: 401,
 			}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response2xx, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses") }).Should(BeEquivalentTo(1))
+			metricReporter.CaptureRoutingResponse(endpoint, &response2xx, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("responses"))
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response4xx, time.Now(), time.Millisecond)
-			Eventually(func() uint64 { return sender.GetCounter("responses") }).Should(BeEquivalentTo(2))
-
+			metricReporter.CaptureRoutingResponse(endpoint, &response4xx, time.Now(), time.Millisecond)
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
+			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("responses"))
 		})
+	})
 
-		It("sends the latency", func() {
-			response := http.Response{
-				StatusCode: 401,
-			}
+	It("sends the latency", func() {
+		response := http.Response{
+			StatusCode: 401,
+		}
 
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
-			Eventually(func() fake.Metric { return sender.GetValue("latency") }).Should(Equal(
-				fake.Metric{
-					Value: 2000,
-					Unit:  "ms",
-				}))
-		})
+		metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
 
-		It("sends the latency for the given component", func() {
-			response := http.Response{
-				StatusCode: 200,
-			}
+		Expect(sender.SendValueCallCount()).To(Equal(1))
+		name, value, unit := sender.SendValueArgsForCall(0)
+		Expect(name).To(Equal("latency"))
+		Expect(value).To(BeEquivalentTo(2000))
+		Expect(unit).To(Equal("ms"))
 
-			endpoint.Tags["component"] = "CloudController"
-			metricsReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
-			Eventually(func() fake.Metric { return sender.GetValue("latency.CloudController") }).Should(Equal(
-				fake.Metric{
-					Value: 2000,
-					Unit:  "ms",
-				}))
-		})
+	})
+
+	It("sends the latency for the given component", func() {
+		response := http.Response{
+			StatusCode: 200,
+		}
+
+		endpoint.Tags["component"] = "CloudController"
+		metricReporter.CaptureRoutingResponse(endpoint, &response, time.Now(), 2*time.Second)
+
+		Expect(sender.SendValueCallCount()).To(Equal(2))
+		name, value, unit := sender.SendValueArgsForCall(1)
+		Expect(name).To(Equal("latency.CloudController"))
+		Expect(value).To(BeEquivalentTo(2000))
+		Expect(unit).To(Equal("ms"))
 	})
 
 	Context("sends route metrics", func() {
@@ -304,40 +346,44 @@ var _ = Describe("MetricsReporter", func() {
 
 		It("sends number of nats messages received from each component", func() {
 			endpoint.Tags = map[string]string{"component": "uaa"}
-			metricsReporter.CaptureRegistryMessage(endpoint)
+			metricReporter.CaptureRegistryMessage(endpoint)
 
 			endpoint.Tags = map[string]string{"component": "route-emitter"}
-			metricsReporter.CaptureRegistryMessage(endpoint)
+			metricReporter.CaptureRegistryMessage(endpoint)
 
-			Eventually(func() uint64 { return sender.GetCounter("registry_message.route-emitter") }).Should(BeEquivalentTo(1))
-			Eventually(func() uint64 { return sender.GetCounter("registry_message.uaa") }).Should(BeEquivalentTo(1))
+			Expect(sender.IncrementCounterCallCount()).To(Equal(2))
+			Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("registry_message.uaa"))
+			Expect(sender.IncrementCounterArgsForCall(1)).To(Equal("registry_message.route-emitter"))
 		})
 
 		It("sends the total routes", func() {
-			metricsReporter.CaptureRouteStats(12, 5)
-			Eventually(func() fake.Metric { return sender.GetValue("total_routes") }).Should(Equal(
-				fake.Metric{
-					Value: 12,
-					Unit:  "",
-				}))
+			metricReporter.CaptureRouteStats(12, 5)
+
+			Expect(sender.SendValueCallCount()).To(Equal(2))
+			name, value, unit := sender.SendValueArgsForCall(0)
+			Expect(name).To(Equal("total_routes"))
+			Expect(value).To(BeEquivalentTo(12))
+			Expect(unit).To(Equal(""))
 		})
 
 		It("sends the time since last update", func() {
-			metricsReporter.CaptureRouteStats(12, 5)
-			Eventually(func() fake.Metric { return sender.GetValue("ms_since_last_registry_update") }).Should(Equal(
-				fake.Metric{
-					Value: 5,
-					Unit:  "ms",
-				}))
+			metricReporter.CaptureRouteStats(12, 5)
+
+			Expect(sender.SendValueCallCount()).To(Equal(2))
+			name, value, unit := sender.SendValueArgsForCall(1)
+			Expect(name).To(Equal("ms_since_last_registry_update"))
+			Expect(value).To(BeEquivalentTo(5))
+			Expect(unit).To(Equal("ms"))
 		})
 
 		It("sends the lookup time for routing table", func() {
-			metricsReporter.CaptureLookupTime(time.Duration(9) * time.Second)
-			Eventually(func() fake.Metric { return sender.GetValue("route_lookup_time") }).Should(Equal(
-				fake.Metric{
-					Value: 9000000000,
-					Unit:  "ns",
-				}))
+			metricReporter.CaptureLookupTime(time.Duration(9) * time.Second)
+
+			Expect(sender.SendValueCallCount()).To(Equal(1))
+			name, value, unit := sender.SendValueArgsForCall(0)
+			Expect(name).To(Equal("route_lookup_time"))
+			Expect(value).To(BeEquivalentTo(9000000000))
+			Expect(unit).To(Equal("ns"))
 		})
 	})
 })

@@ -9,11 +9,11 @@ import (
 
 //go:generate counterfeiter -o fakes/fake_reporter.go . ProxyReporter
 type ProxyReporter interface {
-	CaptureBadRequest(req *http.Request)
-	CaptureBadGateway(req *http.Request)
-	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
+	CaptureBadRequest()
+	CaptureBadGateway()
+	CaptureRoutingRequest(b *route.Endpoint)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
-	CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration)
+	CaptureRouteServiceResponse(res *http.Response)
 }
 
 type ComponentTagged interface {

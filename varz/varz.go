@@ -162,11 +162,11 @@ type Varz interface {
 
 	ActiveApps() *stats.ActiveApps
 
-	CaptureBadRequest(req *http.Request)
-	CaptureBadGateway(req *http.Request)
-	CaptureRoutingRequest(b *route.Endpoint, req *http.Request)
+	CaptureBadRequest()
+	CaptureBadGateway()
+	CaptureRoutingRequest(b *route.Endpoint)
 	CaptureRoutingResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
-	CaptureRouteServiceResponse(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
+	CaptureRouteServiceResponse(res *http.Response)
 }
 
 type RealVarz struct {
@@ -228,13 +228,13 @@ func (x *RealVarz) ActiveApps() *stats.ActiveApps {
 	return x.activeApps
 }
 
-func (x *RealVarz) CaptureBadRequest(*http.Request) {
+func (x *RealVarz) CaptureBadRequest() {
 	x.Lock()
 	x.BadRequests++
 	x.Unlock()
 }
 
-func (x *RealVarz) CaptureBadGateway(*http.Request) {
+func (x *RealVarz) CaptureBadGateway() {
 	x.Lock()
 	x.BadGateways++
 	x.Unlock()
@@ -247,7 +247,7 @@ func (x *RealVarz) CaptureAppStats(b *route.Endpoint, t time.Time) {
 	}
 }
 
-func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
+func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint) {
 	x.Lock()
 
 	var t string
@@ -264,7 +264,7 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint, req *http.Request) {
 }
 
 // do not emit route service through varz
-func (x *RealVarz) CaptureRouteServiceResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
+func (x *RealVarz) CaptureRouteServiceResponse(res *http.Response) {
 }
 
 func (x *RealVarz) CaptureRoutingResponse(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {

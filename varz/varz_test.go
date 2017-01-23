@@ -87,33 +87,28 @@ var _ = Describe("Varz", func() {
 	})
 
 	It("updates bad requests", func() {
-		r := http.Request{}
-
-		Varz.CaptureBadRequest(&r)
+		Varz.CaptureBadRequest()
 		Expect(findValue(Varz, "bad_requests")).To(Equal(float64(1)))
 
-		Varz.CaptureBadRequest(&r)
+		Varz.CaptureBadRequest()
 		Expect(findValue(Varz, "bad_requests")).To(Equal(float64(2)))
 	})
 
 	It("updates bad gateways", func() {
-		r := &http.Request{}
-
-		Varz.CaptureBadGateway(r)
+		Varz.CaptureBadGateway()
 		Expect(findValue(Varz, "bad_gateways")).To(Equal(float64(1)))
 
-		Varz.CaptureBadGateway(r)
+		Varz.CaptureBadGateway()
 		Expect(findValue(Varz, "bad_gateways")).To(Equal(float64(2)))
 	})
 
 	It("updates requests", func() {
 		b := &route.Endpoint{}
-		r := http.Request{}
 
-		Varz.CaptureRoutingRequest(b, &r)
+		Varz.CaptureRoutingRequest(b)
 		Expect(findValue(Varz, "requests")).To(Equal(float64(1)))
 
-		Varz.CaptureRoutingRequest(b, &r)
+		Varz.CaptureRoutingRequest(b)
 		Expect(findValue(Varz, "requests")).To(Equal(float64(2)))
 	})
 
@@ -130,11 +125,8 @@ var _ = Describe("Varz", func() {
 			},
 		}
 
-		r1 := http.Request{}
-		r2 := http.Request{}
-
-		Varz.CaptureRoutingRequest(b1, &r1)
-		Varz.CaptureRoutingRequest(b2, &r2)
+		Varz.CaptureRoutingRequest(b1)
+		Varz.CaptureRoutingRequest(b2)
 
 		Expect(findValue(Varz, "tags", "component", "cc", "requests")).To(Equal(float64(2)))
 	})
