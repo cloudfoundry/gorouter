@@ -1,6 +1,8 @@
 package logger_test
 
 import (
+	"fmt"
+
 	. "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 
@@ -17,11 +19,13 @@ var _ = Describe("Logger", func() {
 
 	var component = "my-component"
 	var action = "my-action"
+	var testField = zap.String("new-key", "new-value")
 
 	BeforeEach(func() {
 		testSink = &test_util.TestZapSink{Buffer: gbytes.NewBuffer()}
 		logger = NewLogger(
 			component,
+			zap.DebugLevel,
 			zap.Output(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))),
 			zap.ErrorOutput(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))))
 	})
@@ -81,22 +85,14 @@ var _ = Describe("Logger", func() {
 	})
 
 	Describe("With", func() {
-		var (
-			fieldKey   string
-			fieldValue string
-		)
-
 		BeforeEach(func() {
-			fieldKey = "new-key"
-			fieldValue = "new-value"
-
-			logger = logger.With(zap.String(fieldKey, fieldValue))
+			logger = logger.With(testField)
 			logger.Info(action)
 		})
 
 		It("returns a logger that adds that field to every log line", func() {
 			Expect(testSink.Lines()).To(HaveLen(1))
-			Expect(testSink.Lines()[0]).To(MatchRegexp("{.*\"new-key\":\"new-value\".*}"))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"new-key":"new-value"}}`))
 		})
 
 		Context("when Session is called with the new Logger", func() {
@@ -106,9 +102,46 @@ var _ = Describe("Logger", func() {
 			})
 			It("has only one source key in the log, with the context added from the call to With", func() {
 				Expect(testSink.Lines()).To(HaveLen(2))
-				Expect(testSink.Lines()[1]).To(MatchRegexp("{.*\"new-key\":\"new-value\".*}"))
-				Expect(testSink.Lines()[1]).To(MatchRegexp("{.*\"source\":\"my-component.session-id\".*}"))
+				Expect(testSink.Lines()[1]).To(MatchRegexp(`{.*"data":{.*"new-key":"new-value".*}`))
+				Expect(testSink.Lines()[1]).To(MatchRegexp(`{.*"source":"my-component.session-id".*}`))
 			})
+		})
+	})
+
+	Describe("Log", func() {
+		It("formats the log line correctly", func() {
+			logger.Log(zap.InfoLevel, action, testField)
+			Expect(testSink.Lines()).To(HaveLen(1))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(fmt.Sprintf(`{.*"message":"%s".*}`, action)))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"log_level":1.*}`))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"new-key":"new-value"}}`))
+		})
+	})
+	Describe("Debug", func() {
+		It("formats the log line correctly", func() {
+			logger.Debug(action, testField)
+			Expect(testSink.Lines()).To(HaveLen(1))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(fmt.Sprintf(`{.*"message":"%s".*}`, action)))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"log_level":0.*}`))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"new-key":"new-value"}}`))
+		})
+	})
+	Describe("Info", func() {
+		It("formats the log line correctly", func() {
+			logger.Info(action, testField)
+			Expect(testSink.Lines()).To(HaveLen(1))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(fmt.Sprintf(`{.*"message":"%s".*}`, action)))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"log_level":1.*}`))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"new-key":"new-value"}}`))
+		})
+	})
+	Describe("Warn", func() {
+		It("formats the log line correctly", func() {
+			logger.Warn(action, testField)
+			Expect(testSink.Lines()).To(HaveLen(1))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(fmt.Sprintf(`{.*"message":"%s".*}`, action)))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"log_level":2.*}`))
+			Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"new-key":"new-value"}}`))
 		})
 	})
 })

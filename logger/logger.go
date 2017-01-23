@@ -2,6 +2,7 @@ package logger
 
 import "github.com/uber-go/zap"
 
+// Logger is the zap.Logger interface with additional Session methods.
 //go:generate counterfeiter -o fakes/fake_logger.go . Logger
 type Logger interface {
 	With(...zap.Field) Logger
@@ -21,9 +22,11 @@ type Logger interface {
 type logger struct {
 	source     string
 	origLogger zap.Logger
+	context    []zap.Field
 	zap.Logger
 }
 
+// NewLogger returns a new zap logger that implements the Logger interface.
 func NewLogger(component string, options ...zap.Option) Logger {
 	enc := zap.NewJSONEncoder(
 		zap.LevelString("log_level"),
@@ -40,26 +43,58 @@ func NewLogger(component string, options ...zap.Option) Logger {
 	}
 }
 
-func (log *logger) Session(component string) Logger {
-	newSource := log.source + "." + component
+func (l *logger) Session(component string) Logger {
+	newSource := l.source + "." + component
 	lggr := &logger{
 		source:     newSource,
-		origLogger: log.origLogger,
-		Logger:     log.origLogger.With(zap.String("source", newSource)),
+		origLogger: l.origLogger,
+		Logger:     l.origLogger.With(zap.String("source", newSource)),
+		context:    l.context,
 	}
 	return lggr
 }
 
-func (log *logger) SessionName() string {
-	return log.source
+func (l *logger) SessionName() string {
+	return l.source
 }
 
-func (log *logger) With(fields ...zap.Field) Logger {
+func (l *logger) wrapDataFields(fields ...zap.Field) zap.Field {
+	finalFields := append(l.context, fields...)
+	return zap.Nest("data", finalFields...)
+}
+
+func (l *logger) With(fields ...zap.Field) Logger {
 	return &logger{
-		source:     log.source,
-		origLogger: log.origLogger.With(fields...),
-		Logger:     log.Logger.With(fields...),
+		source:     l.source,
+		origLogger: l.origLogger,
+		Logger:     l.Logger,
+		context:    append(l.context, fields...),
 	}
+}
+
+func (l *logger) Log(level zap.Level, msg string, fields ...zap.Field) {
+	l.Logger.Log(level, msg, l.wrapDataFields(fields...))
+}
+func (l *logger) Debug(msg string, fields ...zap.Field) {
+	l.Log(zap.DebugLevel, msg, fields...)
+}
+func (l *logger) Info(msg string, fields ...zap.Field) {
+	l.Log(zap.InfoLevel, msg, fields...)
+}
+func (l *logger) Warn(msg string, fields ...zap.Field) {
+	l.Log(zap.WarnLevel, msg, fields...)
+}
+func (l *logger) Error(msg string, fields ...zap.Field) {
+	l.Log(zap.ErrorLevel, msg, fields...)
+}
+func (l *logger) DPanic(msg string, fields ...zap.Field) {
+	l.Logger.DPanic(msg, l.wrapDataFields(fields...))
+}
+func (l *logger) Panic(msg string, fields ...zap.Field) {
+	l.Logger.Panic(msg, l.wrapDataFields(fields...))
+}
+func (l *logger) Fatal(msg string, fields ...zap.Field) {
+	l.Logger.Fatal(msg, l.wrapDataFields(fields...))
 }
 
 func numberLevelFormatter() zap.LevelFormatter {
