@@ -1,4 +1,4 @@
-bin/*
+bin/*.sh
 !bin/test
 !bin/env
 !bin/go
