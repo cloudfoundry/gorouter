@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log"
@@ -72,6 +73,7 @@ type proxy struct {
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
 	defaultLoadBalance       string
+	bufferPool               httputil.BufferPool
 }
 
 func NewProxy(
@@ -116,6 +118,7 @@ func NewProxy(
 		healthCheckUserAgent:     c.HealthCheckUserAgent,
 		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 		defaultLoadBalance:       c.LoadBalance,
+		bufferPool:               NewBufferPool(),
 	}
 
 	n := negroni.New()
@@ -172,6 +175,28 @@ func (p *proxy) lookup(request *http.Request) *route.Pool {
 	}
 
 	return p.registry.Lookup(uri)
+}
+
+type bufferPool struct {
+	pool *sync.Pool
+}
+
+func NewBufferPool() httputil.BufferPool {
+	return &bufferPool{
+		pool: new(sync.Pool),
+	}
+}
+
+func (b *bufferPool) Get() []byte {
+	buf := b.pool.Get()
+	if buf == nil {
+		return make([]byte, 8192)
+	}
+	return buf.([]byte)
+}
+
+func (b *bufferPool) Put(buf []byte) {
+	b.pool.Put(buf)
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
@@ -301,13 +326,15 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	roundTripper := round_tripper.NewProxyRoundTripper(backend,
 		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler.Logger(), after)
 
-	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps).ServeHTTP(proxyWriter, request)
+	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps, p.bufferPool).ServeHTTP(proxyWriter, request)
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 	routeServiceArgs routeservice.RouteServiceRequest,
 	routeServiceConfig *routeservice.RouteServiceConfig,
-	forceForwardedProtoHttps bool) http.Handler {
+	forceForwardedProtoHttps bool,
+	bufPool httputil.BufferPool,
+) http.Handler {
 	rproxy := &httputil.ReverseProxy{
 		Director: func(request *http.Request) {
 			setupProxyRequest(req, request, forceForwardedProtoHttps)
@@ -315,6 +342,7 @@ func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,
 		},
 		Transport:     proxyTransport,
 		FlushInterval: 50 * time.Millisecond,
+		BufferPool:    bufPool,
 	}
 
 	return rproxy
