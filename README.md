@@ -334,6 +334,17 @@ Examples: the router can't bind to its TCP port, a CF component has published in
 * `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
 to prune routes for stale droplets.
 
+Sample log message in gorouter.
+ 
+`[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
+`
+
+- `log_level`: This represents logging level of the message.
+- `timestamp`: Epoch time of the log.
+- `message`: Content of the log line.
+- `source`: The component which initiated the log.
+- `data`: Additional key/val information used for debugging
+
 Access logs provide information for the following fields when recieving a request:
 
 `<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> <Extra Headers>`
