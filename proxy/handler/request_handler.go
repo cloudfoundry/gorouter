@@ -150,7 +150,10 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
+		h.reporter.CaptureBadRequest()
+		return
 	}
+	h.reporter.CaptureRoutingResponse(nil)
 }
 
 func (h *RequestHandler) writeStatus(code int, message string) {

@@ -857,6 +857,58 @@ var _ = Describe("Proxy", func() {
 		conn.Close()
 	})
 
+	It("emits a xxx metric when upgrades to websocket", func() {
+		ln := registerHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			resp := test_util.NewResponse(http.StatusSwitchingProtocols)
+			resp.Header.Set("Upgrade", "Websocket")
+			resp.Header.Set("Connection", "Upgrade")
+
+			conn.WriteResponse(resp)
+			conn.Close()
+		})
+		defer ln.Close()
+
+		connectClient := func() {
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "ws-cs-header", "/chat", nil)
+			req.Header.Add("Upgrade", "Websocket")
+			req.Header.Add("Connection", "keep-alive")
+			req.Header.Add("Connection", "Upgrade")
+
+			conn.WriteRequest(req)
+
+		}
+		// 1st client connected
+		connectClient()
+		// 2nd client connected
+		connectClient()
+
+		Eventually(fakeReporter.CaptureRoutingResponseCallCount).Should(Equal(2))
+	})
+
+	It("does not emit a xxx metric when BadRequests occurs", func() {
+		ln := registerHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			resp := test_util.NewResponse(http.StatusBadRequest)
+			conn.WriteResponse(resp)
+			conn.Close()
+		})
+		// trigger serveWebsocketError
+		ln.Close()
+
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "ws-cs-header", "/chat", nil)
+		req.Header.Add("Upgrade", "Websocket")
+		req.Header.Add("Connection", "keep-alive")
+		req.Header.Add("Connection", "Upgrade")
+
+		conn.WriteRequest(req)
+
+		Eventually(fakeReporter.CaptureRoutingResponseCallCount).Should(Equal(0))
+		Eventually(fakeReporter.CaptureBadRequestCallCount).Should(Equal(1))
+	})
+
 	It("upgrades a Tcp request", func() {
 		ln := registerHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
 			conn.WriteLine("hello")
@@ -871,7 +923,7 @@ var _ = Describe("Proxy", func() {
 		req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
 		req.Header.Set("Upgrade", "tcp")
 
-		req.Header.Set("Connection", "UpgradE")
+		req.Header.Set("Connection", "Upgrade")
 
 		conn.WriteRequest(req)
 
