@@ -126,7 +126,21 @@ var _ = Describe("RouteRegistry", func() {
 
 			})
 
-			It("excludes query strings in routes", func() {
+			It("excludes query strings in routes without context path", func() {
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+
+				// discards query string
+				r.Register("dora.app.com?foo=bar", m1)
+
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(1))
+
+				p := r.Lookup("dora.app.com")
+				Expect(p).ToNot(BeNil())
+				Expect(p.ContextPath()).To(Equal("/"))
+			})
+
+			It("excludes query strings in routes with context path", func() {
 				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
 
 				// discards query string
