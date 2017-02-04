@@ -9,7 +9,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
-	proxyfakes "code.cloudfoundry.org/gorouter/proxy/utils/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	routefakes "code.cloudfoundry.org/gorouter/route/fakes"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -24,12 +23,11 @@ type nullVarz struct{}
 var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
-			proxyRoundTripper http.RoundTripper
+			proxyRoundTripper round_tripper.ProxyRoundTripper
 			endpointIterator  *routefakes.FakeEndpointIterator
-			transport         *roundtripperfakes.FakeRoundTripper
+			transport         *roundtripperfakes.FakeProxyRoundTripper
 			logger            logger.Logger
 			req               *http.Request
-			resp              *proxyfakes.FakeProxyResponseWriter
 			dialError         = &net.OpError{
 				Err: errors.New("error"),
 				Op:  "dial",
@@ -40,10 +38,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 			endpointIterator = &routefakes.FakeEndpointIterator{}
 			req = test_util.NewRequest("GET", "myapp.com", "/", nil)
 			req.URL.Scheme = "http"
-			resp = &proxyfakes.FakeProxyResponseWriter{}
 
 			logger = test_util.NewTestZapLogger("test")
-			transport = &roundtripperfakes.FakeRoundTripper{}
+			transport = new(roundtripperfakes.FakeProxyRoundTripper)
 		})
 
 		Context("backend", func() {
@@ -68,7 +65,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				It("retries 3 times", func() {
-					resp.HeaderReturns(make(http.Header))
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(HaveOccurred())
 					Expect(endpointIterator.NextCallCount()).To(Equal(3))
@@ -81,7 +77,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				It("returns a 502 BadGateway error", func() {
-					resp.HeaderReturns(make(http.Header))
 					backendRes, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(HaveOccurred())
 					Expect(backendRes).To(BeNil())
@@ -109,6 +104,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(endpointIterator.NextCallCount()).To(Equal(2))
 				})
 			})
+
+			It("can cancel requests", func() {
+				proxyRoundTripper.CancelRequest(req)
+				Expect(transport.CancelRequestCallCount()).To(Equal(1))
+				Expect(transport.CancelRequestArgsForCall(0)).To(Equal(req))
+			})
 		})
 
 		Context("route service", func() {
@@ -132,6 +133,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(endpointIterator.NextCallCount()).To(Equal(0))
+			})
+
+			It("can cancel requests", func() {
+				proxyRoundTripper.CancelRequest(req)
+				Expect(transport.CancelRequestCallCount()).To(Equal(1))
+				Expect(transport.CancelRequestArgsForCall(0)).To(Equal(req))
 			})
 
 			Context("when the first request to the route service fails", func() {

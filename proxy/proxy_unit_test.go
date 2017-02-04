@@ -11,6 +11,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/proxy/test_helpers"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -25,6 +26,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		proxyObj         proxy.Proxy
 		fakeAccessLogger *fakelogger.FakeAccessLogger
 		logger           logger.Logger
+		resp             utils.ProxyResponseWriter
 	)
 
 	Context("ServeHTTP", func() {
@@ -52,13 +54,14 @@ var _ = Describe("Proxy Unit tests", func() {
 				routeServiceConfig, tlsConfig, nil)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})
+
+			resp = utils.NewProxyResponseWriter(httptest.NewRecorder())
 		})
 
 		Context("when backend fails to respond", func() {
 			It("logs the error and associated endpoint", func() {
 				body := []byte("some body")
 				req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader(body))
-				resp := httptest.NewRecorder()
 
 				proxyObj.ServeHTTP(resp, req)
 
@@ -71,7 +74,6 @@ var _ = Describe("Proxy Unit tests", func() {
 			It("logs response time for HTTP connections", func() {
 				body := []byte("some body")
 				req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader(body))
-				resp := httptest.NewRecorder()
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
@@ -82,7 +84,6 @@ var _ = Describe("Proxy Unit tests", func() {
 				req := test_util.NewRequest("UPGRADE", "some-app", "/", nil)
 				req.Header.Set("Upgrade", "tcp")
 				req.Header.Set("Connection", "upgrade")
-				resp := httptest.NewRecorder()
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
@@ -93,7 +94,6 @@ var _ = Describe("Proxy Unit tests", func() {
 				req := test_util.NewRequest("UPGRADE", "some-app", "/", nil)
 				req.Header.Set("Upgrade", "websocket")
 				req.Header.Set("Connection", "upgrade")
-				resp := httptest.NewRecorder()
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))

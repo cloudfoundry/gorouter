@@ -51,6 +51,7 @@ type ProxyResponseWriter interface {
 	Size() int
 	Context() Context
 	AddToContext(key, value interface{})
+	CloseNotify() <-chan bool
 }
 
 type proxyResponseWriter struct {
@@ -71,6 +72,13 @@ func NewProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
 	}
 
 	return proxyWriter
+}
+
+func (p *proxyResponseWriter) CloseNotify() <-chan bool {
+	if closeNotifier, ok := p.w.(http.CloseNotifier); ok {
+		return closeNotifier.CloseNotify()
+	}
+	return make(chan bool)
 }
 
 func (p *proxyResponseWriter) Header() http.Header {

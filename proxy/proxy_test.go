@@ -1062,10 +1062,57 @@ var _ = Describe("Proxy", func() {
 		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
 	})
 
-	It("proxy detects closed client connection", func() {
+	It("proxy closes connections with slow apps", func() {
 		serverResult := make(chan error)
 		ln := registerHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET / HTTP/1.1")
+
+			timesToTick := 2
+			time.Sleep(1 * time.Second)
+
+			conn.WriteLines([]string{
+				"HTTP/1.1 200 OK",
+				fmt.Sprintf("Content-Length: %d", timesToTick),
+			})
+
+			for i := 0; i < timesToTick; i++ {
+				_, err := conn.Conn.Write([]byte("x"))
+				if err != nil {
+					serverResult <- err
+					return
+				}
+
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			serverResult <- nil
+		})
+		defer ln.Close()
+
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+		started := time.Now()
+		conn.WriteRequest(req)
+
+		resp, _ := readResponse(conn)
+
+		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+
+		var err error
+		Eventually(serverResult).Should(Receive(&err))
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("proxy detects closed client connection", func() {
+		serverResult := make(chan error)
+		readRequest := make(chan struct{})
+		ln := registerHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			conn.CheckLine("GET / HTTP/1.1")
+
+			readRequest <- struct{}{}
 
 			timesToTick := 10
 
@@ -1091,8 +1138,46 @@ var _ = Describe("Proxy", func() {
 		conn := dialProxy(proxyServer)
 
 		req := test_util.NewRequest("GET", "slow-app", "/", nil)
-		conn.WriteRequest(req)
 
+		conn.WriteRequest(req)
+		Eventually(readRequest).Should(Receive())
+		conn.Conn.Close()
+
+		var err error
+		Eventually(serverResult).Should(Receive(&err))
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("proxy closes connections to backends when client closes the connection", func() {
+		serverResult := make(chan error)
+		readRequest := make(chan struct{})
+		ln := registerHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			conn.CheckLine("GET / HTTP/1.1")
+
+			readRequest <- struct{}{}
+
+			time.Sleep(600 * time.Millisecond)
+
+			for i := 0; i < 2; i++ {
+				_, err := conn.Conn.Write([]byte("x"))
+				if err != nil {
+					serverResult <- err
+					return
+				}
+
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			serverResult <- nil
+		})
+		defer ln.Close()
+
+		conn := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+		conn.WriteRequest(req)
+		Eventually(readRequest).Should(Receive())
 		conn.Conn.Close()
 
 		var err error

@@ -22,7 +22,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"github.com/cloudfoundry/dropsonde"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
@@ -323,8 +322,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		}
 	}
 
-	roundTripper := round_tripper.NewProxyRoundTripper(backend,
-		dropsonde.InstrumentedRoundTripper(p.transport), iter, handler.Logger(), after)
+	roundTripper := round_tripper.NewProxyRoundTripper(
+		backend,
+		round_tripper.NewDropsondeRoundTripper(p.transport),
+		iter,
+		handler.Logger(),
+		after,
+	)
 
 	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps, p.bufferPool).ServeHTTP(proxyWriter, request)
 }

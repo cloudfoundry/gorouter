@@ -12,10 +12,16 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 )
 
+//go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
+type ProxyRoundTripper interface {
+	http.RoundTripper
+	CancelRequest(*http.Request)
+}
+
 type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
-func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIterator route.EndpointIterator,
-	logger logger.Logger, afterRoundTrip AfterRoundTrip) http.RoundTripper {
+func NewProxyRoundTripper(backend bool, transport ProxyRoundTripper, endpointIterator route.EndpointIterator,
+	logger logger.Logger, afterRoundTrip AfterRoundTrip) ProxyRoundTripper {
 	if backend {
 		return &BackendRoundTripper{
 			transport: transport,
@@ -35,7 +41,7 @@ func NewProxyRoundTripper(backend bool, transport http.RoundTripper, endpointIte
 
 type BackendRoundTripper struct {
 	iter      route.EndpointIterator
-	transport http.RoundTripper
+	transport ProxyRoundTripper
 	logger    logger.Logger
 	after     AfterRoundTrip
 }
@@ -87,6 +93,10 @@ func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response,
 	return res, err
 }
 
+func (rt *BackendRoundTripper) CancelRequest(request *http.Request) {
+	rt.transport.CancelRequest(request)
+}
+
 func (rt *BackendRoundTripper) selectEndpoint(request *http.Request) (*route.Endpoint, error) {
 	endpoint := rt.iter.Next()
 	if endpoint == nil {
@@ -110,7 +120,7 @@ func (rt *BackendRoundTripper) reportError(err error) {
 }
 
 type RouteServiceRoundTripper struct {
-	transport http.RoundTripper
+	transport ProxyRoundTripper
 	after     AfterRoundTrip
 	logger    logger.Logger
 }
@@ -135,6 +145,10 @@ func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	}
 
 	return res, err
+}
+
+func (rt *RouteServiceRoundTripper) CancelRequest(request *http.Request) {
+	rt.transport.CancelRequest(request)
 }
 
 // log route service response errors for status code < 200 || >300
