@@ -3,44 +3,54 @@ package handlers
 import (
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni"
+
+	"code.cloudfoundry.org/gorouter/logger"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 )
 
-type zipkin struct {
+type Zipkin struct {
 	zipkinEnabled bool
 	logger        logger.Logger
-	headersToLog  *[]string // Shared state with proxy for access logs
+	headersToLog  []string // Shared state with proxy for access logs
 }
 
-func NewZipkin(enabled bool, headersToLog *[]string, logger logger.Logger) negroni.Handler {
-	return &zipkin{
+var _ negroni.Handler = new(Zipkin)
+
+func NewZipkin(enabled bool, headersToLog []string, logger logger.Logger) *Zipkin {
+	return &Zipkin{
 		zipkinEnabled: enabled,
 		headersToLog:  headersToLog,
 		logger:        logger,
 	}
 }
 
-func (z *zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	defer next(rw, r)
 	if !z.zipkinEnabled {
 		return
 	}
 	router_http.SetB3Headers(r, z.logger)
+}
 
-	if !contains(*z.headersToLog, router_http.B3TraceIdHeader) {
-		*z.headersToLog = append(*z.headersToLog, router_http.B3TraceIdHeader)
+func (z *Zipkin) HeadersToLog() []string {
+	if !z.zipkinEnabled {
+		return z.headersToLog
+	}
+	headersToLog := z.headersToLog
+	if !contains(headersToLog, router_http.B3TraceIdHeader) {
+		headersToLog = append(headersToLog, router_http.B3TraceIdHeader)
 	}
 
-	if !contains(*z.headersToLog, router_http.B3SpanIdHeader) {
-		*z.headersToLog = append(*z.headersToLog, router_http.B3SpanIdHeader)
+	if !contains(headersToLog, router_http.B3SpanIdHeader) {
+		headersToLog = append(headersToLog, router_http.B3SpanIdHeader)
 	}
 
-	if !contains(*z.headersToLog, router_http.B3ParentSpanIdHeader) {
-		*z.headersToLog = append(*z.headersToLog, router_http.B3ParentSpanIdHeader)
+	if !contains(headersToLog, router_http.B3ParentSpanIdHeader) {
+		headersToLog = append(headersToLog, router_http.B3ParentSpanIdHeader)
 	}
+	return headersToLog
 }
 
 func contains(s []string, e string) bool {

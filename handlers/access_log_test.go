@@ -51,7 +51,7 @@ var _ = Describe("AccessLog", func() {
 
 		accessLogger = &fakes.FakeAccessLogger{}
 
-		handler = handlers.NewAccessLog(accessLogger, &extraHeadersToLog)
+		handler = handlers.NewAccessLog(accessLogger, extraHeadersToLog)
 
 		nextCalled = false
 	})
@@ -76,7 +76,7 @@ var _ = Describe("AccessLog", func() {
 
 		Expect(alr.StartedAt).ToNot(BeZero())
 		Expect(alr.Request).To(Equal(req))
-		Expect(*alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
+		Expect(alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
 		Expect(alr.FinishedAt).ToNot(BeZero())
 		Expect(alr.RequestBytesReceived).To(Equal(13))
 		Expect(alr.BodyBytesSent).To(Equal(37))

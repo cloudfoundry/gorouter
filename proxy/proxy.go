@@ -69,7 +69,6 @@ type proxy struct {
 	secureCookies            bool
 	heartbeatOK              *int32
 	routeServiceConfig       *routeservice.RouteServiceConfig
-	extraHeadersToLog        *[]string
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
 	defaultLoadBalance       string
@@ -114,18 +113,18 @@ func NewProxy(
 		secureCookies:            c.SecureCookies,
 		heartbeatOK:              heartbeatOK, // 1->true, 0->false
 		routeServiceConfig:       routeServiceConfig,
-		extraHeadersToLog:        &c.ExtraHeadersToLog,
 		healthCheckUserAgent:     c.HealthCheckUserAgent,
 		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 		defaultLoadBalance:       c.LoadBalance,
 		bufferPool:               NewBufferPool(),
 	}
 
+	zipkinHandler := handlers.NewZipkin(c.Tracing.EnableZipkin, c.ExtraHeadersToLog, logger)
 	n := negroni.New()
 	n.Use(&proxyWriterHandler{})
-	n.Use(handlers.NewAccessLog(accessLogger, &c.ExtraHeadersToLog))
+	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
 	n.Use(handlers.NewHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
-	n.Use(handlers.NewZipkin(c.Tracing.EnableZipkin, &c.ExtraHeadersToLog, logger))
+	n.Use(zipkinHandler)
 
 	n.UseHandler(p)
 	handlers := &proxyHandler{

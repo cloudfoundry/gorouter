@@ -15,10 +15,10 @@ import (
 
 type accessLog struct {
 	accessLogger      access_log.AccessLogger
-	extraHeadersToLog *[]string
+	extraHeadersToLog []string
 }
 
-func NewAccessLog(accessLogger access_log.AccessLogger, extraHeadersToLog *[]string) negroni.Handler {
+func NewAccessLog(accessLogger access_log.AccessLogger, extraHeadersToLog []string) negroni.Handler {
 	return &accessLog{
 		accessLogger:      accessLogger,
 		extraHeadersToLog: extraHeadersToLog,

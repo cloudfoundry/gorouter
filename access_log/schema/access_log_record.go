@@ -86,7 +86,7 @@ type AccessLogRecord struct {
 	FinishedAt           time.Time
 	BodyBytesSent        int
 	RequestBytesReceived int
-	ExtraHeadersToLog    *[]string
+	ExtraHeadersToLog    []string
 	record               []byte
 }
 
@@ -186,14 +186,14 @@ func (r *AccessLogRecord) addExtraHeaders(b *recordBuffer) {
 	if r.ExtraHeadersToLog == nil {
 		return
 	}
-	numExtraHeaders := len(*r.ExtraHeadersToLog)
+	numExtraHeaders := len(r.ExtraHeadersToLog)
 	if numExtraHeaders == 0 {
 		return
 	}
 
 	b.WriteByte(' ')
 	b.AppendSpaces(true)
-	for i, header := range *r.ExtraHeadersToLog {
+	for i, header := range r.ExtraHeadersToLog {
 		// X-Something-Cool -> x_something_cool
 		headerName := strings.Replace(strings.ToLower(header), "-", "_", -1)
 		b.WriteString(headerName)

@@ -121,7 +121,7 @@ var _ = Describe("AccessLogRecord", func() {
 				record.Request.Header.Set("Cache-Control", "no-cache")
 				record.Request.Header.Set("Accept-Encoding", "gzip, deflate")
 				record.Request.Header.Set("If-Match", "737060cd8c284d8af7ad3082f209582d")
-				record.ExtraHeadersToLog = &[]string{"Cache-Control", "Accept-Encoding", "If-Match", "Doesnt-Exist"}
+				record.ExtraHeadersToLog = []string{"Cache-Control", "Accept-Encoding", "If-Match", "Doesnt-Exist"}
 			})
 			It("appends extra headers", func() {
 				recordString := "FakeRequestHost - " +
@@ -175,7 +175,7 @@ var _ = Describe("AccessLogRecord", func() {
 					StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 					FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
 					RequestBytesReceived: 30,
-					ExtraHeadersToLog:    &[]string{},
+					ExtraHeadersToLog:    []string{},
 				}
 
 				recordString := "FakeRequestHost - " +
