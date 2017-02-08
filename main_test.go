@@ -144,6 +144,47 @@ var _ = Describe("Router Integration", func() {
 		}
 	})
 
+	Context("TLS", func() {
+		var config *config.Config
+		var localIP string
+		var statusPort uint16
+		var proxyPort uint16
+		var cfgFile string
+
+		BeforeEach(func() {
+			var err error
+			localIP, err = localip.LocalIP()
+			Expect(err).ToNot(HaveOccurred())
+
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
+
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+			config = createSSLConfig(cfgFile, statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+		})
+		It("supports minimum TLS 1.2", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+
+			dialTls := func(version uint16) error {
+
+				tlsConfig := &tls.Config{
+					MaxVersion:         version,
+					InsecureSkipVerify: true,
+				}
+
+				t := &http.Transport{TLSClientConfig: tlsConfig}
+				client := &http.Client{Transport: t}
+				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
+				return err
+			}
+
+			Expect(dialTls(tls.VersionSSL30)).To(HaveOccurred())
+			Expect(dialTls(tls.VersionTLS10)).To(HaveOccurred())
+			Expect(dialTls(tls.VersionTLS11)).To(HaveOccurred())
+			Expect(dialTls(tls.VersionTLS12)).ToNot(HaveOccurred())
+		})
+	})
+
 	Context("Drain", func() {
 		var config *config.Config
 		var localIP string
@@ -327,7 +368,6 @@ var _ = Describe("Router Integration", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(grouter, 5).Should(Exit(0))
 			})
-
 		})
 
 		Context("when multiple signals are received", func() {
