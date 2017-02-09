@@ -1,11 +1,9 @@
 [![Build Status](https://travis-ci.org/cloudfoundry/gorouter.svg?branch=master)](https://travis-ci.org/cloudfoundry/gorouter)
 
 # GoRouter
-This repository contains the source code for the Cloud Foundry router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
+This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
 
 **Note**: This repository should be imported as `code.cloudfoundry.org/gorouter`.
-
-You can find the old router [here](http://github.com/cloudfoundry-attic/router)
 
 ## Development
 
@@ -78,9 +76,21 @@ gnatsd &
 gorouter
 ```
 
-## Dynamic Configuration of the Routing Table
+## Performance
 
-When the gorouter starts, it sends a `router.start` message. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
+See [Routing Release 0.144.0 Release Notes](https://github.com/cloudfoundry-incubator/routing-release/releases/tag/0.144.0)
+
+## Dynamic Routing Table
+
+Gorouters routing table is updated dynamically via the NATS message bus. NATS can be deployed via BOSH with ([cf-release](https://github.com/cloudfoundry/cf-release)) or standalone using [nats-release](https://github.com/cloudfoundry/nats-release).
+
+To add or remove a record from the routing table, a NATS client must send register or unregister messages. Records in the routing table have a maximum TTL of 120 seconds, so clients must heartbeat registration messages periodically; we recommend every 20s. [Route Registrar](https://github.com/cloudfoundry/route-registrar) is a BOSH job that comes with [Routing Release](https://github.com/cloudfoundry-incubator/routing-release) that automates this process.
+
+When deployed with Cloud Foundry, registration of routes for apps pushed to CF occurs automatically without user involvement. For details, see [Routes and Domains](https://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html).
+
+### Registering Routes via NATS
+
+When the gorouter starts, it sends a `router.start` message to NATS. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
 
 The format of the `router.start` message is as follows:
 
