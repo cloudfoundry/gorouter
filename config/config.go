@@ -247,14 +247,8 @@ func (c *Config) Process() {
 
 func (c *Config) processCipherSuites() []uint16 {
 	cipherMap := map[string]uint16{
-		"TLS_RSA_WITH_AES_128_CBC_SHA":            0x002f,
-		"TLS_RSA_WITH_AES_256_CBC_SHA":            0x0035,
-		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    0xc009,
-		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    0xc00a,
-		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      0xc013,
-		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      0xc014,
-		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   0xc02f,
-		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": 0xc02b,
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256": 0xc02f,
+		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384": 0xc030,
 	}
 
 	var ciphers []string
