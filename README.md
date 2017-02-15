@@ -349,11 +349,11 @@ Sample log message in gorouter.
 `[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
 `
 
-- `log_level`: This represents logging level of the message.
-- `timestamp`: Epoch time of the log.
-- `message`: Content of the log line.
-- `source`: The component which initiated the log.
-- `data`: Additional key/val information used for debugging
+- `log_level`: This represents logging level of the message
+- `timestamp`: Epoch time of the log
+- `message`: Content of the log line
+- `source`: The function within Gorouter that initiated the log message
+- `data`: Additional information that varies based on the message
 
 Access logs provide information for the following fields when recieving a request:
 
