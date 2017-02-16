@@ -24,7 +24,7 @@ var _ = Describe("Subscriber", func() {
 		subOpts *mbus.SubscriberOpts
 		process ifrit.Process
 
-		registry *fakes.FakeRegistryInterface
+		registry *fakes.FakeRegistry
 
 		natsRunner   *test_util.NATSRunner
 		natsPort     uint16
@@ -41,7 +41,7 @@ var _ = Describe("Subscriber", func() {
 		natsRunner.Start()
 		natsClient = natsRunner.MessageBus
 
-		registry = new(fakes.FakeRegistryInterface)
+		registry = new(fakes.FakeRegistry)
 
 		logger = test_util.NewTestZapLogger("mbus-test")
 

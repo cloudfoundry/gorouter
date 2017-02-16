@@ -20,6 +20,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"github.com/uber-go/zap"
@@ -30,11 +31,6 @@ const (
 	VcapCookieId    = "__VCAP_ID__"
 	StickyCookieKey = "JSESSIONID"
 )
-
-type LookupRegistry interface {
-	Lookup(uri route.Uri) *route.Pool
-	LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool
-}
 
 type Proxy interface {
 	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
@@ -61,7 +57,6 @@ type proxy struct {
 	ip                       string
 	traceKey                 string
 	logger                   logger.Logger
-	registry                 LookupRegistry
 	reporter                 metrics.CombinedReporter
 	accessLogger             access_log.AccessLogger
 	transport                *http.Transport
@@ -78,7 +73,7 @@ func NewProxy(
 	logger logger.Logger,
 	accessLogger access_log.AccessLogger,
 	c *config.Config,
-	registry LookupRegistry,
+	registry registry.Registry,
 	reporter metrics.CombinedReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	tlsConfig *tls.Config,
@@ -90,7 +85,6 @@ func NewProxy(
 		traceKey:     c.TraceKey,
 		ip:           c.Ip,
 		logger:       logger,
-		registry:     registry,
 		reporter:     reporter,
 		transport: &http.Transport{
 			Dial: func(network, addr string) (net.Conn, error) {
@@ -124,6 +118,8 @@ func NewProxy(
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
 	n.Use(handlers.NewHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
+	n.Use(handlers.NewProtocolCheck(logger))
+	n.Use(handlers.NewLookup(registry, reporter, logger))
 
 	n.UseHandler(p)
 	handlers := &proxyHandler{
@@ -156,25 +152,6 @@ func (p *proxy) getStickySession(request *http.Request) string {
 	return ""
 }
 
-func (p *proxy) lookup(request *http.Request) *route.Pool {
-	requestPath := request.URL.EscapedPath()
-
-	uri := route.Uri(hostWithoutPort(request) + requestPath)
-	appInstanceHeader := request.Header.Get(router_http.CfAppInstance)
-	if appInstanceHeader != "" {
-		appId, appIndex, err := router_http.ValidateCfAppInstance(appInstanceHeader)
-
-		if err != nil {
-			p.logger.Error("invalid-app-instance-header", zap.Error(err))
-			return nil
-		} else {
-			return p.registry.LookupWithInstance(uri, appId, appIndex)
-		}
-	}
-
-	return p.registry.Lookup(uri)
-}
-
 type bufferPool struct {
 	pool *sync.Pool
 }
@@ -199,26 +176,23 @@ func (b *bufferPool) Put(buf []byte) {
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
-	var accessLog *schema.AccessLogRecord
 
 	alr := request.Context().Value("AccessLogRecord")
 	if alr == nil {
 		p.logger.Error("AccessLogRecord not set on context", zap.Error(errors.New("failed-to-access-LogRecord")))
-	} else {
-		accessLog = alr.(*schema.AccessLogRecord)
+		http.Error(responseWriter, "AccessLogRecord not set on context", http.StatusBadGateway)
+		return
 	}
+	accessLog := alr.(*schema.AccessLogRecord)
 	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, accessLog, p.logger)
 
-	if !isProtocolSupported(request) {
-		handler.HandleUnsupportedProtocol()
+	rp := request.Context().Value("RoutePool")
+	if rp == nil {
+		p.logger.Error("RoutePool not set on context", zap.Error(errors.New("failed-to-access-RoutePool")))
+		http.Error(responseWriter, "RoutePool not set on context", http.StatusBadGateway)
 		return
 	}
-
-	routePool := p.lookup(request)
-	if routePool == nil {
-		handler.HandleMissingRoute()
-		return
-	}
+	routePool := rp.(*route.Pool)
 
 	stickyEndpointId := p.getStickySession(request)
 	iter := &wrappedIterator{
@@ -467,10 +441,6 @@ func forwardingToRouteService(rsUrl, sigHeader string) bool {
 
 func hasBeenToRouteService(rsUrl, sigHeader string) bool {
 	return sigHeader != "" && rsUrl != ""
-}
-
-func isProtocolSupported(request *http.Request) bool {
-	return request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1)
 }
 
 func isWebSocketUpgrade(request *http.Request) bool {

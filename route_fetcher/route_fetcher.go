@@ -20,7 +20,7 @@ import (
 
 type RouteFetcher struct {
 	UaaClient                          uaa_client.Client
-	RouteRegistry                      registry.RegistryInterface
+	RouteRegistry                      registry.Registry
 	FetchRoutesInterval                time.Duration
 	SubscriptionRetryIntervalInSeconds int
 
@@ -40,7 +40,7 @@ const (
 	maxRetries            = 3
 )
 
-func NewRouteFetcher(logger logger.Logger, uaaClient uaa_client.Client, routeRegistry registry.RegistryInterface,
+func NewRouteFetcher(logger logger.Logger, uaaClient uaa_client.Client, routeRegistry registry.Registry,
 	cfg *config.Config, client routing_api.Client, subscriptionRetryInterval int, clock clock.Clock) *RouteFetcher {
 	return &RouteFetcher{
 		UaaClient:                          uaaClient,

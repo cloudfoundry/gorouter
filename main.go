@@ -161,7 +161,7 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger,
 		c.RouteServiceEnabled,
@@ -180,7 +180,7 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 		reporter, routeServiceConfig, tlsConfig, &healthCheck)
 }
 
-func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 
 	uaaClient := newUaaClient(logger, clock, c)
@@ -310,7 +310,7 @@ func createSubscriber(
 	logger goRouterLogger.Logger,
 	c *config.Config,
 	natsClient *nats.Conn,
-	registry rregistry.RegistryInterface,
+	registry rregistry.Registry,
 	startMsgChan chan struct{},
 ) ifrit.Runner {
 

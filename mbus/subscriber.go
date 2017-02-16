@@ -54,7 +54,7 @@ type Subscriber struct {
 	natsClient    *nats.Conn
 	startMsgChan  <-chan struct{}
 	opts          *SubscriberOpts
-	routeRegistry registry.RegistryInterface
+	routeRegistry registry.Registry
 }
 
 // SubscriberOpts contains configuration for Subscriber struct
@@ -68,7 +68,7 @@ type SubscriberOpts struct {
 func NewSubscriber(
 	logger logger.Logger,
 	natsClient *nats.Conn,
-	routeRegistry registry.RegistryInterface,
+	routeRegistry registry.Registry,
 	startMsgChan <-chan struct{},
 	opts *SubscriberOpts,
 ) *Subscriber {

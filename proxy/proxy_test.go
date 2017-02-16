@@ -274,7 +274,7 @@ var _ = Describe("Proxy", func() {
 		conn := dialProxy(proxyServer)
 
 		conn.WriteLines([]string{
-			"GET / HTTP/0.9",
+			"GET / HTTP/1.5",
 			"Host: test",
 		})
 

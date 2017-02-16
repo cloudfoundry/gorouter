@@ -8,7 +8,7 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 )
 
-type FakeRegistryInterface struct {
+type FakeRegistry struct {
 	RegisterStub        func(uri route.Uri, endpoint *route.Endpoint)
 	registerMutex       sync.RWMutex
 	registerArgsForCall []struct {
@@ -68,7 +68,7 @@ type FakeRegistryInterface struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeRegistryInterface) Register(uri route.Uri, endpoint *route.Endpoint) {
+func (fake *FakeRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	fake.registerMutex.Lock()
 	fake.registerArgsForCall = append(fake.registerArgsForCall, struct {
 		uri      route.Uri
@@ -81,19 +81,19 @@ func (fake *FakeRegistryInterface) Register(uri route.Uri, endpoint *route.Endpo
 	}
 }
 
-func (fake *FakeRegistryInterface) RegisterCallCount() int {
+func (fake *FakeRegistry) RegisterCallCount() int {
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	return len(fake.registerArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) RegisterArgsForCall(i int) (route.Uri, *route.Endpoint) {
+func (fake *FakeRegistry) RegisterArgsForCall(i int) (route.Uri, *route.Endpoint) {
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	return fake.registerArgsForCall[i].uri, fake.registerArgsForCall[i].endpoint
 }
 
-func (fake *FakeRegistryInterface) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+func (fake *FakeRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	fake.unregisterMutex.Lock()
 	fake.unregisterArgsForCall = append(fake.unregisterArgsForCall, struct {
 		uri      route.Uri
@@ -106,19 +106,19 @@ func (fake *FakeRegistryInterface) Unregister(uri route.Uri, endpoint *route.End
 	}
 }
 
-func (fake *FakeRegistryInterface) UnregisterCallCount() int {
+func (fake *FakeRegistry) UnregisterCallCount() int {
 	fake.unregisterMutex.RLock()
 	defer fake.unregisterMutex.RUnlock()
 	return len(fake.unregisterArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) UnregisterArgsForCall(i int) (route.Uri, *route.Endpoint) {
+func (fake *FakeRegistry) UnregisterArgsForCall(i int) (route.Uri, *route.Endpoint) {
 	fake.unregisterMutex.RLock()
 	defer fake.unregisterMutex.RUnlock()
 	return fake.unregisterArgsForCall[i].uri, fake.unregisterArgsForCall[i].endpoint
 }
 
-func (fake *FakeRegistryInterface) Lookup(uri route.Uri) *route.Pool {
+func (fake *FakeRegistry) Lookup(uri route.Uri) *route.Pool {
 	fake.lookupMutex.Lock()
 	fake.lookupArgsForCall = append(fake.lookupArgsForCall, struct {
 		uri route.Uri
@@ -131,26 +131,26 @@ func (fake *FakeRegistryInterface) Lookup(uri route.Uri) *route.Pool {
 	return fake.lookupReturns.result1
 }
 
-func (fake *FakeRegistryInterface) LookupCallCount() int {
+func (fake *FakeRegistry) LookupCallCount() int {
 	fake.lookupMutex.RLock()
 	defer fake.lookupMutex.RUnlock()
 	return len(fake.lookupArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) LookupArgsForCall(i int) route.Uri {
+func (fake *FakeRegistry) LookupArgsForCall(i int) route.Uri {
 	fake.lookupMutex.RLock()
 	defer fake.lookupMutex.RUnlock()
 	return fake.lookupArgsForCall[i].uri
 }
 
-func (fake *FakeRegistryInterface) LookupReturns(result1 *route.Pool) {
+func (fake *FakeRegistry) LookupReturns(result1 *route.Pool) {
 	fake.LookupStub = nil
 	fake.lookupReturns = struct {
 		result1 *route.Pool
 	}{result1}
 }
 
-func (fake *FakeRegistryInterface) LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool {
+func (fake *FakeRegistry) LookupWithInstance(uri route.Uri, appId string, appIndex string) *route.Pool {
 	fake.lookupWithInstanceMutex.Lock()
 	fake.lookupWithInstanceArgsForCall = append(fake.lookupWithInstanceArgsForCall, struct {
 		uri      route.Uri
@@ -165,26 +165,26 @@ func (fake *FakeRegistryInterface) LookupWithInstance(uri route.Uri, appId strin
 	return fake.lookupWithInstanceReturns.result1
 }
 
-func (fake *FakeRegistryInterface) LookupWithInstanceCallCount() int {
+func (fake *FakeRegistry) LookupWithInstanceCallCount() int {
 	fake.lookupWithInstanceMutex.RLock()
 	defer fake.lookupWithInstanceMutex.RUnlock()
 	return len(fake.lookupWithInstanceArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) LookupWithInstanceArgsForCall(i int) (route.Uri, string, string) {
+func (fake *FakeRegistry) LookupWithInstanceArgsForCall(i int) (route.Uri, string, string) {
 	fake.lookupWithInstanceMutex.RLock()
 	defer fake.lookupWithInstanceMutex.RUnlock()
 	return fake.lookupWithInstanceArgsForCall[i].uri, fake.lookupWithInstanceArgsForCall[i].appId, fake.lookupWithInstanceArgsForCall[i].appIndex
 }
 
-func (fake *FakeRegistryInterface) LookupWithInstanceReturns(result1 *route.Pool) {
+func (fake *FakeRegistry) LookupWithInstanceReturns(result1 *route.Pool) {
 	fake.LookupWithInstanceStub = nil
 	fake.lookupWithInstanceReturns = struct {
 		result1 *route.Pool
 	}{result1}
 }
 
-func (fake *FakeRegistryInterface) StartPruningCycle() {
+func (fake *FakeRegistry) StartPruningCycle() {
 	fake.startPruningCycleMutex.Lock()
 	fake.startPruningCycleArgsForCall = append(fake.startPruningCycleArgsForCall, struct{}{})
 	fake.recordInvocation("StartPruningCycle", []interface{}{})
@@ -194,13 +194,13 @@ func (fake *FakeRegistryInterface) StartPruningCycle() {
 	}
 }
 
-func (fake *FakeRegistryInterface) StartPruningCycleCallCount() int {
+func (fake *FakeRegistry) StartPruningCycleCallCount() int {
 	fake.startPruningCycleMutex.RLock()
 	defer fake.startPruningCycleMutex.RUnlock()
 	return len(fake.startPruningCycleArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) StopPruningCycle() {
+func (fake *FakeRegistry) StopPruningCycle() {
 	fake.stopPruningCycleMutex.Lock()
 	fake.stopPruningCycleArgsForCall = append(fake.stopPruningCycleArgsForCall, struct{}{})
 	fake.recordInvocation("StopPruningCycle", []interface{}{})
@@ -210,13 +210,13 @@ func (fake *FakeRegistryInterface) StopPruningCycle() {
 	}
 }
 
-func (fake *FakeRegistryInterface) StopPruningCycleCallCount() int {
+func (fake *FakeRegistry) StopPruningCycleCallCount() int {
 	fake.stopPruningCycleMutex.RLock()
 	defer fake.stopPruningCycleMutex.RUnlock()
 	return len(fake.stopPruningCycleArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) NumUris() int {
+func (fake *FakeRegistry) NumUris() int {
 	fake.numUrisMutex.Lock()
 	fake.numUrisArgsForCall = append(fake.numUrisArgsForCall, struct{}{})
 	fake.recordInvocation("NumUris", []interface{}{})
@@ -227,20 +227,20 @@ func (fake *FakeRegistryInterface) NumUris() int {
 	return fake.numUrisReturns.result1
 }
 
-func (fake *FakeRegistryInterface) NumUrisCallCount() int {
+func (fake *FakeRegistry) NumUrisCallCount() int {
 	fake.numUrisMutex.RLock()
 	defer fake.numUrisMutex.RUnlock()
 	return len(fake.numUrisArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) NumUrisReturns(result1 int) {
+func (fake *FakeRegistry) NumUrisReturns(result1 int) {
 	fake.NumUrisStub = nil
 	fake.numUrisReturns = struct {
 		result1 int
 	}{result1}
 }
 
-func (fake *FakeRegistryInterface) NumEndpoints() int {
+func (fake *FakeRegistry) NumEndpoints() int {
 	fake.numEndpointsMutex.Lock()
 	fake.numEndpointsArgsForCall = append(fake.numEndpointsArgsForCall, struct{}{})
 	fake.recordInvocation("NumEndpoints", []interface{}{})
@@ -251,20 +251,20 @@ func (fake *FakeRegistryInterface) NumEndpoints() int {
 	return fake.numEndpointsReturns.result1
 }
 
-func (fake *FakeRegistryInterface) NumEndpointsCallCount() int {
+func (fake *FakeRegistry) NumEndpointsCallCount() int {
 	fake.numEndpointsMutex.RLock()
 	defer fake.numEndpointsMutex.RUnlock()
 	return len(fake.numEndpointsArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) NumEndpointsReturns(result1 int) {
+func (fake *FakeRegistry) NumEndpointsReturns(result1 int) {
 	fake.NumEndpointsStub = nil
 	fake.numEndpointsReturns = struct {
 		result1 int
 	}{result1}
 }
 
-func (fake *FakeRegistryInterface) MarshalJSON() ([]byte, error) {
+func (fake *FakeRegistry) MarshalJSON() ([]byte, error) {
 	fake.marshalJSONMutex.Lock()
 	fake.marshalJSONArgsForCall = append(fake.marshalJSONArgsForCall, struct{}{})
 	fake.recordInvocation("MarshalJSON", []interface{}{})
@@ -275,13 +275,13 @@ func (fake *FakeRegistryInterface) MarshalJSON() ([]byte, error) {
 	return fake.marshalJSONReturns.result1, fake.marshalJSONReturns.result2
 }
 
-func (fake *FakeRegistryInterface) MarshalJSONCallCount() int {
+func (fake *FakeRegistry) MarshalJSONCallCount() int {
 	fake.marshalJSONMutex.RLock()
 	defer fake.marshalJSONMutex.RUnlock()
 	return len(fake.marshalJSONArgsForCall)
 }
 
-func (fake *FakeRegistryInterface) MarshalJSONReturns(result1 []byte, result2 error) {
+func (fake *FakeRegistry) MarshalJSONReturns(result1 []byte, result2 error) {
 	fake.MarshalJSONStub = nil
 	fake.marshalJSONReturns = struct {
 		result1 []byte
@@ -289,7 +289,7 @@ func (fake *FakeRegistryInterface) MarshalJSONReturns(result1 []byte, result2 er
 	}{result1, result2}
 }
 
-func (fake *FakeRegistryInterface) Invocations() map[string][][]interface{} {
+func (fake *FakeRegistry) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.registerMutex.RLock()
@@ -313,7 +313,7 @@ func (fake *FakeRegistryInterface) Invocations() map[string][][]interface{} {
 	return fake.invocations
 }
 
-func (fake *FakeRegistryInterface) recordInvocation(key string, args []interface{}) {
+func (fake *FakeRegistry) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -325,4 +325,4 @@ func (fake *FakeRegistryInterface) recordInvocation(key string, args []interface
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ registry.RegistryInterface = new(FakeRegistryInterface)
+var _ registry.Registry = new(FakeRegistry)

@@ -19,6 +19,8 @@ type accessLog struct {
 	extraHeadersToLog []string
 }
 
+// NewAccessLog creates a new handler that handles logging requests to the
+// access log
 func NewAccessLog(accessLogger access_log.AccessLogger, extraHeadersToLog []string) negroni.Handler {
 	return &accessLog{
 		accessLogger:      accessLogger,

@@ -38,7 +38,7 @@ var _ = Describe("RouteFetcher", func() {
 	var (
 		cfg         *config.Config
 		uaaClient   *testUaaClient.FakeClient
-		registry    *testRegistry.FakeRegistryInterface
+		registry    *testRegistry.FakeRegistry
 		fetcher     *RouteFetcher
 		logger      logger.Logger
 		client      *fake_routing_api.FakeClient
@@ -61,7 +61,7 @@ var _ = Describe("RouteFetcher", func() {
 
 		retryInterval := 0
 		uaaClient = &testUaaClient.FakeClient{}
-		registry = &testRegistry.FakeRegistryInterface{}
+		registry = &testRegistry.FakeRegistry{}
 
 		token = &schema.Token{
 			AccessToken: "access_token",

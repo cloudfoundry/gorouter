@@ -10,6 +10,7 @@ import (
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 )
 
+// Zipkin is a handler that sets Zipkin headers on requests
 type Zipkin struct {
 	zipkinEnabled bool
 	logger        logger.Logger
@@ -18,6 +19,7 @@ type Zipkin struct {
 
 var _ negroni.Handler = new(Zipkin)
 
+// NewZipkin creates a new handler that sets Zipkin headers on requests
 func NewZipkin(enabled bool, headersToLog []string, logger logger.Logger) *Zipkin {
 	return &Zipkin{
 		zipkinEnabled: enabled,
@@ -34,6 +36,8 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	router_http.SetB3Headers(r, z.logger)
 }
 
+// HeadersToLog returns headers that should be logged in the access logs and
+// includes Zipkin headers in this set if necessary
 func (z *Zipkin) HeadersToLog() []string {
 	if !z.zipkinEnabled {
 		return z.headersToLog
