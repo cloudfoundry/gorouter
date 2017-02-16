@@ -29,6 +29,8 @@ var _ = Describe("AccessLog", func() {
 		extraHeadersToLog []string
 
 		nextCalled bool
+
+		reqChan chan *http.Request
 	)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -38,6 +40,7 @@ var _ = Describe("AccessLog", func() {
 		rw.WriteHeader(http.StatusTeapot)
 		rw.Write([]byte("I'm a little teapot, short and stout."))
 
+		reqChan <- req
 		nextCalled = true
 	})
 
@@ -53,16 +56,21 @@ var _ = Describe("AccessLog", func() {
 
 		handler = handlers.NewAccessLog(accessLogger, extraHeadersToLog)
 
+		reqChan = make(chan *http.Request, 1)
+
 		nextCalled = false
 	})
 
 	AfterEach(func() {
 		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		close(reqChan)
 	})
 
 	It("sets an access log record on the context", func() {
 		handler.ServeHTTP(proxyWriter, req, nextHandler)
-		alr := proxyWriter.Context().Value("AccessLogRecord")
+		var contextReq *http.Request
+		Eventually(reqChan).Should(Receive(&contextReq))
+		alr := contextReq.Context().Value("AccessLogRecord")
 		Expect(alr).ToNot(BeNil())
 		Expect(alr).To(BeAssignableToTypeOf(&schema.AccessLogRecord{}))
 	})

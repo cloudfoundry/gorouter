@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -27,6 +28,7 @@ func NewAccessLog(accessLogger access_log.AccessLogger, extraHeadersToLog []stri
 
 func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	proxyWriter := rw.(utils.ProxyResponseWriter)
+
 	alr := &schema.AccessLogRecord{
 		Request:           r,
 		StartedAt:         time.Now(),
@@ -36,7 +38,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}
 	r.Body = requestBodyCounter
 
-	proxyWriter.AddToContext("AccessLogRecord", alr)
+	r = r.WithContext(context.WithValue(r.Context(), "AccessLogRecord", alr))
 
 	next(rw, r)
 

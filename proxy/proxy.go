@@ -199,13 +199,14 @@ func (b *bufferPool) Put(buf []byte) {
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
+	var accessLog *schema.AccessLogRecord
 
-	alr := proxyWriter.Context().Value("AccessLogRecord")
+	alr := request.Context().Value("AccessLogRecord")
 	if alr == nil {
 		p.logger.Error("AccessLogRecord not set on context", zap.Error(errors.New("failed-to-access-LogRecord")))
+	} else {
+		accessLog = alr.(*schema.AccessLogRecord)
 	}
-	accessLog := alr.(*schema.AccessLogRecord)
-
 	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, accessLog, p.logger)
 
 	if !isProtocolSupported(request) {
@@ -330,7 +331,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		after,
 	)
 
-	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps, p.bufferPool).ServeHTTP(proxyWriter, request)
+	newReverseProxy(roundTripper, request, routeServiceArgs, p.routeServiceConfig, p.forceForwardedProtoHttps, p.bufferPool).ServeHTTP(responseWriter, request)
 }
 
 func newReverseProxy(proxyTransport http.RoundTripper, req *http.Request,

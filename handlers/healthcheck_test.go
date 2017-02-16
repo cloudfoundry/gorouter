@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,6 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -20,7 +20,6 @@ var _ = Describe("Healthcheck", func() {
 		handler     negroni.Handler
 		logger      logger.Logger
 		resp        *httptest.ResponseRecorder
-		proxyWriter utils.ProxyResponseWriter
 		req         *http.Request
 		alr         *schema.AccessLogRecord
 		nextCalled  bool
@@ -33,13 +32,13 @@ var _ = Describe("Healthcheck", func() {
 
 	TestHealthcheckOK := func() {
 		It("closes the request", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(req.Close).To(BeTrue())
 			Expect(nextCalled).To(BeFalse())
 		})
 
 		It("responds with 200 OK", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Code).To(Equal(200))
 			bodyString, err := ioutil.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
@@ -47,48 +46,37 @@ var _ = Describe("Healthcheck", func() {
 		})
 
 		It("sets the access log record's status code to 200", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(alr.StatusCode).To(Equal(200))
 		})
 
 		It("sets the Cache-Control and Expires headers", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Header().Get("Cache-Control")).To(Equal("private, max-age=0"))
 			Expect(resp.Header().Get("Expires")).To(Equal("0"))
-		})
-
-		It("does not fail when the ResponseWriter is not a ProxyResponseWriter", func() {
-			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(resp.Code).To(Equal(200))
-			Expect(alr.StatusCode).To(Equal(0))
 		})
 	}
 
 	TestHealthcheckServiceUnavailable := func() {
 		It("closes the request", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(req.Close).To(BeTrue())
 			Expect(nextCalled).To(BeFalse())
 		})
 
 		It("responds with a 503 Service Unavailable", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Code).To(Equal(503))
 		})
 
 		It("sets the access log record's status code to 503", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(alr.StatusCode).To(Equal(503))
 		})
 		It("sets the Cache-Control and Expires headers", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Header().Get("Cache-Control")).To(Equal("private, max-age=0"))
 			Expect(resp.Header().Get("Expires")).To(Equal("0"))
-		})
-		It("does not fail when the ResponseWriter is not a ProxyResponseWriter", func() {
-			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(resp.Code).To(Equal(503))
-			Expect(alr.StatusCode).To(Equal(0))
 		})
 	}
 
@@ -96,11 +84,10 @@ var _ = Describe("Healthcheck", func() {
 		logger = test_util.NewTestZapLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
-		proxyWriter = utils.NewProxyResponseWriter(resp)
 		alr = &schema.AccessLogRecord{
 			Request: req,
 		}
-		proxyWriter.AddToContext("AccessLogRecord", alr)
+		req = req.WithContext(context.WithValue(req.Context(), "AccessLogRecord", alr))
 		nextCalled = false
 		heartbeatOK = 1
 	})
@@ -128,13 +115,13 @@ var _ = Describe("Healthcheck", func() {
 
 		Context("when User-Agent is not set to the healthcheck User-Agent", func() {
 			It("does not close the request and forwards the request to the next handler", func() {
-				handler.ServeHTTP(proxyWriter, req, nextHandler)
+				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Close).To(BeFalse())
 				Expect(nextCalled).To(BeTrue())
 			})
 
 			It("does not set anything on the response", func() {
-				handler.ServeHTTP(proxyWriter, req, nextHandler)
+				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(resp.Header().Get("Cache-Control")).To(BeEmpty())
 				Expect(resp.Header().Get("Expires")).To(BeEmpty())
 				bodyString, err := ioutil.ReadAll(resp.Body)
@@ -143,7 +130,7 @@ var _ = Describe("Healthcheck", func() {
 			})
 
 			It("does not set the access log record's status code to 200", func() {
-				handler.ServeHTTP(proxyWriter, req, nextHandler)
+				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(alr.StatusCode).To(Equal(0))
 			})
 		})

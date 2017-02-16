@@ -10,7 +10,6 @@ import (
 	"github.com/urfave/negroni"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type healthcheck struct {
@@ -32,13 +31,11 @@ func NewHealthcheck(userAgent string, heartbeatOK *int32, logger logger.Logger) 
 }
 
 func (h *healthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	proxyWriter, ok := rw.(utils.ProxyResponseWriter)
 	var accessLogRecord *schema.AccessLogRecord
-	if ok {
-		alr := proxyWriter.Context().Value("AccessLogRecord")
-		if alr == nil {
-			h.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-		}
+	alr := r.Context().Value("AccessLogRecord")
+	if alr == nil {
+		h.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
+	} else {
 		accessLogRecord = alr.(*schema.AccessLogRecord)
 	}
 	if h.userAgent == "" || r.Header.Get("User-Agent") == h.userAgent {
@@ -50,13 +47,13 @@ func (h *healthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next ht
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte("ok\n"))
 			r.Close = true
-			if ok {
+			if accessLogRecord != nil {
 				accessLogRecord.StatusCode = http.StatusOK
 			}
 		} else {
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			r.Close = true
-			if ok {
+			if accessLogRecord != nil {
 				accessLogRecord.StatusCode = http.StatusServiceUnavailable
 			}
 		}
