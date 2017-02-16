@@ -77,6 +77,9 @@ func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate u
 func (m *MetricsReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {
 	m.sender.IncrementCounter("registry_message." + msg.Component())
 }
+func (m *MetricsReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged) {
+	m.sender.IncrementCounter("unregistry_message." + msg.Component())
+}
 
 func getResponseCounterName(res *http.Response) string {
 	var statusCode int

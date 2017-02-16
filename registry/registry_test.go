@@ -280,9 +280,26 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Unregister", func() {
-		It("emits message_count metrics", func() {
-			r.Unregister("foo", fooEndpoint)
-			Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
+		Context("when endpoint has component tagged", func() {
+			BeforeEach(func() {
+				fooEndpoint.Tags = map[string]string{"component": "oauth-server"}
+			})
+			It("emits counter metrics", func() {
+				r.Unregister("foo", fooEndpoint)
+				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(1))
+				Expect(reporter.CaptureUnregistryMessageArgsForCall(0)).To(Equal(fooEndpoint))
+			})
+		})
+
+		Context("when endpoint does not have component tag", func() {
+			BeforeEach(func() {
+				fooEndpoint.Tags = map[string]string{}
+			})
+			It("emits counter metrics", func() {
+				r.Unregister("foo", fooEndpoint)
+				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(1))
+				Expect(reporter.CaptureUnregistryMessageArgsForCall(0)).To(Equal(fooEndpoint))
+			})
 		})
 
 		It("Handles unknown URIs", func() {

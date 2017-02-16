@@ -71,13 +71,6 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter reporter.
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
-	zapData := []zap.Field{
-		zap.Stringer("uri", uri),
-		zap.String("backend", endpoint.CanonicalAddr()),
-		zap.Object("modification_tag", endpoint.ModificationTag),
-	}
-
-	r.reporter.CaptureRegistryMessage(endpoint)
 
 	r.Lock()
 
@@ -96,6 +89,14 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	r.timeOfLastUpdate = t
 	r.Unlock()
 
+	r.reporter.CaptureRegistryMessage(endpoint)
+
+	zapData := []zap.Field{
+		zap.Stringer("uri", uri),
+		zap.String("backend", endpoint.CanonicalAddr()),
+		zap.Object("modification_tag", endpoint.ModificationTag),
+	}
+
 	if endpointAdded {
 		r.logger.Debug("endpoint-registered", zapData...)
 	} else {
@@ -109,7 +110,6 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		zap.String("backend", endpoint.CanonicalAddr()),
 		zap.Object("modification_tag", endpoint.ModificationTag),
 	}
-	r.reporter.CaptureRegistryMessage(endpoint)
 
 	r.Lock()
 
@@ -130,6 +130,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	}
 
 	r.Unlock()
+	r.reporter.CaptureUnregistryMessage(endpoint)
 }
 
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {

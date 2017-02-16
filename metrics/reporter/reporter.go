@@ -26,4 +26,5 @@ type RouteRegistryReporter interface {
 	CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64)
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged)
+	CaptureUnregistryMessage(msg ComponentTagged)
 }

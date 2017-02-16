@@ -25,6 +25,11 @@ type FakeRouteRegistryReporter struct {
 	captureRegistryMessageArgsForCall []struct {
 		msg reporter.ComponentTagged
 	}
+	CaptureUnregistryMessageStub        func(msg reporter.ComponentTagged)
+	captureUnregistryMessageMutex       sync.RWMutex
+	captureUnregistryMessageArgsForCall []struct {
+		msg reporter.ComponentTagged
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -102,6 +107,30 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) 
 	return fake.captureRegistryMessageArgsForCall[i].msg
 }
 
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged) {
+	fake.captureUnregistryMessageMutex.Lock()
+	fake.captureUnregistryMessageArgsForCall = append(fake.captureUnregistryMessageArgsForCall, struct {
+		msg reporter.ComponentTagged
+	}{msg})
+	fake.recordInvocation("CaptureUnregistryMessage", []interface{}{msg})
+	fake.captureUnregistryMessageMutex.Unlock()
+	if fake.CaptureUnregistryMessageStub != nil {
+		fake.CaptureUnregistryMessageStub(msg)
+	}
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageCallCount() int {
+	fake.captureUnregistryMessageMutex.RLock()
+	defer fake.captureUnregistryMessageMutex.RUnlock()
+	return len(fake.captureUnregistryMessageArgsForCall)
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageArgsForCall(i int) reporter.ComponentTagged {
+	fake.captureUnregistryMessageMutex.RLock()
+	defer fake.captureUnregistryMessageMutex.RUnlock()
+	return fake.captureUnregistryMessageArgsForCall[i].msg
+}
+
 func (fake *FakeRouteRegistryReporter) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -111,6 +140,8 @@ func (fake *FakeRouteRegistryReporter) Invocations() map[string][][]interface{} 
 	defer fake.captureLookupTimeMutex.RUnlock()
 	fake.captureRegistryMessageMutex.RLock()
 	defer fake.captureRegistryMessageMutex.RUnlock()
+	fake.captureUnregistryMessageMutex.RLock()
+	defer fake.captureUnregistryMessageMutex.RUnlock()
 	return fake.invocations
 }
 
