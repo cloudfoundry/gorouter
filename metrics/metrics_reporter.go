@@ -75,10 +75,24 @@ func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate u
 }
 
 func (m *MetricsReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {
-	m.sender.IncrementCounter("registry_message." + msg.Component())
+	var componentName string
+	if msg.Component() == "" {
+		componentName = "registry_message"
+	} else {
+		componentName = "registry_message." + msg.Component()
+	}
+	m.sender.IncrementCounter(componentName)
 }
+
 func (m *MetricsReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged) {
-	m.sender.IncrementCounter("unregistry_message." + msg.Component())
+	var componentName string
+	if msg.Component() == "" {
+		componentName = "unregistry_message"
+	} else {
+		componentName = "unregistry_message." + msg.Component()
+	}
+	m.sender.IncrementCounter(componentName)
+
 }
 
 func getResponseCounterName(res *http.Response) string {
