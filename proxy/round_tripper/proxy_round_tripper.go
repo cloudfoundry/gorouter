@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"syscall"
 
 	"github.com/uber-go/zap"
 
@@ -164,7 +165,7 @@ func (rs *RouteServiceRoundTripper) reportError(err error) {
 
 func retryableError(err error) bool {
 	ne, netErr := err.(*net.OpError)
-	if netErr && ne.Op == "dial" {
+	if netErr && (ne.Op == "dial" || ne.Err == syscall.ECONNRESET) {
 		return true
 	}
 

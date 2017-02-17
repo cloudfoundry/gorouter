@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"syscall"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
@@ -32,6 +33,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Err: errors.New("error"),
 				Op:  "dial",
 			}
+			connResetError = &net.OpError{
+				Err: syscall.ECONNRESET,
+				Op:  "read",
+			}
 		)
 
 		BeforeEach(func() {
@@ -57,10 +62,24 @@ var _ = Describe("ProxyRoundTripper", func() {
 					servingBackend, transport, endpointIterator, logger, after)
 			})
 
-			Context("when backend is unavailable", func() {
+			Context("when backend is unavailable due to dial error", func() {
 				BeforeEach(func() {
 					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
 						return nil, dialError
+					}
+				})
+
+				It("retries 3 times", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(endpointIterator.NextCallCount()).To(Equal(3))
+				})
+			})
+
+			Context("when backend is unavailable due to connection reset error", func() {
+				BeforeEach(func() {
+					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+						return nil, connResetError
 					}
 				})
 
