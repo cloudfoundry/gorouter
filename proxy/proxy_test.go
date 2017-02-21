@@ -86,6 +86,22 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
+	It("Does not append ? to the request", func() {
+		ln := registerHandler(r, "test/?", func(conn *test_util.HttpConn) {
+			conn.CheckLine("GET /? HTTP/1.1")
+
+			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+		})
+		defer ln.Close()
+
+		x := dialProxy(proxyServer)
+
+		req := test_util.NewRequest("GET", "test", "/?", nil)
+		x.WriteRequest(req)
+		resp, _ := x.ReadResponse()
+		Expect(resp.StatusCode).To(Equal(200))
+	})
+
 	It("Content-type is not set by proxy", func() {
 		ln := registerHandler(r, "content-test", func(x *test_util.HttpConn) {
 			_, err := http.ReadRequest(x.Reader)

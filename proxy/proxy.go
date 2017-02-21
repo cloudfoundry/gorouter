@@ -390,6 +390,7 @@ func setupProxyRequest(source *http.Request, target *http.Request, forceForwarde
 	target.URL.Host = source.Host
 	target.URL.Opaque = source.RequestURI
 	target.URL.RawQuery = ""
+	target.URL.ForceQuery = false
 
 	handler.SetRequestXRequestStart(source)
 	target.Header.Del(router_http.CfAppInstance)
