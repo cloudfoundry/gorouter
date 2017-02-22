@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/stats"
 )
@@ -20,5 +20,5 @@ func (_ NullVarz) CaptureRoutingRequest(b *route.Endpoint) {}
 func (_ NullVarz) CaptureRoutingResponse(*http.Response)   {}
 func (_ NullVarz) CaptureRoutingResponseLatency(*route.Endpoint, *http.Response, time.Time, time.Duration) {
 }
-func (_ NullVarz) CaptureRouteServiceResponse(*http.Response)          {}
-func (_ NullVarz) CaptureRegistryMessage(msg reporter.ComponentTagged) {}
+func (_ NullVarz) CaptureRouteServiceResponse(*http.Response)         {}
+func (_ NullVarz) CaptureRegistryMessage(msg metrics.ComponentTagged) {}

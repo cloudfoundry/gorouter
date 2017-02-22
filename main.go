@@ -15,7 +15,6 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route_fetcher"
@@ -162,7 +161,7 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter reporter.ProxyReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.RegistryInterface, accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger,
 		c.RouteServiceEnabled,

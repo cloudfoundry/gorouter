@@ -10,7 +10,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry/container"
 	"code.cloudfoundry.org/gorouter/route"
 )
@@ -50,13 +50,13 @@ type RouteRegistry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	reporter reporter.RouteRegistryReporter
+	reporter metrics.RouteRegistryReporter
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
 }
 
-func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter reporter.RouteRegistryReporter) *RouteRegistry {
+func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byUri = container.NewTrie()

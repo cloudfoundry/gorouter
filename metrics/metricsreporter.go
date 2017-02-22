@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
 	"code.cloudfoundry.org/gorouter/route"
 	"github.com/cloudfoundry/dropsonde/metrics"
 )
@@ -53,7 +52,7 @@ func (m *MetricsReporter) CaptureRoutingResponse(res *http.Response) {
 	m.batcher.BatchIncrementCounter("responses")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
+func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration) {
 	latency := float64(d / time.Millisecond)
 	unit := "ms"
 	m.sender.SendValue("latency", latency, unit)
@@ -74,7 +73,7 @@ func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate u
 	m.sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
 }
 
-func (m *MetricsReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {
+func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
 	var componentName string
 	if msg.Component() == "" {
 		componentName = "registry_message"
@@ -84,7 +83,7 @@ func (m *MetricsReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {
 	m.sender.IncrementCounter(componentName)
 }
 
-func (m *MetricsReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged) {
+func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
 	var componentName string
 	if msg.Component() == "" {
 		componentName = "unregistry_message"
@@ -92,7 +91,14 @@ func (m *MetricsReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged)
 		componentName = "unregistry_message." + msg.Component()
 	}
 	m.sender.IncrementCounter(componentName)
+}
 
+func (m *MetricsReporter) CaptureWebSocketUpdate() {
+	m.batcher.BatchIncrementCounter("websocket_upgrades")
+}
+
+func (m *MetricsReporter) CaptureWebSocketFailure() {
+	m.batcher.BatchIncrementCounter("websocket_failures")
 }
 
 func getResponseCounterName(res *http.Response) string {

@@ -308,11 +308,7 @@ var _ = Describe("MetricsReporter", func() {
 	})
 
 	It("sends the latency", func() {
-		response := http.Response{
-			StatusCode: 401,
-		}
-
-		metricReporter.CaptureRoutingResponseLatency(endpoint, &response, time.Now(), 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(1))
 		name, value, unit := sender.SendValueArgsForCall(0)
@@ -323,12 +319,8 @@ var _ = Describe("MetricsReporter", func() {
 	})
 
 	It("sends the latency for the given component", func() {
-		response := http.Response{
-			StatusCode: 200,
-		}
-
 		endpoint.Tags["component"] = "CloudController"
-		metricReporter.CaptureRoutingResponseLatency(endpoint, &response, time.Now(), 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(2))
 		name, value, unit := sender.SendValueArgsForCall(1)
@@ -429,6 +421,19 @@ var _ = Describe("MetricsReporter", func() {
 				Expect(sender.IncrementCounterCallCount()).To(Equal(1))
 				Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("unregistry_message"))
 			})
+		})
+	})
+
+	Context("websocket metrics", func() {
+		It("increments the total responses metric", func() {
+			metricReporter.CaptureWebSocketUpdate()
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("websocket_upgrades"))
+		})
+		It("increments the websocket failures metric", func() {
+			metricReporter.CaptureWebSocketFailure()
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("websocket_failures"))
 		})
 	})
 

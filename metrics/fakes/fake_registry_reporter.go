@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics"
 )
 
 type FakeRouteRegistryReporter struct {
@@ -20,15 +20,15 @@ type FakeRouteRegistryReporter struct {
 	captureLookupTimeArgsForCall []struct {
 		t time.Duration
 	}
-	CaptureRegistryMessageStub        func(msg reporter.ComponentTagged)
+	CaptureRegistryMessageStub        func(msg metrics.ComponentTagged)
 	captureRegistryMessageMutex       sync.RWMutex
 	captureRegistryMessageArgsForCall []struct {
-		msg reporter.ComponentTagged
+		msg metrics.ComponentTagged
 	}
-	CaptureUnregistryMessageStub        func(msg reporter.ComponentTagged)
+	CaptureUnregistryMessageStub        func(msg metrics.ComponentTagged)
 	captureUnregistryMessageMutex       sync.RWMutex
 	captureUnregistryMessageArgsForCall []struct {
-		msg reporter.ComponentTagged
+		msg metrics.ComponentTagged
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
@@ -83,10 +83,10 @@ func (fake *FakeRouteRegistryReporter) CaptureLookupTimeArgsForCall(i int) time.
 	return fake.captureLookupTimeArgsForCall[i].t
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(msg reporter.ComponentTagged) {
+func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(msg metrics.ComponentTagged) {
 	fake.captureRegistryMessageMutex.Lock()
 	fake.captureRegistryMessageArgsForCall = append(fake.captureRegistryMessageArgsForCall, struct {
-		msg reporter.ComponentTagged
+		msg metrics.ComponentTagged
 	}{msg})
 	fake.recordInvocation("CaptureRegistryMessage", []interface{}{msg})
 	fake.captureRegistryMessageMutex.Unlock()
@@ -101,16 +101,16 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageCallCount() int {
 	return len(fake.captureRegistryMessageArgsForCall)
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) reporter.ComponentTagged {
+func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) metrics.ComponentTagged {
 	fake.captureRegistryMessageMutex.RLock()
 	defer fake.captureRegistryMessageMutex.RUnlock()
 	return fake.captureRegistryMessageArgsForCall[i].msg
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(msg reporter.ComponentTagged) {
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(msg metrics.ComponentTagged) {
 	fake.captureUnregistryMessageMutex.Lock()
 	fake.captureUnregistryMessageArgsForCall = append(fake.captureUnregistryMessageArgsForCall, struct {
-		msg reporter.ComponentTagged
+		msg metrics.ComponentTagged
 	}{msg})
 	fake.recordInvocation("CaptureUnregistryMessage", []interface{}{msg})
 	fake.captureUnregistryMessageMutex.Unlock()
@@ -125,7 +125,7 @@ func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageCallCount() int {
 	return len(fake.captureUnregistryMessageArgsForCall)
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageArgsForCall(i int) reporter.ComponentTagged {
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageArgsForCall(i int) metrics.ComponentTagged {
 	fake.captureUnregistryMessageMutex.RLock()
 	defer fake.captureUnregistryMessageMutex.RUnlock()
 	return fake.captureUnregistryMessageArgsForCall[i].msg
@@ -157,4 +157,4 @@ func (fake *FakeRouteRegistryReporter) recordInvocation(key string, args []inter
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ reporter.RouteRegistryReporter = new(FakeRouteRegistryReporter)
+var _ metrics.RouteRegistryReporter = new(FakeRouteRegistryReporter)

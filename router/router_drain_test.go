@@ -16,7 +16,9 @@ import (
 	cfg "code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
-	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
@@ -38,13 +40,14 @@ var _ = Describe("Router", func() {
 		config     *cfg.Config
 		p          proxy.Proxy
 
-		mbusClient  *nats.Conn
-		registry    *rregistry.RouteRegistry
-		varz        vvarz.Varz
-		rtr         *router.Router
-		subscriber  ifrit.Process
-		natsPort    uint16
-		healthCheck int32
+		combinedReporter metrics.CombinedReporter
+		mbusClient       *nats.Conn
+		registry         *rregistry.RouteRegistry
+		varz             vvarz.Varz
+		rtr              *router.Router
+		subscriber       ifrit.Process
+		natsPort         uint16
+		healthCheck      int32
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
@@ -207,12 +210,16 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
-		varz = vvarz.NewVarz(registry)
 		logcounter := schema.NewLogCounter()
 		atomic.StoreInt32(&healthCheck, 0)
 
+		varz = vvarz.NewVarz(registry)
+		sender := new(fakeMetrics.MetricSender)
+		batcher := new(fakeMetrics.MetricBatcher)
+		metricReporter := metrics.NewMetricsReporter(sender, batcher)
+		combinedReporter = metrics.NewCompositeReporter(varz, metricReporter)
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
-		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
 
 		errChan := make(chan error, 2)
@@ -587,7 +594,7 @@ var _ = Describe("Router", func() {
 				var healthCheck int32
 				healthCheck = 0
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
-				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
 
 				errChan = make(chan error, 2)

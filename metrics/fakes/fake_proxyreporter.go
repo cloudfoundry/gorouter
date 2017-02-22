@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -27,12 +27,10 @@ type FakeProxyReporter struct {
 	captureRoutingResponseArgsForCall []struct {
 		res *http.Response
 	}
-	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration)
+	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, d time.Duration)
 	captureRoutingResponseLatencyMutex       sync.RWMutex
 	captureRoutingResponseLatencyArgsForCall []struct {
 		b *route.Endpoint
-		r *http.Response
-		t time.Time
 		d time.Duration
 	}
 	CaptureRouteServiceResponseStub        func(res *http.Response)
@@ -40,8 +38,14 @@ type FakeProxyReporter struct {
 	captureRouteServiceResponseArgsForCall []struct {
 		res *http.Response
 	}
-	invocations      map[string][][]interface{}
-	invocationsMutex sync.RWMutex
+	CaptureWebSocketUpdateStub         func()
+	captureWebSocketUpdateMutex        sync.RWMutex
+	captureWebSocketUpdateArgsForCall  []struct{}
+	CaptureWebSocketFailureStub        func()
+	captureWebSocketFailureMutex       sync.RWMutex
+	captureWebSocketFailureArgsForCall []struct{}
+	invocations                        map[string][][]interface{}
+	invocationsMutex                   sync.RWMutex
 }
 
 func (fake *FakeProxyReporter) CaptureBadRequest() {
@@ -124,18 +128,16 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseArgsForCall(i int) *http.Re
 	return fake.captureRoutingResponseArgsForCall[i].res
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.Lock()
 	fake.captureRoutingResponseLatencyArgsForCall = append(fake.captureRoutingResponseLatencyArgsForCall, struct {
 		b *route.Endpoint
-		r *http.Response
-		t time.Time
 		d time.Duration
-	}{b, r, t, d})
-	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, r, t, d})
+	}{b, d})
+	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, d})
 	fake.captureRoutingResponseLatencyMutex.Unlock()
 	if fake.CaptureRoutingResponseLatencyStub != nil {
-		fake.CaptureRoutingResponseLatencyStub(b, r, t, d)
+		fake.CaptureRoutingResponseLatencyStub(b, d)
 	}
 }
 
@@ -145,10 +147,10 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyCallCount() int {
 	return len(fake.captureRoutingResponseLatencyArgsForCall)
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, *http.Response, time.Time, time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.RLock()
 	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
-	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].r, fake.captureRoutingResponseLatencyArgsForCall[i].t, fake.captureRoutingResponseLatencyArgsForCall[i].d
+	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].d
 }
 
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(res *http.Response) {
@@ -175,6 +177,38 @@ func (fake *FakeProxyReporter) CaptureRouteServiceResponseArgsForCall(i int) *ht
 	return fake.captureRouteServiceResponseArgsForCall[i].res
 }
 
+func (fake *FakeProxyReporter) CaptureWebSocketUpdate() {
+	fake.captureWebSocketUpdateMutex.Lock()
+	fake.captureWebSocketUpdateArgsForCall = append(fake.captureWebSocketUpdateArgsForCall, struct{}{})
+	fake.recordInvocation("CaptureWebSocketUpdate", []interface{}{})
+	fake.captureWebSocketUpdateMutex.Unlock()
+	if fake.CaptureWebSocketUpdateStub != nil {
+		fake.CaptureWebSocketUpdateStub()
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureWebSocketUpdateCallCount() int {
+	fake.captureWebSocketUpdateMutex.RLock()
+	defer fake.captureWebSocketUpdateMutex.RUnlock()
+	return len(fake.captureWebSocketUpdateArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureWebSocketFailure() {
+	fake.captureWebSocketFailureMutex.Lock()
+	fake.captureWebSocketFailureArgsForCall = append(fake.captureWebSocketFailureArgsForCall, struct{}{})
+	fake.recordInvocation("CaptureWebSocketFailure", []interface{}{})
+	fake.captureWebSocketFailureMutex.Unlock()
+	if fake.CaptureWebSocketFailureStub != nil {
+		fake.CaptureWebSocketFailureStub()
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureWebSocketFailureCallCount() int {
+	fake.captureWebSocketFailureMutex.RLock()
+	defer fake.captureWebSocketFailureMutex.RUnlock()
+	return len(fake.captureWebSocketFailureArgsForCall)
+}
+
 func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -190,6 +224,10 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
 	fake.captureRouteServiceResponseMutex.RLock()
 	defer fake.captureRouteServiceResponseMutex.RUnlock()
+	fake.captureWebSocketUpdateMutex.RLock()
+	defer fake.captureWebSocketUpdateMutex.RUnlock()
+	fake.captureWebSocketFailureMutex.RLock()
+	defer fake.captureWebSocketFailureMutex.RUnlock()
 	return fake.invocations
 }
 
@@ -205,4 +243,4 @@ func (fake *FakeProxyReporter) recordInvocation(key string, args []interface{}) 
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ reporter.ProxyReporter = new(FakeProxyReporter)
+var _ metrics.ProxyReporter = new(FakeProxyReporter)

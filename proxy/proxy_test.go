@@ -900,7 +900,7 @@ var _ = Describe("Proxy", func() {
 		// 2nd client connected
 		connectClient()
 
-		Eventually(fakeReporter.CaptureRoutingResponseCallCount).Should(Equal(2))
+		Eventually(fakeReporter.CaptureWebSocketUpdateCallCount).Should(Equal(2))
 	})
 
 	It("does not emit a xxx metric when BadRequests occurs", func() {
@@ -921,8 +921,8 @@ var _ = Describe("Proxy", func() {
 
 		conn.WriteRequest(req)
 
-		Eventually(fakeReporter.CaptureRoutingResponseCallCount).Should(Equal(0))
-		Eventually(fakeReporter.CaptureBadRequestCallCount).Should(Equal(1))
+		Eventually(fakeReporter.CaptureWebSocketUpdateCallCount).Should(Equal(0))
+		Eventually(fakeReporter.CaptureWebSocketFailureCallCount).Should(Equal(1))
 	})
 
 	It("upgrades a Tcp request", func() {

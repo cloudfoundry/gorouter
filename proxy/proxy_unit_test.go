@@ -8,7 +8,8 @@ import (
 
 	fakelogger "code.cloudfoundry.org/gorouter/access_log/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/proxy/test_helpers"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -27,6 +28,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		fakeAccessLogger *fakelogger.FakeAccessLogger
 		logger           logger.Logger
 		resp             utils.ProxyResponseWriter
+		combinedReporter metrics.CombinedReporter
 	)
 
 	Context("ServeHTTP", func() {
@@ -49,8 +51,14 @@ var _ = Describe("Proxy Unit tests", func() {
 				cryptoPrev,
 				false,
 			)
+			varz := test_helpers.NullVarz{}
+			sender := new(fakes.MetricSender)
+			batcher := new(fakes.MetricBatcher)
+			proxyReporter := metrics.NewMetricsReporter(sender, batcher)
+			combinedReporter = metrics.NewCompositeReporter(varz, proxyReporter)
+
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
-			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, test_helpers.NullVarz{},
+			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, nil)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{})

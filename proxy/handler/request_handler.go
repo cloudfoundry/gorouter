@@ -16,7 +16,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/reporter"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 )
@@ -29,14 +29,14 @@ var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
 	logger    logger.Logger
-	reporter  reporter.ProxyReporter
+	reporter  metrics.CombinedReporter
 	logrecord *schema.AccessLogRecord
 
 	request  *http.Request
 	response utils.ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r reporter.ProxyReporter, alr *schema.AccessLogRecord, logger logger.Logger) *RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.CombinedReporter, alr *schema.AccessLogRecord, logger logger.Logger) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
 	return &RequestHandler{
 		logger:    requestLogger,
@@ -150,10 +150,10 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
-		h.reporter.CaptureBadRequest()
+		h.reporter.CaptureWebSocketFailure()
 		return
 	}
-	h.reporter.CaptureRoutingResponse(nil)
+	h.reporter.CaptureWebSocketUpdate()
 }
 
 func (h *RequestHandler) writeStatus(code int, message string) {

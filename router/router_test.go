@@ -1,14 +1,25 @@
 package router_test
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"syscall"
+	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/mbus"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
@@ -26,19 +37,9 @@ import (
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
 
-	"bufio"
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"net/http/httputil"
-	"time"
+	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 )
 
@@ -84,10 +85,14 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
+		sender := new(fakeMetrics.MetricSender)
+		batcher := new(fakeMetrics.MetricBatcher)
+		metricReporter := metrics.NewMetricsReporter(sender, batcher)
+		combinedReporter := metrics.NewCompositeReporter(varz, metricReporter)
 
-		proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, varz,
+		proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, nil)
 
 		var healthCheck int32

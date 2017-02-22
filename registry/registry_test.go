@@ -12,7 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 
 	"encoding/json"

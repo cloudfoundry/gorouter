@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/reporter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -28,7 +28,7 @@ import (
 var (
 	r              *registry.RouteRegistry
 	p              proxy.Proxy
-	fakeReporter   *fakes.FakeProxyReporter
+	fakeReporter   *fakes.FakeCombinedReporter
 	conf           *config.Config
 	proxyServer    net.Listener
 	accessLog      access_log.AccessLogger
@@ -58,7 +58,7 @@ var _ = BeforeEach(func() {
 	conf = config.DefaultConfig()
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
-	fakeReporter = &fakes.FakeProxyReporter{}
+	fakeReporter = &fakes.FakeCombinedReporter{}
 })
 
 var _ = JustBeforeEach(func() {
