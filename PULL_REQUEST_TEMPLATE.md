@@ -4,7 +4,7 @@ Thanks for contributing to gorouter. To speed up the process of reviewing your p
 
 * An explanation of the use cases your change solves
 
-* Instructions to verify the behavior change
+* Instructions to functionally test the behavior change using operator interfaces (BOSH manifest, logs, curl, and metrics)
 
 * Expected result after the change
 
