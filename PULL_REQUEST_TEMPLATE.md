@@ -4,6 +4,12 @@ Thanks for contributing to gorouter. To speed up the process of reviewing your p
 
 * An explanation of the use cases your change solves
 
+* Instructions to verify the behavior change
+
+* Expected result after the change
+
+* Current result before the change
+
 * Links to any other associated PRs
 
 * [ ] I have viewed signed and have submitted the Contributor License Agreement
