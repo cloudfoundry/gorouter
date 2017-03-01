@@ -231,7 +231,7 @@ The `/routes` endpoint returns the entire routing table as JSON. This endpoint r
 
 ```
 $ curl "http://someuser:somepass@10.0.32.15:8080/routes"
-{"0295dd314aaf582f201e655cbd74ade5.cloudfoundry.me":["127.0.0.1:34567"],"03e316d6aa375d1dc1153700da5f1798.cloudfoundry.me":["127.0.0.1:34568"]}
+{"api.catwoman.cf-app.com":[{"address":"10.244.0.138:9022","ttl":0,"tags":{"component":"CloudController"}}],"dora-dora.catwoman.cf-app.com":[{"address":"10.244.16.4:60035","ttl":0,"tags":{"component":"route-emitter"}},{"address":"10.244.16.4:60060","ttl":0,"tags":{"component":"route-emitter"}}]}
 ```
 
 Because of the nature of the data present in `/varz` and `/routes`, they require http basic authentication credentials. These credentials can be found the BOSH manifest for cf-release under the `router` job:
