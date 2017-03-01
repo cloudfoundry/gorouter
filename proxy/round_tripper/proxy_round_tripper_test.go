@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os"
 	"syscall"
 
 	"code.cloudfoundry.org/gorouter/logger"
@@ -34,7 +35,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Op:  "dial",
 			}
 			connResetError = &net.OpError{
-				Err: syscall.ECONNRESET,
+				Err: os.NewSyscallError("read", syscall.ECONNRESET),
 				Op:  "read",
 			}
 		)

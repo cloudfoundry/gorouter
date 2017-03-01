@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"syscall"
 
 	"github.com/uber-go/zap"
 
@@ -165,10 +164,9 @@ func (rs *RouteServiceRoundTripper) reportError(err error) {
 
 func retryableError(err error) bool {
 	ne, netErr := err.(*net.OpError)
-	if netErr && (ne.Op == "dial" || ne.Err == syscall.ECONNRESET) {
+	if netErr && (ne.Op == "dial" || ne.Op == "read" && ne.Err.Error() == "read: connection reset by peer") {
 		return true
 	}
-
 	return false
 }
 
