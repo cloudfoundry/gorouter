@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test/common"
@@ -436,8 +436,8 @@ var _ = Describe("Router Integration", func() {
 		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
-			traceHeader := r.Header.Get(router_http.B3TraceIdHeader)
-			spanIDHeader := r.Header.Get(router_http.B3SpanIdHeader)
+			traceHeader := r.Header.Get(handlers.B3TraceIdHeader)
+			spanIDHeader := r.Header.Get(handlers.B3SpanIdHeader)
 			Expect(traceHeader).ToNot(BeEmpty())
 			Expect(spanIDHeader).ToNot(BeEmpty())
 			w.WriteHeader(http.StatusOK)

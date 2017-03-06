@@ -19,6 +19,7 @@ import (
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -426,7 +427,7 @@ var _ = Describe("Proxy", func() {
 				conn.WriteResponse(resp)
 				conn.Close()
 
-				done <- req.Header.Get(router_http.B3TraceIdHeader)
+				done <- req.Header.Get(handlers.B3TraceIdHeader)
 			})
 			defer ln.Close()
 
