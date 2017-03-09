@@ -123,7 +123,7 @@ func (s *Subscriber) subscribeToGreetMessage() error {
 }
 
 func (s *Subscriber) subscribeRoutes() error {
-	_, err := s.natsClient.Subscribe("router.*", func(message *nats.Msg) {
+	natsSubscriber, err := s.natsClient.Subscribe("router.*", func(message *nats.Msg) {
 		switch message.Subject {
 		case "router.register":
 			s.registerRoute(message)
@@ -132,6 +132,9 @@ func (s *Subscriber) subscribeRoutes() error {
 		default:
 		}
 	})
+
+	// Pending limits are set to twice the defaults
+	natsSubscriber.SetPendingLimits(131072, 131072*1024)
 	return err
 }
 
