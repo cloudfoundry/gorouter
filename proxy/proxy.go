@@ -100,6 +100,7 @@ func NewProxy(
 			DisableKeepAlives:   c.DisableKeepAlives,
 			MaxIdleConns:        c.MaxIdleConns,
 			MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
+			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
 			DisableCompression:  true,
 			TLSClientConfig:     tlsConfig,
 		},
