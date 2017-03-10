@@ -28,7 +28,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/nu7hatch/gouuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -676,7 +676,15 @@ var _ = Describe("Proxy", func() {
 	})
 
 	It("emits HTTP startstop events", func() {
+		done := make(chan struct{})
+		var vcapHeader string
 		ln := registerHandlerWithInstanceId(r, "app", "", func(conn *test_util.HttpConn) {
+			req, _ := conn.ReadRequest()
+			vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
+			done <- struct{}{}
+			resp := test_util.NewResponse(http.StatusOK)
+			conn.WriteResponse(resp)
+			conn.Close()
 		}, "fake-instance-id")
 		defer ln.Close()
 
@@ -686,26 +694,24 @@ var _ = Describe("Proxy", func() {
 		dropsonde.InitializeWithEmitter(fakeEmitter)
 
 		req := test_util.NewRequest("GET", "app", "/", nil)
-		requestId, err := uuid.NewV4()
-		Expect(err).NotTo(HaveOccurred())
-		req.Header.Set("X-Vcap-Request-Id", requestId.String())
-		conn.WriteRequest(req)
 
+		conn.WriteRequest(req)
 		findStartStopEvent := func() *events.HttpStartStop {
-			for _, event := range fakeEmitter.GetEvents() {
-				startStopEvent, ok := event.(*events.HttpStartStop)
+			for _, envelope := range fakeEmitter.GetEvents() {
+				startStopEvent, ok := envelope.(*events.HttpStartStop)
 				if ok {
 					return startStopEvent
 				}
 			}
-
 			return nil
 		}
 
-		Eventually(findStartStopEvent).ShouldNot(BeNil())
+		Eventually(done).Should(Receive())
 
-		Expect(findStartStopEvent().RequestId).To(Equal(factories.NewUUID(requestId)))
-		conn.ReadResponse()
+		Eventually(findStartStopEvent).ShouldNot(BeNil())
+		u2, err := uuid.ParseHex(vcapHeader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(findStartStopEvent().RequestId).To(Equal(factories.NewUUID(u2)))
 	})
 
 	It("X-CF-InstanceID header is added with host:port information if NOT present in the routing endpoint", func() {

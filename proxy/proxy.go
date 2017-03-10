@@ -115,6 +115,7 @@ func NewProxy(
 	zipkinHandler := handlers.NewZipkin(c.Tracing.EnableZipkin, c.ExtraHeadersToLog, logger)
 	n := negroni.New()
 	n.Use(&proxyWriterHandler{})
+	n.Use(handlers.NewsetVcapRequestIdHeader(logger))
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
 	n.Use(handlers.NewProxyHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)

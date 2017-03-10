@@ -4,9 +4,9 @@ import (
 	"bytes"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/routing-api/models"
 
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,11 +32,11 @@ var _ = Describe("AccessLogRecord", func() {
 					Opaque: "http://example.com/request",
 				},
 				Header: http.Header{
-					"Referer":                       []string{"FakeReferer"},
-					"User-Agent":                    []string{"FakeUserAgent"},
-					"X-Forwarded-For":               []string{"FakeProxy1, FakeProxy2"},
-					"X-Forwarded-Proto":             []string{"FakeOriginalRequestProto"},
-					router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
+					"Referer":                    []string{"FakeReferer"},
+					"User-Agent":                 []string{"FakeUserAgent"},
+					"X-Forwarded-For":            []string{"FakeProxy1, FakeProxy2"},
+					"X-Forwarded-Proto":          []string{"FakeOriginalRequestProto"},
+					handlers.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
 				},
 				RemoteAddr: "FakeRemoteAddr",
 			},
@@ -161,11 +161,11 @@ var _ = Describe("AccessLogRecord", func() {
 							Opaque: "http://example.com/request",
 						},
 						Header: http.Header{
-							"Referer":                       []string{"FakeReferer"},
-							"User-Agent":                    []string{"FakeUserAgent"},
-							"X-Forwarded-For":               []string{"FakeProxy1, FakeProxy2"},
-							"X-Forwarded-Proto":             []string{"FakeOriginalRequestProto"},
-							router_http.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
+							"Referer":                    []string{"FakeReferer"},
+							"User-Agent":                 []string{"FakeUserAgent"},
+							"X-Forwarded-For":            []string{"FakeProxy1, FakeProxy2"},
+							"X-Forwarded-Proto":          []string{"FakeOriginalRequestProto"},
+							handlers.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
 						},
 						RemoteAddr: "FakeRemoteAddr",
 					},

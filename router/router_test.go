@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -407,7 +407,7 @@ var _ = Describe("Router", func() {
 			_, err := ioutil.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())
 			w.WriteHeader(http.StatusOK)
-			done <- r.Header.Get(router_http.VcapRequestIdHeader)
+			done <- r.Header.Get(handlers.VcapRequestIdHeader)
 		})
 
 		app.Listen()
@@ -424,7 +424,7 @@ var _ = Describe("Router", func() {
 		httpConn := test_util.NewHttpConn(conn)
 
 		req := test_util.NewRequest("GET", "foo.vcap.me", "/", nil)
-		req.Header.Add(router_http.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
+		req.Header.Add(handlers.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
 
 		httpConn.WriteRequest(req)
 

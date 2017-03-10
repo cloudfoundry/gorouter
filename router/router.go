@@ -20,7 +20,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -138,10 +137,6 @@ type gorouterHandler struct {
 }
 
 func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	// The X-Vcap-Request-Id must be set before the request is passed into the
-	// dropsonde InstrumentedHandler
-	router_http.SetVcapRequestIdHeader(req, h.logger)
-
 	h.handler.ServeHTTP(res, req)
 }
 
