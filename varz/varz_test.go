@@ -136,13 +136,9 @@ var _ = Describe("Varz", func() {
 		var t time.Time
 		var d time.Duration
 
-		r1 := &http.Response{
-			StatusCode: http.StatusOK,
-		}
+		r1 := http.StatusOK
 
-		r2 := &http.Response{
-			StatusCode: http.StatusNotFound,
-		}
+		r2 := http.StatusNotFound
 
 		Varz.CaptureRoutingResponseLatency(b, r1, t, d)
 		Varz.CaptureRoutingResponseLatency(b, r2, t, d)
@@ -168,13 +164,9 @@ var _ = Describe("Varz", func() {
 			},
 		}
 
-		r1 := &http.Response{
-			StatusCode: http.StatusOK,
-		}
+		r1 := http.StatusOK
 
-		r2 := &http.Response{
-			StatusCode: http.StatusNotFound,
-		}
+		r2 := http.StatusNotFound
 
 		Varz.CaptureRoutingResponseLatency(b1, r1, t, d)
 		Varz.CaptureRoutingResponseLatency(b2, r2, t, d)
@@ -189,11 +181,9 @@ var _ = Describe("Varz", func() {
 		var startedAt = time.Now()
 		var duration = 1 * time.Millisecond
 
-		response := &http.Response{
-			StatusCode: http.StatusOK,
-		}
+		statusCode := http.StatusOK
 
-		Varz.CaptureRoutingResponseLatency(routeEndpoint, response, startedAt, duration)
+		Varz.CaptureRoutingResponseLatency(routeEndpoint, statusCode, startedAt, duration)
 
 		Expect(findValue(Varz, "latency", "50").(float64)).To(Equal(float64(duration) / float64(time.Second)))
 		Expect(findValue(Varz, "latency", "75").(float64)).To(Equal(float64(duration) / float64(time.Second)))

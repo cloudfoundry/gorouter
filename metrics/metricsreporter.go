@@ -43,12 +43,16 @@ func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint) {
 }
 
 func (m *MetricsReporter) CaptureRouteServiceResponse(res *http.Response) {
-	m.batcher.BatchIncrementCounter(fmt.Sprintf("responses.route_services.%s", getResponseCounterName(res)))
+	var statusCode int
+	if res != nil {
+		statusCode = res.StatusCode
+	}
+	m.batcher.BatchIncrementCounter(fmt.Sprintf("responses.route_services.%s", getResponseCounterName(statusCode)))
 	m.batcher.BatchIncrementCounter("responses.route_services")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponse(res *http.Response) {
-	m.batcher.BatchIncrementCounter(fmt.Sprintf("responses.%s", getResponseCounterName(res)))
+func (m *MetricsReporter) CaptureRoutingResponse(statusCode int) {
+	m.batcher.BatchIncrementCounter(fmt.Sprintf("responses.%s", getResponseCounterName(statusCode)))
 	m.batcher.BatchIncrementCounter("responses")
 }
 
@@ -101,12 +105,8 @@ func (m *MetricsReporter) CaptureWebSocketFailure() {
 	m.batcher.BatchIncrementCounter("websocket_failures")
 }
 
-func getResponseCounterName(res *http.Response) string {
-	var statusCode int
-
-	if res != nil {
-		statusCode = res.StatusCode / 100
-	}
+func getResponseCounterName(statusCode int) string {
+	statusCode = statusCode / 100
 	if statusCode >= 2 && statusCode <= 5 {
 		return fmt.Sprintf("%dxx", statusCode)
 	}

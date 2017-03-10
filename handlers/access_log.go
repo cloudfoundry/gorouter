@@ -47,6 +47,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
 	alr.FinishedAt = time.Now()
+	alr.StatusCode = proxyWriter.Status()
 	a.accessLogger.Log(*alr)
 }
 

@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"fmt"
+
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -52,24 +51,14 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	l.logger.Info("unknown-route")
 
 	rw.Header().Set("X-Cf-RouterError", "unknown_route")
-	code := http.StatusNotFound
-	body := fmt.Sprintf(
-		"%d %s: Requested route ('%s') does not exist.",
-		code,
-		http.StatusText(code),
-		r.Host,
+
+	writeStatus(
+		rw,
+		http.StatusNotFound,
+		fmt.Sprintf("Requested route ('%s') does not exist.", r.Host),
+		r.Context().Value("AccessLogRecord"),
+		l.logger,
 	)
-	l.logger.Info("status", zap.String("body", body))
-
-	alr := r.Context().Value("AccessLogRecord")
-	if accessLogRecord, ok := alr.(*schema.AccessLogRecord); ok {
-
-		accessLogRecord.StatusCode = code
-	} else {
-		l.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-	}
-	http.Error(rw, body, code)
-	rw.Header().Del("Connection")
 }
 
 func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
@@ -103,16 +92,4 @@ func validateCfAppInstance(appInstanceHeader string) (string, string, error) {
 	}
 
 	return appDetails[0], appDetails[1], nil
-}
-
-func hostWithoutPort(req *http.Request) string {
-	host := req.Host
-
-	// Remove :<port>
-	pos := strings.Index(host, ":")
-	if pos >= 0 {
-		host = host[0:pos]
-	}
-
-	return host
 }

@@ -36,16 +36,13 @@ func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)
 		if err != nil {
-			code := http.StatusBadRequest
-			body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), "Unsupported protocol")
-
-			p.logger.Info("status", zap.String("body", body))
-			if accessLogRecord != nil {
-				accessLogRecord.StatusCode = code
-			}
-
-			http.Error(rw, body, code)
-			rw.Header().Del("Connection")
+			writeStatus(
+				rw,
+				http.StatusBadRequest,
+				"Unsupported protocol",
+				alr,
+				p.logger,
+			)
 			return
 		}
 

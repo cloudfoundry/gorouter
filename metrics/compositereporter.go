@@ -14,7 +14,7 @@ type VarzReporter interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponseLatency(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration)
+	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
 }
 
 //go:generate counterfeiter -o fakes/fake_proxyreporter.go . ProxyReporter
@@ -22,7 +22,7 @@ type ProxyReporter interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponse(res *http.Response)
+	CaptureRoutingResponse(statusCode int)
 	CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration)
 	CaptureRouteServiceResponse(res *http.Response)
 	CaptureWebSocketUpdate()
@@ -46,8 +46,8 @@ type CombinedReporter interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponse(res *http.Response)
-	CaptureRoutingResponseLatency(b *route.Endpoint, r *http.Response, t time.Time, d time.Duration)
+	CaptureRoutingResponse(statusCode int)
+	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
 	CaptureRouteServiceResponse(res *http.Response)
 	CaptureWebSocketUpdate()
 	CaptureWebSocketFailure()
@@ -84,12 +84,12 @@ func (c *CompositeReporter) CaptureRouteServiceResponse(res *http.Response) {
 	c.proxyReporter.CaptureRouteServiceResponse(res)
 }
 
-func (c *CompositeReporter) CaptureRoutingResponse(res *http.Response) {
-	c.proxyReporter.CaptureRoutingResponse(res)
+func (c *CompositeReporter) CaptureRoutingResponse(statusCode int) {
+	c.proxyReporter.CaptureRoutingResponse(statusCode)
 }
 
-func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, t time.Time, d time.Duration) {
-	c.varzReporter.CaptureRoutingResponseLatency(b, res, t, d)
+func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
+	c.varzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
 	c.proxyReporter.CaptureRoutingResponseLatency(b, d)
 }
 
