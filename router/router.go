@@ -90,7 +90,7 @@ func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClie
 	}
 
 	healthz := &health.Healthz{}
-	health := handlers.NewHealthcheck("", heartbeatOK, logger)
+	health := handlers.NewHealthcheck(heartbeatOK, logger)
 	component := &common.VcapComponent{
 		Config:  cfg,
 		Varz:    varz,

@@ -28,12 +28,10 @@ func NewProtocolCheck(logger logger.Logger) negroni.Handler {
 
 func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if !isProtocolSupported(r) {
-		var accessLogRecord *schema.AccessLogRecord
 		alr := r.Context().Value("AccessLogRecord")
-		if alr == nil {
+		accessLogRecord, ok := alr.(*schema.AccessLogRecord)
+		if accessLogRecord == nil || !ok {
 			p.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-		} else {
-			accessLogRecord = alr.(*schema.AccessLogRecord)
 		}
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)

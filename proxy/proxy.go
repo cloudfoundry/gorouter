@@ -116,7 +116,7 @@ func NewProxy(
 	n := negroni.New()
 	n.Use(&proxyWriterHandler{})
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
-	n.Use(handlers.NewHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
+	n.Use(handlers.NewProxyHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger))

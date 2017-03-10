@@ -19,7 +19,6 @@ import (
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
 )
 
 const RefreshInterval time.Duration = time.Second * 1
@@ -87,7 +86,7 @@ type VcapComponent struct {
 	Config     interface{}     `json:"-"`
 	Varz       *health.Varz    `json:"-"`
 	Healthz    *health.Healthz `json:"-"`
-	Health     negroni.Handler
+	Health     http.Handler
 	InfoRoutes map[string]json.Marshaler `json:"-"`
 	Logger     logger.Logger             `json:"-"`
 
@@ -211,7 +210,7 @@ func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
-		c.Health.ServeHTTP(w, req, nil)
+		c.Health.ServeHTTP(w, req)
 	})
 
 	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {

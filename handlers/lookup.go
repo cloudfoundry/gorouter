@@ -55,12 +55,13 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		r.Host,
 	)
 	l.logger.Info("status", zap.String("body", body))
+
 	alr := r.Context().Value("AccessLogRecord")
-	if alr == nil {
-		l.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-	} else {
-		accessLogRecord := alr.(*schema.AccessLogRecord)
+	if accessLogRecord, ok := alr.(*schema.AccessLogRecord); ok {
+
 		accessLogRecord.StatusCode = code
+	} else {
+		l.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
 	}
 	http.Error(rw, body, code)
 	rw.Header().Del("Connection")

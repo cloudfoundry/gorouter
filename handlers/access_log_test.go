@@ -73,6 +73,9 @@ var _ = Describe("AccessLog", func() {
 		alr := contextReq.Context().Value("AccessLogRecord")
 		Expect(alr).ToNot(BeNil())
 		Expect(alr).To(BeAssignableToTypeOf(&schema.AccessLogRecord{}))
+		accessLog, ok := alr.(*schema.AccessLogRecord)
+		Expect(ok).To(BeTrue())
+		Expect(accessLog.Request).To(Equal(req))
 	})
 
 	It("logs the access log record after all subsequent handlers have run", func() {
