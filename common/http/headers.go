@@ -1,10 +1,6 @@
 package http
 
-import (
-	"fmt"
-	"net/http"
-	"strings"
-)
+import "net/http"
 
 const (
 	VcapBackendHeader     = "X-Vcap-Backend"
@@ -19,17 +15,4 @@ func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) 
 	responseWriter.Header().Set(VcapRouterHeader, routerIp)
 	responseWriter.Header().Set(VcapBackendHeader, addr)
 	responseWriter.Header().Set(CfRouteEndpointHeader, addr)
-}
-
-func ValidateCfAppInstance(appInstanceHeader string) (string, string, error) {
-	appDetails := strings.Split(appInstanceHeader, ":")
-	if len(appDetails) != 2 {
-		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
-	}
-
-	if appDetails[0] == "" || appDetails[1] == "" {
-		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
-	}
-
-	return appDetails[0], appDetails[1], nil
 }

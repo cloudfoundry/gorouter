@@ -131,5 +131,37 @@ var _ = Describe("Lookup", func() {
 				Expect(resp.Code).To(Equal(http.StatusNotFound))
 			})
 		})
+
+		Context("when given an incomplete app instance header", func() {
+			BeforeEach(func() {
+				appInstanceHeader := "app-id:"
+				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
+				reg.LookupWithInstanceReturns(pool)
+			})
+			It("does not lookup the instance", func() {
+				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
+			})
+
+			It("responds with 404", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusNotFound))
+			})
+		})
+
+		Context("when only the app id is given", func() {
+			BeforeEach(func() {
+				appInstanceHeader := "app-id"
+				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
+				reg.LookupWithInstanceReturns(pool)
+			})
+			It("does not lookup the instance", func() {
+				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
+			})
+
+			It("responds with 404", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusNotFound))
+			})
+		})
 	})
 })

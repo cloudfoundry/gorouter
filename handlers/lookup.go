@@ -17,6 +17,11 @@ import (
 	"github.com/urfave/negroni"
 )
 
+const (
+	CfInstanceIdHeader = "X-CF-InstanceID"
+	CfAppInstance      = "X-CF-APP-INSTANCE"
+)
+
 type lookupHandler struct {
 	registry registry.Registry
 	reporter metrics.CombinedReporter
@@ -74,7 +79,7 @@ func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {
-		appID, appIndex, err := router_http.ValidateCfAppInstance(appInstanceHeader)
+		appID, appIndex, err := validateCfAppInstance(appInstanceHeader)
 
 		if err != nil {
 			l.logger.Error("invalid-app-instance-header", zap.Error(err))
@@ -85,6 +90,19 @@ func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
 	}
 
 	return l.registry.Lookup(uri)
+}
+
+func validateCfAppInstance(appInstanceHeader string) (string, string, error) {
+	appDetails := strings.Split(appInstanceHeader, ":")
+	if len(appDetails) != 2 {
+		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
+	}
+
+	if appDetails[0] == "" || appDetails[1] == "" {
+		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
+	}
+
+	return appDetails[0], appDetails[1], nil
 }
 
 func hostWithoutPort(req *http.Request) string {
