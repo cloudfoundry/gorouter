@@ -121,11 +121,11 @@ type Config struct {
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 
-	DrainWait     time.Duration `yaml:"drain_wait,omitempty"`
-	DrainTimeout  time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies bool          `yaml:"secure_cookies"`
-
-	HealthCheckUserAgent string `yaml:"healthcheck_user_agent,omitempty"`
+	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies        bool          `yaml:"secure_cookies"`
+	RouterGroupName      string        `yaml:"router_group"`
+	HealthCheckUserAgent string        `yaml:"healthcheck_user_agent,omitempty"`
 
 	OAuth                      OAuthConfig      `yaml:"oauth"`
 	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
@@ -241,6 +241,11 @@ func (c *Config) Process() {
 	}
 	if !validLb {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
+		panic(errMsg)
+	}
+
+	if c.RouterGroupName != "" && !c.RoutingApiEnabled() {
+		errMsg := fmt.Sprintf("Routing API must be enabled to assign Router Group")
 		panic(errMsg)
 	}
 }

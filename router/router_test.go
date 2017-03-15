@@ -107,7 +107,7 @@ var _ = Describe("Router", func() {
 			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
 			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
 		}
-		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts)
+		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts, "")
 
 		members := grouper.Members{
 			{Name: "subscriber", Runner: subscriber},

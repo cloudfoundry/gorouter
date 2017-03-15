@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
+	"github.com/onsi/gomega/ghttp"
 	"gopkg.in/yaml.v2"
 
 	"net"
@@ -697,10 +698,11 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when the routing api is enabled", func() {
 		var (
-			config         *config.Config
-			uaaTlsListener net.Listener
-			routingApi     *httptest.Server
-			cfgFile        string
+			config            *config.Config
+			uaaTlsListener    net.Listener
+			routingApiServer  *httptest.Server
+			cfgFile           string
+			routingApiHandler http.Handler
 		)
 
 		BeforeEach(func() {
@@ -710,12 +712,17 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
-			routingApi = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
-				w.Write(jsonBytes)
-			}))
-			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApi.URL)
+			jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
+			routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
+		})
 
+		JustBeforeEach(func() {
+			routingApiServer = httptest.NewServer(routingApiHandler)
+			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApiServer.URL)
+
+		})
+		AfterEach(func() {
+			routingApiServer.Close()
 		})
 
 		Context("when the routing api auth is disabled ", func() {
@@ -765,7 +772,7 @@ var _ = Describe("Router Integration", func() {
 					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(uaaTlsListener.Addr().String())
 				})
 				It("gorouter exits with non-zero code", func() {
-					routingApi.Close()
+					routingApiServer.Close()
 					writeConfig(config, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -786,6 +793,66 @@ var _ = Describe("Router Integration", func() {
 				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
+				Eventually(session, 5*time.Second).Should(Exit(1))
+			})
+		})
+
+		Context("when given a valid router group", func() {
+			BeforeEach(func() {
+				jsonBytes := []byte(`[{
+"guid": "abc123",
+"name": "valid_router_group",
+"type": "http"
+}]`)
+				routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
+				config.RoutingApi.AuthDisabled = true
+			})
+			It("does not exit", func() {
+				config.RouterGroupName = "valid_router_group"
+				writeConfig(config, cfgFile)
+
+				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+				Expect(err).ToNot(HaveOccurred())
+				Consistently(session, 5*time.Second).ShouldNot(Exit(1))
+			})
+		})
+
+		Context("when given an invalid router group", func() {
+			Context("when the given router_group matches a tcp router group", func() {
+				BeforeEach(func() {
+					jsonBytes := []byte(`[{
+"guid": "abc123",
+"name": "tcp_router_group",
+"reservable_ports":"1024-65535",
+"type": "tcp"
+}]`)
+					routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
+					config.RoutingApi.AuthDisabled = true
+				})
+
+				It("does exit with status 1", func() {
+					config.RoutingApi.AuthDisabled = true
+					config.RouterGroupName = "tcp_router_group"
+					writeConfig(config, cfgFile)
+
+					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(session, 30*time.Second).Should(Say("expected-router-group-type-http"))
+					Eventually(session, 5*time.Second).Should(Exit(1))
+				})
+			})
+
+			It("does exit with status 1", func() {
+				config.RoutingApi.AuthDisabled = true
+				config.RouterGroupName = "invalid_router_group"
+				writeConfig(config, cfgFile)
+
+				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(session, 30*time.Second).Should(Say("invalid-router-group"))
 				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
 		})

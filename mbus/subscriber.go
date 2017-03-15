@@ -28,6 +28,7 @@ type RegistryMessage struct {
 	RouteServiceURL         string            `json:"route_service_url"`
 	PrivateInstanceID       string            `json:"private_instance_id"`
 	PrivateInstanceIndex    string            `json:"private_instance_index"`
+	RouterGroupGuid         string            `json:"router_group_guid"`
 }
 
 func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
@@ -50,11 +51,12 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
 type Subscriber struct {
-	logger        logger.Logger
-	natsClient    *nats.Conn
-	startMsgChan  <-chan struct{}
-	opts          *SubscriberOpts
-	routeRegistry registry.Registry
+	routerGroupGuid string
+	logger          logger.Logger
+	natsClient      *nats.Conn
+	startMsgChan    <-chan struct{}
+	opts            *SubscriberOpts
+	routeRegistry   registry.Registry
 }
 
 // SubscriberOpts contains configuration for Subscriber struct
@@ -71,13 +73,15 @@ func NewSubscriber(
 	routeRegistry registry.Registry,
 	startMsgChan <-chan struct{},
 	opts *SubscriberOpts,
+	routerGroupGuid string,
 ) *Subscriber {
 	return &Subscriber{
-		logger:        logger,
-		natsClient:    natsClient,
-		routeRegistry: routeRegistry,
-		startMsgChan:  startMsgChan,
-		opts:          opts,
+		logger:          logger,
+		natsClient:      natsClient,
+		routeRegistry:   routeRegistry,
+		startMsgChan:    startMsgChan,
+		opts:            opts,
+		routerGroupGuid: routerGroupGuid,
 	}
 }
 
@@ -151,9 +155,11 @@ func (s *Subscriber) unregisterRoute(message *nats.Msg) {
 		return
 	}
 
-	endpoint := msg.makeEndpoint()
-	for _, uri := range msg.Uris {
-		s.routeRegistry.Unregister(uri, endpoint)
+	if s.routerGroupGuid == msg.RouterGroupGuid {
+		endpoint := msg.makeEndpoint()
+		for _, uri := range msg.Uris {
+			s.routeRegistry.Unregister(uri, endpoint)
+		}
 	}
 }
 
@@ -168,9 +174,11 @@ func (s *Subscriber) registerRoute(message *nats.Msg) {
 		return
 	}
 
-	endpoint := msg.makeEndpoint()
-	for _, uri := range msg.Uris {
-		s.routeRegistry.Register(uri, endpoint)
+	if s.routerGroupGuid == msg.RouterGroupGuid {
+		endpoint := msg.makeEndpoint()
+		for _, uri := range msg.Uris {
+			s.routeRegistry.Register(uri, endpoint)
+		}
 	}
 }
 

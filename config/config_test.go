@@ -45,6 +45,17 @@ balancing_algorithm: foo-bar
 			})
 		})
 
+		It("sets router group config", func() {
+			var b = []byte(`
+router_group: test
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.RouterGroupName).To(Equal("test"))
+
+		})
+
 		It("sets status config", func() {
 			var b = []byte(`
 status:
@@ -458,6 +469,50 @@ token_fetcher_retry_interval: 10s
 			Expect(config.TokenFetcherRetryInterval).To(Equal(10 * time.Second))
 			Expect(config.NatsClientPingInterval).To(Equal(20 * time.Second))
 			Expect(config.SecureCookies).To(BeTrue())
+		})
+
+		Context("when routing api is not enabled", func() {
+			Context("when router group name is set", func() {
+				It("fails to initialize", func() {
+					var b = []byte(`
+routing_api:
+  uri: http://localhost
+router_group: test
+`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(config.Process).To(Panic())
+				})
+			})
+		})
+
+		Context("when routing api is enabled", func() {
+			Context("when router group name is set", func() {
+				It("should initialize", func() {
+					var b = []byte(`
+routing_api:
+  uri: http://localhost
+  port: 3000
+router_group: test
+`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(config.Process).ToNot(Panic())
+				})
+			})
+
+			Context("when router group name is not set", func() {
+				It("fails to initialize", func() {
+					var b = []byte(`
+routing_api:
+  uri: http://localhost
+  port: 3000
+`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(config.Process).ToNot(Panic())
+				})
+			})
 		})
 
 		It("converts extra headers to log into a map", func() {
