@@ -23,6 +23,7 @@ import (
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/routing-api"
+	"code.cloudfoundry.org/routing-api/models"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
@@ -119,10 +120,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
-
-	members := grouper.Members{
-		grouper.Member{Name: "router", Runner: router},
-	}
+	members := grouper.Members{}
 
 	var routerGroupGuid string
 	if c.RoutingApiEnabled() {
@@ -131,7 +129,8 @@ func main() {
 		routeFetcher := setupRouteFetcher(logger.Session("route-fetcher"), c, registry, routingApiClient)
 
 		if c.RouterGroupName != "" {
-			routerGroups, err := routingApiClient.RouterGroups()
+			var routerGroups models.RouterGroups
+			routerGroups, err = routingApiClient.RouterGroups()
 			if err != nil {
 				logger.Fatal("routing-api-connection-failed", zap.Error(err))
 			}
@@ -158,11 +157,12 @@ func main() {
 		if err != nil {
 			logger.Fatal("routing-api-connection-failed", zap.Error(err))
 		}
-		subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGuid)
-
-		members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
+	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGuid)
+
+	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
+	members = append(members, grouper.Member{Name: "router", Runner: router})
 
 	group := grouper.NewOrdered(os.Interrupt, members)
 
