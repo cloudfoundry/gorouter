@@ -266,6 +266,8 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 	options := nats.DefaultOptions
 	options.Servers = natsServers
 	options.PingInterval = c.NatsClientPingInterval
+	options.MaxReconnect = -1
+
 	options.ClosedCB = func(conn *nats.Conn) {
 		logger.Fatal(
 			"nats-connection-closed",
@@ -291,11 +293,6 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 
 		logger.Info("nats-connection-reconnected", zap.String("nats-host", natsHostStr))
 		startMsg <- struct{}{}
-	}
-
-	// in the case of suspending pruning, we need to ensure we retry reconnects indefinitely
-	if c.SuspendPruningIfNatsUnavailable {
-		options.MaxReconnect = -1
 	}
 
 	return options

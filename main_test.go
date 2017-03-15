@@ -497,6 +497,50 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	Context("when nats server shuts down", func() {
+		It("should not panic", func() {
+			localIP, err := localip.LocalIP()
+			Expect(err).ToNot(HaveOccurred())
+
+			statusPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+			config.NatsClientPingInterval = 1 * time.Second
+			writeConfig(config, cfgFile)
+			gorouterSession = startGorouterSession(cfgFile)
+
+			mbusClient, err := newMessageBus(config)
+
+			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+			zombieApp.Listen()
+
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+			Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
+
+			heartbeatInterval := 200 * time.Millisecond
+			zombieTicker := time.NewTicker(heartbeatInterval)
+
+			go func() {
+				for {
+					select {
+					case <-zombieTicker.C:
+						zombieApp.Register()
+					}
+				}
+			}()
+
+			zombieApp.VerifyAppStatus(200)
+
+			natsRunner.Stop()
+
+			Eventually(gorouterSession.Out.Contents()).Should(ContainSubstring("nats-connection-disconnected"))
+			Consistently(gorouterSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
+		})
+	})
+
 	Context("multiple nats server", func() {
 		var (
 			config         *config.Config
