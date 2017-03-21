@@ -15,13 +15,18 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/types"
 )
+
+func HaveErrored() types.GomegaMatcher {
+	return HaveOccurred()
+}
 
 var _ = Describe("Route Services", func() {
 	var (
 		routeServiceListener net.Listener
-		routeServiceHandler  http.Handler
+		routeServiceURL      string
+		routeServiceHandler  func(rw http.ResponseWriter, req *http.Request)
 		signatureHeader      string
 		metadataHeader       string
 		cryptoKey            = "ABCDEFGHIJKLMNOP"
@@ -29,16 +34,9 @@ var _ = Describe("Route Services", func() {
 	)
 
 	JustBeforeEach(func() {
-		var err error
-
-		routeServiceListener, err = net.Listen("tcp", "127.0.0.1:0")
-		Expect(err).NotTo(HaveOccurred())
-
-		tlsListener := newTlsListener(routeServiceListener)
-		server := &http.Server{Handler: routeServiceHandler}
+		server := &http.Server{Handler: http.HandlerFunc(routeServiceHandler)}
 		go func() {
-			err := server.Serve(tlsListener)
-			Expect(err).ToNot(HaveOccurred())
+			_ = server.Serve(routeServiceListener)
 		}()
 	})
 
@@ -47,7 +45,8 @@ var _ = Describe("Route Services", func() {
 		recommendHttps = true
 		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
-		routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		routeServiceHandler = func(w http.ResponseWriter, r *http.Request) {
+			Expect(r.Host).ToNot(Equal("my_host.com"))
 			metaHeader := r.Header.Get(routeservice.RouteServiceMetadata)
 			sigHeader := r.Header.Get(routeservice.RouteServiceSignature)
 
@@ -61,8 +60,9 @@ var _ = Describe("Route Services", func() {
 			// validate client request header
 			Expect(r.Header.Get("X-CF-Forwarded-Url")).To(Equal(forwardedUrl))
 
-			w.Write([]byte("My Special Snowflake Route Service\n"))
-		})
+			_, err = w.Write([]byte("My Special Snowflake Route Service\n"))
+			Expect(err).ToNot(HaveOccurred())
+		}
 
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
@@ -78,22 +78,37 @@ var _ = Describe("Route Services", func() {
 		reqArgs, err := config.Request("", forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())
 		signatureHeader, metadataHeader = reqArgs.Signature, reqArgs.Metadata
+
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		Expect(err).NotTo(HaveOccurred())
+
+		routeServiceListener = newTlsListener(ln)
+		routeServiceURL = "https://" + routeServiceListener.Addr().String()
+	})
+
+	AfterEach(func() {
+		err := routeServiceListener.Close()
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("with Route Services disabled", func() {
 		BeforeEach(func() {
 			conf.RouteServiceEnabled = false
 			conf.SkipSSLValidation = true
-			routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			routeServiceHandler = func(http.ResponseWriter, *http.Request) {
+				defer GinkgoRecover()
 				Fail("Should not get here into Route Service")
-			})
+			}
 		})
 
 		It("return 502 Bad Gateway", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+				defer GinkgoRecover()
 				Fail("Should not get here into the app")
 			})
-			defer ln.Close()
+			defer func() {
+				Expect(ln.Close()).ToNot(HaveErrored())
+			}()
 
 			conn := dialProxy(proxyServer)
 
@@ -107,40 +122,6 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	Context("with Route Services enabled", func() {
-		BeforeEach(func() {
-			conf.RouteServiceEnabled = true
-			conf.SkipSSLValidation = true
-		})
-
-		Context("when recommendHttps is set to false", func() {
-			BeforeEach(func() {
-				recommendHttps = false
-				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(ContainSubstring("http://"))
-
-					w.Write([]byte("My Special Snowflake Route Service\n"))
-				})
-			})
-
-			It("routes to backend over http scheme", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-					Fail("Should not get here")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				conn.WriteRequest(req)
-
-				res, body := conn.ReadResponse()
-				Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
-				Expect(res.StatusCode).To(Equal(http.StatusOK))
-			})
-		})
-	})
-
 	Context("with SkipSSLValidation enabled", func() {
 		BeforeEach(func() {
 			conf.SkipSSLValidation = true
@@ -148,10 +129,13 @@ var _ = Describe("Route Services", func() {
 
 		Context("when a request does not have a valid Route service signature header", func() {
 			It("redirects the request to the route service url", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
 					Fail("Should not get here")
 				})
-				defer ln.Close()
+				defer func() {
+					Expect(ln.Close()).ToNot(HaveErrored())
+				}()
 
 				conn := dialProxy(proxyServer)
 
@@ -167,9 +151,12 @@ var _ = Describe("Route Services", func() {
 			Context("when the route service is not available", func() {
 				It("returns a 502 bad gateway error", func() {
 					ln := registerHandlerWithRouteService(r, "my_host.com", "https://bad-route-service", func(conn *test_util.HttpConn) {
+						defer GinkgoRecover()
 						Fail("Should not get here")
 					})
-					defer ln.Close()
+					defer func() {
+						Expect(ln.Close()).ToNot(HaveErrored())
+					}()
 
 					conn := dialProxy(proxyServer)
 
@@ -185,13 +172,14 @@ var _ = Describe("Route Services", func() {
 
 		Context("when a request has a valid Route service signature header", func() {
 			BeforeEach(func() {
-				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				routeServiceHandler = func(http.ResponseWriter, *http.Request) {
+					defer GinkgoRecover()
 					Fail("Should not get here into Route Service")
-				})
+				}
 			})
 
 			It("routes to the backend instance and strips headers", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
 					Expect(req.Header.Get(routeservice.RouteServiceSignature)).To(Equal(""))
 					Expect(req.Header.Get(routeservice.RouteServiceMetadata)).To(Equal(""))
@@ -205,7 +193,9 @@ var _ = Describe("Route Services", func() {
 					}
 					conn.WriteResponse(res)
 				})
-				defer ln.Close()
+				defer func() {
+					Expect(ln.Close()).ToNot(HaveErrored())
+				}()
 
 				conn := dialProxy(proxyServer)
 
@@ -222,7 +212,7 @@ var _ = Describe("Route Services", func() {
 
 			Context("when request has Host header with a port", func() {
 				It("routes to backend instance and disregards port in Host header", func() {
-					ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+					ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
 						conn.ReadRequest()
 						out := &bytes.Buffer{}
 						out.WriteString("backend instance")
@@ -232,7 +222,9 @@ var _ = Describe("Route Services", func() {
 						}
 						conn.WriteResponse(res)
 					})
-					defer ln.Close()
+					defer func() {
+						Expect(ln.Close()).ToNot(HaveErrored())
+					}()
 
 					conn := dialProxy(proxyServer)
 
@@ -263,7 +255,9 @@ var _ = Describe("Route Services", func() {
 						}
 						conn.WriteResponse(res)
 					})
-					defer ln.Close()
+					defer func() {
+						Expect(ln.Close()).ToNot(HaveErrored())
+					}()
 
 					conn := dialProxy(proxyServer)
 
@@ -282,7 +276,7 @@ var _ = Describe("Route Services", func() {
 				Expect(err).To(BeNil())
 
 				// register route service, should NOT route to it
-				registerAddr(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), ip, "instanceId", "1", "")
+				registerAddr(r, "my_host.com", routeServiceURL, ip, "instanceId", "1", "")
 
 				conn := dialProxy(proxyServer)
 
@@ -296,237 +290,46 @@ var _ = Describe("Route Services", func() {
 			})
 		})
 
-		Context("when route service throws an error", func() {
+		Context("when recommendHttps is set to false", func() {
 			BeforeEach(func() {
-				routeServiceHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusBadGateway)
-				})
+				recommendHttps = false
+				routeServiceHandler = func(w http.ResponseWriter, r *http.Request) {
+					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(ContainSubstring("http://"))
+
+					_, err := w.Write([]byte("My Special Snowflake Route Service\n"))
+					Expect(err).ToNot(HaveOccurred())
+				}
 			})
 
-			It("does not routes to backend instance and logs bad Gateway errors", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-					conn.ReadRequest()
-					res := &http.Response{
-						StatusCode: http.StatusBadGateway,
-					}
-					conn.WriteResponse(res)
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Host = "my_host.com"
-				conn.WriteRequest(req)
-
-				res, body := conn.ReadResponse()
-				Expect(body).ToNot(ContainSubstring("backend instance"))
-				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-				Expect(testLogger).Should(gbytes.Say("response.*status-code\":502"))
-			})
-		})
-	})
-
-	Context("when a request has a signature header but no metadata header", func() {
-		It("returns a bad request error", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
-				Fail("Should not get here")
-			})
-			defer ln.Close()
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-			conn.WriteRequest(req)
-
-			res, body := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-		})
-	})
-
-	Context("when a request has an expired Route service signature header", func() {
-		BeforeEach(func() {
-			signatureHeader = "zKQt4bnxW30KxpGUH-saDxTIG98RbKx7tLkyaDBNdE_vTZletyba3bN2yOw9SLtgUhEVsLq3zLYe-7tngGP5edbybGwiF0A6"
-			metadataHeader = "eyJpdiI6IjlBVnBiZWRIdUZMbU1KaVciLCJub25jZSI6InpWdHM5aU1RdXNVV2U5UkoifQ=="
-		})
-
-		It("returns an route service request expired error", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
-				Fail("Should not get here")
-			})
-			defer ln.Close()
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-			req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
-			conn.WriteRequest(req)
-
-			res, body := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-		})
-	})
-
-	Context("when the signature's forwarded_url does not match the request", func() {
-		It("returns a bad request error", func() {
-			ln := registerHandlerWithRouteService(r, "no-match.com", "https://rs.com", func(conn *test_util.HttpConn) {
-				Fail("Should not get here")
-			})
-			defer ln.Close()
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "no-match.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-			// Generate a bad signature
-			req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-			req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
-			conn.WriteRequest(req)
-
-			res, body := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-		})
-	})
-
-	Context("when the header key does not match the current crypto key in the configuration", func() {
-		BeforeEach(func() {
-			// Change the current key to make the header key not match the current key.
-			var err error
-			crypto, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		Context("when there is no previous key in the configuration", func() {
-			It("rejects the signature", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://badkey.com", func(conn *test_util.HttpConn) {
+			It("routes to backend over http scheme", func() {
+				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
 					Fail("Should not get here")
 				})
-				defer ln.Close()
+				defer func() {
+					Expect(ln.Close()).ToNot(HaveErrored())
+				}()
 
 				conn := dialProxy(proxyServer)
+
 				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
 				conn.WriteRequest(req)
 
 				res, body := conn.ReadResponse()
-				Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-				Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-			})
-		})
-
-		Context("when the header key matches the previous key in the configuration", func() {
-			BeforeEach(func() {
-				var err error
-				cryptoPrev, err = secure.NewAesGCM([]byte(cryptoKey))
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("forwards the request to the application", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
-					conn.ReadRequest()
-
-					out := &bytes.Buffer{}
-					out.WriteString("backend instance")
-					res := &http.Response{
-						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(out),
-					}
-					conn.WriteResponse(res)
-				})
-
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
-				conn.WriteRequest(req)
-
-				res, body := conn.ReadResponse()
+				Expect(body).To(ContainSubstring("My Special Snowflake Route Service"))
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				Expect(body).To(ContainSubstring("backend instance"))
-			})
-
-			Context("when a request has an expired Route service signature header", func() {
-				BeforeEach(func() {
-					signature := &header.Signature{
-						RequestedTime: time.Now().Add(-10 * time.Hour),
-						ForwardedUrl:  forwardedUrl,
-					}
-					signatureHeader, metadataHeader, _ = header.BuildSignatureAndMetadata(crypto, signature)
-				})
-
-				It("returns an route service request expired error", func() {
-					ln := registerHandlerWithRouteService(r, "my_host.com", "https://expired.com", func(conn *test_util.HttpConn) {
-						Fail("Should not get here")
-					})
-					defer ln.Close()
-					conn := dialProxy(proxyServer)
-
-					req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-					req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-					req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
-					req.Header.Set(routeservice.RouteServiceForwardedURL, forwardedUrl)
-					conn.WriteRequest(req)
-
-					res, body := conn.ReadResponse()
-					Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-					Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-				})
 			})
 		})
-
-		Context("when the header key does not match the previous key in the configuration", func() {
-			BeforeEach(func() {
-				var err error
-				cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("rejects the signature", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", "https://badkey.com", func(conn *test_util.HttpConn) {
-					Fail("Should not get here")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-				req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-				req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
-				conn.WriteRequest(req)
-
-				res, body := conn.ReadResponse()
-
-				Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-				Expect(body).To(ContainSubstring("Failed to validate Route Service Signature"))
-			})
-		})
-	})
-
-	It("returns an error when a bad route service url is used", func() {
-		ln := registerHandlerWithRouteService(r, "my_host.com", "https://bad%20hostname.com", func(conn *test_util.HttpConn) {
-			Fail("Should not get here")
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-		conn.WriteRequest(req)
-
-		res, body := readResponse(conn)
-
-		Expect(res.StatusCode).To(Equal(http.StatusInternalServerError))
-		Expect(body).NotTo(ContainSubstring("My Special Snowflake Route Service"))
 	})
 
 	It("returns a 502 when the SSL cert of the route service is signed by an unknown authority", func() {
-		ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+		ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+			defer GinkgoRecover()
 			Fail("Should not get here")
 		})
-		defer ln.Close()
+		defer func() {
+			Expect(ln.Close()).ToNot(HaveErrored())
+		}()
 
 		conn := dialProxy(proxyServer)
 
@@ -550,10 +353,13 @@ var _ = Describe("Route Services", func() {
 		})
 
 		It("returns a 200 when we route to a route service", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", "https://"+routeServiceListener.Addr().String(), func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+				defer GinkgoRecover()
 				Fail("Should not get here")
 			})
-			defer ln.Close()
+			defer func() {
+				Expect(ln.Close()).ToNot(HaveErrored())
+			}()
 
 			conn := dialProxy(proxyServer)
 

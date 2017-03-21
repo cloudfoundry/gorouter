@@ -3,7 +3,6 @@ package varz
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"sync"
 	"time"
 
@@ -110,11 +109,8 @@ func (x *HttpMetric) CaptureRequest() {
 	x.Rate.Mark(1)
 }
 
-func (x *HttpMetric) CaptureResponse(response *http.Response, duration time.Duration) {
-	var statusCode int
-	if response != nil {
-		statusCode = response.StatusCode / 100
-	}
+func (x *HttpMetric) CaptureResponse(statusCode int, duration time.Duration) {
+	statusCode = statusCode / 100
 
 	switch statusCode {
 	case 2:
@@ -153,8 +149,8 @@ func (x TaggedHttpMetric) CaptureRequest(t string) {
 	x.httpMetric(t).CaptureRequest()
 }
 
-func (x TaggedHttpMetric) CaptureResponse(t string, y *http.Response, z time.Duration) {
-	x.httpMetric(t).CaptureResponse(y, z)
+func (x TaggedHttpMetric) CaptureResponse(t string, statusCode int, z time.Duration) {
+	x.httpMetric(t).CaptureResponse(statusCode, z)
 }
 
 type Varz interface {
@@ -165,7 +161,7 @@ type Varz interface {
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponseLatency(b *route.Endpoint, res *http.Response, startedAt time.Time, d time.Duration)
+	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, startedAt time.Time, d time.Duration)
 }
 
 type RealVarz struct {
@@ -262,7 +258,7 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint) {
 	x.Unlock()
 }
 
-func (x *RealVarz) CaptureRoutingResponseLatency(endpoint *route.Endpoint, response *http.Response, startedAt time.Time, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponseLatency(endpoint *route.Endpoint, statusCode int, startedAt time.Time, duration time.Duration) {
 	x.Lock()
 
 	var tags string
@@ -270,11 +266,11 @@ func (x *RealVarz) CaptureRoutingResponseLatency(endpoint *route.Endpoint, respo
 
 	tags, ok = endpoint.Tags["component"]
 	if ok {
-		x.varz.Tags.Component.CaptureResponse(tags, response, duration)
+		x.varz.Tags.Component.CaptureResponse(tags, statusCode, duration)
 	}
 
 	x.CaptureAppStats(endpoint, startedAt)
-	x.varz.All.CaptureResponse(response, duration)
+	x.varz.All.CaptureResponse(statusCode, duration)
 
 	x.Unlock()
 }

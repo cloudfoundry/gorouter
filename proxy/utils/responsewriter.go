@@ -74,6 +74,11 @@ func (p *proxyResponseWriter) WriteHeader(s int) {
 		return
 	}
 
+	// if Content-Type not in response, nil out to suppress Go's auto-detect
+	if _, ok := p.w.Header()["Content-Type"]; !ok {
+		p.w.Header()["Content-Type"] = nil
+	}
+
 	p.w.WriteHeader(s)
 
 	if p.status == 0 {
