@@ -14,13 +14,13 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter/fake"
 
 	"testing"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -39,7 +39,6 @@ var (
 	caCertPool     *x509.CertPool
 	recommendHttps bool
 	heartbeatOK    int32
-	fakeEmitter    *fake.FakeEventEmitter
 )
 
 func TestProxy(t *testing.T) {
@@ -66,7 +65,7 @@ var _ = JustBeforeEach(func() {
 	var err error
 	r = registry.NewRouteRegistry(testLogger, conf, new(fakes.FakeRouteRegistryReporter))
 
-	fakeEmitter = fake.NewFakeEventEmitter("fake")
+	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 
 	accessLogFile = new(test_util.FakeFile)

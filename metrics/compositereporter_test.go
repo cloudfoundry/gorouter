@@ -61,14 +61,14 @@ var _ = Describe("CompositeReporter", func() {
 	})
 
 	It("forwards CaptureRoutingResponseLatency to both reporters", func() {
-		composite.CaptureRoutingResponseLatency(endpoint, response.StatusCode, responseTime, responseDuration)
+		composite.CaptureRoutingResponseLatency(endpoint, response, responseTime, responseDuration)
 
 		Expect(fakeVarzReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
 		Expect(fakeProxyReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
 
-		callEndpoint, callStatusCode, callTime, callDuration := fakeVarzReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+		callEndpoint, callResponse, callTime, callDuration := fakeVarzReporter.CaptureRoutingResponseLatencyArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
-		Expect(callStatusCode).To(Equal(response.StatusCode))
+		Expect(callResponse).To(Equal(response))
 		Expect(callTime).To(Equal(responseTime))
 		Expect(callDuration).To(Equal(responseDuration))
 
@@ -87,12 +87,12 @@ var _ = Describe("CompositeReporter", func() {
 	})
 
 	It("forwards CaptureRoutingResponse to proxy reporter", func() {
-		composite.CaptureRoutingResponse(response.StatusCode)
+		composite.CaptureRoutingResponse(response)
 
 		Expect(fakeProxyReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
 
-		callResponseCode := fakeProxyReporter.CaptureRoutingResponseArgsForCall(0)
-		Expect(callResponseCode).To(Equal(response.StatusCode))
+		callResponse := fakeProxyReporter.CaptureRoutingResponseArgsForCall(0)
+		Expect(callResponse).To(Equal(response))
 	})
 
 	It("forwards CaptureWebSocketUpdate to proxy reporter", func() {

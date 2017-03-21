@@ -9,7 +9,6 @@ const (
 	VcapTraceHeader       = "X-Vcap-Trace"
 	CfInstanceIdHeader    = "X-CF-InstanceID"
 	CfAppInstance         = "X-CF-APP-INSTANCE"
-	CfRouterError         = "X-Cf-RouterError"
 )
 
 func SetTraceHeaders(responseWriter http.ResponseWriter, routerIp, addr string) {

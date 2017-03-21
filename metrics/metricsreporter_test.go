@@ -210,71 +210,98 @@ var _ = Describe("MetricsReporter", func() {
 
 	Context("increments the response metrics", func() {
 		It("increments the 2XX response metrics", func() {
-			metricReporter.CaptureRoutingResponse(200)
+			response := http.Response{
+				StatusCode: 200,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.2xx"))
 
-			metricReporter.CaptureRoutingResponse(200)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.2xx"))
 		})
 
 		It("increments the 3XX response metrics", func() {
-			metricReporter.CaptureRoutingResponse(304)
+			response := http.Response{
+				StatusCode: 304,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.3xx"))
 
-			metricReporter.CaptureRoutingResponse(304)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.3xx"))
 		})
 
 		It("increments the 4XX response metrics", func() {
-			metricReporter.CaptureRoutingResponse(401)
+			response := http.Response{
+				StatusCode: 401,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.4xx"))
 
-			metricReporter.CaptureRoutingResponse(401)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.4xx"))
 		})
 
 		It("increments the 5XX response metrics", func() {
-			metricReporter.CaptureRoutingResponse(504)
+			response := http.Response{
+				StatusCode: 504,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.5xx"))
 
-			metricReporter.CaptureRoutingResponse(504)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.5xx"))
 		})
 
 		It("increments the XXX response metrics", func() {
-			metricReporter.CaptureRoutingResponse(100)
+			response := http.Response{
+				StatusCode: 100,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricReporter.CaptureRoutingResponse(100)
+			metricReporter.CaptureRoutingResponse(&response)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
 
 		It("increments the XXX response metrics with null response", func() {
-			metricReporter.CaptureRoutingResponse(0)
+			metricReporter.CaptureRoutingResponse(nil)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("responses.xxx"))
 
-			metricReporter.CaptureRoutingResponse(0)
+			metricReporter.CaptureRoutingResponse(nil)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(2)).To(Equal("responses.xxx"))
 		})
 
 		It("increments the total responses", func() {
-			metricReporter.CaptureRoutingResponse(205)
+			response2xx := http.Response{
+				StatusCode: 205,
+			}
+			response4xx := http.Response{
+				StatusCode: 401,
+			}
+
+			metricReporter.CaptureRoutingResponse(&response2xx)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("responses"))
 
-			metricReporter.CaptureRoutingResponse(401)
+			metricReporter.CaptureRoutingResponse(&response4xx)
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("responses"))
 		})

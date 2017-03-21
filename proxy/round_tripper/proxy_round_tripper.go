@@ -1,29 +1,15 @@
 package round_tripper
 
 import (
-	"errors"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
-)
-
-const (
-	VcapCookieId      = "__VCAP_ID__"
-	StickyCookieKey   = "JSESSIONID"
-	CookieHeader      = "Set-Cookie"
-	BadGatewayMessage = "502 Bad Gateway: Registered endpoint failed to handle the request."
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -32,39 +18,35 @@ type ProxyRoundTripper interface {
 	CancelRequest(*http.Request)
 }
 
-type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.Endpoint, err error)
+type AfterRoundTrip func(rsp *http.Response, endpoint *route.Endpoint, err error)
 
-func NewProxyRoundTripper(
-	transport ProxyRoundTripper,
-	logger logger.Logger,
-	traceKey string,
-	routerIP string,
-	defaultLoadBalance string,
-	combinedReporter metrics.CombinedReporter,
-	secureCookies bool,
-) ProxyRoundTripper {
-	return &roundTripper{
-		logger:             logger,
-		transport:          transport,
-		traceKey:           traceKey,
-		routerIP:           routerIP,
-		defaultLoadBalance: defaultLoadBalance,
-		combinedReporter:   combinedReporter,
-		secureCookies:      secureCookies,
+func NewProxyRoundTripper(backend bool, transport ProxyRoundTripper, endpointIterator route.EndpointIterator,
+	logger logger.Logger, afterRoundTrip AfterRoundTrip) ProxyRoundTripper {
+	if backend {
+		return &BackendRoundTripper{
+			transport: transport,
+			iter:      endpointIterator,
+			logger:    logger,
+			after:     afterRoundTrip,
+		}
+	} else {
+		rlogger := logger.Session("route-service")
+		return &RouteServiceRoundTripper{
+			transport: transport,
+			logger:    rlogger,
+			after:     afterRoundTrip,
+		}
 	}
 }
 
-type roundTripper struct {
-	transport          ProxyRoundTripper
-	logger             logger.Logger
-	traceKey           string
-	routerIP           string
-	defaultLoadBalance string
-	combinedReporter   metrics.CombinedReporter
-	secureCookies      bool
+type BackendRoundTripper struct {
+	iter      route.EndpointIterator
+	transport ProxyRoundTripper
+	logger    logger.Logger
+	after     AfterRoundTrip
 }
 
-func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+func (rt *BackendRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
 	var endpoint *route.Endpoint
@@ -77,194 +59,107 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		}()
 	}
 
-	rp := request.Context().Value("RoutePool")
-	if rp == nil {
-		return nil, errors.New("RoutePool not set on context")
-	}
-
-	rw := request.Context().Value(handlers.ProxyResponseWriterCtxKey)
-	if rw == nil {
-		return nil, errors.New("ProxyResponseWriter not set on context")
-	}
-
-	alr := request.Context().Value("AccessLogRecord")
-	if alr == nil {
-		return nil, errors.New("AccessLogRecord not set on context")
-	}
-	accessLogRecord := alr.(*schema.AccessLogRecord)
-
-	var routeServiceURL *url.URL
-	rsurl := request.Context().Value(handlers.RouteServiceURLCtxKey)
-	if rsurl != nil {
-		routeServiceURL = rsurl.(*url.URL)
-	}
-
-	routePool := rp.(*route.Pool)
-	stickyEndpointID := getStickySession(request)
-	iter := routePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
-
-	logger := rt.logger
 	for retry := 0; retry < handler.MaxRetries; retry++ {
-
-		if routeServiceURL == nil {
-			logger.Debug("backend")
-			endpoint, err = rt.selectEndpoint(iter, request)
-			if err != nil {
-				break
-			}
-			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
-			res, err = rt.backendRoundTrip(request, endpoint, iter)
-			if err == nil || !retryableError(err) {
-				break
-			}
-			iter.EndpointFailed()
-			logger.Error("backend-endpoint-failed", zap.Error(err))
-		} else {
-			logger.Debug("route-service", zap.Object("route-service-url", routeServiceURL))
-			endpoint = newRouteServiceEndpoint()
-			request.URL = routeServiceURL
-			res, err = rt.transport.RoundTrip(request)
-			if err == nil {
-				if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
-					logger.Info(
-						"route-service-response",
-						zap.String("endpoint", request.URL.String()),
-						zap.Int("status-code", res.StatusCode),
-					)
-				}
-				break
-			}
-			if !retryableError(err) {
-				break
-			}
-			logger.Error("route-service-connection-failed", zap.Error(err))
+		endpoint, err = rt.selectEndpoint(request)
+		if err != nil {
+			break
 		}
-	}
 
-	accessLogRecord.RouteEndpoint = endpoint
+		rt.setupRequest(request, endpoint)
+
+		// increment connection stats
+		rt.iter.PreRequest(endpoint)
+
+		res, err = rt.transport.RoundTrip(request)
+
+		// decrement connection stats
+		rt.iter.PostRequest(endpoint)
+
+		if err == nil || !retryableError(err) {
+			break
+		}
+
+		rt.reportError(err)
+	}
 
 	if err != nil {
-		responseWriter := rw.(utils.ProxyResponseWriter)
-		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
-
-		accessLogRecord.StatusCode = http.StatusBadGateway
-
-		logger.Info("status", zap.String("body", BadGatewayMessage))
-
-		http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
-		responseWriter.Header().Del("Connection")
-
-		logger.Error("endpoint-failed", zap.Error(err))
-
-		rt.combinedReporter.CaptureBadGateway()
-
-		responseWriter.Done()
-
-		return nil, err
+		rt.logger.Error("endpoint-failed", zap.Error(err))
 	}
 
-	if rt.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == rt.traceKey {
-		if res != nil && endpoint != nil {
-			res.Header.Set(router_http.VcapRouterHeader, rt.routerIP)
-			res.Header.Set(router_http.VcapBackendHeader, endpoint.CanonicalAddr())
-			res.Header.Set(router_http.CfRouteEndpointHeader, endpoint.CanonicalAddr())
-		}
+	if rt.after != nil {
+		rt.after(res, endpoint, err)
 	}
 
-	if res != nil && endpoint.PrivateInstanceId != "" {
-		setupStickySession(res, endpoint, stickyEndpointID, rt.secureCookies, routePool.ContextPath())
-	}
-
-	return res, nil
-}
-
-func (rt *roundTripper) CancelRequest(request *http.Request) {
-	rt.transport.CancelRequest(request)
-}
-
-func (rt *roundTripper) backendRoundTrip(
-	request *http.Request,
-	endpoint *route.Endpoint,
-	iter route.EndpointIterator,
-) (*http.Response, error) {
-	request.URL.Host = endpoint.CanonicalAddr()
-	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
-	handler.SetRequestXCfInstanceId(request, endpoint)
-
-	// increment connection stats
-	iter.PreRequest(endpoint)
-
-	rt.combinedReporter.CaptureRoutingRequest(endpoint)
-	res, err := rt.transport.RoundTrip(request)
-
-	// decrement connection stats
-	iter.PostRequest(endpoint)
 	return res, err
 }
 
-func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request) (*route.Endpoint, error) {
-	endpoint := iter.Next()
+func (rt *BackendRoundTripper) CancelRequest(request *http.Request) {
+	rt.transport.CancelRequest(request)
+}
+
+func (rt *BackendRoundTripper) selectEndpoint(request *http.Request) (*route.Endpoint, error) {
+	endpoint := rt.iter.Next()
 	if endpoint == nil {
 		return nil, handler.NoEndpointsAvailable
 	}
 
+	rt.logger = rt.logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 	return endpoint, nil
 }
 
-func setupStickySession(
-	response *http.Response,
-	endpoint *route.Endpoint,
-	originalEndpointId string,
-	secureCookies bool,
-	path string,
-) {
-	secure := false
-	maxAge := 0
+func (rt *BackendRoundTripper) setupRequest(request *http.Request, endpoint *route.Endpoint) {
+	rt.logger.Debug("backend")
+	request.URL.Host = endpoint.CanonicalAddr()
+	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+	handler.SetRequestXCfInstanceId(request, endpoint)
+}
 
-	// did the endpoint change?
-	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
+func (rt *BackendRoundTripper) reportError(err error) {
+	rt.iter.EndpointFailed()
+	rt.logger.Error("backend-endpoint-failed", zap.Error(err))
+}
 
-	for _, v := range response.Cookies() {
-		if v.Name == StickyCookieKey {
-			sticky = true
-			if v.MaxAge < 0 {
-				maxAge = v.MaxAge
-			}
-			secure = v.Secure
+type RouteServiceRoundTripper struct {
+	transport ProxyRoundTripper
+	after     AfterRoundTrip
+	logger    logger.Logger
+}
+
+func (rt *RouteServiceRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	var err error
+	var res *http.Response
+
+	for retry := 0; retry < handler.MaxRetries; retry++ {
+		res, err = rt.transport.RoundTrip(request)
+		if err == nil || !retryableError(err) {
 			break
 		}
+
+		rt.reportError(err)
+	}
+	rt.reportResponseError(request, res)
+
+	if rt.after != nil {
+		endpoint := newRouteServiceEndpoint()
+		rt.after(res, endpoint, err)
 	}
 
-	if sticky {
-		// right now secure attribute would as equal to the JSESSION ID cookie (if present),
-		// but override if set to true in config
-		if secureCookies {
-			secure = true
-		}
+	return res, err
+}
 
-		cookie := &http.Cookie{
-			Name:     VcapCookieId,
-			Value:    endpoint.PrivateInstanceId,
-			Path:     path,
-			MaxAge:   maxAge,
-			HttpOnly: true,
-			Secure:   secure,
-		}
+func (rt *RouteServiceRoundTripper) CancelRequest(request *http.Request) {
+	rt.transport.CancelRequest(request)
+}
 
-		if v := cookie.String(); v != "" {
-			response.Header.Add(CookieHeader, v)
-		}
+// log route service response errors for status code < 200 || >300
+func (rs *RouteServiceRoundTripper) reportResponseError(req *http.Request, resp *http.Response) {
+	if resp != nil && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+		rs.logger.Info("response", zap.String("endpoint", req.URL.String()), zap.Int("status-code", resp.StatusCode))
 	}
 }
 
-func getStickySession(request *http.Request) string {
-	// Try choosing a backend using sticky session
-	if _, err := request.Cookie(StickyCookieKey); err == nil {
-		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			return sticky.Value
-		}
-	}
-	return ""
+func (rs *RouteServiceRoundTripper) reportError(err error) {
+	rs.logger.Error("connection-failed", zap.Error(err))
 }
 
 func retryableError(err error) bool {
