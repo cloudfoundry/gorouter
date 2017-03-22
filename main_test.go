@@ -414,7 +414,7 @@ var _ = Describe("Router Integration", func() {
 
 		gorouterSession = startGorouterSession(cfgFile)
 
-		Expect(gorouterSession.Out.Contents()).To(ContainSubstring("Component Router registered successfully"))
+		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Router registered successfully"))
 	})
 
 	It("has Nats connectivity", func() {
@@ -536,7 +536,7 @@ var _ = Describe("Router Integration", func() {
 
 			natsRunner.Stop()
 
-			Eventually(gorouterSession.Out.Contents()).Should(ContainSubstring("nats-connection-disconnected"))
+			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
 			Consistently(gorouterSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
 		})
 	})
@@ -776,7 +776,7 @@ var _ = Describe("Router Integration", func() {
 
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
-				Expect(gorouterSession.Out.Contents()).To(ContainSubstring("using-noop-token-fetcher"))
+				Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("using-noop-token-fetcher"))
 				stopGorouter(session)
 			})
 		})
@@ -793,7 +793,7 @@ var _ = Describe("Router Integration", func() {
 
 					// note, this will start with routing api, but will not be able to connect
 					session := startGorouterSession(cfgFile)
-					Expect(gorouterSession.Out.Contents()).To(ContainSubstring("started-fetching-token"))
+					Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
 					stopGorouter(session)
 				})
 			})
