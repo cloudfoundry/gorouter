@@ -98,17 +98,17 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl
 	signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
 	if err != nil {
 		rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
-		// Decrypt the head again trying to use the old key.
-		if rs.cryptoPrev != nil {
-			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
-			signature, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
-
-			if err != nil {
-				rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
-			}
+		if rs.cryptoPrev == nil {
+			return err
 		}
 
-		return err
+		// Decrypt the head again trying to use the old key.
+		signature, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
+
+		if err != nil {
+			rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
+			return err
+		}
 	}
 
 	err = rs.validateSignatureTimeout(signature)

@@ -412,13 +412,13 @@ var _ = Describe("Route Service Handler", func() {
 					})
 
 					It("returns a 400 bad request response", func() {
-						Skip("This case fails because of bug mentioned in story #141827671.")
 						handler.ServeHTTP(resp, req, nextHandler)
 
 						Expect(resp.Code).To(Equal(http.StatusBadRequest))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-						Expect(fakeLogger.ErrorCallCount()).To(Equal(2))
-						errMsg, _ := fakeLogger.ErrorArgsForCall(1)
+						Expect(fakeLogger.ErrorCallCount()).To(Equal(3))
+
+						errMsg, _ := fakeLogger.ErrorArgsForCall(2)
 						Expect(errMsg).To(Equal("signature-validation-failed"))
 
 						Expect(nextCalled).To(BeFalse())
