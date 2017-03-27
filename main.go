@@ -267,6 +267,7 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 	options.Servers = natsServers
 	options.PingInterval = c.NatsClientPingInterval
 	options.MaxReconnect = -1
+	connectedChan := make(chan struct{})
 
 	options.ClosedCB = func(conn *nats.Conn) {
 		logger.Fatal(
@@ -279,9 +280,24 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 	options.DisconnectedCB = func(conn *nats.Conn) {
 		hostStr := natsHost.Load().(string)
 		logger.Info("nats-connection-disconnected", zap.String("nats-host", hostStr))
+
+		go func() {
+			ticker := time.NewTicker(c.NatsClientPingInterval)
+
+			for {
+				select {
+				case <-connectedChan:
+					break
+				case <-ticker.C:
+					logger.Info("nats-connection-still-disconnected")
+				}
+			}
+		}()
 	}
 
 	options.ReconnectedCB = func(conn *nats.Conn) {
+		connectedChan <- struct{}{}
+
 		natsURL, err := url.Parse(conn.ConnectedUrl())
 		natsHostStr := ""
 		if err != nil {
