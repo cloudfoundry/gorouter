@@ -88,9 +88,6 @@ func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceR
 	return routeServiceArgs, nil
 }
 
-func (rs *RouteServiceConfig) SetupRouteServiceRequest(request *http.Request, args RouteServiceRequest) {
-}
-
 func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl string) error {
 	metadataHeader := headers.Get(RouteServiceMetadata)
 	signatureHeader := headers.Get(RouteServiceSignature)
