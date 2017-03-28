@@ -365,7 +365,7 @@ Access logs are also redirected to syslog.
 
 ## Headers
 
-If an user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned.
+If an user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture. 
 
 ## Docs
 
