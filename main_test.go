@@ -497,8 +497,8 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	Context("when nats server shuts down", func() {
-		It("should not panic", func() {
+	Context("when nats server shuts down and comes back up", func() {
+		It("should not panic, log the disconnection, and reconnect", func() {
 			localIP, err := localip.LocalIP()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -537,6 +537,10 @@ var _ = Describe("Router Integration", func() {
 			natsRunner.Stop()
 
 			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
+			Eventually(gorouterSession, time.Second*25).Should(Say("nats-connection-still-disconnected"))
+			natsRunner.Start()
+			Eventually(gorouterSession, time.Second*5).Should(Say("nats-connection-reconnected"))
+			Consistently(gorouterSession, time.Second*25).ShouldNot(Say("nats-connection-still-disconnected"))
 			Consistently(gorouterSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
 		})
 	})

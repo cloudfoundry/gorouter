@@ -287,7 +287,7 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 			for {
 				select {
 				case <-connectedChan:
-					break
+					return
 				case <-ticker.C:
 					logger.Info("nats-connection-still-disconnected")
 				}
