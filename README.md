@@ -123,7 +123,8 @@ The format of the `router.register` message is as follows:
   },
   "app": "some_app_guid",
   "stale_threshold_in_seconds": 120,
-  "private_instance_id": "some_app_instance_id"
+  "private_instance_id": "some_app_instance_id",
+  "router_group_guid": "some_router_group_guid"
 }
 ```
 
@@ -132,6 +133,8 @@ The format of the `router.register` message is as follows:
 `app` is a unique identifier for an application that the endpoint is registered for. This value will be included in router access logs with the label `app_id`, as well as being sent with requests to the endpoint in an HTTP header `X-CF-ApplicationId`.
 
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
+
+`router_group_guid` is a scope for routes. If this value does not match the GUID associated with the router group name that Gorouter is configured with, this route will not be registered.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
@@ -297,7 +300,7 @@ _NOTE: GoRouter currently only supports changing the load balancing strategy at 
 
 ## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
 
-### Enabling apps and CF to detect that request was encrypted using X-Forwarded-Proto 
+### Enabling apps and CF to detect that request was encrypted using X-Forwarded-Proto
 If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. As an example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
 
 If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
@@ -345,7 +348,7 @@ Examples: the router can't bind to its TCP port, a CF component has published in
 to prune routes for stale droplets.
 
 Sample log message in gorouter.
- 
+
 `[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
 `
 
@@ -373,7 +376,7 @@ There is a separate [docs](docs) folder which contains more advanced topics.
 
 ## Troubleshooting
 
-Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slow_requests.html) to learn more troubleshooting slow requests. 
+Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slow_requests.html) to learn more troubleshooting slow requests.
 
 ## Contributing
 

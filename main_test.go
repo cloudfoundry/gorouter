@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,7 +24,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"net"
-	"net/http/httptest"
 	"net/url"
 	"syscall"
 
@@ -41,12 +41,14 @@ const defaultPruneInterval = 1
 const defaultPruneThreshold = 2
 
 var _ = Describe("Router Integration", func() {
-	var tmpdir string
 
-	var natsPort uint16
-	var natsRunner *test_util.NATSRunner
-
-	var gorouterSession *Session
+	var (
+		tmpdir          string
+		natsPort        uint16
+		natsRunner      *test_util.NATSRunner
+		gorouterSession *Session
+		oauthServerURL  string
+	)
 
 	writeConfig := func(config *config.Config, cfgFile string) {
 		cfgBytes, err := yaml.Marshal(config)
@@ -105,7 +107,7 @@ var _ = Describe("Router Integration", func() {
 		var eventsSessionLogs []byte
 		Eventually(func() string {
 			logAdd, err := ioutil.ReadAll(session.Out)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred(), "Gorouter session closed")
 			eventsSessionLogs = append(eventsSessionLogs, logAdd...)
 			return string(eventsSessionLogs)
 		}, 70*time.Second).Should(SatisfyAll(
@@ -131,6 +133,7 @@ var _ = Describe("Router Integration", func() {
 		natsPort = test_util.NextAvailPort()
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
+		oauthServerURL = oauthServer.Addr()
 	})
 
 	AfterEach(func() {
@@ -323,6 +326,7 @@ var _ = Describe("Router Integration", func() {
 
 		It("prevents new connections", func() {
 			mbusClient, err := newMessageBus(config)
+			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
 			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
@@ -430,6 +434,7 @@ var _ = Describe("Router Integration", func() {
 		gorouterSession = startGorouterSession(cfgFile)
 
 		mbusClient, err := newMessageBus(config)
+		Expect(err).ToNot(HaveOccurred())
 
 		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
 		zombieApp.Listen()
@@ -512,6 +517,7 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 
 			mbusClient, err := newMessageBus(config)
+			Expect(err).ToNot(HaveOccurred())
 
 			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
 			zombieApp.Listen()
@@ -583,6 +589,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			mbusClient, err := newMessageBus(config)
+			Expect(err).ToNot(HaveOccurred())
 
 			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
 			runningApp.Listen()
@@ -645,6 +652,7 @@ var _ = Describe("Router Integration", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				mbusClient, err := newMessageBus(config)
+				Expect(err).ToNot(HaveOccurred())
 
 				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
 				runningApp.Listen()
@@ -746,11 +754,11 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when the routing api is enabled", func() {
 		var (
-			config            *config.Config
-			uaaTlsListener    net.Listener
-			routingApiServer  *httptest.Server
-			cfgFile           string
-			routingApiHandler http.Handler
+			config           *config.Config
+			routingApiServer *ghttp.Server
+			cfgFile          string
+			responseBytes    []byte
+			verifyAuthHeader http.HandlerFunc
 		)
 
 		BeforeEach(func() {
@@ -760,13 +768,45 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
-			jsonBytes := []byte(`[{"route":"foo.com","port":65340,"ip":"1.2.3.4","ttl":60,"log_guid":"foo-guid"}]`)
-			routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
+			responseBytes = []byte(`[{
+				"guid": "abc123",
+				"name": "valid_router_group",
+				"type": "http"
+			}]`)
 		})
 
 		JustBeforeEach(func() {
-			routingApiServer = httptest.NewServer(routingApiHandler)
-			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApiServer.URL)
+			routingApiServer = ghttp.NewUnstartedServer()
+			routingApiServer.RouteToHandler(
+				"GET", "/routing/v1/router_groups", ghttp.CombineHandlers(
+					verifyAuthHeader,
+					ghttp.RespondWith(http.StatusOK, responseBytes),
+				),
+			)
+			path, err := regexp.Compile("/routing/v1/.*")
+			Expect(err).ToNot(HaveOccurred())
+			routingApiServer.RouteToHandler(
+				"GET", path, ghttp.CombineHandlers(
+					verifyAuthHeader,
+					ghttp.RespondWith(http.StatusOK, `[{}]`),
+				),
+			)
+			routingApiServer.AppendHandlers(
+				func(rw http.ResponseWriter, req *http.Request) {
+					defer GinkgoRecover()
+					Expect(true).To(
+						BeFalse(),
+						fmt.Sprintf(
+							"Received unhandled request: %s %s",
+							req.Method,
+							req.URL.RequestURI(),
+						),
+					)
+				},
+			)
+			routingApiServer.Start()
+
+			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApiServer.URL())
 
 		})
 		AfterEach(func() {
@@ -774,31 +814,110 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		Context("when the routing api auth is disabled ", func() {
+			BeforeEach(func() {
+				verifyAuthHeader = func(rw http.ResponseWriter, r *http.Request) {}
+			})
 			It("uses the no-op token fetcher", func() {
 				config.RoutingApi.AuthDisabled = true
 				writeConfig(config, cfgFile)
 
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
+				defer stopGorouter(session)
 				Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("using-noop-token-fetcher"))
-				stopGorouter(session)
 			})
 		})
 
 		Context("when the routing api auth is enabled (default)", func() {
 			Context("when uaa is available on tls port", func() {
 				BeforeEach(func() {
-					uaaTlsListener = setupTlsServer()
-					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(uaaTlsListener.Addr().String())
+					verifyAuthHeader = func(rw http.ResponseWriter, req *http.Request) {
+						defer GinkgoRecover()
+						Expect(req.Header.Get("Authorization")).ToNot(BeEmpty())
+						Expect(req.Header.Get("Authorization")).ToNot(
+							Equal("bearer"),
+							fmt.Sprintf(
+								`"bearer" shouldn't be the only string in the "Authorization" header. Req: %s %s`,
+								req.Method,
+								req.URL.RequestURI(),
+							),
+						)
+					}
+					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(oauthServerURL)
 				})
 
 				It("fetches a token from uaa", func() {
 					writeConfig(config, cfgFile)
 
-					// note, this will start with routing api, but will not be able to connect
 					session := startGorouterSession(cfgFile)
+					defer stopGorouter(session)
 					Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
-					stopGorouter(session)
+				})
+				It("does not exit", func() {
+					config.RouterGroupName = "valid_router_group"
+					writeConfig(config, cfgFile)
+
+					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					Expect(err).ToNot(HaveOccurred())
+					defer session.Kill()
+					Consistently(session, 5*time.Second).ShouldNot(Exit(1))
+				})
+				Context("when a router group is provided", func() {
+					It("logs the router group name and the guid", func() {
+						config.RouterGroupName = "valid_router_group"
+						writeConfig(config, cfgFile)
+						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+						Expect(err).ToNot(HaveOccurred())
+						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"valid_router_group","router-group-guid":"abc123"}`
+						Eventually(session).Should(Say(expectedLog))
+					})
+					Context("when given an invalid router group", func() {
+						It("does exit with status 1", func() {
+							config.RouterGroupName = "invalid_router_group"
+							writeConfig(config, cfgFile)
+
+							gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+							session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+							Expect(err).ToNot(HaveOccurred())
+							defer session.Kill()
+							Eventually(session, 30*time.Second).Should(Say("invalid-router-group"))
+							Eventually(session, 5*time.Second).Should(Exit(1))
+						})
+					})
+					Context("when the given router_group matches a tcp router group", func() {
+						BeforeEach(func() {
+							responseBytes = []byte(`[{
+								"guid": "abc123",
+								"name": "tcp_router_group",
+								"reservable_ports":"1024-65535",
+								"type": "tcp"
+							}]`)
+						})
+
+						It("does exit with status 1", func() {
+							config.RouterGroupName = "tcp_router_group"
+							writeConfig(config, cfgFile)
+
+							gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+							session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+							Expect(err).ToNot(HaveOccurred())
+							defer session.Kill()
+							Eventually(session, 30*time.Second).Should(Say("expected-router-group-type-http"))
+							Eventually(session, 5*time.Second).Should(Exit(1))
+						})
+					})
+				})
+				Context("when a router group is not provided", func() {
+					It("logs the router group name and guid as '-'", func() {
+						writeConfig(config, cfgFile)
+						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+						Expect(err).ToNot(HaveOccurred())
+						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"-","router-group-guid":"-"}`
+						Eventually(session).Should(Say(expectedLog))
+					})
 				})
 			})
 
@@ -809,6 +928,7 @@ var _ = Describe("Router Integration", func() {
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
+					defer session.Kill()
 					Eventually(session, 30*time.Second).Should(Say("unable-to-fetch-token"))
 					Eventually(session, 5*time.Second).Should(Exit(1))
 				})
@@ -816,8 +936,7 @@ var _ = Describe("Router Integration", func() {
 
 			Context("when routing api is not available", func() {
 				BeforeEach(func() {
-					uaaTlsListener = setupTlsServer()
-					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(uaaTlsListener.Addr().String())
+					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(oauthServerURL)
 				})
 				It("gorouter exits with non-zero code", func() {
 					routingApiServer.Close()
@@ -826,6 +945,7 @@ var _ = Describe("Router Integration", func() {
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
+					defer session.Kill()
 					Eventually(session, 30*time.Second).Should(Say("routing-api-connection-failed"))
 					Eventually(session, 5*time.Second).Should(Exit(1))
 				})
@@ -840,70 +960,12 @@ var _ = Describe("Router Integration", func() {
 				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 				Expect(err).ToNot(HaveOccurred())
+				defer session.Kill()
 				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
 				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
 		})
 
-		Context("when given a valid router group", func() {
-			BeforeEach(func() {
-				jsonBytes := []byte(`[{
-"guid": "abc123",
-"name": "valid_router_group",
-"type": "http"
-}]`)
-				routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
-				config.RoutingApi.AuthDisabled = true
-			})
-			It("does not exit", func() {
-				config.RouterGroupName = "valid_router_group"
-				writeConfig(config, cfgFile)
-
-				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-				Expect(err).ToNot(HaveOccurred())
-				Consistently(session, 5*time.Second).ShouldNot(Exit(1))
-			})
-		})
-
-		Context("when given an invalid router group", func() {
-			Context("when the given router_group matches a tcp router group", func() {
-				BeforeEach(func() {
-					jsonBytes := []byte(`[{
-"guid": "abc123",
-"name": "tcp_router_group",
-"reservable_ports":"1024-65535",
-"type": "tcp"
-}]`)
-					routingApiHandler = ghttp.RespondWith(http.StatusOK, jsonBytes)
-					config.RoutingApi.AuthDisabled = true
-				})
-
-				It("does exit with status 1", func() {
-					config.RoutingApi.AuthDisabled = true
-					config.RouterGroupName = "tcp_router_group"
-					writeConfig(config, cfgFile)
-
-					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-					Expect(err).ToNot(HaveOccurred())
-					Eventually(session, 30*time.Second).Should(Say("expected-router-group-type-http"))
-					Eventually(session, 5*time.Second).Should(Exit(1))
-				})
-			})
-
-			It("does exit with status 1", func() {
-				config.RoutingApi.AuthDisabled = true
-				config.RouterGroupName = "invalid_router_group"
-				writeConfig(config, cfgFile)
-
-				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(session, 30*time.Second).Should(Say("invalid-router-group"))
-				Eventually(session, 5*time.Second).Should(Exit(1))
-			})
-		})
 	})
 })
 
@@ -948,6 +1010,7 @@ func appUnregistered(routesUri string, app *common.TestApp) bool {
 func routeExists(routesEndpoint, routeName string) (bool, error) {
 	resp, err := http.Get(routesEndpoint)
 	if err != nil {
+		fmt.Println("Failed to get from routes endpoint")
 		return false, err
 	}
 	switch resp.StatusCode {
@@ -967,22 +1030,45 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 	}
 }
 
-func setupTlsServer() net.Listener {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func setupTlsServer() *ghttp.Server {
+	oauthServer := ghttp.NewUnstartedServer()
+
+	caCertsPath := path.Join("test", "assets", "certs")
+	caCertsPath, err := filepath.Abs(caCertsPath)
 	Expect(err).ToNot(HaveOccurred())
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(fmt.Sprintf("{\"alg\":\"alg\", \"value\": \"%s\" }", "fake-public-key")))
-	})
+	public := filepath.Join(caCertsPath, "server.pem")
+	private := filepath.Join(caCertsPath, "server.key")
+	cert, err := tls.LoadX509KeyPair(public, private)
+	Expect(err).ToNot(HaveOccurred())
 
-	tlsListener := newTlsListener(listener)
-	tlsServer := &http.Server{Handler: handler}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
+	}
+	oauthServer.HTTPTestServer.TLS = tlsConfig
+	oauthServer.AllowUnhandledRequests = true
+	oauthServer.UnhandledRequestStatusCode = http.StatusOK
 
-	go func() {
-		err := tlsServer.Serve(tlsListener)
-		Expect(err).ToNot(HaveOccurred())
-	}()
-	return tlsListener
+	publicKey := "-----BEGIN PUBLIC KEY-----\\n" +
+		"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDHFr+KICms+tuT1OXJwhCUmR2d\\n" +
+		"KVy7psa8xzElSyzqx7oJyfJ1JZyOzToj9T5SfTIq396agbHJWVfYphNahvZ/7uMX\\n" +
+		"qHxf+ZH9BL1gk9Y6kCnbM5R60gfwjyW1/dQPjOzn9N394zd2FJoFHwdq9Qs0wBug\\n" +
+		"spULZVNRxq7veq/fzwIDAQAB\\n" +
+		"-----END PUBLIC KEY-----"
+
+	data := fmt.Sprintf("{\"alg\":\"rsa\", \"value\":\"%s\"}", publicKey)
+	oauthServer.RouteToHandler("GET", "/token_key",
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", "/token_key"),
+			ghttp.RespondWith(http.StatusOK, data)),
+	)
+	oauthServer.RouteToHandler("POST", "/oauth/token",
+		func(w http.ResponseWriter, req *http.Request) {
+			jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
+			w.Write(jsonBytes)
+		})
+	return oauthServer
 }
 
 func newTlsListener(listener net.Listener) net.Listener {

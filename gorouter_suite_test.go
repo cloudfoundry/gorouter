@@ -6,11 +6,15 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
+	"github.com/onsi/gomega/ghttp"
 
 	"testing"
 )
 
-var gorouterPath string
+var (
+	gorouterPath string
+	oauthServer  *ghttp.Server
+)
 
 func TestGorouter(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -25,8 +29,13 @@ var _ = BeforeSuite(func() {
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)
 	SetDefaultConsistentlyPollingInterval(10 * time.Millisecond)
+	oauthServer = setupTlsServer()
+	oauthServer.HTTPTestServer.StartTLS()
 })
 
 var _ = AfterSuite(func() {
+	if oauthServer != nil {
+		oauthServer.Close()
+	}
 	gexec.CleanupBuildArtifacts()
 })

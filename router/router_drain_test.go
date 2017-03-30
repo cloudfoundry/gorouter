@@ -209,7 +209,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 5 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter), "")
 		logcounter := schema.NewLogCounter()
 		atomic.StoreInt32(&healthCheck, 0)
 

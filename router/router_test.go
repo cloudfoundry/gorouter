@@ -85,7 +85,7 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter), "")
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
 		batcher := new(fakeMetrics.MetricBatcher)
