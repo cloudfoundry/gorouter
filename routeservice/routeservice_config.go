@@ -94,11 +94,12 @@ func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl
 
 	signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
 	if err != nil {
-		rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
 		if rs.cryptoPrev == nil {
+			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
 			return err
 		}
 
+		rs.logger.Debug("proxy-route-service-current-key", zap.String("message", "Decrypt-only secret used to validate route service signature header"))
 		// Decrypt the head again trying to use the old key.
 		signature, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
 
