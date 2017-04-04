@@ -248,6 +248,8 @@ properties:
       user: paronymy61-polaric
 ```
 
+If `router.status.user` is not set in the manifest, the default is `router-status` as can be seen from [the job spec](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec).
+
 Or on the Gorouter VM under `/var/vcap/jobs/gorouter/config/gorouter.yml`:
 
 ```
