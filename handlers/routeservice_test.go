@@ -416,9 +416,9 @@ var _ = Describe("Route Service Handler", func() {
 
 						Expect(resp.Code).To(Equal(http.StatusBadRequest))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-						Expect(fakeLogger.ErrorCallCount()).To(Equal(3))
+						Expect(fakeLogger.ErrorCallCount()).To(Equal(2))
 
-						errMsg, _ := fakeLogger.ErrorArgsForCall(2)
+						errMsg, _ := fakeLogger.ErrorArgsForCall(1)
 						Expect(errMsg).To(Equal("signature-validation-failed"))
 
 						Expect(nextCalled).To(BeFalse())
