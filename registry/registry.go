@@ -171,6 +171,10 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 	uri = uri.RouteKey()
 	p := r.Lookup(uri)
 
+	if p == nil {
+		return nil
+	}
+
 	var surgicalPool *route.Pool
 
 	p.Each(func(e *route.Endpoint) {

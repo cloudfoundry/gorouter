@@ -605,6 +605,12 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 			})
 		})
+		Context("when lookup fails to find any routes", func() {
+			It("returns nil", func() {
+				p := r.Lookup("non-existent")
+				Expect(p).To(BeNil())
+			})
+		})
 	})
 
 	Context("LookupWithInstance", func() {
@@ -636,6 +642,13 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(1))
 			Expect(r.NumEndpoints()).To(Equal(2))
+		})
+
+		Context("when lookup fails to find any routes", func() {
+			It("returns nil", func() {
+				p := r.LookupWithInstance("foo", appId, appIndex)
+				Expect(p).To(BeNil())
+			})
 		})
 
 		Context("when given an incorrect app index", func() {
