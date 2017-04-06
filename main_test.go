@@ -770,7 +770,7 @@ var _ = Describe("Router Integration", func() {
 
 			responseBytes = []byte(`[{
 				"guid": "abc123",
-				"name": "valid_router_group",
+				"name": "router_group_name",
 				"type": "http"
 			}]`)
 		})
@@ -780,7 +780,13 @@ var _ = Describe("Router Integration", func() {
 			routingApiServer.RouteToHandler(
 				"GET", "/routing/v1/router_groups", ghttp.CombineHandlers(
 					verifyAuthHeader,
-					ghttp.RespondWith(http.StatusOK, responseBytes),
+					func(w http.ResponseWriter, req *http.Request) {
+						if req.URL.Query().Get("name") != "router_group_name" {
+							ghttp.RespondWith(http.StatusNotFound, []byte(`error: router group not found`))(w, req)
+							return
+						}
+						ghttp.RespondWith(http.StatusOK, responseBytes)(w, req)
+					},
 				),
 			)
 			path, err := regexp.Compile("/routing/v1/.*")
@@ -854,7 +860,7 @@ var _ = Describe("Router Integration", func() {
 					Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
 				})
 				It("does not exit", func() {
-					config.RouterGroupName = "valid_router_group"
+					config.RouterGroupName = "router_group_name"
 					writeConfig(config, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -865,12 +871,12 @@ var _ = Describe("Router Integration", func() {
 				})
 				Context("when a router group is provided", func() {
 					It("logs the router group name and the guid", func() {
-						config.RouterGroupName = "valid_router_group"
+						config.RouterGroupName = "router_group_name"
 						writeConfig(config, cfgFile)
 						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 						Expect(err).ToNot(HaveOccurred())
-						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"valid_router_group","router-group-guid":"abc123"}`
+						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"router_group_name","router-group-guid":"abc123"}`
 						Eventually(session).Should(Say(expectedLog))
 					})
 					Context("when given an invalid router group", func() {
@@ -882,7 +888,7 @@ var _ = Describe("Router Integration", func() {
 							session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 							Expect(err).ToNot(HaveOccurred())
 							defer session.Kill()
-							Eventually(session, 30*time.Second).Should(Say("invalid-router-group"))
+							Eventually(session, 30*time.Second).Should(Say("router group not found"))
 							Eventually(session, 5*time.Second).Should(Exit(1))
 						})
 					})
@@ -890,14 +896,14 @@ var _ = Describe("Router Integration", func() {
 						BeforeEach(func() {
 							responseBytes = []byte(`[{
 								"guid": "abc123",
-								"name": "tcp_router_group",
+								"name": "router_group_name",
 								"reservable_ports":"1024-65535",
 								"type": "tcp"
 							}]`)
 						})
 
 						It("does exit with status 1", func() {
-							config.RouterGroupName = "tcp_router_group"
+							config.RouterGroupName = "router_group_name"
 							writeConfig(config, cfgFile)
 
 							gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
