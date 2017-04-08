@@ -134,7 +134,7 @@ The format of the `router.register` message is as follows:
 
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
 
-`router_group_guid` is a scope for routes. If this value does not match the GUID associated with the router group name that Gorouter is configured with, this route will not be registered.
+`router_group_guid` determines which routers will register route. Only Gorouters configured with the matching router group will register the route. If a value is not provided, the route will be registered by all Gorouters that have not be configured with a router group.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
