@@ -383,3 +383,4 @@ Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slo
 ## Contributing
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
+Please read our [Development Guide for Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md)
