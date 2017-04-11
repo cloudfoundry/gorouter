@@ -153,13 +153,13 @@ $ nats-pub 'router.register' '{"host":"127.0.0.1","port":4567,"uris":["my_first_
 Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
 ```
 
-**Note:** In order to use `nats-pub` to register a route, you must run the command on the NATS VM. If you are using [`cf-deployment`](https://github.com/cloudfoundry/cf-deployment), you can run `nats-pub` from any VM.  
-
 See that it works!
 ```
 $ curl my_first_url.vcap.me:8081
 Hello!
 ```
+
+**Note:** In order to use `nats-pub` to register a route, you must run the command on the NATS VM. If you are using [`cf-deployment`](https://github.com/cloudfoundry/cf-deployment), you can run `nats-pub` from any VM.  
 
 ## Healthchecking from a Load Balancer
 
