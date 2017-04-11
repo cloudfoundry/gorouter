@@ -755,7 +755,7 @@ cipher_suites: potato
 enable_ssl: true
 ssl_cert_path: ../test/assets/certs/server.pem
 ssl_key_path: ../test/assets/certs/server.key
-cipher_suites: TLS_RSA_WITH_RC4_128_SHA
+cipher_suites: TLS_RSA_WITH_RC4_1280_SHA
 `)
 
 				It("panics", func() {
