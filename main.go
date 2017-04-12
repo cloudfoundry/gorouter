@@ -198,15 +198,13 @@ func fetchRoutingGroupGUID(logger goRouterLogger.Logger, c *config.Config, routi
 		logger.Fatal("fetching-router-group-failed", zap.Error(err))
 	}
 	logger.Info("starting-to-fetch-router-groups")
-	routerGroupData := []zap.Field{zap.String("router-group", c.RouterGroupName)}
 
 	if rg.Type != "http" {
-		logger.Fatal("expected-router-group-type-http", routerGroupData...)
+		logger.Fatal("expected-router-group-type-http", zap.Error(fmt.Errorf("Router Group '%s' is not of type http", c.RouterGroupName)))
 	}
 	routerGroupGUID = rg.Guid
 
-	routerGroupData = append(routerGroupData, zap.String("router-group-guid", routerGroupGUID))
-	logger.Info("retrieved-router-group", routerGroupData...)
+	logger.Info("retrieved-router-group", zap.String("router-group", c.RouterGroupName), zap.String("router-group-guid", routerGroupGUID))
 
 	return
 }
