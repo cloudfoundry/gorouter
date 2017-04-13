@@ -291,7 +291,7 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 			for key, _ := range cipherMap {
 				supportedCipherSuites = append(supportedCipherSuites, key)
 			}
-			errMsg := fmt.Sprintf("invalid cipher string configuration: %s, please choose from %v", cipher, supportedCipherSuites)
+			errMsg := fmt.Sprintf("Invalid cipher string configuration: %s, please choose from %v", cipher, supportedCipherSuites)
 			panic(errMsg)
 		}
 	}
