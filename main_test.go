@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -91,12 +92,10 @@ var _ = Describe("Router Integration", func() {
 		return cfg
 	}
 
-	createSSLConfig := func(cfgFile string, statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
+	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
 
 		configDrainSetup(cfg, defaultPruneInterval, defaultPruneThreshold, 0)
-
-		writeConfig(cfg, cfgFile)
 		return cfg
 	}
 
@@ -154,6 +153,7 @@ var _ = Describe("Router Integration", func() {
 		var statusPort uint16
 		var proxyPort uint16
 		var cfgFile string
+		var dialTls func(version uint16) error
 
 		BeforeEach(func() {
 			var err error
@@ -164,8 +164,41 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createSSLConfig(cfgFile, statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+			config = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
 		})
+		JustBeforeEach(func() {
+			writeConfig(config, cfgFile)
+			dialTls = func(version uint16) error {
+
+				tlsConfig := &tls.Config{
+					MaxVersion:         version,
+					InsecureSkipVerify: true,
+				}
+
+				t := &http.Transport{TLSClientConfig: tlsConfig}
+				client := &http.Client{Transport: t}
+				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
+				return err
+			}
+		})
+		Context("when no cipher suite is supported by both client and server", func() {
+			BeforeEach(func() {
+				_, filename, _, _ := runtime.Caller(0)
+				testPath, err := filepath.Abs(filepath.Join(filename, "..", "test", "assets"))
+				Expect(err).NotTo(HaveOccurred())
+				config.SSLKeyPath = filepath.Join(testPath, "ecdsa_certs", "eckey.pem")
+				config.SSLCertPath = filepath.Join(testPath, "ecdsa_certs", "cert.pem")
+				config.CipherString = "TLS_RSA_WITH_RC4_128_SHA"
+			})
+
+			It("throws an error", func() {
+				gorouterSession = startGorouterSession(cfgFile)
+				err := dialTls(tls.VersionTLS12)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("handshake failure"))
+			})
+		})
+
 		It("supports minimum TLS 1.2", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 
@@ -362,7 +395,8 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when ssl is enabled", func() {
 			BeforeEach(func() {
-				createSSLConfig(cfgFile, statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+				config := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+				writeConfig(config, cfgFile)
 			})
 
 			It("drains properly", func() {
