@@ -28,8 +28,8 @@ func writeStatus(rw http.ResponseWriter, code int, message string, alr interface
 	}
 }
 
-func hostWithoutPort(req *http.Request) string {
-	host := req.Host
+func hostWithoutPort(reqHost string) string {
+	host := reqHost
 
 	// Remove :<port>
 	pos := strings.Index(host, ":")

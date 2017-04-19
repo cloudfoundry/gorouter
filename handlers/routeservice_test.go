@@ -20,6 +20,7 @@ import (
 	"code.cloudfoundry.org/routing-api/models"
 
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -30,6 +31,7 @@ var _ = Describe("Route Service Handler", func() {
 	var (
 		handler negroni.Handler
 
+		reg  *fakeRegistry.FakeRegistry
 		resp *httptest.ResponseRecorder
 		req  *http.Request
 
@@ -79,6 +81,7 @@ var _ = Describe("Route Service Handler", func() {
 		req = req.WithContext(context.WithValue(req.Context(), "RoutePool", routePool))
 
 		fakeLogger = new(logger_fakes.FakeLogger)
+		reg = &fakeRegistry.FakeRegistry{}
 
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
@@ -94,7 +97,7 @@ var _ = Describe("Route Service Handler", func() {
 	})
 
 	JustBeforeEach(func() {
-		handler = handlers.NewRouteService(config, fakeLogger)
+		handler = handlers.NewRouteService(config, fakeLogger, reg)
 	})
 
 	Context("with route services disabled", func() {
@@ -195,10 +198,46 @@ var _ = Describe("Route Service Handler", func() {
 				rsurl := passedReq.Context().Value(handlers.RouteServiceURLCtxKey)
 				Expect(rsurl).ToNot(BeNil())
 				Expect(rsurl).To(BeAssignableToTypeOf(new(url.URL)))
+
+				internalRS := passedReq.Context().Value(handlers.InternalRouteServiceCtxKey)
+				Expect(internalRS).To(BeNil())
+
 				routeServiceURL := rsurl.(*url.URL)
 				Expect(routeServiceURL.Host).To(Equal("route-service.com"))
 				Expect(routeServiceURL.Scheme).To(Equal("https"))
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			Context("when the route service has a route in the route registry", func() {
+				BeforeEach(func() {
+					rsPool := route.NewPool(2*time.Minute, "route-service.com")
+					reg.LookupReturns(rsPool)
+				})
+
+				It("adds a flag to the request context", func() {
+					handler.ServeHTTP(resp, req, nextHandler)
+
+					Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+					var passedReq *http.Request
+					Eventually(reqChan).Should(Receive(&passedReq))
+
+					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("https://"))
+
+					rsurl := passedReq.Context().Value(handlers.RouteServiceURLCtxKey)
+					Expect(rsurl).ToNot(BeNil())
+					Expect(rsurl).To(BeAssignableToTypeOf(new(url.URL)))
+					routeServiceURL := rsurl.(*url.URL)
+					Expect(routeServiceURL.Host).To(Equal("route-service.com"))
+					Expect(routeServiceURL.Scheme).To(Equal("https"))
+
+					internalRS := passedReq.Context().Value(handlers.InternalRouteServiceCtxKey)
+					Expect(internalRS).ToNot(BeNil())
+
+					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				})
 			})
 
 			Context("when recommendHttps is set to false", func() {

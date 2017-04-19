@@ -85,6 +85,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				transport, logger, "my_trace_key", routerIP, "",
 				combinedReporter, false,
+				1234,
 			)
 		})
 
@@ -501,6 +502,24 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(logger.Buffer()).To(gbytes.Say(`response.*status-code":418`))
+				})
+			})
+
+			Context("when the InternalRouteServiceCtxFlag is set", func() {
+				BeforeEach(func() {
+					req = req.WithContext(context.WithValue(req.Context(), handlers.InternalRouteServiceCtxKey, ""))
+					transport.RoundTripStub = nil
+					transport.RoundTripReturns(nil, nil)
+				})
+
+				It("routes the request to the configured local address", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(BeNil())
+
+					Expect(transport.RoundTripCallCount()).To(Equal(1))
+					outReq := transport.RoundTripArgsForCall(0)
+					Expect(outReq.URL.Host).To(Equal("localhost:1234"))
+					Expect(outReq.Host).To(Equal(routeServiceURL.Host))
 				})
 			})
 

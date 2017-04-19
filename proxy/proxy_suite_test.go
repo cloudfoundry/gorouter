@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"net"
 	"net/http"
+	"strconv"
 
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -91,10 +92,18 @@ var _ = JustBeforeEach(func() {
 		cryptoPrev,
 		recommendHttps,
 	)
-	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK)
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())
+
+	serverAddr := proxyServer.Addr().String()
+	_, port, err := net.SplitHostPort(serverAddr)
+	Expect(err).ToNot(HaveOccurred())
+	intPort, err := strconv.Atoi(port)
+	Expect(err).ToNot(HaveOccurred())
+	conf.Port = uint16(intPort)
+
+	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)

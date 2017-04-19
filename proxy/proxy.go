@@ -98,7 +98,7 @@ func NewProxy(
 
 	rproxy := &ReverseProxy{
 		Director:       p.setupProxyRequest,
-		Transport:      p.proxyRoundTripper(httpTransport),
+		Transport:      p.proxyRoundTripper(httpTransport, c.Port),
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
@@ -115,7 +115,7 @@ func NewProxy(
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger))
-	n.Use(handlers.NewRouteService(routeServiceConfig, logger))
+	n.Use(handlers.NewRouteService(routeServiceConfig, logger, registry))
 	n.Use(p)
 	n.UseHandler(rproxy)
 
@@ -134,11 +134,12 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (p *proxy) proxyRoundTripper(transport round_tripper.ProxyRoundTripper) round_tripper.ProxyRoundTripper {
+func (p *proxy) proxyRoundTripper(transport round_tripper.ProxyRoundTripper, port uint16) round_tripper.ProxyRoundTripper {
 	return round_tripper.NewProxyRoundTripper(
 		round_tripper.NewDropsondeRoundTripper(transport),
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,
+		port,
 	)
 }
 

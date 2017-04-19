@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -14,15 +15,17 @@ import (
 )
 
 type routeService struct {
-	config *routeservice.RouteServiceConfig
-	logger logger.Logger
+	config   *routeservice.RouteServiceConfig
+	logger   logger.Logger
+	registry registry.Registry
 }
 
 // NewRouteService creates a handler responsible for handling route services
-func NewRouteService(config *routeservice.RouteServiceConfig, logger logger.Logger) negroni.Handler {
+func NewRouteService(config *routeservice.RouteServiceConfig, logger logger.Logger, routeRegistry registry.Registry) negroni.Handler {
 	return &routeService{
-		config: config,
-		logger: logger,
+		config:   config,
+		logger:   logger,
+		registry: routeRegistry,
 	}
 }
 
@@ -65,7 +68,7 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 			recommendedScheme = "http"
 		}
 
-		forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req) + req.RequestURI
+		forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
 		if hasBeenToRouteService(routeServiceUrl, rsSignature) {
 			// A request from a route service destined for a backend instances
 			routeServiceArgs.URLString = routeServiceUrl
@@ -107,6 +110,12 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 			req.Header.Set(routeservice.RouteServiceForwardedURL, routeServiceArgs.ForwardedURL)
 
 			req = req.WithContext(context.WithValue(req.Context(), RouteServiceURLCtxKey, routeServiceArgs.ParsedUrl))
+
+			rsu := routeServiceArgs.ParsedUrl
+			uri := route.Uri(hostWithoutPort(rsu.Host) + rsu.EscapedPath())
+			if r.registry.Lookup(uri) != nil {
+				req = req.WithContext(context.WithValue(req.Context(), InternalRouteServiceCtxKey, struct{}{}))
+			}
 		}
 	}
 

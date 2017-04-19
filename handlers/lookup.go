@@ -64,7 +64,7 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
 	requestPath := r.URL.EscapedPath()
 
-	uri := route.Uri(hostWithoutPort(r) + requestPath)
+	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {

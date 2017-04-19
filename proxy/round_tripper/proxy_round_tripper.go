@@ -2,6 +2,7 @@ package round_tripper
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -42,6 +43,7 @@ func NewProxyRoundTripper(
 	defaultLoadBalance string,
 	combinedReporter metrics.CombinedReporter,
 	secureCookies bool,
+	localPort uint16,
 ) ProxyRoundTripper {
 	return &roundTripper{
 		logger:             logger,
@@ -51,6 +53,7 @@ func NewProxyRoundTripper(
 		defaultLoadBalance: defaultLoadBalance,
 		combinedReporter:   combinedReporter,
 		secureCookies:      secureCookies,
+		localPort:          localPort,
 	}
 }
 
@@ -62,6 +65,7 @@ type roundTripper struct {
 	defaultLoadBalance string
 	combinedReporter   metrics.CombinedReporter
 	secureCookies      bool
+	localPort          uint16
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -128,7 +132,13 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 			endpoint = newRouteServiceEndpoint()
 			request.Host = routeServiceURL.Host
-			request.URL = routeServiceURL
+			request.URL = new(url.URL)
+			*request.URL = *routeServiceURL
+			if request.Context().Value(handlers.InternalRouteServiceCtxKey) != nil {
+				request.URL.Scheme = "http"
+				request.URL.Host = fmt.Sprintf("localhost:%d", rt.localPort)
+			}
+
 			res, err = rt.transport.RoundTrip(request)
 			if err == nil {
 				if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
