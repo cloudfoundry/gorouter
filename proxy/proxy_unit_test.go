@@ -41,7 +41,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
 			logger = test_util.NewTestZapLogger("test")
-			r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter), "")
+			r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 			routeServiceConfig := routeservice.NewRouteServiceConfig(
 				logger,

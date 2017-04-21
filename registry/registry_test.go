@@ -27,7 +27,6 @@ var _ = Describe("RouteRegistry", func() {
 	var configObj *config.Config
 	var logger logger.Logger
 	var modTag models.ModificationTag
-	var routerGroupGuid string
 
 	BeforeEach(func() {
 
@@ -38,9 +37,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		reporter = new(fakes.FakeRouteRegistryReporter)
 
-		routerGroupGuid = "pineapple-router-group-guid"
-
-		r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+		r = NewRouteRegistry(logger, configObj, reporter)
 		modTag = models.ModificationTag{}
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", "0",
@@ -191,23 +188,6 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
 				r.Register("a.route", fooEndpoint)
 				Expect(logger).NotTo(gbytes.Say(`uri-added.*.*a\.route`))
-			})
-
-			It("includes the router-group-guid in the log message", func() {
-				r.Register("a.route", fooEndpoint)
-				Expect(logger).To(gbytes.Say(`endpoint-registered.*.*router-group-guid.*pineapple-router-group-guid`))
-			})
-
-			Context("when router-group-guid is not provided", func() {
-				BeforeEach(func() {
-					routerGroupGuid = ""
-					r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
-				})
-
-				It("defaults to `-`", func() {
-					r.Register("a.route", fooEndpoint)
-					Expect(logger).To(gbytes.Say(`endpoint-registered.*.*router-group-guid.*"-"`))
-				})
 			})
 		})
 
@@ -446,23 +426,6 @@ var _ = Describe("RouteRegistry", func() {
 				r.Unregister("non-existent-route", fooEndpoint)
 				Expect(logger).NotTo(gbytes.Say(`unregister.*.*a\.non-existent-route`))
 			})
-
-			It("includes the router-group-guid in the log message", func() {
-				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*router-group-guid.*pineapple-router-group-guid`))
-			})
-
-			Context("when router-group-guid is not provided", func() {
-				BeforeEach(func() {
-					routerGroupGuid = ""
-					r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
-					r.Register("a.route", fooEndpoint)
-				})
-
-				It("defaults to `-`", func() {
-					r.Unregister("a.route", fooEndpoint)
-					Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*router-group-guid.*"-"`))
-				})
-			})
 		})
 
 		Context("with modification tags", func() {
@@ -696,28 +659,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*router-group-guid.*pineapple-router-group-guid`))
-		})
-
-		Context("when router-group-guid is not provided", func() {
-			BeforeEach(func() {
-				routerGroupGuid = ""
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
-			})
-
-			It("logs the route info for stale routes and router-group-guid defaults to `-`", func() {
-				r.Register("bar.com/path1/path2/path3", barEndpoint)
-				r.Register("bar.com/path1/path2/path3", fooEndpoint)
-
-				Expect(r.NumUris()).To(Equal(1))
-
-				r.StartPruningCycle()
-				time.Sleep(2 * configObj.PruneStaleDropletsInterval)
-
-				Expect(r.NumUris()).To(Equal(0))
-				r.MarshalJSON()
-				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*router-group-guid.*"-"`))
-			})
+			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints`))
 		})
 
 		It("removes stale droplets", func() {
@@ -821,7 +763,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.DropletStaleThreshold = 45 * time.Millisecond
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+				r = NewRouteRegistry(logger, configObj, reporter)
 			})
 
 			It("sends route metrics to the reporter", func() {
@@ -849,7 +791,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.DropletStaleThreshold = 1 * time.Second
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+				r = NewRouteRegistry(logger, configObj, reporter)
 			})
 
 			It("does not log the route info for fresh routes when pruning", func() {

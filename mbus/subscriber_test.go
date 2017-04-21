@@ -53,7 +53,7 @@ var _ = Describe("Subscriber", func() {
 			PruneThresholdInSeconds:          120,
 		}
 
-		sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts, "")
+		sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
 	})
 
 	AfterEach(func() {
@@ -102,7 +102,7 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	It("errors when publish start message fails", func() {
-		sub = mbus.NewSubscriber(logger, nil, registry, startMsgChan, subOpts, "")
+		sub = mbus.NewSubscriber(logger, nil, registry, startMsgChan, subOpts)
 		process = ifrit.Invoke(sub)
 
 		var err error
@@ -187,17 +187,20 @@ var _ = Describe("Subscriber", func() {
 		})
 	})
 
-	Context("when a route without router group is registered", func() {
-		BeforeEach(func() {
-			process = ifrit.Invoke(sub)
-			Eventually(process.Ready()).Should(BeClosed())
+	Context("when the message cannot be unmarshaled", func() {
+		It("does not update the registry", func() {
+			err := natsClient.Publish("router.register", []byte(` `))
+			Expect(err).ToNot(HaveOccurred())
+			Consistently(registry.RegisterCallCount).Should(BeZero())
 		})
+	})
 
-		It("updates the route registry", func() {
+	Context("when the message contains an http url for route services", func() {
+		It("does not update the registry", func() {
 			msg := mbus.RegistryMessage{
 				Host:                 "host",
 				App:                  "app",
-				RouteServiceURL:      "https://url.example.com",
+				RouteServiceURL:      "url",
 				PrivateInstanceID:    "id",
 				PrivateInstanceIndex: "index",
 				Port:                 1111,
@@ -212,99 +215,12 @@ var _ = Describe("Subscriber", func() {
 			err = natsClient.Publish("router.register", data)
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(registry.RegisterCallCount).Should(Equal(2))
-			for i := 0; i < registry.RegisterCallCount(); i++ {
-				uri, endpoint := registry.RegisterArgsForCall(i)
-
-				Expect(msg.Uris).To(ContainElement(uri))
-				Expect(endpoint.ApplicationId).To(Equal(msg.App))
-				Expect(endpoint.Tags).To(Equal(msg.Tags))
-				Expect(endpoint.PrivateInstanceId).To(Equal(msg.PrivateInstanceID))
-				Expect(endpoint.PrivateInstanceIndex).To(Equal(msg.PrivateInstanceIndex))
-				Expect(endpoint.RouteServiceUrl).To(Equal(msg.RouteServiceURL))
-				Expect(endpoint.CanonicalAddr()).To(ContainSubstring(msg.Host))
-			}
-		})
-
-		Context("when the message cannot be unmarshaled", func() {
-			It("does not update the registry", func() {
-				err := natsClient.Publish("router.register", []byte(` `))
-				Expect(err).ToNot(HaveOccurred())
-				Consistently(registry.RegisterCallCount).Should(BeZero())
-			})
-		})
-
-		It("only registers routes with no router group", func() {
-			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				RouteServiceURL:      "https://url.example.com",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
-				StaleThresholdInSeconds: 120,
-				Uris:            []route.Uri{"test.example.com"},
-				Tags:            map[string]string{"key": "value"},
-				RouterGroupGuid: "default-http",
-			}
-			msg1 := mbus.RegistryMessage{
-				Host:                 "host1",
-				App:                  "app1",
-				RouteServiceURL:      "https://url1.example.com",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
-				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test1.example.com"},
-				Tags: map[string]string{"key": "value"},
-			}
-
-			data, err := json.Marshal(msg)
-			Expect(err).NotTo(HaveOccurred())
-
-			data1, err := json.Marshal(msg1)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(registry.RegisterCallCount).Should(Equal(1))
-
-			uri, _ := registry.RegisterArgsForCall(0)
-			Expect(msg1.Uris).To(ContainElement(uri))
-		})
-
-		Context("when the message contains an http url for route services", func() {
-			It("does not update the registry", func() {
-				msg := mbus.RegistryMessage{
-					Host:                 "host",
-					App:                  "app",
-					RouteServiceURL:      "url",
-					PrivateInstanceID:    "id",
-					PrivateInstanceIndex: "index",
-					Port:                 1111,
-					StaleThresholdInSeconds: 120,
-					Uris: []route.Uri{"test.example.com", "test2.example.com"},
-					Tags: map[string]string{"key": "value"},
-				}
-
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
-
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Consistently(registry.RegisterCallCount).Should(BeZero())
-			})
+			Consistently(registry.RegisterCallCount).Should(BeZero())
 		})
 	})
-
-	Context("when a route without router group is unregistered", func() {
+	Context("when a route is unregistered", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts, "")
+			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -406,143 +322,5 @@ var _ = Describe("Subscriber", func() {
 				Expect(endpoint.CanonicalAddr()).To(ContainSubstring(msg.Host))
 			}
 		})
-
-		It("only unregisters routes without router group", func() {
-			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				RouteServiceURL:      "https://url.example.com",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
-				StaleThresholdInSeconds: 120,
-				Uris:            []route.Uri{"test.example.com"},
-				Tags:            map[string]string{"key": "value"},
-				RouterGroupGuid: "default-http",
-			}
-			msg1 := mbus.RegistryMessage{
-				Host:                 "host1",
-				App:                  "app1",
-				RouteServiceURL:      "https://url1.example.com",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
-				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test1.example.com"},
-				Tags: map[string]string{"key": "value"},
-			}
-
-			data, err := json.Marshal(msg)
-			Expect(err).NotTo(HaveOccurred())
-
-			data1, err := json.Marshal(msg1)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.unregister", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.unregister", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(registry.UnregisterCallCount).Should(Equal(1))
-			uri, _ := registry.UnregisterArgsForCall(0)
-			Expect(msg1.Uris).Should(ContainElement(uri))
-		})
-	})
-
-	Context("when a router group is configured", func() {
-		BeforeEach(func() {
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts, "default-http")
-			process = ifrit.Invoke(sub)
-			Eventually(process.Ready()).Should(BeClosed())
-		})
-
-		It("only registers routes with that router group", func() {
-			msgs := testMessages()
-			msg, msg1 := msgs[0], msgs[1]
-
-			data, err := json.Marshal(msg)
-			Expect(err).NotTo(HaveOccurred())
-
-			data1, err := json.Marshal(msg1)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(registry.RegisterCallCount).Should(Equal(1))
-			for i := 0; i < registry.RegisterCallCount(); i++ {
-				uri, _ := registry.RegisterArgsForCall(i)
-				Expect(msg.Uris).To(ContainElement(uri))
-			}
-		})
-
-		It("only unregisters routes with that router group", func() {
-			msgs := testMessages()
-			msg, msg1 := msgs[0], msgs[1]
-
-			data, err := json.Marshal(msg)
-			Expect(err).NotTo(HaveOccurred())
-
-			data1, err := json.Marshal(msg1)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.unregister", data)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.register", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = natsClient.Publish("router.unregister", data1)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(registry.RegisterCallCount).Should(Equal(1))
-			Eventually(registry.UnregisterCallCount).Should(Equal(1))
-			for i := 0; i < registry.UnregisterCallCount(); i++ {
-				uri, _ := registry.UnregisterArgsForCall(i)
-				Expect(msg.Uris).To(ContainElement(uri))
-			}
-		})
 	})
 })
-
-func testMessages() []mbus.RegistryMessage {
-	msg := mbus.RegistryMessage{
-		Host:                 "host",
-		App:                  "app",
-		RouteServiceURL:      "https://url.example.com",
-		PrivateInstanceID:    "id",
-		PrivateInstanceIndex: "index",
-		Port:                 1111,
-		StaleThresholdInSeconds: 120,
-		Uris:            []route.Uri{"test.example.com"},
-		Tags:            map[string]string{"key": "value"},
-		RouterGroupGuid: "default-http",
-	}
-
-	msg1 := mbus.RegistryMessage{
-		Host:                 "host",
-		App:                  "app",
-		RouteServiceURL:      "https://url.example.com",
-		PrivateInstanceID:    "id",
-		PrivateInstanceIndex: "index",
-		Port:                 1111,
-		StaleThresholdInSeconds: 120,
-		Uris:            []route.Uri{"test.example.com"},
-		Tags:            map[string]string{"key": "value"},
-		RouterGroupGuid: "default-http1",
-	}
-	return []mbus.RegistryMessage{msg, msg1}
-}

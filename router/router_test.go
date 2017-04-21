@@ -85,7 +85,7 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter), "")
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
 		batcher := new(fakeMetrics.MetricBatcher)
@@ -107,7 +107,7 @@ var _ = Describe("Router", func() {
 			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
 			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
 		}
-		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts, "")
+		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts)
 
 		members := grouper.Members{
 			{Name: "subscriber", Runner: subscriber},

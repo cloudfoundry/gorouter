@@ -91,10 +91,8 @@ func main() {
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	metricsReporter := metrics.NewMetricsReporter(sender, batcher)
 
-	var (
-		routerGroupGUID  string
-		routingAPIClient routing_api.Client
-	)
+	var routingAPIClient routing_api.Client
+
 	if c.RoutingApiEnabled() {
 		logger.Info("setting-up-routing-api")
 
@@ -103,9 +101,8 @@ func main() {
 			logger.Fatal("routing-api-connection-failed", zap.Error(err))
 		}
 
-		routerGroupGUID = fetchRoutingGroupGUID(logger, c, routingAPIClient)
 	}
-	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter, routerGroupGUID)
+	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
@@ -140,7 +137,7 @@ func main() {
 		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
 
-	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGUID)
+	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan)
 
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
@@ -185,28 +182,6 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 
 	return proxy.NewProxy(logger, accessLogger, c, registry,
 		reporter, routeServiceConfig, tlsConfig, &healthCheck)
-}
-
-func fetchRoutingGroupGUID(logger goRouterLogger.Logger, c *config.Config, routingAPIClient routing_api.Client) (routerGroupGUID string) {
-	if c.RouterGroupName == "" {
-		logger.Info("retrieved-router-group", []zap.Field{zap.String("router-group", "-"), zap.String("router-group-guid", "-")}...)
-		return
-	}
-
-	rg, err := routingAPIClient.RouterGroupWithName(c.RouterGroupName)
-	if err != nil {
-		logger.Fatal("fetching-router-group-failed", zap.Error(err))
-	}
-	logger.Info("starting-to-fetch-router-groups")
-
-	if rg.Type != "http" {
-		logger.Fatal("expected-router-group-type-http", zap.Error(fmt.Errorf("Router Group '%s' is not of type http", c.RouterGroupName)))
-	}
-	routerGroupGUID = rg.Guid
-
-	logger.Info("retrieved-router-group", zap.String("router-group", c.RouterGroupName), zap.String("router-group-guid", routerGroupGUID))
-
-	return
 }
 
 func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {
@@ -379,7 +354,6 @@ func createSubscriber(
 	natsClient *nats.Conn,
 	registry rregistry.Registry,
 	startMsgChan chan struct{},
-	routerGroupGUID string,
 ) ifrit.Runner {
 
 	guid, err := uuid.GenerateUUID()
@@ -392,7 +366,7 @@ func createSubscriber(
 		MinimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
 		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
 	}
-	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts, routerGroupGUID)
+	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts)
 }
 
 func createLogger(component string, level string) (goRouterLogger.Logger, lager.LogLevel) {

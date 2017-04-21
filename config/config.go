@@ -124,7 +124,6 @@ type Config struct {
 	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
 	SecureCookies        bool          `yaml:"secure_cookies"`
-	RouterGroupName      string        `yaml:"router_group"`
 	HealthCheckUserAgent string        `yaml:"healthcheck_user_agent,omitempty"`
 
 	OAuth                      OAuthConfig      `yaml:"oauth"`
@@ -244,10 +243,6 @@ func (c *Config) Process() {
 		panic(errMsg)
 	}
 
-	if c.RouterGroupName != "" && !c.RoutingApiEnabled() {
-		errMsg := fmt.Sprintf("Routing API must be enabled to assign Router Group")
-		panic(errMsg)
-	}
 }
 
 func (c *Config) processCipherSuites() []uint16 {

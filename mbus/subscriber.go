@@ -51,12 +51,11 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
 type Subscriber struct {
-	routerGroupGuid string
-	logger          logger.Logger
-	natsClient      *nats.Conn
-	startMsgChan    <-chan struct{}
-	opts            *SubscriberOpts
-	routeRegistry   registry.Registry
+	logger        logger.Logger
+	natsClient    *nats.Conn
+	startMsgChan  <-chan struct{}
+	opts          *SubscriberOpts
+	routeRegistry registry.Registry
 }
 
 // SubscriberOpts contains configuration for Subscriber struct
@@ -73,15 +72,13 @@ func NewSubscriber(
 	routeRegistry registry.Registry,
 	startMsgChan <-chan struct{},
 	opts *SubscriberOpts,
-	routerGroupGuid string,
 ) *Subscriber {
 	return &Subscriber{
-		logger:          logger,
-		natsClient:      natsClient,
-		routeRegistry:   routeRegistry,
-		startMsgChan:    startMsgChan,
-		opts:            opts,
-		routerGroupGuid: routerGroupGuid,
+		logger:        logger,
+		natsClient:    natsClient,
+		routeRegistry: routeRegistry,
+		startMsgChan:  startMsgChan,
+		opts:          opts,
 	}
 }
 
@@ -139,9 +136,9 @@ func (s *Subscriber) subscribeRoutes() error {
 		}
 		switch message.Subject {
 		case "router.register":
-			s.handleRouteRegister(msg)
+			s.registerEndpoint(msg)
 		case "router.unregister":
-			s.handleRouteUnregsiter(msg)
+			s.unregisterEndpoint(msg)
 			s.logger.Info("unregister-route", zap.String("message", string(message.Data)))
 		default:
 		}
@@ -152,14 +149,6 @@ func (s *Subscriber) subscribeRoutes() error {
 	return err
 }
 
-func (s *Subscriber) handleRouteRegister(msg *RegistryMessage) {
-	if s.routerGroupGuid != "" {
-		s.registerWithRouterGroup(msg)
-		return
-	}
-	s.registerRoute(msg)
-}
-
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 	endpoint := msg.makeEndpoint()
 	for _, uri := range msg.Uris {
@@ -167,42 +156,11 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 	}
 }
 
-func (s *Subscriber) registerWithRouterGroup(msg *RegistryMessage) {
-	if s.routerGroupGuid == msg.RouterGroupGuid {
-		s.registerEndpoint(msg)
-	}
-}
-
-func (s *Subscriber) registerRoute(msg *RegistryMessage) {
-	if msg.RouterGroupGuid == "" {
-		s.registerEndpoint(msg)
-	}
-}
 func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
 	endpoint := msg.makeEndpoint()
 	for _, uri := range msg.Uris {
 		s.routeRegistry.Unregister(uri, endpoint)
 	}
-}
-
-func (s *Subscriber) unregisterWithRouterGroup(msg *RegistryMessage) {
-	if s.routerGroupGuid == msg.RouterGroupGuid {
-		s.unregisterEndpoint(msg)
-	}
-}
-
-func (s *Subscriber) unregisterRoute(msg *RegistryMessage) {
-	if msg.RouterGroupGuid == "" {
-		s.unregisterEndpoint(msg)
-	}
-}
-
-func (s *Subscriber) handleRouteUnregsiter(msg *RegistryMessage) {
-	if s.routerGroupGuid != "" {
-		s.unregisterWithRouterGroup(msg)
-		return
-	}
-	s.unregisterRoute(msg)
 }
 
 func (s *Subscriber) startMessage() ([]byte, error) {

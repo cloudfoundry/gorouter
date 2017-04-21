@@ -65,7 +65,7 @@ var _ = BeforeEach(func() {
 
 var _ = JustBeforeEach(func() {
 	var err error
-	r = registry.NewRouteRegistry(testLogger, conf, new(fakes.FakeRouteRegistryReporter), "")
+	r = registry.NewRouteRegistry(testLogger, conf, new(fakes.FakeRouteRegistryReporter))
 
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
