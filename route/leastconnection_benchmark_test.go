@@ -22,7 +22,7 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	endpoints := make([]*route.Endpoint, 0)
 	for i := 0; i < total; i++ {
 		ip := fmt.Sprintf("10.0.1.%d", i)
-		e := route.NewEndpoint("", ip, 60000, "", "", nil, -1, "", models.ModificationTag{})
+		e := route.NewEndpoint("", ip, 60000, "", "", nil, -1, "", models.ModificationTag{}, "")
 		endpoints = append(endpoints, e)
 		pool.Put(e)
 	}

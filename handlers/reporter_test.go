@@ -52,7 +52,7 @@ var _ = Describe("Reporter Handler", func() {
 		accessLog := alr.(*schema.AccessLogRecord)
 		accessLog.RouteEndpoint = route.NewEndpoint(
 			"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
-			models.ModificationTag{})
+			models.ModificationTag{}, "")
 
 		nextHandler(rw, req)
 	})

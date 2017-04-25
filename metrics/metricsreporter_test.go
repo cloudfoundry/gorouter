@@ -22,7 +22,7 @@ var _ = Describe("MetricsReporter", func() {
 	)
 
 	BeforeEach(func() {
-		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{})
+		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "")
 		sender = new(fakes.MetricSender)
 		batcher = new(fakes.MetricBatcher)
 		metricReporter = metrics.NewMetricsReporter(sender, batcher)

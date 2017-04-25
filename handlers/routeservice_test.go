@@ -108,7 +108,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("for normal routes", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
-					map[string]string{}, 0, "", models.ModificationTag{})
+					map[string]string{}, 0, "", models.ModificationTag{}, "")
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -130,7 +130,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("with route service URL configured for the route", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{})
+					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -154,7 +154,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("for normal routes", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
-					map[string]string{}, 0, "", models.ModificationTag{})
+					map[string]string{}, 0, "", models.ModificationTag{}, "")
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -177,7 +177,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
 					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
-					"https://route-service.com", models.ModificationTag{},
+					"https://route-service.com", models.ModificationTag{}, "",
 				)
 
 				added := routePool.Put(endpoint)
@@ -499,7 +499,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
 					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
-					"https://bad%20service.com", models.ModificationTag{},
+					"https://bad%20service.com", models.ModificationTag{}, "",
 				)
 
 				added := routePool.Put(endpoint)

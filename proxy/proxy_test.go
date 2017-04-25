@@ -1635,7 +1635,7 @@ func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl stri
 
 	port, err := strconv.Atoi(portStr)
 	Expect(err).NotTo(HaveOccurred())
-	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}))
+	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}, ""))
 }
 
 func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {

@@ -28,6 +28,7 @@ type RegistryMessage struct {
 	RouteServiceURL         string            `json:"route_service_url"`
 	PrivateInstanceID       string            `json:"private_instance_id"`
 	PrivateInstanceIndex    string            `json:"private_instance_index"`
+	IsolationSegment        string            `json:"isolation_segment"`
 }
 
 func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
@@ -40,7 +41,9 @@ func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
 		rm.Tags,
 		rm.StaleThresholdInSeconds,
 		rm.RouteServiceURL,
-		models.ModificationTag{})
+		models.ModificationTag{},
+		rm.IsolationSegment,
+	)
 }
 
 // ValidateMessage checks to ensure the registry message is valid

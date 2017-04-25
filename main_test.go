@@ -91,6 +91,29 @@ var _ = Describe("Router Integration", func() {
 		writeConfig(cfg, cfgFile)
 		return cfg
 	}
+	createIsoSegConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
+		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
+
+		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
+
+		cfg.SuspendPruningIfNatsUnavailable = suspendPruning
+		caCertsPath := filepath.Join("test", "assets", "certs", "uaa-ca.pem")
+		caCertsPath, err := filepath.Abs(caCertsPath)
+		Expect(err).ToNot(HaveOccurred())
+		cfg.LoadBalancerHealthyThreshold = 0
+		cfg.OAuth = config.OAuthConfig{
+			TokenEndpoint:     "127.0.0.1",
+			Port:              8443,
+			ClientName:        "client-id",
+			ClientSecret:      "client-secret",
+			SkipSSLValidation: false,
+			CACerts:           caCertsPath,
+		}
+		cfg.IsolationSegments = isoSegs
+
+		writeConfig(cfg, cfgFile)
+		return cfg
+	}
 
 	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
@@ -147,14 +170,41 @@ var _ = Describe("Router Integration", func() {
 		}
 	})
 
-	Context("TLS", func() {
-		var config *config.Config
-		var localIP string
-		var statusPort uint16
-		var proxyPort uint16
-		var cfgFile string
-		var dialTls func(version uint16) error
+	Context("IsolationSegments", func() {
+		var (
+			config     *config.Config
+			localIP    string
+			statusPort uint16
+			proxyPort  uint16
+			cfgFile    string
+		)
+		BeforeEach(func() {
+			var err error
+			localIP, err = localip.LocalIP()
+			Expect(err).ToNot(HaveOccurred())
 
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
+
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+			config = createIsoSegConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 1, false, []string{"is1", "is2"}, natsPort)
+		})
+
+		It("logs retrieved IsolationSegments", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+			Eventually(gorouterSession.Out.Contents).Should(ContainSubstring(`"data":{"isolation_segments":"[is1,is2]"}`))
+		})
+	})
+
+	Context("TLS", func() {
+		var (
+			config     *config.Config
+			localIP    string
+			statusPort uint16
+			proxyPort  uint16
+			cfgFile    string
+			dialTls    func(version uint16) error
+		)
 		BeforeEach(func() {
 			var err error
 			localIP, err = localip.LocalIP()

@@ -153,6 +153,7 @@ var _ = Describe("RouteFetcher", func() {
 						*expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
+						"",
 					)))
 			}
 		})
@@ -226,6 +227,7 @@ var _ = Describe("RouteFetcher", func() {
 						*expectedRoute.TTL,
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
+						"",
 					)))
 			}
 		})
@@ -462,6 +464,7 @@ var _ = Describe("RouteFetcher", func() {
 						*eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
+						"",
 					)))
 			})
 		})
@@ -497,6 +500,7 @@ var _ = Describe("RouteFetcher", func() {
 						*eventRoute.TTL,
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
+						"",
 					)))
 			})
 		})

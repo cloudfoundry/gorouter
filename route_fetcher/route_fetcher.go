@@ -167,7 +167,9 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 		nil,
 		eventRoute.GetTTL(),
 		eventRoute.RouteServiceUrl,
-		eventRoute.ModificationTag)
+		eventRoute.ModificationTag,
+		"",
+	)
 	switch e.Action {
 	case "Delete":
 		r.RouteRegistry.Unregister(uri, endpoint)
@@ -237,6 +239,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 				aRoute.GetTTL(),
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
+				"",
 			))
 	}
 }
@@ -272,6 +275,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 				aRoute.GetTTL(),
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
+				"",
 			))
 	}
 }

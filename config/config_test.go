@@ -193,6 +193,7 @@ access_log:
     file: "/tmp/access_log"
 ssl_port: 4443
 enable_ssl: true
+isolation_segments: [test-iso-seg-1, test-iso-seg-2]
 `)
 
 			err := config.Initialize(b)
@@ -207,6 +208,7 @@ enable_ssl: true
 			Expect(config.EnableSSL).To(Equal(true))
 			Expect(config.SSLPort).To(Equal(uint16(4443)))
 			Expect(config.RouteServiceRecommendHttps).To(BeFalse())
+			Expect(config.IsolationSegments).To(ConsistOf("test-iso-seg-1", "test-iso-seg-2"))
 		})
 
 		It("sets the Routing Api config", func() {

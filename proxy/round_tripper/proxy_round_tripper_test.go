@@ -75,7 +75,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			routerIP = "127.0.0.1"
 
 			endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
-				map[string]string{}, 0, "", models.ModificationTag{})
+				map[string]string{}, 0, "", models.ModificationTag{}, "")
 
 			added := routePool.Put(endpoint)
 			Expect(added).To(BeTrue())
@@ -623,9 +623,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 
 				endpoint1 = route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "id-1", "2",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{})
+					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
 				endpoint2 = route.NewEndpoint("appId", "1.1.1.1", uint16(9092), "id-2", "3",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{})
+					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
 
 				added := routePool.Put(endpoint1)
 				Expect(added).To(BeTrue())
@@ -685,7 +685,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(removed).To(BeTrue())
 
 						new_endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "id-5", "2",
-							map[string]string{}, 0, "route-service.com", models.ModificationTag{})
+							map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
 						added := routePool.Put(new_endpoint)
 						Expect(added).To(BeTrue())
 					})

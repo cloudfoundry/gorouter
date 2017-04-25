@@ -91,26 +91,14 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	r.reporter.CaptureRegistryMessage(endpoint)
 
-	zapData := []zap.Field{
-		zap.Stringer("uri", uri),
-		zap.String("backend", endpoint.CanonicalAddr()),
-		zap.Object("modification_tag", endpoint.ModificationTag),
-	}
-
 	if endpointAdded {
-		r.logger.Debug("endpoint-registered", zapData...)
+		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
 	} else {
-		r.logger.Debug("endpoint-not-registered", zapData...)
+		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
 	}
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
-	zapData := []zap.Field{
-		zap.Stringer("uri", uri),
-		zap.String("backend", endpoint.CanonicalAddr()),
-		zap.Object("modification_tag", endpoint.ModificationTag),
-	}
-
 	r.Lock()
 
 	uri = uri.RouteKey()
@@ -119,9 +107,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Debug("endpoint-unregistered", zapData...)
+			r.logger.Debug("endpoint-unregistered", zapData(uri, endpoint)...)
 		} else {
-			r.logger.Debug("endpoint-not-unregistered", zapData...)
+			r.logger.Debug("endpoint-not-unregistered", zapData(uri, endpoint)...)
 		}
 
 		if pool.IsEmpty() {
@@ -293,4 +281,17 @@ func parseContextPath(uri route.Uri) string {
 	}
 
 	return contextPath
+}
+
+func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
+	isoSegField := zap.String("isolation_segment", "-")
+	if endpoint.IsolationSegment != "" {
+		isoSegField = zap.String("isolation_segment", endpoint.IsolationSegment)
+	}
+	return []zap.Field{
+		zap.Stringer("uri", uri),
+		zap.String("backend", endpoint.CanonicalAddr()),
+		zap.Object("modification_tag", endpoint.ModificationTag),
+		isoSegField,
+	}
 }

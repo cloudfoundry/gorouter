@@ -51,6 +51,7 @@ type Endpoint struct {
 	PrivateInstanceIndex string
 	ModificationTag      models.ModificationTag
 	Stats                *Stats
+	IsolationSegment     string
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -80,8 +81,18 @@ type Pool struct {
 	nextIdx           int
 }
 
-func NewEndpoint(appId, host string, port uint16, privateInstanceId string, privateInstanceIndex string,
-	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string, modificationTag models.ModificationTag) *Endpoint {
+func NewEndpoint(
+	appId,
+	host string,
+	port uint16,
+	privateInstanceId string,
+	privateInstanceIndex string,
+	tags map[string]string,
+	staleThresholdInSeconds int,
+	routeServiceUrl string,
+	modificationTag models.ModificationTag,
+	isolationSegment string,
+) *Endpoint {
 	return &Endpoint{
 		ApplicationId:        appId,
 		addr:                 fmt.Sprintf("%s:%d", host, port),
@@ -92,6 +103,7 @@ func NewEndpoint(appId, host string, port uint16, privateInstanceId string, priv
 		RouteServiceUrl:      routeServiceUrl,
 		ModificationTag:      modificationTag,
 		Stats:                NewStats(),
+		IsolationSegment:     isolationSegment,
 	}
 }
 
