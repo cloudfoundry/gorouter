@@ -192,7 +192,9 @@ var _ = Describe("Router Integration", func() {
 
 		It("logs retrieved IsolationSegments", func() {
 			gorouterSession = startGorouterSession(cfgFile)
-			Eventually(gorouterSession.Out.Contents).Should(ContainSubstring(`"data":{"isolation_segments":"[is1,is2]"}`))
+			Eventually(func() string {
+				return string(gorouterSession.Out.Contents())
+			}).Should(ContainSubstring(`"data":{"isolation_segments":"[is1,is2]"}`))
 		})
 	})
 
