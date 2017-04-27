@@ -16,8 +16,12 @@ import (
 
 const LOAD_BALANCE_RR string = "round-robin"
 const LOAD_BALANCE_LC string = "least-connection"
+const SHARD_ALL string = "all"
+const SHARD_SEGMENTS string = "segments"
+const SHARD_SHARED_AND_SEGMENTS string = "shared-and-segments"
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
+var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
 
 type StatusConfig struct {
 	Host string `yaml:"host"`
@@ -108,6 +112,7 @@ type Config struct {
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
 	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https"`
 	IsolationSegments        []string `yaml:"isolation_segments"`
+	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode"`
 
 	CipherString string `yaml:"cipher_suites"`
 	CipherSuites []uint16
@@ -178,6 +183,8 @@ var defaultConfig = Config{
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,
 
+	RoutingTableShardingMode: "all",
+
 	DisableKeepAlives:   true,
 	MaxIdleConns:        100,
 	MaxIdleConnsPerHost: 2,
@@ -244,6 +251,17 @@ func (c *Config) Process() {
 		panic(errMsg)
 	}
 
+	validShardMode := false
+	for _, sm := range AllowedShardingModes {
+		if c.RoutingTableShardingMode == sm {
+			validShardMode = true
+			break
+		}
+	}
+	if !validShardMode {
+		errMsg := fmt.Sprintf("Invalid sharding mode: %s. Allowed values are %s", c.RoutingTableShardingMode, AllowedShardingModes)
+		panic(errMsg)
+	}
 }
 
 func (c *Config) processCipherSuites() []uint16 {

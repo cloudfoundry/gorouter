@@ -119,6 +119,10 @@ suspend_pruning_if_nats_unavailable: true
 			Expect(config.AccessLog.EnableStreaming).To(BeFalse())
 		})
 
+		It("sets default sharding mode config", func() {
+			Expect(config.RoutingTableShardingMode).To(Equal("all"))
+		})
+
 		It("sets the load_balancer_healthy_threshold configuration", func() {
 			var b = []byte(`
 load_balancer_healthy_threshold: 20s
@@ -194,6 +198,7 @@ access_log:
 ssl_port: 4443
 enable_ssl: true
 isolation_segments: [test-iso-seg-1, test-iso-seg-2]
+routing_table_sharding_mode: "segments"
 `)
 
 			err := config.Initialize(b)
@@ -209,6 +214,7 @@ isolation_segments: [test-iso-seg-1, test-iso-seg-2]
 			Expect(config.SSLPort).To(Equal(uint16(4443)))
 			Expect(config.RouteServiceRecommendHttps).To(BeFalse())
 			Expect(config.IsolationSegments).To(ConsistOf("test-iso-seg-1", "test-iso-seg-2"))
+			Expect(config.RoutingTableShardingMode).To(Equal("segments"))
 		})
 
 		It("sets the Routing Api config", func() {
@@ -721,6 +727,40 @@ enable_ssl: true
 ssl_cert_path: ../test/assets/certs/server.pem
 ssl_key_path: ../test/assets/certs/server.key
 `)
+
+			It("panics", func() {
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).To(Panic())
+			})
+		})
+
+		Context("When given a routing_table_sharding_mode that is supported ", func() {
+			It("sharding mode `all`", func() {
+				var b = []byte(`routing_table_sharding_mode: all`)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).ToNot(Panic())
+			})
+			It("sharding mode `segments`", func() {
+				var b = []byte(`routing_table_sharding_mode: segments`)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).ToNot(Panic())
+			})
+			It("sharding mode `shared-and-segments`", func() {
+				var b = []byte(`routing_table_sharding_mode: shared-and-segments`)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).ToNot(Panic())
+			})
+		})
+		Context("When given a routing_table_sharding_mode that is not supported ", func() {
+			var b = []byte(`routing_table_sharding_mode: foo`)
 
 			It("panics", func() {
 				err := config.Initialize(b)
