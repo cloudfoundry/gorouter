@@ -194,7 +194,7 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 			Eventually(func() string {
 				return string(gorouterSession.Out.Contents())
-			}).Should(ContainSubstring(`"data":{"isolation_segments":"[is1,is2]"}`))
+			}).Should(ContainSubstring(`"data":{"isolation_segments":["is1","is2"]}`))
 		})
 	})
 

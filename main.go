@@ -38,8 +38,6 @@ import (
 	"syscall"
 	"time"
 
-	"strings"
-
 	"code.cloudfoundry.org/gorouter/metrics"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
@@ -74,7 +72,7 @@ func main() {
 		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
 	}
 
-	logger.Info("retrieved-isolation-segments", zap.String("isolation_segments", fmt.Sprintf("[%s]", strings.Join(c.IsolationSegments, ","))))
+	logger.Info("retrieved-isolation-segments", zap.Object("isolation_segments", c.IsolationSegments))
 
 	// setup number of procs
 	if c.GoMaxProcs != 0 {
