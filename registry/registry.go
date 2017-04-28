@@ -77,16 +77,8 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 }
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
-	if r.routingTableShardingMode == config.SHARD_SEGMENTS || r.routingTableShardingMode == config.SHARD_SHARED_AND_SEGMENTS {
-		hasIsoSeg := false
-		for _, v := range r.isolationSegments {
-			if endpoint.IsolationSegment == v {
-				hasIsoSeg = true
-			}
-		}
-		if !hasIsoSeg {
-			return
-		}
+	if !r.endpointInRouterShard(endpoint) {
+		return
 	}
 
 	t := time.Now()
@@ -118,17 +110,10 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
-	if r.routingTableShardingMode == config.SHARD_SEGMENTS || r.routingTableShardingMode == config.SHARD_SHARED_AND_SEGMENTS {
-		hasIsoSeg := false
-		for _, v := range r.isolationSegments {
-			if endpoint.IsolationSegment == v {
-				hasIsoSeg = true
-			}
-		}
-		if !hasIsoSeg {
-			return
-		}
+	if !r.endpointInRouterShard(endpoint) {
+		return
 	}
+
 	r.Lock()
 
 	uri = uri.RouteKey()
@@ -168,6 +153,24 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	endLookup := time.Now()
 	r.reporter.CaptureLookupTime(endLookup.Sub(started))
 	return pool
+}
+
+func (r *RouteRegistry) endpointInRouterShard(endpoint *route.Endpoint) bool {
+	if r.routingTableShardingMode == config.SHARD_ALL {
+		return true
+	}
+
+	if r.routingTableShardingMode == config.SHARD_SHARED_AND_SEGMENTS && endpoint.IsolationSegment == "" {
+		return true
+	}
+
+	for _, v := range r.isolationSegments {
+		if endpoint.IsolationSegment == v {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.Pool {

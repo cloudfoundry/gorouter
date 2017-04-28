@@ -209,14 +209,14 @@ var _ = Describe("RouteRegistry", func() {
 
 			Context("when routing table sharding mode is `segments`", func() {
 				BeforeEach(func() {
-					configObj.RoutingTableShardingMode = "segments"
+					configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS
 					r = NewRouteRegistry(logger, configObj, reporter)
 					fooEndpoint.IsolationSegment = "foo"
 					barEndpoint.IsolationSegment = "bar"
 					bar2Endpoint.IsolationSegment = "baz"
 				})
 
-				It("registers only routes in the specified isolation segments", func() {
+				It("registers routes in the specified isolation segments, but not other isolation segments", func() {
 					r.Register("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(1))
 					Expect(r.NumEndpoints()).To(Equal(1))
@@ -243,6 +243,43 @@ var _ = Describe("RouteRegistry", func() {
 					})
 				})
 
+			})
+
+			Context("when routing table sharding mode is `shared-and-segments`", func() {
+				BeforeEach(func() {
+					configObj.RoutingTableShardingMode = config.SHARD_SHARED_AND_SEGMENTS
+					r = NewRouteRegistry(logger, configObj, reporter)
+					fooEndpoint.IsolationSegment = "foo"
+					barEndpoint.IsolationSegment = "bar"
+					bar2Endpoint.IsolationSegment = "baz"
+				})
+
+				It("registers routes in the specified isolation segments, but not other isolation segments", func() {
+					r.Register("a.route", fooEndpoint)
+					Expect(r.NumUris()).To(Equal(1))
+					Expect(r.NumEndpoints()).To(Equal(1))
+					Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+					r.Register("b.route", barEndpoint)
+					Expect(r.NumUris()).To(Equal(2))
+					Expect(r.NumEndpoints()).To(Equal(2))
+					Expect(logger).To(gbytes.Say(`uri-added.*.*b\.route`))
+					r.Register("c.route", bar2Endpoint)
+					Expect(r.NumUris()).To(Equal(2))
+					Expect(r.NumEndpoints()).To(Equal(2))
+					Expect(logger).ToNot(gbytes.Say(`uri-added.*.*c\.route`))
+				})
+
+				Context("with an endpoint in a shared isolation segment", func() {
+					BeforeEach(func() {
+						fooEndpoint.IsolationSegment = ""
+					})
+					It("resgisters the route", func() {
+						r.Register("a.route", fooEndpoint)
+						Expect(r.NumUris()).To(Equal(1))
+						Expect(r.NumEndpoints()).To(Equal(1))
+						Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+					})
+				})
 			})
 		})
 
@@ -429,7 +466,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		Context("when routing table sharding mode is `segments`", func() {
 			BeforeEach(func() {
-				configObj.RoutingTableShardingMode = "segments"
+				configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS
 				r = NewRouteRegistry(logger, configObj, reporter)
 				fooEndpoint.IsolationSegment = "foo"
 				barEndpoint.IsolationSegment = "bar"
@@ -468,10 +505,55 @@ var _ = Describe("RouteRegistry", func() {
 					r.Unregister("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(3))
 					Expect(r.NumEndpoints()).To(Equal(3))
-					Expect(logger).ToNot(gbytes.Say(`endpoint-unregisted.*.*a\.route`))
+					Expect(logger).ToNot(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
 				})
 			})
 
+		})
+		Context("when routing table sharding mode is `shared-and-segments`", func() {
+			BeforeEach(func() {
+				configObj.RoutingTableShardingMode = config.SHARD_SHARED_AND_SEGMENTS
+				r = NewRouteRegistry(logger, configObj, reporter)
+				fooEndpoint.IsolationSegment = "foo"
+				barEndpoint.IsolationSegment = "bar"
+				bar2Endpoint.IsolationSegment = "bar"
+
+				r.Register("a.route", fooEndpoint)
+				r.Register("b.route", barEndpoint)
+				r.Register("c.route", bar2Endpoint)
+				Expect(r.NumUris()).To(Equal(3))
+				Expect(r.NumEndpoints()).To(Equal(3))
+			})
+
+			It("unregisters routes in the specified isolation segments and not other isolation segments", func() {
+				r.Unregister("a.route", fooEndpoint)
+				Expect(r.NumUris()).To(Equal(2))
+				Expect(r.NumEndpoints()).To(Equal(2))
+				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+
+				r.Unregister("b.route", barEndpoint)
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(1))
+				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*b\.route`))
+
+				bar2Endpoint.IsolationSegment = "baz"
+				r.Unregister("c.route", bar2Endpoint)
+				Expect(r.NumUris()).To(Equal(1))
+				Expect(r.NumEndpoints()).To(Equal(1))
+				Expect(logger).ToNot(gbytes.Say(`endpoint-unregistered.*.*c\.route`))
+			})
+
+			Context("with an endpoint in a shared isolation segment", func() {
+				BeforeEach(func() {
+					fooEndpoint.IsolationSegment = ""
+				})
+				It("unregisters the route", func() {
+					r.Unregister("a.route", fooEndpoint)
+					Expect(r.NumUris()).To(Equal(2))
+					Expect(r.NumEndpoints()).To(Equal(2))
+					Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+				})
+			})
 		})
 
 		It("removes a route with a path", func() {
