@@ -737,28 +737,62 @@ ssl_key_path: ../test/assets/certs/server.key
 		})
 
 		Context("When given a routing_table_sharding_mode that is supported ", func() {
-			It("sharding mode `all`", func() {
-				var b = []byte(`routing_table_sharding_mode: all`)
-				err := config.Initialize(b)
-				Expect(err).ToNot(HaveOccurred())
+			Context("sharding mode `all`", func() {
+				It("succeeds", func() {
+					var b = []byte(`routing_table_sharding_mode: all`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
-				Expect(config.Process).ToNot(Panic())
+					Expect(config.Process).ToNot(Panic())
+				})
 			})
-			It("sharding mode `segments`", func() {
-				var b = []byte(`routing_table_sharding_mode: segments`)
-				err := config.Initialize(b)
-				Expect(err).ToNot(HaveOccurred())
+			Context("sharding mode `segments`", func() {
+				var b []byte
+				BeforeEach(func() {
+					b = []byte("routing_table_sharding_mode: segments")
+				})
 
-				Expect(config.Process).ToNot(Panic())
+				Context("with isolation segments provided", func() {
+					BeforeEach(func() {
+						b = append(b, []byte("\nisolation_segments: [is1, is2]")...)
+					})
+					It("succeeds", func() {
+						err := config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
+
+						Expect(config.Process).ToNot(Panic())
+					})
+				})
+
+				Context("without isolation segments provided", func() {
+					It("fails", func() {
+						err := config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
+
+						Expect(config.Process).To(Panic())
+					})
+				})
 			})
-			It("sharding mode `shared-and-segments`", func() {
-				var b = []byte(`routing_table_sharding_mode: shared-and-segments`)
-				err := config.Initialize(b)
-				Expect(err).ToNot(HaveOccurred())
+			Context("sharding mode `shared-and-segments`", func() {
+				var b []byte
+				BeforeEach(func() {
+					b = []byte("routing_table_sharding_mode: shared-and-segments")
+				})
 
-				Expect(config.Process).ToNot(Panic())
+				Context("with isolation segments provided", func() {
+					BeforeEach(func() {
+						b = append(b, []byte("\nisolation_segments: [is1, is2]")...)
+					})
+					It("succeeds", func() {
+						err := config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
+
+						Expect(config.Process).ToNot(Panic())
+					})
+				})
 			})
 		})
+
 		Context("When given a routing_table_sharding_mode that is not supported ", func() {
 			var b = []byte(`routing_table_sharding_mode: foo`)
 

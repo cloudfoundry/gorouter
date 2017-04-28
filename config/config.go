@@ -262,6 +262,10 @@ func (c *Config) Process() {
 		errMsg := fmt.Sprintf("Invalid sharding mode: %s. Allowed values are %s", c.RoutingTableShardingMode, AllowedShardingModes)
 		panic(errMsg)
 	}
+
+	if c.RoutingTableShardingMode == SHARD_SEGMENTS && len(c.IsolationSegments) == 0 {
+		panic("Expected isolation segments; routing table sharding mode set to segments and none provided.")
+	}
 }
 
 func (c *Config) processCipherSuites() []uint16 {

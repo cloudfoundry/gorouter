@@ -54,6 +54,9 @@ type RouteRegistry struct {
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
+
+	routingTableShardingMode string
+	isolationSegments        []string
 }
 
 func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
@@ -66,10 +69,26 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 	r.suspendPruning = func() bool { return false }
 
 	r.reporter = reporter
+
+	r.routingTableShardingMode = c.RoutingTableShardingMode
+	r.isolationSegments = c.IsolationSegments
+
 	return r
 }
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
+	if r.routingTableShardingMode == config.SHARD_SEGMENTS || r.routingTableShardingMode == config.SHARD_SHARED_AND_SEGMENTS {
+		hasIsoSeg := false
+		for _, v := range r.isolationSegments {
+			if endpoint.IsolationSegment == v {
+				hasIsoSeg = true
+			}
+		}
+		if !hasIsoSeg {
+			return
+		}
+	}
+
 	t := time.Now()
 
 	r.Lock()
@@ -99,6 +118,17 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+	if r.routingTableShardingMode == config.SHARD_SEGMENTS || r.routingTableShardingMode == config.SHARD_SHARED_AND_SEGMENTS {
+		hasIsoSeg := false
+		for _, v := range r.isolationSegments {
+			if endpoint.IsolationSegment == v {
+				hasIsoSeg = true
+			}
+		}
+		if !hasIsoSeg {
+			return
+		}
+	}
 	r.Lock()
 
 	uri = uri.RouteKey()
