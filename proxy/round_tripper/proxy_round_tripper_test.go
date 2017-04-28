@@ -52,6 +52,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Err: errors.New("error"),
 				Op:  "dial",
 			}
+			nonRetryableError = &net.OpError{
+				Err: errors.New("error"),
+				Op:  "blah",
+			}
 			connResetError = &net.OpError{
 				Err: os.NewSyscallError("read", syscall.ECONNRESET),
 				Op:  "read",
@@ -60,15 +64,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 		BeforeEach(func() {
 			routePool = route.NewPool(1*time.Second, "")
-			resp = httptest.NewRecorder()
 			alr = &schema.AccessLogRecord{}
-			proxyWriter := utils.NewProxyResponseWriter(resp)
 			req = test_util.NewRequest("GET", "myapp.com", "/", nil)
 			req.URL.Scheme = "http"
 
+			resp = httptest.NewRecorder()
+			proxyWriter := utils.NewProxyResponseWriter(resp)
 			req = req.WithContext(context.WithValue(req.Context(), "RoutePool", routePool))
-			req = req.WithContext(context.WithValue(req.Context(), handlers.ProxyResponseWriterCtxKey, proxyWriter))
 			req = req.WithContext(context.WithValue(req.Context(), "AccessLogRecord", alr))
+			req = req.WithContext(context.WithValue(req.Context(), handlers.ProxyResponseWriterCtxKey, proxyWriter))
 
 			logger = test_util.NewTestZapLogger("test")
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
@@ -87,6 +91,32 @@ var _ = Describe("ProxyRoundTripper", func() {
 				combinedReporter, false,
 				1234,
 			)
+		})
+
+		Context("CaptureRoutingResponseLatency", func() {
+			Context("when request succeeds without an error to backend app", func() {
+				It("calls latency reporter", func() {
+					transport.RoundTripReturns(resp.Result(), nil)
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(combinedReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+					expectedEndpoint, scode, _, _ := combinedReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+					Expect(expectedEndpoint).To(Equal(endpoint))
+					Expect(scode).To(Equal(http.StatusOK))
+				})
+
+			})
+			Context("request fails with a non retryable error", func() {
+				It("calls latency reporter", func() {
+					transport.RoundTripReturns(nil, nonRetryableError)
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(combinedReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+					expectedEndpoint, scode, _, _ := combinedReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+					Expect(expectedEndpoint).To(Equal(endpoint))
+					Expect(scode).To(Equal(0))
+				})
+			})
 		})
 
 		Context("when route pool is not set on the request context", func() {
@@ -476,6 +506,32 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(req.URL).To(Equal(routeServiceURL))
 					return nil, nil
 				}
+			})
+
+			Context("Capture Routing latency", func() {
+				Context("when request succeeds without an error to route service", func() {
+					It("calls latency reporter", func() {
+						transport.RoundTripReturns(resp.Result(), nil)
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(combinedReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+						expectedEndpoint, scode, _, _ := combinedReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+						Expect(expectedEndpoint).ToNot(BeNil())
+						Expect(scode).To(Equal(http.StatusOK))
+					})
+
+				})
+				Context("request fails with a non retryable error", func() {
+					It("calls latency reporter", func() {
+						transport.RoundTripReturns(nil, nonRetryableError)
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(HaveOccurred())
+						Expect(combinedReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+						expectedEndpoint, scode, _, _ := combinedReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+						Expect(expectedEndpoint).ToNot(BeNil())
+						Expect(scode).To(Equal(0))
+					})
+				})
 			})
 
 			It("makes requests to the route service", func() {

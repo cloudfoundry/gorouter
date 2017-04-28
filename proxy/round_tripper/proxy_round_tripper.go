@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/uber-go/zap"
 
@@ -109,7 +110,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 	logger := rt.logger
 	for retry := 0; retry < handler.MaxRetries; retry++ {
-
+		startTime := time.Now()
 		if routeServiceURL == nil {
 			logger.Debug("backend", zap.Int("attempt", retry))
 			endpoint, err = rt.selectEndpoint(iter, request)
@@ -119,6 +120,11 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
 			if err == nil || !retryableError(err) {
+				var statusCode int
+				if res != nil {
+					statusCode = res.StatusCode
+				}
+				rt.combinedReporter.CaptureRoutingResponseLatency(endpoint, statusCode, startTime, time.Since(startTime))
 				break
 			}
 			iter.EndpointFailed()
@@ -140,19 +146,26 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			}
 
 			res, err = rt.transport.RoundTrip(request)
+			var statusCode int
 			if err == nil {
-				if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
-					logger.Info(
-						"route-service-response",
-						zap.String("endpoint", request.URL.String()),
-						zap.Int("status-code", res.StatusCode),
-					)
+				if res != nil {
+					statusCode = res.StatusCode
+					rt.combinedReporter.CaptureRoutingResponseLatency(endpoint, statusCode, startTime, time.Since(startTime))
+					if statusCode < 200 || statusCode >= 300 {
+						logger.Info(
+							"route-service-response",
+							zap.String("endpoint", request.URL.String()),
+							zap.Int("status-code", statusCode),
+						)
+					}
 				}
 				break
 			}
 			if !retryableError(err) {
+				rt.combinedReporter.CaptureRoutingResponseLatency(endpoint, statusCode, startTime, time.Since(startTime))
 				break
 			}
+
 			logger.Error("route-service-connection-failed", zap.Error(err))
 		}
 	}
