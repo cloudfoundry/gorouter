@@ -124,7 +124,7 @@ The format of the `router.register` message is as follows:
   "app": "some_app_guid",
   "stale_threshold_in_seconds": 120,
   "private_instance_id": "some_app_instance_id",
-  "router_group_guid": "some_router_group_guid"
+  "isolation_segment": "some_iso_seg_name"
 }
 ```
 
@@ -134,7 +134,7 @@ The format of the `router.register` message is as follows:
 
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
 
-`router_group_guid` determines which routers will register route. Only Gorouters configured with the matching router group will register the route. If a value is not provided, the route will be registered by all Gorouters that have not be configured with a router group.
+`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
