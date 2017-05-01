@@ -387,7 +387,7 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(conf.Ip))
 	})
 
-	It("emits metric for routing request and bad gateway", func() {
+	It("captures the routing response", func() {
 		ln := registerHandler(r, "reporter-test", func(conn *test_util.HttpConn) {
 			_, err := http.ReadRequest(conn.Reader)
 			Expect(err).NotTo(HaveOccurred())
@@ -408,7 +408,22 @@ var _ = Describe("Proxy", func() {
 
 		Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 
+		Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
+		capturedRespCode := fakeReporter.CaptureRoutingResponseArgsForCall(0)
+		Expect(capturedRespCode).To(Equal(http.StatusOK))
+
+		Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+		capturedEndpoint, capturedRespCode, startTime, latency := fakeReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+		Expect(capturedEndpoint).ToNot(BeNil())
+		Expect(capturedEndpoint.ApplicationId).To(Equal(""))
+		Expect(capturedEndpoint.PrivateInstanceId).To(Equal(""))
+		Expect(capturedEndpoint.PrivateInstanceIndex).To(Equal("2"))
+		Expect(capturedRespCode).To(Equal(http.StatusOK))
+		Expect(startTime).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
+		Expect(latency).To(BeNumerically(">", 0))
+
 		Expect(fakeReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
+		Expect(fakeReporter.CaptureRoutingRequestArgsForCall(0)).To(Equal(capturedEndpoint))
 	})
 
 	It("trace headers not added on incorrect TraceKey", func() {
