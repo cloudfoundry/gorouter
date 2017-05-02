@@ -279,9 +279,14 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 			for _, e := range endpoints {
 				addresses = append(addresses, e.CanonicalAddr())
 			}
+			isolationSegment := endpoints[0].IsolationSegment
+			if isolationSegment == "" {
+				isolationSegment = "-"
+			}
 			r.logger.Info("pruned-route",
 				zap.String("uri", t.ToPath()),
 				zap.Object("endpoints", addresses),
+				zap.Object("isolation_segment", isolationSegment),
 			)
 		}
 	})

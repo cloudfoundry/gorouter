@@ -861,7 +861,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints`))
+			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
 		})
 
 		It("removes stale droplets", func() {
