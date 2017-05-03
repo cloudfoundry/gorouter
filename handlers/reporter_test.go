@@ -2,17 +2,14 @@ package handlers_test
 
 import (
 	"bytes"
-	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
@@ -24,11 +21,11 @@ import (
 
 var _ = Describe("Reporter Handler", func() {
 	var (
-		handler negroni.Handler
+		handler     *negroni.Negroni
+		nextHandler http.HandlerFunc
 
-		resp        http.ResponseWriter
-		proxyWriter utils.ProxyResponseWriter
-		req         *http.Request
+		resp http.ResponseWriter
+		req  *http.Request
 
 		fakeReporter *metrics_fakes.FakeCombinedReporter
 		fakeLogger   *logger_fakes.FakeLogger
@@ -36,51 +33,44 @@ var _ = Describe("Reporter Handler", func() {
 		nextCalled bool
 	)
 
-	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		_, err := ioutil.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
 		rw.WriteHeader(http.StatusTeapot)
 		rw.Write([]byte("I'm a little teapot, short and stout."))
 
-		nextCalled = true
-	})
-
-	alrHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		alr := req.Context().Value("AccessLogRecord")
-		Expect(alr).ToNot(BeNil())
-		accessLog := alr.(*schema.AccessLogRecord)
-		accessLog.RouteEndpoint = route.NewEndpoint(
+		reqInfo, err := handlers.ContextRequestInfo(req)
+		Expect(err).NotTo(HaveOccurred())
+		reqInfo.RouteEndpoint = route.NewEndpoint(
 			"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
 			models.ModificationTag{}, "")
+		reqInfo.StoppedAt = time.Now()
 
-		nextHandler(rw, req)
+		nextCalled = true
 	})
 
 	BeforeEach(func() {
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
-		proxyWriter = utils.NewProxyResponseWriter(resp)
-
-		alr := &schema.AccessLogRecord{
-			StartedAt: time.Now(),
-		}
-		req = req.WithContext(context.WithValue(req.Context(), "AccessLogRecord", alr))
 
 		fakeReporter = new(metrics_fakes.FakeCombinedReporter)
 		fakeLogger = new(logger_fakes.FakeLogger)
-		handler = handlers.NewReporter(fakeReporter, fakeLogger)
 
 		nextCalled = false
 	})
 
-	AfterEach(func() {
-		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+	JustBeforeEach(func() {
+		handler = negroni.New()
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(handlers.NewProxyWriter(fakeLogger))
+		handler.Use(handlers.NewReporter(fakeReporter, fakeLogger))
+		handler.UseHandlerFunc(nextHandler)
 	})
 
 	It("emits routing response metrics", func() {
-		handler.ServeHTTP(proxyWriter, req, alrHandler)
+		handler.ServeHTTP(resp, req)
 
 		Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 
@@ -97,30 +87,49 @@ var _ = Describe("Reporter Handler", func() {
 		Expect(startTime).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
 		Expect(latency).To(BeNumerically(">", 0))
 		Expect(latency).To(BeNumerically("<", 10*time.Millisecond))
+
+		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 	})
 
 	Context("when endpoint is nil", func() {
+		BeforeEach(func() {
+			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				_, err := ioutil.ReadAll(req.Body)
+				Expect(err).NotTo(HaveOccurred())
+
+				rw.WriteHeader(http.StatusTeapot)
+				rw.Write([]byte("I'm a little teapot, short and stout."))
+
+				reqInfo, err := handlers.ContextRequestInfo(req)
+				Expect(err).NotTo(HaveOccurred())
+				reqInfo.StoppedAt = time.Now()
+			})
+		})
 		It("does not emit routing response metrics", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
+			handler.ServeHTTP(resp, req)
 			Expect(fakeLogger.ErrorCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
+
+			Expect(nextCalled).To(BeFalse())
 		})
 	})
 
-	Context("when access log record is not set on the request context", func() {
+	Context("when request info is not set on the request context", func() {
+		var badHandler *negroni.Negroni
 		BeforeEach(func() {
-			body := bytes.NewBufferString("What are you?")
-			req = test_util.NewRequest("GET", "example.com", "/", body)
+			badHandler = negroni.New()
+			badHandler.Use(handlers.NewReporter(fakeReporter, fakeLogger))
 		})
-		It("logs an error and doesn't report anything", func() {
-			handler.ServeHTTP(proxyWriter, req, nextHandler)
-			Expect(fakeLogger.ErrorCallCount()).To(Equal(1))
+		It("calls Fatal on the logger", func() {
+			badHandler.ServeHTTP(resp, req)
+			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
 			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
-		})
 
+			Expect(nextCalled).To(BeFalse())
+		})
 	})
 })

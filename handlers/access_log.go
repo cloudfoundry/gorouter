@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -39,8 +38,6 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}
 	r.Body = requestBodyCounter
-
-	r = r.WithContext(context.WithValue(r.Context(), "AccessLogRecord", alr))
 
 	next(rw, r)
 

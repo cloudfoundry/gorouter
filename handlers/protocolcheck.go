@@ -8,9 +8,7 @@ import (
 
 	"fmt"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
 
@@ -28,11 +26,6 @@ func NewProtocolCheck(logger logger.Logger) negroni.Handler {
 
 func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if !isProtocolSupported(r) {
-		alr := r.Context().Value("AccessLogRecord")
-		accessLogRecord, ok := alr.(*schema.AccessLogRecord)
-		if accessLogRecord == nil || !ok {
-			p.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-		}
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)
 		if err != nil {
@@ -40,15 +33,11 @@ func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 				rw,
 				http.StatusBadRequest,
 				"Unsupported protocol",
-				alr,
 				p.logger,
 			)
 			return
 		}
 
-		if accessLogRecord != nil {
-			accessLogRecord.StatusCode = http.StatusBadRequest
-		}
 		fmt.Fprintf(buf, "HTTP/1.0 400 Bad Request\r\n\r\n")
 		buf.Flush()
 		conn.Close()

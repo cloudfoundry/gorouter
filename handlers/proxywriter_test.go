@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 
 	"code.cloudfoundry.org/gorouter/handlers"
+	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/test_util"
 
@@ -17,12 +18,13 @@ import (
 
 var _ = Describe("ProxyWriter", func() {
 	var (
-		handler negroni.Handler
+		handler *negroni.Negroni
 
 		resp http.ResponseWriter
 		req  *http.Request
 
 		nextCalled bool
+		fakeLogger *logger_fakes.FakeLogger
 
 		reqChan  chan *http.Request
 		respChan chan http.ResponseWriter
@@ -41,11 +43,15 @@ var _ = Describe("ProxyWriter", func() {
 	})
 
 	BeforeEach(func() {
+		fakeLogger = new(logger_fakes.FakeLogger)
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		handler = handlers.NewProxyWriter()
+		handler = negroni.New()
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(handlers.NewProxyWriter(fakeLogger))
+		handler.UseHandlerFunc(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
 		respChan = make(chan http.ResponseWriter, 1)
@@ -54,26 +60,40 @@ var _ = Describe("ProxyWriter", func() {
 	})
 
 	AfterEach(func() {
-		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 		close(reqChan)
 		close(respChan)
 	})
 
 	It("sets the proxy response writer on the request context", func() {
-		handler.ServeHTTP(resp, req, nextHandler)
+		handler.ServeHTTP(resp, req)
 		var contextReq *http.Request
 		Eventually(reqChan).Should(Receive(&contextReq))
-		rw := contextReq.Context().Value(handlers.ProxyResponseWriterCtxKey)
-		Expect(rw).ToNot(BeNil())
-		Expect(rw).To(BeAssignableToTypeOf(utils.NewProxyResponseWriter(resp)))
+		reqInfo, err := handlers.ContextRequestInfo(contextReq)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(reqInfo.ProxyResponseWriter).ToNot(BeNil())
+		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 	})
 
 	It("passes the proxy response writer to the next handler", func() {
-		handler.ServeHTTP(resp, req, nextHandler)
+		handler.ServeHTTP(resp, req)
 		var rw http.ResponseWriter
 		Eventually(respChan).Should(Receive(&rw))
 		Expect(rw).ToNot(BeNil())
 		Expect(rw).To(BeAssignableToTypeOf(utils.NewProxyResponseWriter(resp)))
+		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 	})
 
+	Context("when request info is not set on the request context", func() {
+		var badHandler *negroni.Negroni
+		BeforeEach(func() {
+			badHandler = negroni.New()
+			badHandler.Use(handlers.NewProxyWriter(fakeLogger))
+			badHandler.UseHandlerFunc(nextHandler)
+		})
+		It("calls Fatal on the logger", func() {
+			badHandler.ServeHTTP(resp, req)
+			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+			Expect(nextCalled).To(BeFalse())
+		})
+	})
 })

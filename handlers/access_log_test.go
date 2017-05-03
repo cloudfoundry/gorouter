@@ -7,9 +7,8 @@ import (
 	"net/http/httptest"
 
 	"code.cloudfoundry.org/gorouter/access_log/fakes"
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
+	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -19,11 +18,10 @@ import (
 
 var _ = Describe("AccessLog", func() {
 	var (
-		handler negroni.Handler
+		handler *negroni.Negroni
 
-		resp        http.ResponseWriter
-		proxyWriter utils.ProxyResponseWriter
-		req         *http.Request
+		resp http.ResponseWriter
+		req  *http.Request
 
 		accessLogger      *fakes.FakeAccessLogger
 		extraHeadersToLog []string
@@ -48,13 +46,18 @@ var _ = Describe("AccessLog", func() {
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
-		proxyWriter = utils.NewProxyResponseWriter(resp)
 
 		extraHeadersToLog = []string{}
 
 		accessLogger = &fakes.FakeAccessLogger{}
 
-		handler = handlers.NewAccessLog(accessLogger, extraHeadersToLog)
+		fakeLogger := new(logger_fakes.FakeLogger)
+
+		handler = negroni.New()
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(handlers.NewProxyWriter(fakeLogger))
+		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog))
+		handler.UseHandlerFunc(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
 
@@ -66,27 +69,18 @@ var _ = Describe("AccessLog", func() {
 		close(reqChan)
 	})
 
-	It("sets an access log record on the context", func() {
-		handler.ServeHTTP(proxyWriter, req, nextHandler)
-		var contextReq *http.Request
-		Eventually(reqChan).Should(Receive(&contextReq))
-		alr := contextReq.Context().Value("AccessLogRecord")
-		Expect(alr).ToNot(BeNil())
-		Expect(alr).To(BeAssignableToTypeOf(&schema.AccessLogRecord{}))
-		accessLog, ok := alr.(*schema.AccessLogRecord)
-		Expect(ok).To(BeTrue())
-		Expect(accessLog.Request).To(Equal(req))
-	})
-
 	It("logs the access log record after all subsequent handlers have run", func() {
-		handler.ServeHTTP(proxyWriter, req, nextHandler)
+		handler.ServeHTTP(resp, req)
 
 		Expect(accessLogger.LogCallCount()).To(Equal(1))
 
 		alr := accessLogger.LogArgsForCall(0)
 
 		Expect(alr.StartedAt).ToNot(BeZero())
-		Expect(alr.Request).To(Equal(req))
+		Expect(alr.Request.Header).To(Equal(req.Header))
+		Expect(alr.Request.Method).To(Equal(req.Method))
+		Expect(alr.Request.URL).To(Equal(req.URL))
+		Expect(alr.Request.RemoteAddr).To(Equal(req.RemoteAddr))
 		Expect(alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
 		Expect(alr.FinishedAt).ToNot(BeZero())
 		Expect(alr.RequestBytesReceived).To(Equal(13))

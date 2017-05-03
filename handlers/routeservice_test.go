@@ -3,14 +3,12 @@ package handlers_test
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
@@ -29,7 +27,7 @@ import (
 
 var _ = Describe("Route Service Handler", func() {
 	var (
-		handler negroni.Handler
+		handler *negroni.Negroni
 
 		reg  *fakeRegistry.FakeRegistry
 		resp *httptest.ResponseRecorder
@@ -58,6 +56,13 @@ var _ = Describe("Route Service Handler", func() {
 		nextCalled = true
 	})
 
+	testSetupHandler := func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+		reqInfo, err := handlers.ContextRequestInfo(req)
+		Expect(err).ToNot(HaveOccurred())
+		reqInfo.RoutePool = routePool
+		next(rw, req)
+	}
+
 	BeforeEach(func() {
 		body := bytes.NewBufferString("What are you?")
 		testReq := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", body)
@@ -72,13 +77,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		reqChan = make(chan *http.Request, 1)
 
-		alr := &schema.AccessLogRecord{
-			StartedAt: time.Now(),
-		}
 		routePool = route.NewPool(1*time.Second, "")
-
-		req = req.WithContext(context.WithValue(req.Context(), "AccessLogRecord", alr))
-		req = req.WithContext(context.WithValue(req.Context(), "RoutePool", routePool))
 
 		fakeLogger = new(logger_fakes.FakeLogger)
 		reg = &fakeRegistry.FakeRegistry{}
@@ -97,7 +96,11 @@ var _ = Describe("Route Service Handler", func() {
 	})
 
 	JustBeforeEach(func() {
-		handler = handlers.NewRouteService(config, fakeLogger, reg)
+		handler = negroni.New()
+		handler.Use(handlers.NewRequestInfo())
+		handler.UseFunc(testSetupHandler)
+		handler.Use(handlers.NewRouteService(config, fakeLogger, reg))
+		handler.UseHandlerFunc(nextHandler)
 	})
 
 	Context("with route services disabled", func() {
@@ -114,7 +117,7 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(added).To(BeTrue())
 			})
 			It("should not add route service metadata to the request for normal routes", func() {
-				handler.ServeHTTP(resp, req, nextHandler)
+				handler.ServeHTTP(resp, req)
 
 				var passedReq *http.Request
 				Eventually(reqChan).Should(Receive(&passedReq))
@@ -122,7 +125,10 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
-				Expect(passedReq.Context().Value(handlers.RouteServiceURLCtxKey)).To(BeNil())
+
+				reqInfo, err := handlers.ContextRequestInfo(passedReq)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reqInfo.RouteServiceURL).To(BeNil())
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
 		})
@@ -137,7 +143,7 @@ var _ = Describe("Route Service Handler", func() {
 			})
 
 			It("returns 502 Bad Gateway", func() {
-				handler.ServeHTTP(resp, req, nextHandler)
+				handler.ServeHTTP(resp, req)
 
 				Expect(fakeLogger.InfoCallCount()).ToNot(Equal(0))
 				message, _ := fakeLogger.InfoArgsForCall(0)
@@ -160,7 +166,7 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(added).To(BeTrue())
 			})
 			It("should not add route service metadata to the request for normal routes", func() {
-				handler.ServeHTTP(resp, req, nextHandler)
+				handler.ServeHTTP(resp, req)
 
 				var passedReq *http.Request
 				Eventually(reqChan).Should(Receive(&passedReq))
@@ -168,7 +174,9 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
-				Expect(passedReq.Context().Value(handlers.RouteServiceURLCtxKey)).To(BeNil())
+				reqInfo, err := handlers.ContextRequestInfo(passedReq)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reqInfo.RouteServiceURL).To(BeNil())
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
 		})
@@ -185,7 +193,7 @@ var _ = Describe("Route Service Handler", func() {
 			})
 
 			It("sends the request to the route service with X-CF-Forwarded-Url using https scheme", func() {
-				handler.ServeHTTP(resp, req, nextHandler)
+				handler.ServeHTTP(resp, req)
 
 				Expect(resp.Code).To(Equal(http.StatusTeapot))
 
@@ -195,16 +203,14 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
 				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("https://"))
-				rsurl := passedReq.Context().Value(handlers.RouteServiceURLCtxKey)
-				Expect(rsurl).ToNot(BeNil())
-				Expect(rsurl).To(BeAssignableToTypeOf(new(url.URL)))
 
-				internalRS := passedReq.Context().Value(handlers.InternalRouteServiceCtxKey)
-				Expect(internalRS).To(BeNil())
+				reqInfo, err := handlers.ContextRequestInfo(passedReq)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
 
-				routeServiceURL := rsurl.(*url.URL)
-				Expect(routeServiceURL.Host).To(Equal("route-service.com"))
-				Expect(routeServiceURL.Scheme).To(Equal("https"))
+				Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+				Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+				Expect(reqInfo.IsInternalRouteService).To(BeFalse())
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
 
@@ -215,7 +221,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("adds a flag to the request context", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusTeapot))
 
@@ -226,16 +232,13 @@ var _ = Describe("Route Service Handler", func() {
 					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
 					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("https://"))
 
-					rsurl := passedReq.Context().Value(handlers.RouteServiceURLCtxKey)
-					Expect(rsurl).ToNot(BeNil())
-					Expect(rsurl).To(BeAssignableToTypeOf(new(url.URL)))
-					routeServiceURL := rsurl.(*url.URL)
-					Expect(routeServiceURL.Host).To(Equal("route-service.com"))
-					Expect(routeServiceURL.Scheme).To(Equal("https"))
+					reqInfo, err := handlers.ContextRequestInfo(passedReq)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
 
-					internalRS := passedReq.Context().Value(handlers.InternalRouteServiceCtxKey)
-					Expect(internalRS).ToNot(BeNil())
-
+					Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+					Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+					Expect(reqInfo.IsInternalRouteService).To(BeTrue())
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
 			})
@@ -247,7 +250,7 @@ var _ = Describe("Route Service Handler", func() {
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusTeapot))
 
@@ -257,12 +260,14 @@ var _ = Describe("Route Service Handler", func() {
 					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
 					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
 					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("http://"))
-					rsurl := passedReq.Context().Value(handlers.RouteServiceURLCtxKey)
-					Expect(rsurl).ToNot(BeNil())
-					Expect(rsurl).To(BeAssignableToTypeOf(new(url.URL)))
-					routeServiceURL := rsurl.(*url.URL)
-					Expect(routeServiceURL.Host).To(Equal("route-service.com"))
-					Expect(routeServiceURL.Scheme).To(Equal("https"))
+
+					reqInfo, err := handlers.ContextRequestInfo(passedReq)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+					Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+					Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+					Expect(reqInfo.IsInternalRouteService).To(BeFalse())
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
 			})
@@ -276,7 +281,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("strips headers and sends the request to the backend instance", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusTeapot))
 
@@ -286,7 +291,9 @@ var _ = Describe("Route Service Handler", func() {
 					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
 					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
 					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
-					Expect(passedReq.Context().Value(handlers.RouteServiceURLCtxKey)).To(BeNil())
+					reqInfo, err := handlers.ContextRequestInfo(passedReq)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(reqInfo.RouteServiceURL).To(BeNil())
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
 			})
@@ -299,7 +306,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("returns a 400 bad request response", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusBadRequest))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -328,7 +335,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("returns a 400 bad request response", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusBadRequest))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -349,7 +356,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("returns a 400 bad request response", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusBadRequest))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -381,7 +388,7 @@ var _ = Describe("Route Service Handler", func() {
 				})
 
 				It("returns a 400 bad request response", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusBadRequest))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -421,7 +428,7 @@ var _ = Describe("Route Service Handler", func() {
 					})
 
 					It("sends the request to the backend instance", func() {
-						handler.ServeHTTP(resp, req, nextHandler)
+						handler.ServeHTTP(resp, req)
 
 						var passedReq *http.Request
 						Eventually(reqChan).Should(Receive(&passedReq))
@@ -429,7 +436,9 @@ var _ = Describe("Route Service Handler", func() {
 						Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
 						Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
 						Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
-						Expect(passedReq.Context().Value(handlers.RouteServiceURLCtxKey)).To(BeNil())
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).To(BeNil())
 						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 					})
 				})
@@ -451,7 +460,7 @@ var _ = Describe("Route Service Handler", func() {
 					})
 
 					It("returns a 400 bad request response", func() {
-						handler.ServeHTTP(resp, req, nextHandler)
+						handler.ServeHTTP(resp, req)
 
 						Expect(resp.Code).To(Equal(http.StatusBadRequest))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -484,7 +493,7 @@ var _ = Describe("Route Service Handler", func() {
 					})
 
 					It("returns a 400 bad request response", func() {
-						handler.ServeHTTP(resp, req, nextHandler)
+						handler.ServeHTTP(resp, req)
 
 						Expect(resp.Code).To(Equal(http.StatusBadRequest))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
@@ -507,13 +516,42 @@ var _ = Describe("Route Service Handler", func() {
 
 			})
 			It("returns a 500 internal server error response", func() {
-				handler.ServeHTTP(resp, req, nextHandler)
+				handler.ServeHTTP(resp, req)
 
 				Expect(resp.Code).To(Equal(http.StatusInternalServerError))
 				Expect(resp.Body.String()).To(ContainSubstring("Route service request failed."))
 
 				Expect(nextCalled).To(BeFalse())
 			})
+		})
+	})
+
+	Context("when request info is not set on the request context", func() {
+		var badHandler *negroni.Negroni
+		BeforeEach(func() {
+			badHandler = negroni.New()
+			badHandler.Use(handlers.NewRouteService(config, fakeLogger, reg))
+			badHandler.UseHandlerFunc(nextHandler)
+		})
+		It("calls Fatal on the logger", func() {
+			badHandler.ServeHTTP(resp, req)
+			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+			Expect(nextCalled).To(BeFalse())
+		})
+	})
+
+	Context("when request info is not set on the request context", func() {
+		var badHandler *negroni.Negroni
+		BeforeEach(func() {
+			badHandler = negroni.New()
+			badHandler.Use(handlers.NewRequestInfo())
+			badHandler.Use(handlers.NewRouteService(config, fakeLogger, reg))
+			badHandler.UseHandlerFunc(nextHandler)
+		})
+		It("calls Fatal on the logger", func() {
+			badHandler.ServeHTTP(resp, req)
+			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+			Expect(nextCalled).To(BeFalse())
 		})
 	})
 })

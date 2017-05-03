@@ -1,15 +1,12 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
@@ -32,21 +29,22 @@ func NewReporter(reporter metrics.CombinedReporter, logger logger.Logger) negron
 func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	next(rw, r)
 
-	alr := r.Context().Value("AccessLogRecord")
-	if alr == nil {
-		rh.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
+	requestInfo, err := ContextRequestInfo(r)
+	// logger.Fatal does not cause gorouter to exit 1 but rather throw panic with
+	// stacktrace in error log
+	if err != nil {
+		rh.logger.Fatal("request-info-err", zap.Error(err))
 		return
 	}
-	accessLog := alr.(*schema.AccessLogRecord)
 
-	if accessLog.RouteEndpoint == nil {
+	if requestInfo.RouteEndpoint == nil {
 		return
 	}
 
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 	rh.reporter.CaptureRoutingResponse(proxyWriter.Status())
 	rh.reporter.CaptureRoutingResponseLatency(
-		accessLog.RouteEndpoint, proxyWriter.Status(),
-		accessLog.StartedAt, time.Since(accessLog.StartedAt),
+		requestInfo.RouteEndpoint, proxyWriter.Status(),
+		requestInfo.StartedAt, requestInfo.StoppedAt.Sub(requestInfo.StartedAt),
 	)
 }

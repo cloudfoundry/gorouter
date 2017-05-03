@@ -7,16 +7,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -81,36 +80,25 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		}()
 	}
 
-	rp := request.Context().Value("RoutePool")
-	if rp == nil {
+	reqInfo, err := handlers.ContextRequestInfo(request)
+	if err != nil {
+		return nil, err
+	}
+	if reqInfo.RoutePool == nil {
 		return nil, errors.New("RoutePool not set on context")
 	}
 
-	rw := request.Context().Value(handlers.ProxyResponseWriterCtxKey)
-	if rw == nil {
+	if reqInfo.ProxyResponseWriter == nil {
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	alr := request.Context().Value("AccessLogRecord")
-	if alr == nil {
-		return nil, errors.New("AccessLogRecord not set on context")
-	}
-	accessLogRecord := alr.(*schema.AccessLogRecord)
-
-	var routeServiceURL *url.URL
-	rsurl := request.Context().Value(handlers.RouteServiceURLCtxKey)
-	if rsurl != nil {
-		routeServiceURL = rsurl.(*url.URL)
-	}
-
-	routePool := rp.(*route.Pool)
 	stickyEndpointID := getStickySession(request)
-	iter := routePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
+	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	logger := rt.logger
 	for retry := 0; retry < handler.MaxRetries; retry++ {
 
-		if routeServiceURL == nil {
+		if reqInfo.RouteServiceURL == nil {
 			logger.Debug("backend", zap.Int("attempt", retry))
 			endpoint, err = rt.selectEndpoint(iter, request)
 			if err != nil {
@@ -126,15 +114,15 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		} else {
 			logger.Debug(
 				"route-service",
-				zap.Object("route-service-url", routeServiceURL),
+				zap.Object("route-service-url", reqInfo.RouteServiceURL),
 				zap.Int("attempt", retry),
 			)
 
 			endpoint = newRouteServiceEndpoint()
-			request.Host = routeServiceURL.Host
+			request.Host = reqInfo.RouteServiceURL.Host
 			request.URL = new(url.URL)
-			*request.URL = *routeServiceURL
-			if request.Context().Value(handlers.InternalRouteServiceCtxKey) != nil {
+			*request.URL = *reqInfo.RouteServiceURL
+			if reqInfo.IsInternalRouteService {
 				request.URL.Scheme = "http"
 				request.URL.Host = fmt.Sprintf("localhost:%d", rt.localPort)
 			}
@@ -157,13 +145,12 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		}
 	}
 
-	accessLogRecord.RouteEndpoint = endpoint
+	reqInfo.RouteEndpoint = endpoint
+	reqInfo.StoppedAt = time.Now()
 
 	if err != nil {
-		responseWriter := rw.(utils.ProxyResponseWriter)
+		responseWriter := reqInfo.ProxyResponseWriter
 		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
-
-		accessLogRecord.StatusCode = http.StatusBadGateway
 
 		logger.Info("status", zap.String("body", BadGatewayMessage))
 
@@ -188,7 +175,10 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	}
 
 	if res != nil && endpoint.PrivateInstanceId != "" {
-		setupStickySession(res, endpoint, stickyEndpointID, rt.secureCookies, routePool.ContextPath())
+		setupStickySession(
+			res, endpoint, stickyEndpointID, rt.secureCookies,
+			reqInfo.RoutePool.ContextPath(),
+		)
 	}
 
 	return res, nil

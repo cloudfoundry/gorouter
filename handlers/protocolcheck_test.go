@@ -2,11 +2,9 @@ package handlers_test
 
 import (
 	"bufio"
-	"context"
 	"net"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -20,7 +18,6 @@ import (
 var _ = Describe("Protocolcheck", func() {
 	var (
 		logger     logger.Logger
-		alr        *schema.AccessLogRecord
 		nextCalled bool
 		server     *ghttp.Server
 		n          *negroni.Negroni
@@ -29,13 +26,9 @@ var _ = Describe("Protocolcheck", func() {
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("protocolcheck")
 		nextCalled = false
-		alr = &schema.AccessLogRecord{}
 
 		n = negroni.New()
 		n.UseFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
-			alr.Request = req
-
-			req = req.WithContext(context.WithValue(req.Context(), "AccessLogRecord", alr))
 			next(rw, req)
 		})
 		n.Use(handlers.NewProtocolCheck(logger))
@@ -93,7 +86,6 @@ var _ = Describe("Protocolcheck", func() {
 			conn.Write([]byte("GET / HTTP/1.5\r\nHost: example.com\r\n\r\n"))
 			resp, err := http.ReadResponse(respReader, nil)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(alr.StatusCode).To(Equal(http.StatusBadRequest))
 			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 
 			Expect(nextCalled).To(BeFalse())
@@ -111,7 +103,6 @@ var _ = Describe("Protocolcheck", func() {
 			resp, err := http.ReadResponse(respReader, nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(alr.StatusCode).To(Equal(http.StatusBadRequest))
 		})
 	})
 })

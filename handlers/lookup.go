@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
@@ -42,7 +41,12 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		l.handleMissingRoute(rw, r)
 		return
 	}
-	r = r.WithContext(context.WithValue(r.Context(), "RoutePool", pool))
+	requestInfo, err := ContextRequestInfo(r)
+	if err != nil {
+		l.logger.Fatal("request-info-err", zap.Error(err))
+		return
+	}
+	requestInfo.RoutePool = pool
 	next(rw, r)
 }
 
@@ -56,7 +60,6 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		rw,
 		http.StatusNotFound,
 		fmt.Sprintf("Requested route ('%s') does not exist.", r.Host),
-		r.Context().Value("AccessLogRecord"),
 		l.logger,
 	)
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -106,7 +105,8 @@ func NewProxy(
 
 	zipkinHandler := handlers.NewZipkin(c.Tracing.EnableZipkin, c.ExtraHeadersToLog, logger)
 	n := negroni.New()
-	n.Use(handlers.NewProxyWriter())
+	n.Use(handlers.NewRequestInfo())
+	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewsetVcapRequestIdHeader(logger))
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
 	n.Use(handlers.NewReporter(reporter, logger))
@@ -168,30 +168,23 @@ func (b *bufferPool) Put(buf []byte) {
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 
-	alr := request.Context().Value("AccessLogRecord")
-	if alr == nil {
-		p.logger.Error("AccessLogRecord not set on context", zap.Error(errors.New("failed-to-access-LogRecord")))
-		http.Error(responseWriter, "AccessLogRecord not set on context", http.StatusInternalServerError)
-		return
+	reqInfo, err := handlers.ContextRequestInfo(request)
+	if err != nil {
+		p.logger.Fatal("request-info-err", zap.Error(err))
 	}
-	accessLog := alr.(*schema.AccessLogRecord)
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, accessLog, p.logger)
+	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger)
 
-	rp := request.Context().Value("RoutePool")
-	if rp == nil {
-		p.logger.Error("RoutePool not set on context", zap.Error(errors.New("failed-to-access-RoutePool")))
-		http.Error(responseWriter, "RoutePool not set on context", http.StatusInternalServerError)
-		return
+	if reqInfo.RoutePool == nil {
+		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
-	routePool := rp.(*route.Pool)
 
 	stickyEndpointId := getStickySession(request)
 	iter := &wrappedIterator{
-		nested: routePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
+		nested: reqInfo.RoutePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
-				accessLog.RouteEndpoint = endpoint
+				reqInfo.RouteEndpoint = endpoint
 				p.reporter.CaptureRoutingRequest(endpoint)
 			}
 		},

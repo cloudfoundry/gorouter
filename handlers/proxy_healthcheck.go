@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"sync/atomic"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
 
@@ -30,11 +27,6 @@ func NewProxyHealthcheck(userAgent string, heartbeatOK *int32, logger logger.Log
 }
 
 func (h *proxyHealthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	alr := r.Context().Value("AccessLogRecord")
-	accessLogRecord, ok := alr.(*schema.AccessLogRecord)
-	if accessLogRecord == nil || !ok {
-		h.logger.Error("AccessLogRecord-not-set-on-context", zap.Error(errors.New("failed-to-access-log-record")))
-	}
 	// If reqeust is not intended for healthcheck
 	if r.Header.Get("User-Agent") != h.userAgent {
 		next(rw, r)
@@ -48,16 +40,10 @@ func (h *proxyHealthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	if draining {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		r.Close = true
-		if accessLogRecord != nil {
-			accessLogRecord.StatusCode = http.StatusServiceUnavailable
-		}
 		return
 	}
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("ok\n"))
 	r.Close = true
-	if accessLogRecord != nil {
-		accessLogRecord.StatusCode = http.StatusOK
-	}
 }
