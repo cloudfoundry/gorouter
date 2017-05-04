@@ -134,7 +134,7 @@ The format of the `router.register` message is as follows:
 
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
 
-`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes.
+`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec) for more information.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
