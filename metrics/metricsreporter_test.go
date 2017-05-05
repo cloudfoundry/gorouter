@@ -313,8 +313,8 @@ var _ = Describe("MetricsReporter", func() {
 			endpoint.Tags = map[string]string{}
 			metricReporter.CaptureRegistryMessage(endpoint)
 
-			Expect(sender.IncrementCounterCallCount()).To(Equal(1))
-			Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("registry_message"))
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message"))
 		})
 
 		It("sends number of nats messages received from each component", func() {
@@ -324,9 +324,9 @@ var _ = Describe("MetricsReporter", func() {
 			endpoint.Tags = map[string]string{"component": "route-emitter"}
 			metricReporter.CaptureRegistryMessage(endpoint)
 
-			Expect(sender.IncrementCounterCallCount()).To(Equal(2))
-			Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("registry_message.uaa"))
-			Expect(sender.IncrementCounterArgsForCall(1)).To(Equal("registry_message.route-emitter"))
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message.uaa"))
+			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("registry_message.route-emitter"))
 		})
 
 		It("sends the total routes", func() {

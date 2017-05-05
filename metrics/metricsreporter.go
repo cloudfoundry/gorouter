@@ -84,7 +84,7 @@ func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
 	} else {
 		componentName = "registry_message." + msg.Component()
 	}
-	m.sender.IncrementCounter(componentName)
+	m.batcher.BatchIncrementCounter(componentName)
 }
 
 func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
