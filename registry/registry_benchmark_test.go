@@ -38,23 +38,23 @@ func setupLogger() logger.Logger {
 	sink := &test_util.TestZapSink{
 		Buffer: gbytes.NewBuffer(),
 	}
-	testLogger := logger.NewLogger(
+	l := logger.NewLogger(
 		"test",
 		zap.InfoLevel,
 		zap.Output(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
 		zap.ErrorOutput(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
 	)
 	return &test_util.TestZapLogger{
-		Logger:      testLogger,
+		Logger:      l,
 		TestZapSink: sink,
 	}
 }
 func setupConfig() *config.Config {
-	configObj := config.DefaultConfig()
-	configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
-	configObj.DropletStaleThreshold = 24 * time.Millisecond
-	configObj.IsolationSegments = []string{"foo", "bar"}
-	return configObj
+	c := config.DefaultConfig()
+	c.PruneStaleDropletsInterval = 50 * time.Millisecond
+	c.DropletStaleThreshold = 24 * time.Millisecond
+	c.IsolationSegments = []string{"foo", "bar"}
+	return c
 }
 func BenchmarkRegisterWith100KRoutes(b *testing.B) {
 	r := registry.NewRouteRegistry(testLogger, configObj, reporter)
