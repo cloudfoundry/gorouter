@@ -15,6 +15,7 @@ type ProxyResponseWriter interface {
 	Done()
 	Flush()
 	Status() int
+	SetStatus(status int)
 	Size() int
 	CloseNotify() <-chan bool
 }
@@ -98,6 +99,12 @@ func (p *proxyResponseWriter) Flush() {
 
 func (p *proxyResponseWriter) Status() int {
 	return p.status
+}
+
+// SetStatus should be used when the ResponseWriter has been hijacked
+// so WriteHeader is not valid but still needs to save a status code
+func (p *proxyResponseWriter) SetStatus(status int) {
+	p.status = status
 }
 
 func (p *proxyResponseWriter) Size() int {

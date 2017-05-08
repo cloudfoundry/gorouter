@@ -272,11 +272,8 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("returns 502 when backend not available", func() {
-				ip, err := net.ResolveTCPAddr("tcp", "localhost:81")
-				Expect(err).To(BeNil())
-
 				// register route service, should NOT route to it
-				registerAddr(r, "my_host.com", routeServiceURL, ip, "instanceId", "1", "")
+				registerAddr(r, "my_host.com", routeServiceURL, "localhost:81", "instanceId", "1", "")
 
 				conn := dialProxy(proxyServer)
 

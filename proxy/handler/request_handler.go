@@ -83,16 +83,14 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	h.logger.Info("handling-websocket-request", zap.String("Upgrade", "websocket"))
 
-	// TODO: FIX IN #144420947, this was broken anyway
-	// h.logrecord.StatusCode = http.StatusSwitchingProtocols
-
 	err := h.serveWebSocket(iter)
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
-		h.writeStatus(http.StatusBadRequest, "WebSocket request to endpoint failed.")
+		h.writeStatus(http.StatusBadGateway, "WebSocket request to endpoint failed.")
 		h.reporter.CaptureWebSocketFailure()
 		return
 	}
+	h.response.SetStatus(http.StatusSwitchingProtocols)
 	h.reporter.CaptureWebSocketUpdate()
 }
 
