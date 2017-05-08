@@ -1572,8 +1572,9 @@ var _ = Describe("Proxy", func() {
 
 					conn.WriteRequest(req)
 
-					_, err := http.ReadResponse(conn.Reader, &http.Request{})
-					Expect(err).To(HaveOccurred())
+					res, err := http.ReadResponse(conn.Reader, &http.Request{})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
 					var payload []byte
 					Eventually(func() int {

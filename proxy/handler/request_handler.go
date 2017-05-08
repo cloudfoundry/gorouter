@@ -11,13 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -73,7 +72,8 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	// TODO: FIX IN #144420947, this was broken anyway
 	// h.logrecord.StatusCode = http.StatusSwitchingProtocols
 
-	err := h.serveTcp(iter)
+	onConnectionFailed := func(err error) { h.logger.Error("tcp-connection-failed", zap.Error(err)) }
+	err := h.serveTcp(iter, nil, onConnectionFailed)
 	if err != nil {
 		h.logger.Error("tcp-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadRequest, "TCP forwarding to endpoint failed.")
@@ -83,7 +83,18 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	h.logger.Info("handling-websocket-request", zap.String("Upgrade", "websocket"))
 
-	err := h.serveWebSocket(iter)
+	onConnectionSucceeded := func(connection net.Conn, endpoint *route.Endpoint) error {
+		h.setupRequest(endpoint)
+		err := h.request.Write(connection)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	onConnectionFailed := func(err error) { h.logger.Error("websocket-connection-failed", zap.Error(err)) }
+
+	err := h.serveTcp(iter, onConnectionSucceeded, onConnectionFailed)
+
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadGateway, "WebSocket request to endpoint failed.")
@@ -105,25 +116,31 @@ func (h *RequestHandler) writeStatus(code int, message string) {
 	}
 }
 
-func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
+type connSuccessCB func(net.Conn, *route.Endpoint) error
+type connFailureCB func(error)
+
+var nilConnSuccessCB = func(net.Conn, *route.Endpoint) error { return nil }
+var nilConnFailureCB = func(error) {}
+
+func (h *RequestHandler) serveTcp(
+	iter route.EndpointIterator,
+	onConnectionSucceeded connSuccessCB,
+	onConnectionFailed connFailureCB,
+) error {
 	var err error
 	var connection net.Conn
+	var endpoint *route.Endpoint
 
-	client, _, err := h.hijack()
-	if err != nil {
-		return err
+	if onConnectionSucceeded == nil {
+		onConnectionSucceeded = nilConnSuccessCB
 	}
-
-	defer func() {
-		client.Close()
-		if connection != nil {
-			connection.Close()
-		}
-	}()
+	if onConnectionFailed == nil {
+		onConnectionFailed = nilConnFailureCB
+	}
 
 	retry := 0
 	for {
-		endpoint := iter.Next()
+		endpoint = iter.Next()
 		if endpoint == nil {
 			err = NoEndpointsAvailable
 			h.HandleBadGateway(err, h.request)
@@ -136,69 +153,30 @@ func (h *RequestHandler) serveTcp(iter route.EndpointIterator) error {
 		}
 
 		iter.EndpointFailed()
-		h.logger.Error("tcp-connection-failed", zap.Error(err))
+		onConnectionFailed(err)
 
 		retry++
 		if retry == MaxRetries {
 			return err
 		}
 	}
-
-	if connection != nil {
-		forwardIO(client, connection)
+	if connection == nil {
+		return nil
 	}
+	defer connection.Close()
 
-	return nil
-}
-
-func (h *RequestHandler) serveWebSocket(iter route.EndpointIterator) error {
-	var err error
-	var connection net.Conn
+	err = onConnectionSucceeded(connection, endpoint)
+	if err != nil {
+		return err
+	}
 
 	client, _, err := h.hijack()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
-	defer func() {
-		client.Close()
-		if connection != nil {
-			connection.Close()
-		}
-	}()
-
-	retry := 0
-	for {
-		endpoint := iter.Next()
-		if endpoint == nil {
-			err = NoEndpointsAvailable
-			h.HandleBadGateway(err, h.request)
-			return err
-		}
-
-		connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), 5*time.Second)
-		if err == nil {
-			h.setupRequest(endpoint)
-			break
-		}
-
-		iter.EndpointFailed()
-		h.logger.Error("websocket-connection-failed", zap.Error(err))
-
-		retry++
-		if retry == MaxRetries {
-			return err
-		}
-	}
-
-	if connection != nil {
-		err = h.request.Write(connection)
-		if err != nil {
-			return err
-		}
-
-		forwardIO(client, connection)
-	}
+	forwardIO(client, connection)
 	return nil
 }
 
