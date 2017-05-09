@@ -1465,46 +1465,78 @@ var _ = Describe("Proxy", func() {
 		})
 
 		Context("when the request is a TCP Upgrade", func() {
-			It("Logs the response time", func() {
+			Context("when the connection to the backend succeeds", func() {
+				It("Logs the response time and status code 101", func() {
+					ln := registerHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
+						conn.WriteLine("hello")
+						conn.CheckLine("hello from client")
+						conn.WriteLine("hello from server")
+						conn.Close()
+					})
+					defer ln.Close()
 
-				ln := registerHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-					conn.WriteLine("hello")
-					conn.CheckLine("hello from client")
-					conn.WriteLine("hello from server")
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
+					req.Header.Set("Upgrade", "tcp")
+
+					req.Header.Set("Connection", "Upgrade")
+
+					conn.WriteRequest(req)
+
+					conn.CheckLine("hello")
+					conn.WriteLine("hello from client")
+					conn.CheckLine("hello from server")
+
+					var payload []byte
+					Eventually(func() int {
+						accessLogFile.Read(&payload)
+						return len(payload)
+					}).ShouldNot(BeZero())
+
+					Expect(string(payload)).To(ContainSubstring(`response_time:`))
+					Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 101"))
+					responseTime := parseResponseTimeFromLog(string(payload))
+					Expect(responseTime).To(BeNumerically(">", 0))
+
 					conn.Close()
 				})
-				defer ln.Close()
+			})
+			Context("when the connection to the backend fails", func() {
+				It("logs a 502 BadGateway", func() {
+					registerAddr(r, "tcp-handler", "", "192.0.2.1:1234", "", "2", "abc")
 
-				conn := dialProxy(proxyServer)
+					conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
-				req.Header.Set("Upgrade", "tcp")
+					req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
+					req.Header.Set("Upgrade", "tcp")
+					req.Header.Set("Connection", "Upgrade")
 
-				req.Header.Set("Connection", "Upgrade")
+					conn.WriteRequest(req)
 
-				conn.WriteRequest(req)
+					res, err := http.ReadResponse(conn.Reader, &http.Request{})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
-				conn.CheckLine("hello")
-				conn.WriteLine("hello from client")
-				conn.CheckLine("hello from server")
+					var payload []byte
+					Eventually(func() int {
+						accessLogFile.Read(&payload)
+						return len(payload)
+					}).ShouldNot(BeZero())
 
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
-				}).ShouldNot(BeZero())
+					Expect(string(payload)).To(ContainSubstring(`response_time:`))
+					Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 502"))
+					responseTime := parseResponseTimeFromLog(string(payload))
+					Expect(responseTime).To(BeNumerically(">", 0))
 
-				Expect(string(payload)).To(ContainSubstring(`response_time:`))
-				responseTime := parseResponseTimeFromLog(string(payload))
-				Expect(responseTime).To(BeNumerically(">", 0))
-
-				conn.Close()
+					conn.Close()
+				})
 			})
 		})
 
 		Context("when the request is a web connection", func() {
 			Context("when the connection to the backend succeeds", func() {
-				It("Logs the response time", func() {
+				It("Logs the response time and status code 101", func() {
 					done := make(chan bool)
 					ln := registerHandler(r, "ws", func(conn *test_util.HttpConn) {
 						req, err := http.ReadRequest(conn.Reader)
