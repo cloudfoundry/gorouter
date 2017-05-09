@@ -8,22 +8,30 @@ import (
 
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
+	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
 
 type accessLog struct {
 	accessLogger      access_log.AccessLogger
 	extraHeadersToLog []string
+	logger            logger.Logger
 }
 
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
-func NewAccessLog(accessLogger access_log.AccessLogger, extraHeadersToLog []string) negroni.Handler {
+func NewAccessLog(
+	accessLogger access_log.AccessLogger,
+	extraHeadersToLog []string,
+	logger logger.Logger,
+) negroni.Handler {
 	return &accessLog{
 		accessLogger:      accessLogger,
 		extraHeadersToLog: extraHeadersToLog,
+		logger:            logger,
 	}
 }
 
@@ -41,6 +49,12 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 
 	next(rw, r)
 
+	reqInfo, err := ContextRequestInfo(r)
+	if err != nil {
+		a.logger.Fatal("request-info-err", zap.Error(err))
+		return
+	}
+	alr.RouteEndpoint = reqInfo.RouteEndpoint
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
 	alr.FinishedAt = time.Now()

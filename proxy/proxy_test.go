@@ -1343,7 +1343,7 @@ var _ = Describe("Proxy", func() {
 
 	Context("Access log", func() {
 		It("Logs a request", func() {
-			ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
+			ln := registerHandlerWithAppId(r, "test", "", func(conn *test_util.HttpConn) {
 				req, body := conn.ReadRequest()
 				Expect(req.Method).To(Equal("POST"))
 				Expect(req.URL.Path).To(Equal("/"))
@@ -1357,7 +1357,7 @@ var _ = Describe("Proxy", func() {
 				out.WriteString("DEFG")
 				rsp.Body = ioutil.NopCloser(out)
 				conn.WriteResponse(rsp)
-			})
+			}, "123", "456")
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
@@ -1382,7 +1382,8 @@ var _ = Describe("Proxy", func() {
 			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
 			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
 			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring(`app_id:`))
+			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
+			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
 			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
 		})
 

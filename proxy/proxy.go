@@ -108,7 +108,7 @@ func NewProxy(
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewsetVcapRequestIdHeader(logger))
-	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog()))
+	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 
 	n.Use(handlers.NewProxyHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
