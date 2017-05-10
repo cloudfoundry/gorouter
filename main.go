@@ -72,7 +72,10 @@ func main() {
 		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
 	}
 
-	logger.Info("retrieved-isolation-segments", zap.Object("isolation_segments", c.IsolationSegments))
+	logger.Info("retrieved-isolation-segments",
+		zap.Object("isolation_segments", c.IsolationSegments),
+		zap.Object("routing_table_sharding_mode", c.RoutingTableShardingMode),
+	)
 
 	// setup number of procs
 	if c.GoMaxProcs != 0 {
