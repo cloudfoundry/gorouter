@@ -33,23 +33,6 @@ var _ = Describe("Reporter Handler", func() {
 		nextCalled bool
 	)
 
-	nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := ioutil.ReadAll(req.Body)
-		Expect(err).NotTo(HaveOccurred())
-
-		rw.WriteHeader(http.StatusTeapot)
-		rw.Write([]byte("I'm a little teapot, short and stout."))
-
-		reqInfo, err := handlers.ContextRequestInfo(req)
-		Expect(err).NotTo(HaveOccurred())
-		reqInfo.RouteEndpoint = route.NewEndpoint(
-			"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
-			models.ModificationTag{}, "")
-		reqInfo.StoppedAt = time.Now()
-
-		nextCalled = true
-	})
-
 	BeforeEach(func() {
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
@@ -58,6 +41,22 @@ var _ = Describe("Reporter Handler", func() {
 		fakeReporter = new(metrics_fakes.FakeCombinedReporter)
 		fakeLogger = new(logger_fakes.FakeLogger)
 
+		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			_, err := ioutil.ReadAll(req.Body)
+			Expect(err).NotTo(HaveOccurred())
+
+			rw.WriteHeader(http.StatusTeapot)
+			rw.Write([]byte("I'm a little teapot, short and stout."))
+
+			reqInfo, err := handlers.ContextRequestInfo(req)
+			Expect(err).NotTo(HaveOccurred())
+			reqInfo.RouteEndpoint = route.NewEndpoint(
+				"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
+				models.ModificationTag{}, "")
+			reqInfo.StoppedAt = time.Now()
+
+			nextCalled = true
+		})
 		nextCalled = false
 	})
 
