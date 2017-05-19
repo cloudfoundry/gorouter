@@ -1240,7 +1240,7 @@ var _ = Describe("Proxy", func() {
 		Expect(resp.TransferEncoding).To(Equal([]string{"chunked"}))
 
 		// Expect 3 individual reads to complete
-		b := make([]byte, 16)
+		b := make([]byte, 5)
 		for i := 0; i < 3; i++ {
 			n, err := resp.Body.Read(b[0:])
 			if err != nil {
