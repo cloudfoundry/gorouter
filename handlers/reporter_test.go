@@ -91,6 +91,38 @@ var _ = Describe("Reporter Handler", func() {
 		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 	})
 
+	Context("when reqInfo.StoppedAt is 0", func() {
+		BeforeEach(func() {
+			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				_, err := ioutil.ReadAll(req.Body)
+				Expect(err).NotTo(HaveOccurred())
+
+				rw.WriteHeader(http.StatusTeapot)
+				rw.Write([]byte("I'm a little teapot, short and stout."))
+
+				reqInfo, err := handlers.ContextRequestInfo(req)
+				Expect(err).NotTo(HaveOccurred())
+				reqInfo.RouteEndpoint = route.NewEndpoint(
+					"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
+					models.ModificationTag{}, "")
+
+				nextCalled = true
+			})
+		})
+		It("emits the routing response status code, but does not emit a latency metric", func() {
+			handler.ServeHTTP(resp, req)
+			Expect(fakeLogger.ErrorCallCount()).To(Equal(0))
+			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
+			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
+			capturedRespCode := fakeReporter.CaptureRoutingResponseArgsForCall(0)
+			Expect(capturedRespCode).To(Equal(http.StatusTeapot))
+
+			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
+
+			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		})
+	})
+
 	Context("when endpoint is nil", func() {
 		BeforeEach(func() {
 			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
