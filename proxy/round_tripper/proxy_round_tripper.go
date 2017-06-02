@@ -195,6 +195,7 @@ func (rt *roundTripper) backendRoundTrip(
 ) (*http.Response, error) {
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
+	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)
 	handler.SetRequestXCfInstanceId(request, endpoint)
 
 	// increment connection stats

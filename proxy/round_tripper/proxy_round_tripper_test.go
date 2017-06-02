@@ -95,7 +95,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
 			routerIP = "127.0.0.1"
 
-			endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
+			endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",
 				map[string]string{}, 0, "", models.ModificationTag{}, "")
 
 			added := routePool.Put(endpoint)
@@ -140,9 +140,16 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 		})
 
-		Context("VcapTraceHeader", func() {
+		Context("HTTP headers", func() {
 			BeforeEach(func() {
 				transport.RoundTripReturns(resp.Result(), nil)
+			})
+			It("Sends X-cf headers", func() {
+				_, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))
+				Expect(req.Header.Get("X-CF-InstanceID")).To(Equal("instanceId"))
+				Expect(req.Header.Get("X-CF-InstanceIndex")).To(Equal("1"))
 			})
 
 			Context("when VcapTraceHeader matches the trace key", func() {
