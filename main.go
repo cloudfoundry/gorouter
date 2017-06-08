@@ -44,9 +44,10 @@ import (
 	"github.com/tedsuo/ifrit/sigmon"
 )
 
-var configFile string
-
-var healthCheck int32
+var (
+	configFile  string
+	healthCheck int32
+)
 
 func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
@@ -91,11 +92,6 @@ func main() {
 	startMsgChan := make(chan struct{})
 	natsClient := connectToNatsServer(logger.Session("nats"), c, startMsgChan)
 
-	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
-	// 5 sec is dropsonde default batching interval
-	batcher := metricbatcher.New(sender, 5*time.Second)
-	metricsReporter := metrics.NewMetricsReporter(sender, batcher)
-
 	var routingAPIClient routing_api.Client
 
 	if c.RoutingApiEnabled() {
@@ -107,6 +103,8 @@ func main() {
 		}
 
 	}
+
+	metricsReporter := initializeMetrics()
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
@@ -158,6 +156,27 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+func initializeMetrics() *metrics.MetricsReporter {
+	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	// 5 sec is dropsonde default batching interval
+	batcher := metricbatcher.New(sender, 5*time.Second)
+	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
+		"rejected_requests",
+		"total_requests",
+		"responses",
+		"responses.2xx",
+		"responses.3xx",
+		"responses.4xx",
+		"responses.5xx",
+		"responses.xxx",
+		"routed_app_requests",
+		"websocket_failures",
+		"websocket_upgrades",
+	)
+
+	return metrics.NewMetricsReporter(sender, batcher)
 }
 
 func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
