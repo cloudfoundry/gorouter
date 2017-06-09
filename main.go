@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route_fetcher"
@@ -104,7 +105,9 @@ func main() {
 
 	}
 
-	metricsReporter := initializeMetrics()
+	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	metricsReporter := initializeMetrics(sender)
+	fdMonintor := initializeFDMonitor(sender, logger)
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
@@ -142,6 +145,7 @@ func main() {
 
 	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan)
 
+	members = append(members, grouper.Member{Name: "fdMonintor", Runner: fdMonintor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
 
@@ -158,8 +162,14 @@ func main() {
 	os.Exit(0)
 }
 
-func initializeMetrics() *metrics.MetricsReporter {
-	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+func initializeFDMonitor(sender *metric_sender.MetricSender, logger goRouterLogger.Logger) *monitor.FileDescriptor {
+	pid := os.Getpid()
+	path := fmt.Sprintf("/proc/%d/fd", pid)
+	ticker := time.NewTicker(time.Second * 5)
+	return monitor.NewFileDescriptor(path, ticker.C, sender, logger.Session("FileDescriptor"))
+}
+
+func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -175,7 +185,6 @@ func initializeMetrics() *metrics.MetricsReporter {
 		"websocket_failures",
 		"websocket_upgrades",
 	)
-
 	return metrics.NewMetricsReporter(sender, batcher)
 }
 
