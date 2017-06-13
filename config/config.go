@@ -250,6 +250,10 @@ func (c *Config) Process() {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
 		panic(errMsg)
 	}
+	if c.LoadBalancerHealthyThreshold < 0 {
+		errMsg := fmt.Sprintf("Invalid load balancer healthy threshold: %s", c.LoadBalancerHealthyThreshold)
+		panic(errMsg)
+	}
 
 	validShardMode := false
 	for _, sm := range AllowedShardingModes {

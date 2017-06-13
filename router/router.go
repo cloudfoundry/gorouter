@@ -148,28 +148,8 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	lbOKDelay := r.config.StartResponseDelayInterval - r.config.LoadBalancerHealthyThreshold
-
-	totalWaitDelay := r.config.LoadBalancerHealthyThreshold
-	if lbOKDelay > 0 {
-		totalWaitDelay = r.config.StartResponseDelayInterval
-	}
-
-	r.logger.Info("Waiting before listening",
-		zap.Float64("total_wait_delay_seconds", totalWaitDelay.Seconds()),
-		zap.Float64("route_registration_interval_seconds", r.config.StartResponseDelayInterval.Seconds()),
-		zap.Float64("load_balancer_healthy_threshold_seconds", r.config.LoadBalancerHealthyThreshold.Seconds()),
-	)
-	if lbOKDelay > 0 {
-		r.logger.Debug("Sleeping before enabled /health endpoint", zap.Float64("sleep_time_seconds", lbOKDelay.Seconds()))
-		time.Sleep(lbOKDelay)
-	}
-
-	atomic.StoreInt32(r.HeartbeatOK, 1)
-	r.logger.Debug("Gorouter reporting healthy")
-	time.Sleep(r.config.LoadBalancerHealthyThreshold)
-
-	r.logger.Info("completed-wait")
+	r.logger.Debug("Sleeping before enabled /health endpoint", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
+	time.Sleep(r.config.StartResponseDelayInterval)
 
 	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
 
@@ -189,6 +169,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
+	atomic.StoreInt32(r.HeartbeatOK, 1)
 	// create pid file
 	err = r.writePidFile(r.config.PidFile)
 	if err != nil {

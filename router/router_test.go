@@ -143,13 +143,12 @@ var _ = Describe("Router", func() {
 		}).Should(BeTrue())
 	})
 
-	Context("when LoadBalancerHealthyThreshold is greater than the start response delay", func() {
+	Context("when start response delay is set", func() {
 		BeforeEach(func() {
-			config.LoadBalancerHealthyThreshold = 2 * time.Second
+			config.StartResponseDelayInterval = 2 * time.Second
 		})
 		It("should log waiting delay value", func() {
-
-			Eventually(logger).Should(gbytes.Say("Waiting before listening"))
+			Eventually(logger).Should(gbytes.Say("Sleeping before enabled /health endpoint"))
 			verify_health(fmt.Sprintf("localhost:%d", statusPort))
 		})
 	})

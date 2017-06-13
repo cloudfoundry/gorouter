@@ -468,6 +468,28 @@ token_fetcher_retry_interval: 10s
 			Expect(config.SecureCookies).To(BeTrue())
 		})
 
+		Context("When LoadBalancerHealthyThreshold is provided", func() {
+			It("panics when an invalid duration string is given", func() {
+				var b = []byte("load_balancer_healthy_threshold: -5s")
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).To(Panic())
+			})
+
+			It("fails to initialize a non time string", func() {
+				var b = []byte("load_balancer_healthy_threshold: test")
+				err := config.Initialize(b)
+				Expect(err).To(HaveOccurred())
+			})
+
+			It("process the string into a valid duration", func() {
+				var b = []byte("load_balancer_healthy_threshold: 10s")
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
 		It("converts extra headers to log into a map", func() {
 			var b = []byte(`
 extra_headers_to_log:
