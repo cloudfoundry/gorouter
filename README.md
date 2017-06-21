@@ -364,9 +364,9 @@ Sample log message in gorouter.
 
 Access logs provide information for the following fields when recieving a request:
 
-`<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> <Extra Headers>`
-* Status Code, Response Time, Application ID, and Extra Headers are all optional fields
-* The absence of Status Code, Response Time or Application ID will result in a "-" in the corresponding field
+`<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> <Backend Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
+* Status Code, Response Time, Application ID, Application Index, and Extra Headers are all optional fields
+* The absence of Status Code, Response Time, Application ID, or Application Index will result in a "-" in the corresponding field
 
 Access logs are also redirected to syslog.
 
