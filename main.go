@@ -107,7 +107,7 @@ func main() {
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 	metricsReporter := initializeMetrics(sender)
-	fdMonintor := initializeFDMonitor(sender, logger)
+	fdMonitor := initializeFDMonitor(sender, logger)
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
@@ -145,7 +145,7 @@ func main() {
 
 	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan)
 
-	members = append(members, grouper.Member{Name: "fdMonintor", Runner: fdMonintor})
+	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
 
