@@ -19,19 +19,15 @@ import (
 
 var _ = Describe("FileDescriptor", func() {
 	var (
-		sender            *fakes.MetricSender
-		ch                chan time.Time
-		testTickerHarness monitor.Ticker
-		procPath          string
-		logger            logger.Logger
+		sender   *fakes.MetricSender
+		ch       chan time.Time
+		procPath string
+		logger   logger.Logger
 	)
 
 	BeforeEach(func() {
 		sender = new(fakes.MetricSender)
 		ch = make(chan time.Time)
-		testTickerHarness = func(d time.Duration) <-chan time.Time {
-			return ch
-		}
 		logger = test_util.NewTestZapLogger("test")
 	})
 
@@ -40,8 +36,8 @@ var _ = Describe("FileDescriptor", func() {
 	})
 
 	It("exists when os signal is received", func() {
-		fdMonintor := monitor.NewFileDescriptor(procPath, testTickerHarness(1), sender, logger)
-		process := ifrit.Invoke(fdMonintor)
+		fdMonitor := monitor.NewFileDescriptor(procPath, ch, sender, logger)
+		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
 		process.Signal(os.Interrupt)
@@ -53,14 +49,16 @@ var _ = Describe("FileDescriptor", func() {
 
 	It("monitors all the open file descriptors for a given pid", func() {
 		procPath = createTestPath("", 10)
-		fdMonintor := monitor.NewFileDescriptor(procPath, testTickerHarness(1), sender, logger)
-		process := ifrit.Invoke(fdMonintor)
+		fdMonitor := monitor.NewFileDescriptor(procPath, ch, sender, logger)
+		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
 		ch <- time.Time{}
 		ch <- time.Time{}
 
-		Expect(sender.SendValueCallCount()).To(Equal(1))
+		time.Sleep(1 * time.Millisecond)
+
+		Eventually(sender.SendValueCallCount()).Should(Equal(2))
 		name, value, unit := sender.SendValueArgsForCall(0)
 		Expect(name).To(Equal("file_descriptors"))
 		Expect(value).To(BeEquivalentTo(10))
@@ -71,7 +69,10 @@ var _ = Describe("FileDescriptor", func() {
 
 		ch <- time.Time{}
 		ch <- time.Time{}
-		Expect(sender.SendValueCallCount()).To(Equal(3))
+
+		time.Sleep(1 * time.Millisecond)
+
+		Eventually(sender.SendValueCallCount()).Should(Equal(4))
 		name, value, unit = sender.SendValueArgsForCall(2)
 		Expect(name).To(Equal("file_descriptors"))
 		Expect(value).To(BeEquivalentTo(20))

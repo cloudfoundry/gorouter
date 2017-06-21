@@ -10,8 +10,6 @@ import (
 	"github.com/uber-go/zap"
 )
 
-type Ticker func(d time.Duration) <-chan time.Time
-
 type FileDescriptor struct {
 	path     string
 	tickChan <-chan time.Time
@@ -36,6 +34,7 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 			fdInfo, err := ioutil.ReadDir(f.path)
 			if err != nil {
 				f.logger.Error("error-reading-filedescriptor-path", zap.Error(err))
+				break
 			}
 			f.sender.SendValue("file_descriptors", float64(symlinks(fdInfo)), "file")
 		case <-signals:
@@ -43,7 +42,6 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 			return nil
 		}
 	}
-	return nil
 }
 
 func symlinks(fileInfos []os.FileInfo) (count int) {
