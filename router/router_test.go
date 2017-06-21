@@ -30,7 +30,6 @@ import (
 	vvarz "code.cloudfoundry.org/gorouter/varz"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
-	gConfig "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
@@ -49,7 +48,6 @@ var _ = Describe("Router", func() {
 
 	var (
 		natsRunner *test_util.NATSRunner
-		natsPort   uint16
 		config     *cfg.Config
 
 		mbusClient *nats.Conn
@@ -58,48 +56,38 @@ var _ = Describe("Router", func() {
 		router     *Router
 		logger     logger.Logger
 		statusPort uint16
+		natsPort   uint16
 	)
 
 	BeforeEach(func() {
-		natsPort = test_util.NextAvailPort()
 		proxyPort := test_util.NextAvailPort()
 		statusPort = test_util.NextAvailPort()
-		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
-		Expect(err).ToNot(HaveOccurred())
-
+		natsPort = test_util.NextAvailPort()
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
-		config.SSLPort = 4443 + uint16(gConfig.GinkgoConfig.ParallelNode)
+		config.SSLPort = test_util.NextAvailPort()
+		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
+		Expect(err).ToNot(HaveOccurred())
 		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-	})
 
-	JustBeforeEach(func() {
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
-
-		// set pid file
-		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
-		Expect(err).ToNot(HaveOccurred())
-		config.PidFile = f.Name()
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
 		varz = vvarz.NewVarz(registry)
-		sender := new(fakeMetrics.MetricSender)
-		batcher := new(fakeMetrics.MetricBatcher)
-		metricReporter := metrics.NewMetricsReporter(sender, batcher)
-		combinedReporter := metrics.NewCompositeReporter(varz, metricReporter)
 
-		proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-			&routeservice.RouteServiceConfig{}, &tls.Config{}, nil)
+	})
 
-		var healthCheck int32
-		healthCheck = 0
-		logcounter := schema.NewLogCounter()
-		router, err = NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, nil)
+	JustBeforeEach(func() {
+		// set pid file
+		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
+		Expect(err).ToNot(HaveOccurred())
+		config.PidFile = f.Name()
 
+		router, err = initializeRouter(config, registry, varz, mbusClient, logger)
 		Expect(err).ToNot(HaveOccurred())
 
 		opts := &mbus.SubscriberOpts{
@@ -136,17 +124,55 @@ var _ = Describe("Router", func() {
 	})
 
 	It("creates a pidfile on startup", func() {
-
 		Eventually(func() bool {
 			_, err := os.Stat(config.PidFile)
 			return err == nil
 		}).Should(BeTrue())
 	})
 
-	Context("when start response delay is set", func() {
+	Context("when StartResponseDelayInterval is set", func() {
+		var (
+			rtr *Router
+			c   *cfg.Config
+			err error
+		)
+
 		BeforeEach(func() {
-			config.StartResponseDelayInterval = 2 * time.Second
+			natsPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+			statusPort := test_util.NextAvailPort()
+			c = test_util.SpecConfig(statusPort, proxyPort, natsPort)
+			c.StartResponseDelayInterval = 1 * time.Second
+
+			// Create a second router to test the health check in parallel to startup
+			rtr, err = initializeRouter(c, registry, varz, mbusClient, logger)
+			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("does not immediately make the health check endpoint available", func() {
+			healthCheckWithEndpointReceives := func() int {
+				url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
+				req, _ := http.NewRequest("GET", url, nil)
+
+				client := http.Client{}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				defer resp.Body.Close()
+				return resp.StatusCode
+			}
+			signals := make(chan os.Signal)
+			readyChan := make(chan struct{})
+			go rtr.Run(signals, readyChan)
+
+			Consistently(func() int {
+				return healthCheckWithEndpointReceives()
+			}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+			Eventually(func() int {
+				return healthCheckWithEndpointReceives()
+			}).Should(Equal(http.StatusOK))
+			signals <- syscall.SIGUSR1
+		})
+
 		It("should log waiting delay value", func() {
 			Eventually(logger).Should(gbytes.Say("Sleeping before enabled /health endpoint"))
 			verify_health(fmt.Sprintf("localhost:%d", statusPort))
@@ -864,6 +890,21 @@ var _ = Describe("Router", func() {
 
 	})
 })
+
+func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger) (*Router, error) {
+	sender := new(fakeMetrics.MetricSender)
+	batcher := new(fakeMetrics.MetricBatcher)
+	metricReporter := metrics.NewMetricsReporter(sender, batcher)
+	combinedReporter := metrics.NewCompositeReporter(varz, metricReporter)
+
+	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
+		&routeservice.RouteServiceConfig{}, &tls.Config{}, nil)
+
+	var healthCheck int32
+	healthCheck = 0
+	logcounter := schema.NewLogCounter()
+	return NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, nil)
+}
 
 func readVarz(v vvarz.Varz) map[string]interface{} {
 	varz_byte, err := v.MarshalJSON()
