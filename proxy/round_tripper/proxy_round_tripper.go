@@ -97,14 +97,16 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 	logger := rt.logger
 	for retry := 0; retry < handler.MaxRetries; retry++ {
+		logger = rt.logger
 
 		if reqInfo.RouteServiceURL == nil {
-			logger.Debug("backend", zap.Int("attempt", retry))
 			endpoint, err = rt.selectEndpoint(iter, request)
 			if err != nil {
 				break
 			}
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
+
+			logger.Debug("backend", zap.Int("attempt", retry))
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
 			if err == nil || !retryableError(err) {
 				break

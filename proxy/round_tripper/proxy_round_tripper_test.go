@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -291,9 +292,19 @@ var _ = Describe("ProxyRoundTripper", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(MatchError(dialError))
 
+				// Ensures each backend-endpoint-failed message only contains one
+				// route endpoint
+				logContents := string(logger.Contents())
+				reRegexp, err := regexp.Compile(`route-endpoint`)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reRegexp.FindAllString(logContents, -1)).To(HaveLen(8))
+
 				for i := 0; i < 3; i++ {
-					Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed.*dial`))
+					Expect(logger.Buffer()).To(gbytes.Say(`backend.*route-endpoint`))
+					Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed.*route-endpoint.*dial`))
 				}
+				Expect(logger.Buffer()).To(gbytes.Say(`status.*route-endpoint`))
+				Expect(logger.Buffer()).To(gbytes.Say(`endpoint-failed.*route-endpoint.*dial`))
 			})
 		})
 
