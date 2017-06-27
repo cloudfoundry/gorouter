@@ -95,7 +95,7 @@ func NewProxy(
 		TLSClientConfig:     tlsConfig,
 	}
 
-	rproxy := &ReverseProxy{
+	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
 		Transport:      p.proxyRoundTripper(httpTransport, c.Port),
 		FlushInterval:  50 * time.Millisecond,
