@@ -137,19 +137,17 @@ var _ = Describe("Router", func() {
 			err error
 		)
 
-		BeforeEach(func() {
+		It("does not immediately make the health check endpoint available", func() {
 			natsPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
-			statusPort := test_util.NextAvailPort()
+			statusPort = test_util.NextAvailPort()
 			c = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 			c.StartResponseDelayInterval = 1 * time.Second
 
 			// Create a second router to test the health check in parallel to startup
 			rtr, err = initializeRouter(c, registry, varz, mbusClient, logger)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("does not immediately make the health check endpoint available", func() {
+			Expect(err).ToNot(HaveOccurred())
 			healthCheckWithEndpointReceives := func() int {
 				url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
 				req, _ := http.NewRequest("GET", url, nil)
