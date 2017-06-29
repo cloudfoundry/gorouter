@@ -1,14 +1,19 @@
 package test_util
 
 import (
-	"path/filepath"
-	"runtime"
-
-	"code.cloudfoundry.org/gorouter/config"
-
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"math/big"
 	"time"
 
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/config"
 )
 
 func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
@@ -20,12 +25,13 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *
 
 	c.EnableSSL = true
 
-	_, filename, _, _ := runtime.Caller(0)
-	testPath, err := filepath.Abs(filepath.Join(filename, "..", "..", "test", "assets"))
-	Expect(err).NotTo(HaveOccurred())
+	key, cert := CreateKeyPair("potato.com")
+	secondKey, secondCert := CreateKeyPair("potato2.com")
 
-	c.SSLKeyPath = filepath.Join(testPath, "certs", "server.key")
-	c.SSLCertPath = filepath.Join(testPath, "certs", "server.pem")
+	c.TLSPEM = []string{
+		fmt.Sprintf("%s\n%s", string(key), string(cert)),
+		fmt.Sprintf("%s\n%s", string(secondKey), string(secondCert)),
+	}
 	c.SSLPort = SSLPort
 	c.CipherString = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
 
@@ -86,4 +92,46 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 	}
 
 	return c
+}
+
+func CreateKeyPair(cname string) (keyPEM, certPEM []byte) {
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.SHA256WithRSA,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+	}
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).ToNot(HaveOccurred())
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+
+	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
+	certPEM = pem.EncodeToMemory(&b)
+	keyPEM = pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	})
+
+	return
+}
+
+func CreateCert(cname string) tls.Certificate {
+	privKeyPEM, certPEM := CreateKeyPair(cname)
+	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
+	Expect(err).ToNot(HaveOccurred())
+	return tlsCert
 }

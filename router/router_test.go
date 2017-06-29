@@ -3,10 +3,16 @@ package router_test
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -66,9 +72,8 @@ var _ = Describe("Router", func() {
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = test_util.NextAvailPort()
-		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
-		Expect(err).ToNot(HaveOccurred())
-		config.SSLCertificate = cert
+		cert := test_util.CreateCert("default")
+		config.SSLCertificates = []tls.Certificate{cert}
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
@@ -814,6 +819,10 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("serving https", func() {
+		BeforeEach(func() {
+			config.SSLCertificates = append(config.SSLCertificates, createCert("test.vcap.me"))
+		})
+
 		It("serves ssl traffic", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.Listen()
@@ -886,8 +895,162 @@ var _ = Describe("Router", func() {
 			resp.Body.Close()
 		})
 
+		Context("when a supported server name is provided", func() {
+			It("return 200 Ok status", func() {
+				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+				req, _ := http.NewRequest("GET", uri, nil)
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+						ServerName:         "test.vcap.me",
+					},
+				}
+				client := http.Client{Transport: tr}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				bytes, err := ioutil.ReadAll(resp.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(bytes)).To(ContainSubstring("Hello"))
+				resp.Body.Close()
+			})
+
+			It("retrieves the correct certificate for the client", func() {
+				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				tlsConfig := &tls.Config{
+					InsecureSkipVerify: true,
+					ServerName:         "test.vcap.me",
+				}
+				conn, err := tls.Dial("tcp", uri, tlsConfig)
+				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close()
+				cstate := conn.ConnectionState()
+				certs := cstate.PeerCertificates
+				Expect(len(certs)).To(Equal(1))
+				Expect(certs[0].Subject.CommonName).To(Equal("test.vcap.me"))
+
+			})
+		})
+		Context("when server name does not match anything", func() {
+			It("returns the default certificate", func() {
+				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				tlsConfig := &tls.Config{
+					InsecureSkipVerify: true,
+					ServerName:         "not-here.com",
+				}
+				conn, err := tls.Dial("tcp", uri, tlsConfig)
+				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close()
+				cstate := conn.ConnectionState()
+				certs := cstate.PeerCertificates
+				Expect(len(certs)).To(Equal(1))
+				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+			})
+		})
+
+		Context("when no server name header is provided", func() {
+			It("uses a cert that matches the hostname", func() {
+				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				tlsConfig := &tls.Config{
+					InsecureSkipVerify: true,
+				}
+				conn, err := tls.Dial("tcp", uri, tlsConfig)
+				Expect(err).ToNot(HaveOccurred())
+				cstate := conn.ConnectionState()
+				certs := cstate.PeerCertificates
+				Expect(len(certs)).To(Equal(1))
+				Expect(certs[0].Subject.CommonName).To(Equal("test.vcap.me"))
+			})
+
+			It("uses the default cert when hostname does not match any cert", func() {
+				app := test.NewGreetApp([]route.Uri{"notexist.vcap.me"}, config.Port, mbusClient, nil)
+
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("notexist.vcap.me:%d", config.SSLPort)
+				tlsConfig := &tls.Config{
+					InsecureSkipVerify: true,
+				}
+				conn, err := tls.Dial("tcp", uri, tlsConfig)
+				Expect(err).ToNot(HaveOccurred())
+				cstate := conn.ConnectionState()
+				certs := cstate.PeerCertificates
+				Expect(len(certs)).To(Equal(1))
+				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+			})
+		})
 	})
 })
+
+func createCert(cname string) tls.Certificate {
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.SHA256WithRSA,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+	}
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).ToNot(HaveOccurred())
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+
+	//PEM encoded cert (standard TLS encoding)
+	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
+	certPEM := pem.EncodeToMemory(&b)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
+	Expect(err).ToNot(HaveOccurred())
+	return tlsCert
+}
 
 func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/tls"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 
@@ -106,9 +107,8 @@ type Config struct {
 	EnablePROXY              bool          `yaml:"enable_proxy"`
 	EnableSSL                bool          `yaml:"enable_ssl"`
 	SSLPort                  uint16        `yaml:"ssl_port"`
-	SSLCertPath              string        `yaml:"ssl_cert_path"`
-	SSLKeyPath               string        `yaml:"ssl_key_path"`
-	SSLCertificate           tls.Certificate
+	SSLCertificates          []tls.Certificate
+	TLSPEM                   []string `yaml:"tls_pem"`
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
 	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https"`
 	IsolationSegments        []string `yaml:"isolation_segments"`
@@ -226,12 +226,21 @@ func (c *Config) Process() {
 	}
 
 	if c.EnableSSL {
-		c.CipherSuites = c.processCipherSuites()
-		cert, err := tls.LoadX509KeyPair(c.SSLCertPath, c.SSLKeyPath)
-		if err != nil {
-			panic(err)
+		if len(c.TLSPEM) == 0 {
+			panic("router.tls_pem must be provided if router.enable_ssl is set to true")
 		}
-		c.SSLCertificate = cert
+
+		for _, v := range c.TLSPEM {
+			certPEM, keyPEM := parsePEMBlocks(v)
+
+			certificate, err := tls.X509KeyPair(certPEM, keyPEM)
+			if err != nil {
+				errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+				panic(errMsg)
+			}
+			c.SSLCertificates = append(c.SSLCertificates, certificate)
+		}
+		c.CipherSuites = c.processCipherSuites()
 	}
 
 	if c.RouteServiceSecret != "" {
@@ -319,6 +328,34 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 	}
 
 	return ciphers
+}
+
+func parsePEMBlocks(pemBlocks string) (certPEMBlock, keyPEMBlock []byte) {
+	var certPEM, keyPEM []byte
+
+	block1, rest := pem.Decode([]byte(pemBlocks))
+	block2, tail := pem.Decode(rest)
+	if len(tail) > 0 {
+		panic(fmt.Sprintf("error parsing router.tls_pem, found more than two PEM blocks %s", string(tail)))
+	}
+
+	if strings.Contains(strings.ToLower(block1.Type), "private key") {
+		keyPEM = pem.EncodeToMemory(block1)
+	} else if strings.Contains(strings.ToLower(block1.Type), "certificate") {
+		certPEM = pem.EncodeToMemory(block1)
+	} else {
+		panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
+	}
+
+	if strings.Contains(strings.ToLower(block2.Type), "private key") {
+		keyPEM = pem.EncodeToMemory(block2)
+	} else if strings.Contains(strings.ToLower(block2.Type), "certificate") {
+		certPEM = pem.EncodeToMemory(block2)
+	} else {
+		panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
+	}
+
+	return certPEM, keyPEM
 }
 
 func (c *Config) NatsServers() []string {

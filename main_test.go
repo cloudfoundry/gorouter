@@ -5,7 +5,6 @@ import (
 	"errors"
 	"path"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -242,11 +241,13 @@ var _ = Describe("Router Integration", func() {
 		})
 		Context("when no cipher suite is supported by both client and server", func() {
 			BeforeEach(func() {
-				_, filename, _, _ := runtime.Caller(0)
-				testPath, err := filepath.Abs(filepath.Join(filename, "..", "test", "assets"))
-				Expect(err).NotTo(HaveOccurred())
-				config.SSLKeyPath = filepath.Join(testPath, "ecdsa_certs", "eckey.pem")
-				config.SSLCertPath = filepath.Join(testPath, "ecdsa_certs", "cert.pem")
+				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")
+				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
+
+				tlsPem1 := fmt.Sprintf("%s%s", string(certPEM1), string(keyPEM1))
+				tlsPem2 := fmt.Sprintf("%s%s", string(certPEM2), string(keyPEM2))
+
+				config.TLSPEM = []string{tlsPem1, tlsPem2}
 				config.CipherString = "TLS_RSA_WITH_RC4_128_SHA"
 			})
 
