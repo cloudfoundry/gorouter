@@ -2,8 +2,12 @@ package config_test
 
 import (
 	"crypto/tls"
+	"fmt"
+
+	yaml "gopkg.in/yaml.v2"
 
 	. "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -646,39 +650,68 @@ routing_api:
 		})
 
 		Context("When EnableSSL is set to true", func() {
+			var (
+				expectedTLSPEMs         []string
+				expectedSSLCertificates []tls.Certificate
+				tlsPEM1YML              []byte
+				tlsPEM2YML              []byte
+			)
+			BeforeEach(func() {
+				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")
+				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
-			Context("When it is given valid values for a certificate", func() {
-				var b = []byte(`
+				tlsPem1 := fmt.Sprintf("%s%s", string(certPEM1), string(keyPEM1))
+				tlsPem2 := fmt.Sprintf("%s%s", string(certPEM2), string(keyPEM2))
+
+				cert1, err := tls.X509KeyPair(certPEM1, keyPEM1)
+				Expect(err).ToNot(HaveOccurred())
+				cert2, err := tls.X509KeyPair(certPEM2, keyPEM2)
+				Expect(err).ToNot(HaveOccurred())
+
+				expectedTLSPEMs = []string{
+					tlsPem1,
+					tlsPem2,
+				}
+
+				tlsPEM1Array := []string{tlsPem1}
+				tlsPEM2Array := []string{tlsPem2}
+				tlsPEM1YML, err = yaml.Marshal(&tlsPEM1Array)
+				Expect(err).ToNot(HaveOccurred())
+				tlsPEM2YML, err = yaml.Marshal(&tlsPEM2Array)
+				Expect(err).ToNot(HaveOccurred())
+
+				expectedSSLCertificates = []tls.Certificate{cert1, cert2}
+			})
+
+			Context("When it is given a valid tls_pem value", func() {
+
+				It("populates the TLSPEM field and generates the SSLCertificates", func() {
+					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/certs/server.pem
-ssl_key_path: ../test/assets/certs/server.key
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-`)
-
-				It("returns a valid certificate", func() {
-					expectedCertificate, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
-					Expect(err).ToNot(HaveOccurred())
-
-					err = config.Initialize(b)
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
 
 					config.Process()
-					Expect(config.SSLCertificate).To(Equal(expectedCertificate))
+					Expect(config.TLSPEM).To(ConsistOf(expectedTLSPEMs))
+
+					Expect(config.SSLCertificates).To(ConsistOf(expectedSSLCertificates))
 				})
 
 			})
 
-			Context("When it is given invalid values for a certificate", func() {
+			Context("When TLSPEM is not provided ", func() {
 				var b = []byte(`
 enable_ssl: true
-ssl_cert: ../notathing
-ssl_key: ../alsonotathing
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 
-				It("fails to create the certificate and panics", func() {
+				It("fails to validate", func() {
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -687,14 +720,14 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 			})
 
 			Context("When it is given valid cipher suites", func() {
-				var b = []byte(`
-enable_ssl: true
-ssl_cert_path: ../test/assets/certs/server.pem
-ssl_key_path: ../test/assets/certs/server.key
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-`)
-
 				It("Construct the proper array of cipher suites", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+
 					expectedSuites := []uint16{
 						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -710,12 +743,12 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_
 			})
 
 			Context("When it is given invalid cipher suites", func() {
-				var b = []byte(`
+				var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/certs/server.pem
-ssl_key_path: ../test/assets/certs/server.key
+tls_pem:
+%s
 cipher_suites: potato
-`)
+`, tlsPEM1YML))
 
 				It("panics", func() {
 					err := config.Initialize(b)
@@ -726,12 +759,12 @@ cipher_suites: potato
 			})
 
 			Context("When it is given an unsupported cipher suite", func() {
-				var b = []byte(`
+				var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/certs/server.pem
-ssl_key_path: ../test/assets/certs/server.key
+tls_pem:
+%s
 cipher_suites: TLS_RSA_WITH_RC4_1280_SHA
-`)
+`, tlsPEM1YML))
 
 				It("panics", func() {
 					err := config.Initialize(b)
@@ -741,20 +774,19 @@ cipher_suites: TLS_RSA_WITH_RC4_1280_SHA
 				})
 			})
 
-		})
-
-		Context("When given no cipher suites", func() {
-			var b = []byte(`
+			Context("When given no cipher suites", func() {
+				var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-ssl_cert_path: ../test/assets/certs/server.pem
-ssl_key_path: ../test/assets/certs/server.key
-`)
+tls_pem:
+%s
+`, tlsPEM1YML))
 
-			It("panics", func() {
-				err := config.Initialize(b)
-				Expect(err).ToNot(HaveOccurred())
+				It("panics", func() {
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
-				Expect(config.Process).To(Panic())
+					Expect(config.Process).To(Panic())
+				})
 			})
 		})
 
