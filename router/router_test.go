@@ -172,7 +172,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("should log waiting delay value", func() {
-			Eventually(logger).Should(gbytes.Say("Sleeping before enabled /health endpoint"))
+			Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
 			verify_health(fmt.Sprintf("localhost:%d", statusPort))
 		})
 	})

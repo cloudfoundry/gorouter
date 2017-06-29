@@ -148,7 +148,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	r.logger.Debug("Sleeping before enabled /health endpoint", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
+	r.logger.Debug("Sleeping before returning success on /health endpoint to preload routing table", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
 	time.Sleep(r.config.StartResponseDelayInterval)
 
 	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
