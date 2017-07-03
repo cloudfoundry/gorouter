@@ -819,18 +819,10 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("serving https", func() {
-		var (
-			rootCAsPool *x509.CertPool
-		)
 		BeforeEach(func() {
-			serverRootCA, serverRootKey, err := createRootCA("serverRootCA")
-			Expect(err).ToNot(HaveOccurred())
-			cert, err := createServerCert("test.vcap.me", serverRootCA, serverRootKey)
+			cert, err := createSelfSignedCert("test.vcap.me")
 			Expect(err).ToNot(HaveOccurred())
 			config.SSLCertificates = append(config.SSLCertificates, *cert)
-			rootCAsPool, err = x509.SystemCertPool()
-			Expect(err).ToNot(HaveOccurred())
-			rootCAsPool.AddCert(serverRootCA)
 		})
 
 		It("serves ssl traffic", func() {
@@ -843,7 +835,7 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{RootCAs: rootCAsPool},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
 
 			client := http.Client{Transport: tr}
@@ -871,8 +863,8 @@ var _ = Describe("Router", func() {
 			req, _ := http.NewRequest("GET", uri, nil)
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{
-					RootCAs:      rootCAsPool,
-					CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA},
+					InsecureSkipVerify: true,
+					CipherSuites:       []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA},
 				},
 			}
 			client := http.Client{Transport: tr}
@@ -890,7 +882,7 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{RootCAs: rootCAsPool},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
 			client := http.Client{Transport: tr}
 
@@ -917,8 +909,8 @@ var _ = Describe("Router", func() {
 				req, _ := http.NewRequest("GET", uri, nil)
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{
-						RootCAs:    rootCAsPool,
-						ServerName: "test.vcap.me",
+						InsecureSkipVerify: true,
+						ServerName:         "test.vcap.me",
 					},
 				}
 				client := http.Client{Transport: tr}
@@ -943,8 +935,8 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
 				tlsConfig := &tls.Config{
-					RootCAs:    rootCAsPool,
-					ServerName: "test.vcap.me",
+					InsecureSkipVerify: true,
+					ServerName:         "test.vcap.me",
 				}
 				conn, err := tls.Dial("tcp", uri, tlsConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -967,8 +959,8 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
 				tlsConfig := &tls.Config{
-					RootCAs:    rootCAsPool,
-					ServerName: "not-here.com",
+					InsecureSkipVerify: true,
+					ServerName:         "not-here.com",
 				}
 				conn, err := tls.Dial("tcp", uri, tlsConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -991,7 +983,7 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
 				tlsConfig := &tls.Config{
-					RootCAs: rootCAsPool,
+					InsecureSkipVerify: true,
 				}
 				conn, err := tls.Dial("tcp", uri, tlsConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -1011,7 +1003,7 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("notexist.vcap.me:%d", config.SSLPort)
 				tlsConfig := &tls.Config{
-					RootCAs: rootCAsPool,
+					InsecureSkipVerify: true,
 				}
 				conn, err := tls.Dial("tcp", uri, tlsConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -1037,7 +1029,7 @@ var _ = Describe("Router", func() {
 				}
 			})
 
-			FIt("fails the connection if the certificate is invalid", func() {
+			It("fails the connection if the certificate is invalid", func() {
 				badRootCert, badRootKey, err := createRootCA("badRootCA")
 				Expect(err).ToNot(HaveOccurred())
 				clientCert, err := createClientCert("invalidClientSSL", badRootCert, badRootKey)
@@ -1051,12 +1043,9 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
-				rootCAs, err := x509.SystemCertPool()
-				Expect(err).ToNot(HaveOccurred())
-				rootCAs.AddCert(rootCert)
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{
-						RootCAs: rootCAsPool,
+						InsecureSkipVerify: true,
 						Certificates: []tls.Certificate{
 							*clientCert,
 						},
@@ -1066,7 +1055,6 @@ var _ = Describe("Router", func() {
 				client := http.Client{Transport: tr}
 
 				resp, err := client.Do(req)
-				fmt.Println(err)
 				Expect(err).To(HaveOccurred())
 				Expect(resp).To(BeNil())
 			})
@@ -1085,7 +1073,7 @@ var _ = Describe("Router", func() {
 				req, _ := http.NewRequest("GET", uri, nil)
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{
-						RootCAs: rootCAsPool,
+						InsecureSkipVerify: true,
 						Certificates: []tls.Certificate{
 							*clientCert,
 						},
@@ -1109,7 +1097,7 @@ var _ = Describe("Router", func() {
 	})
 })
 
-func createServerCert(cname string, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
+func createSelfSignedCert(cname string) (*tls.Certificate, error) {
 	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
@@ -1118,14 +1106,11 @@ func createServerCert(cname string, rootCert *x509.Certificate, rootKey *rsa.Pri
 	if err != nil {
 		return nil, err
 	}
+	serverCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
+	serverCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+	serverCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
 
-	parentCert := rootCert
-	signerKey := rootKey
-	if rootCert == nil {
-		parentCert = serverCertTmpl
-		signerKey = serverKey
-	}
-	_, serverCertPEM, err := createCert(serverCertTmpl, parentCert, &serverKey.PublicKey, signerKey)
+	_, serverCertPEM, err := createCert(serverCertTmpl, serverCertTmpl, &serverKey.PublicKey, serverKey)
 	if err != nil {
 		return nil, err
 	}
