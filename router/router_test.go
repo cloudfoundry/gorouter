@@ -820,9 +820,7 @@ var _ = Describe("Router", func() {
 
 	Context("serving https", func() {
 		BeforeEach(func() {
-			cert, err := createSelfSignedCert("test.vcap.me")
-			Expect(err).ToNot(HaveOccurred())
-			config.SSLCertificates = append(config.SSLCertificates, *cert)
+			config.SSLCertificates = append(config.SSLCertificates, createCert("test.vcap.me"))
 		})
 
 		It("serves ssl traffic", func() {
@@ -1013,197 +1011,14 @@ var _ = Describe("Router", func() {
 				Expect(certs[0].Subject.CommonName).To(Equal("default"))
 			})
 		})
-
-		Context("when a client provides a certificate", func() {
-			var (
-				rootCert *x509.Certificate
-				rootKey  *rsa.PrivateKey
-			)
-
-			BeforeEach(func() {
-				var err error
-				rootCert, rootKey, err = createRootCA("rootCA")
-				Expect(err).ToNot(HaveOccurred())
-				config.MTLSRootCAs = []*x509.Certificate{
-					rootCert,
-				}
-			})
-
-			It("fails the connection if the certificate is invalid", func() {
-				badRootCert, badRootKey, err := createRootCA("badRootCA")
-				Expect(err).ToNot(HaveOccurred())
-				clientCert, err := createClientCert("invalidClientSSL", badRootCert, badRootKey)
-				Expect(err).ToNot(HaveOccurred())
-
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
-				req, _ := http.NewRequest("GET", uri, nil)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-						Certificates: []tls.Certificate{
-							*clientCert,
-						},
-					},
-				}
-
-				client := http.Client{Transport: tr}
-
-				resp, err := client.Do(req)
-				Expect(err).To(HaveOccurred())
-				Expect(resp).To(BeNil())
-			})
-
-			It("successfully serves SSL traffic if the certificate is valid", func() {
-				clientCert, err := createClientCert("clientSSL", rootCert, rootKey)
-				Expect(err).ToNot(HaveOccurred())
-
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
-				Eventually(func() bool {
-					return appRegistered(registry, app)
-				}).Should(BeTrue())
-
-				uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
-				req, _ := http.NewRequest("GET", uri, nil)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-						Certificates: []tls.Certificate{
-							*clientCert,
-						},
-					},
-				}
-
-				client := http.Client{Transport: tr}
-
-				resp, err := client.Do(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(resp).ToNot(BeNil())
-
-				Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-				bytes, err := ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(bytes).To(ContainSubstring("Hello"))
-				defer resp.Body.Close()
-			})
-		})
 	})
 })
 
-func createSelfSignedCert(cname string) (*tls.Certificate, error) {
-	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-	serverCertTmpl, err := certTemplate(cname)
-	if err != nil {
-		return nil, err
-	}
-	serverCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
-	serverCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-	serverCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
-
-	_, serverCertPEM, err := createCert(serverCertTmpl, serverCertTmpl, &serverKey.PublicKey, serverKey)
-	if err != nil {
-		return nil, err
-	}
-	// provide the private key and the cert
-	serverKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(serverKey),
-	})
-	serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	return &serverCert, nil
-}
-
-func createClientCert(cname string, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
-	// generate a key pair for the client
-	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-	clientCertTmpl, err := certTemplate(cname)
-	if err != nil {
-		return nil, err
-	}
-	clientCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
-	clientCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-	clientCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
-
-	// create a certificate which wraps the server's public key, sign it with the root private key
-	// pretending rootCert belongs to CA
-	_, clientCertPEM, err := createCert(clientCertTmpl, rootCert, &clientKey.PublicKey, rootKey)
-	if err != nil {
-		return nil, err
-	}
-	// provide the private key and the cert
-	clientKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(clientKey),
-	})
-	clientCert, err := tls.X509KeyPair(clientCertPEM, clientKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	return &clientCert, nil
-
-}
-
-func createRootCA(cname string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	rootCertTmpl, err := certTemplate(cname)
-	if err != nil {
-		return nil, nil, err
-	}
-	rootCertTmpl.IsCA = true
-	rootCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
-	rootCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
-	rootCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
-
-	rootCert, _, err := createCert(rootCertTmpl, rootCertTmpl, &rootKey.PublicKey, rootKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	return rootCert, rootKey, err
-}
-
-func createCert(template, parent *x509.Certificate, pub, parentPriv interface{}) (cert *x509.Certificate, certPEM []byte, err error) {
-	certDER, err := x509.CreateCertificate(rand.Reader, template, parent, pub, parentPriv)
-	if err != nil {
-		return
-	}
-	cert, err = x509.ParseCertificate(certDER)
-	if err != nil {
-		return
-	}
-	//PEM encoded cert (standard TLS encoding)
-	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
-	certPEM = pem.EncodeToMemory(&b)
-	return
-}
-
-// helper func to crate cert template with a serial number and other fields
-func certTemplate(cname string) (*x509.Certificate, error) {
+func createCert(cname string) tls.Certificate {
 	// generate a random serial number (a real cert authority would have some logic behind this)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	if err != nil {
-		return nil, err
-	}
+	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
 	if cname != "" {
@@ -1218,7 +1033,23 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
 	}
-	return &tmpl, nil
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).ToNot(HaveOccurred())
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+
+	//PEM encoded cert (standard TLS encoding)
+	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
+	certPEM := pem.EncodeToMemory(&b)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
+	Expect(err).ToNot(HaveOccurred())
+	return tlsCert
 }
 
 func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger) (*Router, error) {
