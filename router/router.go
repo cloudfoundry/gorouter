@@ -238,14 +238,11 @@ func (r *Router) DrainAndStop() {
 
 func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 	if r.config.EnableSSL {
-
 		tlsConfig := &tls.Config{
-			Certificates: r.config.SSLCertificates,
+			Certificates: []tls.Certificate{r.config.SSLCertificate},
 			CipherSuites: r.config.CipherSuites,
 			MinVersion:   tls.VersionTLS12,
 		}
-
-		tlsConfig.BuildNameToCertificate()
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 		if err != nil {

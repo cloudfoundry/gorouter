@@ -198,13 +198,13 @@ var _ = Describe("Router", func() {
 
 		sslPort := test_util.NextAvailPort()
 
-		defaultCert := test_util.CreateCert("default")
-		cert2 := test_util.CreateCert("default")
+		cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
+		Expect(err).ToNot(HaveOccurred())
 
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = sslPort
-		config.SSLCertificates = []tls.Certificate{defaultCert, cert2}
+		config.SSLCertificate = cert
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 		config.EndpointTimeout = 5 * time.Second
 
@@ -223,7 +223,6 @@ var _ = Describe("Router", func() {
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
 
 		errChan := make(chan error, 2)
-		var err error
 		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
 		Expect(err).ToNot(HaveOccurred())
 
