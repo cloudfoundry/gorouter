@@ -14,19 +14,10 @@ The following instructions may help you get started with gorouter.
 - Go should be installed and in the PATH
 - GOPATH should be set as described in http://golang.org/doc/code.html
 - [gnatsd](https://github.com/nats-io/gnatsd) installed and in the PATH
-- Install [direnv](http://direnv.net/)
 
 ### Setup
 
-GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
-
-```bash
-git clone https://github.com/cloudfoundry-incubator/routing-release
-cd routing-release
-./scripts/update
-cd src/code.cloudfoundry.org/gorouter
-```
- *Note: direnv will automatically set your GOPATH when you cd into the routing-release directory. You will need to run `direnv allow` the first time.*
+GoRouter dependencies are managed with [routing-release](https://github.com/cloudfoundry-incubator/routing-release#). Do not clone this repo; instead, follow instructions at https://github.com/cloudfoundry-incubator/routing-release#get-the-code.
 
 ### Running Tests
 
