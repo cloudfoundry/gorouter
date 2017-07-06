@@ -18,7 +18,7 @@ The following instructions may help you get started with gorouter.
 
 ### Setup
 
-GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/routing-release).
+GoRouter dependencies are managed with [routing-release](https://github.com/cloudfoundry-incubator/routing-release#). Do not clone the gorouter repo directly; instead, follow instructions at https://github.com/cloudfoundry-incubator/routing-release#get-the-code (summarized below).
 
 ```bash
 git clone https://github.com/cloudfoundry-incubator/routing-release
