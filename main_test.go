@@ -239,6 +239,7 @@ var _ = Describe("Router Integration", func() {
 				return err
 			}
 		})
+
 		Context("when no cipher suite is supported by both client and server", func() {
 			BeforeEach(func() {
 				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")

@@ -232,6 +232,9 @@ func (c *Config) Process() {
 
 		for _, v := range c.TLSPEM {
 			certPEM, keyPEM := parsePEMBlocks(v)
+			if len(certPEM) == 0 || len(keyPEM) == 0 {
+				panic(fmt.Sprintf("Error parsing PEM blocks of router.tls_pem: %s", v))
+			}
 
 			certificate, err := tls.X509KeyPair(certPEM, keyPEM)
 			if err != nil {
@@ -332,30 +335,47 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 
 func parsePEMBlocks(pemBlocks string) (certPEMBlock, keyPEMBlock []byte) {
 	var certPEM, keyPEM []byte
+	var blocks []*pem.Block
 
 	block1, rest := pem.Decode([]byte(pemBlocks))
-	block2, tail := pem.Decode(rest)
-	if len(tail) > 0 {
-		panic(fmt.Sprintf("error parsing router.tls_pem, found more than two PEM blocks %s", string(tail)))
+	blocks = append(blocks, block1)
+
+	block2, rest2 := pem.Decode(rest)
+	blocks = append(blocks, block2)
+
+	if len(rest2) > 0 {
+		block3, rest3 := pem.Decode(rest2)
+		blocks = append(blocks, block3)
+		if len(rest3) > 0 {
+			panic(fmt.Sprintf("error parsing router.tls_pem, found more than three PEM blocks:\n%s", pemBlocks))
+		}
 	}
 
-	if strings.Contains(strings.ToLower(block1.Type), "private key") {
-		keyPEM = pem.EncodeToMemory(block1)
-	} else if strings.Contains(strings.ToLower(block1.Type), "certificate") {
-		certPEM = pem.EncodeToMemory(block1)
-	} else {
-		panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
-	}
-
-	if strings.Contains(strings.ToLower(block2.Type), "private key") {
-		keyPEM = pem.EncodeToMemory(block2)
-	} else if strings.Contains(strings.ToLower(block2.Type), "certificate") {
-		certPEM = pem.EncodeToMemory(block2)
-	} else {
-		panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
+	for _, block := range blocks {
+		if isECParameters(block) {
+			continue
+		} else if isPrivateKey(block) {
+			keyPEM = pem.EncodeToMemory(block)
+		} else if isCertificate(block) {
+			certPEM = pem.EncodeToMemory(block)
+		} else {
+			panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
+		}
 	}
 
 	return certPEM, keyPEM
+}
+
+func isECParameters(block *pem.Block) bool {
+	return strings.Contains(block.Type, "PARAMETERS")
+}
+
+func isPrivateKey(block *pem.Block) bool {
+	return strings.Contains(block.Type, "PRIVATE KEY")
+}
+
+func isCertificate(block *pem.Block) bool {
+	return strings.Contains(block.Type, "CERTIFICATE")
 }
 
 func (c *Config) NatsServers() []string {

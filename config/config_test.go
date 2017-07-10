@@ -684,7 +684,6 @@ routing_api:
 			})
 
 			Context("When it is given a valid tls_pem value", func() {
-
 				It("populates the TLSPEM field and generates the SSLCertificates", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
@@ -702,17 +701,71 @@ tls_pem:
 
 					Expect(config.SSLCertificates).To(ConsistOf(expectedSSLCertificates))
 				})
-
 			})
 
-			Context("When TLSPEM is not provided ", func() {
-				var b = []byte(`
+			Context("PEM with ECDSA cipher algorithm", func() {
+				var tlsPEMYML []byte
+
+				BeforeEach(func() {
+					keyPEM, certPEM := test_util.CreateECKeyPair("parsnip.com")
+					tlsPEM := fmt.Sprintf("%s%s", string(keyPEM), string(certPEM))
+					cert, err := tls.X509KeyPair(certPEM, keyPEM)
+					Expect(err).ToNot(HaveOccurred())
+
+					expectedTLSPEMs = []string{
+						tlsPEM,
+					}
+
+					tlsPEMArray := []string{tlsPEM}
+					tlsPEMYML, err = yaml.Marshal(&tlsPEMArray)
+					Expect(err).ToNot(HaveOccurred())
+
+					expectedSSLCertificates = []tls.Certificate{cert}
+				})
+
+				It("supports ECDSA PEM block", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s
+`, tlsPEMYML))
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.EnableSSL).To(Equal(true))
+
+					config.Process()
+					Expect(config.TLSPEM).To(ConsistOf(expectedTLSPEMs))
+
+					Expect(config.SSLCertificates).To(ConsistOf(expectedSSLCertificates))
+				})
+			})
+
+			Context("When TLSPEM is invalid", func() {
+				It("fails to validate if TLSPEM is missing", func() {
+					var b = []byte(`
 enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
-
-				It("fails to validate", func() {
 					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.Process).To(Panic())
+				})
+
+				It("fails to validate if TLSPEM does not contain both key and cert", func() {
+					keyPEM, _ := test_util.CreateECKeyPair("parsnip.com")
+					tlsPEMArray := []string{string(keyPEM)}
+					partialTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
+					Expect(err).ToNot(HaveOccurred())
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s
+`, partialTLSPEMYML))
+					err = config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process).To(Panic())

@@ -1,11 +1,14 @@
 package test_util
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -129,8 +132,58 @@ func CreateKeyPair(cname string) (keyPEM, certPEM []byte) {
 	return
 }
 
+func CreateECKeyPair(cname string) (keyPEM, certPEM []byte) {
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.ECDSAWithSHA256,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+	}
+
+	elliptic := elliptic.P256()
+	privKey, err := ecdsa.GenerateKey(elliptic, rand.Reader)
+	Expect(err).ToNot(HaveOccurred())
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+
+	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
+	certPEM = pem.EncodeToMemory(&b)
+	privBytes, err := x509.MarshalECPrivateKey(privKey)
+	Expect(err).ToNot(HaveOccurred())
+
+	keyPEM = pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: privBytes,
+	})
+	// the values for oid came from https://golang.org/src/crypto/x509/x509.go?s=54495:54612#L290
+	ecdsaOid, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2})
+	paramPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PARAMETERS", Bytes: ecdsaOid})
+	keyPEM = []byte(fmt.Sprintf("%s%s", paramPEM, keyPEM))
+	return
+}
+
 func CreateCert(cname string) tls.Certificate {
 	privKeyPEM, certPEM := CreateKeyPair(cname)
+	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
+	Expect(err).ToNot(HaveOccurred())
+	return tlsCert
+}
+
+func CreateECCert(cname string) tls.Certificate {
+	privKeyPEM, certPEM := CreateECKeyPair(cname)
 	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
 	Expect(err).ToNot(HaveOccurred())
 	return tlsCert
