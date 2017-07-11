@@ -154,8 +154,9 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	handler := gorouterHandler{handler: dropsonde.InstrumentedHandler(r.proxy), logger: r.logger}
 
 	server := &http.Server{
-		Handler:   &handler,
-		ConnState: r.HandleConnState,
+		Handler:     &handler,
+		ConnState:   r.HandleConnState,
+		IdleTimeout: 5 * time.Second,
 	}
 
 	err := r.serveHTTP(server, r.errChan)
