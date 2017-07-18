@@ -1030,9 +1030,10 @@ var _ = Describe("Router", func() {
 			})
 
 			It("fails the connection if the certificate is invalid", func() {
-				badRootCert, badRootKey, err := createRootCA("badRootCA")
+				//client presents expired certificate signed by server-trusted CA
+				badCertTemplate, err := badCertTemplate("invalidClientSSL")
 				Expect(err).ToNot(HaveOccurred())
-				clientCert, err := createClientCert("invalidClientSSL", badRootCert, badRootKey)
+				clientCert, err := createClientCert(badCertTemplate, rootCert, rootKey)
 				Expect(err).ToNot(HaveOccurred())
 
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
@@ -1053,14 +1054,15 @@ var _ = Describe("Router", func() {
 				}
 
 				client := http.Client{Transport: tr}
-
 				resp, err := client.Do(req)
 				Expect(err).To(HaveOccurred())
 				Expect(resp).To(BeNil())
 			})
 
 			It("successfully serves SSL traffic if the certificate is valid", func() {
-				clientCert, err := createClientCert("clientSSL", rootCert, rootKey)
+				clientCertTemplate, err := certTemplate("clientSSL")
+				Expect(err).ToNot(HaveOccurred())
+				clientCert, err := createClientCert(clientCertTemplate, rootCert, rootKey)
 				Expect(err).ToNot(HaveOccurred())
 
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
@@ -1126,16 +1128,13 @@ func createSelfSignedCert(cname string) (*tls.Certificate, error) {
 	return &serverCert, nil
 }
 
-func createClientCert(cname string, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
+func createClientCert(clientCertTmpl *x509.Certificate, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
 	// generate a key pair for the client
 	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
-	clientCertTmpl, err := certTemplate(cname)
-	if err != nil {
-		return nil, err
-	}
+
 	clientCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
 	clientCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 	clientCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
@@ -1217,6 +1216,28 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
+	}
+	return &tmpl, nil
+}
+
+func badCertTemplate(cname string) (*x509.Certificate, error) {
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:       serialNumber,
+		Subject:            subject,
+		SignatureAlgorithm: x509.SHA256WithRSA,
+		NotBefore:          time.Now(),
+		NotAfter:           time.Now(), //cert will be expired when server verifies it
 	}
 	return &tmpl, nil
 }
