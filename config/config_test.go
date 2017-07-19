@@ -955,6 +955,28 @@ tls_pem:
 			})
 		})
 
+		Context("When given a forwarded_client_cert value that is supported", func() {
+			It("correctly sets the value", func() {
+				var b = []byte(`forwarded_client_cert: sanitize_set`)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.ForwardedClientCert).To(Equal("sanitize_set"))
+
+			})
+		})
+
+		Context("When given a forwarded_client_cert value that is not supported ", func() {
+			var b = []byte(`forwarded_client_cert: foo`)
+
+			It("panics", func() {
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process).To(Panic())
+			})
+		})
+
 		Describe("Timeout", func() {
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`

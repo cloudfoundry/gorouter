@@ -20,6 +20,7 @@ import (
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
@@ -100,6 +101,64 @@ var _ = Describe("Proxy", func() {
 		x.WriteRequest(req)
 		resp, _ := x.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(200))
+	})
+
+	It("does not sanitize xfcc header when ForwardedClientCert is set to default [always_forward]", func() {
+		var expectedReq *http.Request
+		ln := registerHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+			var err error
+			expectedReq, err = http.ReadRequest(conn.Reader)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp := test_util.NewResponse(http.StatusOK)
+			conn.WriteResponse(resp)
+			conn.WriteLine("hello from server")
+			conn.Close()
+		})
+		defer ln.Close()
+
+		req := test_util.NewRequest("GET", "xfcc", "/", nil)
+		req.Host = "xfcc"
+		req.Header.Add("X-Forwarded-Client-Cert", "foo")
+		req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+		conn := dialProxy(proxyServer)
+		conn.WriteRequest(req)
+		conn.ReadResponse()
+
+		Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(ConsistOf("foo", "bar"))
+	})
+
+	Context("when ForwardedClientCert is set to sanitize_set", func() {
+		BeforeEach(func() {
+			conf.ForwardedClientCert = config.SANITIZE_SET
+		})
+
+		It("removes xfcc header in sanitize_set mode", func() {
+			var expectedReq *http.Request
+			ln := registerHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+				var err error
+				expectedReq, err = http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.WriteLine("hello from server")
+				conn.Close()
+			})
+			defer ln.Close()
+
+			req := test_util.NewRequest("GET", "xfcc", "/", nil)
+			req.Host = "xfcc"
+			req.Header.Add("X-Forwarded-Client-Cert", "foo")
+			req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+			conn := dialProxy(proxyServer)
+			conn.WriteRequest(req)
+			conn.ReadResponse()
+
+			Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
+		})
 	})
 
 	It("Content-type is not set by proxy", func() {

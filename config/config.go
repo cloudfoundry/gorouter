@@ -16,14 +16,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const LOAD_BALANCE_RR string = "round-robin"
-const LOAD_BALANCE_LC string = "least-connection"
-const SHARD_ALL string = "all"
-const SHARD_SEGMENTS string = "segments"
-const SHARD_SHARED_AND_SEGMENTS string = "shared-and-segments"
+const (
+	LOAD_BALANCE_RR           string = "round-robin"
+	LOAD_BALANCE_LC           string = "least-connection"
+	SHARD_ALL                 string = "all"
+	SHARD_SEGMENTS            string = "segments"
+	SHARD_SHARED_AND_SEGMENTS string = "shared-and-segments"
+	ALWAYS_FORWARD            string = "always_forward"
+	SANITIZE_SET              string = "sanitize_set"
+)
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
+var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, SANITIZE_SET}
 
 type StatusConfig struct {
 	Host string `yaml:"host"`
@@ -112,6 +117,7 @@ type Config struct {
 	TLSPEM                   []string `yaml:"tls_pem"`
 	MTLSRootCAs              []*x509.Certificate
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
+	ForwardedClientCert      string   `yaml:"forwarded_client_cert"`
 	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https"`
 	IsolationSegments        []string `yaml:"isolation_segments"`
 	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode"`
@@ -188,6 +194,7 @@ var defaultConfig = Config{
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,
 
+	ForwardedClientCert:      "always_forward",
 	RoutingTableShardingMode: "all",
 
 	DisableKeepAlives:   true,
@@ -280,6 +287,18 @@ func (c *Config) Process() {
 	}
 	if c.LoadBalancerHealthyThreshold < 0 {
 		errMsg := fmt.Sprintf("Invalid load balancer healthy threshold: %s", c.LoadBalancerHealthyThreshold)
+		panic(errMsg)
+	}
+
+	validForwardedClientCertMode := false
+	for _, fm := range AllowedForwardedClientCertModes {
+		if c.ForwardedClientCert == fm {
+			validForwardedClientCertMode = true
+			break
+		}
+	}
+	if !validForwardedClientCertMode {
+		errMsg := fmt.Sprintf("Invalid forwarded client cert mode: %s. Allowed values are %s", c.ForwardedClientCert, AllowedForwardedClientCertModes)
 		panic(errMsg)
 	}
 
