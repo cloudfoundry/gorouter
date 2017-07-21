@@ -128,7 +128,7 @@ var _ = Describe("Route Service Config", func() {
 			h := make(http.Header, 0)
 			headers = &h
 			var err error
-			requestUrl = "some-forwarded-url"
+			requestUrl = "http://some-forwarded-url.com"
 			signature = &header.Signature{
 				RequestedTime: time.Now(),
 				ForwardedUrl:  requestUrl,
@@ -136,7 +136,7 @@ var _ = Describe("Route Service Config", func() {
 			signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
 
-			headers.Set(routeservice.RouteServiceForwardedURL, "some-forwarded-url")
+			headers.Set(routeservice.RouteServiceForwardedURL, requestUrl)
 		})
 
 		JustBeforeEach(func() {
@@ -153,7 +153,7 @@ var _ = Describe("Route Service Config", func() {
 			BeforeEach(func() {
 				signature = &header.Signature{
 					RequestedTime: time.Now().Add(-10 * time.Hour),
-					ForwardedUrl:  "some-forwarded-url",
+					ForwardedUrl:  requestUrl,
 				}
 				var err error
 				signatureHeader, metadataHeader, err = header.BuildSignatureAndMetadata(crypto, signature)
@@ -191,6 +191,17 @@ var _ = Describe("Route Service Config", func() {
 			})
 		})
 
+		Context("when the path and query are different, but the host is the same", func() {
+			BeforeEach(func() {
+				requestUrl = requestUrl + "/foo?bar=baz"
+			})
+
+			It("marks the signature as valid", func() {
+				err := config.ValidateSignature(headers, requestUrl)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
 		Context("when there is a url encoded character in the request", func() {
 			encodedCharacters := make(map[string]string)
 			encodedCharacters["%2C"] = ","
@@ -198,7 +209,7 @@ var _ = Describe("Route Service Config", func() {
 			encodedCharacters["%41"] = "A"
 
 			for encoded, decoded := range encodedCharacters {
-				forwardedUrl := fmt.Sprintf("some-forwarded-url?fields=foo%sbar", decoded)
+				forwardedUrl := fmt.Sprintf("http://some-forwarded-url.com?fields=foo%sbar", decoded)
 				url := fmt.Sprintf("?fields=foo%sbar", encoded)
 
 				Context("with character "+decoded, func() {

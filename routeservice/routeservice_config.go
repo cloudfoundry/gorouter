@@ -147,23 +147,37 @@ func (rs *RouteServiceConfig) validateSignatureTimeout(signature header.Signatur
 	return nil
 }
 
-func (rs *RouteServiceConfig) validateForwardedURL(signature header.Signature, requestUrl string) error {
+func (rs *RouteServiceConfig) validateForwardedURL(signature header.Signature, requestUrlString string) error {
 	var err error
-	forwardedUrl := signature.ForwardedUrl
-	requestUrl, err = url.QueryUnescape(requestUrl)
+	forwardedUrl, requestUrl, err := parseURLs(signature.ForwardedUrl, requestUrlString)
 	if err != nil {
 		rsErr := fmt.Errorf("%s: %s", RouteServiceForwardedURLMismatch, err)
 		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(rsErr))
 		return err
 	}
 
-	if requestUrl != forwardedUrl {
+	if requestUrl.Host != forwardedUrl.Host {
 		var err = RouteServiceForwardedURLMismatch
 		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(err),
-			zap.String("request-url", requestUrl),
-			zap.String("forwarded-url", forwardedUrl),
+			zap.String("request-url", requestUrl.String()),
+			zap.String("forwarded-url", forwardedUrl.String()),
 		)
 		return err
 	}
 	return nil
+}
+
+func parseURLs(forwardUrlString, requestUrlString string) (forwardUrl, requestUrl *url.URL, err error) {
+	var terr error
+	forwardUrl, terr = url.Parse(forwardUrlString)
+	if terr != nil {
+		err = terr
+	}
+
+	requestUrl, terr = url.Parse(requestUrlString)
+	if terr != nil {
+		err = terr
+	}
+
+	return forwardUrl, requestUrl, err
 }
