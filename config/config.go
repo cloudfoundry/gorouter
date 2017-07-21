@@ -116,8 +116,10 @@ type Config struct {
 	IsolationSegments        []string `yaml:"isolation_segments"`
 	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode"`
 
-	CipherString string `yaml:"cipher_suites"`
-	CipherSuites []uint16
+	CipherString        string `yaml:"cipher_suites"`
+	CipherSuites        []uint16
+	MinTLSVersionString string `yaml:"min_tls_version"`
+	MinTLSVersion       uint16
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold"`
 	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval"`
@@ -163,12 +165,13 @@ var defaultConfig = Config{
 	Nats:    []NatsConfig{defaultNatsConfig},
 	Logging: defaultLoggingConfig,
 
-	Port:        8081,
-	Index:       0,
-	GoMaxProcs:  -1,
-	EnablePROXY: false,
-	EnableSSL:   false,
-	SSLPort:     443,
+	Port:          8081,
+	Index:         0,
+	GoMaxProcs:    -1,
+	EnablePROXY:   false,
+	EnableSSL:     false,
+	SSLPort:       443,
+	MinTLSVersion: tls.VersionTLS12,
 
 	EndpointTimeout:     60 * time.Second,
 	RouteServiceTimeout: 60 * time.Second,
@@ -228,6 +231,17 @@ func (c *Config) Process() {
 	}
 
 	if c.EnableSSL {
+		switch c.MinTLSVersionString {
+		case "TLSv1.0":
+			c.MinTLSVersion = tls.VersionTLS10
+		case "TLSv1.1":
+			c.MinTLSVersion = tls.VersionTLS11
+		case "TLSv1.2", "":
+			c.MinTLSVersion = tls.VersionTLS12
+		default:
+			panic(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
+		}
+
 		if len(c.TLSPEM) == 0 {
 			panic("router.tls_pem must be provided if router.enable_ssl is set to true")
 		}

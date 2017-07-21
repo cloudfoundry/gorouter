@@ -681,6 +681,51 @@ routing_api:
 				Expect(err).ToNot(HaveOccurred())
 
 				expectedSSLCertificates = []tls.Certificate{cert1, cert2}
+
+			})
+
+			Context("when valid value for min_tls_version is set", func() {
+				It("populates MinTLSVersion", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+min_tls_version: TLSv1.1
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+					err := config.Initialize(b)
+					Expect(err).NotTo(HaveOccurred())
+					config.Process()
+					Expect(config.MinTLSVersion).To(Equal(uint16(tls.VersionTLS11)))
+				})
+			})
+			Context("when invalid value for min_tls_version is set", func() {
+				It("errors", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+min_tls_version: fake-tls
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+					err := config.Initialize(b)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process).To(Panic())
+				})
+			})
+			Context("when min_tls_version is not set", func() {
+				It("sets the default to TLSv1.2", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+					err := config.Initialize(b)
+					Expect(err).NotTo(HaveOccurred())
+					config.Process()
+					Expect(config.MinTLSVersion).To(Equal(uint16(tls.VersionTLS12)))
+				})
 			})
 
 			Context("When it is given a valid tls_pem value", func() {
@@ -750,7 +795,6 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 `)
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
-
 					Expect(config.Process).To(Panic())
 				})
 

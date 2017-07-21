@@ -260,7 +260,7 @@ var _ = Describe("Router Integration", func() {
 			})
 		})
 
-		It("supports minimum TLS 1.2", func() {
+		It("supports minimum TLS 1.2 by default", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 
 			dialTls := func(version uint16) error {
