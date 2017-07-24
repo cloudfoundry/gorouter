@@ -955,14 +955,39 @@ tls_pem:
 			})
 		})
 
-		Context("When given a forwarded_client_cert value that is supported", func() {
+		Context("defaults forwarded_client_cert value to always_forward", func() {
 			It("correctly sets the value", func() {
-				var b = []byte(`forwarded_client_cert: sanitize_set`)
-				err := config.Initialize(b)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(config.ForwardedClientCert).To(Equal("always_forward"))
+			})
+		})
 
-				Expect(config.ForwardedClientCert).To(Equal("sanitize_set"))
+		Context("When given a forwarded_client_cert value that is supported", func() {
+			Context("when forwarded_client_cert is always_forward", func() {
+				It("correctly sets the value", func() {
+					var b = []byte(`forwarded_client_cert: always_forward`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
 
+					Expect(config.ForwardedClientCert).To(Equal("always_forward"))
+				})
+			})
+			Context("when forwarded_client_cert is forward", func() {
+				It("correctly sets the value", func() {
+					var b = []byte(`forwarded_client_cert: forward`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.ForwardedClientCert).To(Equal("forward"))
+				})
+			})
+			Context("when forwarded_client_cert is sanitize_set", func() {
+				It("correctly sets the value", func() {
+					var b = []byte(`forwarded_client_cert: sanitize_set`)
+					err := config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.ForwardedClientCert).To(Equal("sanitize_set"))
+				})
 			})
 		})
 

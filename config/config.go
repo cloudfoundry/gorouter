@@ -24,11 +24,12 @@ const (
 	SHARD_SHARED_AND_SEGMENTS string = "shared-and-segments"
 	ALWAYS_FORWARD            string = "always_forward"
 	SANITIZE_SET              string = "sanitize_set"
+	FORWARD                   string = "forward"
 )
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
-var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, SANITIZE_SET}
+var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
 
 type StatusConfig struct {
 	Host string `yaml:"host"`

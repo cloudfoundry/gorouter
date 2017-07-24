@@ -6,21 +6,35 @@ import (
 	"net/http"
 	"strings"
 
+	"code.cloudfoundry.org/gorouter/config"
+
 	"github.com/urfave/negroni"
 )
 
 const xfcc = "X-Forwarded-Client-Cert"
 
-type clientCert struct{}
+type clientCert struct {
+	forwardingMode string
+}
 
-func NewClientCert() negroni.Handler {
-	return &clientCert{}
+func NewClientCert(forwardingMode string) negroni.Handler {
+	return &clientCert{
+		forwardingMode: forwardingMode,
+	}
 }
 
 func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	r.Header.Del(xfcc)
-	if r.TLS != nil {
-		sanitizeHeader(r)
+	if c.forwardingMode == config.FORWARD {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			r.Header.Del(xfcc)
+		}
+	}
+
+	if c.forwardingMode == config.SANITIZE_SET {
+		r.Header.Del(xfcc)
+		if r.TLS != nil {
+			sanitizeHeader(r)
+		}
 	}
 	next(rw, r)
 }

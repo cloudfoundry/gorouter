@@ -161,6 +161,38 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
+	Context("when ForwardedClientCert is set to forward", func() {
+		BeforeEach(func() {
+			conf.ForwardedClientCert = config.FORWARD
+		})
+
+		It("removes xfcc header in forward mode when not mTLS", func() {
+			var expectedReq *http.Request
+			ln := registerHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+				var err error
+				expectedReq, err = http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.WriteLine("hello from server")
+				conn.Close()
+			})
+			defer ln.Close()
+
+			req := test_util.NewRequest("GET", "xfcc", "/", nil)
+			req.Host = "xfcc"
+			req.Header.Add("X-Forwarded-Client-Cert", "foo")
+			req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+			conn := dialProxy(proxyServer)
+			conn.WriteRequest(req)
+			conn.ReadResponse()
+
+			Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
+		})
+	})
+
 	It("Content-type is not set by proxy", func() {
 		ln := registerHandler(r, "content-test", func(x *test_util.HttpConn) {
 			_, err := http.ReadRequest(x.Reader)

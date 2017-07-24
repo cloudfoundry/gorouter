@@ -108,8 +108,8 @@ func NewProxy(
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewsetVcapRequestIdHeader(logger))
-	if c.ForwardedClientCert == config.SANITIZE_SET {
-		n.Use(handlers.NewClientCert())
+	if c.ForwardedClientCert != config.ALWAYS_FORWARD {
+		n.Use(handlers.NewClientCert(c.ForwardedClientCert))
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
