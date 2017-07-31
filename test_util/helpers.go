@@ -99,8 +99,8 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 }
 
 type CertChain struct {
-	CertDER, CACertDER []byte
-	PrivKey, CAPrivKey *rsa.PrivateKey
+	CertPEM, CACertPEM       []byte
+	PrivKeyPEM, CAPrivKeyPEM []byte
 }
 
 func CreateSignedCertWithRootCA(cname string) CertChain {
@@ -131,11 +131,14 @@ func CreateSignedCertWithRootCA(cname string) CertChain {
 	Expect(err).NotTo(HaveOccurred())
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)
+	Expect(err).NotTo(HaveOccurred())
+	ownKeyPEM, ownCertPEM := CreateKeyPairFromDER(certDER, ownKey)
+	rootKeyPEM, rootCertPEM := CreateKeyPairFromDER(rootCADER, rootPrivateKey)
 	return CertChain{
-		CertDER:   certDER,
-		PrivKey:   ownKey,
-		CACertDER: rootCADER,
-		CAPrivKey: rootPrivateKey,
+		CertPEM:      ownCertPEM,
+		PrivKeyPEM:   ownKeyPEM,
+		CACertPEM:    rootCertPEM,
+		CAPrivKeyPEM: rootKeyPEM,
 	}
 }
 
@@ -166,6 +169,37 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	Expect(err).ToNot(HaveOccurred())
 	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+	return privKey, certDER
+}
+
+func CreateSignedCertDER(cname string, parentCert x509.Certificate, parentKey *rsa.PrivateKey) (*rsa.PrivateKey, []byte) {
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.SHA256WithRSA,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:                  false,
+	}
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).ToNot(HaveOccurred())
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &parentCert, &privKey.PublicKey, parentKey)
 	Expect(err).ToNot(HaveOccurred())
 	return privKey, certDER
 }

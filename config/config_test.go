@@ -673,33 +673,42 @@ routing_api:
 				expectedSSLCertificates []tls.Certificate
 				tlsPEM1YML              []byte
 				tlsPEM2YML              []byte
+				tlsPEM3YML              []byte
+				keyPEM1, certPEM1       []byte
 			)
 			BeforeEach(func() {
-				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")
+				certChain := test_util.CreateSignedCertWithRootCA("spinach.com")
+				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
 				tlsPem1 := fmt.Sprintf("%s%s", string(certPEM1), string(keyPEM1))
-				tlsPem2 := fmt.Sprintf("%s%s", string(certPEM2), string(keyPEM2))
+				tlsPem2 := fmt.Sprintf("%s%s", string(keyPEM2), string(certPEM2))
+				tlsPem3 := fmt.Sprintf("%s%s%s", string(certChain.PrivKeyPEM), string(certChain.CertPEM), string(certChain.CACertPEM))
 
 				cert1, err := tls.X509KeyPair(certPEM1, keyPEM1)
 				Expect(err).ToNot(HaveOccurred())
 				cert2, err := tls.X509KeyPair(certPEM2, keyPEM2)
 				Expect(err).ToNot(HaveOccurred())
+				cert3, err := tls.X509KeyPair(append(certChain.CertPEM, certChain.CACertPEM...), certChain.PrivKeyPEM)
+				Expect(err).ToNot(HaveOccurred())
 
 				expectedTLSPEMs = []string{
 					tlsPem1,
 					tlsPem2,
+					tlsPem3,
 				}
 
 				tlsPEM1Array := []string{tlsPem1}
 				tlsPEM2Array := []string{tlsPem2}
+				tlsPEM3Array := []string{tlsPem3}
 				tlsPEM1YML, err = yaml.Marshal(&tlsPEM1Array)
 				Expect(err).ToNot(HaveOccurred())
 				tlsPEM2YML, err = yaml.Marshal(&tlsPEM2Array)
 				Expect(err).ToNot(HaveOccurred())
+				tlsPEM3YML, err = yaml.Marshal(&tlsPEM3Array)
+				Expect(err).ToNot(HaveOccurred())
 
-				expectedSSLCertificates = []tls.Certificate{cert1, cert2}
-
+				expectedSSLCertificates = []tls.Certificate{cert1, cert2, cert3}
 			})
 
 			Context("when valid value for min_tls_version is set", func() {
@@ -752,8 +761,8 @@ tls_pem:
 enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s%s%s
+`, tlsPEM1YML, tlsPEM2YML, tlsPEM3YML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -827,6 +836,27 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
 %s
 `, partialTLSPEMYML))
+					err = config.Initialize(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.Process).To(Panic())
+				})
+
+				It("fails to validate if TLSPEM does not contains an supported type", func() {
+					invalidPEM := []byte(fmt.Sprintf(`
+-----BEGIN INVALID-----
+dGVzdA==
+-----END INVALID-----
+`))
+					tlsPEMArray := []string{string(append(append(keyPEM1, invalidPEM...), certPEM1...))}
+					invalidTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
+					Expect(err).ToNot(HaveOccurred())
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+tls_pem:
+%s
+`, invalidTLSPEMYML))
 					err = config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 

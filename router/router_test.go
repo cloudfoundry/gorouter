@@ -823,6 +823,7 @@ var _ = Describe("Router", func() {
 			cert, err := createSelfSignedCert("test.vcap.me")
 			Expect(err).ToNot(HaveOccurred())
 			config.SSLCertificates = append(config.SSLCertificates, *cert)
+
 		})
 
 		It("serves ssl traffic", func() {
@@ -947,6 +948,59 @@ var _ = Describe("Router", func() {
 				Expect(certs[0].Subject.CommonName).To(Equal("test.vcap.me"))
 
 			})
+			Context("with certificate chain", func() {
+				BeforeEach(func() {
+					chainRootCaCert, chainRootCaKey, rootPEM, err := createRootCA("a.vcap.me")
+					Expect(err).ToNot(HaveOccurred())
+					intermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+					Expect(err).ToNot(HaveOccurred())
+					intermediateTmpl, err := certTemplate("b.vcap.me")
+					Expect(err).ToNot(HaveOccurred())
+					intermediateCert, intermediatePEM, err := createCert(intermediateTmpl, chainRootCaCert, &intermediateKey.PublicKey, chainRootCaKey)
+					Expect(err).ToNot(HaveOccurred())
+					leafTmpl, err := certTemplate("c.vcap.me")
+					Expect(err).ToNot(HaveOccurred())
+					leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
+					Expect(err).ToNot(HaveOccurred())
+					leafKeyPEM := pem.EncodeToMemory(&pem.Block{
+						Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(leafKey),
+					})
+					_, leafPEM, err := createCert(leafTmpl, intermediateCert, &leafKey.PublicKey, intermediateKey)
+					Expect(err).ToNot(HaveOccurred())
+					chainPEM := append(leafPEM, intermediatePEM...)
+					chainPEM = append(chainPEM, rootPEM...)
+					chainCert, err := tls.X509KeyPair(chainPEM, leafKeyPEM)
+					Expect(err).ToNot(HaveOccurred())
+					config.SSLCertificates = append(config.SSLCertificates, chainCert) //[]tls.Certificate{chainCert}
+
+				})
+				It("return 200 Ok status", func() {
+					app := test.NewGreetApp([]route.Uri{"c.vcap.me"}, config.Port, mbusClient, nil)
+
+					app.Listen()
+					Eventually(func() bool {
+						return appRegistered(registry, app)
+					}).Should(BeTrue())
+
+					uri := fmt.Sprintf("c.vcap.me:%d", config.SSLPort)
+					tlsConfig := &tls.Config{
+						InsecureSkipVerify: true,
+						ServerName:         "c.vcap.me",
+					}
+					conn, err := tls.Dial("tcp", uri, tlsConfig)
+					Expect(err).ToNot(HaveOccurred())
+					defer conn.Close()
+					cstate := conn.ConnectionState()
+					certs := cstate.PeerCertificates
+					Expect(len(certs)).To(Equal(3))
+					Expect(certs[0].Subject.CommonName).To(Equal("c.vcap.me"))
+					Expect(certs[1].Subject.CommonName).To(Equal("b.vcap.me"))
+					Expect(certs[2].Subject.CommonName).To(Equal("a.vcap.me"))
+
+				})
+
+			})
+
 		})
 		Context("when server name does not match anything", func() {
 			It("returns the default certificate", func() {
@@ -1022,7 +1076,7 @@ var _ = Describe("Router", func() {
 
 			BeforeEach(func() {
 				var err error
-				rootCert, rootKey, err = createRootCA("rootCA")
+				rootCert, rootKey, _, err = createRootCA("rootCA")
 				Expect(err).ToNot(HaveOccurred())
 				config.MTLSRootCAs = []*x509.Certificate{
 					rootCert,
@@ -1158,26 +1212,26 @@ func createClientCert(clientCertTmpl *x509.Certificate, rootCert *x509.Certifica
 
 }
 
-func createRootCA(cname string) (*x509.Certificate, *rsa.PrivateKey, error) {
+func createRootCA(cname string) (*x509.Certificate, *rsa.PrivateKey, []byte, error) {
 	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	rootCertTmpl, err := certTemplate(cname)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	rootCertTmpl.IsCA = true
 	rootCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
 	rootCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
 	rootCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
 
-	rootCert, _, err := createCert(rootCertTmpl, rootCertTmpl, &rootKey.PublicKey, rootKey)
+	rootCert, rootPEM, err := createCert(rootCertTmpl, rootCertTmpl, &rootKey.PublicKey, rootKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return rootCert, rootKey, err
+	return rootCert, rootKey, rootPEM, err
 }
 
 func createCert(template, parent *x509.Certificate, pub, parentPriv interface{}) (cert *x509.Certificate, certPEM []byte, err error) {

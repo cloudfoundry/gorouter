@@ -259,9 +259,9 @@ func (c *Config) Process() {
 		}
 
 		for _, v := range c.TLSPEM {
-			certPEM, keyPEM := parsePEMBlocks(v)
+			certPEM, keyPEM := parsePEMBlocks([]byte(v))
 			if len(certPEM) == 0 || len(keyPEM) == 0 {
-				panic(fmt.Sprintf("Error parsing PEM blocks of router.tls_pem: %s", v))
+				panic(fmt.Sprintf("Error parsing PEM blocks of router.tls_pem, missing cert or key: %s", v))
 			}
 
 			certificate, err := tls.X509KeyPair(certPEM, keyPEM)
@@ -373,37 +373,28 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 	return ciphers
 }
 
-func parsePEMBlocks(pemBlocks string) (certPEMBlock, keyPEMBlock []byte) {
-	var certPEM, keyPEM []byte
-	var blocks []*pem.Block
-
-	block1, rest := pem.Decode([]byte(pemBlocks))
-	blocks = append(blocks, block1)
-
-	block2, rest2 := pem.Decode(rest)
-	blocks = append(blocks, block2)
-
-	if len(rest2) > 0 {
-		block3, rest3 := pem.Decode(rest2)
-		blocks = append(blocks, block3)
-		if len(rest3) > 0 {
-			panic(fmt.Sprintf("error parsing router.tls_pem, found more than three PEM blocks:\n%s", pemBlocks))
+func parsePEMBlocks(pemBlocks []byte) (certPEMBlock, keyPEMBlock []byte) {
+	for {
+		var block *pem.Block
+		block, pemBlocks = pem.Decode(pemBlocks)
+		if block == nil {
+			break
 		}
-	}
 
-	for _, block := range blocks {
-		if isECParameters(block) {
-			continue
+		if isCertificate(block) {
+			certPEM := pem.EncodeToMemory(block)
+			certPEMBlock = append(certPEMBlock, certPEM...)
 		} else if isPrivateKey(block) {
-			keyPEM = pem.EncodeToMemory(block)
-		} else if isCertificate(block) {
-			certPEM = pem.EncodeToMemory(block)
+			keyPEM := pem.EncodeToMemory(block)
+			keyPEMBlock = append(keyPEMBlock, keyPEM...)
+		} else if isECParameters(block) {
+			continue
 		} else {
-			panic(fmt.Sprintf("error parsing router.tls_pem value %s", pemBlocks))
+			panic(fmt.Sprintf("error parsing router.tls_pem, found unsupported PEM block:\n%s", pem.EncodeToMemory(block)))
 		}
 	}
 
-	return certPEM, keyPEM
+	return
 }
 
 func isECParameters(block *pem.Block) bool {
