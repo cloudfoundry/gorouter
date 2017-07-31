@@ -21,17 +21,19 @@ const (
 )
 
 type lookupHandler struct {
-	registry registry.Registry
-	reporter metrics.CombinedReporter
-	logger   logger.Logger
+	registry           registry.Registry
+	reporter           metrics.CombinedReporter
+	logger             logger.Logger
+	maxConnsPerBackend int64
 }
 
 // NewLookup creates a handler responsible for looking up a route.
-func NewLookup(registry registry.Registry, rep metrics.CombinedReporter, logger logger.Logger) negroni.Handler {
+func NewLookup(registry registry.Registry, rep metrics.CombinedReporter, logger logger.Logger, maxConnsPerBackend int64) negroni.Handler {
 	return &lookupHandler{
-		registry: registry,
-		reporter: rep,
-		logger:   logger,
+		registry:           registry,
+		reporter:           rep,
+		logger:             logger,
+		maxConnsPerBackend: maxConnsPerBackend,
 	}
 }
 
@@ -41,6 +43,16 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		l.handleMissingRoute(rw, r)
 		return
 	}
+
+	if l.maxConnsPerBackend > 0 && !pool.IsEmpty() {
+		newPool := pool.FilteredPool(l.maxConnsPerBackend)
+		if newPool.IsEmpty() {
+			l.handleOverloadedRoute(rw, r)
+			return
+		}
+		pool = newPool
+	}
+
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
 		l.logger.Fatal("request-info-err", zap.Error(err))
@@ -60,6 +72,19 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		rw,
 		http.StatusNotFound,
 		fmt.Sprintf("Requested route ('%s') does not exist.", r.Host),
+		l.logger,
+	)
+}
+
+func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request) {
+	l.logger.Info("connection-limit-reached")
+
+	rw.Header().Set("X-Cf-RouterError", "Connection Limit Reached")
+
+	writeStatus(
+		rw,
+		http.StatusServiceUnavailable,
+		fmt.Sprintf("Requested route ('%s') has reached the connection limit.", r.Host),
 		l.logger,
 	)
 }

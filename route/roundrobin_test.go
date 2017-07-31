@@ -132,6 +132,7 @@ var _ = Describe("RoundRobin", func() {
 			iter = route.NewRoundRobin(pool, "bar")
 			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
+
 	})
 
 	Describe("Failed", func() {
@@ -197,6 +198,31 @@ var _ = Describe("RoundRobin", func() {
 			n1 = iter.Next()
 			n2 = iter.Next()
 			Expect(n1).ToNot(Equal(n2))
+		})
+	})
+
+	Context("PreRequest", func() {
+		It("increments the NumberConnections counter", func() {
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
+			pool.Put(endpointFoo)
+			iter := route.NewRoundRobin(pool, "foo")
+			iter.PreRequest(endpointFoo)
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+		})
+	})
+
+	Context("PostRequest", func() {
+		It("decrements the NumberConnections counter", func() {
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			endpointFoo.Stats = &route.Stats{
+				NumberConnections: route.NewCounter(int64(1)),
+			}
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+			pool.Put(endpointFoo)
+			iter := route.NewRoundRobin(pool, "foo")
+			iter.PostRequest(endpointFoo)
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 		})
 	})
 })

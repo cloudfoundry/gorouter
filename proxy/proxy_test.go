@@ -193,6 +193,53 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
+	Context("when max conn per backend is set to > 0 ", func() {
+		BeforeEach(func() {
+			conf.Backends.MaxConns = 2
+		})
+		It("responds with 503 after conn limit is reached ", func() {
+			ln := registerHandler(r, "sleep", func(x *test_util.HttpConn) {
+				defer GinkgoRecover()
+				_, err := http.ReadRequest(x.Reader)
+				Expect(err).NotTo(HaveOccurred())
+				time.Sleep(10 * time.Millisecond)
+				resp := test_util.NewResponse(http.StatusOK)
+				x.WriteResponse(resp)
+				x.WriteLine("hello from server after sleeping")
+				x.Close()
+			})
+			defer ln.Close()
+
+			x := dialProxy(proxyServer)
+			x2 := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "sleep", "/", nil)
+			req2 := test_util.NewRequest("GET", "sleep", "/", nil)
+			req.Host = "sleep"
+			req2.Host = "sleep"
+			var resp *http.Response
+			var resp2 *http.Response
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer GinkgoRecover()
+				x.WriteRequest(req)
+				resp, _ = x.ReadResponse()
+				Eventually(resp.StatusCode).Should(Equal(http.StatusOK), "first goroutine blows up")
+			}()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer GinkgoRecover()
+				x2.WriteRequest(req2)
+				resp2, _ = x2.ReadResponse()
+				Eventually(resp2.StatusCode).Should(Equal(http.StatusOK), "2nd goroutine blows up")
+			}()
+			wg.Wait()
+		})
+	})
+
 	It("Content-type is not set by proxy", func() {
 		ln := registerHandler(r, "content-test", func(x *test_util.HttpConn) {
 			_, err := http.ReadRequest(x.Reader)

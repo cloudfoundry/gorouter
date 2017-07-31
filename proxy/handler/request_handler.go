@@ -146,7 +146,9 @@ func (h *RequestHandler) serveTcp(
 			return err
 		}
 
+		iter.PreRequest(endpoint)
 		connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), 5*time.Second)
+		iter.PostRequest(endpoint)
 		if err == nil {
 			break
 		}

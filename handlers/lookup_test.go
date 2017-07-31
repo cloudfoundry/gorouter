@@ -11,6 +11,7 @@ import (
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,15 +20,17 @@ import (
 
 var _ = Describe("Lookup", func() {
 	var (
-		handler     *negroni.Negroni
-		nextHandler http.HandlerFunc
-		logger      *logger_fakes.FakeLogger
-		reg         *fakeRegistry.FakeRegistry
-		rep         *fakes.FakeCombinedReporter
-		resp        *httptest.ResponseRecorder
-		req         *http.Request
-		nextCalled  bool
-		nextRequest *http.Request
+		handler        *negroni.Negroni
+		nextHandler    http.HandlerFunc
+		logger         *logger_fakes.FakeLogger
+		reg            *fakeRegistry.FakeRegistry
+		rep            *fakes.FakeCombinedReporter
+		resp           *httptest.ResponseRecorder
+		req            *http.Request
+		nextCalled     bool
+		nextRequest    *http.Request
+		maxConnections int64
+		modTag         models.ModificationTag
 	)
 
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
@@ -38,23 +41,24 @@ var _ = Describe("Lookup", func() {
 	BeforeEach(func() {
 		nextCalled = false
 		nextRequest = &http.Request{}
+		modTag = models.ModificationTag{}
+		maxConnections = 2
 		logger = new(logger_fakes.FakeLogger)
 		rep = &fakes.FakeCombinedReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
-		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewLookup(reg, rep, logger))
-		handler.UseHandler(nextHandler)
-
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 	})
 
-	Context("when there are no endpoints", func() {
-		BeforeEach(func() {
-			handler.ServeHTTP(resp, req)
-		})
+	JustBeforeEach(func() {
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(handlers.NewLookup(reg, rep, logger, maxConnections))
+		handler.UseHandler(nextHandler)
+		handler.ServeHTTP(resp, req)
+	})
 
+	Context("when there are no endpoints", func() {
 		It("sends a bad request metric", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
 		})
@@ -81,8 +85,84 @@ var _ = Describe("Lookup", func() {
 			reg.LookupReturns(pool)
 		})
 
-		JustBeforeEach(func() {
-			handler.ServeHTTP(resp, req)
+		Context("when conn limit is set to zero (unlimited)", func() {
+			BeforeEach(func() {
+				maxConnections = 0
+				pool = route.NewPool(2*time.Minute, "example.com")
+				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
+				for i := 0; i < 5; i++ {
+					testEndpoint.Stats.NumberConnections.Increment()
+				}
+				pool.Put(testEndpoint)
+				testEndpoint1 := route.NewEndpoint("testid2", "1.2.3.6", 5679, "", "", nil, -1, "", modTag, "")
+				pool.Put(testEndpoint1)
+				reg.LookupReturns(pool)
+			})
+
+			It("all backends are in the pool", func() {
+				Expect(nextCalled).To(BeTrue())
+				requestInfo, err := handlers.ContextRequestInfo(nextRequest)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(requestInfo.RoutePool.IsEmpty()).To(BeFalse())
+				len := 0
+				requestInfo.RoutePool.Each(func(endpoint *route.Endpoint) {
+					len++
+				})
+				Expect(len).To(Equal(2))
+				Expect(resp.Code).To(Equal(http.StatusOK))
+			})
+		})
+
+		Context("when conn limit is reached for an endpoint", func() {
+			BeforeEach(func() {
+				pool = route.NewPool(2*time.Minute, "example.com")
+				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
+				testEndpoint.Stats.NumberConnections.Increment()
+				testEndpoint.Stats.NumberConnections.Increment()
+				testEndpoint.Stats.NumberConnections.Increment()
+				pool.Put(testEndpoint)
+				testEndpoint1 := route.NewEndpoint("testid2", "1.4.6.7", 5679, "", "", nil, -1, "", modTag, "")
+				pool.Put(testEndpoint1)
+				reg.LookupReturns(pool)
+			})
+
+			It("does not include the overloaded backend in the pool", func() {
+				Expect(nextCalled).To(BeTrue())
+				requestInfo, err := handlers.ContextRequestInfo(nextRequest)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(requestInfo.RoutePool.IsEmpty()).To(BeFalse())
+				len := 0
+				var expectedAppId string
+				requestInfo.RoutePool.Each(func(endpoint *route.Endpoint) {
+					expectedAppId = endpoint.ApplicationId
+					len++
+				})
+				Expect(len).To(Equal(1))
+				Expect(expectedAppId).To(Equal("testid2"))
+				Expect(resp.Code).To(Equal(http.StatusOK))
+			})
+		})
+
+		Context("when conn limit is reached for all requested endpoints", func() {
+			var testEndpoint *route.Endpoint
+			BeforeEach(func() {
+				pool = route.NewPool(2*time.Minute, "example.com")
+				testEndpoint = route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
+				testEndpoint.Stats.NumberConnections.Increment()
+				testEndpoint.Stats.NumberConnections.Increment()
+				testEndpoint.Stats.NumberConnections.Increment()
+				pool.Put(testEndpoint)
+				testEndpoint1 := route.NewEndpoint("testid2", "1.4.6.7", 5679, "", "", nil, -1, "", modTag, "")
+				testEndpoint1.Stats.NumberConnections.Increment()
+				testEndpoint1.Stats.NumberConnections.Increment()
+				testEndpoint1.Stats.NumberConnections.Increment()
+				pool.Put(testEndpoint1)
+				reg.LookupReturns(pool)
+			})
+			It("returns a 503", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
+			})
 		})
 
 		It("calls next with the pool", func() {
@@ -161,7 +241,7 @@ var _ = Describe("Lookup", func() {
 		Context("when request info is not set on the request context", func() {
 			BeforeEach(func() {
 				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, logger))
+				handler.Use(handlers.NewLookup(reg, rep, logger, 0))
 				handler.UseHandler(nextHandler)
 			})
 			It("calls Fatal on the logger", func() {

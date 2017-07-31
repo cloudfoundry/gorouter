@@ -124,6 +124,31 @@ var _ = Describe("LeastConnection", func() {
 			})
 		})
 	})
+
+	Context("PreRequest", func() {
+		It("increments the NumberConnections counter", func() {
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", models.ModificationTag{}, "")
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
+			pool.Put(endpointFoo)
+			iter := route.NewLeastConnection(pool, "foo")
+			iter.PreRequest(endpointFoo)
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+		})
+	})
+
+	Context("PostRequest", func() {
+		It("decrements the NumberConnections counter", func() {
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", models.ModificationTag{}, "")
+			endpointFoo.Stats = &route.Stats{
+				NumberConnections: route.NewCounter(int64(1)),
+			}
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
+			pool.Put(endpointFoo)
+			iter := route.NewLeastConnection(pool, "foo")
+			iter.PostRequest(endpointFoo)
+			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
+		})
+	})
 })
 
 func setConnectionCount(endpoints []*route.Endpoint, counts []int) {

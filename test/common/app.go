@@ -122,6 +122,22 @@ func (a *TestApp) VerifyAppStatus(status int) {
 	}).ShouldNot(HaveOccurred())
 }
 
+func (a *TestApp) CheckAppStatusWithPath(status int, path string) error {
+	for _, url := range a.urls {
+		uri := fmt.Sprintf("http://%s:%d/%s", url, a.rPort, path)
+		resp, err := http.Get(uri)
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != status {
+			return errors.New(fmt.Sprintf("expected status code %d, got %d", status, resp.StatusCode))
+		}
+	}
+
+	return nil
+}
+
 func (a *TestApp) CheckAppStatus(status int) error {
 	for _, url := range a.urls {
 		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)

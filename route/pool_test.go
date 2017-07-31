@@ -164,6 +164,43 @@ var _ = Describe("Pool", func() {
 				})
 			})
 		})
+
+		Context("Filtered pool", func() {
+			It("returns copy of the pool with non overloaded endpoints", func() {
+				Expect(pool.IsEmpty()).To(BeTrue())
+				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
+				endpoint1.Stats.NumberConnections.Increment()
+				endpoint1.Stats.NumberConnections.Increment()
+				endpoint1.Stats.NumberConnections.Increment()
+				Expect(pool.Put(endpoint1)).To(BeTrue())
+
+				endpoint2 := route.NewEndpoint("", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
+				Expect(pool.Put(endpoint2)).To(BeTrue())
+				// verify the pool before filter has 2 endpoints
+				var len int
+				pool.Each(func(endpoint *route.Endpoint) {
+					len++
+				})
+				Expect(len).To(Equal(2))
+
+				newPool := pool.FilteredPool(1)
+				Expect(newPool).NotTo(BeNil())
+
+				// verify the original pool has both endpoints
+				len = 0
+				pool.Each(func(endpoint *route.Endpoint) {
+					len++
+				})
+				Expect(len).To(Equal(2))
+
+				// verify newpool has an endpoint
+				newPoolLen := 0
+				newPool.Each(func(endpoint *route.Endpoint) {
+					newPoolLen++
+				})
+				Expect(newPoolLen).To(Equal(1))
+			})
+		})
 	})
 
 	Context("IsEmpty", func() {
@@ -186,6 +223,12 @@ var _ = Describe("Pool", func() {
 			Expect(pool.IsEmpty()).To(BeTrue())
 		})
 	})
+	//
+	// Context("IsOverloaded", func() {
+	// 	It("starts not overloaded", func() {
+	// 		Expect(pool.IsOverloaded()).To(BeFalse())
+	// 	})
+	// })
 
 	Context("PruneEndpoints", func() {
 		defaultThreshold := 1 * time.Minute

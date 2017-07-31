@@ -91,7 +91,9 @@ func (r *RoundRobin) EndpointFailed() {
 }
 
 func (r *RoundRobin) PreRequest(e *Endpoint) {
+	e.Stats.NumberConnections.Increment()
 }
 
 func (r *RoundRobin) PostRequest(e *Endpoint) {
+	e.Stats.NumberConnections.Decrement()
 }

@@ -79,6 +79,7 @@ type Pool struct {
 
 	retryAfterFailure time.Duration
 	nextIdx           int
+	overloaded        bool
 }
 
 func NewEndpoint(
@@ -168,6 +169,17 @@ func (p *Pool) RouteServiceUrl() string {
 	} else {
 		return ""
 	}
+}
+
+func (p *Pool) FilteredPool(maxConnsPerBackend int64) *Pool {
+	filteredPool := NewPool(p.retryAfterFailure, p.ContextPath())
+	p.Each(func(endpoint *Endpoint) {
+		if endpoint.Stats.NumberConnections.Count() < maxConnsPerBackend {
+			filteredPool.Put(endpoint)
+		}
+	})
+
+	return filteredPool
 }
 
 func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) []*Endpoint {

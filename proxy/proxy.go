@@ -117,7 +117,7 @@ func NewProxy(
 	n.Use(handlers.NewProxyHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
-	n.Use(handlers.NewLookup(registry, reporter, logger))
+	n.Use(handlers.NewLookup(registry, reporter, logger, c.Backends.MaxConns))
 	n.Use(handlers.NewRouteService(routeServiceConfig, logger, registry))
 	n.Use(p)
 	n.UseHandler(rproxy)

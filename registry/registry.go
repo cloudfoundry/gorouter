@@ -152,6 +152,7 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	r.RUnlock()
 	endLookup := time.Now()
 	r.reporter.CaptureLookupTime(endLookup.Sub(started))
+
 	return pool
 }
 
@@ -189,6 +190,7 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 			surgicalPool.Put(e)
 		}
 	})
+
 	return surgicalPool
 }
 

@@ -61,7 +61,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, nil)
 
-			r.Register(route.Uri("some-app"), &route.Endpoint{})
+			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
 
 			resp = utils.NewProxyResponseWriter(httptest.NewRecorder())
 		})
