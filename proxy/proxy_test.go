@@ -202,7 +202,7 @@ var _ = Describe("Proxy", func() {
 				defer GinkgoRecover()
 				_, err := http.ReadRequest(x.Reader)
 				Expect(err).NotTo(HaveOccurred())
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 				resp := test_util.NewResponse(http.StatusOK)
 				x.WriteResponse(resp)
 				x.WriteLine("hello from server after sleeping")
@@ -210,33 +210,33 @@ var _ = Describe("Proxy", func() {
 			})
 			defer ln.Close()
 
-			x := dialProxy(proxyServer)
-			x2 := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "sleep", "/", nil)
-			req2 := test_util.NewRequest("GET", "sleep", "/", nil)
-			req.Host = "sleep"
-			req2.Host = "sleep"
-			var resp *http.Response
-			var resp2 *http.Response
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer GinkgoRecover()
-				x.WriteRequest(req)
-				resp, _ = x.ReadResponse()
-				Eventually(resp.StatusCode).Should(Equal(http.StatusOK), "first goroutine blows up")
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer GinkgoRecover()
-				x2.WriteRequest(req2)
-				resp2, _ = x2.ReadResponse()
-				Eventually(resp2.StatusCode).Should(Equal(http.StatusOK), "2nd goroutine blows up")
-			}()
+			var badGatewayCount int32
+
+			for i := 0; i < 3; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					defer GinkgoRecover()
+
+					x := dialProxy(proxyServer)
+					defer x.Close()
+
+					req := test_util.NewRequest("GET", "sleep", "/", nil)
+					req.Host = "sleep"
+
+					x.WriteRequest(req)
+					resp, _ := x.ReadResponse()
+					if resp.StatusCode == http.StatusServiceUnavailable {
+						atomic.AddInt32(&badGatewayCount, 1)
+					} else if resp.StatusCode != http.StatusOK {
+						Fail(fmt.Sprintf("Expected resp to return 200 or 503, got %d", resp.StatusCode))
+					}
+				}()
+				time.Sleep(10 * time.Millisecond)
+			}
 			wg.Wait()
+			Expect(atomic.LoadInt32(&badGatewayCount)).To(Equal(int32(1)))
 		})
 	})
 
