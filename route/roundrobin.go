@@ -1,11 +1,8 @@
 package route
 
 import (
-	"math/rand"
 	"time"
 )
-
-var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type RoundRobin struct {
 	pool *Pool
@@ -47,7 +44,7 @@ func (r *RoundRobin) next() *Endpoint {
 	}
 
 	if r.pool.nextIdx == -1 {
-		r.pool.nextIdx = random.Intn(last)
+		r.pool.nextIdx = r.pool.random.Intn(last)
 	} else if r.pool.nextIdx >= last {
 		r.pool.nextIdx = 0
 	}

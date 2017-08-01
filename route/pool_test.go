@@ -223,12 +223,6 @@ var _ = Describe("Pool", func() {
 			Expect(pool.IsEmpty()).To(BeTrue())
 		})
 	})
-	//
-	// Context("IsOverloaded", func() {
-	// 	It("starts not overloaded", func() {
-	// 		Expect(pool.IsOverloaded()).To(BeFalse())
-	// 	})
-	// })
 
 	Context("PruneEndpoints", func() {
 		defaultThreshold := 1 * time.Minute

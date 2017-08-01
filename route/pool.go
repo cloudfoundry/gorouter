@@ -3,6 +3,7 @@ package route
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -80,6 +81,8 @@ type Pool struct {
 	retryAfterFailure time.Duration
 	nextIdx           int
 	overloaded        bool
+
+	random *rand.Rand
 }
 
 func NewEndpoint(
@@ -115,6 +118,7 @@ func NewPool(retryAfterFailure time.Duration, contextPath string) *Pool {
 		retryAfterFailure: retryAfterFailure,
 		nextIdx:           -1,
 		contextPath:       contextPath,
+		random:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
