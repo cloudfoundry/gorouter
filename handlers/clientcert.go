@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"encoding/pem"
 	"net/http"
 	"strings"
@@ -54,6 +53,5 @@ func sanitize(cert []byte) string {
 	r := strings.NewReplacer("-----BEGIN CERTIFICATE-----", "",
 		"-----END CERTIFICATE-----", "",
 		"\n", "")
-	s = r.Replace(s)
-	return base64.StdEncoding.EncodeToString([]byte(s))
+	return r.Replace(s)
 }

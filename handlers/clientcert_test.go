@@ -3,7 +3,6 @@ package handlers_test
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -152,7 +151,7 @@ var _ = Describe("Clientcert", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-				Expect(headerCerts).To(ConsistOf(encodeBase64(certPEM)))
+				Expect(headerCerts).To(ConsistOf(sanitize(certPEM)))
 			})
 		})
 	})
@@ -291,11 +290,10 @@ var _ = Describe("Clientcert", func() {
 	})
 })
 
-func encodeBase64(cert []byte) string {
+func sanitize(cert []byte) string {
 	s := string(cert)
 	r := strings.NewReplacer("-----BEGIN CERTIFICATE-----", "",
 		"-----END CERTIFICATE-----", "",
 		"\n", "")
-	s = r.Replace(s)
-	return base64.StdEncoding.EncodeToString([]byte(s))
+	return r.Replace(s)
 }
