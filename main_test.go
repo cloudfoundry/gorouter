@@ -1005,6 +1005,8 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when max conn per backend is set", func() {
 		It("responds with 503 when conn limit is reached", func() {
+			var wg, wg2 sync.WaitGroup
+
 			localIP, err := localip.LocalIP()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1026,7 +1028,7 @@ var _ = Describe("Router Integration", func() {
 				defer GinkgoRecover()
 				waitChan <- struct{}{}
 				runtime.Gosched()
-				time.Sleep(4 * time.Second)
+				wg2.Wait()
 				w.WriteHeader(http.StatusOK)
 			})
 
@@ -1047,17 +1049,18 @@ var _ = Describe("Router Integration", func() {
 				}
 			}()
 
-			var wg sync.WaitGroup
 			wg.Add(1)
+			wg2.Add(1)
 			go func() {
 				defer wg.Done()
 				defer GinkgoRecover()
-				err := runningApp1.CheckAppStatusWithPath(200, "sleep")
-				Expect(err).ToNot(HaveOccurred())
+				goErr := runningApp1.CheckAppStatusWithPath(200, "sleep")
+				Expect(goErr).ToNot(HaveOccurred())
 			}()
 			Eventually(waitChan).Should(Receive())
 			err = runningApp1.CheckAppStatusWithPath(503, "path")
 			Expect(err).ToNot(HaveOccurred())
+			wg2.Done()
 
 			wg.Wait()
 		})
