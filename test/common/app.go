@@ -125,7 +125,13 @@ func (a *TestApp) VerifyAppStatus(status int) {
 func (a *TestApp) CheckAppStatusWithPath(status int, path string) error {
 	for _, url := range a.urls {
 		uri := fmt.Sprintf("http://%s:%d/%s", url, a.rPort, path)
-		resp, err := http.Get(uri)
+		testReq, err := http.NewRequest("GET", uri, nil)
+		if err != nil {
+			return err
+		}
+		testClient := http.Client{}
+		testClient.Timeout = 90 * time.Second
+		resp, err := testClient.Do(testReq)
 		if err != nil {
 			return err
 		}

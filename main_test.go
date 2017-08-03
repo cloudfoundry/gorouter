@@ -5,7 +5,6 @@ import (
 	"errors"
 	"path"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -1027,7 +1026,6 @@ var _ = Describe("Router Integration", func() {
 			runningApp1.AddHandler("/sleep", func(w http.ResponseWriter, r *http.Request) {
 				defer GinkgoRecover()
 				waitChan <- struct{}{}
-				runtime.Gosched()
 				wg2.Wait()
 				w.WriteHeader(http.StatusOK)
 			})
@@ -1058,7 +1056,7 @@ var _ = Describe("Router Integration", func() {
 				Expect(goErr).ToNot(HaveOccurred())
 			}()
 			Eventually(waitChan).Should(Receive())
-			err = runningApp1.CheckAppStatusWithPath(503, "path")
+			err = runningApp1.CheckAppStatusWithPath(503, "sleep")
 			Expect(err).ToNot(HaveOccurred())
 			wg2.Done()
 
