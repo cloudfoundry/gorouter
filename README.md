@@ -372,11 +372,19 @@ Access logs are also redirected to syslog.
 
 ## Headers
 
-If an user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture. 
+If an user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture.
 
 ## Supported Cipher Suites
 
-Refer to [golang 1.7](https://github.com/golang/go/blob/release-branch.go1.7/src/crypto/tls/cipher_suites.go#L269-L285) for the list of supported cipher suites for the Gorouter.
+Refer to [golang 1.7](https://github.com/golang/go/blob/release-branch.go1.7/src/crypto/tls/cipher_suites.go#L269-L285) for the list of supported cipher suites for the Gorouter and configure Gorouter process with the corresponding OpenSSL cipher suite names. Refer [this](https://testssl.sh/openssl-rfc.mapping.html) documentation for list of OpenSSL RFC mappings.
+Example configuration enabling the TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 cipher suite for Gorouter:
+
+```
+...
+enable_ssl: true
+cipher_suite: "ECDHE-ECDSA-AES128-GCM-SHA256"
+...
+```
 
 ## Docs
 

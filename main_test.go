@@ -240,7 +240,7 @@ var _ = Describe("Router Integration", func() {
 				tlsPem2 := fmt.Sprintf("%s%s", string(certPEM2), string(keyPEM2))
 
 				config.TLSPEM = []string{tlsPem1, tlsPem2}
-				config.CipherString = "TLS_RSA_WITH_RC4_128_SHA"
+				config.CipherString = "RC4-SHA"
 			})
 
 			It("throws an error", func() {

@@ -716,7 +716,7 @@ routing_api:
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 min_tls_version: TLSv1.1
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s%s
 `, tlsPEM1YML, tlsPEM2YML))
@@ -731,7 +731,7 @@ tls_pem:
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 min_tls_version: fake-tls
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s%s
 `, tlsPEM1YML, tlsPEM2YML))
@@ -744,7 +744,7 @@ tls_pem:
 				It("sets the default to TLSv1.2", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s%s
 `, tlsPEM1YML, tlsPEM2YML))
@@ -759,7 +759,7 @@ tls_pem:
 				It("populates the TLSPEM field and generates the SSLCertificates", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s%s%s
 `, tlsPEM1YML, tlsPEM2YML, tlsPEM3YML))
@@ -798,7 +798,7 @@ tls_pem:
 				It("supports ECDSA PEM block", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-ECDSA-AES256-GCM-SHA384
 tls_pem:
 %s
 `, tlsPEMYML))
@@ -818,7 +818,7 @@ tls_pem:
 				It("fails to validate if TLSPEM is missing", func() {
 					var b = []byte(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 `)
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
@@ -832,7 +832,7 @@ cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 					Expect(err).ToNot(HaveOccurred())
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s
 `, partialTLSPEMYML))
@@ -853,7 +853,7 @@ dGVzdA==
 					Expect(err).ToNot(HaveOccurred())
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
 %s
 `, invalidTLSPEMYML))
@@ -868,7 +868,7 @@ tls_pem:
 				It("Construct the proper array of cipher suites", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384
 tls_pem:
 %s%s
 `, tlsPEM1YML, tlsPEM2YML))

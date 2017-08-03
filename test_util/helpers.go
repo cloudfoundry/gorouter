@@ -37,7 +37,7 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *
 		fmt.Sprintf("%s\n%s", string(secondKey), string(secondCert)),
 	}
 	c.SSLPort = SSLPort
-	c.CipherString = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 
 	return c
 }
