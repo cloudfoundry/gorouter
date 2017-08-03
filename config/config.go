@@ -120,7 +120,8 @@ type Config struct {
 	SSLPort                  uint16        `yaml:"ssl_port"`
 	SSLCertificates          []tls.Certificate
 	TLSPEM                   []string `yaml:"tls_pem"`
-	MTLSRootCAs              []*x509.Certificate
+	CACerts                  []string `yaml:"ca_certs"`
+	CAPool                   *x509.CertPool
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
 	ForwardedClientCert      string   `yaml:"forwarded_client_cert"`
 	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https"`
@@ -322,6 +323,10 @@ func (c *Config) Process() {
 	if c.RoutingTableShardingMode == SHARD_SEGMENTS && len(c.IsolationSegments) == 0 {
 		panic("Expected isolation segments; routing table sharding mode set to segments and none provided.")
 	}
+
+	if err := c.buildCertPool(); err != nil {
+		panic(err)
+	}
 }
 
 func (c *Config) processCipherSuites() []uint16 {
@@ -354,6 +359,21 @@ func (c *Config) processCipherSuites() []uint16 {
 	}
 
 	return convertCipherStringToInt(ciphers, cipherMap)
+}
+
+func (c *Config) buildCertPool() error {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		return err
+	}
+
+	for i, cert := range c.CACerts {
+		if ok := certPool.AppendCertsFromPEM([]byte(cert)); !ok {
+			return fmt.Errorf("Error while adding %d cert in CACerts to gorouter's cert pool", i)
+		}
+	}
+	c.CAPool = certPool
+	return nil
 }
 
 func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) []uint16 {

@@ -819,10 +819,16 @@ var _ = Describe("Router", func() {
 	})
 
 	Context("serving https", func() {
+		var (
+			cert, key []byte
+			tlsCert   tls.Certificate
+		)
 		BeforeEach(func() {
-			cert, err := createSelfSignedCert("test.vcap.me")
+			var err error
+			key, cert = test_util.CreateKeyPair("test.vcap.me")
+			tlsCert, err = tls.X509KeyPair(cert, key)
 			Expect(err).ToNot(HaveOccurred())
-			config.SSLCertificates = append(config.SSLCertificates, *cert)
+			config.SSLCertificates = append(config.SSLCertificates, tlsCert)
 
 		})
 
@@ -896,6 +902,40 @@ var _ = Describe("Router", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(bytes)).To(Equal("https"))
 			resp.Body.Close()
+		})
+
+		Context("when a ca cert is provided", func() {
+			BeforeEach(func() {
+				config.CACerts = []string{
+					string(cert),
+				}
+			})
+			It("add the ca cert to the trusted pool and returns 200", func() {
+				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app.Listen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+				req, _ := http.NewRequest("GET", uri, nil)
+
+				certPool, err := x509.SystemCertPool()
+				Expect(err).ToNot(HaveOccurred())
+				certPool.AppendCertsFromPEM(cert)
+
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs:      certPool,
+						Certificates: []tls.Certificate{tlsCert},
+					},
+				}
+				client := http.Client{Transport: tr}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
 		})
 
 		Context("when a supported server name is provided", func() {
@@ -1075,11 +1115,14 @@ var _ = Describe("Router", func() {
 			)
 
 			BeforeEach(func() {
-				var err error
-				rootCert, rootKey, _, err = createRootCA("rootCA")
+				var (
+					err     error
+					rootPEM []byte
+				)
+				rootCert, rootKey, rootPEM, err = createRootCA("rootCA")
 				Expect(err).ToNot(HaveOccurred())
-				config.MTLSRootCAs = []*x509.Certificate{
-					rootCert,
+				config.CACerts = []string{
+					string(rootPEM),
 				}
 			})
 

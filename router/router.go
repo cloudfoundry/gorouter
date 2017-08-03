@@ -245,8 +245,11 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 			rootCAs = nil
 		}
 		if err == nil {
-			for _, cert := range r.config.MTLSRootCAs {
-				rootCAs.AddCert(cert)
+			for _, cert := range r.config.CACerts {
+				if ok := rootCAs.AppendCertsFromPEM([]byte(cert)); !ok {
+					r.logger.Fatal("servehttps-certpool-error",
+						zap.Error(fmt.Errorf("error adding a CA cert to cert pool")))
+				}
 			}
 		}
 

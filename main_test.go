@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"net"
+	"net/http/httptest"
 	"net/url"
 	"syscall"
 
@@ -779,20 +780,76 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Context("when the route_services_secret and the route_services_secret_decrypt_only are valid", func() {
-		It("starts fine", func() {
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
+	Context("route services", func() {
+		var (
+			session                        *Session
+			config                         *config.Config
+			statusPort, proxyPort, sslPort uint16
+		)
 
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+		BeforeEach(func() {
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
+			sslPort = test_util.NextAvailPort()
+
+			config = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
 			config.RouteServiceSecret = "route-service-secret"
 			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
-			writeConfig(config, cfgFile)
 
-			// The process should not have any error.
-			session := startGorouterSession(cfgFile)
+		})
+
+		JustBeforeEach(func() {
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			writeConfig(config, cfgFile)
+			session = startGorouterSession(cfgFile)
+		})
+
+		AfterEach(func() {
 			stopGorouter(session)
+		})
+
+		Context("When an HTTPS request is destined to an app bound to route service", func() {
+			var rsKey, rsCert []byte
+			BeforeEach(func() {
+				rsKey, rsCert = test_util.CreateKeyPair("test.routeservice.com")
+				config.CACerts = []string{string(rsCert)}
+			})
+			It("successfully connects to the route service", func() {
+				rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)
+				Expect(err).ToNot(HaveOccurred())
+
+				routeServiceSrv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusTeapot)
+				}))
+
+				routeServiceSrv.TLS = &tls.Config{
+					Certificates: []tls.Certificate{rsTLSCert},
+					ServerName:   "test.routeservice.com",
+				}
+				routeServiceSrv.StartTLS()
+				defer routeServiceSrv.Close()
+
+				mbusClient, err := newMessageBus(config)
+				Expect(err).ToNot(HaveOccurred())
+
+				runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceSrv.URL)
+				runningApp.Listen()
+
+				localIP, err := localip.LocalIP()
+				Expect(err).ToNot(HaveOccurred())
+
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.Host = "demo.vcap.me"
+				client := http.DefaultClient
+				res, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+			})
 		})
 	})
 
@@ -835,7 +892,6 @@ var _ = Describe("Router Integration", func() {
 			Eventually(session).ShouldNot(Say("setting-up-routing-api"))
 			stopGorouter(session)
 		})
-
 	})
 
 	Context("when the routing api is enabled", func() {
