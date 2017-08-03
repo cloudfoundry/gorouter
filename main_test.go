@@ -1070,6 +1070,8 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 1, natsPort)
+			config.EndpointTimeout = 10 * time.Second
+			writeConfig(config, cfgFile)
 
 			gorouterSession = startGorouterSession(cfgFile)
 			defer gorouterSession.Kill()
@@ -1106,8 +1108,8 @@ var _ = Describe("Router Integration", func() {
 			wg.Add(1)
 			wg2.Add(1)
 			go func() {
-				defer wg.Done()
 				defer GinkgoRecover()
+				defer wg.Done()
 				goErr := runningApp1.CheckAppStatusWithPath(200, "sleep")
 				Expect(goErr).ToNot(HaveOccurred())
 			}()
