@@ -193,12 +193,12 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		},
 	}
 
-	if isTcpUpgrade(request) {
+	if handlers.IsTcpUpgrade(request) {
 		handler.HandleTcpRequest(iter)
 		return
 	}
 
-	if isWebSocketUpgrade(request) {
+	if handlers.IsWebSocketUpgrade(request) {
 		handler.HandleWebSocketRequest(iter)
 		return
 	}
@@ -261,26 +261,5 @@ func getStickySession(request *http.Request) string {
 			return sticky.Value
 		}
 	}
-	return ""
-}
-
-func isWebSocketUpgrade(request *http.Request) bool {
-	// websocket should be case insensitive per RFC6455 4.2.1
-	return strings.ToLower(upgradeHeader(request)) == "websocket"
-}
-
-func isTcpUpgrade(request *http.Request) bool {
-	return upgradeHeader(request) == "tcp"
-}
-
-func upgradeHeader(request *http.Request) string {
-	// handle multiple Connection field-values, either in a comma-separated string or multiple field-headers
-	for _, v := range request.Header[http.CanonicalHeaderKey("Connection")] {
-		// upgrade should be case insensitive per RFC6455 4.2.1
-		if strings.Contains(strings.ToLower(v), "upgrade") {
-			return request.Header.Get("Upgrade")
-		}
-	}
-
 	return ""
 }

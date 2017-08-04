@@ -504,6 +504,51 @@ var _ = Describe("Route Service Handler", func() {
 			})
 		})
 
+		Context("when a TCP request an app bound to a route service", func() {
+			BeforeEach(func() {
+				endpoint := route.NewEndpoint(
+					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"https://goodrouteservice.com", models.ModificationTag{}, "",
+				)
+
+				added := routePool.Put(endpoint)
+				Expect(added).To(BeTrue())
+				req.Header.Set("connection", "upgrade")
+				req.Header.Set("upgrade", "tcp")
+
+			})
+			It("returns a 503", func() {
+				handler.ServeHTTP(resp, req)
+
+				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
+				Expect(resp.Body.String()).To(ContainSubstring("TCP requests are not supported for routes bound to Route Services."))
+
+				Expect(nextCalled).To(BeFalse())
+			})
+		})
+		Context("when a websocket request an app bound to a route service", func() {
+			BeforeEach(func() {
+				endpoint := route.NewEndpoint(
+					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"https://goodrouteservice.com", models.ModificationTag{}, "",
+				)
+
+				added := routePool.Put(endpoint)
+				Expect(added).To(BeTrue())
+				req.Header.Set("connection", "upgrade")
+				req.Header.Set("upgrade", "websocket")
+
+			})
+			It("returns a 503", func() {
+				handler.ServeHTTP(resp, req)
+
+				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
+				Expect(resp.Body.String()).To(ContainSubstring("Websocket requests are not supported for routes bound to Route Services."))
+
+				Expect(nextCalled).To(BeFalse())
+			})
+		})
+
 		Context("when a bad route service url is used", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(

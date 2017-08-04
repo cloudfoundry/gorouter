@@ -259,6 +259,37 @@ var _ = Describe("Router", func() {
 		}
 	})
 
+	Context("when websocket request is bound to RouteService URL", func() {
+		It("the request should respond with a 503", func() {
+			app := test.NewWebSocketApp(
+				[]route.Uri{"ws-app.vcap.me"},
+				config.Port,
+				mbusClient,
+				1*time.Second,
+				"https://sample_rs_url.com",
+			)
+			app.Listen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
+			Expect(err).NotTo(HaveOccurred())
+
+			x := test_util.NewHttpConn(conn)
+
+			req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+			req.Header.Set("Upgrade", "websocket")
+			req.Header.Set("Connection", "upgrade")
+
+			x.WriteRequest(req)
+
+			resp, _ := x.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+			// verify the app handler never got invoked.
+			x.Close()
+		})
+	})
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
 			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
@@ -723,6 +754,7 @@ var _ = Describe("Router", func() {
 				config.Port,
 				mbusClient,
 				1*time.Second,
+				"",
 			)
 			app.Listen()
 			Eventually(func() bool {
@@ -1344,9 +1376,10 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := metrics.NewMetricsReporter(sender, batcher)
 	combinedReporter := metrics.NewCompositeReporter(varz, metricReporter)
+	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
 
 	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-		&routeservice.RouteServiceConfig{}, &tls.Config{}, nil)
+		routeServiceConfig, &tls.Config{}, nil)
 
 	var healthCheck int32
 	healthCheck = 0

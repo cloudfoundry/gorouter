@@ -14,8 +14,8 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 )
 
-func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {
-	app := common.NewTestApp(urls, rPort, mbusClient, nil, "")
+func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration, routeServiceUrl string) *common.TestApp {
+	app := common.NewTestApp(urls, rPort, mbusClient, nil, routeServiceUrl)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		defer ginkgo.GinkgoRecover()
 

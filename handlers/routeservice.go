@@ -54,6 +54,31 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		return
 	}
 
+	if routeServiceURL != "" && IsTcpUpgrade(req) {
+		r.logger.Info("route-service-unsupported")
+
+		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+		writeStatus(
+			rw,
+			http.StatusServiceUnavailable,
+			"TCP requests are not supported for routes bound to Route Services.",
+			r.logger,
+		)
+		return
+	}
+	if routeServiceURL != "" && IsWebSocketUpgrade(req) {
+		r.logger.Info("route-service-unsupported")
+
+		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+		writeStatus(
+			rw,
+			http.StatusServiceUnavailable,
+			"Websocket requests are not supported for routes bound to Route Services.",
+			r.logger,
+		)
+		return
+	}
+
 	var routeServiceArgs routeservice.RouteServiceRequest
 	if routeServiceURL != "" {
 		rsSignature := req.Header.Get(routeservice.RouteServiceSignature)

@@ -915,6 +915,55 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Context("when the request is a WebSocket connections", func() {
+
+		Context("when the request is mapped to route service", func() {
+
+			It("responds with 503", func() {
+				done := make(chan bool)
+
+				ln := registerHandler(r, "ws", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					done <- req.Header.Get("Upgrade") == "WebsockeT" &&
+						req.Header.Get("Connection") == "UpgradE"
+
+					resp := test_util.NewResponse(http.StatusSwitchingProtocols)
+					resp.Header.Set("Upgrade", "WebsockeT")
+					resp.Header.Set("Connection", "UpgradE")
+
+					conn.WriteResponse(resp)
+
+					conn.CheckLine("hello from client")
+					conn.WriteLine("hello from server")
+					conn.Close()
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "ws", "/chat", nil)
+				req.Header.Set("Upgrade", "WebsockeT")
+				req.Header.Set("Connection", "UpgradE")
+
+				conn.WriteRequest(req)
+
+				var answer bool
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(BeTrue())
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+				Expect(resp.Header.Get("Upgrade")).To(Equal("WebsockeT"))
+				Expect(resp.Header.Get("Connection")).To(Equal("UpgradE"))
+
+				conn.WriteLine("hello from client")
+				conn.CheckLine("hello from server")
+
+				conn.Close()
+			})
+		})
+
 		It("upgrades for a WebSocket request", func() {
 			done := make(chan bool)
 
