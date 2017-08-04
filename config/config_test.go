@@ -930,25 +930,49 @@ tls_pem:
 			})
 
 			Context("When it is given valid cipher suites", func() {
-				It("Construct the proper array of cipher suites", func() {
-					var b = []byte(fmt.Sprintf(`
+				Context("of openssl format", func() {
+					It("Construct the proper array of cipher suites", func() {
+						var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384
 tls_pem:
 %s%s
 `, tlsPEM1YML, tlsPEM2YML))
 
-					expectedSuites := []uint16{
-						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					}
+						expectedSuites := []uint16{
+							tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+							tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						}
 
-					err := config.Initialize(b)
-					Expect(err).ToNot(HaveOccurred())
+						err := config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
 
-					config.Process()
+						config.Process()
 
-					Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
+						Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
+					})
+				})
+				Context("of RFC format", func() {
+					It("Construct the proper array of cipher suites", func() {
+						var b = []byte(fmt.Sprintf(`
+enable_ssl: true
+cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+tls_pem:
+%s%s
+`, tlsPEM1YML, tlsPEM2YML))
+
+						expectedSuites := []uint16{
+							tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+							tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						}
+
+						err := config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
+
+						config.Process()
+
+						Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
+					})
 				})
 			})
 
