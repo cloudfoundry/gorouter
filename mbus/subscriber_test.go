@@ -190,6 +190,11 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	Context("when the message cannot be unmarshaled", func() {
+		BeforeEach(func() {
+			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
 		It("does not update the registry", func() {
 			err := natsClient.Publish("router.register", []byte(` `))
 			Expect(err).ToNot(HaveOccurred())
@@ -229,6 +234,11 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	Context("when the message contains an http url for route services", func() {
+		BeforeEach(func() {
+			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
 		It("does not update the registry", func() {
 			msg := mbus.RegistryMessage{
 				Host:                 "host",
