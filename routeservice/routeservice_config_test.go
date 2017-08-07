@@ -146,7 +146,8 @@ var _ = Describe("Route Service Config", func() {
 		It("decrypts a valid signature and returns the decrypted signature", func() {
 			validatedSig, err := config.ValidatedSignature(headers, requestUrl)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(validatedSig).To(Equal(signature))
+			Expect(validatedSig.ForwardedUrl).To(Equal(signature.ForwardedUrl))
+			Expect(validatedSig.RequestedTime.String()).To(Equal(signature.RequestedTime.String()))
 		})
 
 		Context("when the timestamp is expired", func() {
