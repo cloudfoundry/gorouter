@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"code.cloudfoundry.org/gorouter/routeservice/header"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util/rss/common"
 	"github.com/codegangsta/cli"
 )
@@ -24,7 +24,7 @@ func ReadSignature(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	signature, err := header.SignatureFromHeaders(sigEncoded, metaEncoded, crypto)
+	signature, err := routeservice.SignatureFromHeaders(sigEncoded, metaEncoded, crypto)
 
 	if err != nil {
 		fmt.Printf("Failed to read signature: %s\n", err.Error())
@@ -34,7 +34,7 @@ func ReadSignature(c *cli.Context) {
 	printSignature(signature)
 }
 
-func printSignature(signature header.Signature) {
+func printSignature(signature routeservice.Signature) {
 	signatureJson, _ := json.MarshalIndent(&signature, "", "  ")
 	fmt.Printf("Decoded Signature:\n%s\n\n", signatureJson)
 }

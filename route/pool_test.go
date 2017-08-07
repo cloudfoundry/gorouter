@@ -15,8 +15,31 @@ var _ = Describe("Pool", func() {
 	var modTag models.ModificationTag
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "")
+		pool = route.NewPool(2*time.Minute, "", "")
 		modTag = models.ModificationTag{}
+	})
+
+	Context("PoolsMatch", func() {
+		It("returns true if the hosts and paths on both pools are the same", func() {
+			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			p2 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			Expect(route.PoolsMatch(p1, p2)).To(BeTrue())
+		})
+		It("returns false if the hosts are the same but paths are different", func() {
+			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			p2 := route.NewPool(2*time.Minute, "foo.com", "/other")
+			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
+		})
+		It("returns false if the paths are the same but hosts are different", func() {
+			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			p2 := route.NewPool(2*time.Minute, "bar.com", "/path")
+			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
+		})
+		It("returns false if the both hosts and paths on the pools are different", func() {
+			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			p2 := route.NewPool(2*time.Minute, "bar.com", "/other")
+			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
+		})
 	})
 
 	Context("Put", func() {

@@ -14,7 +14,7 @@ var _ = Describe("LeastConnection", func() {
 	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "")
+		pool = route.NewPool(2*time.Minute, "", "")
 	})
 
 	Describe("Next", func() {

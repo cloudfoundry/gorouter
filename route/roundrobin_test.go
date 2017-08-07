@@ -14,7 +14,7 @@ var _ = Describe("RoundRobin", func() {
 	var modTag models.ModificationTag
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "")
+		pool = route.NewPool(2*time.Minute, "", "")
 		modTag = models.ModificationTag{}
 	})
 
@@ -175,7 +175,7 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("resets failed endpoints after exceeding failure duration", func() {
-			pool = route.NewPool(50*time.Millisecond, "")
+			pool = route.NewPool(50*time.Millisecond, "", "")
 
 			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
 			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "")

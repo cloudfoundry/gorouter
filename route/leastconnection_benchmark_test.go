@@ -17,7 +17,7 @@ func loadBalance(lb route.EndpointIterator) {
 
 func loadBalanceFor(strategy string, b *testing.B) {
 
-	pool := route.NewPool(2*time.Minute, "")
+	pool := route.NewPool(2*time.Minute, "", "")
 	total := 5
 	endpoints := make([]*route.Endpoint, 0)
 	for i := 0; i < total; i++ {

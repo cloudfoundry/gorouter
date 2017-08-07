@@ -73,7 +73,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 		)
 
 		BeforeEach(func() {
-			routePool = route.NewPool(1*time.Second, "")
+			routePool = route.NewPool(1*time.Second, "", "")
 			resp = httptest.NewRecorder()
 			alr = &schema.AccessLogRecord{}
 			proxyWriter := utils.NewProxyResponseWriter(resp)

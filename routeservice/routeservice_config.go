@@ -2,7 +2,6 @@ package routeservice
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,17 +10,15 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice/header"
 )
 
 const (
-	RouteServiceSignature    = "X-CF-Proxy-Signature"
-	RouteServiceForwardedURL = "X-CF-Forwarded-Url"
-	RouteServiceMetadata     = "X-CF-Proxy-Metadata"
+	HeaderKeySignature    = "X-CF-Proxy-Signature"
+	HeaderKeyForwardedURL = "X-CF-Forwarded-Url"
+	HeaderKeyMetadata     = "X-CF-Proxy-Metadata"
 )
 
-var RouteServiceExpired = errors.New("Route service request expired")
-var RouteServiceForwardedURLMismatch = errors.New("Route service forwarded url mismatch")
+var ErrExpired = errors.New("route service request expired")
 
 type RouteServiceConfig struct {
 	routeServiceEnabled bool
@@ -88,33 +85,33 @@ func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceR
 	return routeServiceArgs, nil
 }
 
-func (rs *RouteServiceConfig) ValidateSignature(headers *http.Header, requestUrl string) error {
-	metadataHeader := headers.Get(RouteServiceMetadata)
-	signatureHeader := headers.Get(RouteServiceSignature)
+func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUrl string) (*Signature, error) {
+	metadataHeader := headers.Get(HeaderKeyMetadata)
+	signatureHeader := headers.Get(HeaderKeySignature)
 
-	signature, err := header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
+	signature, err := SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
 	if err != nil {
 		if rs.cryptoPrev == nil {
 			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
-			return err
+			return nil, err
 		}
 
 		rs.logger.Debug("proxy-route-service-current-key", zap.String("message", "Decrypt-only secret used to validate route service signature header"))
 		// Decrypt the head again trying to use the old key.
-		signature, err = header.SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
+		signature, err = SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
 
 		if err != nil {
 			rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
-			return err
+			return nil, err
 		}
 	}
 
 	err = rs.validateSignatureTimeout(signature)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return rs.validateForwardedURL(signature, requestUrl)
+	return &signature, nil
 }
 
 func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw string) (string, string, error) {
@@ -123,61 +120,26 @@ func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw strin
 		rs.logger.Error("proxy-route-service-invalidForwardedURL", zap.Error(err))
 		return "", "", err
 	}
-	signature := &header.Signature{
+	signature := &Signature{
 		RequestedTime: time.Now(),
 		ForwardedUrl:  decodedURL,
 	}
 
-	signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(rs.crypto, signature)
+	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signature)
 	if err != nil {
 		return "", "", err
 	}
 	return signatureHeader, metadataHeader, nil
 }
 
-func (rs *RouteServiceConfig) validateSignatureTimeout(signature header.Signature) error {
+func (rs *RouteServiceConfig) validateSignatureTimeout(signature Signature) error {
 	if time.Since(signature.RequestedTime) > rs.routeServiceTimeout {
 		rs.logger.Error("proxy-route-service-timeout",
-			zap.Error(RouteServiceExpired),
+			zap.Error(ErrExpired),
 			zap.String("forwarded-url", signature.ForwardedUrl),
 			zap.Time("request-time", signature.RequestedTime),
 		)
-		return RouteServiceExpired
+		return ErrExpired
 	}
 	return nil
-}
-
-func (rs *RouteServiceConfig) validateForwardedURL(signature header.Signature, requestUrlString string) error {
-	var err error
-	forwardedUrl, requestUrl, err := parseURLs(signature.ForwardedUrl, requestUrlString)
-	if err != nil {
-		rsErr := fmt.Errorf("%s: %s", RouteServiceForwardedURLMismatch, err)
-		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(rsErr))
-		return err
-	}
-
-	if requestUrl.Host != forwardedUrl.Host {
-		var err = RouteServiceForwardedURLMismatch
-		rs.logger.Error("proxy-route-service-forwarded-url-mismatch", zap.Error(err),
-			zap.String("request-url", requestUrl.String()),
-			zap.String("forwarded-url", forwardedUrl.String()),
-		)
-		return err
-	}
-	return nil
-}
-
-func parseURLs(forwardUrlString, requestUrlString string) (forwardUrl, requestUrl *url.URL, err error) {
-	var terr error
-	forwardUrl, terr = url.Parse(forwardUrlString)
-	if terr != nil {
-		err = terr
-	}
-
-	requestUrl, terr = url.Parse(requestUrlString)
-	if terr != nil {
-		err = terr
-	}
-
-	return forwardUrl, requestUrl, err
 }

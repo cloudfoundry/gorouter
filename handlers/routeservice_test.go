@@ -13,7 +13,6 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/routeservice/header"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
 
@@ -29,7 +28,9 @@ var _ = Describe("Route Service Handler", func() {
 	var (
 		handler *negroni.Negroni
 
-		reg  *fakeRegistry.FakeRegistry
+		reg      *fakeRegistry.FakeRegistry
+		routeMap map[string]*route.Pool
+
 		resp *httptest.ResponseRecorder
 		req  *http.Request
 
@@ -77,10 +78,15 @@ var _ = Describe("Route Service Handler", func() {
 
 		reqChan = make(chan *http.Request, 1)
 
-		routePool = route.NewPool(1*time.Second, "")
+		routePool = route.NewPool(1*time.Second, "my_host.com", "/resource+9-9_9")
 
 		fakeLogger = new(logger_fakes.FakeLogger)
 		reg = &fakeRegistry.FakeRegistry{}
+		routeMap = make(map[string]*route.Pool)
+		reg.LookupStub = func(uri route.Uri) *route.Pool {
+			return routeMap[uri.String()]
+		}
+		routeMap["my_host.com/resource%209-9_9"] = routePool
 
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
@@ -122,9 +128,9 @@ var _ = Describe("Route Service Handler", func() {
 				var passedReq *http.Request
 				Eventually(reqChan).Should(Receive(&passedReq))
 
-				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
 
 				reqInfo, err := handlers.ContextRequestInfo(passedReq)
 				Expect(err).ToNot(HaveOccurred())
@@ -171,9 +177,9 @@ var _ = Describe("Route Service Handler", func() {
 				var passedReq *http.Request
 				Eventually(reqChan).Should(Receive(&passedReq))
 
-				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
 				reqInfo, err := handlers.ContextRequestInfo(passedReq)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(reqInfo.RouteServiceURL).To(BeNil())
@@ -187,7 +193,6 @@ var _ = Describe("Route Service Handler", func() {
 					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
 					"https://route-service.com", models.ModificationTag{}, "",
 				)
-
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 			})
@@ -200,9 +205,9 @@ var _ = Describe("Route Service Handler", func() {
 				var passedReq *http.Request
 				Eventually(reqChan).Should(Receive(&passedReq))
 
-				Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
-				Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("https://"))
+				Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+				Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
 
 				reqInfo, err := handlers.ContextRequestInfo(passedReq)
 				Expect(err).ToNot(HaveOccurred())
@@ -216,8 +221,8 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when the route service has a route in the route registry", func() {
 				BeforeEach(func() {
-					rsPool := route.NewPool(2*time.Minute, "route-service.com")
-					reg.LookupReturns(rsPool)
+					rsPool := route.NewPool(2*time.Minute, "route-service.com", "/")
+					routeMap["route-service.com"] = rsPool
 				})
 
 				It("adds a flag to the request context", func() {
@@ -228,9 +233,9 @@ var _ = Describe("Route Service Handler", func() {
 					var passedReq *http.Request
 					Eventually(reqChan).Should(Receive(&passedReq))
 
-					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("https://"))
+					Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
 
 					reqInfo, err := handlers.ContextRequestInfo(passedReq)
 					Expect(err).ToNot(HaveOccurred())
@@ -257,9 +262,9 @@ var _ = Describe("Route Service Handler", func() {
 					var passedReq *http.Request
 					Eventually(reqChan).Should(Receive(&passedReq))
 
-					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).ToNot(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).ToNot(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(ContainSubstring("http://"))
+					Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("http://"))
 
 					reqInfo, err := handlers.ContextRequestInfo(passedReq)
 					Expect(err).ToNot(HaveOccurred())
@@ -276,8 +281,8 @@ var _ = Describe("Route Service Handler", func() {
 				BeforeEach(func() {
 					reqArgs, err := config.Request("", forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
-					req.Header.Set(routeservice.RouteServiceSignature, reqArgs.Signature)
-					req.Header.Set(routeservice.RouteServiceMetadata, reqArgs.Metadata)
+					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
+					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
 				})
 
 				It("strips headers and sends the request to the backend instance", func() {
@@ -288,9 +293,9 @@ var _ = Describe("Route Service Handler", func() {
 					var passedReq *http.Request
 					Eventually(reqChan).Should(Receive(&passedReq))
 
-					Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
 					reqInfo, err := handlers.ContextRequestInfo(passedReq)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(reqInfo.RouteServiceURL).To(BeNil())
@@ -302,7 +307,7 @@ var _ = Describe("Route Service Handler", func() {
 				BeforeEach(func() {
 					reqArgs, err := config.Request("", forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
-					req.Header.Set(routeservice.RouteServiceSignature, reqArgs.Signature)
+					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 				})
 
 				It("returns a 400 bad request response", func() {
@@ -323,15 +328,15 @@ var _ = Describe("Route Service Handler", func() {
 					decodedURL, err := url.QueryUnescape(forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
 
-					signature := &header.Signature{
+					signature := &routeservice.Signature{
 						RequestedTime: time.Now().Add(-2 * time.Minute),
 						ForwardedUrl:  decodedURL,
 					}
 
-					signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(crypto, signature)
+					signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(crypto, signature)
 					Expect(err).ToNot(HaveOccurred())
-					req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-					req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(routeservice.HeaderKeySignature, signatureHeader)
+					req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 				})
 
 				It("returns a 400 bad request response", func() {
@@ -349,10 +354,13 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when the signature's forwarded_url does not match the request", func() {
 				BeforeEach(func() {
-					reqArgs, err := config.Request("", "example.com")
+					reqArgs, err := config.Request("", "https://my_host.com/original_path")
 					Expect(err).ToNot(HaveOccurred())
-					req.Header.Set(routeservice.RouteServiceSignature, reqArgs.Signature)
-					req.Header.Set(routeservice.RouteServiceMetadata, reqArgs.Metadata)
+					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
+					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
+
+					rsPool := route.NewPool(2*time.Minute, "my_host.com", "/original_path")
+					routeMap["my_host.com/original_path"] = rsPool
 				})
 
 				It("returns a 400 bad request response", func() {
@@ -360,8 +368,8 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadRequest))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(fakeLogger.ErrorCallCount()).To(Equal(2))
-					errMsg, _ := fakeLogger.ErrorArgsForCall(1)
+					Expect(fakeLogger.ErrorCallCount()).To(Equal(1))
+					errMsg, _ := fakeLogger.ErrorArgsForCall(0)
 					Expect(errMsg).To(Equal("signature-validation-failed"))
 
 					Expect(nextCalled).To(BeFalse())
@@ -373,7 +381,7 @@ var _ = Describe("Route Service Handler", func() {
 					decodedURL, err := url.QueryUnescape(forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
 
-					signature := &header.Signature{
+					signature := &routeservice.Signature{
 						RequestedTime: time.Now(),
 						ForwardedUrl:  decodedURL,
 					}
@@ -381,10 +389,10 @@ var _ = Describe("Route Service Handler", func() {
 					altCrypto, err := secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).NotTo(HaveOccurred())
 
-					signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(altCrypto, signature)
+					signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(altCrypto, signature)
 					Expect(err).ToNot(HaveOccurred())
-					req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-					req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+					req.Header.Set(routeservice.HeaderKeySignature, signatureHeader)
+					req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 				})
 
 				It("returns a 400 bad request response", func() {
@@ -416,15 +424,15 @@ var _ = Describe("Route Service Handler", func() {
 						decodedURL, err := url.QueryUnescape(forwardedUrl)
 						Expect(err).ToNot(HaveOccurred())
 
-						signature := &header.Signature{
+						signature := &routeservice.Signature{
 							RequestedTime: time.Now(),
 							ForwardedUrl:  decodedURL,
 						}
 
-						signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(cryptoPrev, signature)
+						signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(cryptoPrev, signature)
 						Expect(err).ToNot(HaveOccurred())
-						req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-						req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+						req.Header.Set(routeservice.HeaderKeySignature, signatureHeader)
+						req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 					})
 
 					It("sends the request to the backend instance", func() {
@@ -433,9 +441,9 @@ var _ = Describe("Route Service Handler", func() {
 						var passedReq *http.Request
 						Eventually(reqChan).Should(Receive(&passedReq))
 
-						Expect(passedReq.Header.Get(routeservice.RouteServiceSignature)).To(BeEmpty())
-						Expect(passedReq.Header.Get(routeservice.RouteServiceMetadata)).To(BeEmpty())
-						Expect(passedReq.Header.Get(routeservice.RouteServiceForwardedURL)).To(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
 						reqInfo, err := handlers.ContextRequestInfo(passedReq)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(reqInfo.RouteServiceURL).To(BeNil())
@@ -448,15 +456,15 @@ var _ = Describe("Route Service Handler", func() {
 						decodedURL, err := url.QueryUnescape(forwardedUrl)
 						Expect(err).ToNot(HaveOccurred())
 
-						signature := &header.Signature{
+						signature := &routeservice.Signature{
 							RequestedTime: time.Now().Add(-2 * time.Minute),
 							ForwardedUrl:  decodedURL,
 						}
 
-						signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(cryptoPrev, signature)
+						signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(cryptoPrev, signature)
 						Expect(err).ToNot(HaveOccurred())
-						req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-						req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+						req.Header.Set(routeservice.HeaderKeySignature, signatureHeader)
+						req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 					})
 
 					It("returns a 400 bad request response", func() {
@@ -478,7 +486,7 @@ var _ = Describe("Route Service Handler", func() {
 						decodedURL, err := url.QueryUnescape(forwardedUrl)
 						Expect(err).ToNot(HaveOccurred())
 
-						signature := &header.Signature{
+						signature := &routeservice.Signature{
 							RequestedTime: time.Now(),
 							ForwardedUrl:  decodedURL,
 						}
@@ -486,10 +494,10 @@ var _ = Describe("Route Service Handler", func() {
 						altCrypto, err := secure.NewAesGCM([]byte("123456QRSTUVWXYZ"))
 						Expect(err).NotTo(HaveOccurred())
 
-						signatureHeader, metadataHeader, err := header.BuildSignatureAndMetadata(altCrypto, signature)
+						signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(altCrypto, signature)
 						Expect(err).ToNot(HaveOccurred())
-						req.Header.Set(routeservice.RouteServiceSignature, signatureHeader)
-						req.Header.Set(routeservice.RouteServiceMetadata, metadataHeader)
+						req.Header.Set(routeservice.HeaderKeySignature, signatureHeader)
+						req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 					})
 
 					It("returns a 400 bad request response", func() {

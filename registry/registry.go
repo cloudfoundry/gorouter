@@ -89,8 +89,8 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	pool := r.byURI.Find(routekey)
 	if pool == nil {
-		contextPath := parseContextPath(uri)
-		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
+		host, contextPath := splitHostAndContextPath(uri)
+		pool = route.NewPool(r.dropletStaleThreshold/4, host, contextPath)
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
@@ -186,7 +186,7 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
-			surgicalPool = route.NewPool(0, "")
+			surgicalPool = route.NewPool(0, p.Host(), p.ContextPath())
 			surgicalPool.Put(e)
 		}
 	})
@@ -308,7 +308,7 @@ func (r *RouteRegistry) freshenRoutes() {
 	})
 }
 
-func parseContextPath(uri route.Uri) string {
+func splitHostAndContextPath(uri route.Uri) (string, string) {
 	contextPath := "/"
 	split := strings.SplitN(strings.TrimPrefix(uri.String(), "/"), "/", 2)
 
@@ -320,7 +320,7 @@ func parseContextPath(uri route.Uri) string {
 		contextPath = contextPath[0:idx]
 	}
 
-	return contextPath
+	return split[0], contextPath
 }
 
 func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {

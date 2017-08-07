@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
@@ -53,7 +55,6 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		)
 		return
 	}
-
 	if routeServiceURL != "" && IsTcpUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
@@ -79,9 +80,8 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		return
 	}
 
-	var routeServiceArgs routeservice.RouteServiceRequest
 	if routeServiceURL != "" {
-		rsSignature := req.Header.Get(routeservice.RouteServiceSignature)
+		rsSignature := req.Header.Get(routeservice.HeaderKeySignature)
 
 		var recommendedScheme string
 
@@ -94,8 +94,19 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
 		if hasBeenToRouteService(routeServiceURL, rsSignature) {
 			// A request from a route service destined for a backend instances
-			routeServiceArgs.URLString = routeServiceURL
-			err := r.config.ValidateSignature(&req.Header, forwardedURLRaw)
+			validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+			if err != nil {
+				r.logger.Error("signature-validation-failed", zap.Error(err))
+
+				writeStatus(
+					rw,
+					http.StatusBadRequest,
+					"Failed to validate Route Service Signature",
+					r.logger,
+				)
+				return
+			}
+			err = r.validateRouteServicePool(validatedSig, reqInfo)
 			if err != nil {
 				r.logger.Error("signature-validation-failed", zap.Error(err))
 
@@ -108,13 +119,12 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 				return
 			}
 			// Remove the headers since the backend should not see it
-			req.Header.Del(routeservice.RouteServiceSignature)
-			req.Header.Del(routeservice.RouteServiceMetadata)
-			req.Header.Del(routeservice.RouteServiceForwardedURL)
+			req.Header.Del(routeservice.HeaderKeySignature)
+			req.Header.Del(routeservice.HeaderKeyMetadata)
+			req.Header.Del(routeservice.HeaderKeyForwardedURL)
 		} else {
 			var err error
-			// should not hardcode http, will be addressed by #100982038
-			routeServiceArgs, err = r.config.Request(routeServiceURL, forwardedURLRaw)
+			routeServiceArgs, err := r.config.Request(routeServiceURL, forwardedURLRaw)
 			if err != nil {
 				r.logger.Error("route-service-failed", zap.Error(err))
 
@@ -126,9 +136,9 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 				)
 				return
 			}
-			req.Header.Set(routeservice.RouteServiceSignature, routeServiceArgs.Signature)
-			req.Header.Set(routeservice.RouteServiceMetadata, routeServiceArgs.Metadata)
-			req.Header.Set(routeservice.RouteServiceForwardedURL, routeServiceArgs.ForwardedURL)
+			req.Header.Set(routeservice.HeaderKeySignature, routeServiceArgs.Signature)
+			req.Header.Set(routeservice.HeaderKeyMetadata, routeServiceArgs.Metadata)
+			req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
 
 			reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
 
@@ -141,6 +151,23 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	}
 
 	next(rw, req)
+}
+
+func (r *routeService) validateRouteServicePool(validatedSig *routeservice.Signature, reqInfo *RequestInfo) error {
+	forwardedURL, err := url.Parse(validatedSig.ForwardedUrl)
+	if err != nil {
+		return err
+	}
+	uri := route.Uri(hostWithoutPort(forwardedURL.Host) + forwardedURL.EscapedPath())
+	forwardedPool := r.registry.Lookup(uri)
+	if forwardedPool == nil {
+		return fmt.Errorf("original request URL %s does not exist in the routing table", uri.String())
+	}
+	reqPool := reqInfo.RoutePool
+	if !route.PoolsMatch(reqPool, forwardedPool) {
+		return fmt.Errorf("route service forwarded URL %s%s does not match the original request URL %s", reqPool.Host(), reqPool.ContextPath(), uri.String())
+	}
+	return nil
 }
 
 func hasBeenToRouteService(rsUrl, sigHeader string) bool {

@@ -75,6 +75,7 @@ type Pool struct {
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
 
+	host            string
 	contextPath     string
 	routeServiceUrl string
 
@@ -111,15 +112,24 @@ func NewEndpoint(
 	}
 }
 
-func NewPool(retryAfterFailure time.Duration, contextPath string) *Pool {
+func NewPool(retryAfterFailure time.Duration, host, contextPath string) *Pool {
 	return &Pool{
 		endpoints:         make([]*endpointElem, 0, 1),
 		index:             make(map[string]*endpointElem),
 		retryAfterFailure: retryAfterFailure,
 		nextIdx:           -1,
+		host:              host,
 		contextPath:       contextPath,
 		random:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
+}
+
+func PoolsMatch(p1, p2 *Pool) bool {
+	return p1.Host() == p2.Host() && p1.ContextPath() == p2.ContextPath()
+}
+
+func (p *Pool) Host() string {
+	return p.host
 }
 
 func (p *Pool) ContextPath() string {
@@ -176,7 +186,7 @@ func (p *Pool) RouteServiceUrl() string {
 }
 
 func (p *Pool) FilteredPool(maxConnsPerBackend int64) *Pool {
-	filteredPool := NewPool(p.retryAfterFailure, p.ContextPath())
+	filteredPool := NewPool(p.retryAfterFailure, p.Host(), p.ContextPath())
 	p.Each(func(endpoint *Endpoint) {
 		if endpoint.Stats.NumberConnections.Count() < maxConnsPerBackend {
 			filteredPool.Put(endpoint)

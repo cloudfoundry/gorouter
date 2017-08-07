@@ -81,14 +81,14 @@ var _ = Describe("Lookup", func() {
 		var pool *route.Pool
 
 		BeforeEach(func() {
-			pool = route.NewPool(2*time.Minute, "example.com")
+			pool = route.NewPool(2*time.Minute, "example.com", "/")
 			reg.LookupReturns(pool)
 		})
 
 		Context("when conn limit is set to zero (unlimited)", func() {
 			BeforeEach(func() {
 				maxConnections = 0
-				pool = route.NewPool(2*time.Minute, "example.com")
+				pool = route.NewPool(2*time.Minute, "example.com", "/")
 				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
 				for i := 0; i < 5; i++ {
 					testEndpoint.Stats.NumberConnections.Increment()
@@ -115,7 +115,7 @@ var _ = Describe("Lookup", func() {
 
 		Context("when conn limit is reached for an endpoint", func() {
 			BeforeEach(func() {
-				pool = route.NewPool(2*time.Minute, "example.com")
+				pool = route.NewPool(2*time.Minute, "example.com", "/")
 				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
@@ -146,7 +146,7 @@ var _ = Describe("Lookup", func() {
 		Context("when conn limit is reached for all requested endpoints", func() {
 			var testEndpoint *route.Endpoint
 			BeforeEach(func() {
-				pool = route.NewPool(2*time.Minute, "example.com")
+				pool = route.NewPool(2*time.Minute, "example.com", "/")
 				testEndpoint = route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", nil, -1, "", modTag, "")
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
