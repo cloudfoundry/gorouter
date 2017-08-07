@@ -1092,6 +1092,7 @@ var _ = Describe("Router Integration", func() {
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
 			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+			runningApp1.VerifyAppStatus(200)
 
 			heartbeatInterval := 200 * time.Millisecond
 			runningTicker := time.NewTicker(heartbeatInterval)
