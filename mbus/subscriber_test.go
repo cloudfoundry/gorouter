@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync/atomic"
 
+	"code.cloudfoundry.org/routing-api/models"
+
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -192,6 +194,37 @@ var _ = Describe("Subscriber", func() {
 			err := natsClient.Publish("router.register", []byte(` `))
 			Expect(err).ToNot(HaveOccurred())
 			Consistently(registry.RegisterCallCount).Should(BeZero())
+		})
+	})
+
+	Context("when the message contains a tls port for route", func() {
+		BeforeEach(func() {
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
+		It("endpoint is constructed with tls port instead of http", func() {
+			msg := mbus.RegistryMessage{
+				Host:                 "host",
+				App:                  "app",
+				TLSPort:              1999,
+				PrivateInstanceID:    "id",
+				PrivateInstanceIndex: "index",
+				Port:                 1111,
+				StaleThresholdInSeconds: 120,
+				Uris: []route.Uri{"test.example.com"},
+				Tags: map[string]string{"key": "value"},
+			}
+
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint("app", "host", 1999, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "")
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
 		})
 	})
 
