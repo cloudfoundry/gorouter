@@ -20,9 +20,9 @@ var _ = Describe("RoundRobin", func() {
 
 	Describe("Next", func() {
 		It("performs round-robin through the endpoints", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
-			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "")
-			e3 := route.NewEndpoint("", "1.2.7.8", 1234, "", "", nil, -1, "", modTag, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "", false)
+			e3 := route.NewEndpoint("", "1.2.7.8", 1234, "", "", nil, -1, "", modTag, "", false)
 			endpoints := []*route.Endpoint{e1, e2, e3}
 
 			for _, e := range endpoints {
@@ -56,11 +56,11 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("finds the initial endpoint by private id", func() {
-			b := route.NewEndpoint("", "1.2.3.4", 1235, "b", "", nil, -1, "", modTag, "")
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1234, "a", "", nil, -1, "", modTag, ""))
+			b := route.NewEndpoint("", "1.2.3.4", 1235, "b", "", nil, -1, "", modTag, "", false)
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1234, "a", "", nil, -1, "", modTag, "", false))
 			pool.Put(b)
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1236, "c", "", nil, -1, "", modTag, ""))
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag, ""))
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1236, "c", "", nil, -1, "", modTag, "", false))
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag, "", false))
 
 			for i := 0; i < 10; i++ {
 				iter := route.NewRoundRobin(pool, b.PrivateInstanceId)
@@ -71,11 +71,11 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("finds the initial endpoint by canonical addr", func() {
-			b := route.NewEndpoint("", "1.2.3.4", 1235, "b", "", nil, -1, "", modTag, "")
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1234, "a", "", nil, -1, "", modTag, ""))
+			b := route.NewEndpoint("", "1.2.3.4", 1235, "b", "", nil, -1, "", modTag, "", false)
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1234, "a", "", nil, -1, "", modTag, "", false))
 			pool.Put(b)
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1236, "c", "", nil, -1, "", modTag, ""))
-			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag, ""))
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1236, "c", "", nil, -1, "", modTag, "", false))
+			pool.Put(route.NewEndpoint("", "1.2.3.4", 1237, "d", "", nil, -1, "", modTag, "", false))
 
 			for i := 0; i < 10; i++ {
 				iter := route.NewRoundRobin(pool, b.CanonicalAddr())
@@ -86,8 +86,8 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("finds when there are multiple private ids", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
-			endpointBar := route.NewEndpoint("", "5.6.7.8", 5678, "bar", "", nil, -1, "", modTag, "")
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "", false)
+			endpointBar := route.NewEndpoint("", "5.6.7.8", 5678, "bar", "", nil, -1, "", modTag, "", false)
 
 			pool.Put(endpointFoo)
 			pool.Put(endpointBar)
@@ -104,7 +104,7 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("returns the next available endpoint when the initial is not found", func() {
-			eFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			eFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "", false)
 			pool.Put(eFoo)
 
 			iter := route.NewRoundRobin(pool, "bogus")
@@ -114,7 +114,7 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("finds the correct endpoint when private ids change", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "", false)
 			pool.Put(endpointFoo)
 
 			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
@@ -122,7 +122,7 @@ var _ = Describe("RoundRobin", func() {
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
 
-			endpointBar := route.NewEndpoint("", "1.2.3.4", 1234, "bar", "", nil, -1, "", modTag, "")
+			endpointBar := route.NewEndpoint("", "1.2.3.4", 1234, "bar", "", nil, -1, "", modTag, "", false)
 			pool.Put(endpointBar)
 
 			iter = route.NewRoundRobin(pool, "foo")
@@ -137,8 +137,8 @@ var _ = Describe("RoundRobin", func() {
 
 	Describe("Failed", func() {
 		It("skips failed endpoints", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
-			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "", false)
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -157,8 +157,8 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("resets when all endpoints are failed", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
-			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "", false)
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -177,8 +177,8 @@ var _ = Describe("RoundRobin", func() {
 		It("resets failed endpoints after exceeding failure duration", func() {
 			pool = route.NewPool(50*time.Millisecond, "", "")
 
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "")
-			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "")
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", nil, -1, "", modTag, "", false)
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -203,7 +203,7 @@ var _ = Describe("RoundRobin", func() {
 
 	Context("PreRequest", func() {
 		It("increments the NumberConnections counter", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "", false)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
 			iter := route.NewRoundRobin(pool, "foo")
@@ -214,7 +214,7 @@ var _ = Describe("RoundRobin", func() {
 
 	Context("PostRequest", func() {
 		It("decrements the NumberConnections counter", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "")
+			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", nil, -1, "", modTag, "", false)
 			endpointFoo.Stats = &route.Stats{
 				NumberConnections: route.NewCounter(int64(1)),
 			}

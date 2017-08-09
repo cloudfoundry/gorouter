@@ -173,10 +173,9 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	Status:  defaultStatusConfig,
-	Nats:    []NatsConfig{defaultNatsConfig},
-	Logging: defaultLoggingConfig,
-
+	Status:        defaultStatusConfig,
+	Nats:          []NatsConfig{defaultNatsConfig},
+	Logging:       defaultLoggingConfig,
 	Port:          8081,
 	Index:         0,
 	GoMaxProcs:    -1,

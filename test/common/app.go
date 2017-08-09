@@ -57,12 +57,26 @@ func (a *TestApp) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
 }
 
+func (a *TestApp) TlsListen() {
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", a.port),
+		Handler: a.mux,
+	}
+	certFile := "test/assets/certs/server.pem"
+	keyFile := "test/assets/certs/server.key"
+	go server.ListenAndServeTLS(certFile, keyFile)
+}
+
+func (a *TestApp) RegisterAndListen() {
+	a.Register()
+	a.Listen()
+}
+
 func (a *TestApp) Listen() {
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", a.port),
 		Handler: a.mux,
 	}
-	a.Register()
 	go server.ListenAndServe()
 }
 
@@ -81,6 +95,25 @@ func (a *TestApp) Port() uint16 {
 	return a.port
 }
 
+func (a *TestApp) TlsRegister() {
+	uuid, _ := uuid.GenerateUUID()
+	rm := registerMessage{
+		Host:    "localhost",
+		TlsPort: a.port,
+		Port:    a.port,
+		Uris:    a.urls,
+		Tags:    a.tags,
+		Dea:     "dea",
+		App:     "0",
+		StaleThresholdInSeconds: 1,
+
+		RouteServiceUrl:   a.routeService,
+		PrivateInstanceId: uuid,
+	}
+
+	b, _ := json.Marshal(rm)
+	a.mbusClient.Publish("router.register", b)
+}
 func (a *TestApp) Register() {
 	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
@@ -181,6 +214,7 @@ func (a *TestApp) isStopped() bool {
 type registerMessage struct {
 	Host                    string            `json:"host"`
 	Port                    uint16            `json:"port"`
+	TlsPort                 uint16            `json:"tls_port"`
 	Uris                    []route.Uri       `json:"uris"`
 	Tags                    map[string]string `json:"tags"`
 	Dea                     string            `json:"dea"`

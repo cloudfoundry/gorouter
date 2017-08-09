@@ -33,7 +33,7 @@ var _ = Describe("AccessLog", func() {
 
 		reqChan chan *http.Request
 	)
-	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "")
+	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "", false)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		_, err := ioutil.ReadAll(req.Body)

@@ -154,6 +154,7 @@ var _ = Describe("RouteFetcher", func() {
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
 						"",
+						false,
 					)))
 			}
 		})
@@ -228,6 +229,7 @@ var _ = Describe("RouteFetcher", func() {
 						expectedRoute.RouteServiceUrl,
 						expectedRoute.ModificationTag,
 						"",
+						false,
 					)))
 			}
 		})
@@ -465,6 +467,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
 						"",
+						false,
 					)))
 			})
 		})
@@ -501,6 +504,7 @@ var _ = Describe("RouteFetcher", func() {
 						eventRoute.RouteServiceUrl,
 						eventRoute.ModificationTag,
 						"",
+						false,
 					)))
 			})
 		})

@@ -33,10 +33,11 @@ type RegistryMessage struct {
 }
 
 func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
+	port, useTls := rm.port()
 	return route.NewEndpoint(
 		rm.App,
 		rm.Host,
-		rm.port(),
+		port,
 		rm.PrivateInstanceID,
 		rm.PrivateInstanceIndex,
 		rm.Tags,
@@ -44,6 +45,7 @@ func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
 		rm.RouteServiceURL,
 		models.ModificationTag{},
 		rm.IsolationSegment,
+		useTls,
 	)
 }
 
@@ -53,11 +55,11 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 }
 
 // Prefer TLS Port instead of HTTP Port in Registrty Message
-func (rm *RegistryMessage) port() uint16 {
+func (rm *RegistryMessage) port() (uint16, bool) {
 	if rm.TLSPort != 0 {
-		return rm.TLSPort
+		return rm.TLSPort, true
 	}
-	return rm.Port
+	return rm.Port, false
 }
 
 // Subscriber subscribes to NATS for all router.* messages and handles them

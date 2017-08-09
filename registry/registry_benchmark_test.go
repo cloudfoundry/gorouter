@@ -31,7 +31,7 @@ var reporter = metrics.NewMetricsReporter(sender, batcher)
 
 var fooEndpoint = route.NewEndpoint(
 	"12345", "192.168.1.1", 1234, "id1", "0", map[string]string{}, -1, "",
-	models.ModificationTag{}, "",
+	models.ModificationTag{}, "", false,
 )
 
 func setupLogger() logger.Logger {

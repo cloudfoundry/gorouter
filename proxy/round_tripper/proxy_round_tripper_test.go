@@ -2,6 +2,7 @@ package round_tripper_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"io/ioutil"
 	"net"
@@ -97,7 +98,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			routerIP = "127.0.0.1"
 
 			endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",
-				map[string]string{}, 0, "", models.ModificationTag{}, "")
+				map[string]string{}, 0, "", models.ModificationTag{}, "", false)
 
 			added := routePool.Put(endpoint)
 			Expect(added).To(BeTrue())
@@ -297,13 +298,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 				logContents := string(logger.Contents())
 				reRegexp, err := regexp.Compile(`route-endpoint`)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(reRegexp.FindAllString(logContents, -1)).To(HaveLen(8))
+				Expect(reRegexp.FindAllString(logContents, -1)).To(HaveLen(7))
 
 				for i := 0; i < 3; i++ {
 					Expect(logger.Buffer()).To(gbytes.Say(`backend.*route-endpoint`))
 					Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed.*route-endpoint.*dial`))
 				}
-				Expect(logger.Buffer()).To(gbytes.Say(`status.*route-endpoint`))
 				Expect(logger.Buffer()).To(gbytes.Say(`endpoint-failed.*route-endpoint.*dial`))
 			})
 		})
@@ -506,6 +506,69 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 			})
+
+		})
+
+		Context("when backend is registered with a tls port", func() {
+			BeforeEach(func() {
+				var oldEndpoints []*route.Endpoint
+				routePool.Each(func(endpoint *route.Endpoint) {
+					oldEndpoints = append(oldEndpoints, endpoint)
+				})
+				for _, ep := range oldEndpoints {
+					routePool.Remove(ep)
+				}
+				Expect(routePool.IsEmpty()).To(BeTrue())
+				endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",
+					map[string]string{}, 0, "", models.ModificationTag{}, "", true /* use TLS */)
+				added := routePool.Put(endpoint)
+				Expect(added).To(BeTrue())
+				transport.RoundTripReturns(
+					&http.Response{StatusCode: http.StatusTeapot}, nil,
+				)
+			})
+			It("should set request URL scheme to https", func() {
+				resp, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(transport.RoundTripCallCount()).To(Equal(1))
+				transformedReq := transport.RoundTripArgsForCall(0)
+				Expect(transformedReq.URL.Scheme).To(Equal("https"))
+				Expect(reqBody.closeCount).To(Equal(1))
+				Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+			})
+			Context("when backend is listening for non tls conn", func() {
+				BeforeEach(func() {
+					transport.RoundTripReturns(nil, tls.RecordHeaderError{Msg: "potato"})
+				})
+				It("should error with 525 status code", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(resp.Code).To(Equal(525))
+					Expect(resp.Body).To(ContainSubstring("SSL Handshake Failed"))
+				})
+			})
+
+			Context("when the backend is registered with a non-tls port", func() {
+				BeforeEach(func() {
+					endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",
+						map[string]string{}, 0, "", models.ModificationTag{}, "", false /* do not use TLS */)
+
+					added := routePool.Put(endpoint)
+					Expect(added).To(BeTrue())
+					transport.RoundTripReturns(
+						&http.Response{StatusCode: http.StatusTeapot}, nil,
+					)
+				})
+				It("should set request URL scheme to http", func() {
+					resp, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(transport.RoundTripCallCount()).To(Equal(1))
+					transformedReq := transport.RoundTripArgsForCall(0)
+					Expect(transformedReq.URL.Scheme).To(Equal("http"))
+					Expect(reqBody.closeCount).To(Equal(1))
+					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+				})
+			})
 		})
 
 		Context("when the request context contains a Route Service URL", func() {
@@ -671,9 +734,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 
 				endpoint1 = route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "id-1", "2",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
+					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
 				endpoint2 = route.NewEndpoint("appId", "1.1.1.1", uint16(9092), "id-2", "3",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
+					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
 
 				added := routePool.Put(endpoint1)
 				Expect(added).To(BeTrue())
@@ -733,7 +796,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(removed).To(BeTrue())
 
 						new_endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "id-5", "2",
-							map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "")
+							map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
 						added := routePool.Put(new_endpoint)
 						Expect(added).To(BeTrue())
 					})

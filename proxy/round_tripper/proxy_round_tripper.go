@@ -1,6 +1,7 @@
 package round_tripper
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -20,10 +21,11 @@ import (
 )
 
 const (
-	VcapCookieId      = "__VCAP_ID__"
-	StickyCookieKey   = "JSESSIONID"
-	CookieHeader      = "Set-Cookie"
-	BadGatewayMessage = "502 Bad Gateway: Registered endpoint failed to handle the request."
+	VcapCookieId        = "__VCAP_ID__"
+	StickyCookieKey     = "JSESSIONID"
+	CookieHeader        = "Set-Cookie"
+	BadGatewayMessage   = "502 Bad Gateway: Registered endpoint failed to handle the request."
+	SSLHandshakeMessage = "525 SSL Handshake Failed"
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -107,6 +109,9 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 
 			logger.Debug("backend", zap.Int("attempt", retry))
+			if endpoint.IsTLS() {
+				request.URL.Scheme = "https"
+			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
 			if err == nil || !retryableError(err) {
 				break
@@ -154,12 +159,13 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		responseWriter := reqInfo.ProxyResponseWriter
 		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
 
-		logger.Info("status", zap.String("body", BadGatewayMessage))
-
-		http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
-		responseWriter.Header().Del("Connection")
-
+		if _, ok := err.(tls.RecordHeaderError); ok {
+			http.Error(responseWriter, SSLHandshakeMessage, 525)
+		} else {
+			http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
+		}
 		logger.Error("endpoint-failed", zap.Error(err))
+		responseWriter.Header().Del("Connection")
 
 		rt.combinedReporter.CaptureBadGateway()
 

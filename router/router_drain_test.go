@@ -66,7 +66,7 @@ var _ = Describe("Router", func() {
 			w.WriteHeader(http.StatusNoContent)
 		})
 
-		app.Listen()
+		app.RegisterAndListen()
 
 		Eventually(func() bool {
 			return appRegistered(registry, app)
@@ -144,7 +144,7 @@ var _ = Describe("Router", func() {
 			w.WriteHeader(http.StatusNoContent)
 		})
 
-		app.Listen()
+		app.RegisterAndListen()
 
 		Eventually(func() bool {
 			return appRegistered(registry, app)
@@ -275,7 +275,7 @@ var _ = Describe("Router", func() {
 				w.WriteHeader(http.StatusNoContent)
 			})
 
-			app.Listen()
+			app.RegisterAndListen()
 
 			Eventually(func() bool {
 				return appRegistered(registry, app)
@@ -328,7 +328,7 @@ var _ = Describe("Router", func() {
 
 				time.Sleep(1 * time.Second)
 			})
-			app.Listen()
+			app.RegisterAndListen()
 
 			Eventually(func() bool {
 				return appRegistered(registry, app)
@@ -379,7 +379,7 @@ var _ = Describe("Router", func() {
 					w.WriteHeader(http.StatusNoContent)
 				})
 
-				app.Listen()
+				app.RegisterAndListen()
 
 				Eventually(func() bool {
 					return appRegistered(registry, app)

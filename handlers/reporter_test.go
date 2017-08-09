@@ -52,7 +52,7 @@ var _ = Describe("Reporter Handler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			reqInfo.RouteEndpoint = route.NewEndpoint(
 				"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
-				models.ModificationTag{}, "")
+				models.ModificationTag{}, "", false)
 			reqInfo.StoppedAt = time.Now()
 
 			nextCalled = true
@@ -103,7 +103,7 @@ var _ = Describe("Reporter Handler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				reqInfo.RouteEndpoint = route.NewEndpoint(
 					"appID", "blah", uint16(1234), "id", "1", nil, 0, "",
-					models.ModificationTag{}, "")
+					models.ModificationTag{}, "", false)
 
 				nextCalled = true
 			})

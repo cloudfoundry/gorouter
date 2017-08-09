@@ -200,8 +200,86 @@ var _ = Describe("Router Integration", func() {
 			}).Should(ContainSubstring(`"routing_table_sharding_mode":"all"`))
 		})
 	})
+	Context("Backend TLS ", func() {
+		var (
+			config     *config.Config
+			statusPort uint16
+			proxyPort  uint16
+			cfgFile    string
+		)
+		BeforeEach(func() {
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
 
-	Context("TLS", func() {
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
+			config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+			config.SkipSSLValidation = true
+		})
+		JustBeforeEach(func() {
+			writeConfig(config, cfgFile)
+		})
+		Context("when backend registration includes TLS port", func() {
+			Context("when backend is listening for TLS connections", func() {
+				It("successfully connects to backend using TLS connection", func() {
+					localIP, err := localip.LocalIP()
+					mbusClient, err := newMessageBus(config)
+					Expect(err).ToNot(HaveOccurred())
+
+					gorouterSession = startGorouterSession(cfgFile)
+					defer gorouterSession.Kill()
+
+					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+					runningApp1.TlsRegister()
+					runningApp1.TlsListen()
+					heartbeatInterval := 200 * time.Millisecond
+					runningTicker := time.NewTicker(heartbeatInterval)
+					go func() {
+						for {
+							select {
+							case <-runningTicker.C:
+								runningApp1.TlsRegister()
+							}
+						}
+					}()
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+					runningApp1.VerifyAppStatus(200)
+
+				})
+			})
+			Context("when backend is only listening for non TLS connections", func() {
+				It("fails with a 525 SSL Handhsake error", func() {
+					localIP, err := localip.LocalIP()
+					mbusClient, err := newMessageBus(config)
+					Expect(err).ToNot(HaveOccurred())
+
+					gorouterSession = startGorouterSession(cfgFile)
+					defer gorouterSession.Kill()
+
+					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+					runningApp1.TlsRegister()
+					runningApp1.Listen()
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+					heartbeatInterval := 200 * time.Millisecond
+					runningTicker := time.NewTicker(heartbeatInterval)
+					go func() {
+						for {
+							select {
+							case <-runningTicker.C:
+								runningApp1.TlsRegister()
+							}
+						}
+					}()
+					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+					runningApp1.VerifyAppStatus(525)
+				})
+			})
+		})
+	})
+	Context("Frontend TLS", func() {
 		var (
 			config     *config.Config
 			statusPort uint16
@@ -328,6 +406,7 @@ var _ = Describe("Router Integration", func() {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte{'b'})
 			})
+			longApp.Register()
 			longApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
@@ -384,6 +463,7 @@ var _ = Describe("Router Integration", func() {
 				blocker <- true
 				<-blocker
 			})
+			timeoutApp.Register()
 			timeoutApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
@@ -420,6 +500,7 @@ var _ = Describe("Router Integration", func() {
 				blocker <- true
 				<-blocker
 			})
+			timeoutApp.Register()
 			timeoutApp.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
@@ -524,6 +605,7 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+		zombieApp.Register()
 		zombieApp.Listen()
 
 		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
@@ -535,7 +617,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(spanIDHeader).ToNot(BeEmpty())
 			w.WriteHeader(http.StatusOK)
 		})
-
+		runningApp.Register()
 		runningApp.Listen()
 
 		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -607,6 +689,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+			zombieApp.Register()
 			zombieApp.Listen()
 
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -679,6 +762,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp.Register()
 			runningApp.Listen()
 
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -742,6 +826,7 @@ var _ = Describe("Router Integration", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+				runningApp.Register()
 				runningApp.Listen()
 
 				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -833,6 +918,7 @@ var _ = Describe("Router Integration", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceSrv.URL)
+				runningApp.Register()
 				runningApp.Listen()
 
 				localIP, err := localip.LocalIP()
@@ -1087,7 +1173,7 @@ var _ = Describe("Router Integration", func() {
 				wg2.Wait()
 				w.WriteHeader(http.StatusOK)
 			})
-
+			runningApp1.Register()
 			runningApp1.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 

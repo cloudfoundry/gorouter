@@ -333,5 +333,6 @@ func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
 		zap.String("backend", endpoint.CanonicalAddr()),
 		zap.Object("modification_tag", endpoint.ModificationTag),
 		isoSegField,
+		zap.Bool("isTLS", endpoint.IsTLS()),
 	}
 }

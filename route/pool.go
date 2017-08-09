@@ -53,6 +53,7 @@ type Endpoint struct {
 	ModificationTag      models.ModificationTag
 	Stats                *Stats
 	IsolationSegment     string
+	useTls               bool
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -97,11 +98,13 @@ func NewEndpoint(
 	routeServiceUrl string,
 	modificationTag models.ModificationTag,
 	isolationSegment string,
+	useTLS bool,
 ) *Endpoint {
 	return &Endpoint{
 		ApplicationId:        appId,
 		addr:                 fmt.Sprintf("%s:%d", host, port),
 		Tags:                 tags,
+		useTls:               useTLS,
 		PrivateInstanceId:    privateInstanceId,
 		PrivateInstanceIndex: privateInstanceIndex,
 		staleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
@@ -110,6 +113,10 @@ func NewEndpoint(
 		Stats:                NewStats(),
 		IsolationSegment:     isolationSegment,
 	}
+}
+
+func (e *Endpoint) IsTLS() bool {
+	return e.useTls
 }
 
 func NewPool(retryAfterFailure time.Duration, host, contextPath string) *Pool {

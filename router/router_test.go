@@ -184,7 +184,7 @@ var _ = Describe("Router", func() {
 
 	It("registry contains last updated varz", func() {
 		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, config.Port, mbusClient, nil)
-		app1.Listen()
+		app1.RegisterAndListen()
 
 		Eventually(func() bool {
 			return appRegistered(registry, app1)
@@ -194,7 +194,7 @@ var _ = Describe("Router", func() {
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 
 		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
-		app2.Listen()
+		app2.RegisterAndListen()
 		Eventually(func() bool {
 			return appRegistered(registry, app2)
 		}).Should(BeTrue())
@@ -206,7 +206,7 @@ var _ = Describe("Router", func() {
 
 	It("varz", func() {
 		app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, config.Port, mbusClient, map[string]string{"framework": "rails"})
-		app.Listen()
+		app.RegisterAndListen()
 		additionalRequests := 100
 		go app.RegisterRepeatedly(100 * time.Millisecond)
 
@@ -240,7 +240,7 @@ var _ = Describe("Router", func() {
 		apps := make([]*testcommon.TestApp, 10)
 		for i := range apps {
 			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, config.Port, mbusClient, nil)
-			apps[i].Listen()
+			apps[i].RegisterAndListen()
 		}
 
 		for _, app := range apps {
@@ -268,7 +268,7 @@ var _ = Describe("Router", func() {
 				1*time.Second,
 				"https://sample_rs_url.com",
 			)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -300,7 +300,7 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
 			})
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -350,7 +350,7 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
 			})
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -395,7 +395,7 @@ var _ = Describe("Router", func() {
 			}
 			msg = string(b)
 		})
-		app.Listen()
+		app.RegisterAndListen()
 		Eventually(func() bool {
 			return appRegistered(registry, app)
 		}).Should(BeTrue())
@@ -428,7 +428,7 @@ var _ = Describe("Router", func() {
 			rCh <- r
 		})
 
-		app.Listen()
+		app.RegisterAndListen()
 		go app.RegisterRepeatedly(1 * time.Second)
 
 		Eventually(func() bool {
@@ -469,7 +469,7 @@ var _ = Describe("Router", func() {
 			done <- r.Header.Get(handlers.VcapRequestIdHeader)
 		})
 
-		app.Listen()
+		app.RegisterAndListen()
 		go app.RegisterRepeatedly(1 * time.Second)
 
 		Eventually(func() bool {
@@ -538,7 +538,7 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				rCh <- r.Header.Get("X-Forwarded-For")
 			})
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -561,7 +561,7 @@ var _ = Describe("Router", func() {
 
 		It("sets the x-Forwarded-Proto header to https", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -588,7 +588,7 @@ var _ = Describe("Router", func() {
 	Context("HTTP keep-alive", func() {
 		It("reuses the same connection on subsequent calls", func() {
 			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -619,7 +619,7 @@ var _ = Describe("Router", func() {
 
 		It("resets the idle timeout on activity", func() {
 			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -669,7 +669,7 @@ var _ = Describe("Router", func() {
 				mbusClient,
 				config.EndpointTimeout/4*3,
 			)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -712,7 +712,7 @@ var _ = Describe("Router", func() {
 					1*time.Second,
 				)
 
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -756,7 +756,7 @@ var _ = Describe("Router", func() {
 				1*time.Second,
 				"",
 			)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -790,7 +790,7 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				rCh <- r.Header.Get("X-Forwarded-For")
 			})
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -824,7 +824,7 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				rCh <- r.Header.Get("X-Forwarded-For")
 			})
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -866,7 +866,7 @@ var _ = Describe("Router", func() {
 
 		It("serves ssl traffic", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -893,7 +893,7 @@ var _ = Describe("Router", func() {
 
 		It("fails when the client uses an unsupported cipher suite", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -913,7 +913,7 @@ var _ = Describe("Router", func() {
 
 		It("sets the x-Forwarded-Proto header to https", func() {
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-			app.Listen()
+			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
@@ -944,7 +944,7 @@ var _ = Describe("Router", func() {
 			})
 			It("add the ca cert to the trusted pool and returns 200", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -973,7 +973,7 @@ var _ = Describe("Router", func() {
 		Context("when a supported server name is provided", func() {
 			It("return 200 Ok status", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1001,7 +1001,7 @@ var _ = Describe("Router", func() {
 			It("retrieves the correct certificate for the client", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1049,7 +1049,7 @@ var _ = Describe("Router", func() {
 				It("return 200 Ok status", func() {
 					app := test.NewGreetApp([]route.Uri{"c.vcap.me"}, config.Port, mbusClient, nil)
 
-					app.Listen()
+					app.RegisterAndListen()
 					Eventually(func() bool {
 						return appRegistered(registry, app)
 					}).Should(BeTrue())
@@ -1078,7 +1078,7 @@ var _ = Describe("Router", func() {
 			It("returns the default certificate", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1102,7 +1102,7 @@ var _ = Describe("Router", func() {
 			It("uses a cert that matches the hostname", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1122,7 +1122,7 @@ var _ = Describe("Router", func() {
 			It("uses the default cert when hostname does not match any cert", func() {
 				app := test.NewGreetApp([]route.Uri{"notexist.vcap.me"}, config.Port, mbusClient, nil)
 
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1166,7 +1166,7 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
@@ -1195,7 +1195,7 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
-				app.Listen()
+				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())

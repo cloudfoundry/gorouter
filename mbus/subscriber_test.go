@@ -228,7 +228,7 @@ var _ = Describe("Subscriber", func() {
 
 			Eventually(registry.RegisterCallCount).Should(Equal(1))
 			_, originalEndpoint := registry.RegisterArgsForCall(0)
-			expectedEndpoint := route.NewEndpoint("app", "host", 1999, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "")
+			expectedEndpoint := route.NewEndpoint("app", "host", 1999, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", true)
 			Expect(originalEndpoint).To(Equal(expectedEndpoint))
 		})
 	})

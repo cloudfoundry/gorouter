@@ -22,7 +22,7 @@ var _ = Describe("AccessLogRecord", func() {
 		record   *schema.AccessLogRecord
 	)
 	BeforeEach(func() {
-		endpoint = route.NewEndpoint("FakeApplicationId", "1.2.3.4", 1234, "", "3", nil, 0, "", models.ModificationTag{}, "")
+		endpoint = route.NewEndpoint("FakeApplicationId", "1.2.3.4", 1234, "", "3", nil, 0, "", models.ModificationTag{}, "", false)
 		record = &schema.AccessLogRecord{
 			Request: &http.Request{
 				Host:   "FakeRequestHost",

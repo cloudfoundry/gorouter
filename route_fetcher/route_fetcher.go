@@ -169,6 +169,7 @@ func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 		eventRoute.RouteServiceUrl,
 		eventRoute.ModificationTag,
 		"",
+		false, /* routing api routes will not register https backends */
 	)
 	switch e.Action {
 	case "Delete":
@@ -240,6 +241,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
 				"",
+				false,
 			))
 	}
 }
@@ -276,6 +278,7 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 				aRoute.RouteServiceUrl,
 				aRoute.ModificationTag,
 				"",
+				false,
 			))
 	}
 }
