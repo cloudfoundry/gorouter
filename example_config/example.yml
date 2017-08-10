@@ -19,12 +19,12 @@ index: 0
 
 go_max_procs: 8
 
-publish_start_message_interval: 30
-prune_stale_droplets_interval: 30
-droplet_stale_threshold: 120
+publish_start_message_interval: 60s
+prune_stale_droplets_interval: 30s
+droplet_stale_threshold: 120s
 publish_active_apps_interval: 0 # 0 means disabled
 secure_cookies: true
-route_service_timeout: 60
+route_service_timeout: 60s
 route_services_secret: "tWPE+sWJq+ZnGJpyKkIPYg=="
 
 extra_headers_to_log:

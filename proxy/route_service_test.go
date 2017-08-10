@@ -371,48 +371,98 @@ var _ = Describe("Route Services", func() {
 
 	Context("when the route service is a CF app", func() {
 
-		It("successfully looks up the route service and sends the request", func() {
+		Context("when registration message does not contain tls_port", func() {
+			It("successfully looks up the route service and sends the request", func() {
 
-			routeServiceHandler := func(conn *test_util.HttpConn) {
-				defer GinkgoRecover()
-				resp := test_util.NewResponse(http.StatusOK)
-				req, _ := conn.ReadRequest()
+				routeServiceHandler := func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
+					resp := test_util.NewResponse(http.StatusOK)
+					req, _ := conn.ReadRequest()
 
-				Expect(req.Host).ToNot(Equal("my_app.com"))
-				metaHeader := req.Header.Get(routeservice.HeaderKeyMetadata)
-				sigHeader := req.Header.Get(routeservice.HeaderKeySignature)
+					Expect(req.Host).ToNot(Equal("my_app.com"))
+					metaHeader := req.Header.Get(routeservice.HeaderKeyMetadata)
+					sigHeader := req.Header.Get(routeservice.HeaderKeySignature)
 
-				crypto, err := secure.NewAesGCM([]byte(cryptoKey))
-				Expect(err).ToNot(HaveOccurred())
-				_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
-				Expect(err).ToNot(HaveOccurred())
+					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
+					Expect(err).ToNot(HaveOccurred())
+					_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
+					Expect(err).ToNot(HaveOccurred())
 
-				// X-CF-ApplicationID will only be set if the request was sent to internal cf app first time
-				Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("my-route-service-app-id"))
+					// X-CF-ApplicationID will only be set if the request was sent to internal cf app first time
+					Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("my-route-service-app-id"))
 
-				Expect(req.Header.Get("X-CF-Forwarded-Url")).To(Equal("https://my_app.com/"))
-				conn.WriteResponse(resp)
-			}
+					Expect(req.Header.Get("X-CF-Forwarded-Url")).To(Equal("https://my_app.com/"))
+					conn.WriteResponse(resp)
+				}
 
-			rsListener := registerHandlerWithAppId(r, "route_service.com", "", routeServiceHandler, "", "my-route-service-app-id")
-			appListener := registerHandlerWithRouteService(r, "my_app.com", "https://route_service.com", func(conn *test_util.HttpConn) {
-				defer GinkgoRecover()
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				Fail("Should not get here")
+				rsListener := registerHandlerWithAppId(r, "route_service.com", "", routeServiceHandler, "", "my-route-service-app-id")
+				appListener := registerHandlerWithRouteService(r, "my_app.com", "https://route_service.com", func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					Fail("Should not get here")
+				})
+				defer func() {
+					Expect(rsListener.Close()).ToNot(HaveErrored())
+					Expect(appListener.Close()).ToNot(HaveErrored())
+				}()
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "my_app.com", "", nil)
+				conn.WriteRequest(req)
+
+				res, _ := readResponse(conn)
+
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
-			defer func() {
-				Expect(rsListener.Close()).ToNot(HaveErrored())
-				Expect(appListener.Close()).ToNot(HaveErrored())
-			}()
-			conn := dialProxy(proxyServer)
+		})
 
-			req := test_util.NewRequest("GET", "my_app.com", "", nil)
-			conn.WriteRequest(req)
+		Context("when registration message contains tls_port", func() {
+			BeforeEach(func() {
+				conf.SkipSSLValidation = true
+			})
 
-			res, _ := readResponse(conn)
+			It("successfully looks up the route service and sends the request", func() {
+				routeServiceHandler := func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
+					resp := test_util.NewResponse(http.StatusOK)
+					req, _ := conn.ReadRequest()
 
-			Expect(res.StatusCode).To(Equal(http.StatusOK))
+					Expect(req.Host).ToNot(Equal("my_app.com"))
+					metaHeader := req.Header.Get(routeservice.HeaderKeyMetadata)
+					sigHeader := req.Header.Get(routeservice.HeaderKeySignature)
+
+					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
+					Expect(err).ToNot(HaveOccurred())
+					_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
+					Expect(err).ToNot(HaveOccurred())
+
+					// X-CF-ApplicationID will only be set if the request was sent to internal cf app first time
+					Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("my-route-service-app-id"))
+
+					Expect(req.Header.Get("X-CF-Forwarded-Url")).To(Equal("https://my_app.com/"))
+					conn.WriteResponse(resp)
+				}
+
+				rsListener := registerHandlerWithAppIdWithTLS(r, "route_service.com", "", routeServiceHandler, "", "my-route-service-app-id")
+				appListener := registerHandlerWithRouteService(r, "my_app.com", "https://route_service.com", func(conn *test_util.HttpConn) {
+					defer GinkgoRecover()
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					Fail("Should not get here")
+				})
+				defer func() {
+					Expect(rsListener.Close()).ToNot(HaveErrored())
+					Expect(appListener.Close()).ToNot(HaveErrored())
+				}()
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "my_app.com", "", nil)
+				conn.WriteRequest(req)
+
+				res, _ := readResponse(conn)
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
+			})
 		})
 	})
 })

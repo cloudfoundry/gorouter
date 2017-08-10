@@ -1938,6 +1938,15 @@ func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl stri
 	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}, "", false))
 }
 
+func registerAddrWithTLS(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr string, instanceId, instanceIndex, appId string) {
+	host, portStr, err := net.SplitHostPort(addr)
+	Expect(err).NotTo(HaveOccurred())
+
+	port, err := strconv.Atoi(portStr)
+	Expect(err).NotTo(HaveOccurred())
+	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}, "", true))
+}
+
 func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {
 	return registerHandlerWithInstanceId(reg, path, "", handler, "")
 }
@@ -1958,6 +1967,23 @@ func registerHandlerWithAppId(reg *registry.RouteRegistry, path string, routeSer
 
 	registerAddr(reg, path, routeServiceUrl, ln.Addr().String(), instanceId, "2", appId)
 
+	return ln
+}
+
+func registerHandlerWithAppIdWithTLS(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId, appId string) net.Listener {
+	certFile := "../test/assets/certs/server.pem"
+	keyFile := "../test/assets/certs/server.key"
+
+	var config *tls.Config
+	config = &tls.Config{}
+	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
+	Expect(err).NotTo(HaveOccurred())
+	config.Certificates = append(config.Certificates, certificate)
+
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", config)
+	Expect(err).NotTo(HaveOccurred())
+	go runBackendInstance(ln, handler)
+	registerAddrWithTLS(reg, path, routeServiceUrl, ln.Addr().String(), instanceId, "2", appId)
 	return ln
 }
 
