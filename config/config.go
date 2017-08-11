@@ -263,7 +263,7 @@ func (c *Config) Process() {
 		for _, v := range c.TLSPEM {
 			certPEM, keyPEM := parsePEMBlocks([]byte(v))
 			if len(certPEM) == 0 || len(keyPEM) == 0 {
-				panic(fmt.Sprintf("Error parsing PEM blocks of router.tls_pem, missing cert or key: %s", v))
+				panic("Error parsing PEM blocks of router.tls_pem, missing cert or key.")
 			}
 
 			certificate, err := tls.X509KeyPair(certPEM, keyPEM)
