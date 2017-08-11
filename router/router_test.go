@@ -72,6 +72,7 @@ var _ = Describe("Router", func() {
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = test_util.NextAvailPort()
+		config.DisableHTTP = false
 		cert := test_util.CreateCert("default")
 		config.SSLCertificates = []tls.Certificate{cert}
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
@@ -290,6 +291,7 @@ var _ = Describe("Router", func() {
 			x.Close()
 		})
 	})
+
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
 			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
@@ -847,6 +849,26 @@ var _ = Describe("Router", func() {
 			var rr string
 			Eventually(rCh, 1*time.Second).Should(Receive(&rr))
 			Expect(rr).ToNot(BeNil())
+		})
+	})
+
+	Context("when DisableHTTP is true", func() {
+		BeforeEach(func() {
+			config.DisableHTTP = true
+		})
+
+		It("does not serve http traffic", func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.RegisterAndListen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			req, err := http.NewRequest("GET", app.Endpoint(), nil)
+			Expect(err).ToNot(HaveOccurred())
+			client := http.Client{}
+			_, err = client.Do(req)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 

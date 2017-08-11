@@ -265,7 +265,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 		if err != nil {
-			r.logger.Fatal("tcp-listener-error", zap.Error(err))
+			r.logger.Fatal("tls-listener-error", zap.Error(err))
 			return err
 		}
 
@@ -289,37 +289,43 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 			r.stopLock.Unlock()
 			close(r.tlsServeDone)
 		}()
+	} else {
+		r.logger.Info("tls-listener-not-enabled")
 	}
 	return nil
 }
 
 func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
-	if err != nil {
-		r.logger.Fatal("tcp-listener-error", zap.Error(err))
-		return err
-	}
-
-	r.listener = listener
-	if r.config.EnablePROXY {
-		r.listener = &proxyproto.Listener{
-			Listener:           listener,
-			ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+	if !r.config.DisableHTTP {
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+		if err != nil {
+			r.logger.Fatal("tcp-listener-error", zap.Error(err))
+			return err
 		}
-	}
 
-	r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
-
-	go func() {
-		err := server.Serve(r.listener)
-		r.stopLock.Lock()
-		if !r.stopping {
-			errChan <- err
+		r.listener = listener
+		if r.config.EnablePROXY {
+			r.listener = &proxyproto.Listener{
+				Listener:           listener,
+				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+			}
 		}
-		r.stopLock.Unlock()
 
-		close(r.serveDone)
-	}()
+		r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
+
+		go func() {
+			err := server.Serve(r.listener)
+			r.stopLock.Lock()
+			if !r.stopping {
+				errChan <- err
+			}
+			r.stopLock.Unlock()
+
+			close(r.serveDone)
+		}()
+	} else {
+		r.logger.Info("tcp-listener-disabled")
+	}
 	return nil
 }
 
@@ -389,14 +395,15 @@ func (r *Router) stopListening() {
 	r.stopping = true
 	r.stopLock.Unlock()
 
-	r.listener.Close()
+	if r.listener != nil {
+		r.listener.Close()
+		<-r.serveDone
+	}
 
 	if r.tlsListener != nil {
 		r.tlsListener.Close()
 		<-r.tlsServeDone
 	}
-
-	<-r.serveDone
 }
 
 func (r *Router) RegisterComponent() {
