@@ -463,6 +463,17 @@ backends:
 
 			Expect(config.MaxIdleConnsPerHost).To(Equal(10))
 		})
+
+		It("defaults DisableHTTP to false", func() {
+			Expect(config.DisableHTTP).To(BeFalse())
+		})
+
+		It("sets DisableHTTP", func() {
+			var b = []byte("disable_http: true")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.DisableHTTP).To(BeTrue())
+		})
 	})
 
 	Describe("Process", func() {
@@ -1058,6 +1069,32 @@ tls_pem:
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
+					Expect(config.Process).To(Panic())
+				})
+			})
+		})
+
+		Context("When enable_ssl is set to false", func() {
+			Context("When disable_http is set to false", func() {
+				It("succeeds", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: false
+disable_http: false
+`))
+					err := config.Initialize(b)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process).ToNot(Panic())
+					Expect(config.DisableHTTP).To(BeFalse())
+				})
+			})
+			Context("When disable_http is set to true", func() {
+				It("panics", func() {
+					var b = []byte(fmt.Sprintf(`
+enable_ssl: false
+disable_http: true
+`))
+					err := config.Initialize(b)
+					Expect(err).NotTo(HaveOccurred())
 					Expect(config.Process).To(Panic())
 				})
 			})

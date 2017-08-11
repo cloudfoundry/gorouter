@@ -118,6 +118,7 @@ type Config struct {
 	EnablePROXY              bool          `yaml:"enable_proxy"`
 	EnableSSL                bool          `yaml:"enable_ssl"`
 	SSLPort                  uint16        `yaml:"ssl_port"`
+	DisableHTTP              bool          `yaml:"disable_http"`
 	SSLCertificates          []tls.Certificate
 	TLSPEM                   []string `yaml:"tls_pem"`
 	CACerts                  []string `yaml:"ca_certs"`
@@ -182,6 +183,7 @@ var defaultConfig = Config{
 	EnablePROXY:   false,
 	EnableSSL:     false,
 	SSLPort:       443,
+	DisableHTTP:   false,
 	MinTLSVersion: tls.VersionTLS12,
 
 	EndpointTimeout:     60 * time.Second,
@@ -272,6 +274,11 @@ func (c *Config) Process() {
 			c.SSLCertificates = append(c.SSLCertificates, certificate)
 		}
 		c.CipherSuites = c.processCipherSuites()
+	} else {
+		if c.DisableHTTP {
+			errMsg := fmt.Sprintf("neither http nor https listener is enabled: router.enable_ssl: %t, router.disable_http: %t", c.EnableSSL, c.DisableHTTP)
+			panic(errMsg)
+		}
 	}
 
 	if c.RouteServiceSecret != "" {
