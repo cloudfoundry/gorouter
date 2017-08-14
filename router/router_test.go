@@ -883,6 +883,17 @@ var _ = Describe("Router", func() {
 			clientCert      *tls.Certificate
 		)
 
+		doAndGetReceivedRequest := func() *http.Request {
+			resp, err := httpClient.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+			var receivedReq *http.Request
+			Eventually(receivedReqChan).Should(Receive(&receivedReq))
+			return receivedReq
+		}
+
 		BeforeEach(func() {
 			receivedReqChan = make(chan *http.Request, 1)
 
@@ -938,26 +949,14 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not remove the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
 					})
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("does not remove the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
 					})
 				})
@@ -970,13 +969,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not remove the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
 					})
 				})
@@ -993,26 +986,14 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1035,26 +1016,14 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not remove the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
 					})
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("removes the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1067,13 +1036,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("removes the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1090,26 +1053,14 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1132,13 +1083,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("replaces the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						xfccData := receivedReq.Header.Get("X-Forwarded-Client-Cert")
 						Expect(base64.StdEncoding.EncodeToString(clientCert.Certificate[0])).To(Equal(xfccData))
 					})
@@ -1146,13 +1091,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("removes the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1165,13 +1104,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("removes the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1188,13 +1121,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("adds the xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						xfccData := receivedReq.Header.Get("X-Forwarded-Client-Cert")
 						Expect(base64.StdEncoding.EncodeToString(clientCert.Certificate[0])).To(Equal(xfccData))
 					})
@@ -1202,13 +1129,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
@@ -1221,13 +1142,7 @@ var _ = Describe("Router", func() {
 					})
 
 					It("does not add a xfcc header", func() {
-						resp, err := httpClient.Do(req)
-						Expect(err).NotTo(HaveOccurred())
-						defer resp.Body.Close()
-						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-
-						var receivedReq *http.Request
-						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
 					})
 				})
