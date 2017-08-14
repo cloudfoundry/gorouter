@@ -44,6 +44,8 @@ import (
 
 	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 
+	"encoding/base64"
+
 	"code.cloudfoundry.org/gorouter/logger"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 )
@@ -872,6 +874,368 @@ var _ = Describe("Router", func() {
 		})
 	})
 
+	Describe("XFCC header behavior", func() {
+		var (
+			receivedReqChan chan *http.Request
+			req             *http.Request
+			httpClient      *http.Client
+			tlsClientConfig *tls.Config
+			clientCert      *tls.Certificate
+		)
+
+		BeforeEach(func() {
+			receivedReqChan = make(chan *http.Request, 1)
+
+			uri := fmt.Sprintf("https://test.vcap.me:%d/record_headers", config.SSLPort)
+			req, _ = http.NewRequest("GET", uri, nil)
+
+			certChain := test_util.CreateSignedCertWithRootCA("*.vcap.me")
+			config.CACerts = []string{
+				string(certChain.CACertPEM),
+			}
+			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
+
+			clientCertTemplate, err := certTemplate("clientSSL")
+			Expect(err).ToNot(HaveOccurred())
+			clientCert, err = createClientCert(clientCertTemplate, certChain.CACert, certChain.CAPrivKey)
+			Expect(err).ToNot(HaveOccurred())
+
+			rootCAs := x509.NewCertPool()
+			rootCAs.AddCert(certChain.CACert)
+			tlsClientConfig = &tls.Config{
+				RootCAs: rootCAs,
+			}
+			httpClient = &http.Client{Transport: &http.Transport{
+				TLSClientConfig: tlsClientConfig,
+			}}
+		})
+
+		JustBeforeEach(func() {
+			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app.AddHandler("/record_headers", func(w http.ResponseWriter, r *http.Request) {
+				receivedReqChan <- r
+				w.WriteHeader(http.StatusTeapot)
+			})
+			app.RegisterAndListen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+		})
+
+		Context("when the gorouter is configured with always_forward", func() {
+			BeforeEach(func() {
+				config.ForwardedClientCert = "always_forward"
+			})
+
+			Context("when the xfcc header is provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Set("X-Forwarded-Client-Cert", "potato")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("does not remove the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("does not remove the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
+					})
+				})
+
+				Context("when the client connects with out any TLS", func() {
+					BeforeEach(func() {
+						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						req, _ = http.NewRequest("GET", uri, nil)
+						req.Header.Set("X-Forwarded-Client-Cert", "potato")
+					})
+
+					It("does not remove the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
+					})
+				})
+			})
+
+			Context("when the xfcc header is not provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Del("X-Forwarded-Client-Cert")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+			})
+		})
+
+		Context("when the gorouter is configured with forward", func() {
+			BeforeEach(func() {
+				config.ForwardedClientCert = "forward"
+			})
+
+			Context("when the xfcc header is provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Set("X-Forwarded-Client-Cert", "potato")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("does not remove the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("removes the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+
+				Context("when the client connects with out any TLS", func() {
+					BeforeEach(func() {
+						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						req, _ = http.NewRequest("GET", uri, nil)
+						req.Header.Set("X-Forwarded-Client-Cert", "potato")
+					})
+
+					It("removes the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+			})
+
+			Context("when the xfcc header is not provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Del("X-Forwarded-Client-Cert")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+			})
+		})
+
+		Context("when the gorouter is configured with sanitize_set", func() {
+			BeforeEach(func() {
+				config.ForwardedClientCert = "sanitize_set"
+			})
+
+			Context("when the xfcc header is provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Set("X-Forwarded-Client-Cert", "potato")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("replaces the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						xfccData := receivedReq.Header.Get("X-Forwarded-Client-Cert")
+						Expect(base64.StdEncoding.EncodeToString(clientCert.Certificate[0])).To(Equal(xfccData))
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("removes the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+
+				Context("when the client connects with out any TLS", func() {
+					BeforeEach(func() {
+						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						req, _ = http.NewRequest("GET", uri, nil)
+						req.Header.Set("X-Forwarded-Client-Cert", "potato")
+					})
+
+					It("removes the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+			})
+
+			Context("when the xfcc header is not provided by the client", func() {
+				BeforeEach(func() {
+					req.Header.Del("X-Forwarded-Client-Cert")
+				})
+
+				Context("when the client connects with mTLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+					})
+
+					It("adds the xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						xfccData := receivedReq.Header.Get("X-Forwarded-Client-Cert")
+						Expect(base64.StdEncoding.EncodeToString(clientCert.Certificate[0])).To(Equal(xfccData))
+					})
+				})
+
+				Context("when the client connects with regular (non-mutual) TLS", func() {
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+
+				Context("when the client connects with out any TLS", func() {
+					BeforeEach(func() {
+						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						req, _ = http.NewRequest("GET", uri, nil)
+						req.Header.Set("X-Forwarded-Client-Cert", "potato")
+					})
+
+					It("does not add a xfcc header", func() {
+						resp, err := httpClient.Do(req)
+						Expect(err).NotTo(HaveOccurred())
+						defer resp.Body.Close()
+						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+
+						var receivedReq *http.Request
+						Eventually(receivedReqChan).Should(Receive(&receivedReq))
+						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+					})
+				})
+			})
+		})
+
+	})
+
 	Context("serving https", func() {
 		var (
 			cert, key []byte
@@ -1247,6 +1611,7 @@ var _ = Describe("Router", func() {
 				defer resp.Body.Close()
 			})
 		})
+
 	})
 })
 

@@ -101,18 +101,21 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 type CertChain struct {
 	CertPEM, CACertPEM       []byte
 	PrivKeyPEM, CAPrivKeyPEM []byte
+
+	CACert    *x509.Certificate
+	CAPrivKey *rsa.PrivateKey
 }
 
-func CreateSignedCertWithRootCA(cname string) CertChain {
-	rootPrivateKey, rootCADER := CreateCertDER(cname)
+func CreateSignedCertWithRootCA(serverCName string) CertChain {
+	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if cname != "" {
-		subject.CommonName = cname
+	if serverCName != "" {
+		subject.CommonName = serverCName
 	}
 
 	certTemplate := x509.Certificate{
@@ -139,7 +142,14 @@ func CreateSignedCertWithRootCA(cname string) CertChain {
 		PrivKeyPEM:   ownKeyPEM,
 		CACertPEM:    rootCertPEM,
 		CAPrivKeyPEM: rootKeyPEM,
+		CACert:       rootCert,
+		CAPrivKey:    rootPrivateKey,
 	}
+}
+
+func (c *CertChain) TLSCert() tls.Certificate {
+	cert, _ := tls.X509KeyPair(c.CertPEM, c.PrivKeyPEM)
+	return cert
 }
 
 func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
