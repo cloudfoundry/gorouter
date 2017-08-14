@@ -955,6 +955,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("does not remove the xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(Equal("potato"))
@@ -992,6 +995,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("does not add a xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
@@ -1022,6 +1028,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("removes the xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
@@ -1059,6 +1068,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("does not add a xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
@@ -1090,6 +1102,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("removes the xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
@@ -1128,6 +1143,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when the client connects with regular (non-mutual) TLS", func() {
+					BeforeEach(func() {
+						tlsClientConfig.Certificates = nil
+					})
 					It("does not add a xfcc header", func() {
 						receivedReq := doAndGetReceivedRequest()
 						Expect(receivedReq.Header.Get("X-Forwarded-Client-Cert")).To(BeEmpty())
