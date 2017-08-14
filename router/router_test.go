@@ -1172,15 +1172,27 @@ var _ = Describe("Router", func() {
 	Context("serving https", func() {
 		var (
 			cert, key []byte
-			tlsCert   tls.Certificate
+
+			client          *http.Client
+			tlsClientConfig *tls.Config
 		)
 		BeforeEach(func() {
-			var err error
-			key, cert = test_util.CreateKeyPair("test.vcap.me")
-			tlsCert, err = tls.X509KeyPair(cert, key)
-			Expect(err).ToNot(HaveOccurred())
-			config.SSLCertificates = append(config.SSLCertificates, tlsCert)
+			certChain := test_util.CreateSignedCertWithRootCA("test.vcap.me")
+			config.CACerts = []string{
+				string(certChain.CACertPEM),
+			}
+			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
+			cert = certChain.CertPEM
+			key = certChain.PrivKeyPEM
 
+			rootCAs := x509.NewCertPool()
+			rootCAs.AddCert(certChain.CACert)
+			tlsClientConfig = &tls.Config{
+				RootCAs: rootCAs,
+			}
+			client = &http.Client{Transport: &http.Transport{
+				TLSClientConfig: tlsClientConfig,
+			}}
 		})
 
 		It("serves ssl traffic", func() {
@@ -1192,11 +1204,6 @@ var _ = Describe("Router", func() {
 
 			uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-
-			client := http.Client{Transport: tr}
 
 			resp, err := client.Do(req)
 			Expect(err).ToNot(HaveOccurred())
@@ -1211,6 +1218,8 @@ var _ = Describe("Router", func() {
 		})
 
 		It("fails when the client uses an unsupported cipher suite", func() {
+			tlsClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA}
+
 			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
@@ -1219,13 +1228,7 @@ var _ = Describe("Router", func() {
 
 			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-					CipherSuites:       []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA},
-				},
-			}
-			client := http.Client{Transport: tr}
+
 			_, err := client.Do(req)
 			Expect(err).To(HaveOccurred())
 		})
@@ -1239,10 +1242,6 @@ var _ = Describe("Router", func() {
 
 			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client := http.Client{Transport: tr}
 
 			resp, err := client.Do(req)
 			Expect(err).ToNot(HaveOccurred())
@@ -1262,6 +1261,11 @@ var _ = Describe("Router", func() {
 				}
 			})
 			It("add the ca cert to the trusted pool and returns 200", func() {
+				certPool, err := x509.SystemCertPool()
+				Expect(err).ToNot(HaveOccurred())
+				certPool.AppendCertsFromPEM(cert)
+				tlsClientConfig.RootCAs = certPool
+
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 				app.RegisterAndListen()
 				Eventually(func() bool {
@@ -1271,17 +1275,6 @@ var _ = Describe("Router", func() {
 				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
 
-				certPool, err := x509.SystemCertPool()
-				Expect(err).ToNot(HaveOccurred())
-				certPool.AppendCertsFromPEM(cert)
-
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						RootCAs:      certPool,
-						Certificates: []tls.Certificate{tlsCert},
-					},
-				}
-				client := http.Client{Transport: tr}
 				resp, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resp).ToNot(BeNil())
@@ -1290,6 +1283,9 @@ var _ = Describe("Router", func() {
 		})
 
 		Context("when a supported server name is provided", func() {
+			BeforeEach(func() {
+				tlsClientConfig.ServerName = "test.vcap.me"
+			})
 			It("return 200 Ok status", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 				app.RegisterAndListen()
@@ -1299,13 +1295,7 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-						ServerName:         "test.vcap.me",
-					},
-				}
-				client := http.Client{Transport: tr}
+
 				resp, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resp).ToNot(BeNil())
@@ -1326,11 +1316,8 @@ var _ = Describe("Router", func() {
 				}).Should(BeTrue())
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-					ServerName:         "test.vcap.me",
-				}
-				conn, err := tls.Dial("tcp", uri, tlsConfig)
+
+				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
 				defer conn.Close()
 				cstate := conn.ConnectionState()
@@ -1395,6 +1382,9 @@ var _ = Describe("Router", func() {
 		})
 		Context("when server name does not match anything", func() {
 			It("returns the default certificate", func() {
+				tlsClientConfig.ServerName = "not-here.com"
+				tlsClientConfig.InsecureSkipVerify = true
+
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
@@ -1403,11 +1393,8 @@ var _ = Describe("Router", func() {
 				}).Should(BeTrue())
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-					ServerName:         "not-here.com",
-				}
-				conn, err := tls.Dial("tcp", uri, tlsConfig)
+
+				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
 				defer conn.Close()
 				cstate := conn.ConnectionState()
@@ -1418,6 +1405,10 @@ var _ = Describe("Router", func() {
 		})
 
 		Context("when no server name header is provided", func() {
+			BeforeEach(func() {
+				tlsClientConfig.ServerName = ""
+			})
+
 			It("uses a cert that matches the hostname", func() {
 				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
 
@@ -1427,10 +1418,8 @@ var _ = Describe("Router", func() {
 				}).Should(BeTrue())
 
 				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-				}
-				conn, err := tls.Dial("tcp", uri, tlsConfig)
+
+				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
@@ -1439,6 +1428,8 @@ var _ = Describe("Router", func() {
 			})
 
 			It("uses the default cert when hostname does not match any cert", func() {
+				tlsClientConfig.InsecureSkipVerify = true
+
 				app := test.NewGreetApp([]route.Uri{"notexist.vcap.me"}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
@@ -1447,10 +1438,8 @@ var _ = Describe("Router", func() {
 				}).Should(BeTrue())
 
 				uri := fmt.Sprintf("notexist.vcap.me:%d", config.SSLPort)
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-				}
-				conn, err := tls.Dial("tcp", uri, tlsConfig)
+
+				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
@@ -1521,16 +1510,8 @@ var _ = Describe("Router", func() {
 
 				uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-						Certificates: []tls.Certificate{
-							*clientCert,
-						},
-					},
-				}
 
-				client := http.Client{Transport: tr}
+				tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
 
 				resp, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
