@@ -119,7 +119,7 @@ func (a *TestApp) Port() uint16 {
 
 func (a *TestApp) TlsRegister(privateInstanceId string) {
 	rm := registerMessage{
-		Host:    "localhost",
+		Host:    "127.0.0.1",
 		TlsPort: a.port,
 		Port:    a.port,
 		Uris:    a.urls,
@@ -138,7 +138,7 @@ func (a *TestApp) TlsRegister(privateInstanceId string) {
 func (a *TestApp) Register() {
 	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
-		Host: "localhost",
+		Host: "127.0.0.1",
 		Port: a.port,
 		Uris: a.urls,
 		Tags: a.tags,
@@ -156,7 +156,7 @@ func (a *TestApp) Register() {
 
 func (a *TestApp) Unregister() {
 	rm := registerMessage{
-		Host: "localhost",
+		Host: "127.0.0.1",
 		Port: a.port,
 		Uris: a.urls,
 		Tags: nil,

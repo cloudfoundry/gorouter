@@ -216,7 +216,7 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
 			config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-			config.SkipSSLValidation = true
+			config.SkipSSLValidation = false
 
 			privateInstanceId, _ = uuid.GenerateUUID()
 			certChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
