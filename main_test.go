@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
@@ -202,10 +203,12 @@ var _ = Describe("Router Integration", func() {
 	})
 	Context("Backend TLS ", func() {
 		var (
-			config     *config.Config
-			statusPort uint16
-			proxyPort  uint16
-			cfgFile    string
+			config            *config.Config
+			statusPort        uint16
+			proxyPort         uint16
+			cfgFile           string
+			privateInstanceId string
+			certChain         test_util.CertChain
 		)
 		BeforeEach(func() {
 			statusPort = test_util.NextAvailPort()
@@ -215,6 +218,10 @@ var _ = Describe("Router Integration", func() {
 			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
 			config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 			config.SkipSSLValidation = true
+
+			privateInstanceId, _ = uuid.GenerateUUID()
+			certChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
+			config.CACerts = []string{string(certChain.CACertPEM)}
 		})
 		JustBeforeEach(func() {
 			writeConfig(config, cfgFile)
@@ -230,15 +237,15 @@ var _ = Describe("Router Integration", func() {
 					defer gorouterSession.Kill()
 
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
-					runningApp1.TlsRegister()
-					runningApp1.TlsListen()
+					runningApp1.TlsRegister(privateInstanceId)
+					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
 					go func() {
 						for {
 							select {
 							case <-runningTicker.C:
-								runningApp1.TlsRegister()
+								runningApp1.TlsRegister(privateInstanceId)
 							}
 						}
 					}()
@@ -250,7 +257,7 @@ var _ = Describe("Router Integration", func() {
 				})
 			})
 			Context("when backend is only listening for non TLS connections", func() {
-				It("fails with a 525 SSL Handhsake error", func() {
+				It("fails with a 525 SSL Handshake error", func() {
 					localIP, err := localip.LocalIP()
 					mbusClient, err := newMessageBus(config)
 					Expect(err).ToNot(HaveOccurred())
@@ -259,7 +266,7 @@ var _ = Describe("Router Integration", func() {
 					defer gorouterSession.Kill()
 
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
-					runningApp1.TlsRegister()
+					runningApp1.TlsRegister(privateInstanceId)
 					runningApp1.Listen()
 					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
@@ -269,7 +276,7 @@ var _ = Describe("Router Integration", func() {
 						for {
 							select {
 							case <-runningTicker.C:
-								runningApp1.TlsRegister()
+								runningApp1.TlsRegister(privateInstanceId)
 							}
 						}
 					}()

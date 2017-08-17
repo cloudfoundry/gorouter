@@ -1,6 +1,8 @@
 package common
 
 import (
+	"io/ioutil"
+
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/localip"
@@ -57,14 +59,34 @@ func (a *TestApp) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
 }
 
-func (a *TestApp) TlsListen() {
+func (a *TestApp) TlsListen(serverPEM, serverKey []byte) error {
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", a.port),
 		Handler: a.mux,
 	}
-	certFile := "test/assets/certs/server.pem"
-	keyFile := "test/assets/certs/server.key"
-	go server.ListenAndServeTLS(certFile, keyFile)
+	certFile, err := ioutil.TempFile("", "cert")
+	if err != nil {
+		return err
+	}
+
+	keyFile, err := ioutil.TempFile("", "key")
+	if err != nil {
+		return err
+	}
+
+	_, err = certFile.Write(serverPEM)
+	if err != nil {
+		return err
+	}
+	_, err = keyFile.Write(serverKey)
+	if err != nil {
+		return err
+	}
+	certFile.Close()
+	keyFile.Close()
+
+	go server.ListenAndServeTLS(certFile.Name(), keyFile.Name())
+	return nil
 }
 
 func (a *TestApp) RegisterAndListen() {
@@ -95,8 +117,7 @@ func (a *TestApp) Port() uint16 {
 	return a.port
 }
 
-func (a *TestApp) TlsRegister() {
-	uuid, _ := uuid.GenerateUUID()
+func (a *TestApp) TlsRegister(privateInstanceId string) {
 	rm := registerMessage{
 		Host:    "localhost",
 		TlsPort: a.port,
@@ -108,7 +129,7 @@ func (a *TestApp) TlsRegister() {
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:   a.routeService,
-		PrivateInstanceId: uuid,
+		PrivateInstanceId: privateInstanceId,
 	}
 
 	b, _ := json.Marshal(rm)
