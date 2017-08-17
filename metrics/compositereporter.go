@@ -19,6 +19,7 @@ type VarzReporter interface {
 
 //go:generate counterfeiter -o fakes/fake_proxyreporter.go . ProxyReporter
 type ProxyReporter interface {
+	CaptureBackendExhaustedConns()
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
@@ -43,6 +44,7 @@ type RouteRegistryReporter interface {
 
 //go:generate counterfeiter -o fakes/fake_combinedreporter.go . CombinedReporter
 type CombinedReporter interface {
+	CaptureBackendExhaustedConns()
 	CaptureBadRequest()
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
@@ -63,6 +65,10 @@ func NewCompositeReporter(varzReporter VarzReporter, proxyReporter ProxyReporter
 		varzReporter:  varzReporter,
 		proxyReporter: proxyReporter,
 	}
+}
+
+func (c *CompositeReporter) CaptureBackendExhaustedConns() {
+	c.proxyReporter.CaptureBackendExhaustedConns()
 }
 
 func (c *CompositeReporter) CaptureBadRequest() {

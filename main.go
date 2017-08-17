@@ -173,6 +173,7 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
+		"backend_exhausted_conns",
 		"rejected_requests",
 		"total_requests",
 		"responses",

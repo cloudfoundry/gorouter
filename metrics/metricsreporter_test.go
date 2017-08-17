@@ -52,6 +52,18 @@ var _ = Describe("MetricsReporter", func() {
 		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("bad_gateways"))
 	})
 
+	It("increments the backend_exhausted_conns metric", func() {
+		metricReporter.CaptureBackendExhaustedConns()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("backend_exhausted_conns"))
+
+		metricReporter.CaptureBackendExhaustedConns()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("backend_exhausted_conns"))
+	})
+
 	Context("increments the request metrics", func() {
 		It("increments the total requests metric", func() {
 			metricReporter.CaptureRoutingRequest(&route.Endpoint{})

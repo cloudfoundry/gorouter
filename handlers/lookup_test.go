@@ -163,6 +163,10 @@ var _ = Describe("Lookup", func() {
 				Expect(nextCalled).To(BeFalse())
 				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
 			})
+
+			It("increments the backend_exhausted_conn metric", func() {
+				Expect(rep.CaptureBackendExhaustedConnsCallCount()).To(Equal(1))
+			})
 		})
 
 		It("calls next with the pool", func() {

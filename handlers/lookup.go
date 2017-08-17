@@ -77,6 +77,7 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 }
 
 func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request) {
+	l.reporter.CaptureBackendExhaustedConns()
 	l.logger.Info("connection-limit-reached")
 
 	rw.Header().Set("X-Cf-RouterError", "Connection Limit Reached")

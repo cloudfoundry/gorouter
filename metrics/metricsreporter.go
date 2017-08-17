@@ -22,6 +22,10 @@ func NewMetricsReporter(sender metrics.MetricSender, batcher metrics.MetricBatch
 	}
 }
 
+func (m *MetricsReporter) CaptureBackendExhaustedConns() {
+	m.batcher.BatchIncrementCounter("backend_exhausted_conns")
+}
+
 func (m *MetricsReporter) CaptureBadRequest() {
 	m.batcher.BatchIncrementCounter("rejected_requests")
 }
