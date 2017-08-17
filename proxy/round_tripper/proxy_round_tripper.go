@@ -130,6 +130,9 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			request.URL = new(url.URL)
 			*request.URL = *reqInfo.RouteServiceURL
 			if reqInfo.IsInternalRouteService {
+				// note: this *looks* like it breaks TLS to internal route service backends,
+				// but in fact it is right!  this hairpins back on the gorouter, and the subsequent
+				// request from the gorouter will go to a backend using TLS (if tls_port is set on that endpoint)
 				request.URL.Scheme = "http"
 				request.URL.Host = fmt.Sprintf("localhost:%d", rt.localPort)
 			}
