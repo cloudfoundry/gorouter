@@ -24,22 +24,26 @@ func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Confi
 	return generateConfig(statusPort, proxyPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
+func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *x509.CertPool) {
 	c := generateConfig(statusPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
-	key, cert := CreateKeyPair("potato.com")
-	secondKey, secondCert := CreateKeyPair("potato2.com")
+	potatoCertchain := CreateSignedCertWithRootCA("potato.com")
+	potato2Certchain := CreateSignedCertWithRootCA("potato2.com")
+
+	clientTrustedCertPool := x509.NewCertPool()
+	clientTrustedCertPool.AppendCertsFromPEM(potatoCertchain.CACertPEM)
+	clientTrustedCertPool.AppendCertsFromPEM(potato2Certchain.CACertPEM)
 
 	c.TLSPEM = []string{
-		fmt.Sprintf("%s\n%s", string(key), string(cert)),
-		fmt.Sprintf("%s\n%s", string(secondKey), string(secondCert)),
+		fmt.Sprintf("%s\n%s", string(potatoCertchain.PrivKeyPEM), string(potatoCertchain.CertPEM)),
+		fmt.Sprintf("%s\n%s", string(potato2Certchain.PrivKeyPEM), string(potato2Certchain.CertPEM)),
 	}
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 
-	return c
+	return c, clientTrustedCertPool
 }
 
 func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {

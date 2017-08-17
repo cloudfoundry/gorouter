@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"path"
 	"regexp"
@@ -118,11 +119,11 @@ var _ = Describe("Router Integration", func() {
 		return cfg
 	}
 
-	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
-		cfg := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
+	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *x509.CertPool) {
+		cfg, clientTrustedCAs := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
 
 		configDrainSetup(cfg, defaultPruneInterval, defaultPruneThreshold, 0)
-		return cfg
+		return cfg, clientTrustedCAs
 	}
 
 	startGorouterSession := func(cfgFile string) *Session {
@@ -288,26 +289,26 @@ var _ = Describe("Router Integration", func() {
 	})
 	Context("Frontend TLS", func() {
 		var (
-			config     *config.Config
-			statusPort uint16
-			proxyPort  uint16
-			cfgFile    string
-			dialTls    func(version uint16) error
+			config           *config.Config
+			statusPort       uint16
+			proxyPort        uint16
+			cfgFile          string
+			dialTls          func(version uint16) error
+			clientTrustedCAs *x509.CertPool
 		)
 		BeforeEach(func() {
 			statusPort = test_util.NextAvailPort()
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+			config, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
 		})
 		JustBeforeEach(func() {
 			writeConfig(config, cfgFile)
 			dialTls = func(version uint16) error {
 
 				tlsConfig := &tls.Config{
-					MaxVersion:         version,
-					InsecureSkipVerify: true,
+					MaxVersion: version,
 				}
 
 				t := &http.Transport{TLSClientConfig: tlsConfig}
@@ -343,8 +344,9 @@ var _ = Describe("Router Integration", func() {
 			dialTls := func(version uint16) error {
 
 				tlsConfig := &tls.Config{
-					MaxVersion:         version,
-					InsecureSkipVerify: true,
+					MaxVersion: version,
+					RootCAs:    clientTrustedCAs,
+					ServerName: "potato.com",
 				}
 
 				t := &http.Transport{TLSClientConfig: tlsConfig}
@@ -536,7 +538,7 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when ssl is enabled", func() {
 			BeforeEach(func() {
-				config := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+				config, _ := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
 				writeConfig(config, cfgFile)
 			})
 
@@ -884,7 +886,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 			sslPort = test_util.NextAvailPort()
 
-			config = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+			config, _ = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
 			config.RouteServiceSecret = "route-service-secret"
 			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
 
