@@ -83,12 +83,11 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 		cfg.LoadBalancerHealthyThreshold = 0
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint:     "127.0.0.1",
-			Port:              8443,
-			ClientName:        "client-id",
-			ClientSecret:      "client-secret",
-			SkipSSLValidation: false,
-			CACerts:           caCertsPath,
+			TokenEndpoint: "127.0.0.1",
+			Port:          8443,
+			ClientName:    "client-id",
+			ClientSecret:  "client-secret",
+			CACerts:       caCertsPath,
 		}
 		cfg.Backends.MaxConns = maxBackendConns
 
@@ -106,12 +105,11 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 		cfg.LoadBalancerHealthyThreshold = 0
 		cfg.OAuth = config.OAuthConfig{
-			TokenEndpoint:     "127.0.0.1",
-			Port:              8443,
-			ClientName:        "client-id",
-			ClientSecret:      "client-secret",
-			SkipSSLValidation: false,
-			CACerts:           caCertsPath,
+			TokenEndpoint: "127.0.0.1",
+			Port:          8443,
+			ClientName:    "client-id",
+			ClientSecret:  "client-secret",
+			CACerts:       caCertsPath,
 		}
 		cfg.IsolationSegments = isoSegs
 
