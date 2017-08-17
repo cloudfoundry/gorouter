@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"net/url"
 
@@ -97,6 +96,11 @@ type Tracing struct {
 	EnableZipkin bool `yaml:"enable_zipkin"`
 }
 
+type TLSPem struct {
+	CertChain  string `yaml:"cert_chain"`
+	PrivateKey string `yaml:"private_key"`
+}
+
 var defaultLoggingConfig = LoggingConfig{
 	Level:         "debug",
 	MetronAddress: "localhost:3457",
@@ -120,7 +124,7 @@ type Config struct {
 	SSLPort                  uint16        `yaml:"ssl_port"`
 	DisableHTTP              bool          `yaml:"disable_http"`
 	SSLCertificates          []tls.Certificate
-	TLSPEM                   []string `yaml:"tls_pem"`
+	TLSPEM                   []TLSPem `yaml:"tls_pem"`
 	CACerts                  []string `yaml:"ca_certs"`
 	CAPool                   *x509.CertPool
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
@@ -261,17 +265,17 @@ func (c *Config) Process() {
 		}
 
 		for _, v := range c.TLSPEM {
-			certPEM, keyPEM := parsePEMBlocks([]byte(v))
-			if len(certPEM) == 0 || len(keyPEM) == 0 {
+			if len(v.PrivateKey) == 0 || len(v.CertChain) == 0 {
 				panic("Error parsing PEM blocks of router.tls_pem, missing cert or key.")
 			}
 
-			certificate, err := tls.X509KeyPair(certPEM, keyPEM)
+			certificate, err := tls.X509KeyPair([]byte(v.CertChain), []byte(v.PrivateKey))
 			if err != nil {
 				errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
 				panic(errMsg)
 			}
 			c.SSLCertificates = append(c.SSLCertificates, certificate)
+
 		}
 		c.CipherSuites = c.processCipherSuites()
 	} else {
@@ -425,42 +429,6 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 	}
 
 	return ciphers
-}
-
-func parsePEMBlocks(pemBlocks []byte) (certPEMBlock, keyPEMBlock []byte) {
-	for {
-		var block *pem.Block
-		block, pemBlocks = pem.Decode(pemBlocks)
-		if block == nil {
-			break
-		}
-
-		if isCertificate(block) {
-			certPEM := pem.EncodeToMemory(block)
-			certPEMBlock = append(certPEMBlock, certPEM...)
-		} else if isPrivateKey(block) {
-			keyPEM := pem.EncodeToMemory(block)
-			keyPEMBlock = append(keyPEMBlock, keyPEM...)
-		} else if isECParameters(block) {
-			continue
-		} else {
-			panic(fmt.Sprintf("error parsing router.tls_pem, found unsupported PEM block:\n%s", pem.EncodeToMemory(block)))
-		}
-	}
-
-	return
-}
-
-func isECParameters(block *pem.Block) bool {
-	return strings.Contains(block.Type, "PARAMETERS")
-}
-
-func isPrivateKey(block *pem.Block) bool {
-	return strings.Contains(block.Type, "PRIVATE KEY")
-}
-
-func isCertificate(block *pem.Block) bool {
-	return strings.Contains(block.Type, "CERTIFICATE")
 }
 
 func (c *Config) NatsServers() []string {

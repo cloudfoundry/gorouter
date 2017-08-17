@@ -682,47 +682,43 @@ routing_api:
 
 		Context("When EnableSSL is set to true", func() {
 			var (
-				expectedTLSPEMs          []string
 				expectedCAPEMs           []string
 				expectedSSLCertificates  []tls.Certificate
 				tlsPEM1YML               []byte
-				tlsPEM2YML               []byte
-				tlsPEM3YML               []byte
 				rootCA1YML               []byte
 				rootCA2YML               []byte
 				keyPEM1, certPEM1        []byte
 				rootRSAPEM, rootECDSAPEM []byte
+				tlsPEMYML                []byte
+				expectedTLSPEMs          []TLSPem
 			)
 			BeforeEach(func() {
 				certChain := test_util.CreateSignedCertWithRootCA("spinach.com")
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
-				tlsPem1 := fmt.Sprintf("%s%s", string(certPEM1), string(keyPEM1))
-				tlsPem2 := fmt.Sprintf("%s%s", string(keyPEM2), string(certPEM2))
-				tlsPem3 := fmt.Sprintf("%s%s%s", string(certChain.PrivKeyPEM), string(certChain.CertPEM), string(certChain.CACertPEM))
+				tlsPem1 := TLSPem{
+					CertChain:  string(certPEM1),
+					PrivateKey: string(keyPEM1),
+				}
+				tlsPem2 := TLSPem{
+					CertChain:  string(certPEM2),
+					PrivateKey: string(keyPEM2),
+				}
+				tlsPemCertChain := TLSPem{
+					CertChain:  fmt.Sprintf("%s%s", certChain.CertPEM, certChain.CACertPEM),
+					PrivateKey: string(certChain.PrivKeyPEM),
+				}
+				expectedTLSPEMs = []TLSPem{tlsPem1, tlsPem2, tlsPemCertChain}
+				var err error
+				tlsPEMYML, err = yaml.Marshal(expectedTLSPEMs)
+				Expect(err).ToNot(HaveOccurred())
 
 				cert1, err := tls.X509KeyPair(certPEM1, keyPEM1)
 				Expect(err).ToNot(HaveOccurred())
 				cert2, err := tls.X509KeyPair(certPEM2, keyPEM2)
 				Expect(err).ToNot(HaveOccurred())
 				cert3, err := tls.X509KeyPair(append(certChain.CertPEM, certChain.CACertPEM...), certChain.PrivKeyPEM)
-				Expect(err).ToNot(HaveOccurred())
-
-				expectedTLSPEMs = []string{
-					tlsPem1,
-					tlsPem2,
-					tlsPem3,
-				}
-
-				tlsPEM1Array := []string{tlsPem1}
-				tlsPEM2Array := []string{tlsPem2}
-				tlsPEM3Array := []string{tlsPem3}
-				tlsPEM1YML, err = yaml.Marshal(tlsPEM1Array)
-				Expect(err).ToNot(HaveOccurred())
-				tlsPEM2YML, err = yaml.Marshal(tlsPEM2Array)
-				Expect(err).ToNot(HaveOccurred())
-				tlsPEM3YML, err = yaml.Marshal(tlsPEM3Array)
 				Expect(err).ToNot(HaveOccurred())
 
 				expectedSSLCertificates = []tls.Certificate{cert1, cert2, cert3}
@@ -751,8 +747,8 @@ enable_ssl: true
 min_tls_version: TLSv1.1
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s
+`, tlsPEMYML))
 					err := config.Initialize(b)
 					Expect(err).NotTo(HaveOccurred())
 					config.Process()
@@ -766,8 +762,8 @@ enable_ssl: true
 min_tls_version: fake-tls
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s
+`, tlsPEMYML))
 					err := config.Initialize(b)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(config.Process).To(Panic())
@@ -779,8 +775,8 @@ tls_pem:
 enable_ssl: true
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s
+`, tlsPEMYML))
 					err := config.Initialize(b)
 					Expect(err).NotTo(HaveOccurred())
 					config.Process()
@@ -794,10 +790,10 @@ tls_pem:
 enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
-%s%s%s
+%s
 ca_certs:
 %s%s
-`, tlsPEM1YML, tlsPEM2YML, tlsPEM3YML, rootCA1YML, rootCA2YML))
+`, tlsPEMYML, rootCA1YML, rootCA2YML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -811,9 +807,9 @@ ca_certs:
 enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
-%s%s%s
+%s
 ca_certs:
-%s%s`, tlsPEM1YML, tlsPEM2YML, tlsPEM3YML, rootCA1YML, rootCA2YML))
+%s%s`, tlsPEMYML, rootCA1YML, rootCA2YML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -837,8 +833,8 @@ ca_certs:
 enable_ssl: true
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s%s%s
-`, tlsPEM1YML, tlsPEM2YML, tlsPEM3YML))
+%s`, tlsPEMYML))
+
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -852,20 +848,21 @@ tls_pem:
 			})
 
 			Context("PEM with ECDSA cipher algorithm", func() {
-				var tlsPEMYML []byte
+				var tlsECPEMYML []byte
 
 				BeforeEach(func() {
 					keyPEM, certPEM := test_util.CreateECKeyPair("parsnip.com")
-					tlsPEM := fmt.Sprintf("%s%s", string(keyPEM), string(certPEM))
 					cert, err := tls.X509KeyPair(certPEM, keyPEM)
 					Expect(err).ToNot(HaveOccurred())
 
-					expectedTLSPEMs = []string{
-						tlsPEM,
+					expectedTLSPEMs = []TLSPem{
+						TLSPem{
+							CertChain:  string(certPEM),
+							PrivateKey: string(keyPEM),
+						},
 					}
 
-					tlsPEMArray := []string{tlsPEM}
-					tlsPEMYML, err = yaml.Marshal(&tlsPEMArray)
+					tlsECPEMYML, err = yaml.Marshal(expectedTLSPEMs)
 					Expect(err).ToNot(HaveOccurred())
 
 					expectedSSLCertificates = []tls.Certificate{cert}
@@ -877,7 +874,7 @@ enable_ssl: true
 cipher_suites: ECDHE-ECDSA-AES256-GCM-SHA384
 tls_pem:
 %s
-`, tlsPEMYML))
+`, tlsECPEMYML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -894,8 +891,7 @@ tls_pem:
 				It("fails to validate if TLSPEM is missing", func() {
 					var b = []byte(`
 enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-`)
+cipher_suites: ECDHE-RSA-AES128-GCM-SHA256`)
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(config.Process).To(Panic())
@@ -903,36 +899,36 @@ cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 
 				It("fails to validate if TLSPEM does not contain both key and cert", func() {
 					keyPEM, _ := test_util.CreateECKeyPair("parsnip.com")
-					tlsPEMArray := []string{string(keyPEM)}
+					tlsPEMArray := []TLSPem{TLSPem{PrivateKey: string(keyPEM)}}
 					partialTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
 					Expect(err).ToNot(HaveOccurred())
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s
-`, partialTLSPEMYML))
+%s`, partialTLSPEMYML))
 					err = config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process).To(Panic())
 				})
 
-				It("fails to validate if TLSPEM does not contains an supported type", func() {
+				It("fails to validate if TLSPEM does not contains a supported type", func() {
 					invalidPEM := []byte(fmt.Sprintf(`
 -----BEGIN INVALID-----
 dGVzdA==
------END INVALID-----
-`))
-					tlsPEMArray := []string{string(append(append(keyPEM1, invalidPEM...), certPEM1...))}
+-----END INVALID-----`))
+					tlsPEMArray := []TLSPem{TLSPem{
+						PrivateKey: string(keyPEM1),
+						CertChain:  string(invalidPEM),
+					}}
 					invalidTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
 					Expect(err).ToNot(HaveOccurred())
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
 tls_pem:
-%s
-`, invalidTLSPEMYML))
+%s`, invalidTLSPEMYML))
 					err = config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -946,8 +942,8 @@ tls_pem:
 enable_ssl: true
 cipher_suites: RC4-SHA:DES-CBC3-SHA:AES128-SHA:AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-ECDSA-RC4-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-RC4-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-CHACHA20-POLY1305
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s
+`, tlsPEMYML))
 
 						expectedSuites := []uint16{
 							tls.TLS_RSA_WITH_RC4_128_SHA,
@@ -988,8 +984,8 @@ tls_pem:
 enable_ssl: true
 cipher_suites: TLS_RSA_WITH_RC4_128_SHA:TLS_RSA_WITH_3DES_EDE_CBC_SHA:TLS_RSA_WITH_AES_128_CBC_SHA:TLS_RSA_WITH_AES_256_CBC_SHA:TLS_RSA_WITH_AES_128_GCM_SHA256:TLS_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_RC4_128_SHA:TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
 tls_pem:
-%s%s
-`, tlsPEM1YML, tlsPEM2YML))
+%s
+`, tlsPEMYML))
 
 						expectedSuites := []uint16{
 							tls.TLS_RSA_WITH_RC4_128_SHA,

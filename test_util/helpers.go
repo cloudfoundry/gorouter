@@ -36,9 +36,15 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 	clientTrustedCertPool.AppendCertsFromPEM(potatoCertchain.CACertPEM)
 	clientTrustedCertPool.AppendCertsFromPEM(potato2Certchain.CACertPEM)
 
-	c.TLSPEM = []string{
-		fmt.Sprintf("%s\n%s", string(potatoCertchain.PrivKeyPEM), string(potatoCertchain.CertPEM)),
-		fmt.Sprintf("%s\n%s", string(potato2Certchain.PrivKeyPEM), string(potato2Certchain.CertPEM)),
+	c.TLSPEM = []config.TLSPem{
+		config.TLSPem{
+			CertChain:  string(potatoCertchain.CertPEM),
+			PrivateKey: string(potatoCertchain.PrivKeyPEM),
+		},
+		config.TLSPem{
+			CertChain:  string(potato2Certchain.CertPEM),
+			PrivateKey: string(potato2Certchain.PrivKeyPEM),
+		},
 	}
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"

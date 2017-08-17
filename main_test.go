@@ -289,7 +289,7 @@ var _ = Describe("Router Integration", func() {
 	})
 	Context("Frontend TLS", func() {
 		var (
-			config           *config.Config
+			cfg              *config.Config
 			statusPort       uint16
 			proxyPort        uint16
 			cfgFile          string
@@ -301,10 +301,10 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+			cfg, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
 		})
 		JustBeforeEach(func() {
-			writeConfig(config, cfgFile)
+			writeConfig(cfg, cfgFile)
 			dialTls = func(version uint16) error {
 
 				tlsConfig := &tls.Config{
@@ -313,7 +313,7 @@ var _ = Describe("Router Integration", func() {
 
 				t := &http.Transport{TLSClientConfig: tlsConfig}
 				client := &http.Client{Transport: t}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
+				_, err := client.Get(fmt.Sprintf("https://localhost:%d", cfg.SSLPort))
 				return err
 			}
 		})
@@ -323,11 +323,17 @@ var _ = Describe("Router Integration", func() {
 				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
-				tlsPem1 := fmt.Sprintf("%s%s", string(certPEM1), string(keyPEM1))
-				tlsPem2 := fmt.Sprintf("%s%s", string(certPEM2), string(keyPEM2))
-
-				config.TLSPEM = []string{tlsPem1, tlsPem2}
-				config.CipherString = "RC4-SHA"
+				cfg.TLSPEM = []config.TLSPem{
+					config.TLSPem{
+						PrivateKey: string(keyPEM1),
+						CertChain:  string(certPEM1),
+					},
+					config.TLSPem{
+						PrivateKey: string(keyPEM2),
+						CertChain:  string(certPEM2),
+					},
+				}
+				cfg.CipherString = "RC4-SHA"
 			})
 
 			It("throws an error", func() {
@@ -351,7 +357,7 @@ var _ = Describe("Router Integration", func() {
 
 				t := &http.Transport{TLSClientConfig: tlsConfig}
 				client := &http.Client{Transport: t}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
+				_, err := client.Get(fmt.Sprintf("https://localhost:%d", cfg.SSLPort))
 				return err
 			}
 
