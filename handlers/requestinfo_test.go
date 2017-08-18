@@ -2,12 +2,14 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -15,7 +17,7 @@ import (
 	"github.com/urfave/negroni"
 )
 
-var _ = Describe("RequestInfo", func() {
+var _ = Describe("RequestInfoHandler", func() {
 	var (
 		handler negroni.Handler
 
@@ -68,5 +70,53 @@ var _ = Describe("RequestInfo", func() {
 		Expect(ri.StartedAt).To(BeTemporally("~", expectedStartTime))
 
 	})
+})
 
+var _ = Describe("GetEndpoint", func() {
+	var (
+		ctx              context.Context
+		requestInfo      *handlers.RequestInfo
+		expectedEndpoint *route.Endpoint
+	)
+
+	BeforeEach(func() {
+		// some hackery to set data on requestInfo using only exported symbols
+		req, _ := http.NewRequest("banana", "", nil)
+		rih := &handlers.RequestInfoHandler{}
+		rih.ServeHTTP(nil, req, func(w http.ResponseWriter, r *http.Request) {
+			ctx = r.Context()
+			requestInfo, _ = handlers.ContextRequestInfo(r)
+		})
+		expectedEndpoint = &route.Endpoint{PrivateInstanceId: "some-id"}
+
+		requestInfo.RouteEndpoint = expectedEndpoint
+	})
+
+	It("returns the endpoint private instance id", func() {
+		endpoint, err := handlers.GetEndpoint(ctx)
+		Expect(endpoint).To(Equal(expectedEndpoint))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	Context("when the context is missing the key", func() {
+		BeforeEach(func() {
+			ctx = context.Background()
+		})
+
+		It("returns a friendly error", func() {
+			_, err := handlers.GetEndpoint(ctx)
+			Expect(err).To(MatchError("RequestInfo not set on context"))
+		})
+	})
+
+	Context("when the route endpoint is not set", func() {
+		BeforeEach(func() {
+			requestInfo.RouteEndpoint = nil
+		})
+		It("returns a friendly error", func() {
+			_, err := handlers.GetEndpoint(ctx)
+			Expect(err).To(MatchError("route endpoint not set on request info"))
+		})
+
+	})
 })

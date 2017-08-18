@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +43,11 @@ func NewStats() *Stats {
 	}
 }
 
+type ProxyRoundTripper interface {
+	http.RoundTripper
+	CancelRequest(*http.Request)
+}
+
 type Endpoint struct {
 	ApplicationId        string
 	addr                 string
@@ -54,6 +60,7 @@ type Endpoint struct {
 	Stats                *Stats
 	IsolationSegment     string
 	useTls               bool
+	RoundTripper         ProxyRoundTripper
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator

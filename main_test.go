@@ -264,6 +264,28 @@ var _ = Describe("Router Integration", func() {
 
 			})
 
+			Context("when registered instance id does not match the common name on cert presented by the backend", func() {
+				It("fails the connection to the backend with 503 Service Unavailable error", func() {
+					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+					runningApp1.TlsRegister("wrong-instance-id")
+					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
+					heartbeatInterval := 200 * time.Millisecond
+					runningTicker := time.NewTicker(heartbeatInterval)
+					go func() {
+						for {
+							select {
+							case <-runningTicker.C:
+								runningApp1.TlsRegister("wrong-instance-id")
+							}
+						}
+					}()
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+					runningApp1.VerifyAppStatus(503)
+				})
+			})
+
 			Context("when backend is only listening for non TLS connections", func() {
 				It("fails with a 525 SSL Handshake error", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)

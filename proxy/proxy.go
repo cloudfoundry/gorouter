@@ -22,6 +22,7 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/cloudfoundry/dropsonde"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
@@ -50,6 +51,46 @@ type proxy struct {
 	bufferPool               httputil.BufferPool
 }
 
+func NewDropsondeRoundTripper(p round_tripper.ProxyRoundTripper) round_tripper.ProxyRoundTripper {
+	return &dropsondeRoundTripper{
+		p: p,
+		d: dropsonde.InstrumentedRoundTripper(p),
+	}
+}
+
+type dropsondeRoundTripper struct {
+	p round_tripper.ProxyRoundTripper
+	d http.RoundTripper
+}
+
+func (d *dropsondeRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	return d.d.RoundTrip(r)
+}
+
+func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
+	d.p.CancelRequest(r)
+}
+
+type RoundTripperFactoryImpl struct {
+	Template *http.Transport
+}
+
+func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.ProxyRoundTripper {
+	var customTLSConfig tls.Config
+	customTLSConfig = *(t.Template.TLSClientConfig)
+	customTLSConfig.ServerName = expectedServerName
+	newTransport := &http.Transport{
+		Dial:                t.Template.Dial,
+		DisableKeepAlives:   t.Template.DisableKeepAlives,
+		MaxIdleConns:        t.Template.MaxIdleConns,
+		IdleConnTimeout:     t.Template.IdleConnTimeout,
+		MaxIdleConnsPerHost: t.Template.MaxIdleConnsPerHost,
+		DisableCompression:  t.Template.DisableCompression,
+		TLSClientConfig:     &customTLSConfig,
+	}
+	return NewDropsondeRoundTripper(newTransport)
+}
+
 func NewProxy(
 	logger logger.Logger,
 	accessLogger access_log.AccessLogger,
@@ -76,7 +117,7 @@ func NewProxy(
 		bufferPool:               NewBufferPool(),
 	}
 
-	httpTransport := &http.Transport{
+	httpTransportTemplate := &http.Transport{
 		Dial: func(network, addr string) (net.Conn, error) {
 			conn, err := net.DialTimeout(network, addr, 5*time.Second)
 			if err != nil {
@@ -94,10 +135,13 @@ func NewProxy(
 		DisableCompression:  true,
 		TLSClientConfig:     tlsConfig,
 	}
+	roundTripperFactory := &RoundTripperFactoryImpl{
+		Template: httpTransportTemplate,
+	}
 
 	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
-		Transport:      p.proxyRoundTripper(httpTransport, c.Port),
+		Transport:      p.proxyRoundTripper(roundTripperFactory, c.Port),
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
@@ -137,9 +181,10 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (p *proxy) proxyRoundTripper(transport round_tripper.ProxyRoundTripper, port uint16) round_tripper.ProxyRoundTripper {
+func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory, port uint16) round_tripper.ProxyRoundTripper {
 	return round_tripper.NewProxyRoundTripper(
-		round_tripper.NewDropsondeRoundTripper(transport),
+		roundTripperFactory,
+		// round_tripper.NewDropsondeRoundTripper(transport),
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,
 		port,

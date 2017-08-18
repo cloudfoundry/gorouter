@@ -30,15 +30,7 @@ type RequestInfo struct {
 
 // ContextRequestInfo gets the RequestInfo from the request Context
 func ContextRequestInfo(req *http.Request) (*RequestInfo, error) {
-	ri := req.Context().Value(requestInfoCtxKey)
-	if ri == nil {
-		return nil, errors.New("RequestInfo not set on context")
-	}
-	reqInfo, ok := ri.(*RequestInfo)
-	if !ok {
-		return nil, errors.New("RequestInfo is not the correct type")
-	}
-	return reqInfo, nil
+	return getRequestInfo(req.Context())
 }
 
 // RequestInfoHandler adds a RequestInfo to the context of all requests that go
@@ -55,4 +47,28 @@ func (r *RequestInfoHandler) ServeHTTP(w http.ResponseWriter, req *http.Request,
 	req = req.WithContext(context.WithValue(req.Context(), requestInfoCtxKey, reqInfo))
 	reqInfo.StartedAt = time.Now()
 	next(w, req)
+}
+
+func GetEndpoint(ctx context.Context) (*route.Endpoint, error) {
+	reqInfo, err := getRequestInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ep := reqInfo.RouteEndpoint
+	if ep == nil {
+		return nil, errors.New("route endpoint not set on request info")
+	}
+	return ep, nil
+}
+
+func getRequestInfo(ctx context.Context) (*RequestInfo, error) {
+	ri := ctx.Value(requestInfoCtxKey)
+	if ri == nil {
+		return nil, errors.New("RequestInfo not set on context")
+	}
+	reqInfo, ok := ri.(*RequestInfo)
+	if !ok {
+		return nil, errors.New("RequestInfo is not the correct type") // untested
+	}
+	return reqInfo, nil
 }

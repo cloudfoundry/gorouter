@@ -28,6 +28,8 @@ import (
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 
+	"crypto/x509"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -45,19 +47,30 @@ func (t *testBody) Close() error {
 	return nil
 }
 
+type FakeRoundTripperFactory struct {
+	ReturnValue round_tripper.ProxyRoundTripper
+	Calls       int
+}
+
+func (f *FakeRoundTripperFactory) New(expectedServerName string) round_tripper.ProxyRoundTripper {
+	f.Calls++
+	return f.ReturnValue
+}
+
 var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
-			proxyRoundTripper round_tripper.ProxyRoundTripper
-			routePool         *route.Pool
-			transport         *roundtripperfakes.FakeProxyRoundTripper
-			logger            *test_util.TestZapLogger
-			req               *http.Request
-			reqBody           *testBody
-			resp              *httptest.ResponseRecorder
-			alr               *schema.AccessLogRecord
-			routerIP          string
-			combinedReporter  *fakes.FakeCombinedReporter
+			proxyRoundTripper   round_tripper.ProxyRoundTripper
+			routePool           *route.Pool
+			transport           *roundtripperfakes.FakeProxyRoundTripper
+			logger              *test_util.TestZapLogger
+			req                 *http.Request
+			reqBody             *testBody
+			resp                *httptest.ResponseRecorder
+			alr                 *schema.AccessLogRecord
+			routerIP            string
+			combinedReporter    *fakes.FakeCombinedReporter
+			roundTripperFactory *FakeRoundTripperFactory
 
 			reqInfo *handlers.RequestInfo
 
@@ -74,7 +87,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 		)
 
 		BeforeEach(func() {
-			routePool = route.NewPool(1*time.Second, "", "")
+			routePool = route.NewPool(1*time.Second, "myapp.com", "")
 			resp = httptest.NewRecorder()
 			alr = &schema.AccessLogRecord{}
 			proxyWriter := utils.NewProxyResponseWriter(resp)
@@ -105,8 +118,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			combinedReporter = new(fakes.FakeCombinedReporter)
 
+			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
-				transport, logger, "my_trace_key", routerIP, "",
+				roundTripperFactory,
+				logger, "my_trace_key", routerIP, "",
 				combinedReporter, false,
 				1234,
 			)
@@ -548,6 +563,19 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 
+			Context("when backend has an invalid instance-id in the certificate", func() {
+				BeforeEach(func() {
+					backendCert := x509.Certificate{}
+					transport.RoundTripReturns(nil, x509.HostnameError{Certificate: &backendCert, Host: "the wrong one"})
+				})
+				It("should error with 503 status code", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
+					Expect(resp.Body).To(ContainSubstring("Service Unavailable"))
+				})
+			})
+
 			Context("when the backend is registered with a non-tls port", func() {
 				BeforeEach(func() {
 					endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",
@@ -568,6 +596,33 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(reqBody.closeCount).To(Equal(1))
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 				})
+			})
+		})
+
+		Context("transport re-use", func() {
+			It("re-uses transports for the same endpoint", func() {
+				_, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(roundTripperFactory.Calls).To(Equal(1))
+				_, err = proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(roundTripperFactory.Calls).To(Equal(1))
+			})
+
+			It("does not re-use transports between endpoints", func() {
+				endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "instanceId-2", "2",
+					map[string]string{}, 0, "", models.ModificationTag{}, "", true /* use TLS */)
+				added := routePool.Put(endpoint)
+				Expect(added).To(BeTrue())
+				_, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(roundTripperFactory.Calls).To(Equal(1))
+				_, err = proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(roundTripperFactory.Calls).To(Equal(2))
+				_, err = proxyRoundTripper.RoundTrip(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(roundTripperFactory.Calls).To(Equal(2))
 			})
 		})
 
@@ -818,6 +873,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 		})
 
 		It("can cancel requests", func() {
+			reqInfo.RouteEndpoint = endpoint
 			proxyRoundTripper.CancelRequest(req)
 			Expect(transport.CancelRequestCallCount()).To(Equal(1))
 			Expect(transport.CancelRequestArgsForCall(0)).To(Equal(req))
