@@ -318,7 +318,7 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	It("returns a 502 when the SSL cert of the route service is signed by an unknown authority", func() {
+	It("returns a 526 when the SSL cert of the route service is signed by an unknown authority", func() {
 		ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
 			defer GinkgoRecover()
 			Fail("Should not get here")
@@ -334,7 +334,7 @@ var _ = Describe("Route Services", func() {
 
 		res, _ := readResponse(conn)
 
-		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+		Expect(res.StatusCode).To(Equal(526))
 	})
 
 	Context("with a valid certificate", func() {

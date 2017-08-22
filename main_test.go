@@ -263,7 +263,28 @@ var _ = Describe("Router Integration", func() {
 				})
 
 			})
+			Context("when backend instance certificate is signed with an invalid CA", func() {
+				It("fails and returns 526 to the user", func() {
+					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+					runningApp1.TlsRegister(privateInstanceId)
+					differentCertChain := test_util.CreateSignedCertWithRootCA(privateInstanceId)
+					runningApp1.TlsListen(differentCertChain.CertPEM, differentCertChain.PrivKeyPEM)
+					heartbeatInterval := 200 * time.Millisecond
+					runningTicker := time.NewTicker(heartbeatInterval)
+					go func() {
+						for {
+							select {
+							case <-runningTicker.C:
+								runningApp1.TlsRegister(privateInstanceId)
+							}
+						}
+					}()
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
+					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+					runningApp1.VerifyAppStatus(526)
+				})
+			})
 			Context("when registered instance id does not match the common name on cert presented by the backend", func() {
 				It("fails the connection to the backend with 503 Service Unavailable error", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
@@ -283,6 +304,18 @@ var _ = Describe("Router Integration", func() {
 
 					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
 					runningApp1.VerifyAppStatus(503)
+				})
+			})
+
+			Context("but backend registration does not include private_instance_id", func() {
+				It("does not validate the instance_id", func() {
+					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+					runningApp1.TlsRegister("")
+					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+					runningApp1.VerifyAppStatus(200)
 				})
 			})
 

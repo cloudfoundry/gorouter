@@ -576,6 +576,19 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 
+			Context("when backend has a certificate signed by an invalid CA", func() {
+				BeforeEach(func() {
+					backendCert := x509.Certificate{}
+					transport.RoundTripReturns(nil, x509.UnknownAuthorityError{Cert: &backendCert})
+				})
+				It("should error with 526 status code", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(resp.Code).To(Equal(526))
+					Expect(resp.Body).To(ContainSubstring("Invalid SSL Certificate"))
+				})
+			})
+
 			Context("when the backend is registered with a non-tls port", func() {
 				BeforeEach(func() {
 					endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "instanceId", "1",

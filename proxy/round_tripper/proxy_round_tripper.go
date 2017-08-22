@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	VcapCookieId         = "__VCAP_ID__"
-	StickyCookieKey      = "JSESSIONID"
-	CookieHeader         = "Set-Cookie"
-	BadGatewayMessage    = "502 Bad Gateway: Registered endpoint failed to handle the request."
-	HostnameErrorMessage = "503 Service Unavailable"
-	SSLHandshakeMessage  = "525 SSL Handshake Failed"
+	VcapCookieId              = "__VCAP_ID__"
+	StickyCookieKey           = "JSESSIONID"
+	CookieHeader              = "Set-Cookie"
+	BadGatewayMessage         = "502 Bad Gateway: Registered endpoint failed to handle the request."
+	HostnameErrorMessage      = "503 Service Unavailable"
+	InvalidCertificateMessage = "526 Invalid SSL Certificate"
+	SSLHandshakeMessage       = "525 SSL Handshake Failed"
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -61,7 +62,7 @@ func NewProxyRoundTripper(
 	localPort uint16,
 ) ProxyRoundTripper {
 	return &roundTripper{
-		logger: logger,
+		logger:              logger,
 		traceKey:            traceKey,
 		routerIP:            routerIP,
 		defaultLoadBalance:  defaultLoadBalance,
@@ -182,6 +183,8 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			http.Error(responseWriter, SSLHandshakeMessage, 525)
 		case x509.HostnameError:
 			http.Error(responseWriter, HostnameErrorMessage, http.StatusServiceUnavailable)
+		case x509.UnknownAuthorityError:
+			http.Error(responseWriter, InvalidCertificateMessage, 526)
 		default:
 			http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
 			rt.combinedReporter.CaptureBadGateway()
