@@ -44,8 +44,14 @@ type RoundTripperFactory interface {
 
 func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
 	if e.RoundTripper == nil {
-		e.RoundTripper = roundTripperFactory.New(e.PrivateInstanceId)
+		e.Lock()
+		if e.RoundTripper == nil {
+
+			e.RoundTripper = roundTripperFactory.New(e.PrivateInstanceId)
+		}
+		e.Unlock()
 	}
+
 	return e.RoundTripper
 }
 

@@ -1038,9 +1038,8 @@ var _ = Describe("RouteRegistry", func() {
 				r.StartPruningCycle()
 
 				Eventually(func() int {
-					e := *fooEndpoint
-					r.Register("foo", &e)
-					r.Register("fooo", &e)
+					r.Register("foo", fooEndpoint)
+					r.Register("fooo", fooEndpoint)
 					return reporter.CaptureRouteStatsCallCount()
 				},
 					2*configObj.PruneStaleDropletsInterval,

@@ -76,9 +76,13 @@ type RoundTripperFactoryImpl struct {
 }
 
 func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.ProxyRoundTripper {
-	var customTLSConfig tls.Config
-	customTLSConfig = *(t.Template.TLSClientConfig)
-	customTLSConfig.ServerName = expectedServerName
+	customTLSConfig := &tls.Config{
+		CipherSuites:       t.Template.TLSClientConfig.CipherSuites,
+		InsecureSkipVerify: t.Template.TLSClientConfig.InsecureSkipVerify,
+		RootCAs:            t.Template.TLSClientConfig.RootCAs,
+		ServerName:         expectedServerName,
+	}
+
 	newTransport := &http.Transport{
 		Dial:                t.Template.Dial,
 		DisableKeepAlives:   t.Template.DisableKeepAlives,
@@ -86,7 +90,7 @@ func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.P
 		IdleConnTimeout:     t.Template.IdleConnTimeout,
 		MaxIdleConnsPerHost: t.Template.MaxIdleConnsPerHost,
 		DisableCompression:  t.Template.DisableCompression,
-		TLSClientConfig:     &customTLSConfig,
+		TLSClientConfig:     customTLSConfig,
 	}
 	return NewDropsondeRoundTripper(newTransport)
 }

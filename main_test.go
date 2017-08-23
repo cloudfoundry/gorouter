@@ -247,11 +247,15 @@ var _ = Describe("Router Integration", func() {
 						runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
 						heartbeatInterval := 200 * time.Millisecond
 						runningTicker := time.NewTicker(heartbeatInterval)
+						done := make(chan bool, 1)
+						defer func() { done <- true }()
 						go func() {
 							for {
 								select {
 								case <-runningTicker.C:
 									runningApp1.TlsRegister(privateInstanceId)
+								case <-done:
+									return
 								}
 							}
 						}()
@@ -271,11 +275,15 @@ var _ = Describe("Router Integration", func() {
 					runningApp1.TlsListen(differentCertChain.CertPEM, differentCertChain.PrivKeyPEM)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
+					done := make(chan bool, 1)
+					defer func() { done <- true }()
 					go func() {
 						for {
 							select {
 							case <-runningTicker.C:
 								runningApp1.TlsRegister(privateInstanceId)
+							case <-done:
+								return
 							}
 						}
 					}()
@@ -292,11 +300,15 @@ var _ = Describe("Router Integration", func() {
 					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
+					done := make(chan bool, 1)
+					defer func() { done <- true }()
 					go func() {
 						for {
 							select {
 							case <-runningTicker.C:
 								runningApp1.TlsRegister("wrong-instance-id")
+							case <-done:
+								return
 							}
 						}
 					}()
@@ -313,7 +325,20 @@ var _ = Describe("Router Integration", func() {
 					runningApp1.TlsRegister("")
 					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
 					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-
+					heartbeatInterval := 200 * time.Millisecond
+					runningTicker := time.NewTicker(heartbeatInterval)
+					done := make(chan bool, 1)
+					defer func() { done <- true }()
+					go func() {
+						for {
+							select {
+							case <-runningTicker.C:
+								runningApp1.TlsRegister(privateInstanceId)
+							case <-done:
+								return
+							}
+						}
+					}()
 					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
 					runningApp1.VerifyAppStatus(200)
 				})
@@ -328,11 +353,15 @@ var _ = Describe("Router Integration", func() {
 
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
+					done := make(chan bool, 1)
+					defer func() { done <- true }()
 					go func() {
 						for {
 							select {
 							case <-runningTicker.C:
 								runningApp1.TlsRegister(privateInstanceId)
+							case <-done:
+								return
 							}
 						}
 					}()

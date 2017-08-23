@@ -49,6 +49,7 @@ type ProxyRoundTripper interface {
 }
 
 type Endpoint struct {
+	sync.RWMutex
 	ApplicationId        string
 	addr                 string
 	Tags                 map[string]string
@@ -328,9 +329,9 @@ func (p *Pool) Each(f func(endpoint *Endpoint)) {
 
 func (p *Pool) MarshalJSON() ([]byte, error) {
 	p.lock.Lock()
-	endpoints := make([]Endpoint, 0, len(p.endpoints))
+	endpoints := make([]*Endpoint, 0, len(p.endpoints))
 	for _, e := range p.endpoints {
-		endpoints = append(endpoints, *e.endpoint)
+		endpoints = append(endpoints, e.endpoint)
 	}
 	p.lock.Unlock()
 
