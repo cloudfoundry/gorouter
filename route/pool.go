@@ -164,10 +164,12 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 			}
 
 			oldEndpoint := e.endpoint
-			e.endpoint = endpoint
-
-			if oldEndpoint.PrivateInstanceId != endpoint.PrivateInstanceId {
+			if oldEndpoint.PrivateInstanceId == endpoint.PrivateInstanceId {
+				endpoint.RoundTripper = oldEndpoint.RoundTripper
+				e.endpoint = endpoint
+			} else {
 				delete(p.index, oldEndpoint.PrivateInstanceId)
+				e.endpoint = endpoint
 				p.index[endpoint.PrivateInstanceId] = e
 			}
 		}

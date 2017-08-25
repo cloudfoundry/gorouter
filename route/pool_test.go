@@ -2,7 +2,10 @@ package route_test
 
 import (
 	"fmt"
+	"net/http"
 	"time"
+
+	"crypto/tls"
 
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/routing-api/models"
@@ -121,6 +124,36 @@ var _ = Describe("Pool", func() {
 					Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
 				})
 			})
+		})
+
+		Context("RoundTrippers", func() {
+			var (
+				roundTripper *http.Transport
+			)
+			BeforeEach(func() {
+				endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "instance-id-1", "", nil, 1, "", modTag, "", false)
+				pool.Put(endpoint)
+				roundTripper = &http.Transport{TLSClientConfig: &tls.Config{ServerName: "instance-id-1"}}
+				pool.Each(func(e *route.Endpoint) {
+					e.RoundTripper = roundTripper
+				})
+			})
+			It("preserves roundTrippers on duplicate endpoints", func() {
+				sameEndpointRegisteredTwice := route.NewEndpoint("", "1.2.3.4", 5678, "instance-id-1", "", nil, 1, "", modTag, "", false)
+				pool.Put(sameEndpointRegisteredTwice)
+				pool.Each(func(e *route.Endpoint) {
+					Expect(e.RoundTripper).To(Equal(roundTripper))
+				})
+			})
+
+			It("clears roundTrippers if the privateInstanceId changes", func() {
+				endpointWithSameAddressButDifferentId := route.NewEndpoint("", "1.2.3.4", 5678, "instance-id-2", "", nil, 1, "", modTag, "", false)
+				pool.Put(endpointWithSameAddressButDifferentId)
+				pool.Each(func(e *route.Endpoint) {
+					Expect(e.RoundTripper).To(BeNil())
+				})
+			})
+
 		})
 	})
 
