@@ -222,7 +222,7 @@ var _ = Describe("Router Integration", func() {
 
 			privateInstanceId, _ = uuid.GenerateUUID()
 			certChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
-			config.CACerts = []string{string(certChain.CACertPEM)}
+			config.CACerts = string(certChain.CACertPEM)
 		})
 
 		JustBeforeEach(func() {
@@ -996,7 +996,7 @@ var _ = Describe("Router Integration", func() {
 			var rsKey, rsCert []byte
 			BeforeEach(func() {
 				rsKey, rsCert = test_util.CreateKeyPair("test.routeservice.com")
-				config.CACerts = []string{string(rsCert)}
+				config.CACerts = string(rsCert)
 			})
 			It("successfully connects to the route service", func() {
 				rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)

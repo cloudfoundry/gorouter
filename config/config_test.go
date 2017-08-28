@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 
@@ -785,21 +786,24 @@ tls_pem:
 			})
 
 			Context("when a valid CACerts is provided", func() {
+				var caCertsYML []byte
+				BeforeEach(func() {
+					caCertsYML, _ = yaml.Marshal(string(rootRSAPEM) + "\n" + string(rootECDSAPEM))
+				})
 				It("populates the CACerts field", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
 %s
-ca_certs:
-%s%s
-`, tlsPEMYML, rootCA1YML, rootCA2YML))
+ca_certs: %s
+`, tlsPEMYML, caCertsYML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
 					config.Process()
-					Expect(config.CACerts).To(ConsistOf(expectedCAPEMs))
+					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "\n")))
 				})
 
 				It("populates the CAPool property", func() {
@@ -808,22 +812,20 @@ enable_ssl: true
 cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 tls_pem:
 %s
-ca_certs:
-%s%s`, tlsPEMYML, rootCA1YML, rootCA2YML))
+ca_certs: %s
+`, tlsPEMYML, caCertsYML))
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
 					config.Process()
-					Expect(config.CACerts).To(ConsistOf(expectedCAPEMs))
+					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "\n")))
 
-					for _, cert := range config.CACerts {
-						certDER, _ := pem.Decode([]byte(cert))
-						Expect(err).NotTo(HaveOccurred())
-						c, err := x509.ParseCertificate(certDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.CAPool.Subjects()).To(ContainElement(c.RawSubject))
-					}
+					certDER, _ := pem.Decode([]byte(config.CACerts))
+					Expect(err).NotTo(HaveOccurred())
+					c, err := x509.ParseCertificate(certDER.Bytes)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.CAPool.Subjects()).To(ContainElement(c.RawSubject))
 				})
 			})
 

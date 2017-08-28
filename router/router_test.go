@@ -901,9 +901,7 @@ var _ = Describe("Router", func() {
 			req, _ = http.NewRequest("GET", uri, nil)
 
 			certChain := test_util.CreateSignedCertWithRootCA("*.vcap.me")
-			config.CACerts = []string{
-				string(certChain.CACertPEM),
-			}
+			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
 			clientCertTemplate, err := certTemplate("clientSSL")
@@ -1178,9 +1176,7 @@ var _ = Describe("Router", func() {
 		)
 		BeforeEach(func() {
 			certChain := test_util.CreateSignedCertWithRootCA("test.vcap.me")
-			config.CACerts = []string{
-				string(certChain.CACertPEM),
-			}
+			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
 			key = certChain.PrivKeyPEM
@@ -1256,9 +1252,7 @@ var _ = Describe("Router", func() {
 
 		Context("when a ca cert is provided", func() {
 			BeforeEach(func() {
-				config.CACerts = []string{
-					string(cert),
-				}
+				config.CACerts = string(cert)
 			})
 			It("add the ca cert to the trusted pool and returns 200", func() {
 				certPool, err := x509.SystemCertPool()
@@ -1461,9 +1455,7 @@ var _ = Describe("Router", func() {
 				)
 				rootCert, rootKey, rootPEM, err = createRootCA("rootCA")
 				Expect(err).ToNot(HaveOccurred())
-				config.CACerts = []string{
-					string(rootPEM),
-				}
+				config.CACerts = string(rootPEM)
 			})
 
 			It("fails the connection if the certificate is invalid", func() {

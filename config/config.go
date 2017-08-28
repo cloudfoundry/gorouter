@@ -125,7 +125,7 @@ type Config struct {
 	DisableHTTP              bool          `yaml:"disable_http"`
 	SSLCertificates          []tls.Certificate
 	TLSPEM                   []TLSPem `yaml:"tls_pem"`
-	CACerts                  []string `yaml:"ca_certs"`
+	CACerts                  string   `yaml:"ca_certs"`
 	CAPool                   *x509.CertPool
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
 	ForwardedClientCert      string   `yaml:"forwarded_client_cert"`
@@ -404,9 +404,9 @@ func (c *Config) buildCertPool() error {
 		return err
 	}
 
-	for i, cert := range c.CACerts {
-		if ok := certPool.AppendCertsFromPEM([]byte(cert)); !ok {
-			return fmt.Errorf("Error while adding %d cert in CACerts to gorouter's cert pool", i)
+	if c.CACerts != "" {
+		if ok := certPool.AppendCertsFromPEM([]byte(c.CACerts)); !ok {
+			return fmt.Errorf("Error while adding CACerts to gorouter's cert pool: \n%s\n", c.CACerts)
 		}
 	}
 	c.CAPool = certPool
