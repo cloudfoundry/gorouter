@@ -142,10 +142,11 @@ func NewProxy(
 	roundTripperFactory := &RoundTripperFactoryImpl{
 		Template: httpTransportTemplate,
 	}
+	retryableClassififer := &round_tripper.RoundTripperRetryableClassifier{}
 
 	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
-		Transport:      p.proxyRoundTripper(roundTripperFactory, c.Port),
+		Transport:      p.proxyRoundTripper(roundTripperFactory, retryableClassififer, c.Port),
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
@@ -185,9 +186,10 @@ func hostWithoutPort(req *http.Request) string {
 	return host
 }
 
-func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory, port uint16) round_tripper.ProxyRoundTripper {
+func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory, retryableClassifier round_tripper.RetryableClassifier, port uint16) round_tripper.ProxyRoundTripper {
 	return round_tripper.NewProxyRoundTripper(
 		roundTripperFactory,
+		retryableClassifier,
 		// round_tripper.NewDropsondeRoundTripper(transport),
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,

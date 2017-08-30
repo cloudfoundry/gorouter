@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -57,6 +56,7 @@ type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.
 
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
+	retryableClassifier RetryableClassifier,
 	logger logger.Logger,
 	traceKey string,
 	routerIP string,
@@ -74,6 +74,7 @@ func NewProxyRoundTripper(
 		secureCookies:       secureCookies,
 		localPort:           localPort,
 		roundTripperFactory: roundTripperFactory,
+		retryableClassifier: retryableClassifier,
 	}
 }
 
@@ -86,6 +87,7 @@ type roundTripper struct {
 	secureCookies       bool
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory
+	retryableClassifier RetryableClassifier
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -133,7 +135,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				request.URL.Scheme = "https"
 			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
-			if err == nil || !retryableError(err) {
+			if err == nil || !rt.retryableClassifier.IsRetryable(err) {
 				break
 			}
 			iter.EndpointFailed()
@@ -169,7 +171,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				}
 				break
 			}
-			if !retryableError(err) {
+			if !rt.retryableClassifier.IsRetryable(err) {
 				break
 			}
 			logger.Error("route-service-connection-failed", zap.Error(err))
@@ -315,14 +317,6 @@ func getStickySession(request *http.Request) string {
 		}
 	}
 	return ""
-}
-
-func retryableError(err error) bool {
-	ne, netErr := err.(*net.OpError)
-	if netErr && (ne.Op == "dial" || ne.Op == "read" && ne.Err.Error() == "read: connection reset by peer") {
-		return true
-	}
-	return false
 }
 
 func newRouteServiceEndpoint() *route.Endpoint {
