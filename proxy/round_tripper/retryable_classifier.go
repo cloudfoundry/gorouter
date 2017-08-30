@@ -1,6 +1,9 @@
 package round_tripper
 
-import "net"
+import (
+	"crypto/x509"
+	"net"
+)
 
 //go:generate counterfeiter -o fakes/fake_retryable_classifier.go . RetryableClassifier
 type RetryableClassifier interface {
@@ -15,5 +18,9 @@ func (rc RoundTripperRetryableClassifier) IsRetryable(err error) bool {
 		return true
 	}
 
+	_, ok = err.(*x509.HostnameError)
+	if ok {
+		return true
+	}
 	return false
 }
