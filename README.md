@@ -32,23 +32,23 @@ cd src/code.cloudfoundry.org/gorouter
 
 We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
 
-Running `scripts/test` will:
+Running `bin/test` will:
 - Checks for Go
 - Checks that GOPATH is set
 - Installs gnatsd and ginkgo (or use the one already downloaded into the GOPATH)
 - Runs all the tests with ginkgo (in random order, without benchmarks)
 
-Any flags passed into `scripts/test` will be passed into ginkgo.
+Any flags passed into `bin/test` will be passed into ginkgo.
 
 ```bash
 # run all the tests
-scripts/test
+bin/test
 
 # run only tests whose names match Registry
-scripts/test -focus=Registry
+bin/test -focus=Registry
 
 # run only the tests in the registry package
-scripts/test registry
+bin/test registry
 ```
 
 ### Building
