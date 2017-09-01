@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/cloudfoundry/gorouter.svg?branch=master)](https://travis-ci.org/cloudfoundry/gorouter) [![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
 
 # GoRouter
 This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
