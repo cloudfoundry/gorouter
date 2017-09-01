@@ -200,17 +200,19 @@ var _ = Describe("Router Integration", func() {
 			}).Should(ContainSubstring(`"routing_table_sharding_mode":"all"`))
 		})
 	})
-	Context("Backend TLS ", func() {
+
+	Context("TLS to backends", func() {
 		var (
 			config            *config.Config
 			statusPort        uint16
 			proxyPort         uint16
 			cfgFile           string
 			privateInstanceId string
-			certChain         test_util.CertChain
+			backendCertChain  test_util.CertChain // server cert presented by backend to gorouter
 			localIP           string
 			mbusClient        *nats.Conn
 		)
+
 		BeforeEach(func() {
 			statusPort = test_util.NextAvailPort()
 			proxyPort = test_util.NextAvailPort()
@@ -221,8 +223,8 @@ var _ = Describe("Router Integration", func() {
 			config.SkipSSLValidation = false
 
 			privateInstanceId, _ = uuid.GenerateUUID()
-			certChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
-			config.CACerts = string(certChain.CACertPEM)
+			backendCertChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
+			config.CACerts = string(backendCertChain.CACertPEM)
 		})
 
 		JustBeforeEach(func() {
@@ -242,9 +244,9 @@ var _ = Describe("Router Integration", func() {
 			Context("when backend is listening for TLS connections", func() {
 				Context("when registered instance id matches the common name on cert presented by the backend", func() {
 					It("successfully connects to backend using TLS", func() {
-						runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+						runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
 						runningApp1.TlsRegister(privateInstanceId)
-						runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
+						runningApp1.TlsListen(backendCertChain.AsTLSConfig())
 						heartbeatInterval := 200 * time.Millisecond
 						runningTicker := time.NewTicker(heartbeatInterval)
 						done := make(chan bool, 1)
@@ -265,14 +267,14 @@ var _ = Describe("Router Integration", func() {
 						runningApp1.VerifyAppStatus(200)
 					})
 				})
-
 			})
+
 			Context("when backend instance certificate is signed with an invalid CA", func() {
-				It("fails and returns 526 to the user", func() {
+				It("fails and returns 526 status code to the user", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister(privateInstanceId)
 					differentCertChain := test_util.CreateSignedCertWithRootCA(privateInstanceId)
-					runningApp1.TlsListen(differentCertChain.CertPEM, differentCertChain.PrivKeyPEM)
+					runningApp1.TlsListen(differentCertChain.AsTLSConfig())
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
 					done := make(chan bool, 1)
@@ -297,7 +299,7 @@ var _ = Describe("Router Integration", func() {
 				It("fails the connection to the backend with 503 Service Unavailable error", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister("wrong-instance-id")
-					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
+					runningApp1.TlsListen(backendCertChain.AsTLSConfig())
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
 					done := make(chan bool, 1)
@@ -323,7 +325,7 @@ var _ = Describe("Router Integration", func() {
 				It("does not validate the instance_id", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister("")
-					runningApp1.TlsListen(certChain.CertPEM, certChain.PrivKeyPEM)
+					runningApp1.TlsListen(backendCertChain.AsTLSConfig())
 					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)

@@ -1,7 +1,7 @@
 package common
 
 import (
-	"io/ioutil"
+	"crypto/tls"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
@@ -59,33 +59,14 @@ func (a *TestApp) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
 }
 
-func (a *TestApp) TlsListen(serverPEM, serverKey []byte) error {
+func (a *TestApp) TlsListen(tlsConfig *tls.Config) error {
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", a.port),
-		Handler: a.mux,
-	}
-	certFile, err := ioutil.TempFile("", "cert")
-	if err != nil {
-		return err
+		Addr:      fmt.Sprintf(":%d", a.port),
+		Handler:   a.mux,
+		TLSConfig: tlsConfig,
 	}
 
-	keyFile, err := ioutil.TempFile("", "key")
-	if err != nil {
-		return err
-	}
-
-	_, err = certFile.Write(serverPEM)
-	if err != nil {
-		return err
-	}
-	_, err = keyFile.Write(serverKey)
-	if err != nil {
-		return err
-	}
-	certFile.Close()
-	keyFile.Close()
-
-	go server.ListenAndServeTLS(certFile.Name(), keyFile.Name())
+	go server.ListenAndServeTLS("", "")
 	return nil
 }
 

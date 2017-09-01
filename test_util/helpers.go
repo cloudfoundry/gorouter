@@ -116,7 +116,15 @@ type CertChain struct {
 	CAPrivKey *rsa.PrivateKey
 }
 
-func CreateSignedCertWithRootCA(serverCName string) CertChain {
+func (cc *CertChain) AsTLSConfig() *tls.Config {
+	cert, err := tls.X509KeyPair(cc.CertPEM, cc.PrivKeyPEM)
+	Expect(err).ToNot(HaveOccurred())
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+}
+
+func CreateSignedCertWithRootCA(commonName string) CertChain {
 	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -124,8 +132,8 @@ func CreateSignedCertWithRootCA(serverCName string) CertChain {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if serverCName != "" {
-		subject.CommonName = serverCName
+	if commonName != "" {
+		subject.CommonName = commonName
 	}
 
 	certTemplate := x509.Certificate{
