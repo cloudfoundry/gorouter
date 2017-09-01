@@ -288,8 +288,34 @@ var _ = Describe("Router Integration", func() {
 								}()
 								routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
-								Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+								Eventually(func() bool { return appRegistered(routesUri, runningApp1) }, "2s").Should(BeTrue())
 								runningApp1.VerifyAppStatus(200)
+							})
+						})
+
+						Context("when the gorouter does not present certs", func() {
+							It("successfully connects to backend using TLS", func() {
+								runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
+								runningApp1.TlsRegister(privateInstanceId)
+								runningApp1.TlsListen(backendTLSConfig)
+								heartbeatInterval := 200 * time.Millisecond
+								runningTicker := time.NewTicker(heartbeatInterval)
+								done := make(chan bool, 1)
+								defer func() { done <- true }()
+								go func() {
+									for {
+										select {
+										case <-runningTicker.C:
+											runningApp1.TlsRegister(privateInstanceId)
+										case <-done:
+											return
+										}
+									}
+								}()
+								routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+								Eventually(func() bool { return appRegistered(routesUri, runningApp1) }, "2s").Should(BeTrue())
+								runningApp1.VerifyAppStatus(496)
 							})
 						})
 					})

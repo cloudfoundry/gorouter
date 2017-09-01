@@ -541,6 +541,31 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 				})
 			})
+
+			Context("when the backend requires a valid client cert, but the gorouter does not provide one", func() {
+				BeforeEach(func() {
+					// we've empirically discovered that this is the error returned
+					theError := &net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")}
+					transport.RoundTripReturns(nil, theError)
+				})
+				It("should error with 496 status code", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(resp.Code).To(Equal(496))
+					Expect(resp.Body).To(ContainSubstring("SSL Certificate Required"))
+				})
+			})
+			Context("when some other kind of OpError occurs", func() {
+				BeforeEach(func() {
+					theError := &net.OpError{Op: "remote error", Err: errors.New("potato")}
+					transport.RoundTripReturns(nil, theError)
+				})
+				It("should error with the default 502 status code", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(resp.Code).To(Equal(502))
+				})
+			})
 		})
 
 		Context("transport re-use", func() {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -29,6 +30,7 @@ const (
 	HostnameErrorMessage      = "503 Service Unavailable"
 	InvalidCertificateMessage = "526 Invalid SSL Certificate"
 	SSLHandshakeMessage       = "525 SSL Handshake Failed"
+	SSLCertRequiredMessage    = "496 SSL Certificate Required"
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -184,13 +186,20 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		responseWriter := reqInfo.ProxyResponseWriter
 		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
 
-		switch err.(type) {
+		switch typedErr := err.(type) {
 		case tls.RecordHeaderError:
 			http.Error(responseWriter, SSLHandshakeMessage, 525)
 		case x509.HostnameError:
 			http.Error(responseWriter, HostnameErrorMessage, http.StatusServiceUnavailable)
 		case x509.UnknownAuthorityError:
 			http.Error(responseWriter, InvalidCertificateMessage, 526)
+		case *net.OpError:
+			if typedErr.Op == "remote error" && typedErr.Err.Error() == "tls: bad certificate" {
+				http.Error(responseWriter, SSLCertRequiredMessage, 496)
+			} else {
+				http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
+				rt.combinedReporter.CaptureBadGateway()
+			}
 		default:
 			http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
 			rt.combinedReporter.CaptureBadGateway()
