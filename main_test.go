@@ -203,12 +203,14 @@ var _ = Describe("Router Integration", func() {
 
 	Context("TLS to backends", func() {
 		var (
-			config            *config.Config
+			cfg               *config.Config
 			statusPort        uint16
 			proxyPort         uint16
 			cfgFile           string
 			privateInstanceId string
 			backendCertChain  test_util.CertChain // server cert presented by backend to gorouter
+			clientCertChain   test_util.CertChain // client cert presented by gorouter to backend
+			backendTLSConfig  *tls.Config
 			localIP           string
 			mbusClient        *nats.Conn
 		)
@@ -218,20 +220,23 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
-			config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-			config.SkipSSLValidation = false
+			cfg = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
+			cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+			cfg.SkipSSLValidation = false
 
 			privateInstanceId, _ = uuid.GenerateUUID()
 			backendCertChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
-			config.CACerts = string(backendCertChain.CACertPEM)
+			cfg.CACerts = string(backendCertChain.CACertPEM)
+
+			clientCertChain = test_util.CreateSignedCertWithRootCA("gorouter")
+			backendTLSConfig = backendCertChain.AsTLSConfig()
 		})
 
 		JustBeforeEach(func() {
 			var err error
-			writeConfig(config, cfgFile)
+			writeConfig(cfg, cfgFile)
 			localIP, err = localip.LocalIP()
-			mbusClient, err = newMessageBus(config)
+			mbusClient, err = newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			gorouterSession = startGorouterSession(cfgFile)
@@ -243,28 +248,76 @@ var _ = Describe("Router Integration", func() {
 		Context("when backend registration includes TLS port", func() {
 			Context("when backend is listening for TLS connections", func() {
 				Context("when registered instance id matches the common name on cert presented by the backend", func() {
-					It("successfully connects to backend using TLS", func() {
-						runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
-						runningApp1.TlsRegister(privateInstanceId)
-						runningApp1.TlsListen(backendCertChain.AsTLSConfig())
-						heartbeatInterval := 200 * time.Millisecond
-						runningTicker := time.NewTicker(heartbeatInterval)
-						done := make(chan bool, 1)
-						defer func() { done <- true }()
-						go func() {
-							for {
-								select {
-								case <-runningTicker.C:
-									runningApp1.TlsRegister(privateInstanceId)
-								case <-done:
-									return
-								}
-							}
-						}()
-						routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
 
-						Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
-						runningApp1.VerifyAppStatus(200)
+					Context("when the backend requires client certs be presented", func() {
+						BeforeEach(func() {
+							backendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+						})
+
+						Context("when the gorouter presents client certs that the backend trusts", func() {
+							BeforeEach(func() {
+								// set Gorouter to use client certs
+								cfg.Backends.ClientAuth = config.TLSPem{
+									CertChain:  string(clientCertChain.CertPEM),
+									PrivateKey: string(clientCertChain.PrivKeyPEM),
+								}
+
+								// make backend trust the CA that signed the gorouter's client cert
+								certPool := x509.NewCertPool()
+								certPool.AddCert(clientCertChain.CACert)
+								backendTLSConfig.ClientCAs = certPool
+							})
+
+							It("successfully connects to backend using TLS", func() {
+								runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
+								runningApp1.TlsRegister(privateInstanceId)
+								runningApp1.TlsListen(backendTLSConfig)
+								heartbeatInterval := 200 * time.Millisecond
+								runningTicker := time.NewTicker(heartbeatInterval)
+								done := make(chan bool, 1)
+								defer func() { done <- true }()
+								go func() {
+									for {
+										select {
+										case <-runningTicker.C:
+											runningApp1.TlsRegister(privateInstanceId)
+										case <-done:
+											return
+										}
+									}
+								}()
+								routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+								Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+								runningApp1.VerifyAppStatus(200)
+							})
+						})
+					})
+
+					Context("when the backend does not require client certs", func() {
+						It("successfully connects to backend using TLS", func() {
+							runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
+							runningApp1.TlsRegister(privateInstanceId)
+							runningApp1.TlsListen(backendTLSConfig)
+							heartbeatInterval := 200 * time.Millisecond
+							runningTicker := time.NewTicker(heartbeatInterval)
+							done := make(chan bool, 1)
+							defer func() { done <- true }()
+							go func() {
+								for {
+									select {
+									case <-runningTicker.C:
+										runningApp1.TlsRegister(privateInstanceId)
+									case <-done:
+										return
+									}
+								}
+							}()
+							routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+							Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+							runningApp1.VerifyAppStatus(200)
+						})
 					})
 				})
 			})
@@ -289,7 +342,7 @@ var _ = Describe("Router Integration", func() {
 							}
 						}
 					}()
-					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
 					runningApp1.VerifyAppStatus(526)
@@ -299,7 +352,7 @@ var _ = Describe("Router Integration", func() {
 				It("fails the connection to the backend with 503 Service Unavailable error", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister("wrong-instance-id")
-					runningApp1.TlsListen(backendCertChain.AsTLSConfig())
+					runningApp1.TlsListen(backendTLSConfig)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
 					done := make(chan bool, 1)
@@ -314,7 +367,7 @@ var _ = Describe("Router Integration", func() {
 							}
 						}
 					}()
-					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 					Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
 					runningApp1.VerifyAppStatus(503)
@@ -326,7 +379,7 @@ var _ = Describe("Router Integration", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister("")
 					runningApp1.TlsListen(backendCertChain.AsTLSConfig())
-					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)
 					done := make(chan bool, 1)
@@ -351,7 +404,7 @@ var _ = Describe("Router Integration", func() {
 					runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
 					runningApp1.TlsRegister(privateInstanceId)
 					runningApp1.Listen()
-					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+					routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 					heartbeatInterval := 200 * time.Millisecond
 					runningTicker := time.NewTicker(heartbeatInterval)

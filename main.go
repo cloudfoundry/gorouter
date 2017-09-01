@@ -199,7 +199,10 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry,
+	accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter,
+	crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger,
 		c.RouteServiceEnabled,
@@ -213,6 +216,7 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 		CipherSuites:       c.CipherSuites,
 		InsecureSkipVerify: c.SkipSSLValidation,
 		RootCAs:            c.CAPool,
+		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
 	}
 
 	return proxy.NewProxy(logger, accessLogger, c, registry,

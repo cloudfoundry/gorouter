@@ -81,6 +81,7 @@ func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.P
 		InsecureSkipVerify: t.Template.TLSClientConfig.InsecureSkipVerify,
 		RootCAs:            t.Template.TLSClientConfig.RootCAs,
 		ServerName:         expectedServerName,
+		Certificates:       t.Template.TLSClientConfig.Certificates,
 	}
 
 	newTransport := &http.Transport{

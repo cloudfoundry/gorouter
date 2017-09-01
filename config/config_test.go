@@ -1245,5 +1245,57 @@ endpoint_timeout: 10s
 				Expect(config.DrainTimeout).To(Equal(10 * time.Second))
 			})
 		})
+
+		Describe("configuring client (mTLS) authentication to backends", func() {
+			Context("when provided PEM for ClientAuth", func() {
+				var expectedTLSPEM TLSPem
+				var certChain test_util.CertChain
+				var cfgYaml []byte
+
+				BeforeEach(func() {
+					certChain = test_util.CreateSignedCertWithRootCA("foo")
+					expectedTLSPEM = TLSPem{
+						CertChain:  string(certChain.CertPEM),
+						PrivateKey: string(certChain.PrivKeyPEM),
+					}
+					cfg := map[string]interface{}{
+						"backends": map[string]interface{}{
+							"client_auth": expectedTLSPEM,
+						},
+					}
+					cfgYaml, _ = yaml.Marshal(cfg)
+				})
+
+				It("populates the ClientAuthCertificates", func() {
+					err := config.Initialize(cfgYaml)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(config.Backends.ClientAuth).To(Equal(expectedTLSPEM))
+
+					config.Process()
+					Expect(config.Backends.ClientAuthCertificate).To(Equal(certChain.AsTLSConfig().Certificates[0]))
+				})
+
+				Context("cert or key are invalid", func() {
+					BeforeEach(func() {
+						cfgYaml, _ = yaml.Marshal(map[string]interface{}{
+							"backends": map[string]interface{}{
+								"client_auth": map[string]string{
+									"cert_chain":  "invalid-cert",
+									"private_key": "invalid-key",
+								},
+							},
+						})
+					})
+
+					It("panics", func() {
+						err := config.Initialize(cfgYaml)
+						Expect(err).ToNot(HaveOccurred())
+
+						Expect(config.Process).To(Panic())
+					})
+				})
+			})
+		})
+
 	})
 })

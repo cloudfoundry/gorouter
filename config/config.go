@@ -74,7 +74,9 @@ type OAuthConfig struct {
 }
 
 type BackendConfig struct {
-	MaxConns int64 `yaml:"max_conns"`
+	MaxConns              int64  `yaml:"max_conns"`
+	ClientAuth            TLSPem `yaml:"client_auth"`
+	ClientAuthCertificate tls.Certificate
 }
 
 type LoggingConfig struct {
@@ -246,6 +248,15 @@ func (c *Config) Process() {
 	c.Ip, err = localip.LocalIP()
 	if err != nil {
 		panic(err)
+	}
+
+	if c.Backends.ClientAuth.CertChain != "" && c.Backends.ClientAuth.PrivateKey != "" {
+		certificate, err := tls.X509KeyPair([]byte(c.Backends.ClientAuth.CertChain), []byte(c.Backends.ClientAuth.PrivateKey))
+		if err != nil {
+			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			panic(errMsg)
+		}
+		c.Backends.ClientAuthCertificate = certificate
 	}
 
 	if c.EnableSSL {
