@@ -74,9 +74,9 @@ type OAuthConfig struct {
 }
 
 type BackendConfig struct {
-	MaxConns              int64  `yaml:"max_conns"`
-	ClientAuth            TLSPem `yaml:"client_auth"`
+	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 	ClientAuthCertificate tls.Certificate
+	MaxConns              int64 `yaml:"max_conns"`
 }
 
 type LoggingConfig struct {
@@ -250,8 +250,8 @@ func (c *Config) Process() {
 		panic(err)
 	}
 
-	if c.Backends.ClientAuth.CertChain != "" && c.Backends.ClientAuth.PrivateKey != "" {
-		certificate, err := tls.X509KeyPair([]byte(c.Backends.ClientAuth.CertChain), []byte(c.Backends.ClientAuth.PrivateKey))
+	if c.Backends.CertChain != "" && c.Backends.PrivateKey != "" {
+		certificate, err := tls.X509KeyPair([]byte(c.Backends.CertChain), []byte(c.Backends.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
 			panic(errMsg)

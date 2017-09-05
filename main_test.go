@@ -257,7 +257,7 @@ var _ = Describe("Router Integration", func() {
 						Context("when the gorouter presents client certs that the backend trusts", func() {
 							BeforeEach(func() {
 								// set Gorouter to use client certs
-								cfg.Backends.ClientAuth = config.TLSPem{
+								cfg.Backends.TLSPem = config.TLSPem{
 									CertChain:  string(clientCertChain.CertPEM),
 									PrivateKey: string(clientCertChain.PrivKeyPEM),
 								}
@@ -296,7 +296,7 @@ var _ = Describe("Router Integration", func() {
 						Context("when the gorouter presentes certs that the backend does not trust", func() {
 							BeforeEach(func() {
 								// set Gorouter to use client certs
-								cfg.Backends.ClientAuth = config.TLSPem{
+								cfg.Backends.TLSPem = config.TLSPem{
 									CertChain:  string(clientCertChain.CertPEM),
 									PrivateKey: string(clientCertChain.PrivKeyPEM),
 								}
