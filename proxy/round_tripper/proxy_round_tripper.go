@@ -186,23 +186,20 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		responseWriter := reqInfo.ProxyResponseWriter
 		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
 
-		switch typedErr := err.(type) {
+		switch err.(type) {
 		case tls.RecordHeaderError:
 			http.Error(responseWriter, SSLHandshakeMessage, 525)
 		case x509.HostnameError:
 			http.Error(responseWriter, HostnameErrorMessage, http.StatusServiceUnavailable)
 		case x509.UnknownAuthorityError:
 			http.Error(responseWriter, InvalidCertificateMessage, 526)
-		case *net.OpError:
-			if typedErr.Op == "remote error" && typedErr.Err.Error() == "tls: bad certificate" {
+		default:
+			if typedErr, ok := err.(*net.OpError); ok && typedErr.Op == "remote error" && typedErr.Err.Error() == "tls: bad certificate" {
 				http.Error(responseWriter, SSLCertRequiredMessage, 496)
 			} else {
 				http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
 				rt.combinedReporter.CaptureBadGateway()
 			}
-		default:
-			http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
-			rt.combinedReporter.CaptureBadGateway()
 		}
 
 		logger.Error("endpoint-failed", zap.Error(err))
