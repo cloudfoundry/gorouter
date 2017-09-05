@@ -293,8 +293,45 @@ var _ = Describe("Router Integration", func() {
 							})
 						})
 
+						Context("when the gorouter presentes certs that the backend does not trust", func() {
+							BeforeEach(func() {
+								// set Gorouter to use client certs
+								cfg.Backends.ClientAuth = config.TLSPem{
+									CertChain:  string(clientCertChain.CertPEM),
+									PrivateKey: string(clientCertChain.PrivKeyPEM),
+								}
+
+								// backend has an empty cert pool, does not trust CA that signed gorouter's client certs
+								backendTLSConfig.ClientCAs = x509.NewCertPool()
+							})
+
+							It("transforms the resulting tls error into a HTTP 496 status code", func() {
+								runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
+								runningApp1.TlsRegister(privateInstanceId)
+								runningApp1.TlsListen(backendTLSConfig)
+								heartbeatInterval := 200 * time.Millisecond
+								runningTicker := time.NewTicker(heartbeatInterval)
+								done := make(chan bool, 1)
+								defer func() { done <- true }()
+								go func() {
+									for {
+										select {
+										case <-runningTicker.C:
+											runningApp1.TlsRegister(privateInstanceId)
+										case <-done:
+											return
+										}
+									}
+								}()
+								routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+								Eventually(func() bool { return appRegistered(routesUri, runningApp1) }, "2s").Should(BeTrue())
+								runningApp1.VerifyAppStatus(496)
+							})
+						})
+
 						Context("when the gorouter does not present certs", func() {
-							It("successfully connects to backend using TLS", func() {
+							It("transforms the resulting tls error into a HTTP 496 status code", func() {
 								runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
 								runningApp1.TlsRegister(privateInstanceId)
 								runningApp1.TlsListen(backendTLSConfig)
