@@ -1,18 +1,14 @@
 package round_tripper
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/uber-go/zap"
-
-	"crypto/x509"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -77,6 +73,7 @@ func NewProxyRoundTripper(
 		localPort:           localPort,
 		roundTripperFactory: roundTripperFactory,
 		retryableClassifier: retryableClassifier,
+		errorHandler:        &ErrorHandler{combinedReporter},
 	}
 }
 
@@ -90,6 +87,7 @@ type roundTripper struct {
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory
 	retryableClassifier RetryableClassifier
+	errorHandler        *ErrorHandler
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -183,30 +181,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	reqInfo.StoppedAt = time.Now()
 
 	if err != nil {
-		responseWriter := reqInfo.ProxyResponseWriter
-		responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
-
-		switch err.(type) {
-		case tls.RecordHeaderError:
-			http.Error(responseWriter, SSLHandshakeMessage, 525)
-		case x509.HostnameError:
-			http.Error(responseWriter, HostnameErrorMessage, http.StatusServiceUnavailable)
-		case x509.UnknownAuthorityError:
-			http.Error(responseWriter, InvalidCertificateMessage, 526)
-		default:
-			if typedErr, ok := err.(*net.OpError); ok && typedErr.Op == "remote error" && typedErr.Err.Error() == "tls: bad certificate" {
-				http.Error(responseWriter, SSLCertRequiredMessage, 496)
-			} else {
-				http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
-				rt.combinedReporter.CaptureBadGateway()
-			}
-		}
-
-		logger.Error("endpoint-failed", zap.Error(err))
-		responseWriter.Header().Del("Connection")
-
-		responseWriter.Done()
-
+		rt.errorHandler.HandleError(logger, reqInfo.ProxyResponseWriter, err)
 		return nil, err
 	}
 
