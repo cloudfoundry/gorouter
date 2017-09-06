@@ -101,10 +101,10 @@ var _ = Describe("Route Services", func() {
 		})
 
 		It("return 502 Bad Gateway", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+			ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 				defer GinkgoRecover()
 				Fail("Should not get here into the app")
-			})
+			}, registerConfig{RouteServiceUrl: routeServiceURL})
 			defer func() {
 				Expect(ln.Close()).ToNot(HaveErrored())
 			}()
@@ -128,10 +128,10 @@ var _ = Describe("Route Services", func() {
 
 		Context("when a request does not have a valid Route service signature header", func() {
 			It("redirects the request to the route service url", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+				ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					Fail("Should not get here")
-				})
+				}, registerConfig{RouteServiceUrl: routeServiceURL})
 				defer func() {
 					Expect(ln.Close()).ToNot(HaveErrored())
 				}()
@@ -149,10 +149,10 @@ var _ = Describe("Route Services", func() {
 
 			Context("when the route service is not available", func() {
 				It("returns a 502 bad gateway error", func() {
-					ln := registerHandlerWithRouteService(r, "my_host.com", "https://bad-route-service", func(conn *test_util.HttpConn) {
+					ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 						defer GinkgoRecover()
 						Fail("Should not get here")
-					})
+					}, registerConfig{RouteServiceUrl: "https://bad-route-service"})
 					defer func() {
 						Expect(ln.Close()).ToNot(HaveErrored())
 					}()
@@ -178,7 +178,7 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("routes to the backend instance and strips headers", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+				ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 					req, _ := conn.ReadRequest()
 					Expect(req.Header.Get(routeservice.HeaderKeySignature)).To(Equal(""))
 					Expect(req.Header.Get(routeservice.HeaderKeyMetadata)).To(Equal(""))
@@ -191,7 +191,7 @@ var _ = Describe("Route Services", func() {
 						Body:       ioutil.NopCloser(out),
 					}
 					conn.WriteResponse(res)
-				})
+				}, registerConfig{RouteServiceUrl: routeServiceURL})
 				defer func() {
 					Expect(ln.Close()).ToNot(HaveErrored())
 				}()
@@ -211,7 +211,7 @@ var _ = Describe("Route Services", func() {
 
 			Context("when request has Host header with a port", func() {
 				It("routes to backend instance and disregards port in Host header", func() {
-					ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+					ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 						conn.ReadRequest()
 						out := &bytes.Buffer{}
 						out.WriteString("backend instance")
@@ -220,7 +220,7 @@ var _ = Describe("Route Services", func() {
 							Body:       ioutil.NopCloser(out),
 						}
 						conn.WriteResponse(res)
-					})
+					}, registerConfig{RouteServiceUrl: routeServiceURL})
 					defer func() {
 						Expect(ln.Close()).ToNot(HaveErrored())
 					}()
@@ -272,7 +272,11 @@ var _ = Describe("Route Services", func() {
 
 			It("returns 502 when backend not available", func() {
 				// register route service, should NOT route to it
-				registerAddr(r, "my_host.com", routeServiceURL, "localhost:81", "instanceId", "1", "")
+				registerAddr(r, "my_host.com", "localhost:81", registerConfig{
+					RouteServiceUrl: routeServiceURL,
+					InstanceId:      "instanceId",
+					InstanceIndex:   "1",
+				})
 
 				conn := dialProxy(proxyServer)
 
@@ -298,10 +302,10 @@ var _ = Describe("Route Services", func() {
 			})
 
 			It("routes to backend over http scheme", func() {
-				ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+				ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					Fail("Should not get here")
-				})
+				}, registerConfig{RouteServiceUrl: routeServiceURL})
 				defer func() {
 					Expect(ln.Close()).ToNot(HaveErrored())
 				}()
@@ -319,10 +323,10 @@ var _ = Describe("Route Services", func() {
 	})
 
 	It("returns a 526 when the SSL cert of the route service is signed by an unknown authority", func() {
-		ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+		ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 			defer GinkgoRecover()
 			Fail("Should not get here")
-		})
+		}, registerConfig{RouteServiceUrl: routeServiceURL})
 		defer func() {
 			Expect(ln.Close()).ToNot(HaveErrored())
 		}()
@@ -349,10 +353,10 @@ var _ = Describe("Route Services", func() {
 		})
 
 		It("returns a 200 when we route to a route service", func() {
-			ln := registerHandlerWithRouteService(r, "my_host.com", routeServiceURL, func(conn *test_util.HttpConn) {
+			ln := registerHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
 				defer GinkgoRecover()
 				Fail("Should not get here")
-			})
+			}, registerConfig{RouteServiceUrl: routeServiceURL})
 			defer func() {
 				Expect(ln.Close()).ToNot(HaveErrored())
 			}()
@@ -395,13 +399,13 @@ var _ = Describe("Route Services", func() {
 					conn.WriteResponse(resp)
 				}
 
-				rsListener := registerHandlerWithAppId(r, "route_service.com", "", routeServiceHandler, "", "my-route-service-app-id")
-				appListener := registerHandlerWithRouteService(r, "my_app.com", "https://route_service.com", func(conn *test_util.HttpConn) {
+				rsListener := registerHandler(r, "route_service.com", routeServiceHandler, registerConfig{AppId: "my-route-service-app-id"})
+				appListener := registerHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					resp := test_util.NewResponse(http.StatusOK)
 					conn.WriteResponse(resp)
 					Fail("Should not get here")
-				})
+				}, registerConfig{RouteServiceUrl: "https://route_service.com"})
 				defer func() {
 					Expect(rsListener.Close()).ToNot(HaveErrored())
 					Expect(appListener.Close()).ToNot(HaveErrored())
@@ -444,13 +448,13 @@ var _ = Describe("Route Services", func() {
 					conn.WriteResponse(resp)
 				}
 
-				rsListener := registerHandlerWithAppIdWithTLS(r, "route_service.com", "", routeServiceHandler, "", "my-route-service-app-id")
-				appListener := registerHandlerWithRouteService(r, "my_app.com", "https://route_service.com", func(conn *test_util.HttpConn) {
+				rsListener := registerHandler(r, "route_service.com", routeServiceHandler, registerConfig{AppId: "my-route-service-app-id", IsTLS: true})
+				appListener := registerHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					resp := test_util.NewResponse(http.StatusOK)
 					conn.WriteResponse(resp)
 					Fail("Should not get here")
-				})
+				}, registerConfig{RouteServiceUrl: "https://route_service.com"})
 				defer func() {
 					Expect(rsListener.Close()).ToNot(HaveErrored())
 					Expect(appListener.Close()).ToNot(HaveErrored())

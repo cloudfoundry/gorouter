@@ -51,9 +51,9 @@ var _ = Describe("Session Affinity", func() {
 	Context("context paths", func() {
 		Context("when two requests have the same context paths", func() {
 			It("responds with the same instance id", func() {
-				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				ln := registerHandler(r, "app.com/path1", responseWithJSessionID, registerConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := registerHandlerWithInstanceId(r, "app.com/path2/context/path", "", responseWithJSessionID, "instance-id-2")
+				ln2 := registerHandler(r, "app.com/path2/context/path", responseWithJSessionID, registerConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -83,9 +83,9 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when two requests have different context paths", func() {
 			It("responds with different instance ids", func() {
-				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				ln := registerHandler(r, "app.com/path1", responseWithJSessionID, registerConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := registerHandlerWithInstanceId(r, "app.com/path2/context/path", "", responseWithJSessionID, "instance-id-2")
+				ln2 := registerHandler(r, "app.com/path2/context/path", responseWithJSessionID, registerConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -115,9 +115,9 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when only one request has a context path", func() {
 			It("responds with different instance ids", func() {
-				ln := registerHandlerWithInstanceId(r, "app.com/path1", "", responseWithJSessionID, "instance-id-1")
+				ln := registerHandler(r, "app.com/path1", responseWithJSessionID, registerConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := registerHandlerWithInstanceId(r, "app.com", "", responseWithJSessionID, "instance-id-2")
+				ln2 := registerHandler(r, "app.com", responseWithJSessionID, registerConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -150,7 +150,7 @@ var _ = Describe("Session Affinity", func() {
 	Context("first request", func() {
 		Context("when the response does not contain a JESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
-				ln := registerHandlerWithInstanceId(r, "app", "", responseNoCookies, "my-id")
+				ln := registerHandler(r, "app", responseNoCookies, registerConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -167,7 +167,7 @@ var _ = Describe("Session Affinity", func() {
 		Context("when the response contains a JESSIONID cookie", func() {
 
 			It("responds with a VCAP_ID cookie scoped to the session", func() {
-				ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
+				ln := registerHandler(r, "app", responseWithJSessionID, registerConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -195,7 +195,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("responds with a VCAP_ID cookie that is also Secure ", func() {
-					ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
+					ln := registerHandler(r, "app", responseWithJSessionID, registerConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -222,7 +222,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("marks the cookie as secure only", func() {
-					ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
+					ln := registerHandler(r, "app", responseWithJSessionID, registerConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -272,7 +272,7 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when the response does not contain a JESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
-				ln := registerHandlerWithInstanceId(r, host, "", responseNoCookies, "my-id")
+				ln := registerHandler(r, host, responseNoCookies, registerConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -288,7 +288,7 @@ var _ = Describe("Session Affinity", func() {
 
 			Context("when the preferred server is gone", func() {
 				It("updates the VCAP_ID with the new server", func() {
-					ln := registerHandlerWithInstanceId(r, host, "", responseNoCookies, "other-id")
+					ln := registerHandler(r, host, responseNoCookies, registerConfig{InstanceId: "other-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -310,7 +310,7 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when the response contains a JESSIONID cookie", func() {
 			It("responds with a VCAP_ID cookie", func() {
-				ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "some-id")
+				ln := registerHandler(r, "app", responseWithJSessionID, registerConfig{InstanceId: "some-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -337,7 +337,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("expires the VCAP_ID", func() {
-					ln := registerHandlerWithInstanceId(r, "app", "", responseWithJSessionID, "my-id")
+					ln := registerHandler(r, "app", responseWithJSessionID, registerConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)

@@ -1227,6 +1227,7 @@ var _ = Describe("Router", func() {
 
 			_, err := client.Do(req)
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("handshake failure"))
 		})
 
 		It("sets the x-Forwarded-Proto header to https", func() {

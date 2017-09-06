@@ -740,7 +740,7 @@ var _ = Describe("Proxy", func() {
 	It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
 		done := make(chan string)
 
-		ln := registerHandlerWithInstanceId(r, "app", "", func(conn *test_util.HttpConn) {
+		ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
 			req, err := http.ReadRequest(conn.Reader)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -749,7 +749,7 @@ var _ = Describe("Proxy", func() {
 			conn.Close()
 
 			done <- req.Header.Get(router_http.CfInstanceIdHeader)
-		}, "fake-instance-id")
+		}, registerConfig{InstanceId: "fake-instance-id"})
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
@@ -854,14 +854,14 @@ var _ = Describe("Proxy", func() {
 	It("emits HTTP startstop events", func() {
 		done := make(chan struct{})
 		var vcapHeader string
-		ln := registerHandlerWithInstanceId(r, "app", "", func(conn *test_util.HttpConn) {
+		ln := registerHandler(r, "app", func(conn *test_util.HttpConn) {
 			req, _ := conn.ReadRequest()
 			vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
 			done <- struct{}{}
 			resp := test_util.NewResponse(http.StatusOK)
 			conn.WriteResponse(resp)
 			conn.Close()
-		}, "fake-instance-id")
+		}, registerConfig{InstanceId: "fake-instance-id"})
 		defer ln.Close()
 
 		conn := dialProxy(proxyServer)
@@ -1231,7 +1231,10 @@ var _ = Describe("Proxy", func() {
 
 		Context("when the connection to the backend fails", func() {
 			It("emits a failure metric and logs a 502 in the access logs", func() {
-				registerAddr(r, "ws", "", "192.0.2.1:1234", "", "2", "abc")
+				registerAddr(r, "ws", "192.0.2.1:1234", registerConfig{
+					InstanceIndex: "2",
+					AppId:         "abc",
+				})
 
 				conn := dialProxy(proxyServer)
 
@@ -1356,7 +1359,10 @@ var _ = Describe("Proxy", func() {
 		})
 		Context("when the connection to the backend fails", func() {
 			It("logs a 502 BadGateway", func() {
-				registerAddr(r, "tcp-handler", "", "192.0.2.1:1234", "", "2", "abc")
+				registerAddr(r, "tcp-handler", "192.0.2.1:1234", registerConfig{
+					InstanceIndex: "2",
+					AppId:         "abc",
+				})
 
 				conn := dialProxy(proxyServer)
 
@@ -1720,7 +1726,10 @@ var _ = Describe("Proxy", func() {
 		})
 		defer ln.Close()
 
-		registerAddr(r, "retries", "", "localhost:81", "instanceId", "2", "")
+		registerAddr(r, "retries", "localhost:81", registerConfig{
+			InstanceId:    "instanceId",
+			InstanceIndex: "2",
+		})
 
 		for i := 0; i < 5; i++ {
 			body := &bytes.Buffer{}
@@ -1738,7 +1747,7 @@ var _ = Describe("Proxy", func() {
 
 	Context("Access log", func() {
 		It("Logs a request", func() {
-			ln := registerHandlerWithAppId(r, "test", "", func(conn *test_util.HttpConn) {
+			ln := registerHandler(r, "test", func(conn *test_util.HttpConn) {
 				req, body := conn.ReadRequest()
 				Expect(req.Method).To(Equal("POST"))
 				Expect(req.URL.Path).To(Equal("/"))
@@ -1752,7 +1761,7 @@ var _ = Describe("Proxy", func() {
 				out.WriteString("DEFG")
 				rsp.Body = ioutil.NopCloser(out)
 				conn.WriteResponse(rsp)
-			}, "123", "456")
+			}, registerConfig{InstanceId: "123", AppId: "456"})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
@@ -1807,12 +1816,12 @@ var _ = Describe("Proxy", func() {
 			It("lookups the route to that specific app index and id", func() {
 				done := make(chan struct{})
 				// app handler for app.vcap.me
-				ln := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+				ln := registerHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
-				}, "", "app-1-id")
+				}, registerConfig{AppId: "app-1-id"})
 				defer ln.Close()
 
-				ln2 := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+				ln2 := registerHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -1825,7 +1834,7 @@ var _ = Describe("Proxy", func() {
 					conn.Close()
 
 					done <- struct{}{}
-				}, "", "app-2-id")
+				}, registerConfig{AppId: "app-2-id"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -1843,9 +1852,9 @@ var _ = Describe("Proxy", func() {
 			})
 
 			It("returns a 404 if it cannot find the specified instance", func() {
-				ln := registerHandlerWithAppId(r, "app.vcap.me", "", func(conn *test_util.HttpConn) {
+				ln := registerHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
-				}, "", "app-1-id")
+				}, registerConfig{AppId: "app-1-id"})
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
@@ -1929,62 +1938,70 @@ func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
 	return res, body
 }
 
-func registerAddr(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr string, instanceId, instanceIndex, appId string) {
+func registerAddr(reg *registry.RouteRegistry, path string, addr string, cfg registerConfig) {
 	host, portStr, err := net.SplitHostPort(addr)
 	Expect(err).NotTo(HaveOccurred())
 
 	port, err := strconv.Atoi(portStr)
 	Expect(err).NotTo(HaveOccurred())
-	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}, "", false))
+	reg.Register(
+		route.Uri(path),
+		route.NewEndpoint(
+			cfg.AppId,
+			host, uint16(port),
+			cfg.InstanceId,
+			cfg.InstanceIndex,
+			nil, -1,
+			cfg.RouteServiceUrl,
+			models.ModificationTag{},
+			"", cfg.IsTLS,
+		),
+	)
 }
 
-func registerAddrWithTLS(reg *registry.RouteRegistry, path string, routeServiceUrl string, addr string, instanceId, instanceIndex, appId string) {
-	host, portStr, err := net.SplitHostPort(addr)
-	Expect(err).NotTo(HaveOccurred())
+func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler, cfg ...registerConfig) net.Listener {
+	var (
+		ln  net.Listener
+		err error
+	)
+	var rcfg registerConfig
+	if len(cfg) > 0 {
+		rcfg = cfg[0]
+	}
+	if rcfg.IsTLS {
+		certFile := "../test/assets/certs/server.pem"
+		keyFile := "../test/assets/certs/server.key"
+		var config *tls.Config
+		config = &tls.Config{}
 
-	port, err := strconv.Atoi(portStr)
-	Expect(err).NotTo(HaveOccurred())
-	reg.Register(route.Uri(path), route.NewEndpoint(appId, host, uint16(port), instanceId, instanceIndex, nil, -1, routeServiceUrl, models.ModificationTag{}, "", true))
-}
+		var certificate tls.Certificate
+		certificate, err = tls.LoadX509KeyPair(certFile, keyFile)
 
-func registerHandler(reg *registry.RouteRegistry, path string, handler connHandler) net.Listener {
-	return registerHandlerWithInstanceId(reg, path, "", handler, "")
-}
+		Expect(err).NotTo(HaveOccurred())
+		config.Certificates = append(config.Certificates, certificate)
 
-func registerHandlerWithRouteService(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler) net.Listener {
-	return registerHandlerWithInstanceId(reg, path, routeServiceUrl, handler, "")
-}
-
-func registerHandlerWithInstanceId(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId string) net.Listener {
-	return registerHandlerWithAppId(reg, path, routeServiceUrl, handler, instanceId, "")
-}
-
-func registerHandlerWithAppId(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId, appId string) net.Listener {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err = tls.Listen("tcp", "127.0.0.1:0", config)
+	} else {
+		ln, err = net.Listen("tcp", "127.0.0.1:0")
+	}
 	Expect(err).NotTo(HaveOccurred())
 
 	go runBackendInstance(ln, handler)
 
-	registerAddr(reg, path, routeServiceUrl, ln.Addr().String(), instanceId, "2", appId)
+	if rcfg.InstanceIndex == "" {
+		rcfg.InstanceIndex = "2"
+	}
+	registerAddr(reg, path, ln.Addr().String(), rcfg)
 
 	return ln
 }
 
-func registerHandlerWithAppIdWithTLS(reg *registry.RouteRegistry, path string, routeServiceUrl string, handler connHandler, instanceId, appId string) net.Listener {
-	certFile := "../test/assets/certs/server.pem"
-	keyFile := "../test/assets/certs/server.key"
-
-	var config *tls.Config
-	config = &tls.Config{}
-	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
-	Expect(err).NotTo(HaveOccurred())
-	config.Certificates = append(config.Certificates, certificate)
-
-	ln, err := tls.Listen("tcp", "127.0.0.1:0", config)
-	Expect(err).NotTo(HaveOccurred())
-	go runBackendInstance(ln, handler)
-	registerAddrWithTLS(reg, path, routeServiceUrl, ln.Addr().String(), instanceId, "2", appId)
-	return ln
+type registerConfig struct {
+	RouteServiceUrl string
+	InstanceId      string
+	InstanceIndex   string
+	AppId           string
+	IsTLS           bool
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {

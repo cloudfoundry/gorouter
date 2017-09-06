@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
@@ -495,8 +494,9 @@ var _ = Describe("Router Integration", func() {
 			statusPort       uint16
 			proxyPort        uint16
 			cfgFile          string
-			dialTls          func(version uint16) error
 			clientTrustedCAs *x509.CertPool
+			mbusClient       *nats.Conn
+			localIP          string
 		)
 		BeforeEach(func() {
 			statusPort = test_util.NextAvailPort()
@@ -504,46 +504,48 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			cfg, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+
 		})
 		JustBeforeEach(func() {
+			var err error
 			writeConfig(cfg, cfgFile)
-			dialTls = func(version uint16) error {
-
-				tlsConfig := &tls.Config{
-					MaxVersion: version,
-				}
-
-				t := &http.Transport{TLSClientConfig: tlsConfig}
-				client := &http.Client{Transport: t}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", cfg.SSLPort))
-				return err
-			}
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			localIP, err = localip.LocalIP()
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		Context("when no cipher suite is supported by both client and server", func() {
-			BeforeEach(func() {
-				keyPEM1, certPEM1 := test_util.CreateKeyPair("potato.com")
-				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
+		It("forwards incoming TLS requests to backends", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
-				cfg.TLSPEM = []config.TLSPem{
-					config.TLSPem{
-						PrivateKey: string(keyPEM1),
-						CertChain:  string(certPEM1),
-					},
-					config.TLSPem{
-						PrivateKey: string(keyPEM2),
-						CertChain:  string(certPEM2),
-					},
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done := make(chan bool, 1)
+			defer func() { done <- true }()
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
 				}
-				cfg.CipherString = "RC4-SHA"
-			})
-
-			It("throws an error", func() {
-				gorouterSession = startGorouterSession(cfgFile)
-				err := dialTls(tls.VersionTLS12)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("handshake failure"))
-			})
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+			tlsConfig := &tls.Config{
+				RootCAs:    clientTrustedCAs,
+				ServerName: "potato.com",
+			}
+			t := &http.Transport{TLSClientConfig: tlsConfig}
+			client := &http.Client{Transport: t}
+			resp, err := client.Get(fmt.Sprintf("https://test.vcap.me:%d", cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
 		It("supports minimum TLS 1.2 by default", func() {
@@ -1358,71 +1360,6 @@ var _ = Describe("Router Integration", func() {
 				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
 				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
-		})
-	})
-
-	Context("when max conn per backend is set", func() {
-		It("responds with 503 when conn limit is reached", func() {
-			var wg, wg2 sync.WaitGroup
-
-			localIP, err := localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 1, natsPort)
-			config.EndpointTimeout = 10 * time.Second
-			writeConfig(config, cfgFile)
-
-			gorouterSession = startGorouterSession(cfgFile)
-			defer gorouterSession.Kill()
-
-			mbusClient, err := newMessageBus(config)
-			Expect(err).ToNot(HaveOccurred())
-
-			waitChan := make(chan struct{})
-			runningApp1 := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
-			runningApp1.AddHandler("/sleep", func(w http.ResponseWriter, r *http.Request) {
-				defer GinkgoRecover()
-				waitChan <- struct{}{}
-				wg2.Wait()
-				w.WriteHeader(http.StatusOK)
-			})
-			runningApp1.Register()
-			runningApp1.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-
-			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
-			runningApp1.VerifyAppStatus(200)
-
-			heartbeatInterval := 200 * time.Millisecond
-			runningTicker := time.NewTicker(heartbeatInterval)
-
-			go func() {
-				for {
-					select {
-					case <-runningTicker.C:
-						runningApp1.Register()
-					}
-				}
-			}()
-
-			wg.Add(1)
-			wg2.Add(1)
-			go func() {
-				defer GinkgoRecover()
-				defer wg.Done()
-				goErr := runningApp1.CheckAppStatusWithPath(200, "sleep")
-				Expect(goErr).ToNot(HaveOccurred())
-			}()
-			Eventually(waitChan).Should(Receive())
-			err = runningApp1.CheckAppStatusWithPath(503, "sleep")
-			Expect(err).ToNot(HaveOccurred())
-			wg2.Done()
-
-			wg.Wait()
 		})
 	})
 })
