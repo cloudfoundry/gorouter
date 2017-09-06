@@ -13,12 +13,112 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strconv"
 	"time"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/routing-api/models"
 )
+
+func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg RegisterConfig) {
+	host, portStr, err := net.SplitHostPort(addr)
+	Expect(err).NotTo(HaveOccurred())
+
+	port, err := strconv.Atoi(portStr)
+	Expect(err).NotTo(HaveOccurred())
+	reg.Register(
+		route.Uri(path),
+		route.NewEndpoint(
+			cfg.AppId,
+			host, uint16(port),
+			cfg.InstanceId,
+			cfg.InstanceIndex,
+			nil, -1,
+			cfg.RouteServiceUrl,
+			models.ModificationTag{},
+			"", cfg.IsTLS,
+		),
+	)
+}
+
+type connHandler func(*HttpConn)
+
+func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandler, cfg ...RegisterConfig) net.Listener {
+	var (
+		ln  net.Listener
+		err error
+	)
+	var rcfg RegisterConfig
+	if len(cfg) > 0 {
+		rcfg = cfg[0]
+	}
+	if rcfg.IsTLS {
+		certFile := "../test/assets/certs/server.pem"
+		keyFile := "../test/assets/certs/server.key"
+		var config *tls.Config
+		config = &tls.Config{}
+
+		var certificate tls.Certificate
+		certificate, err = tls.LoadX509KeyPair(certFile, keyFile)
+
+		Expect(err).NotTo(HaveOccurred())
+		config.Certificates = append(config.Certificates, certificate)
+
+		ln, err = tls.Listen("tcp", "127.0.0.1:0", config)
+	} else {
+		ln, err = net.Listen("tcp", "127.0.0.1:0")
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	go runBackendInstance(ln, handler)
+
+	if rcfg.InstanceIndex == "" {
+		rcfg.InstanceIndex = "2"
+	}
+	RegisterAddr(reg, path, ln.Addr().String(), rcfg)
+
+	return ln
+}
+
+type RegisterConfig struct {
+	RouteServiceUrl string
+	InstanceId      string
+	InstanceIndex   string
+	AppId           string
+	IsTLS           bool
+}
+
+func runBackendInstance(ln net.Listener, handler connHandler) {
+	var tempDelay time.Duration // how long to sleep on accept failure
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				fmt.Printf("http: Accept error: %v; retrying in %v\n", err, tempDelay)
+				time.Sleep(tempDelay)
+				continue
+			}
+			break
+		}
+		go func() {
+			defer GinkgoRecover()
+			handler(NewHttpConn(conn))
+		}()
+	}
+}
 
 func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
 	return generateConfig(statusPort, proxyPort, natsPorts...)
