@@ -34,14 +34,9 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 	reg.Register(
 		route.Uri(path),
 		route.NewEndpoint(
-			cfg.AppId,
-			host, uint16(port),
-			cfg.InstanceId,
-			cfg.InstanceIndex,
-			nil, -1,
-			cfg.RouteServiceUrl,
-			models.ModificationTag{},
-			"", cfg.IsTLS,
+			cfg.AppId, host, uint16(port), cfg.InstanceId, cfg.InstanceIndex,
+			nil, -1, cfg.RouteServiceUrl, models.ModificationTag{}, "",
+			(cfg.TLSConfig != nil),
 		),
 	)
 }
@@ -57,14 +52,8 @@ func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandl
 	if len(cfg) > 0 {
 		rcfg = cfg[0]
 	}
-	if rcfg.IsTLS {
-		Expect(rcfg.TLSCert).NotTo(BeNil())
-
-		var config *tls.Config
-		config = &tls.Config{}
-		config.Certificates = append(config.Certificates, rcfg.TLSCert)
-
-		ln, err = tls.Listen("tcp", "127.0.0.1:0", config)
+	if rcfg.TLSConfig != nil && !rcfg.IgnoreTLSConfig {
+		ln, err = tls.Listen("tcp", "127.0.0.1:0", rcfg.TLSConfig)
 	} else {
 		ln, err = net.Listen("tcp", "127.0.0.1:0")
 	}
@@ -85,8 +74,8 @@ type RegisterConfig struct {
 	InstanceId      string
 	InstanceIndex   string
 	AppId           string
-	IsTLS           bool
-	TLSCert         tls.Certificate
+	TLSConfig       *tls.Config
+	IgnoreTLSConfig bool
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {

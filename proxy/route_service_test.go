@@ -458,7 +458,9 @@ var _ = Describe("Route Services", func() {
 				}
 
 				rsListener := test_util.RegisterHandler(r, "route_service.com", routeServiceHandler, test_util.RegisterConfig{
-					AppId: "my-route-service-app-id", IsTLS: true, TLSCert: rsTLSCert,
+					AppId: "my-route-service-app-id", TLSConfig: &tls.Config{
+						Certificates: []tls.Certificate{rsTLSCert},
+					},
 				})
 				appListener := test_util.RegisterHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()

@@ -81,6 +81,7 @@ var _ = JustBeforeEach(func() {
 		CipherSuites:       conf.CipherSuites,
 		InsecureSkipVerify: conf.SkipSSLValidation,
 		RootCAs:            caCertPool,
+		Certificates:       []tls.Certificate{conf.Backends.ClientAuthCertificate},
 	}
 	heartbeatOK = 1
 
