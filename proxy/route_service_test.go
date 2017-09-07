@@ -2,6 +2,7 @@ package proxy_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
 	"net"
@@ -422,8 +423,16 @@ var _ = Describe("Route Services", func() {
 		})
 
 		Context("when registration message contains tls_port", func() {
+			var rsTLSCert tls.Certificate
 			BeforeEach(func() {
-				conf.SkipSSLValidation = true
+				var err error
+				certChain := test_util.CreateSignedCertWithRootCA("route_service.com")
+				rsTLSCert, err = tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				caCertPool, err = x509.SystemCertPool()
+				Expect(err).NotTo(HaveOccurred())
+				caCertPool.AddCert(certChain.CACert)
 			})
 
 			It("successfully looks up the route service and sends the request", func() {
@@ -448,7 +457,9 @@ var _ = Describe("Route Services", func() {
 					conn.WriteResponse(resp)
 				}
 
-				rsListener := test_util.RegisterHandler(r, "route_service.com", routeServiceHandler, test_util.RegisterConfig{AppId: "my-route-service-app-id", IsTLS: true})
+				rsListener := test_util.RegisterHandler(r, "route_service.com", routeServiceHandler, test_util.RegisterConfig{
+					AppId: "my-route-service-app-id", IsTLS: true, TLSCert: rsTLSCert,
+				})
 				appListener := test_util.RegisterHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					resp := test_util.NewResponse(http.StatusOK)

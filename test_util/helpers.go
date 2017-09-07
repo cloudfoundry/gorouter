@@ -58,16 +58,11 @@ func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandl
 		rcfg = cfg[0]
 	}
 	if rcfg.IsTLS {
-		certFile := "../test/assets/certs/server.pem"
-		keyFile := "../test/assets/certs/server.key"
+		Expect(rcfg.TLSCert).NotTo(BeNil())
+
 		var config *tls.Config
 		config = &tls.Config{}
-
-		var certificate tls.Certificate
-		certificate, err = tls.LoadX509KeyPair(certFile, keyFile)
-
-		Expect(err).NotTo(HaveOccurred())
-		config.Certificates = append(config.Certificates, certificate)
+		config.Certificates = append(config.Certificates, rcfg.TLSCert)
 
 		ln, err = tls.Listen("tcp", "127.0.0.1:0", config)
 	} else {
@@ -91,6 +86,7 @@ type RegisterConfig struct {
 	InstanceIndex   string
 	AppId           string
 	IsTLS           bool
+	TLSCert         tls.Certificate
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {
