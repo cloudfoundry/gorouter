@@ -157,7 +157,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	server := &http.Server{
 		Handler:     &handler,
 		ConnState:   r.HandleConnState,
-		IdleTimeout: 5 * time.Second,
+		IdleTimeout: r.config.FrontendIdleTimeout,
 	}
 
 	err := r.serveHTTP(server, r.errChan)

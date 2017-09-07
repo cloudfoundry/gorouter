@@ -149,6 +149,7 @@ type Config struct {
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
+	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout"`
 
 	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
@@ -203,6 +204,7 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
+	FrontendIdleTimeout:                       5 * time.Second,
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -1519,6 +1520,36 @@ var _ = Describe("Router", func() {
 			})
 		})
 
+	})
+
+	Describe("frontend timeouts", func() {
+		Context("when the frontend connection idles for more than the configured IdleTimeout", func() {
+			BeforeEach(func() {
+				config.FrontendIdleTimeout = 500 * time.Millisecond
+			})
+			It("closes the TCP connection", func() {
+				conn, err := net.Dial("tcp", fmt.Sprintf("some-app.vcap.me:%d", config.Port))
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = conn.Write([]byte("GET /index.html HTTP/1.1\nHost: www.example.com\n\n"))
+				Expect(err).NotTo(HaveOccurred())
+
+				buffer := make([]byte, 1024)
+				_, err = conn.Read(buffer)
+				Expect(err).NotTo(HaveOccurred())
+
+				readErr := make(chan error, 1)
+				go func() {
+					_, err := conn.Read(buffer)
+					readErr <- err
+				}()
+				// now connection is idle
+
+				Consistently(readErr, "200ms").ShouldNot(Receive()) // connection stays open
+
+				Eventually(readErr, "1s").Should(Receive(Equal(io.EOF))) // connection is closed
+			})
+		})
 	})
 })
 
