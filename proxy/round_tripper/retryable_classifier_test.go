@@ -1,6 +1,7 @@
 package round_tripper_test
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"net"
@@ -43,7 +44,30 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
-		Context("When error is a HostnameError", func() {
+		Context("When error is a 'tls: bad certificate' error", func() {
+			BeforeEach(func() {
+				err = &net.OpError{
+					Err: errors.New("tls: bad certificate"),
+					Op:  "remote error",
+				}
+			})
+			It("returns true", func() {
+				Expect(retry.IsRetryable(err)).To(BeTrue())
+			})
+		})
+
+		Context("when the error is a tls: handshake failure' error (e.g. cipher suite mismatch)", func() {
+			BeforeEach(func() {
+				err = &net.OpError{
+					Err: errors.New("tls: handshake failure"),
+					Op:  "remote error",
+				}
+			})
+			It("returns true", func() {
+				Expect(retry.IsRetryable(err)).To(BeTrue())
+			})
+		})
+		Context("When error is a x509.HostnameError", func() {
 			BeforeEach(func() {
 				_, c := test_util.CreateCertDER("foobaz.com")
 				var cert *x509.Certificate
@@ -58,6 +82,30 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
+		Context("When error is a x509.UnknownAuthorityError", func() {
+			BeforeEach(func() {
+				_, c := test_util.CreateCertDER("foobar.com")
+				var cert *x509.Certificate
+				cert, err = x509.ParseCertificate(c)
+				Expect(err).NotTo(HaveOccurred())
+				err = &x509.UnknownAuthorityError{
+					Cert: cert,
+				}
+			})
+			It("returns true", func() {
+				Expect(retry.IsRetryable(err)).To(BeTrue())
+			})
+		})
+		Context("When error is a tls.RecordHeaderError", func() {
+			BeforeEach(func() {
+				err = &tls.RecordHeaderError{
+					Msg: "foobar",
+				}
+			})
+			It("returns true", func() {
+				Expect(retry.IsRetryable(err)).To(BeTrue())
+			})
+		})
 		Context("When error is anything else", func() {
 			BeforeEach(func() {
 				err = &net.OpError{
@@ -65,7 +113,7 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 					Op:  "write",
 				}
 			})
-			It("returns true", func() {
+			It("returns false", func() {
 				Expect(retry.IsRetryable(err)).To(BeFalse())
 			})
 		})
