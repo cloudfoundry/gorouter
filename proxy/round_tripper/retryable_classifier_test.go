@@ -22,6 +22,7 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 		AfterEach(func() {
 			err = nil
 		})
+
 		Context("When error is a dial error", func() {
 			BeforeEach(func() {
 				err = &net.OpError{
@@ -33,6 +34,7 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
+
 		Context("When error is a 'read: connection reset by peer' error", func() {
 			BeforeEach(func() {
 				err = &net.OpError{
@@ -44,7 +46,8 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
-		Context("When error is a 'tls: bad certificate' error", func() {
+
+		Context("When error is a 'tls: bad certificate' error (e.g. backend requires client certs, but gorouter doesn't provide them OR provides ones that the backend does not trust)", func() {
 			BeforeEach(func() {
 				err = &net.OpError{
 					Err: errors.New("tls: bad certificate"),
@@ -67,7 +70,8 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
-		Context("When error is a x509.HostnameError", func() {
+
+		Context("When error is a x509.HostnameError (e.g. backend cert common name is not expected)", func() {
 			BeforeEach(func() {
 				_, c := test_util.CreateCertDER("foobaz.com")
 				var cert *x509.Certificate
@@ -82,7 +86,8 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
-		Context("When error is a x509.UnknownAuthorityError", func() {
+
+		Context("When error is a x509.UnknownAuthorityError (e.g. gorouter doesn't trust CA that signed the backend certs)", func() {
 			BeforeEach(func() {
 				_, c := test_util.CreateCertDER("foobar.com")
 				var cert *x509.Certificate
@@ -96,7 +101,8 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
-		Context("When error is a tls.RecordHeaderError", func() {
+
+		Context("When error is a tls.RecordHeaderError (e.g. the backend is listening only for regular HTTP)", func() {
 			BeforeEach(func() {
 				err = &tls.RecordHeaderError{
 					Msg: "foobar",
@@ -106,6 +112,7 @@ var _ = Describe("roundTripperRetryableClassifier", func() {
 				Expect(retry.IsRetryable(err)).To(BeTrue())
 			})
 		})
+
 		Context("When error is anything else", func() {
 			BeforeEach(func() {
 				err = &net.OpError{
