@@ -139,6 +139,10 @@ The format of the `router.register` message is as follows:
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
 
+### Deleting a Route
+
+Routes can be deleted with the `router.unregister` nats message. The format of the `router.unregister` message the same as the `router.register` message, but most information is ignored. Any route that matches the `host`, `port` and `uris` fields will be deleted.
+
 ### Example
 
 Create a simple app
@@ -158,6 +162,21 @@ See that it works!
 $ curl my_first_url.vcap.me:8081
 Hello!
 ```
+
+Unregister the route
+```
+$ nats-pub 'router.unregister' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+
+Published [router.unregister] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+```
+
+See that the route is gone
+
+```
+$ curl my_first_url.vcap.me:8081
+404 Not Found: Requested route ('my_first_url.vcap.me') does not exist.
+```
+
 
 **Note:** In order to use `nats-pub` to register a route, you must run the command on the NATS VM. If you are using [`cf-deployment`](https://github.com/cloudfoundry/cf-deployment), you can run `nats-pub` from any VM.  
 
