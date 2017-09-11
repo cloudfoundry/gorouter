@@ -2,9 +2,7 @@ package round_tripper_test
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -24,8 +22,6 @@ import (
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/uuid"
-
-	"crypto/x509"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -69,6 +65,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			combinedReporter    *fakes.FakeCombinedReporter
 			roundTripperFactory *FakeRoundTripperFactory
 			retryableClassifier *roundtripperfakes.FakeRetryableClassifier
+			errorHandler        *roundtripperfakes.ErrorHandler
 
 			reqInfo *handlers.RequestInfo
 
@@ -112,6 +109,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			combinedReporter = new(fakes.FakeCombinedReporter)
 
+			errorHandler = &roundtripperfakes.ErrorHandler{}
+
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			retryableClassifier = &roundtripperfakes.FakeRetryableClassifier{}
 			retryableClassifier.IsRetryableReturns(false)
@@ -120,6 +119,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				logger, "my_trace_key", routerIP, "",
 				combinedReporter, false,
 				1234,
+				errorHandler,
 			)
 		})
 
@@ -208,21 +208,16 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 		Context("when backend is unavailable due to a retryable error", func() {
 			BeforeEach(func() {
-				transport.RoundTripReturns(nil, errors.New("error"))
+				transport.RoundTripReturns(nil, errors.New("potato"))
 				retryableClassifier.IsRetryableReturns(true)
 			})
 
-			It("retries 3 times and returns status bad gateway", func() {
+			It("retries 3 times", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
 				Expect(transport.RoundTripCallCount()).To(Equal(3))
 				Expect(retryableClassifier.IsRetryableCallCount()).To(Equal(3))
 
-				Expect(resp.Code).To(Equal(http.StatusBadGateway))
-				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
-				bodyBytes, err := ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(string(bodyBytes)).To(ContainSubstring(round_tripper.BadGatewayMessage))
 				Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
 			})
@@ -247,11 +242,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 			})
 
-			It("captures bad gateway response in the metrics reporter", func() {
+			It("calls the error handler", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
-
-				Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+				_, _, err = errorHandler.HandleErrorArgsForCall(0)
+				Expect(err).To(MatchError("potato"))
 			})
 
 			It("does not log anything about route services", func() {
@@ -264,42 +260,38 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 		Context("when backend is unavailable due to non-retryable error", func() {
 			BeforeEach(func() {
-				transport.RoundTripReturns(nil, errors.New("error"))
+				transport.RoundTripReturns(nil, errors.New("potato"))
 				retryableClassifier.IsRetryableReturns(false)
 			})
 
-			It("does not retry and returns status bad gateway", func() {
+			It("does not retry", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(MatchError(errors.New("error")))
+				Expect(err).To(MatchError("potato"))
 				Expect(transport.RoundTripCallCount()).To(Equal(1))
 
-				Expect(resp.Code).To(Equal(http.StatusBadGateway))
-				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
-				bodyBytes, err := ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(string(bodyBytes)).To(ContainSubstring(round_tripper.BadGatewayMessage))
 				Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
 			})
 
 			It("captures each routing request to the backend", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(MatchError(errors.New("error")))
+				Expect(err).To(MatchError("potato"))
 
 				Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
 				Expect(combinedReporter.CaptureRoutingRequestArgsForCall(0)).To(Equal(endpoint))
 			})
 
-			It("captures bad gateway response in the metrics reporter", func() {
+			It("calls the error handler", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(MatchError(errors.New("error")))
-
-				Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+				Expect(err).To(HaveOccurred())
+				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+				_, _, err = errorHandler.HandleErrorArgsForCall(0)
+				Expect(err).To(MatchError("potato"))
 			})
 
 			It("does not log anything about route services", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(MatchError(errors.New("error")))
+				Expect(err).To(MatchError("potato"))
 
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 			})
@@ -307,7 +299,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			It("does not log the error or report the endpoint failure", func() {
 				// TODO: Test "iter.EndpointFailed"
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(MatchError(errors.New("error")))
+				Expect(err).To(MatchError("potato"))
 
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
 			})
@@ -321,20 +313,20 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			It("returns a 502 Bad Gateway response", func() {
 				backendRes, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
 				Expect(backendRes).To(BeNil())
 				Expect(err).To(Equal(handler.NoEndpointsAvailable))
 
 				Expect(reqBody.closeCount).To(Equal(1))
 
-				Expect(resp.Code).To(Equal(http.StatusBadGateway))
-				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
-				bodyBytes, err := ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(string(bodyBytes)).To(ContainSubstring(round_tripper.BadGatewayMessage))
-
 				Expect(reqInfo.RouteEndpoint).To(BeNil())
 				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+			})
+
+			It("calls the error handler", func() {
+				proxyRoundTripper.RoundTrip(req)
+				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+				_, _, err := errorHandler.HandleErrorArgsForCall(0)
+				Expect(err).To(Equal(handler.NoEndpointsAvailable))
 			})
 
 			It("does not capture any routing requests to the backend", func() {
@@ -342,13 +334,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Expect(err).To(Equal(handler.NoEndpointsAvailable))
 
 				Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(0))
-			})
-
-			It("captures bad gateway response in the metrics reporter", func() {
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(Equal(handler.NoEndpointsAvailable))
-
-				Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(1))
 			})
 
 			It("does not log anything about route services", func() {
@@ -482,43 +467,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Expect(reqBody.closeCount).To(Equal(1))
 				Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 			})
-			Context("when backend is listening for non tls conn", func() {
-				BeforeEach(func() {
-					transport.RoundTripReturns(nil, tls.RecordHeaderError{Msg: "potato"})
-				})
-				It("should error with 525 status code", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(resp.Code).To(Equal(525))
-					Expect(resp.Body).To(ContainSubstring("SSL Handshake Failed"))
-				})
-			})
-
-			Context("when backend has an invalid instance-id in the certificate", func() {
-				BeforeEach(func() {
-					backendCert := x509.Certificate{}
-					transport.RoundTripReturns(nil, x509.HostnameError{Certificate: &backendCert, Host: "the wrong one"})
-				})
-				It("should error with 503 status code", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
-					Expect(resp.Body).To(ContainSubstring("Service Unavailable"))
-				})
-			})
-
-			Context("when backend has a certificate signed by an invalid CA", func() {
-				BeforeEach(func() {
-					backendCert := x509.Certificate{}
-					transport.RoundTripReturns(nil, x509.UnknownAuthorityError{Cert: &backendCert})
-				})
-				It("should error with 526 status code", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(resp.Code).To(Equal(526))
-					Expect(resp.Body).To(ContainSubstring("Invalid SSL Certificate"))
-				})
-			})
 
 			Context("when the backend is registered with a non-tls port", func() {
 				BeforeEach(func() {
@@ -539,31 +487,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(transformedReq.URL.Scheme).To(Equal("http"))
 					Expect(reqBody.closeCount).To(Equal(1))
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-				})
-			})
-
-			Context("when the backend requires a valid client cert, but the gorouter does not provide one", func() {
-				BeforeEach(func() {
-					// we've empirically discovered that this is the error returned
-					theError := &net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")}
-					transport.RoundTripReturns(nil, theError)
-				})
-				It("should error with 496 status code", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(resp.Code).To(Equal(496))
-					Expect(resp.Body).To(ContainSubstring("SSL Certificate Required"))
-				})
-			})
-			Context("when some other kind of OpError occurs", func() {
-				BeforeEach(func() {
-					theError := &net.OpError{Op: "remote error", Err: errors.New("potato")}
-					transport.RoundTripReturns(nil, theError)
-				})
-				It("should error with the default 502 status code", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(resp.Code).To(Equal(502))
 				})
 			})
 		})
@@ -663,10 +586,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 					retryableClassifier.IsRetryableReturns(true)
 				})
 
-				It("captures bad gateway response in the metrics reporter", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError(dialError))
-					Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+				It("calls the error handler", func() {
+					proxyRoundTripper.RoundTrip(req)
+					Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+					_, _, err := errorHandler.HandleErrorArgsForCall(0)
+					Expect(err).To(Equal(dialError))
 				})
 
 				It("logs the failure", func() {
@@ -681,35 +605,29 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				Context("when route service is unavailable due to non-retryable error", func() {
 					BeforeEach(func() {
-						transport.RoundTripReturns(nil, errors.New("error"))
+						transport.RoundTripReturns(nil, errors.New("banana"))
 						retryableClassifier.IsRetryableReturns(false)
 					})
 
 					It("does not retry and returns status bad gateway", func() {
 						_, err := proxyRoundTripper.RoundTrip(req)
-						Expect(err).To(MatchError(errors.New("error")))
+						Expect(err).To(MatchError(errors.New("banana")))
 						Expect(transport.RoundTripCallCount()).To(Equal(1))
 
 						Expect(reqBody.closeCount).To(Equal(1))
-
-						Expect(resp.Code).To(Equal(http.StatusBadGateway))
-						Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
-						bodyBytes, err := ioutil.ReadAll(resp.Body)
-						Expect(err).ToNot(HaveOccurred())
-						Expect(string(bodyBytes)).To(ContainSubstring(round_tripper.BadGatewayMessage))
 					})
 
-					It("captures bad gateway response in the metrics reporter", func() {
-						_, err := proxyRoundTripper.RoundTrip(req)
-						Expect(err).To(MatchError(errors.New("error")))
-
-						Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+					It("calls the error handler", func() {
+						proxyRoundTripper.RoundTrip(req)
+						Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+						_, _, err := errorHandler.HandleErrorArgsForCall(0)
+						Expect(err).To(MatchError("banana"))
 					})
 
 					It("does not log the error or report the endpoint failure", func() {
 						// TODO: Test "iter.EndpointFailed"
 						_, err := proxyRoundTripper.RoundTrip(req)
-						Expect(err).To(MatchError(errors.New("error")))
+						Expect(err).To(MatchError("banana"))
 
 						Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service-connection-failed`))
 					})

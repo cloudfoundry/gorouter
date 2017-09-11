@@ -197,6 +197,10 @@ func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripper
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,
 		port,
+		&round_tripper.ErrorHandler{
+			MetricReporter: p.reporter,
+			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
+		},
 	)
 }
 

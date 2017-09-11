@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -50,6 +51,11 @@ func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory)
 	return e.RoundTripper
 }
 
+//go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler
+type errorHandler interface {
+	HandleError(logger.Logger, utils.ProxyResponseWriter, error)
+}
+
 type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.Endpoint, err error)
 
 func NewProxyRoundTripper(
@@ -62,6 +68,7 @@ func NewProxyRoundTripper(
 	combinedReporter metrics.CombinedReporter,
 	secureCookies bool,
 	localPort uint16,
+	errorHandler errorHandler,
 ) ProxyRoundTripper {
 	return &roundTripper{
 		logger:              logger,
@@ -73,10 +80,7 @@ func NewProxyRoundTripper(
 		localPort:           localPort,
 		roundTripperFactory: roundTripperFactory,
 		retryableClassifier: retryableClassifier,
-		errorHandler: &ErrorHandler{
-			MetricReporter: combinedReporter,
-			ErrorSpecs:     DefaultErrorSpecs,
-		},
+		errorHandler:        errorHandler,
 	}
 }
 
@@ -90,7 +94,7 @@ type roundTripper struct {
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory
 	retryableClassifier RetryableClassifier
-	errorHandler        *ErrorHandler
+	errorHandler        errorHandler
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
