@@ -7,9 +7,11 @@ type RetryableClassifier interface {
 	IsRetryable(err error) bool
 }
 
-type RoundTripperRetryableClassifier struct{}
+type RoundTripperRetryableClassifier struct {
+	RetryOnAny []error_classifiers.Classifier
+}
 
-var retriable = []error_classifiers.Classifier{
+var DefaultRetryOnAny = []error_classifiers.Classifier{
 	error_classifiers.AttemptedTLSWithNonTLSBackend,
 	error_classifiers.Dial,
 	error_classifiers.ConnectionResetOnRead,
@@ -20,7 +22,7 @@ var retriable = []error_classifiers.Classifier{
 }
 
 func (rc *RoundTripperRetryableClassifier) IsRetryable(err error) bool {
-	for _, classifier := range retriable {
+	for _, classifier := range rc.RetryOnAny {
 		if classifier(err) {
 			return true
 		}
