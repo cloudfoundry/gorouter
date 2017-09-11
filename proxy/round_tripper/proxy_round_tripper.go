@@ -73,7 +73,10 @@ func NewProxyRoundTripper(
 		localPort:           localPort,
 		roundTripperFactory: roundTripperFactory,
 		retryableClassifier: retryableClassifier,
-		errorHandler:        &ErrorHandler{combinedReporter},
+		errorHandler: &ErrorHandler{
+			MetricReporter: combinedReporter,
+			ErrorSpecs:     DefaultErrorSpecs,
+		},
 	}
 }
 

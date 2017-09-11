@@ -11,8 +11,22 @@ import (
 	"github.com/uber-go/zap"
 )
 
+type ErrorSpec struct {
+	Classifier error_classifiers.Classifier
+	Message    string
+	Code       int
+}
+
+var DefaultErrorSpecs = []ErrorSpec{
+	{error_classifiers.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525},
+	{error_classifiers.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable},
+	{error_classifiers.UntrustedCert, InvalidCertificateMessage, 526},
+	{error_classifiers.RemoteFailedCertCheck, SSLCertRequiredMessage, 496},
+}
+
 type ErrorHandler struct {
 	MetricReporter metrics.CombinedReporter
+	ErrorSpecs     []ErrorSpec
 }
 
 func (eh *ErrorHandler) HandleError(logger logger.Logger, responseWriter utils.ProxyResponseWriter, err error) {
@@ -26,24 +40,14 @@ func (eh *ErrorHandler) HandleError(logger logger.Logger, responseWriter utils.P
 }
 
 func (eh *ErrorHandler) writeErrorCode(err error, responseWriter http.ResponseWriter) {
-	errorHandling := []struct {
-		Classifier error_classifiers.Classifier
-		Message    string
-		Code       int
-	}{
-		{error_classifiers.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525},
-		{error_classifiers.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable},
-		{error_classifiers.UntrustedCert, InvalidCertificateMessage, 526},
-		{error_classifiers.RemoteFailedCertCheck, SSLCertRequiredMessage, 496},
-	}
-
-	for _, eh := range errorHandling {
+	for _, eh := range eh.ErrorSpecs {
 		if eh.Classifier(err) {
 			http.Error(responseWriter, eh.Message, eh.Code)
 			return
 		}
 	}
 
+	// default case
 	http.Error(responseWriter, BadGatewayMessage, http.StatusBadGateway)
 	eh.MetricReporter.CaptureBadGateway()
 }
