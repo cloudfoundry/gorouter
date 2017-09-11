@@ -177,8 +177,7 @@ $ curl my_first_url.vcap.me:8081
 404 Not Found: Requested route ('my_first_url.vcap.me') does not exist.
 ```
 
-
-**Note:** In order to use `nats-pub` to register a route, you must run the command on the NATS VM. If you are using [`cf-deployment`](https://github.com/cloudfoundry/cf-deployment), you can run `nats-pub` from any VM.  
+**Note:** In order to use `nats-pub` to register a route, you must install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's easiest on a VM that has ruby as a package, such as the API VM. Find the ruby installed in /var/vcap/packages, export your PATH variable to include the bin directory, and then run `gem install nats`. Find the nats login info from your gorouter config, and use it to connect to the nats cluster.  
 
 ## Healthchecking from a Load Balancer
 
