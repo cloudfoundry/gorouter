@@ -92,6 +92,10 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 
 func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
 	requestPath := r.URL.EscapedPath()
+	// we want to avoid redirects by detecting invalid paths that include '//'
+	if strings.Contains(requestPath, "//") {
+		return nil
+	}
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
