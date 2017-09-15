@@ -10,6 +10,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
@@ -46,9 +47,7 @@ var _ = Describe("Lookup", func() {
 		rep = &fakes.FakeCombinedReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
-		var err error
-		req, err = http.NewRequest("GET", "http://example.com", nil)
-		Expect(err).ToNot(HaveOccurred())
+		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 	})
 
@@ -251,21 +250,6 @@ var _ = Describe("Lookup", func() {
 			})
 			It("calls Fatal on the logger", func() {
 				Expect(logger.FatalCallCount()).To(Equal(1))
-				Expect(nextCalled).To(BeFalse())
-			})
-		})
-
-		Context("when a request with a path that includes // is provided", func() {
-			BeforeEach(func() {
-				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, logger, 0))
-				handler.UseHandler(nextHandler)
-				var err error
-				req, err = http.NewRequest("GET", "http://example.com//hello.io", nil)
-				Expect(err).ToNot(HaveOccurred())
-			})
-			It("returns 404 not found", func() {
-				Expect(resp.Code).To(Equal(http.StatusNotFound))
 				Expect(nextCalled).To(BeFalse())
 			})
 		})
