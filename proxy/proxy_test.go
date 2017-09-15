@@ -34,69 +34,187 @@ import (
 
 var _ = Describe("Proxy", func() {
 
-	It("responds to http/1.0 with path", func() {
-		ln := test_util.RegisterHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET /my_path HTTP/1.1")
+	Context("URL Handling", func() {
+		It("responds transparently to a trailing slash versus no trailing slash", func() {
+			lnWithoutSlash := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
 
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer lnWithoutSlash.Close()
+
+			lnWithSlash := test_util.RegisterHandler(r, "test/another-path/your_path/", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET /another-path/your_path HTTP/1.1")
+
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer lnWithSlash.Close()
+
+			conn := dialProxy(proxyServer)
+			y := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "test", "/my%20path/your_path/", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			req = test_util.NewRequest("GET", "test", "/another-path/your_path", nil)
+			y.WriteRequest(req)
+
+			resp, _ = y.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
+		It("Does not append ? to the request", func() {
+			ln := test_util.RegisterHandler(r, "test/?", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET /? HTTP/1.1")
 
-		conn.WriteLines([]string{
-			"GET /my_path HTTP/1.0",
-			"Host: test",
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			x := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "test", "/?", nil)
+			x.WriteRequest(req)
+			resp, _ := x.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(200))
 		})
 
-		conn.CheckLine("HTTP/1.0 200 OK")
-	})
+		It("responds to http/1.0 with path", func() {
+			ln := test_util.RegisterHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET /my_path HTTP/1.1")
 
-	It("responds transparently to a trailing slash versus no trailing slash", func() {
-		lnWithoutSlash := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
 
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my_path HTTP/1.0",
+				"Host: test",
+			})
+
+			conn.CheckLine("HTTP/1.0 200 OK")
 		})
-		defer lnWithoutSlash.Close()
 
-		lnWithSlash := test_util.RegisterHandler(r, "test/another-path/your_path/", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET /another-path/your_path HTTP/1.1")
+		It("responds to http/1.0 with path/path", func() {
+			ln := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET /my%20path/your_path HTTP/1.1")
 
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET /my%20path/your_path HTTP/1.0",
+				"Host: test",
+			})
+
+			conn.CheckLine("HTTP/1.0 200 OK")
 		})
-		defer lnWithSlash.Close()
 
-		conn := dialProxy(proxyServer)
-		y := dialProxy(proxyServer)
+		It("responds to HTTP/1.1 with absolute-form request target", func() {
+			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET http://test.io/ HTTP/1.1")
 
-		req := test_util.NewRequest("GET", "test", "/my%20path/your_path/", nil)
-		conn.WriteRequest(req)
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
 
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			conn := dialProxy(proxyServer)
 
-		req = test_util.NewRequest("GET", "test", "/another-path/your_path", nil)
-		y.WriteRequest(req)
+			conn.WriteLines([]string{
+				"GET http://test.io/ HTTP/1.1",
+				"Host: test.io",
+			})
 
-		resp, _ = y.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("Does not append ? to the request", func() {
-		ln := test_util.RegisterHandler(r, "test/?", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET /? HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
-		defer ln.Close()
 
-		x := dialProxy(proxyServer)
+		It("responds to http/1.1 with absolute-form request that has encoded characters in the path", func() {
+			ln := test_util.RegisterHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET http://test.io/my%20path/your_path HTTP/1.1")
 
-		req := test_util.NewRequest("GET", "test", "/?", nil)
-		x.WriteRequest(req)
-		resp, _ := x.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(200))
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET http://test.io/my%20path/your_path HTTP/1.1",
+				"Host: test.io",
+			})
+
+			conn.CheckLine("HTTP/1.1 200 OK")
+		})
+
+		It("maintains percent-encoded values in URLs", func() {
+			shouldEcho("/abc%2b%2f%25%20%22%3F%5Edef", "/abc%2b%2f%25%20%22%3F%5Edef") // +, /, %, <space>, ", £, ^
+		})
+
+		It("does not encode reserved characters in URLs", func() {
+			rfc3986_reserved_characters := "!*'();:@&=+$,/?#[]"
+			shouldEcho("/"+rfc3986_reserved_characters, "/"+rfc3986_reserved_characters)
+		})
+
+		It("maintains encoding of percent-encoded reserved characters", func() {
+			encoded_reserved_characters := "%21%27%28%29%3B%3A%40%26%3D%2B%24%2C%2F%3F%23%5B%5D"
+			shouldEcho("/"+encoded_reserved_characters, "/"+encoded_reserved_characters)
+		})
+
+		It("does not encode unreserved characters in URLs", func() {
+			shouldEcho("/abc123_.~def", "/abc123_.~def")
+		})
+
+		It("does not percent-encode special characters in URLs (they came in like this, they go out like this)", func() {
+			shouldEcho("/abc\"£^def", "/abc\"£^def")
+		})
+
+		It("handles requests with encoded query strings", func() {
+			queryString := strings.Join([]string{"a=b", url.QueryEscape("b= bc "), url.QueryEscape("c=d&e")}, "&")
+			shouldEcho("/test?a=b&b%3D+bc+&c%3Dd%26e", "/test?"+queryString)
+		})
+
+		It("treats double slashes in request URI as an absolute-form request target", func() {
+			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET http://test.io//something.io HTTP/1.1")
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			req, err := http.NewRequest("GET", "http://test.io//something.io", nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			conn := dialProxy(proxyServer)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("handles double slashes in an absolute-form request target correctly", func() {
+			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET http://test.io//something.io HTTP/1.1")
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+			conn.WriteLines([]string{
+				"GET http://test.io//something.io HTTP/1.1",
+				"Host: test.io",
+			})
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
 	})
 
 	It("does not sanitize xfcc header when ForwardedClientCert is set to default [always_forward]", func() {
@@ -312,24 +430,6 @@ var _ = Describe("Proxy", func() {
 		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
 	})
 
-	It("responds to http/1.0 with path/path", func() {
-		ln := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET /my%20path/your_path HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET /my%20path/your_path HTTP/1.0",
-			"Host: test",
-		})
-
-		conn.CheckLine("HTTP/1.0 200 OK")
-	})
-
 	It("responds to http/1.0", func() {
 		ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
 			conn.CheckLine("GET / HTTP/1.1")
@@ -365,43 +465,6 @@ var _ = Describe("Proxy", func() {
 
 		resp, _ := conn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("responds to HTTP/1.1 with absolute-form request target", func() {
-		ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET http://test.io/ HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET http://test.io/ HTTP/1.1",
-			"Host: test.io",
-		})
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("responds to http/1.1 with absolute-form request that has encoded characters in the path", func() {
-		ln := test_util.RegisterHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET http://test.io/my%20path/your_path HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET http://test.io/my%20path/your_path HTTP/1.1",
-			"Host: test.io",
-		})
-
-		conn.CheckLine("HTTP/1.1 200 OK")
 	})
 
 	It("does not respond to unsupported HTTP versions", func() {
@@ -1462,33 +1525,6 @@ var _ = Describe("Proxy", func() {
 		resp, _ := conn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 		Expect(resp.TransferEncoding).To(BeNil())
-	})
-
-	It("maintains percent-encoded values in URLs", func() {
-		shouldEcho("/abc%2b%2f%25%20%22%3F%5Edef", "/abc%2b%2f%25%20%22%3F%5Edef") // +, /, %, <space>, ", £, ^
-	})
-
-	It("does not encode reserved characters in URLs", func() {
-		rfc3986_reserved_characters := "!*'();:@&=+$,/?#[]"
-		shouldEcho("/"+rfc3986_reserved_characters, "/"+rfc3986_reserved_characters)
-	})
-
-	It("maintains encoding of percent-encoded reserved characters", func() {
-		encoded_reserved_characters := "%21%27%28%29%3B%3A%40%26%3D%2B%24%2C%2F%3F%23%5B%5D"
-		shouldEcho("/"+encoded_reserved_characters, "/"+encoded_reserved_characters)
-	})
-
-	It("does not encode unreserved characters in URLs", func() {
-		shouldEcho("/abc123_.~def", "/abc123_.~def")
-	})
-
-	It("does not percent-encode special characters in URLs (they came in like this, they go out like this)", func() {
-		shouldEcho("/abc\"£^def", "/abc\"£^def")
-	})
-
-	It("handles requests with encoded query strings", func() {
-		queryString := strings.Join([]string{"a=b", url.QueryEscape("b= bc "), url.QueryEscape("c=d&e")}, "&")
-		shouldEcho("/test?a=b&b%3D+bc+&c%3Dd%26e", "/test?"+queryString)
 	})
 
 	It("request terminates with slow response", func() {

@@ -271,9 +271,13 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 
 	target.URL.Scheme = "http"
 	target.URL.Host = target.Host
-	target.URL.Opaque = target.RequestURI
 	target.URL.RawQuery = ""
 	target.URL.ForceQuery = false
+	target.URL.Opaque = target.RequestURI
+
+	if strings.HasPrefix(target.RequestURI, "//") {
+		target.URL.Opaque = "//" + target.Host + target.URL.Path
+	}
 
 	handler.SetRequestXRequestStart(target)
 	target.Header.Del(router_http.CfAppInstance)
