@@ -34,7 +34,58 @@ import (
 
 var _ = Describe("Proxy", func() {
 
-	Context("URL Handling", func() {
+	Describe("Supported HTTP Protocol Versions", func() {
+		It("responds to http/1.0", func() {
+			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET / HTTP/1.0",
+				"Host: test",
+			})
+
+			conn.CheckLine("HTTP/1.0 200 OK")
+		})
+
+		It("responds to HTTP/1.1", func() {
+			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET / HTTP/1.1",
+				"Host: test",
+			})
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("does not respond to unsupported HTTP versions", func() {
+			conn := dialProxy(proxyServer)
+
+			conn.WriteLines([]string{
+				"GET / HTTP/1.5",
+				"Host: test",
+			})
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+		})
+	})
+
+	Describe("URL Handling", func() {
 		It("responds transparently to a trailing slash versus no trailing slash", func() {
 			lnWithoutSlash := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
@@ -217,464 +268,838 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
-	It("does not sanitize xfcc header when ForwardedClientCert is set to default [always_forward]", func() {
-		var expectedReq *http.Request
-		ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-			var err error
-			expectedReq, err = http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
+	Describe("Request Header Handling", func() {
+		Describe("X-Forwarded-Client-Cert", func() {
+			Context("when ForwardedClientCert is set to sanitize_set", func() {
+				BeforeEach(func() {
+					conf.ForwardedClientCert = config.SANITIZE_SET
+				})
 
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.WriteLine("hello from server")
-			conn.Close()
+				It("removes xfcc header in sanitize_set mode", func() {
+					var expectedReq *http.Request
+					ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+						var err error
+						expectedReq, err = http.ReadRequest(conn.Reader)
+						Expect(err).NotTo(HaveOccurred())
+
+						resp := test_util.NewResponse(http.StatusOK)
+						conn.WriteResponse(resp)
+						conn.WriteLine("hello from server")
+						conn.Close()
+					})
+					defer ln.Close()
+
+					req := test_util.NewRequest("GET", "xfcc", "/", nil)
+					req.Host = "xfcc"
+					req.Header.Add("X-Forwarded-Client-Cert", "foo")
+					req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+					conn := dialProxy(proxyServer)
+					conn.WriteRequest(req)
+					conn.ReadResponse()
+
+					Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
+				})
+			})
+
+			Context("when ForwardedClientCert is set to forward", func() {
+				BeforeEach(func() {
+					conf.ForwardedClientCert = config.FORWARD
+				})
+
+				It("removes xfcc header in forward mode when not mTLS", func() {
+					var expectedReq *http.Request
+					ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+						var err error
+						expectedReq, err = http.ReadRequest(conn.Reader)
+						Expect(err).NotTo(HaveOccurred())
+
+						resp := test_util.NewResponse(http.StatusOK)
+						conn.WriteResponse(resp)
+						conn.WriteLine("hello from server")
+						conn.Close()
+					})
+					defer ln.Close()
+
+					req := test_util.NewRequest("GET", "xfcc", "/", nil)
+					req.Host = "xfcc"
+					req.Header.Add("X-Forwarded-Client-Cert", "foo")
+					req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+					conn := dialProxy(proxyServer)
+					conn.WriteRequest(req)
+					conn.ReadResponse()
+
+					Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
+				})
+			})
+			It("does not sanitize xfcc header when ForwardedClientCert is set to default [always_forward]", func() {
+				var expectedReq *http.Request
+				ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
+					var err error
+					expectedReq, err = http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.WriteLine("hello from server")
+					conn.Close()
+				})
+				defer ln.Close()
+
+				req := test_util.NewRequest("GET", "xfcc", "/", nil)
+				req.Host = "xfcc"
+				req.Header.Add("X-Forwarded-Client-Cert", "foo")
+				req.Header.Add("X-Forwarded-Client-Cert", "bar")
+
+				conn := dialProxy(proxyServer)
+				conn.WriteRequest(req)
+				conn.ReadResponse()
+
+				Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(ConsistOf("foo", "bar"))
+			})
 		})
-		defer ln.Close()
 
-		req := test_util.NewRequest("GET", "xfcc", "/", nil)
-		req.Host = "xfcc"
-		req.Header.Add("X-Forwarded-Client-Cert", "foo")
-		req.Header.Add("X-Forwarded-Client-Cert", "bar")
+		Describe("Content-type", func() {
+			It("Content-type is not set by proxy", func() {
+				ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
+					_, err := http.ReadRequest(x.Reader)
+					Expect(err).NotTo(HaveOccurred())
 
-		conn := dialProxy(proxyServer)
-		conn.WriteRequest(req)
-		conn.ReadResponse()
+					resp := test_util.NewResponse(http.StatusOK)
+					x.WriteResponse(resp)
+					x.WriteLine("hello from server")
+					x.Close()
+				})
+				defer ln.Close()
 
-		Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(ConsistOf("foo", "bar"))
+				x := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "content-test", "/", nil)
+				req.Host = "content-test"
+				x.WriteRequest(req)
+
+				resp, _ := x.ReadResponse()
+				h, present := resp.Header["Content-Type"]
+				Expect(h).To(BeNil())
+				Expect(present).To(BeFalse())
+				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
+			})
+
+			It("Content-type xml is not set by proxy", func() {
+				ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
+					_, err := http.ReadRequest(x.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					x.WriteResponse(resp)
+					x.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+					x.Close()
+				})
+				defer ln.Close()
+
+				x := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "content-test", "/", nil)
+				req.Host = "content-test"
+				x.WriteRequest(req)
+
+				resp, _ := x.ReadResponse()
+
+				h, present := resp.Header["Content-Type"]
+				Expect(present).To(BeFalse())
+				Expect(h).To(BeNil())
+				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
+			})
+
+			It("Content-type header is not set for an HTTP 204 response", func() {
+				ln := test_util.RegisterHandler(r, "no-content-test", func(x *test_util.HttpConn) {
+					_, err := http.ReadRequest(x.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusNoContent)
+					x.WriteResponse(resp)
+					x.Close()
+				})
+				defer ln.Close()
+
+				x := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "no-content-test", "/", nil)
+				req.Host = "no-content-test"
+				x.WriteRequest(req)
+
+				resp, _ := x.ReadResponse()
+
+				h, present := resp.Header["Content-Type"]
+				Expect(present).To(BeFalse())
+				Expect(h).To(BeNil())
+				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
+			})
+		})
+
+		Describe("X-Forwarded-Proto", func() {
+			It("adds X-Forwarded-Proto if not present", func() {
+				done := make(chan string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get("X-Forwarded-Proto")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(Equal("http"))
+
+				conn.ReadResponse()
+			})
+
+			It("doesn't overwrite X-Forwarded-Proto if present", func() {
+				done := make(chan string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get("X-Forwarded-Proto")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				req.Header.Set("X-Forwarded-Proto", "https")
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(Equal("https"))
+
+				conn.ReadResponse()
+			})
+
+			Context("Force Forwarded Proto HTTPS config option is set", func() {
+				BeforeEach(func() {
+					conf.ForceForwardedProtoHttps = true
+				})
+				It("uses config option for X-Forwarded-Proto if present", func() {
+					done := make(chan string)
+
+					ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+						req, err := http.ReadRequest(conn.Reader)
+						Expect(err).NotTo(HaveOccurred())
+
+						resp := test_util.NewResponse(http.StatusOK)
+						conn.WriteResponse(resp)
+						conn.Close()
+
+						done <- req.Header.Get("X-Forwarded-Proto")
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "app", "/", nil)
+					conn.WriteRequest(req)
+
+					var answer string
+					Eventually(done).Should(Receive(&answer))
+					Expect(answer).To(Equal("https"))
+
+					conn.ReadResponse()
+				})
+			})
+		})
+
+		Describe("X-Forwarded-For", func() {
+			It("X-Forwarded-For is added", func() {
+				done := make(chan bool)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get("X-Forwarded-For") == "127.0.0.1"
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer bool
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(BeTrue())
+
+				conn.ReadResponse()
+			})
+
+			It("X-Forwarded-For is appended", func() {
+				done := make(chan bool)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get("X-Forwarded-For") == "1.2.3.4, 127.0.0.1"
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				req.Header.Add("X-Forwarded-For", "1.2.3.4")
+				conn.WriteRequest(req)
+
+				var answer bool
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(BeTrue())
+
+				conn.ReadResponse()
+			})
+		})
+
+		Describe("X-Request-Start", func() {
+			It("X-Request-Start is appended", func() {
+				done := make(chan string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get("X-Request-Start")
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
+
+				conn.ReadResponse()
+			})
+
+			It("X-Request-Start is not overwritten", func() {
+				done := make(chan []string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header[http.CanonicalHeaderKey("X-Request-Start")]
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
+				req.Header.Add("X-Request-Start", "user-set2")
+				conn.WriteRequest(req)
+
+				var answer []string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(Equal([]string{"", "user-set2"}))
+
+				conn.ReadResponse()
+			})
+		})
+
+		Describe("X-CF-InstanceID", func() {
+			It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
+				done := make(chan string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get(router_http.CfInstanceIdHeader)
+				}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(Equal("fake-instance-id"))
+
+				conn.ReadResponse()
+			})
+
+			It("X-CF-InstanceID header is added with host:port information if NOT present in the routing endpoint", func() {
+				done := make(chan string)
+
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get(router_http.CfInstanceIdHeader)
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
+
+				conn.ReadResponse()
+			})
+		})
 	})
 
-	Context("when ForwardedClientCert is set to sanitize_set", func() {
-		BeforeEach(func() {
-			conf.ForwardedClientCert = config.SANITIZE_SET
-		})
-
-		It("removes xfcc header in sanitize_set mode", func() {
-			var expectedReq *http.Request
-			ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-				var err error
-				expectedReq, err = http.ReadRequest(conn.Reader)
+	Describe("Response Handling", func() {
+		It("trace headers added on correct TraceKey", func() {
+			ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp := test_util.NewResponse(http.StatusOK)
 				conn.WriteResponse(resp)
-				conn.WriteLine("hello from server")
 				conn.Close()
 			})
 			defer ln.Close()
 
-			req := test_util.NewRequest("GET", "xfcc", "/", nil)
-			req.Host = "xfcc"
-			req.Header.Add("X-Forwarded-Client-Cert", "foo")
-			req.Header.Add("X-Forwarded-Client-Cert", "bar")
-
 			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "trace-test", "/", nil)
+			req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
 			conn.WriteRequest(req)
-			conn.ReadResponse()
 
-			Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-		})
-	})
-
-	Context("when ForwardedClientCert is set to forward", func() {
-		BeforeEach(func() {
-			conf.ForwardedClientCert = config.FORWARD
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(ln.Addr().String()))
+			Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(ln.Addr().String()))
+			Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(conf.Ip))
 		})
 
-		It("removes xfcc header in forward mode when not mTLS", func() {
-			var expectedReq *http.Request
-			ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-				var err error
-				expectedReq, err = http.ReadRequest(conn.Reader)
+		It("trace headers not added on incorrect TraceKey", func() {
+			ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp := test_util.NewResponse(http.StatusOK)
 				conn.WriteResponse(resp)
-				conn.WriteLine("hello from server")
 				conn.Close()
 			})
 			defer ln.Close()
 
-			req := test_util.NewRequest("GET", "xfcc", "/", nil)
-			req.Host = "xfcc"
-			req.Header.Add("X-Forwarded-Client-Cert", "foo")
-			req.Header.Add("X-Forwarded-Client-Cert", "bar")
-
 			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "trace-test", "/", nil)
+			req.Header.Set(router_http.VcapTraceHeader, "a_bad_trace_key")
 			conn.WriteRequest(req)
-			conn.ReadResponse()
 
-			Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
+			resp, _ := conn.ReadResponse()
+			Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
+			Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(""))
+			Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
 		})
-	})
 
-	Context("when max conn per backend is set to > 0 ", func() {
-		BeforeEach(func() {
-			conf.Backends.MaxConns = 2
-		})
-		It("responds with 503 after conn limit is reached ", func() {
-			ln := test_util.RegisterHandler(r, "sleep", func(x *test_util.HttpConn) {
-				defer GinkgoRecover()
-				_, err := http.ReadRequest(x.Reader)
+		It("Status No Content returns no Transfer Encoding response header", func() {
+			ln := test_util.RegisterHandler(r, "not-modified", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
-				time.Sleep(50 * time.Millisecond)
-				resp := test_util.NewResponse(http.StatusOK)
-				x.WriteResponse(resp)
-				x.WriteLine("hello from server after sleeping")
-				x.Close()
+
+				resp := test_util.NewResponse(http.StatusNoContent)
+				resp.Header.Set("Connection", "close")
+				conn.WriteResponse(resp)
+				conn.Close()
 			})
 			defer ln.Close()
 
-			var wg sync.WaitGroup
-			var badGatewayCount int32
+			conn := dialProxy(proxyServer)
 
-			for i := 0; i < 3; i++ {
-				wg.Add(1)
+			req := test_util.NewRequest("GET", "not-modified", "/", nil)
+
+			req.Header.Set("Connection", "close")
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+			Expect(resp.TransferEncoding).To(BeNil())
+		})
+
+		It("transfers chunked encodings", func() {
+			ln := test_util.RegisterHandler(r, "chunk", func(conn *test_util.HttpConn) {
+				r, w := io.Pipe()
+
+				// Write 3 times on a 100ms interval
 				go func() {
-					defer wg.Done()
-					defer GinkgoRecover()
+					t := time.NewTicker(100 * time.Millisecond)
+					defer t.Stop()
+					defer w.Close()
 
-					x := dialProxy(proxyServer)
-					defer x.Close()
-
-					req := test_util.NewRequest("GET", "sleep", "/", nil)
-					req.Host = "sleep"
-
-					x.WriteRequest(req)
-					resp, _ := x.ReadResponse()
-					if resp.StatusCode == http.StatusServiceUnavailable {
-						atomic.AddInt32(&badGatewayCount, 1)
-					} else if resp.StatusCode != http.StatusOK {
-						Fail(fmt.Sprintf("Expected resp to return 200 or 503, got %d", resp.StatusCode))
+					for i := 0; i < 3; i++ {
+						<-t.C
+						_, err := w.Write([]byte("hello"))
+						Expect(err).NotTo(HaveOccurred())
 					}
 				}()
-				time.Sleep(10 * time.Millisecond)
-			}
-			wg.Wait()
-			Expect(atomic.LoadInt32(&badGatewayCount)).To(Equal(int32(1)))
-		})
-	})
 
-	It("Content-type is not set by proxy", func() {
-		ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
-			_, err := http.ReadRequest(x.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.WriteLine("hello from server")
-			x.Close()
-		})
-		defer ln.Close()
-
-		x := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "content-test", "/", nil)
-		req.Host = "content-test"
-		x.WriteRequest(req)
-
-		resp, _ := x.ReadResponse()
-		h, present := resp.Header["Content-Type"]
-		Expect(h).To(BeNil())
-		Expect(present).To(BeFalse())
-		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-	})
-
-	It("Content-type xml is not set by proxy", func() {
-		ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
-			_, err := http.ReadRequest(x.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			x.WriteResponse(resp)
-			x.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-			x.Close()
-		})
-		defer ln.Close()
-
-		x := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "content-test", "/", nil)
-		req.Host = "content-test"
-		x.WriteRequest(req)
-
-		resp, _ := x.ReadResponse()
-
-		h, present := resp.Header["Content-Type"]
-		Expect(present).To(BeFalse())
-		Expect(h).To(BeNil())
-		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-	})
-
-	It("Content-type header is not set for an HTTP 204 response", func() {
-		ln := test_util.RegisterHandler(r, "no-content-test", func(x *test_util.HttpConn) {
-			_, err := http.ReadRequest(x.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusNoContent)
-			x.WriteResponse(resp)
-			x.Close()
-		})
-		defer ln.Close()
-
-		x := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "no-content-test", "/", nil)
-		req.Host = "no-content-test"
-		x.WriteRequest(req)
-
-		resp, _ := x.ReadResponse()
-
-		h, present := resp.Header["Content-Type"]
-		Expect(present).To(BeFalse())
-		Expect(h).To(BeNil())
-		Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-	})
-
-	It("responds to http/1.0", func() {
-		ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET / HTTP/1.0",
-			"Host: test",
-		})
-
-		conn.CheckLine("HTTP/1.0 200 OK")
-	})
-
-	It("responds to HTTP/1.1", func() {
-		ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
-
-			conn.WriteResponse(test_util.NewResponse(http.StatusOK))
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET / HTTP/1.1",
-			"Host: test",
-		})
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("does not respond to unsupported HTTP versions", func() {
-		conn := dialProxy(proxyServer)
-
-		conn.WriteLines([]string{
-			"GET / HTTP/1.5",
-			"Host: test",
-		})
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-	})
-
-	It("responds to load balancer check", func() {
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "", "/", nil)
-		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
-		Expect(resp.Header.Get("Expires")).To(Equal("0"))
-		Expect(resp.Status).To(Equal("200 OK"))
-		Expect(body).To(Equal("ok\n"))
-	})
-
-	It("responds with failure to load balancer check if heartbeatOK is false", func() {
-		atomic.StoreInt32(&heartbeatOK, 0)
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "", "/", nil)
-		req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
-		Expect(resp.Header.Get("Expires")).To(Equal("0"))
-		Expect(resp.Status).NotTo(Equal("200 OK"))
-		Expect(body).NotTo(Equal("ok\n"))
-	})
-
-	It("responds to unknown host with 404", func() {
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "unknown", "/", nil)
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		Expect(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
-	})
-
-	It("responds to host with malicious script with 400", func() {
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "<html><header><script>alert(document.cookie);</script></header><body/></html>", "/", nil)
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-		Expect(body).To(ContainSubstring("malformed Host header"))
-	})
-
-	It("responds with 404 for a not found host name with only valid characters", func() {
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ", "/", nil)
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
-	})
-
-	It("responds to misbehaving host with 502", func() {
-		ln := test_util.RegisterHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "enfant-terrible", "/", nil)
-		conn.WriteRequest(req)
-
-		resp, body := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("endpoint_failure"))
-		Expect(body).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
-	})
-
-	It("trace headers added on correct TraceKey", func() {
-		ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "trace-test", "/", nil)
-		req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
-		conn.WriteRequest(req)
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(ln.Addr().String()))
-		Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(ln.Addr().String()))
-		Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(conf.Ip))
-	})
-
-	It("captures the routing response", func() {
-		ln := test_util.RegisterHandler(r, "reporter-test", func(conn *test_util.HttpConn) {
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "reporter-test", "/", nil)
-		conn.WriteRequest(req)
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-		Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
-
-		Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
-		capturedRespCode := fakeReporter.CaptureRoutingResponseArgsForCall(0)
-		Expect(capturedRespCode).To(Equal(http.StatusOK))
-
-		Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
-		capturedEndpoint, capturedRespCode, startTime, latency := fakeReporter.CaptureRoutingResponseLatencyArgsForCall(0)
-		Expect(capturedEndpoint).ToNot(BeNil())
-		Expect(capturedEndpoint.ApplicationId).To(Equal(""))
-		Expect(capturedEndpoint.PrivateInstanceId).To(Equal(""))
-		Expect(capturedEndpoint.PrivateInstanceIndex).To(Equal("2"))
-		Expect(capturedRespCode).To(Equal(http.StatusOK))
-		Expect(startTime).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
-		Expect(latency).To(BeNumerically(">", 0))
-
-		Expect(fakeReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
-		Expect(fakeReporter.CaptureRoutingRequestArgsForCall(0)).To(Equal(capturedEndpoint))
-	})
-
-	It("trace headers not added on incorrect TraceKey", func() {
-		ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "trace-test", "/", nil)
-		req.Header.Set(router_http.VcapTraceHeader, "a_bad_trace_key")
-		conn.WriteRequest(req)
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-		Expect(resp.Header.Get(router_http.CfRouteEndpointHeader)).To(Equal(""))
-		Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
-	})
-
-	Context("with EnableZipkin set to true", func() {
-		BeforeEach(func() {
-			conf.Tracing.EnableZipkin = true
-		})
-
-		It("x_b3_traceid does show up in the access log", func() {
-			done := make(chan string)
-			ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
+				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-
-				done <- req.Header.Get(handlers.B3TraceIdHeader)
+				resp.TransferEncoding = []string{"chunked"}
+				resp.Body = r
+				resp.Write(conn)
 			})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
-			req := test_util.NewRequest("GET", "app", "/", nil)
+
+			req := test_util.NewRequest("GET", "chunk", "/", nil)
+
+			err := req.Write(conn)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.TransferEncoding).To(Equal([]string{"chunked"}))
+
+			// Expect 3 individual reads to complete
+			b := make([]byte, 5)
+			for i := 0; i < 3; i++ {
+				n, err := resp.Body.Read(b[0:])
+				if err != nil {
+					Expect(err).To(Equal(io.EOF))
+				}
+				Expect(n).To(Equal(5))
+				Expect(string(b[0:n])).To(Equal("hello"))
+			}
+		})
+
+		It("disables compression", func() {
+			ln := test_util.RegisterHandler(r, "remote", func(conn *test_util.HttpConn) {
+				request, _ := http.ReadRequest(conn.Reader)
+				encoding := request.Header["Accept-Encoding"]
+				var resp *http.Response
+				if len(encoding) != 0 {
+					resp = test_util.NewResponse(http.StatusInternalServerError)
+				} else {
+					resp = test_util.NewResponse(http.StatusOK)
+				}
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "remote", "/", nil)
+			conn.WriteRequest(req)
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	})
+
+	Describe("Backend Connection Handling", func() {
+		Context("when max conn per backend is set to > 0 ", func() {
+			BeforeEach(func() {
+				conf.Backends.MaxConns = 2
+			})
+			It("responds with 503 after conn limit is reached ", func() {
+				ln := test_util.RegisterHandler(r, "sleep", func(x *test_util.HttpConn) {
+					defer GinkgoRecover()
+					_, err := http.ReadRequest(x.Reader)
+					Expect(err).NotTo(HaveOccurred())
+					time.Sleep(50 * time.Millisecond)
+					resp := test_util.NewResponse(http.StatusOK)
+					x.WriteResponse(resp)
+					x.WriteLine("hello from server after sleeping")
+					x.Close()
+				})
+				defer ln.Close()
+
+				var wg sync.WaitGroup
+				var badGatewayCount int32
+
+				for i := 0; i < 3; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						defer GinkgoRecover()
+
+						x := dialProxy(proxyServer)
+						defer x.Close()
+
+						req := test_util.NewRequest("GET", "sleep", "/", nil)
+						req.Host = "sleep"
+
+						x.WriteRequest(req)
+						resp, _ := x.ReadResponse()
+						if resp.StatusCode == http.StatusServiceUnavailable {
+							atomic.AddInt32(&badGatewayCount, 1)
+						} else if resp.StatusCode != http.StatusOK {
+							Fail(fmt.Sprintf("Expected resp to return 200 or 503, got %d", resp.StatusCode))
+						}
+					}()
+					time.Sleep(10 * time.Millisecond)
+				}
+				wg.Wait()
+				Expect(atomic.LoadInt32(&badGatewayCount)).To(Equal(int32(1)))
+			})
+		})
+		It("request terminates with slow response", func() {
+			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				time.Sleep(1 * time.Second)
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+			started := time.Now()
 			conn.WriteRequest(req)
 
-			var answer string
-			Eventually(done).Should(Receive(&answer))
-			Expect(answer).ToNot(BeEmpty())
+			resp, _ := readResponse(conn)
 
-			conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+		})
+
+		It("proxy closes connections with slow apps", func() {
+			serverResult := make(chan error)
+			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+
+				timesToTick := 2
+				time.Sleep(1 * time.Second)
+
+				conn.WriteLines([]string{
+					"HTTP/1.1 200 OK",
+					fmt.Sprintf("Content-Length: %d", timesToTick),
+				})
+
+				for i := 0; i < timesToTick; i++ {
+					_, err := conn.Conn.Write([]byte("x"))
+					if err != nil {
+						serverResult <- err
+						return
+					}
+
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				serverResult <- nil
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+			started := time.Now()
+			conn.WriteRequest(req)
+
+			resp, _ := readResponse(conn)
+
+			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+
+			var err error
+			Eventually(serverResult).Should(Receive(&err))
+			Expect(err).NotTo(BeNil())
+		})
+
+		It("proxy detects closed client connection", func() {
+			serverResult := make(chan error)
+			readRequest := make(chan struct{})
+			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+
+				readRequest <- struct{}{}
+
+				timesToTick := 10
+
+				conn.WriteLines([]string{
+					"HTTP/1.1 200 OK",
+					fmt.Sprintf("Content-Length: %d", timesToTick),
+				})
+
+				for i := 0; i < timesToTick; i++ {
+					_, err := conn.Conn.Write([]byte("x"))
+					if err != nil {
+						serverResult <- err
+						return
+					}
+
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				serverResult <- nil
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+			conn.WriteRequest(req)
+			Eventually(readRequest).Should(Receive())
+			conn.Conn.Close()
+
+			var err error
+			Eventually(serverResult).Should(Receive(&err))
+			Expect(err).NotTo(BeNil())
+		})
+
+		It("proxy closes connections to backends when client closes the connection", func() {
+			serverResult := make(chan error)
+			readRequest := make(chan struct{})
+			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+				conn.CheckLine("GET / HTTP/1.1")
+
+				readRequest <- struct{}{}
+
+				time.Sleep(600 * time.Millisecond)
+
+				for i := 0; i < 2; i++ {
+					_, err := conn.Conn.Write([]byte("x"))
+					if err != nil {
+						serverResult <- err
+						return
+					}
+
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				serverResult <- nil
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "slow-app", "/", nil)
+
+			conn.WriteRequest(req)
+			Eventually(readRequest).Should(Receive())
+			conn.Conn.Close()
+
+			var err error
+			Eventually(serverResult).Should(Receive(&err))
+			Expect(err).NotTo(BeNil())
+		})
+
+		It("retries when failed endpoints exist", func() {
+			ln := test_util.RegisterHandler(r, "retries", func(conn *test_util.HttpConn) {
+				req, _ := conn.ReadRequest()
+				Expect(req.Method).To(Equal("GET"))
+				Expect(req.Host).To(Equal("retries"))
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			test_util.RegisterAddr(r, "retries", "localhost:81", test_util.RegisterConfig{
+				InstanceId:    "instanceId",
+				InstanceIndex: "2",
+			})
+
+			for i := 0; i < 5; i++ {
+				body := &bytes.Buffer{}
+				body.WriteString("use an actual body")
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "retries", "/", ioutil.NopCloser(body))
+				conn.WriteRequest(req)
+				resp, _ := conn.ReadResponse()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			}
+		})
+	})
+
+	Describe("Access Logging", func() {
+		It("Logs a request", func() {
+			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+				req, body := conn.ReadRequest()
+				Expect(req.Method).To(Equal("POST"))
+				Expect(req.URL.Path).To(Equal("/"))
+				Expect(req.ProtoMajor).To(Equal(1))
+				Expect(req.ProtoMinor).To(Equal(1))
+
+				Expect(body).To(Equal("ABCD"))
+
+				rsp := test_util.NewResponse(200)
+				out := &bytes.Buffer{}
+				out.WriteString("DEFG")
+				rsp.Body = ioutil.NopCloser(out)
+				conn.WriteResponse(rsp)
+			}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			body := &bytes.Buffer{}
+			body.WriteString("ABCD")
+			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			var payload []byte
 			Eventually(func() int {
@@ -682,299 +1107,258 @@ var _ = Describe("Proxy", func() {
 				return len(payload)
 			}).ShouldNot(BeZero())
 
-			Expect(string(payload)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
+			//make sure the record includes all the data
+			//since the building of the log record happens throughout the life of the request
+			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
+			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
+			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+			Expect(string(payload)).To(ContainSubstring(`response_time:`))
+			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
+			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
+			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
+		})
+
+		It("Logs a request when it exits early", func() {
+			conn := dialProxy(proxyServer)
+
+			body := &bytes.Buffer{}
+			body.WriteString("ABCD")
+			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+
+			var payload []byte
+			Eventually(func() int {
+				n, e := accessLogFile.Read(&payload)
+				Expect(e).ToNot(HaveOccurred())
+				return n
+			}).ShouldNot(BeZero())
+
+			Expect(string(payload)).To(MatchRegexp("^test.*\n"))
+		})
+
+		Context("when the request has X-CF-APP-INSTANCE", func() {
+			It("lookups the route to that specific app index and id", func() {
+				done := make(chan struct{})
+				// app handler for app.vcap.me
+				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id"})
+				defer ln.Close()
+
+				ln2 := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(req.Header.Get(router_http.CfAppInstance)).To(BeEmpty())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
+					conn.WriteResponse(resp)
+
+					conn.Close()
+
+					done <- struct{}{}
+				}, test_util.RegisterConfig{AppId: "app-2-id"})
+				defer ln2.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/chat", nil)
+				req.Header.Set(router_http.CfAppInstance, "app-2-id:2")
+
+				Consistently(func() string {
+					conn.WriteRequest(req)
+
+					Eventually(done).Should(Receive())
+					_, b := conn.ReadResponse()
+					return b
+				}).Should(Equal("Hellow World: App2"))
+			})
+
+			It("returns a 404 if it cannot find the specified instance", func() {
+				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
+				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
+				conn.WriteRequest(req)
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
+		})
+
+		Context("with EnableZipkin set to true", func() {
+			BeforeEach(func() {
+				conf.Tracing.EnableZipkin = true
+			})
+
+			It("x_b3_traceid does show up in the access log", func() {
+				done := make(chan string)
+				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- req.Header.Get(handlers.B3TraceIdHeader)
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+				req := test_util.NewRequest("GET", "app", "/", nil)
+				conn.WriteRequest(req)
+
+				var answer string
+				Eventually(done).Should(Receive(&answer))
+				Expect(answer).ToNot(BeEmpty())
+
+				conn.ReadResponse()
+
+				var payload []byte
+				Eventually(func() int {
+					accessLogFile.Read(&payload)
+					return len(payload)
+				}).ShouldNot(BeZero())
+
+				Expect(string(payload)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
+			})
 		})
 	})
 
-	It("X-Forwarded-For is added", func() {
-		done := make(chan bool)
+	Describe("User-Agent Healthcheck", func() {
+		It("responds to load balancer check", func() {
+			conn := dialProxy(proxyServer)
 
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
+			req := test_util.NewRequest("GET", "", "/", nil)
+			req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+			conn.WriteRequest(req)
 
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get("X-Forwarded-For") == "127.0.0.1"
+			resp, body := conn.ReadResponse()
+			Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
+			Expect(resp.Header.Get("Expires")).To(Equal("0"))
+			Expect(resp.Status).To(Equal("200 OK"))
+			Expect(body).To(Equal("ok\n"))
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		conn.WriteRequest(req)
+		It("responds with failure to load balancer check if heartbeatOK is false", func() {
+			atomic.StoreInt32(&heartbeatOK, 0)
 
-		var answer bool
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
+			conn := dialProxy(proxyServer)
 
-		conn.ReadResponse()
+			req := test_util.NewRequest("GET", "", "/", nil)
+			req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+			conn.WriteRequest(req)
+
+			resp, body := conn.ReadResponse()
+			Expect(resp.Header.Get("Cache-Control")).To(Equal("private, max-age=0"))
+			Expect(resp.Header.Get("Expires")).To(Equal("0"))
+			Expect(resp.Status).NotTo(Equal("200 OK"))
+			Expect(body).NotTo(Equal("ok\n"))
+		})
 	})
 
-	It("X-Forwarded-For is appended", func() {
-		done := make(chan bool)
+	Describe("Error Responses", func() {
+		It("responds to unknown host with 404", func() {
+			conn := dialProxy(proxyServer)
 
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
+			req := test_util.NewRequest("GET", "unknown", "/", nil)
+			conn.WriteRequest(req)
 
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get("X-Forwarded-For") == "1.2.3.4, 127.0.0.1"
+			resp, body := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+			Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			Expect(body).To(Equal("404 Not Found: Requested route ('unknown') does not exist.\n"))
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
+		It("responds to host with malicious script with 400", func() {
+			conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		req.Header.Add("X-Forwarded-For", "1.2.3.4")
-		conn.WriteRequest(req)
+			req := test_util.NewRequest("GET", "<html><header><script>alert(document.cookie);</script></header><body/></html>", "/", nil)
+			conn.WriteRequest(req)
 
-		var answer bool
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(BeTrue())
-
-		conn.ReadResponse()
-	})
-
-	It("X-Request-Start is appended", func() {
-		done := make(chan string)
-
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get("X-Request-Start")
+			resp, body := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+			Expect(body).To(ContainSubstring("malformed Host header"))
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
+		It("responds with 404 for a not found host name with only valid characters", func() {
+			conn := dialProxy(proxyServer)
 
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		conn.WriteRequest(req)
+			req := test_util.NewRequest("GET", "abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ", "/", nil)
+			conn.WriteRequest(req)
 
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
-
-		conn.ReadResponse()
-	})
-
-	It("X-Request-Start is not overwritten", func() {
-		done := make(chan []string)
-
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header[http.CanonicalHeaderKey("X-Request-Start")]
+			resp, body := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+			Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
 		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
-		req.Header.Add("X-Request-Start", "user-set2")
-		conn.WriteRequest(req)
-
-		var answer []string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal([]string{"", "user-set2"}))
-
-		conn.ReadResponse()
-	})
-
-	It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
-		done := make(chan string)
-
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get(router_http.CfInstanceIdHeader)
-		}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal("fake-instance-id"))
-
-		conn.ReadResponse()
-	})
-
-	It("adds X-Forwarded-Proto if not present", func() {
-		done := make(chan string)
-
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get("X-Forwarded-Proto")
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal("http"))
-
-		conn.ReadResponse()
-	})
-
-	It("doesn't overwrite X-Forwarded-Proto if present", func() {
-		done := make(chan string)
-
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get("X-Forwarded-Proto")
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		req.Header.Set("X-Forwarded-Proto", "https")
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(Equal("https"))
-
-		conn.ReadResponse()
-	})
-
-	Context("Force Forwarded Proto HTTPS config option is set", func() {
-		BeforeEach(func() {
-			conf.ForceForwardedProtoHttps = true
-		})
-		It("uses config option for X-Forwarded-Proto if present", func() {
-			done := make(chan string)
-
-			ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
+		It("responds to misbehaving host with 502", func() {
+			ln := test_util.RegisterHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
 				conn.Close()
-
-				done <- req.Header.Get("X-Forwarded-Proto")
 			})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "app", "/", nil)
+			req := test_util.NewRequest("GET", "enfant-terrible", "/", nil)
 			conn.WriteRequest(req)
 
-			var answer string
-			Eventually(done).Should(Receive(&answer))
-			Expect(answer).To(Equal("https"))
-
-			conn.ReadResponse()
+			resp, body := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+			Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("endpoint_failure"))
+			Expect(body).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
 		})
-	})
 
-	It("emits HTTP startstop events", func() {
-		done := make(chan struct{})
-		var vcapHeader string
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, _ := conn.ReadRequest()
-			vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
-			done <- struct{}{}
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-
-		conn.WriteRequest(req)
-		findStartStopEvent := func() *events.HttpStartStop {
-			for _, ev := range fakeEmitter.GetEvents() {
-				startStopEvent, ok := ev.(*events.HttpStartStop)
-				if ok {
-					return startStopEvent
+		Context("when the endpoint is nil", func() {
+			removeAllEndpoints := func(pool *route.Pool) {
+				endpoints := make([]*route.Endpoint, 0)
+				pool.Each(func(e *route.Endpoint) {
+					endpoints = append(endpoints, e)
+				})
+				for _, e := range endpoints {
+					pool.Remove(e)
 				}
 			}
-			return nil
-		}
 
-		Eventually(done).Should(Receive())
+			It("responds with a 502 BadGateway", func() {
+				ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+					conn.CheckLine("GET / HTTP/1.1")
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+				})
+				defer ln.Close()
 
-		Eventually(findStartStopEvent).ShouldNot(BeNil())
-		u2, err := uuid.ParseHex(vcapHeader)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(findStartStopEvent().RequestId).To(Equal(factories.NewUUID(u2)))
-	})
+				removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
+				conn := dialProxy(proxyServer)
 
-	It("X-CF-InstanceID header is added with host:port information if NOT present in the routing endpoint", func() {
-		done := make(chan string)
+				req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
+				conn.WriteRequest(req)
 
-		ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-			req, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-
-			done <- req.Header.Get(router_http.CfInstanceIdHeader)
+				b := make([]byte, 0, 0)
+				buf := bytes.NewBuffer(b)
+				log.SetOutput(buf)
+				res, _ := conn.ReadResponse()
+				log.SetOutput(os.Stderr)
+				Expect(buf).NotTo(ContainSubstring("multiple response.WriteHeader calls"))
+				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+			})
 		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "app", "/", nil)
-		conn.WriteRequest(req)
-
-		var answer string
-		Eventually(done).Should(Receive(&answer))
-		Expect(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
-
-		conn.ReadResponse()
 	})
 
-	Context("when the request is a WebSocket connections", func() {
-
+	Describe("WebSocket Connections", func() {
 		Context("when the request is mapped to route service", func() {
 
 			It("responds with 503", func() {
@@ -1325,7 +1709,7 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
-	Context("when the request is a TCP Upgrade", func() {
+	Describe("TCP Upgrade Connections", func() {
 		It("upgrades a Tcp request", func() {
 			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
 				conn.WriteLine("hello")
@@ -1451,236 +1835,13 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
-	It("transfers chunked encodings", func() {
-		ln := test_util.RegisterHandler(r, "chunk", func(conn *test_util.HttpConn) {
-			r, w := io.Pipe()
+	Describe("Metrics", func() {
+		It("captures the routing response", func() {
+			ln := test_util.RegisterHandler(r, "reporter-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
 
-			// Write 3 times on a 100ms interval
-			go func() {
-				t := time.NewTicker(100 * time.Millisecond)
-				defer t.Stop()
-				defer w.Close()
-
-				for i := 0; i < 3; i++ {
-					<-t.C
-					_, err := w.Write([]byte("hello"))
-					Expect(err).NotTo(HaveOccurred())
-				}
-			}()
-
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusOK)
-			resp.TransferEncoding = []string{"chunked"}
-			resp.Body = r
-			resp.Write(conn)
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "chunk", "/", nil)
-
-		err := req.Write(conn)
-		Expect(err).NotTo(HaveOccurred())
-
-		resp, err := http.ReadResponse(conn.Reader, &http.Request{})
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		Expect(resp.TransferEncoding).To(Equal([]string{"chunked"}))
-
-		// Expect 3 individual reads to complete
-		b := make([]byte, 5)
-		for i := 0; i < 3; i++ {
-			n, err := resp.Body.Read(b[0:])
-			if err != nil {
-				Expect(err).To(Equal(io.EOF))
-			}
-			Expect(n).To(Equal(5))
-			Expect(string(b[0:n])).To(Equal("hello"))
-		}
-	})
-
-	It("status no content was no Transfer Encoding response header", func() {
-		ln := test_util.RegisterHandler(r, "not-modified", func(conn *test_util.HttpConn) {
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			resp := test_util.NewResponse(http.StatusNoContent)
-			resp.Header.Set("Connection", "close")
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "not-modified", "/", nil)
-
-		req.Header.Set("Connection", "close")
-		conn.WriteRequest(req)
-
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-		Expect(resp.TransferEncoding).To(BeNil())
-	})
-
-	It("request terminates with slow response", func() {
-		ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
-			_, err := http.ReadRequest(conn.Reader)
-			Expect(err).NotTo(HaveOccurred())
-
-			time.Sleep(1 * time.Second)
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "slow-app", "/", nil)
-
-		started := time.Now()
-		conn.WriteRequest(req)
-
-		resp, _ := readResponse(conn)
-
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
-	})
-
-	It("proxy closes connections with slow apps", func() {
-		serverResult := make(chan error)
-		ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
-
-			timesToTick := 2
-			time.Sleep(1 * time.Second)
-
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				fmt.Sprintf("Content-Length: %d", timesToTick),
-			})
-
-			for i := 0; i < timesToTick; i++ {
-				_, err := conn.Conn.Write([]byte("x"))
-				if err != nil {
-					serverResult <- err
-					return
-				}
-
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			serverResult <- nil
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "slow-app", "/", nil)
-
-		started := time.Now()
-		conn.WriteRequest(req)
-
-		resp, _ := readResponse(conn)
-
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
-
-		var err error
-		Eventually(serverResult).Should(Receive(&err))
-		Expect(err).NotTo(BeNil())
-	})
-
-	It("proxy detects closed client connection", func() {
-		serverResult := make(chan error)
-		readRequest := make(chan struct{})
-		ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
-
-			readRequest <- struct{}{}
-
-			timesToTick := 10
-
-			conn.WriteLines([]string{
-				"HTTP/1.1 200 OK",
-				fmt.Sprintf("Content-Length: %d", timesToTick),
-			})
-
-			for i := 0; i < timesToTick; i++ {
-				_, err := conn.Conn.Write([]byte("x"))
-				if err != nil {
-					serverResult <- err
-					return
-				}
-
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			serverResult <- nil
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "slow-app", "/", nil)
-
-		conn.WriteRequest(req)
-		Eventually(readRequest).Should(Receive())
-		conn.Conn.Close()
-
-		var err error
-		Eventually(serverResult).Should(Receive(&err))
-		Expect(err).NotTo(BeNil())
-	})
-
-	It("proxy closes connections to backends when client closes the connection", func() {
-		serverResult := make(chan error)
-		readRequest := make(chan struct{})
-		ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
-			conn.CheckLine("GET / HTTP/1.1")
-
-			readRequest <- struct{}{}
-
-			time.Sleep(600 * time.Millisecond)
-
-			for i := 0; i < 2; i++ {
-				_, err := conn.Conn.Write([]byte("x"))
-				if err != nil {
-					serverResult <- err
-					return
-				}
-
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			serverResult <- nil
-		})
-		defer ln.Close()
-
-		conn := dialProxy(proxyServer)
-
-		req := test_util.NewRequest("GET", "slow-app", "/", nil)
-
-		conn.WriteRequest(req)
-		Eventually(readRequest).Should(Receive())
-		conn.Conn.Close()
-
-		var err error
-		Eventually(serverResult).Should(Receive(&err))
-		Expect(err).NotTo(BeNil())
-	})
-
-	Context("respect client keepalives", func() {
-		It("closes the connection when told to close", func() {
-			ln := test_util.RegisterHandler(r, "remote", func(conn *test_util.HttpConn) {
-				http.ReadRequest(conn.Reader)
 				resp := test_util.NewResponse(http.StatusOK)
-				resp.Close = true
 				conn.WriteResponse(resp)
 				conn.Close()
 			})
@@ -1688,277 +1849,103 @@ var _ = Describe("Proxy", func() {
 
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "remote", "/", nil)
-			req.Close = true
+			req := test_util.NewRequest("GET", "reporter-test", "/", nil)
 			conn.WriteRequest(req)
+
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			conn.WriteRequest(req)
-			_, err := http.ReadResponse(conn.Reader, &http.Request{})
-			Expect(err).To(HaveOccurred())
+			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
+
+			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
+			capturedRespCode := fakeReporter.CaptureRoutingResponseArgsForCall(0)
+			Expect(capturedRespCode).To(Equal(http.StatusOK))
+
+			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+			capturedEndpoint, capturedRespCode, startTime, latency := fakeReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+			Expect(capturedEndpoint).ToNot(BeNil())
+			Expect(capturedEndpoint.ApplicationId).To(Equal(""))
+			Expect(capturedEndpoint.PrivateInstanceId).To(Equal(""))
+			Expect(capturedEndpoint.PrivateInstanceIndex).To(Equal("2"))
+			Expect(capturedRespCode).To(Equal(http.StatusOK))
+			Expect(startTime).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
+			Expect(latency).To(BeNumerically(">", 0))
+
+			Expect(fakeReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
+			Expect(fakeReporter.CaptureRoutingRequestArgsForCall(0)).To(Equal(capturedEndpoint))
 		})
 
-		It("keeps the connection alive", func() {
-			ln := test_util.RegisterHandler(r, "remote", func(conn *test_util.HttpConn) {
-				http.ReadRequest(conn.Reader)
+		It("emits HTTP startstop events", func() {
+			done := make(chan struct{})
+			var vcapHeader string
+			ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+				req, _ := conn.ReadRequest()
+				vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
+				done <- struct{}{}
 				resp := test_util.NewResponse(http.StatusOK)
-				resp.Close = true
 				conn.WriteResponse(resp)
 				conn.Close()
-			})
+			}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("GET", "remote", "/", nil)
-			req.Close = false
-			conn.WriteRequest(req)
-			resp, _ := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			req := test_util.NewRequest("GET", "app", "/", nil)
 
 			conn.WriteRequest(req)
-			_, err := http.ReadResponse(conn.Reader, &http.Request{})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-	})
-
-	It("disables compression", func() {
-		ln := test_util.RegisterHandler(r, "remote", func(conn *test_util.HttpConn) {
-			request, _ := http.ReadRequest(conn.Reader)
-			encoding := request.Header["Accept-Encoding"]
-			var resp *http.Response
-			if len(encoding) != 0 {
-				resp = test_util.NewResponse(http.StatusInternalServerError)
-			} else {
-				resp = test_util.NewResponse(http.StatusOK)
+			findStartStopEvent := func() *events.HttpStartStop {
+				for _, ev := range fakeEmitter.GetEvents() {
+					startStopEvent, ok := ev.(*events.HttpStartStop)
+					if ok {
+						return startStopEvent
+					}
+				}
+				return nil
 			}
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
 
-		conn := dialProxy(proxyServer)
+			Eventually(done).Should(Receive())
 
-		req := test_util.NewRequest("GET", "remote", "/", nil)
-		conn.WriteRequest(req)
-		resp, _ := conn.ReadResponse()
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("retries when failed endpoints exist", func() {
-		ln := test_util.RegisterHandler(r, "retries", func(conn *test_util.HttpConn) {
-			req, _ := conn.ReadRequest()
-			Expect(req.Method).To(Equal("GET"))
-			Expect(req.Host).To(Equal("retries"))
-			resp := test_util.NewResponse(http.StatusOK)
-			conn.WriteResponse(resp)
-			conn.Close()
-		})
-		defer ln.Close()
-
-		test_util.RegisterAddr(r, "retries", "localhost:81", test_util.RegisterConfig{
-			InstanceId:    "instanceId",
-			InstanceIndex: "2",
+			Eventually(findStartStopEvent).ShouldNot(BeNil())
+			u2, err := uuid.ParseHex(vcapHeader)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(findStartStopEvent().RequestId).To(Equal(factories.NewUUID(u2)))
 		})
 
-		for i := 0; i < 5; i++ {
-			body := &bytes.Buffer{}
-			body.WriteString("use an actual body")
+		Context("when the endpoint is nil", func() {
+			removeAllEndpoints := func(pool *route.Pool) {
+				endpoints := make([]*route.Endpoint, 0)
+				pool.Each(func(e *route.Endpoint) {
+					endpoints = append(endpoints, e)
+				})
+				for _, e := range endpoints {
+					pool.Remove(e)
+				}
+			}
 
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "retries", "/", ioutil.NopCloser(body))
-			conn.WriteRequest(req)
-			resp, _ := conn.ReadResponse()
-
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		}
-	})
-
-	Context("Access log", func() {
-		It("Logs a request", func() {
-			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
-				req, body := conn.ReadRequest()
-				Expect(req.Method).To(Equal("POST"))
-				Expect(req.URL.Path).To(Equal("/"))
-				Expect(req.ProtoMajor).To(Equal(1))
-				Expect(req.ProtoMinor).To(Equal(1))
-
-				Expect(body).To(Equal("ABCD"))
-
-				rsp := test_util.NewResponse(200)
-				out := &bytes.Buffer{}
-				out.WriteString("DEFG")
-				rsp.Body = ioutil.NopCloser(out)
-				conn.WriteResponse(rsp)
-			}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-
-			body := &bytes.Buffer{}
-			body.WriteString("ABCD")
-			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
-			conn.WriteRequest(req)
-
-			resp, _ := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
-			}).ShouldNot(BeZero())
-
-			//make sure the record includes all the data
-			//since the building of the log record happens throughout the life of the request
-			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
-			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
-			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
-			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
-		})
-
-		It("Logs a request when it exits early", func() {
-			conn := dialProxy(proxyServer)
-
-			body := &bytes.Buffer{}
-			body.WriteString("ABCD")
-			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
-			conn.WriteRequest(req)
-
-			resp, _ := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-
-			var payload []byte
-			Eventually(func() int {
-				n, e := accessLogFile.Read(&payload)
-				Expect(e).ToNot(HaveOccurred())
-				return n
-			}).ShouldNot(BeZero())
-
-			Expect(string(payload)).To(MatchRegexp("^test.*\n"))
-		})
-
-		Context("when the request has X-CF-APP-INSTANCE", func() {
-			It("lookups the route to that specific app index and id", func() {
-				done := make(chan struct{})
-				// app handler for app.vcap.me
-				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
-					Fail("App should not have received request")
-				}, test_util.RegisterConfig{AppId: "app-1-id"})
-				defer ln.Close()
-
-				ln2 := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					Expect(req.Header.Get(router_http.CfAppInstance)).To(BeEmpty())
-
+			It("captures bad gateway but does not capture routing response", func() {
+				ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+					conn.CheckLine("GET / HTTP/1.1")
 					resp := test_util.NewResponse(http.StatusOK)
-					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
 					conn.WriteResponse(resp)
-
 					conn.Close()
-
-					done <- struct{}{}
-				}, test_util.RegisterConfig{AppId: "app-2-id"})
-				defer ln2.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app.vcap.me", "/chat", nil)
-				req.Header.Set(router_http.CfAppInstance, "app-2-id:2")
-
-				Consistently(func() string {
-					conn.WriteRequest(req)
-
-					Eventually(done).Should(Receive())
-					_, b := conn.ReadResponse()
-					return b
-				}).Should(Equal("Hellow World: App2"))
-			})
-
-			It("returns a 404 if it cannot find the specified instance", func() {
-				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
-					Fail("App should not have received request")
-				}, test_util.RegisterConfig{AppId: "app-1-id"})
+				})
 				defer ln.Close()
 
+				removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
-				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
+				req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
 				conn.WriteRequest(req)
 
-				resp, _ := conn.ReadResponse()
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+				res, _ := conn.ReadResponse()
+				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+				Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
+				Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
 			})
 		})
 	})
 
-	Context("when the endpoint is nil", func() {
-		removeAllEndpoints := func(pool *route.Pool) {
-			endpoints := make([]*route.Endpoint, 0)
-			pool.Each(func(e *route.Endpoint) {
-				endpoints = append(endpoints, e)
-			})
-			for _, e := range endpoints {
-				pool.Remove(e)
-			}
-		}
-
-		It("responds with a 502 BadGateway", func() {
-			ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
-				conn.CheckLine("GET / HTTP/1.1")
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-			})
-			defer ln.Close()
-
-			removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
-			conn.WriteRequest(req)
-
-			b := make([]byte, 0, 0)
-			buf := bytes.NewBuffer(b)
-			log.SetOutput(buf)
-			res, _ := conn.ReadResponse()
-			log.SetOutput(os.Stderr)
-			Expect(buf).NotTo(ContainSubstring("multiple response.WriteHeader calls"))
-			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-		})
-
-		It("captures bad gateway but does not capture routing response", func() {
-			ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
-				conn.CheckLine("GET / HTTP/1.1")
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-			})
-			defer ln.Close()
-
-			removeAllEndpoints(r.Lookup(route.Uri("nil-endpoint")))
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
-			conn.WriteRequest(req)
-
-			res, _ := conn.ReadResponse()
-			Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(1))
-			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
-			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
-		})
-	})
 })
 
 // HACK: this is used to silence any http warnings in logs
