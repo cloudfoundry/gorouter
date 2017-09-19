@@ -204,7 +204,7 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
-	FrontendIdleTimeout:                       5 * time.Second,
+	FrontendIdleTimeout:                       900 * time.Second,
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,

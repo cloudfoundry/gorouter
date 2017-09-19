@@ -69,6 +69,21 @@ status:
 
 		})
 
+		It("defaults frontend idle timeout to 900", func() {
+			Expect(config.FrontendIdleTimeout).To(Equal(900 * time.Second))
+		})
+
+		It("sets frontend idle timeout", func() {
+			var b = []byte(`
+frontend_idle_timeout: 5s
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.FrontendIdleTimeout).To(Equal(5 * time.Second))
+		})
+
 		It("sets endpoint timeout", func() {
 			var b = []byte(`
 endpoint_timeout: 10s
