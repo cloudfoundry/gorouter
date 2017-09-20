@@ -229,6 +229,7 @@ func CreateSignedCertWithRootCA(commonName string) CertChain {
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
 		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{commonName},
 	}
 	rootCert, err := x509.ParseCertificate(rootCADER)
 	Expect(err).NotTo(HaveOccurred())
