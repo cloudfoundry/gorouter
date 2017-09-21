@@ -347,18 +347,22 @@ func (e *endpointElem) failed() {
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	var jsonObj struct {
-		Address          string            `json:"address"`
-		TTL              int               `json:"ttl"`
-		RouteServiceUrl  string            `json:"route_service_url,omitempty"`
-		Tags             map[string]string `json:"tags"`
-		IsolationSegment string            `json:"isolation_segment,omitempty"`
+		Address           string            `json:"address"`
+		TLS               bool              `json:"tls"`
+		TTL               int               `json:"ttl"`
+		RouteServiceUrl   string            `json:"route_service_url,omitempty"`
+		Tags              map[string]string `json:"tags"`
+		IsolationSegment  string            `json:"isolation_segment,omitempty"`
+		PrivateInstanceId string            `json:"private_instance_id,omitempty"`
 	}
 
 	jsonObj.Address = e.addr
+	jsonObj.TLS = e.IsTLS()
 	jsonObj.RouteServiceUrl = e.RouteServiceUrl
 	jsonObj.TTL = int(e.staleThreshold.Seconds())
 	jsonObj.Tags = e.Tags
 	jsonObj.IsolationSegment = e.IsolationSegment
+	jsonObj.PrivateInstanceId = e.PrivateInstanceId
 	return json.Marshal(jsonObj)
 }
 
