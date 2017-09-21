@@ -404,6 +404,7 @@ func createSubscriber(
 		ID: fmt.Sprintf("%d-%s", c.Index, guid),
 		MinimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
 		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
+		AcceptTLS:                        c.Backends.EnableTLS,
 	}
 	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts)
 }

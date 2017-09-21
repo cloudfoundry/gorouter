@@ -32,8 +32,11 @@ type RegistryMessage struct {
 	IsolationSegment        string            `json:"isolation_segment"`
 }
 
-func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
-	port, useTls := rm.port()
+func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error) {
+	port, useTls, err := rm.port(acceptTLS)
+	if err != nil {
+		return nil, err
+	}
 	return route.NewEndpoint(
 		rm.App,
 		rm.Host,
@@ -46,7 +49,7 @@ func (rm *RegistryMessage) makeEndpoint() *route.Endpoint {
 		models.ModificationTag{},
 		rm.IsolationSegment,
 		useTls,
-	)
+	), nil
 }
 
 // ValidateMessage checks to ensure the registry message is valid
@@ -55,11 +58,13 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 }
 
 // Prefer TLS Port instead of HTTP Port in Registrty Message
-func (rm *RegistryMessage) port() (uint16, bool) {
-	if rm.TLSPort != 0 {
-		return rm.TLSPort, true
+func (rm *RegistryMessage) port(acceptTLS bool) (uint16, bool, error) {
+	if !acceptTLS && rm.Port == 0 {
+		return 0, false, errors.New("Invalid registry message: backend tls is not enabled")
+	} else if acceptTLS && rm.TLSPort != 0 {
+		return rm.TLSPort, true, nil
 	}
-	return rm.Port, false
+	return rm.Port, false, nil
 }
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
@@ -76,6 +81,7 @@ type SubscriberOpts struct {
 	ID                               string
 	MinimumRegisterIntervalInSeconds int
 	PruneThresholdInSeconds          int
+	AcceptTLS                        bool
 }
 
 // NewSubscriber returns a new Subscriber
@@ -163,14 +169,29 @@ func (s *Subscriber) subscribeRoutes() error {
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
-	endpoint := msg.makeEndpoint()
+	endpoint, err := msg.makeEndpoint(s.opts.AcceptTLS)
+	if err != nil {
+		s.logger.Error("Unable to register route",
+			zap.Error(err),
+			zap.Object("message", msg),
+		)
+		return
+	}
+
 	for _, uri := range msg.Uris {
 		s.routeRegistry.Register(uri, endpoint)
 	}
 }
 
 func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
-	endpoint := msg.makeEndpoint()
+	endpoint, err := msg.makeEndpoint(s.opts.AcceptTLS)
+	if err != nil {
+		s.logger.Error("Unable to unregister route",
+			zap.Error(err),
+			zap.Object("message", msg),
+		)
+		return
+	}
 	for _, uri := range msg.Uris {
 		s.routeRegistry.Unregister(uri, endpoint)
 	}
