@@ -143,7 +143,9 @@ func NewProxy(
 	roundTripperFactory := &RoundTripperFactoryImpl{
 		Template: httpTransportTemplate,
 	}
-	retryableClassififer := &round_tripper.RoundTripperRetryableClassifier{}
+	retryableClassififer := &round_tripper.RoundTripperRetryableClassifier{
+		RetryOnAny: round_tripper.DefaultRetryOnAny,
+	}
 
 	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
@@ -195,6 +197,10 @@ func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripper
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,
 		port,
+		&round_tripper.ErrorHandler{
+			MetricReporter: p.reporter,
+			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
+		},
 	)
 }
 
