@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"strconv"
 	"time"
-
-	"code.cloudfoundry.org/localip"
 )
 
 type Nats struct {
@@ -32,13 +30,6 @@ func NewNatsOnRandomPort() *Nats {
 
 func (n *Nats) Port() uint16 {
 	return n.port
-}
-
-func NextAvailPort() uint16 {
-	port, err := localip.LocalPort()
-	Expect(err).ToNot(HaveOccurred())
-
-	return port
 }
 
 func (n *Nats) Start() {
