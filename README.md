@@ -113,6 +113,7 @@ The format of the `router.register` message is as follows:
 {
   "host": "127.0.0.1",
   "port": 4567,
+  "tls_port": 1234,
   "uris": [
     "my_first_url.vcap.me",
     "my_second_url.vcap.me"
@@ -135,6 +136,10 @@ The format of the `router.register` message is as follows:
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
 
 `isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec) for more information.
+
+`tls_port` is the port that Gorouter will use to attempt TLS connections with the registered backends. `router.backends.tls_pem` must be configured with a certificate authority used to generate the certificates for the backend. If `router.backend.enable_tls` has been set to true, the router will prefer `tls_port` over `port` if present. Otherwise, `port` will be preferred, and messages with only `tls_port` will be rejected with an error message in the logs.
+
+Additionally, if the `host` and `tls_port` pair matches an already registered `host` and `port` pair, the previously registered route will be overwritten and Gorouter will now attempt TLS connections with the `host` and `tls_port` pair. The same is also true if the `host` and `port` pair matches an already registered `host` and `tls_port` pair, except Gorouter will no longer attempt TLS connections with the backend.
 
 Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
@@ -165,9 +170,9 @@ Hello!
 
 Unregister the route
 ```
-$ nats-pub 'router.unregister' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+$ nats-pub 'router.unregister' '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
 
-Published [router.unregister] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+Published [router.unregister] : '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
 ```
 
 See that the route is gone
@@ -176,6 +181,10 @@ See that the route is gone
 $ curl my_first_url.vcap.me:8081
 404 Not Found: Requested route ('my_first_url.vcap.me') does not exist.
 ```
+
+If `router.backends.enable_tls` has been set to true, `tls_port` will be used as the definitive port when unregistering a route if present, otherwise `port` will be used. If `router.backends.enable_tls` is set to false, `port` will be preferred and any requests with only `tls_port` will be rejected and an error logged to the gorouter logs.
+
+Note that if `router.backends.enable_tls` is true and `host` and `tls_port` happens to match a registered `host` and `port` pair, this `host` and `port` pair will be unregistered. The reverse is also true.
 
 **Note:** In order to use `nats-pub` to register a route, you must install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's easiest on a VM that has ruby as a package, such as the API VM. Find the ruby installed in /var/vcap/packages, export your PATH variable to include the bin directory, and then run `gem install nats`. Find the nats login info from your gorouter config, and use it to connect to the nats cluster.  
 
@@ -426,3 +435,4 @@ Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slo
 
 Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
 Please read our [Development Guide for Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md)
+
