@@ -4,33 +4,30 @@ package fakes
 import (
 	"sync"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type ErrorHandler struct {
-	HandleErrorStub        func(logger.Logger, utils.ProxyResponseWriter, error)
+	HandleErrorStub        func(utils.ProxyResponseWriter, error)
 	handleErrorMutex       sync.RWMutex
 	handleErrorArgsForCall []struct {
-		arg1 logger.Logger
-		arg2 utils.ProxyResponseWriter
-		arg3 error
+		arg1 utils.ProxyResponseWriter
+		arg2 error
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *ErrorHandler) HandleError(arg1 logger.Logger, arg2 utils.ProxyResponseWriter, arg3 error) {
+func (fake *ErrorHandler) HandleError(arg1 utils.ProxyResponseWriter, arg2 error) {
 	fake.handleErrorMutex.Lock()
 	fake.handleErrorArgsForCall = append(fake.handleErrorArgsForCall, struct {
-		arg1 logger.Logger
-		arg2 utils.ProxyResponseWriter
-		arg3 error
-	}{arg1, arg2, arg3})
-	fake.recordInvocation("HandleError", []interface{}{arg1, arg2, arg3})
+		arg1 utils.ProxyResponseWriter
+		arg2 error
+	}{arg1, arg2})
+	fake.recordInvocation("HandleError", []interface{}{arg1, arg2})
 	fake.handleErrorMutex.Unlock()
 	if fake.HandleErrorStub != nil {
-		fake.HandleErrorStub(arg1, arg2, arg3)
+		fake.HandleErrorStub(arg1, arg2)
 	}
 }
 
@@ -40,10 +37,10 @@ func (fake *ErrorHandler) HandleErrorCallCount() int {
 	return len(fake.handleErrorArgsForCall)
 }
 
-func (fake *ErrorHandler) HandleErrorArgsForCall(i int) (logger.Logger, utils.ProxyResponseWriter, error) {
+func (fake *ErrorHandler) HandleErrorArgsForCall(i int) (utils.ProxyResponseWriter, error) {
 	fake.handleErrorMutex.RLock()
 	defer fake.handleErrorMutex.RUnlock()
-	return fake.handleErrorArgsForCall[i].arg1, fake.handleErrorArgsForCall[i].arg2, fake.handleErrorArgsForCall[i].arg3
+	return fake.handleErrorArgsForCall[i].arg1, fake.handleErrorArgsForCall[i].arg2
 }
 
 func (fake *ErrorHandler) Invocations() map[string][][]interface{} {

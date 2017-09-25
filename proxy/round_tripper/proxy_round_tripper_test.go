@@ -246,7 +246,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
 				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-				_, _, err = errorHandler.HandleErrorArgsForCall(0)
+				_, err = errorHandler.HandleErrorArgsForCall(0)
 				Expect(err).To(MatchError("potato"))
 			})
 
@@ -285,7 +285,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
 				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-				_, _, err = errorHandler.HandleErrorArgsForCall(0)
+				_, err = errorHandler.HandleErrorArgsForCall(0)
 				Expect(err).To(MatchError("potato"))
 			})
 
@@ -325,7 +325,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			It("calls the error handler", func() {
 				proxyRoundTripper.RoundTrip(req)
 				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-				_, _, err := errorHandler.HandleErrorArgsForCall(0)
+				_, err := errorHandler.HandleErrorArgsForCall(0)
 				Expect(err).To(Equal(handler.NoEndpointsAvailable))
 			})
 
@@ -589,7 +589,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("calls the error handler", func() {
 					proxyRoundTripper.RoundTrip(req)
 					Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-					_, _, err := errorHandler.HandleErrorArgsForCall(0)
+					_, err := errorHandler.HandleErrorArgsForCall(0)
 					Expect(err).To(Equal(dialError))
 				})
 
@@ -620,7 +620,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					It("calls the error handler", func() {
 						proxyRoundTripper.RoundTrip(req)
 						Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-						_, _, err := errorHandler.HandleErrorArgsForCall(0)
+						_, err := errorHandler.HandleErrorArgsForCall(0)
 						Expect(err).To(MatchError("banana"))
 					})
 

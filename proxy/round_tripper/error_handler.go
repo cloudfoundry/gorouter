@@ -4,11 +4,9 @@ import (
 	"net/http"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"github.com/uber-go/zap"
 )
 
 type ErrorSpec struct {
@@ -29,20 +27,18 @@ type ErrorHandler struct {
 	ErrorSpecs     []ErrorSpec
 }
 
-func (eh *ErrorHandler) HandleError(logger logger.Logger, responseWriter utils.ProxyResponseWriter, err error) {
+func (eh *ErrorHandler) HandleError(responseWriter utils.ProxyResponseWriter, err error) {
 	responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
 
 	eh.writeErrorCode(err, responseWriter)
-
-	logger.Error("endpoint-failed", zap.Error(err))
 	responseWriter.Header().Del("Connection")
 	responseWriter.Done()
 }
 
 func (eh *ErrorHandler) writeErrorCode(err error, responseWriter http.ResponseWriter) {
-	for _, eh := range eh.ErrorSpecs {
-		if eh.Classifier(err) {
-			http.Error(responseWriter, eh.Message, eh.Code)
+	for _, spec := range eh.ErrorSpecs {
+		if spec.Classifier(err) {
+			http.Error(responseWriter, spec.Message, spec.Code)
 			return
 		}
 	}

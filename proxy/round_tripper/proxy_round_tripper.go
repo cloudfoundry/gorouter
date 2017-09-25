@@ -53,7 +53,7 @@ func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory)
 
 //go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler
 type errorHandler interface {
-	HandleError(logger.Logger, utils.ProxyResponseWriter, error)
+	HandleError(utils.ProxyResponseWriter, error)
 }
 
 type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.Endpoint, err error)
@@ -188,7 +188,8 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	reqInfo.StoppedAt = time.Now()
 
 	if err != nil {
-		rt.errorHandler.HandleError(logger, reqInfo.ProxyResponseWriter, err)
+		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
+		logger.Error("endpoint-failed", zap.Error(err))
 		return nil, err
 	}
 
