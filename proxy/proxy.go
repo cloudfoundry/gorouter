@@ -195,7 +195,6 @@ func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripper
 	return round_tripper.NewProxyRoundTripper(
 		roundTripperFactory,
 		retryableClassifier,
-		// round_tripper.NewDropsondeRoundTripper(transport),
 		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
 		p.reporter, p.secureCookies,
 		port,
