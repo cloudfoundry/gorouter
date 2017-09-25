@@ -12,9 +12,11 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/error_classifiers/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
+
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -64,7 +66,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			routerIP            string
 			combinedReporter    *fakes.FakeCombinedReporter
 			roundTripperFactory *FakeRoundTripperFactory
-			retryableClassifier *roundtripperfakes.FakeRetryableClassifier
+			retryableClassifier *errorClassifierFakes.Classifier
 			errorHandler        *roundtripperfakes.ErrorHandler
 
 			reqInfo *handlers.RequestInfo
@@ -112,8 +114,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			errorHandler = &roundtripperfakes.ErrorHandler{}
 
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
-			retryableClassifier = &roundtripperfakes.FakeRetryableClassifier{}
-			retryableClassifier.IsRetryableReturns(false)
+			retryableClassifier = &errorClassifierFakes.Classifier{}
+			retryableClassifier.ClassifyReturns(false)
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				roundTripperFactory, retryableClassifier,
 				logger, "my_trace_key", routerIP, "",
@@ -209,14 +211,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 		Context("when backend is unavailable due to a retryable error", func() {
 			BeforeEach(func() {
 				transport.RoundTripReturns(nil, errors.New("potato"))
-				retryableClassifier.IsRetryableReturns(true)
+				retryableClassifier.ClassifyReturns(true)
 			})
 
 			It("retries 3 times", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
 				Expect(transport.RoundTripCallCount()).To(Equal(3))
-				Expect(retryableClassifier.IsRetryableCallCount()).To(Equal(3))
+				Expect(retryableClassifier.ClassifyCallCount()).To(Equal(3))
 
 				Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
@@ -261,7 +263,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 		Context("when backend is unavailable due to non-retryable error", func() {
 			BeforeEach(func() {
 				transport.RoundTripReturns(nil, errors.New("potato"))
-				retryableClassifier.IsRetryableReturns(false)
+				retryableClassifier.ClassifyReturns(false)
 			})
 
 			It("does not retry", func() {
@@ -365,7 +367,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					}
 					return nil, err
 				}
-				retryableClassifier.IsRetryableReturns(true)
+				retryableClassifier.ClassifyReturns(true)
 			})
 
 			It("retries 2 times", func() {
@@ -583,7 +585,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					transport.RoundTripReturns(
 						nil, dialError,
 					)
-					retryableClassifier.IsRetryableReturns(true)
+					retryableClassifier.ClassifyReturns(true)
 				})
 
 				It("calls the error handler", func() {
@@ -606,7 +608,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Context("when route service is unavailable due to non-retryable error", func() {
 					BeforeEach(func() {
 						transport.RoundTripReturns(nil, errors.New("banana"))
-						retryableClassifier.IsRetryableReturns(false)
+						retryableClassifier.ClassifyReturns(false)
 					})
 
 					It("does not retry and returns status bad gateway", func() {

@@ -12,19 +12,19 @@ import (
 
 var _ = Describe("RetryableClassifier", func() {
 	It("matches against any of the classifiers in the RetryOnAny set", func() {
-		rc := &round_tripper.RoundTripperRetryableClassifier{
+		rc := &round_tripper.Retriable{
 			RetryOnAny: []error_classifiers.Classifier{
-				func(err error) bool {
+				error_classifiers.ClassifierFunc(func(err error) bool {
 					return err.Error() == "i'm a teapot"
-				},
-				func(err error) bool {
+				}),
+				error_classifiers.ClassifierFunc(func(err error) bool {
 					return err.Error() == "i'm a tomato"
-				},
+				}),
 			},
 		}
 
-		Expect(rc.IsRetryable(errors.New("i'm a teapot"))).To(BeTrue())
-		Expect(rc.IsRetryable(errors.New("i'm a tomato"))).To(BeTrue())
-		Expect(rc.IsRetryable(errors.New("i'm a potato"))).To(BeFalse())
+		Expect(rc.Classify(errors.New("i'm a teapot"))).To(BeTrue())
+		Expect(rc.Classify(errors.New("i'm a tomato"))).To(BeTrue())
+		Expect(rc.Classify(errors.New("i'm a potato"))).To(BeFalse())
 	})
 })

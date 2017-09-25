@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
@@ -60,7 +61,7 @@ type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.
 
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
-	retryableClassifier RetryableClassifier,
+	retryableClassifier error_classifiers.Classifier,
 	logger logger.Logger,
 	traceKey string,
 	routerIP string,
@@ -93,7 +94,7 @@ type roundTripper struct {
 	secureCookies       bool
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory
-	retryableClassifier RetryableClassifier
+	retryableClassifier error_classifiers.Classifier
 	errorHandler        errorHandler
 }
 
@@ -142,7 +143,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				request.URL.Scheme = "https"
 			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
-			if err == nil || !rt.retryableClassifier.IsRetryable(err) {
+			if err == nil || !rt.retryableClassifier.Classify(err) {
 				break
 			}
 			iter.EndpointFailed()
@@ -178,7 +179,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				}
 				break
 			}
-			if !rt.retryableClassifier.IsRetryable(err) {
+			if !rt.retryableClassifier.Classify(err) {
 				break
 			}
 			logger.Error("route-service-connection-failed", zap.Error(err))

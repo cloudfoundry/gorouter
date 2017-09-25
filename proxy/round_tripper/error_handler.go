@@ -37,7 +37,7 @@ func (eh *ErrorHandler) HandleError(responseWriter utils.ProxyResponseWriter, er
 
 func (eh *ErrorHandler) writeErrorCode(err error, responseWriter http.ResponseWriter) {
 	for _, spec := range eh.ErrorSpecs {
-		if spec.Classifier(err) {
+		if spec.Classifier.Classify(err) {
 			http.Error(responseWriter, spec.Message, spec.Code)
 			return
 		}
