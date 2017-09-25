@@ -1,4 +1,4 @@
-package error_classifiers_test
+package fails_test
 
 import (
 	"crypto/tls"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -83,7 +83,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 			_, err = testTransport.RoundTrip(req)
 			Expect(err).To(HaveOccurred())
-			Expect(error_classifiers.AttemptedTLSWithNonTLSBackend(err)).To(BeTrue())
+			Expect(fails.AttemptedTLSWithNonTLSBackend(err)).To(BeTrue())
 		})
 
 		It("does not match on other tls errors", func() {
@@ -93,7 +93,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 			testTransport.TLSClientConfig.RootCAs = x509.NewCertPool() // create other error condition
 			_, err = testTransport.RoundTrip(req)
 			Expect(err).To(HaveOccurred())
-			Expect(error_classifiers.AttemptedTLSWithNonTLSBackend(err)).To(BeFalse())
+			Expect(fails.AttemptedTLSWithNonTLSBackend(err)).To(BeFalse())
 		})
 	})
 
@@ -104,7 +104,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 			_, err := testTransport.RoundTrip(req)
 			Expect(err).To(HaveOccurred())
-			Expect(error_classifiers.Dial(err)).To(BeTrue())
+			Expect(fails.Dial(err)).To(BeTrue())
 		})
 
 		It("does not match TLS connection errors", func() {
@@ -113,7 +113,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 			testTransport.TLSClientConfig.RootCAs = x509.NewCertPool() // create other error condition
 			_, err := testTransport.RoundTrip(req)
 			Expect(err).To(HaveOccurred())
-			Expect(error_classifiers.Dial(err)).To(BeFalse())
+			Expect(fails.Dial(err)).To(BeFalse())
 		})
 	})
 
@@ -129,7 +129,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 					_, err := testTransport.RoundTrip(req)
 					Expect(err).To(HaveOccurred())
-					Expect(error_classifiers.RemoteFailedCertCheck(err)).To(BeTrue())
+					Expect(fails.RemoteFailedCertCheck(err)).To(BeTrue())
 				})
 			})
 
@@ -142,7 +142,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 					_, err := testTransport.RoundTrip(req)
 					Expect(err).To(HaveOccurred())
-					Expect(error_classifiers.RemoteFailedCertCheck(err)).To(BeTrue())
+					Expect(fails.RemoteFailedCertCheck(err)).To(BeTrue())
 				})
 			})
 
@@ -155,7 +155,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 					_, err := testTransport.RoundTrip(req)
 					Expect(err).To(HaveOccurred())
-					Expect(error_classifiers.RemoteFailedCertCheck(err)).To(BeFalse())
+					Expect(fails.RemoteFailedCertCheck(err)).To(BeFalse())
 				})
 			})
 		})
@@ -172,7 +172,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 				_, err := testTransport.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
-				Expect(error_classifiers.RemoteHandshakeFailure(err)).To(BeTrue())
+				Expect(fails.RemoteHandshakeFailure(err)).To(BeTrue())
 			})
 		})
 
@@ -187,7 +187,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 				_, err := testTransport.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
-				Expect(error_classifiers.RemoteHandshakeFailure(err)).To(BeFalse())
+				Expect(fails.RemoteHandshakeFailure(err)).To(BeFalse())
 			})
 		})
 	})

@@ -9,7 +9,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -30,14 +30,14 @@ var _ = Describe("HandleError", func() {
 				{
 					Code:    418,
 					Message: "teapot",
-					Classifier: error_classifiers.ClassifierFunc(func(err error) bool {
+					Classifier: fails.ClassifierFunc(func(err error) bool {
 						return err.Error() == "i'm a teapot"
 					}),
 				},
 				{
 					Code:    419,
 					Message: "you say tomato",
-					Classifier: error_classifiers.ClassifierFunc(func(err error) bool {
+					Classifier: fails.ClassifierFunc(func(err error) bool {
 						return err.Error() == "i'm a tomato"
 					}),
 				},

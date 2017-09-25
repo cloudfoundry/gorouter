@@ -16,7 +16,7 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -144,8 +144,8 @@ func NewProxy(
 	roundTripperFactory := &RoundTripperFactoryImpl{
 		Template: httpTransportTemplate,
 	}
-	retryableClassififer := &round_tripper.Retriable{
-		RetryOnAny: round_tripper.DefaultRetryOnAny,
+	retryableClassififer := &fails.Retriable{
+		RetryOnAny: fails.DefaultRetryOnAny,
 	}
 
 	rproxy := &httputil.ReverseProxy{
@@ -191,7 +191,7 @@ func hostWithoutPort(req *http.Request) string {
 }
 
 func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory,
-	retryableClassifier error_classifiers.Classifier, port uint16) round_tripper.ProxyRoundTripper {
+	retryableClassifier fails.Classifier, port uint16) round_tripper.ProxyRoundTripper {
 	return round_tripper.NewProxyRoundTripper(
 		roundTripperFactory,
 		retryableClassifier,

@@ -5,21 +5,21 @@ import (
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type ErrorSpec struct {
-	Classifier error_classifiers.Classifier
+	Classifier fails.Classifier
 	Message    string
 	Code       int
 }
 
 var DefaultErrorSpecs = []ErrorSpec{
-	{error_classifiers.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525},
-	{error_classifiers.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable},
-	{error_classifiers.UntrustedCert, InvalidCertificateMessage, 526},
-	{error_classifiers.RemoteFailedCertCheck, SSLCertRequiredMessage, 496},
+	{fails.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525},
+	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable},
+	{fails.UntrustedCert, InvalidCertificateMessage, 526},
+	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496},
 }
 
 type ErrorHandler struct {

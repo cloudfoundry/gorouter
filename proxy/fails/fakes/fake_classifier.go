@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 )
 
 type Classifier struct {
@@ -95,4 +95,4 @@ func (fake *Classifier) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ error_classifiers.Classifier = new(Classifier)
+var _ fails.Classifier = new(Classifier)

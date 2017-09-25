@@ -1,23 +1,21 @@
-package round_tripper_test
+package fails_test
 
 import (
 	"errors"
 
-	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
-
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("RetryableClassifier", func() {
-	It("matches against any of the classifiers in the RetryOnAny set", func() {
-		rc := &round_tripper.Retriable{
-			RetryOnAny: []error_classifiers.Classifier{
-				error_classifiers.ClassifierFunc(func(err error) bool {
+	It("matches any of the classifiers in the RetryOnAny set", func() {
+		rc := &fails.Retriable{
+			RetryOnAny: []fails.Classifier{
+				fails.ClassifierFunc(func(err error) bool {
 					return err.Error() == "i'm a teapot"
 				}),
-				error_classifiers.ClassifierFunc(func(err error) bool {
+				fails.ClassifierFunc(func(err error) bool {
 					return err.Error() == "i'm a tomato"
 				}),
 			},

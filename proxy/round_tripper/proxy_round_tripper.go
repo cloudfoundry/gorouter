@@ -14,7 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/error_classifiers"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
@@ -61,7 +61,7 @@ type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.
 
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
-	retryableClassifier error_classifiers.Classifier,
+	retryableClassifier fails.Classifier,
 	logger logger.Logger,
 	traceKey string,
 	routerIP string,
@@ -94,7 +94,7 @@ type roundTripper struct {
 	secureCookies       bool
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory
-	retryableClassifier error_classifiers.Classifier
+	retryableClassifier fails.Classifier
 	errorHandler        errorHandler
 }
 

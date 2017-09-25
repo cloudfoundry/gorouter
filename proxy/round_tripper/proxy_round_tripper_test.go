@@ -12,7 +12,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/error_classifiers/fakes"
+	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
