@@ -380,6 +380,12 @@ var _ = Describe("MetricsReporter", func() {
 		Expect(count).To(Equal(uint64(5)))
 	})
 
+	It("increments the backend_tls_handshake_failed metric", func() {
+		metricReporter.CaptureBackendTLSHandshakeFailed()
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("backend_tls_handshake_failed"))
+	})
+
 	Describe("Unregister messages", func() {
 		var endpoint *route.Endpoint
 		Context("when unregister msg with component name is incremented", func() {

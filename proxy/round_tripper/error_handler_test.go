@@ -9,6 +9,9 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
+	"crypto/tls"
+
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -20,10 +23,12 @@ var _ = Describe("HandleError", func() {
 		errorHandler     *round_tripper.ErrorHandler
 		responseWriter   utils.ProxyResponseWriter
 		responseRecorder *httptest.ResponseRecorder
+		errorHandled     bool
 	)
 
 	BeforeEach(func() {
 		metricReporter = new(fakes.FakeCombinedReporter)
+		errorHandled = false
 		errorHandler = &round_tripper.ErrorHandler{
 			MetricReporter: metricReporter,
 			ErrorSpecs: []round_tripper.ErrorSpec{
@@ -40,6 +45,9 @@ var _ = Describe("HandleError", func() {
 					Classifier: fails.ClassifierFunc(func(err error) bool {
 						return err.Error() == "i'm a tomato"
 					}),
+					HandleError: func(_ metrics.CombinedReporter) {
+						errorHandled = true
+					},
 				},
 			},
 		}
@@ -75,6 +83,16 @@ var _ = Describe("HandleError", func() {
 			errorHandler.HandleError(responseWriter, errors.New("i'm a tomato"))
 			Expect(metricReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 		})
+
+		It("calls the handleError callback if it exists", func() {
+			firstResponseWriter := utils.NewProxyResponseWriter(httptest.NewRecorder())
+			errorHandler.HandleError(firstResponseWriter, errors.New("i'm a teapot"))
+			Expect(errorHandled).To(BeFalse())
+
+			errorHandler.HandleError(responseWriter, errors.New("i'm a tomato"))
+			Expect(responseWriter.Status()).To(Equal(419))
+			Expect(errorHandled).To(BeTrue())
+		})
 	})
 
 	It("removes any headers named 'Connection'", func() {
@@ -88,5 +106,30 @@ var _ = Describe("HandleError", func() {
 		nBytesWritten, err := responseWriter.Write([]byte("foo"))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(nBytesWritten).To(Equal(0))
+	})
+
+	Context("DefaultErrorSpecs", func() {
+		BeforeEach(func() {
+			errorHandler = &round_tripper.ErrorHandler{
+				MetricReporter: metricReporter,
+				ErrorSpecs:     round_tripper.DefaultErrorSpecs,
+			}
+		})
+
+		Context("SSL Handshake Error", func() {
+			var err error
+			BeforeEach(func() {
+				err = tls.RecordHeaderError{Msg: "bad handshake"}
+				errorHandler.HandleError(responseWriter, err)
+			})
+
+			It("Has a 525 Status Code", func() {
+				Expect(responseWriter.Status()).To(Equal(525))
+			})
+
+			It("Emits a backend_tls_handshake_failed metric", func() {
+				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
+			})
+		})
 	})
 })

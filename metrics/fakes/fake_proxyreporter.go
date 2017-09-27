@@ -11,18 +11,21 @@ import (
 )
 
 type FakeProxyReporter struct {
-	CaptureBackendExhaustedConnsStub        func()
-	captureBackendExhaustedConnsMutex       sync.RWMutex
-	captureBackendExhaustedConnsArgsForCall []struct{}
-	CaptureBadRequestStub                   func()
-	captureBadRequestMutex                  sync.RWMutex
-	captureBadRequestArgsForCall            []struct{}
-	CaptureBadGatewayStub                   func()
-	captureBadGatewayMutex                  sync.RWMutex
-	captureBadGatewayArgsForCall            []struct{}
-	CaptureRoutingRequestStub               func(b *route.Endpoint)
-	captureRoutingRequestMutex              sync.RWMutex
-	captureRoutingRequestArgsForCall        []struct {
+	CaptureBackendExhaustedConnsStub            func()
+	captureBackendExhaustedConnsMutex           sync.RWMutex
+	captureBackendExhaustedConnsArgsForCall     []struct{}
+	CaptureBackendTLSHandshakeFailedStub        func()
+	captureBackendTLSHandshakeFailedMutex       sync.RWMutex
+	captureBackendTLSHandshakeFailedArgsForCall []struct{}
+	CaptureBadRequestStub                       func()
+	captureBadRequestMutex                      sync.RWMutex
+	captureBadRequestArgsForCall                []struct{}
+	CaptureBadGatewayStub                       func()
+	captureBadGatewayMutex                      sync.RWMutex
+	captureBadGatewayArgsForCall                []struct{}
+	CaptureRoutingRequestStub                   func(b *route.Endpoint)
+	captureRoutingRequestMutex                  sync.RWMutex
+	captureRoutingRequestArgsForCall            []struct {
 		b *route.Endpoint
 	}
 	CaptureRoutingResponseStub        func(statusCode int)
@@ -65,6 +68,22 @@ func (fake *FakeProxyReporter) CaptureBackendExhaustedConnsCallCount() int {
 	fake.captureBackendExhaustedConnsMutex.RLock()
 	defer fake.captureBackendExhaustedConnsMutex.RUnlock()
 	return len(fake.captureBackendExhaustedConnsArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureBackendTLSHandshakeFailed() {
+	fake.captureBackendTLSHandshakeFailedMutex.Lock()
+	fake.captureBackendTLSHandshakeFailedArgsForCall = append(fake.captureBackendTLSHandshakeFailedArgsForCall, struct{}{})
+	fake.recordInvocation("CaptureBackendTLSHandshakeFailed", []interface{}{})
+	fake.captureBackendTLSHandshakeFailedMutex.Unlock()
+	if fake.CaptureBackendTLSHandshakeFailedStub != nil {
+		fake.CaptureBackendTLSHandshakeFailedStub()
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureBackendTLSHandshakeFailedCallCount() int {
+	fake.captureBackendTLSHandshakeFailedMutex.RLock()
+	defer fake.captureBackendTLSHandshakeFailedMutex.RUnlock()
+	return len(fake.captureBackendTLSHandshakeFailedArgsForCall)
 }
 
 func (fake *FakeProxyReporter) CaptureBadRequest() {
@@ -233,6 +252,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.captureBackendExhaustedConnsMutex.RLock()
 	defer fake.captureBackendExhaustedConnsMutex.RUnlock()
+	fake.captureBackendTLSHandshakeFailedMutex.RLock()
+	defer fake.captureBackendTLSHandshakeFailedMutex.RUnlock()
 	fake.captureBadRequestMutex.RLock()
 	defer fake.captureBadRequestMutex.RUnlock()
 	fake.captureBadGatewayMutex.RLock()

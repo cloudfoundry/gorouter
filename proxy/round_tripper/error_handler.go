@@ -10,16 +10,21 @@ import (
 )
 
 type ErrorSpec struct {
-	Classifier fails.Classifier
-	Message    string
-	Code       int
+	Classifier  fails.Classifier
+	Message     string
+	Code        int
+	HandleError func(reporter metrics.CombinedReporter)
+}
+
+func handleSSLHandshake(reporter metrics.CombinedReporter) {
+	reporter.CaptureBackendTLSHandshakeFailed()
 }
 
 var DefaultErrorSpecs = []ErrorSpec{
-	{fails.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525},
-	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable},
-	{fails.UntrustedCert, InvalidCertificateMessage, 526},
-	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496},
+	{fails.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525, handleSSLHandshake},
+	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable, nil},
+	{fails.UntrustedCert, InvalidCertificateMessage, 526, nil},
+	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496, nil},
 }
 
 type ErrorHandler struct {
@@ -38,6 +43,9 @@ func (eh *ErrorHandler) HandleError(responseWriter utils.ProxyResponseWriter, er
 func (eh *ErrorHandler) writeErrorCode(err error, responseWriter http.ResponseWriter) {
 	for _, spec := range eh.ErrorSpecs {
 		if spec.Classifier.Classify(err) {
+			if spec.HandleError != nil {
+				spec.HandleError(eh.MetricReporter)
+			}
 			http.Error(responseWriter, spec.Message, spec.Code)
 			return
 		}

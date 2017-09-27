@@ -26,6 +26,10 @@ func (m *MetricsReporter) CaptureBackendExhaustedConns() {
 	m.batcher.BatchIncrementCounter("backend_exhausted_conns")
 }
 
+func (m *MetricsReporter) CaptureBackendTLSHandshakeFailed() {
+	m.batcher.BatchIncrementCounter("backend_tls_handshake_failed")
+}
+
 func (m *MetricsReporter) CaptureBadRequest() {
 	m.batcher.BatchIncrementCounter("rejected_requests")
 }

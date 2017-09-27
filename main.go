@@ -174,6 +174,7 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
 		"backend_exhausted_conns",
+		"backend_tls_handshake_failed",
 		"rejected_requests",
 		"total_requests",
 		"responses",
