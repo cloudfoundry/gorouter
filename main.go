@@ -183,6 +183,7 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 		"responses.5xx",
 		"responses.xxx",
 		"routed_app_requests",
+		"routes_pruned",
 		"websocket_failures",
 		"websocket_upgrades",
 	)

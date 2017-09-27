@@ -372,6 +372,14 @@ var _ = Describe("MetricsReporter", func() {
 		})
 	})
 
+	It("increments the routes_pruned metric", func() {
+		metricReporter.CaptureRoutesPruned(5)
+		Expect(batcher.BatchAddCounterCallCount()).To(Equal(1))
+		metric, count := batcher.BatchAddCounterArgsForCall(0)
+		Expect(metric).To(Equal("routes_pruned"))
+		Expect(count).To(Equal(uint64(5)))
+	})
+
 	Describe("Unregister messages", func() {
 		var endpoint *route.Endpoint
 		Context("when unregister msg with component name is incremented", func() {

@@ -81,6 +81,10 @@ func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate u
 	m.sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
 }
 
+func (m *MetricsReporter) CaptureRoutesPruned(routesPruned uint64) {
+	m.batcher.BatchAddCounter("routes_pruned", routesPruned)
+}
+
 func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
 	var componentName string
 	if msg.Component() == "" {

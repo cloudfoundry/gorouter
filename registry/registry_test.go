@@ -951,6 +951,20 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(string(marshalled)).To(Equal(`{}`))
 		})
 
+		It("emits a routes pruned metric when removing stale droplets", func() {
+			r.Register("foo", fooEndpoint)
+			r.Register("fooo", fooEndpoint)
+			r.Register("fooo", barEndpoint)
+
+			r.StartPruningCycle()
+			time.Sleep(configObj.PruneStaleDropletsInterval + configObj.DropletStaleThreshold)
+			Expect(reporter.CaptureRoutesPrunedCallCount()).To(Equal(2))
+			prunedRoutes := reporter.CaptureRoutesPrunedArgsForCall(0) +
+				reporter.CaptureRoutesPrunedArgsForCall(1)
+
+			Expect(prunedRoutes).To(Equal(uint64(3)))
+		})
+
 		It("removes stale droplets that have children", func() {
 			doneChan := make(chan struct{})
 			defer close(doneChan)

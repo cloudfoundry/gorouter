@@ -290,6 +290,7 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 				zap.Object("endpoints", addresses),
 				zap.Object("isolation_segment", isolationSegment),
 			)
+			r.reporter.CaptureRoutesPruned(uint64(len(endpoints)))
 		}
 	})
 }
