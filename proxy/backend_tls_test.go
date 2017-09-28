@@ -13,34 +13,20 @@ import (
 
 var _ = Describe("Backend TLS", func() {
 	var registerConfig test_util.RegisterConfig
-	BeforeEach(func() {
-		privateInstanceId, _ := uuid.GenerateUUID()
-		backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: privateInstanceId})
-		clientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
 
+	freshProxyCACertPool := func() *x509.CertPool {
 		var err error
-		// Add backend CA cert to Gorouter CA pool
 		caCertPool, err = x509.SystemCertPool()
 		Expect(err).NotTo(HaveOccurred())
-		caCertPool.AddCert(backendCertChain.CACert)
-
-		// Add gorouter CA cert to backend app CA pool
-		backendCACertPool := x509.NewCertPool()
-		Expect(err).NotTo(HaveOccurred())
-		backendCACertPool.AddCert(clientCertChain.CACert)
-
-		backendTLSConfig := backendCertChain.AsTLSConfig()
-		backendTLSConfig.ClientCAs = backendCACertPool
-
-		conf.Backends.ClientAuthCertificate, err = tls.X509KeyPair(clientCertChain.CertPEM, clientCertChain.PrivKeyPEM)
-		Expect(err).NotTo(HaveOccurred())
-
-		registerConfig = test_util.RegisterConfig{
-			TLSConfig:  backendTLSConfig,
-			InstanceId: privateInstanceId,
-			AppId:      "app-1",
-		}
-	})
+		return caCertPool
+	}
+	// createCertAndAddCA creates a signed cert with a root CA and adds the CA
+	// to the specified cert pool
+	createCertAndAddCA := func(cn test_util.CertNames, cp *x509.CertPool) test_util.CertChain {
+		certChain := test_util.CreateSignedCertWithRootCA(cn)
+		cp.AddCert(certChain.CACert)
+		return certChain
+	}
 
 	registerAppAndTest := func() *http.Response {
 		ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
@@ -65,6 +51,32 @@ var _ = Describe("Backend TLS", func() {
 		resp, _ := conn.ReadResponse()
 		return resp
 	}
+
+	BeforeEach(func() {
+		var err error
+
+		privateInstanceId, _ := uuid.GenerateUUID()
+		// Clear proxy's CA cert pool
+		proxyCertPool := freshProxyCACertPool()
+
+		// Clear backend app's CA cert pool
+		backendCACertPool := x509.NewCertPool()
+
+		backendCertChain := createCertAndAddCA(test_util.CertNames{CommonName: privateInstanceId}, proxyCertPool)
+		clientCertChain := createCertAndAddCA(test_util.CertNames{CommonName: "gorouter"}, backendCACertPool)
+
+		backendTLSConfig := backendCertChain.AsTLSConfig()
+		backendTLSConfig.ClientCAs = backendCACertPool
+
+		conf.Backends.ClientAuthCertificate, err = tls.X509KeyPair(clientCertChain.CertPEM, clientCertChain.PrivKeyPEM)
+		Expect(err).NotTo(HaveOccurred())
+
+		registerConfig = test_util.RegisterConfig{
+			TLSConfig:  backendTLSConfig,
+			InstanceId: privateInstanceId,
+			AppId:      "app-1",
+		}
+	})
 
 	Context("when the backend does not require a client certificate", func() {
 		It("makes an mTLS connection with the backend", func() {
@@ -125,6 +137,86 @@ var _ = Describe("Backend TLS", func() {
 		})
 	})
 
+	Context("when the backend instance returns a cert that only has a DNS SAN", func() {
+		BeforeEach(func() {
+			proxyCertPool := freshProxyCACertPool()
+			backendCertChain := createCertAndAddCA(test_util.CertNames{
+				SANs: test_util.SubjectAltNames{DNS: registerConfig.InstanceId},
+			}, proxyCertPool)
+			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
+
+		})
+
+		It("returns a successful 200 OK response from the backend", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	})
+
+	Context("when the backend instance returns a cert that has a matching CommonName but non-matching DNS SAN", func() {
+		BeforeEach(func() {
+			proxyCertPool := freshProxyCACertPool()
+			backendCertChain := createCertAndAddCA(test_util.CertNames{
+				CommonName: registerConfig.InstanceId,
+				SANs:       test_util.SubjectAltNames{DNS: "foo"},
+			}, proxyCertPool)
+			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
+		})
+
+		It("returns a HTTP 503 Service Unavailable error", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+		})
+	})
+
+	Context("when the backend instance returns a cert that has a non-matching CommonName but matching DNS SAN", func() {
+		BeforeEach(func() {
+			proxyCertPool := freshProxyCACertPool()
+			backendCertChain := createCertAndAddCA(test_util.CertNames{
+				CommonName: "foo",
+				SANs:       test_util.SubjectAltNames{DNS: registerConfig.InstanceId},
+			}, proxyCertPool)
+			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
+		})
+
+		It("returns a successful 200 OK response from the backend", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	})
+
+	Context("when the backend instance returns a cert that has a matching CommonName but non-matching IP SAN", func() {
+		BeforeEach(func() {
+			proxyCertPool := freshProxyCACertPool()
+			backendCertChain := createCertAndAddCA(test_util.CertNames{
+				CommonName: registerConfig.InstanceId,
+				SANs:       test_util.SubjectAltNames{IP: "192.0.2.1"},
+			}, proxyCertPool)
+			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
+		})
+
+		It("returns a successful 200 OK response from the backend (only works for Go1.8 and before)", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	})
+
+	Context("when the backend instance returns a cert that has a non-matching CommonName but matching IP SAN", func() {
+		BeforeEach(func() {
+			proxyCertPool := freshProxyCACertPool()
+			backendCertChain := createCertAndAddCA(test_util.CertNames{
+				CommonName: "foo",
+				SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
+			}, proxyCertPool)
+			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
+		})
+
+		It("returns with a HTTP 503 Service Unavailable error (possible route integrity failure)", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+		})
+	})
+
 	Context("when the backend registration does not include instance id", func() {
 		BeforeEach(func() {
 			registerConfig.InstanceId = ""
@@ -135,6 +227,7 @@ var _ = Describe("Backend TLS", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
 		})
 	})
+
 	Context("when the backend is only listening for non TLS connections", func() {
 		BeforeEach(func() {
 			registerConfig.IgnoreTLSConfig = true
