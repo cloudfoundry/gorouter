@@ -30,11 +30,11 @@ func NewHttpConn(x net.Conn) *HttpConn {
 
 func (x *HttpConn) ReadRequest() (*http.Request, string) {
 	req, err := http.ReadRequest(x.Reader)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	defer req.Body.Close()
 
 	b, err := ioutil.ReadAll(req.Body)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	return req, string(b)
 }
@@ -73,8 +73,8 @@ func (x *HttpConn) WriteResponse(resp *http.Response) {
 
 func (x *HttpConn) CheckLine(expected string) {
 	l, err := x.Reader.ReadString('\n')
-	Expect(err).NotTo(HaveOccurred())
-	Expect(strings.TrimRight(l, "\r\n")).To(Equal(expected))
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, strings.TrimRight(l, "\r\n")).To(Equal(expected))
 }
 
 func (x *HttpConn) CheckLines(expected []string) {

@@ -713,7 +713,7 @@ routing_api:
 				expectedTLSPEMs          []TLSPem
 			)
 			BeforeEach(func() {
-				certChain := test_util.CreateSignedCertWithRootCA("spinach.com")
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
@@ -1272,7 +1272,7 @@ endpoint_timeout: 10s
 				var cfgYaml []byte
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA("foo")
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "foo"})
 					expectedTLSPEM = TLSPem{
 						CertChain:  string(certChain.CertPEM),
 						PrivateKey: string(certChain.PrivKeyPEM),

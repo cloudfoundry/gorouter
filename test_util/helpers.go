@@ -114,8 +114,8 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 
 	c.EnableSSL = true
 
-	potatoCertchain := CreateSignedCertWithRootCA("potato.com")
-	potato2Certchain := CreateSignedCertWithRootCA("potato2.com")
+	potatoCertchain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato.com"})
+	potato2Certchain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato2.com"})
 
 	clientTrustedCertPool := x509.NewCertPool()
 	clientTrustedCertPool.AppendCertsFromPEM(potatoCertchain.CACertPEM)
@@ -209,7 +209,17 @@ func (cc *CertChain) AsTLSConfig() *tls.Config {
 	}
 }
 
-func CreateSignedCertWithRootCA(commonName string) CertChain {
+type SubjectAltNames struct {
+	DNS string
+	IP  string
+}
+
+type CertNames struct {
+	CommonName string
+	SANs       SubjectAltNames
+}
+
+func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -217,9 +227,7 @@ func CreateSignedCertWithRootCA(commonName string) CertChain {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if commonName != "" {
-		subject.CommonName = commonName
-	}
+	subject.CommonName = cert.CommonName
 
 	certTemplate := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -228,8 +236,12 @@ func CreateSignedCertWithRootCA(commonName string) CertChain {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-		DNSNames:              []string{commonName},
+	}
+	if cert.SANs.IP != "" {
+		certTemplate.IPAddresses = []net.IP{net.ParseIP(cert.SANs.IP)}
+	}
+	if cert.SANs.DNS != "" {
+		certTemplate.DNSNames = []string{cert.SANs.DNS}
 	}
 	rootCert, err := x509.ParseCertificate(rootCADER)
 	Expect(err).NotTo(HaveOccurred())

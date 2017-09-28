@@ -426,7 +426,7 @@ var _ = Describe("Route Services", func() {
 			var rsTLSCert tls.Certificate
 			BeforeEach(func() {
 				var err error
-				certChain := test_util.CreateSignedCertWithRootCA("route_service.com")
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "route-service-instance"})
 				rsTLSCert, err = tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -458,7 +458,8 @@ var _ = Describe("Route Services", func() {
 				}
 
 				rsListener := test_util.RegisterHandler(r, "route_service.com", routeServiceHandler, test_util.RegisterConfig{
-					AppId: "my-route-service-app-id", TLSConfig: &tls.Config{
+					InstanceId: "route-service-instance", AppId: "my-route-service-app-id",
+					TLSConfig: &tls.Config{
 						Certificates: []tls.Certificate{rsTLSCert},
 					},
 				})

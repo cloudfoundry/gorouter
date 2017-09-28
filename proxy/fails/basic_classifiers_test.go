@@ -33,8 +33,8 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 		server = httptest.NewUnstartedServer(teapotHandler)
 		tlsServer = httptest.NewUnstartedServer(teapotHandler)
 
-		serverCert = test_util.CreateSignedCertWithRootCA("server")
-		clientCert = test_util.CreateSignedCertWithRootCA("client")
+		serverCert = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "server"})
+		clientCert = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "client"})
 		tlsServer.TLS = serverCert.AsTLSConfig()
 		tlsServer.TLS.ClientCAs = x509.NewCertPool()
 		tlsServer.TLS.ClientCAs.AddCert(clientCert.CACert)
@@ -51,6 +51,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 			ExpectContinueTimeout: 1 * time.Second,
 			TLSClientConfig:       clientCert.AsTLSConfig(),
 		}
+		testTransport.TLSClientConfig.ServerName = "server"
 		testTransport.TLSClientConfig.RootCAs = x509.NewCertPool()
 		testTransport.TLSClientConfig.RootCAs.AddCert(serverCert.CACert)
 	})
@@ -66,7 +67,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 	})
 
 	Describe("happy path mTLS", func() {
-		It("works", func() {
+		It("successfully completes a round-trip using mutual TLS", func() {
 			req, _ := http.NewRequest("GET", tlsServer.URL, nil)
 			resp, err := testTransport.RoundTrip(req)
 			Expect(err).NotTo(HaveOccurred())

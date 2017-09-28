@@ -15,8 +15,8 @@ var _ = Describe("Backend TLS", func() {
 	var registerConfig test_util.RegisterConfig
 	BeforeEach(func() {
 		privateInstanceId, _ := uuid.GenerateUUID()
-		backendCertChain := test_util.CreateSignedCertWithRootCA(privateInstanceId)
-		clientCertChain := test_util.CreateSignedCertWithRootCA("gorouter")
+		backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: privateInstanceId})
+		clientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
 
 		var err error
 		// Add backend CA cert to Gorouter CA pool
@@ -130,9 +130,9 @@ var _ = Describe("Backend TLS", func() {
 			registerConfig.InstanceId = ""
 		})
 
-		It("does not validate the instance id", func() {
+		It("fails to validate (backends registering with a tls_port MUST provide a name that we can validate on their server certificate)", func() {
 			resp := registerAppAndTest()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
 		})
 	})
 	Context("when the backend is only listening for non TLS connections", func() {

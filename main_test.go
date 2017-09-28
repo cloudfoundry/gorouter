@@ -224,10 +224,10 @@ var _ = Describe("Router Integration", func() {
 			cfg.SkipSSLValidation = false
 
 			privateInstanceId, _ = uuid.GenerateUUID()
-			backendCertChain = test_util.CreateSignedCertWithRootCA(privateInstanceId)
+			backendCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: privateInstanceId})
 			cfg.CACerts = string(backendCertChain.CACertPEM)
 
-			clientCertChain = test_util.CreateSignedCertWithRootCA("gorouter")
+			clientCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
 			backendTLSConfig = backendCertChain.AsTLSConfig()
 			backendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 

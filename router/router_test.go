@@ -901,7 +901,7 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("https://test.vcap.me:%d/record_headers", config.SSLPort)
 			req, _ = http.NewRequest("GET", uri, nil)
 
-			certChain := test_util.CreateSignedCertWithRootCA("*.vcap.me")
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*.vcap.me"})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
@@ -1176,7 +1176,7 @@ var _ = Describe("Router", func() {
 			tlsClientConfig *tls.Config
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA("test.vcap.me")
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test.vcap.me"})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
