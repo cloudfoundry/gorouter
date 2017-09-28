@@ -17,7 +17,7 @@ type setVcapRequestIdHeader struct {
 	logger logger.Logger
 }
 
-func NewsetVcapRequestIdHeader(logger logger.Logger) negroni.Handler {
+func NewVcapRequestIdHeader(logger logger.Logger) negroni.Handler {
 	return &setVcapRequestIdHeader{
 		logger: logger,
 	}

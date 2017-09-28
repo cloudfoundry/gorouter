@@ -160,7 +160,8 @@ func NewProxy(
 	n := negroni.New()
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
-	n.Use(handlers.NewsetVcapRequestIdHeader(logger))
+	n.Use(handlers.NewVcapRequestIdHeader(logger))
+	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	if c.ForwardedClientCert != config.ALWAYS_FORWARD {
 		n.Use(handlers.NewClientCert(c.ForwardedClientCert))
 	}
@@ -291,6 +292,10 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 }
 
 func (p *proxy) modifyResponse(backendResp *http.Response) error {
+	if backendResp.Header.Get(handlers.VcapRequestIdHeader) == "" {
+		vcapID := backendResp.Request.Header.Get(handlers.VcapRequestIdHeader)
+		backendResp.Header.Set(handlers.VcapRequestIdHeader, vcapID)
+	}
 	return nil
 }
 

@@ -36,7 +36,7 @@ var _ = Describe("Set Vcap Request Id header", func() {
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("setVcapRequestIdHeader")
 		nextCalled = false
-		handler = handlers.NewsetVcapRequestIdHeader(logger)
+		handler = handlers.NewVcapRequestIdHeader(logger)
 
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()

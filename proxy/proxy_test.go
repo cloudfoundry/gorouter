@@ -746,6 +746,49 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
 		})
 
+		It("adds X-Vcap-Request-Id if it doesn't already exist in the response", func() {
+			ln := test_util.RegisterHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "vcap-id-test", "/", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get(handlers.VcapRequestIdHeader)).ToNot(BeEmpty())
+		})
+
+		It("does not adds X-Vcap-Request-Id if it already exists in the response", func() {
+			ln := test_util.RegisterHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				resp.Header.Set(handlers.VcapRequestIdHeader, "foobar")
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "vcap-id-test", "/", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get(handlers.VcapRequestIdHeader)).To(Equal("foobar"))
+		})
+
 		It("Status No Content returns no Transfer Encoding response header", func() {
 			ln := test_util.RegisterHandler(r, "not-modified", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
