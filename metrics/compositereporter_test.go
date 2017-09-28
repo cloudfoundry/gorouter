@@ -28,7 +28,7 @@ var _ = Describe("CompositeReporter", func() {
 		fakeVarzReporter = new(fakes.FakeVarzReporter)
 		fakeProxyReporter = new(fakes.FakeProxyReporter)
 
-		composite = metrics.NewCompositeReporter(fakeVarzReporter, fakeProxyReporter)
+		composite = &metrics.CompositeReporter{VarzReporter: fakeVarzReporter, ProxyReporter: fakeProxyReporter}
 		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
@@ -45,6 +45,11 @@ var _ = Describe("CompositeReporter", func() {
 	It("forwards CaptureBackendExhaustedConns to the proxy reporter", func() {
 		composite.CaptureBackendExhaustedConns()
 		Expect(fakeProxyReporter.CaptureBackendExhaustedConnsCallCount()).To(Equal(1))
+	})
+
+	It("forwards CaptureBackendInvalidID() to the proxy reporter", func() {
+		composite.CaptureBackendInvalidID()
+		Expect(fakeProxyReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureBadGateway to both reporters", func() {

@@ -30,6 +30,10 @@ func (m *MetricsReporter) CaptureBackendTLSHandshakeFailed() {
 	m.batcher.BatchIncrementCounter("backend_tls_handshake_failed")
 }
 
+func (m *MetricsReporter) CaptureBackendInvalidID() {
+	m.batcher.BatchIncrementCounter("backend_invalid_id")
+}
+
 func (m *MetricsReporter) CaptureBadRequest() {
 	m.batcher.BatchIncrementCounter("rejected_requests")
 }

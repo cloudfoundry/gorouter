@@ -114,7 +114,7 @@ func main() {
 	}
 
 	varz := rvarz.NewVarz(registry)
-	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
+	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
 
 	accessLogger, err := access_log.CreateRunningAccessLogger(logger.Session("access-log"), c)
 	if err != nil {
@@ -174,6 +174,7 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
 		"backend_exhausted_conns",
+		"backend_invalid_id",
 		"backend_tls_handshake_failed",
 		"rejected_requests",
 		"total_requests",

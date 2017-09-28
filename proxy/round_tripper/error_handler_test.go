@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"crypto/x509"
 )
 
 var _ = Describe("HandleError", func() {
@@ -109,6 +110,8 @@ var _ = Describe("HandleError", func() {
 	})
 
 	Context("DefaultErrorSpecs", func() {
+		var err error
+
 		BeforeEach(func() {
 			errorHandler = &round_tripper.ErrorHandler{
 				MetricReporter: metricReporter,
@@ -116,8 +119,22 @@ var _ = Describe("HandleError", func() {
 			}
 		})
 
+		Context("HostnameMismatch", func() {
+			BeforeEach(func() {
+				err = x509.HostnameError{Host: "the wrong one"}
+				errorHandler.HandleError(responseWriter, err)
+			})
+
+			It("Has a 503 Status Code", func() {
+				Expect(responseWriter.Status()).To(Equal(503))
+			})
+
+			It("Emits a backend_invalid_id metric", func() {
+				Expect(metricReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
+			})
+		})
+
 		Context("SSL Handshake Error", func() {
-			var err error
 			BeforeEach(func() {
 				err = tls.RecordHeaderError{Msg: "bad handshake"}
 				errorHandler.HandleError(responseWriter, err)

@@ -29,7 +29,7 @@ var _ = Describe("AccessLogRecord", func() {
 		logger := test_util.NewTestZapLogger("test")
 		c := config.DefaultConfig()
 		r := registry.NewRouteRegistry(logger, c, new(fakes.FakeRouteRegistryReporter))
-		combinedReporter := metrics.NewCompositeReporter(varz.NewVarz(r), metricsReporter)
+		combinedReporter := &metrics.CompositeReporter{VarzReporter: varz.NewVarz(r), ProxyReporter: metricsReporter}
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())
 

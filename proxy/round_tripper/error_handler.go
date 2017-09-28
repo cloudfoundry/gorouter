@@ -16,13 +16,17 @@ type ErrorSpec struct {
 	HandleError func(reporter metrics.CombinedReporter)
 }
 
+func handleHostnameMismatch(reporter metrics.CombinedReporter) {
+	reporter.CaptureBackendInvalidID()
+}
+
 func handleSSLHandshake(reporter metrics.CombinedReporter) {
 	reporter.CaptureBackendTLSHandshakeFailed()
 }
 
 var DefaultErrorSpecs = []ErrorSpec{
 	{fails.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525, handleSSLHandshake},
-	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable, nil},
+	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable, handleHostnameMismatch},
 	{fails.UntrustedCert, InvalidCertificateMessage, 526, nil},
 	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496, nil},
 }

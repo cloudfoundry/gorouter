@@ -217,7 +217,7 @@ var _ = Describe("Router", func() {
 		sender := new(fakeMetrics.MetricSender)
 		batcher := new(fakeMetrics.MetricBatcher)
 		metricReporter := metrics.NewMetricsReporter(sender, batcher)
-		combinedReporter = metrics.NewCompositeReporter(varz, metricReporter)
+		combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)

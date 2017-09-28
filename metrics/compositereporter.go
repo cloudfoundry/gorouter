@@ -20,6 +20,7 @@ type VarzReporter interface {
 //go:generate counterfeiter -o fakes/fake_proxyreporter.go . ProxyReporter
 type ProxyReporter interface {
 	CaptureBackendExhaustedConns()
+	CaptureBackendInvalidID()
 	CaptureBackendTLSHandshakeFailed()
 	CaptureBadRequest()
 	CaptureBadGateway()
@@ -47,6 +48,7 @@ type RouteRegistryReporter interface {
 //go:generate counterfeiter -o fakes/fake_combinedreporter.go . CombinedReporter
 type CombinedReporter interface {
 	CaptureBackendExhaustedConns()
+	CaptureBackendInvalidID()
 	CaptureBackendTLSHandshakeFailed()
 	CaptureBadRequest()
 	CaptureBadGateway()
@@ -59,57 +61,26 @@ type CombinedReporter interface {
 }
 
 type CompositeReporter struct {
-	varzReporter  VarzReporter
-	proxyReporter ProxyReporter
-}
-
-func NewCompositeReporter(varzReporter VarzReporter, proxyReporter ProxyReporter) CombinedReporter {
-	return &CompositeReporter{
-		varzReporter:  varzReporter,
-		proxyReporter: proxyReporter,
-	}
-}
-
-func (c *CompositeReporter) CaptureBackendExhaustedConns() {
-	c.proxyReporter.CaptureBackendExhaustedConns()
-}
-
-func (c *CompositeReporter) CaptureBackendTLSHandshakeFailed() {
-	c.proxyReporter.CaptureBackendTLSHandshakeFailed()
+	VarzReporter
+	ProxyReporter
 }
 
 func (c *CompositeReporter) CaptureBadRequest() {
-	c.varzReporter.CaptureBadRequest()
-	c.proxyReporter.CaptureBadRequest()
+	c.VarzReporter.CaptureBadRequest()
+	c.ProxyReporter.CaptureBadRequest()
 }
 
 func (c *CompositeReporter) CaptureBadGateway() {
-	c.varzReporter.CaptureBadGateway()
-	c.proxyReporter.CaptureBadGateway()
+	c.VarzReporter.CaptureBadGateway()
+	c.ProxyReporter.CaptureBadGateway()
 }
 
 func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint) {
-	c.varzReporter.CaptureRoutingRequest(b)
-	c.proxyReporter.CaptureRoutingRequest(b)
-}
-
-func (c *CompositeReporter) CaptureRouteServiceResponse(res *http.Response) {
-	c.proxyReporter.CaptureRouteServiceResponse(res)
-}
-
-func (c *CompositeReporter) CaptureRoutingResponse(statusCode int) {
-	c.proxyReporter.CaptureRoutingResponse(statusCode)
+	c.VarzReporter.CaptureRoutingRequest(b)
+	c.ProxyReporter.CaptureRoutingRequest(b)
 }
 
 func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
-	c.varzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
-	c.proxyReporter.CaptureRoutingResponseLatency(b, d)
-}
-
-func (c *CompositeReporter) CaptureWebSocketUpdate() {
-	c.proxyReporter.CaptureWebSocketUpdate()
-}
-
-func (c *CompositeReporter) CaptureWebSocketFailure() {
-	c.proxyReporter.CaptureWebSocketFailure()
+	c.VarzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
+	c.ProxyReporter.CaptureRoutingResponseLatency(b, d)
 }

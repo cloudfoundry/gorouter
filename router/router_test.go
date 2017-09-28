@@ -1700,7 +1700,7 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := metrics.NewMetricsReporter(sender, batcher)
-	combinedReporter := metrics.NewCompositeReporter(varz, metricReporter)
+	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
 
 	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
