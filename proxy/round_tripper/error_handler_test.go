@@ -13,9 +13,9 @@ import (
 
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
+	"crypto/x509"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"crypto/x509"
 )
 
 var _ = Describe("HandleError", func() {

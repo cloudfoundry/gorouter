@@ -189,7 +189,8 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 		"websocket_failures",
 		"websocket_upgrades",
 	)
-	return metrics.NewMetricsReporter(sender, batcher)
+
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 }
 
 func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {

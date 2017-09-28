@@ -1699,7 +1699,7 @@ func badCertTemplate(cname string) (*x509.Certificate, error) {
 func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
-	metricReporter := metrics.NewMetricsReporter(sender, batcher)
+	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
 

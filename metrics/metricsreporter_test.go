@@ -25,7 +25,7 @@ var _ = Describe("MetricsReporter", func() {
 		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
 		sender = new(fakes.MetricSender)
 		batcher = new(fakes.MetricBatcher)
-		metricReporter = metrics.NewMetricsReporter(sender, batcher)
+		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 	})
 
 	It("increments the bad_requests metric", func() {

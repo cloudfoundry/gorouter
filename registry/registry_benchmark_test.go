@@ -27,7 +27,7 @@ var configObj = setupConfig()
 var _ = dropsonde.Initialize(configObj.Logging.MetronAddress, configObj.Logging.JobName)
 var sender = metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 var batcher = metricbatcher.New(sender, 5*time.Second)
-var reporter = metrics.NewMetricsReporter(sender, batcher)
+var reporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 
 var fooEndpoint = route.NewEndpoint(
 	"12345", "192.168.1.1", 1234, "id1", "0", map[string]string{}, -1, "",

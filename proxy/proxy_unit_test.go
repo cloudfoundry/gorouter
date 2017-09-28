@@ -54,7 +54,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			varz := test_helpers.NullVarz{}
 			sender := new(fakes.MetricSender)
 			batcher := new(fakes.MetricBatcher)
-			proxyReporter := metrics.NewMetricsReporter(sender, batcher)
+			proxyReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 			combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyReporter}
 
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"

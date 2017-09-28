@@ -25,7 +25,7 @@ var _ = Describe("AccessLogRecord", func() {
 	Measure("Register", func(b Benchmarker) {
 		sender := new(fakes.MetricSender)
 		batcher := new(fakes.MetricBatcher)
-		metricsReporter := metrics.NewMetricsReporter(sender, batcher)
+		metricsReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 		logger := test_util.NewTestZapLogger("test")
 		c := config.DefaultConfig()
 		r := registry.NewRouteRegistry(logger, c, new(fakes.FakeRouteRegistryReporter))
