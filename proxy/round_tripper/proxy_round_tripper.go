@@ -10,7 +10,6 @@ import (
 
 	"github.com/uber-go/zap"
 
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -63,8 +62,6 @@ func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
 	retryableClassifier fails.Classifier,
 	logger logger.Logger,
-	traceKey string,
-	routerIP string,
 	defaultLoadBalance string,
 	combinedReporter metrics.CombinedReporter,
 	secureCookies bool,
@@ -73,8 +70,6 @@ func NewProxyRoundTripper(
 ) ProxyRoundTripper {
 	return &roundTripper{
 		logger:              logger,
-		traceKey:            traceKey,
-		routerIP:            routerIP,
 		defaultLoadBalance:  defaultLoadBalance,
 		combinedReporter:    combinedReporter,
 		secureCookies:       secureCookies,
@@ -87,8 +82,6 @@ func NewProxyRoundTripper(
 
 type roundTripper struct {
 	logger              logger.Logger
-	traceKey            string
-	routerIP            string
 	defaultLoadBalance  string
 	combinedReporter    metrics.CombinedReporter
 	secureCookies       bool
@@ -192,14 +185,6 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
 		logger.Error("endpoint-failed", zap.Error(err))
 		return nil, err
-	}
-
-	if rt.traceKey != "" && request.Header.Get(router_http.VcapTraceHeader) == rt.traceKey {
-		if res != nil && endpoint != nil {
-			res.Header.Set(router_http.VcapRouterHeader, rt.routerIP)
-			res.Header.Set(router_http.VcapBackendHeader, endpoint.CanonicalAddr())
-			res.Header.Set(router_http.CfRouteEndpointHeader, endpoint.CanonicalAddr())
-		}
 	}
 
 	if res != nil && endpoint.PrivateInstanceId != "" {

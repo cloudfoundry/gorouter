@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
@@ -21,9 +22,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
-
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/common/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -118,10 +116,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 			retryableClassifier.ClassifyReturns(false)
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				roundTripperFactory, retryableClassifier,
-				logger, "my_trace_key", routerIP, "",
+				logger, "",
 				combinedReporter, false,
-				1234,
-				errorHandler,
+				1234, errorHandler,
 			)
 		})
 
@@ -165,46 +162,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))
 				Expect(req.Header.Get("X-CF-InstanceID")).To(Equal("instanceId"))
 				Expect(req.Header.Get("X-CF-InstanceIndex")).To(Equal("1"))
-			})
-
-			Context("when VcapTraceHeader matches the trace key", func() {
-				BeforeEach(func() {
-					req.Header.Set(router_http.VcapTraceHeader, "my_trace_key")
-				})
-
-				It("sets the trace headers on the response", func() {
-					backendResp, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(backendResp.Header.Get(router_http.VcapRouterHeader)).To(Equal(routerIP))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal("1.1.1.1:9090"))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal("1.1.1.1:9090"))
-				})
-			})
-
-			Context("when VcapTraceHeader does not match the trace key", func() {
-				BeforeEach(func() {
-					req.Header.Set(router_http.VcapTraceHeader, "not_my_trace_key")
-				})
-				It("does not set the trace headers on the response", func() {
-					backendResp, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(backendResp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-				})
-			})
-
-			Context("when VcapTraceHeader is not set", func() {
-				It("does not set the trace headers on the response", func() {
-					backendResp, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(backendResp.Header.Get(router_http.VcapRouterHeader)).To(Equal(""))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-					Expect(backendResp.Header.Get(router_http.VcapBackendHeader)).To(Equal(""))
-				})
 			})
 		})
 

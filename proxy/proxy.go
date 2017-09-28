@@ -194,11 +194,8 @@ func hostWithoutPort(req *http.Request) string {
 func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory,
 	retryableClassifier fails.Classifier, port uint16) round_tripper.ProxyRoundTripper {
 	return round_tripper.NewProxyRoundTripper(
-		roundTripperFactory,
-		retryableClassifier,
-		p.logger, p.traceKey, p.ip, p.defaultLoadBalance,
-		p.reporter, p.secureCookies,
-		port,
+		roundTripperFactory, retryableClassifier, p.logger,
+		p.defaultLoadBalance, p.reporter, p.secureCookies, port,
 		&round_tripper.ErrorHandler{
 			MetricReporter: p.reporter,
 			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
@@ -289,14 +286,6 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 
 	handler.SetRequestXRequestStart(target)
 	target.Header.Del(router_http.CfAppInstance)
-}
-
-func (p *proxy) modifyResponse(backendResp *http.Response) error {
-	if backendResp.Header.Get(handlers.VcapRequestIdHeader) == "" {
-		vcapID := backendResp.Request.Header.Get(handlers.VcapRequestIdHeader)
-		backendResp.Header.Set(handlers.VcapRequestIdHeader, vcapID)
-	}
-	return nil
 }
 
 type wrappedIterator struct {
