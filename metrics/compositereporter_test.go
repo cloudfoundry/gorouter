@@ -52,6 +52,11 @@ var _ = Describe("CompositeReporter", func() {
 		Expect(fakeProxyReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
 	})
 
+	It("forwards CaptureBackendInvalidTLSCert() to the proxy reporter", func() {
+		composite.CaptureBackendInvalidTLSCert()
+		Expect(fakeProxyReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
+	})
+
 	It("forwards CaptureBadGateway to both reporters", func() {
 		composite.CaptureBadGateway()
 		Expect(fakeVarzReporter.CaptureBadGatewayCallCount()).To(Equal(1))

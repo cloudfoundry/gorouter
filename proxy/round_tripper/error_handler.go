@@ -24,10 +24,14 @@ func handleSSLHandshake(reporter metrics.CombinedReporter) {
 	reporter.CaptureBackendTLSHandshakeFailed()
 }
 
+func handleUntrustedCert(reporter metrics.CombinedReporter) {
+	reporter.CaptureBackendInvalidTLSCert()
+}
+
 var DefaultErrorSpecs = []ErrorSpec{
 	{fails.AttemptedTLSWithNonTLSBackend, SSLHandshakeMessage, 525, handleSSLHandshake},
 	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable, handleHostnameMismatch},
-	{fails.UntrustedCert, InvalidCertificateMessage, 526, nil},
+	{fails.UntrustedCert, InvalidCertificateMessage, 526, handleUntrustedCert},
 	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496, nil},
 }
 

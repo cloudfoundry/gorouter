@@ -21,6 +21,7 @@ type VarzReporter interface {
 type ProxyReporter interface {
 	CaptureBackendExhaustedConns()
 	CaptureBackendInvalidID()
+	CaptureBackendInvalidTLSCert()
 	CaptureBackendTLSHandshakeFailed()
 	CaptureBadRequest()
 	CaptureBadGateway()
@@ -49,6 +50,7 @@ type RouteRegistryReporter interface {
 type CombinedReporter interface {
 	CaptureBackendExhaustedConns()
 	CaptureBackendInvalidID()
+	CaptureBackendInvalidTLSCert()
 	CaptureBackendTLSHandshakeFailed()
 	CaptureBadRequest()
 	CaptureBadGateway()

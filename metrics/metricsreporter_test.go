@@ -76,6 +76,18 @@ var _ = Describe("MetricsReporter", func() {
 		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("backend_invalid_id"))
 	})
 
+	It("increments the backend_invalid_tls_cert metric", func() {
+		metricReporter.CaptureBackendInvalidTLSCert()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("backend_invalid_tls_cert"))
+
+		metricReporter.CaptureBackendInvalidTLSCert()
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
+		Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("backend_invalid_tls_cert"))
+	})
+
 	Context("increments the request metrics", func() {
 		It("increments the total requests metric", func() {
 			metricReporter.CaptureRoutingRequest(&route.Endpoint{})

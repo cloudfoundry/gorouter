@@ -27,6 +27,10 @@ func (m *MetricsReporter) CaptureBackendInvalidID() {
 	m.Batcher.BatchIncrementCounter("backend_invalid_id")
 }
 
+func (m *MetricsReporter) CaptureBackendInvalidTLSCert() {
+	m.Batcher.BatchIncrementCounter("backend_invalid_tls_cert")
+}
+
 func (m *MetricsReporter) CaptureBadRequest() {
 	m.Batcher.BatchIncrementCounter("rejected_requests")
 }

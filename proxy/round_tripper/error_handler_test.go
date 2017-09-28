@@ -11,9 +11,10 @@ import (
 
 	"crypto/tls"
 
+	"crypto/x509"
+
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
-	"crypto/x509"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -131,6 +132,21 @@ var _ = Describe("HandleError", func() {
 
 			It("Emits a backend_invalid_id metric", func() {
 				Expect(metricReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
+			})
+		})
+
+		Context("Untrusted Cert", func() {
+			BeforeEach(func() {
+				err = x509.UnknownAuthorityError{}
+				errorHandler.HandleError(responseWriter, err)
+			})
+
+			It("Has a 526 Status Code", func() {
+				Expect(responseWriter.Status()).To(Equal(526))
+			})
+
+			It("Emits a backend_invalid_tls_cert metric", func() {
+				Expect(metricReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
 			})
 		})
 

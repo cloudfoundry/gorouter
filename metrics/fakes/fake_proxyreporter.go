@@ -17,6 +17,9 @@ type FakeProxyReporter struct {
 	CaptureBackendInvalidIDStub                 func()
 	captureBackendInvalidIDMutex                sync.RWMutex
 	captureBackendInvalidIDArgsForCall          []struct{}
+	CaptureBackendInvalidTLSCertStub            func()
+	captureBackendInvalidTLSCertMutex           sync.RWMutex
+	captureBackendInvalidTLSCertArgsForCall     []struct{}
 	CaptureBackendTLSHandshakeFailedStub        func()
 	captureBackendTLSHandshakeFailedMutex       sync.RWMutex
 	captureBackendTLSHandshakeFailedArgsForCall []struct{}
@@ -87,6 +90,22 @@ func (fake *FakeProxyReporter) CaptureBackendInvalidIDCallCount() int {
 	fake.captureBackendInvalidIDMutex.RLock()
 	defer fake.captureBackendInvalidIDMutex.RUnlock()
 	return len(fake.captureBackendInvalidIDArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureBackendInvalidTLSCert() {
+	fake.captureBackendInvalidTLSCertMutex.Lock()
+	fake.captureBackendInvalidTLSCertArgsForCall = append(fake.captureBackendInvalidTLSCertArgsForCall, struct{}{})
+	fake.recordInvocation("CaptureBackendInvalidTLSCert", []interface{}{})
+	fake.captureBackendInvalidTLSCertMutex.Unlock()
+	if fake.CaptureBackendInvalidTLSCertStub != nil {
+		fake.CaptureBackendInvalidTLSCertStub()
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureBackendInvalidTLSCertCallCount() int {
+	fake.captureBackendInvalidTLSCertMutex.RLock()
+	defer fake.captureBackendInvalidTLSCertMutex.RUnlock()
+	return len(fake.captureBackendInvalidTLSCertArgsForCall)
 }
 
 func (fake *FakeProxyReporter) CaptureBackendTLSHandshakeFailed() {
@@ -273,6 +292,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureBackendExhaustedConnsMutex.RUnlock()
 	fake.captureBackendInvalidIDMutex.RLock()
 	defer fake.captureBackendInvalidIDMutex.RUnlock()
+	fake.captureBackendInvalidTLSCertMutex.RLock()
+	defer fake.captureBackendInvalidTLSCertMutex.RUnlock()
 	fake.captureBackendTLSHandshakeFailedMutex.RLock()
 	defer fake.captureBackendTLSHandshakeFailedMutex.RUnlock()
 	fake.captureBadRequestMutex.RLock()
