@@ -47,7 +47,7 @@ var _ = Describe("HandleError", func() {
 					Classifier: fails.ClassifierFunc(func(err error) bool {
 						return err.Error() == "i'm a tomato"
 					}),
-					HandleError: func(_ metrics.CombinedReporter) {
+					HandleError: func(_ metrics.ProxyReporter) {
 						errorHandled = true
 					},
 				},

@@ -317,7 +317,7 @@ var _ = Describe("MetricsReporter", func() {
 	})
 
 	It("sends the latency", func() {
-		metricReporter.CaptureRoutingResponseLatency(endpoint, 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 0, time.Time{}, 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(1))
 		name, value, unit := sender.SendValueArgsForCall(0)
@@ -329,7 +329,7 @@ var _ = Describe("MetricsReporter", func() {
 
 	It("sends the latency for the given component", func() {
 		endpoint.Tags["component"] = "CloudController"
-		metricReporter.CaptureRoutingResponseLatency(endpoint, 2*time.Second)
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 0, time.Time{}, 2*time.Second)
 
 		Expect(sender.SendValueCallCount()).To(Equal(2))
 		name, value, unit := sender.SendValueArgsForCall(1)

@@ -13,18 +13,18 @@ type ErrorSpec struct {
 	Classifier  fails.Classifier
 	Message     string
 	Code        int
-	HandleError func(reporter metrics.CombinedReporter)
+	HandleError func(reporter metrics.ProxyReporter)
 }
 
-func handleHostnameMismatch(reporter metrics.CombinedReporter) {
+func handleHostnameMismatch(reporter metrics.ProxyReporter) {
 	reporter.CaptureBackendInvalidID()
 }
 
-func handleSSLHandshake(reporter metrics.CombinedReporter) {
+func handleSSLHandshake(reporter metrics.ProxyReporter) {
 	reporter.CaptureBackendTLSHandshakeFailed()
 }
 
-func handleUntrustedCert(reporter metrics.CombinedReporter) {
+func handleUntrustedCert(reporter metrics.ProxyReporter) {
 	reporter.CaptureBackendInvalidTLSCert()
 }
 
@@ -36,7 +36,7 @@ var DefaultErrorSpecs = []ErrorSpec{
 }
 
 type ErrorHandler struct {
-	MetricReporter metrics.CombinedReporter
+	MetricReporter metrics.ProxyReporter
 	ErrorSpecs     []ErrorSpec
 }
 

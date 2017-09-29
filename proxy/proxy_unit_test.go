@@ -28,7 +28,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		fakeAccessLogger *fakelogger.FakeAccessLogger
 		logger           logger.Logger
 		resp             utils.ProxyResponseWriter
-		combinedReporter metrics.CombinedReporter
+		combinedReporter metrics.ProxyReporter
 	)
 
 	Context("ServeHTTP", func() {

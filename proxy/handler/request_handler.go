@@ -27,13 +27,13 @@ var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
 	logger   logger.Logger
-	reporter metrics.CombinedReporter
+	reporter metrics.ProxyReporter
 
 	request  *http.Request
 	response utils.ProxyResponseWriter
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.CombinedReporter, logger logger.Logger) *RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
 	return &RequestHandler{
 		logger:   requestLogger,

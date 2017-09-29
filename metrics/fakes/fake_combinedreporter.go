@@ -335,4 +335,4 @@ func (fake *FakeCombinedReporter) recordInvocation(key string, args []interface{
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ metrics.CombinedReporter = new(FakeCombinedReporter)
+var _ metrics.ProxyReporter = new(FakeCombinedReporter)

@@ -63,7 +63,7 @@ func NewProxyRoundTripper(
 	retryableClassifier fails.Classifier,
 	logger logger.Logger,
 	defaultLoadBalance string,
-	combinedReporter metrics.CombinedReporter,
+	combinedReporter metrics.ProxyReporter,
 	secureCookies bool,
 	localPort uint16,
 	errorHandler errorHandler,
@@ -83,7 +83,7 @@ func NewProxyRoundTripper(
 type roundTripper struct {
 	logger              logger.Logger
 	defaultLoadBalance  string
-	combinedReporter    metrics.CombinedReporter
+	combinedReporter    metrics.ProxyReporter
 	secureCookies       bool
 	localPort           uint16
 	roundTripperFactory RoundTripperFactory

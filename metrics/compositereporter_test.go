@@ -17,7 +17,7 @@ var _ = Describe("CompositeReporter", func() {
 
 	var fakeVarzReporter *fakes.FakeVarzReporter
 	var fakeProxyReporter *fakes.FakeProxyReporter
-	var composite metrics.CombinedReporter
+	var composite metrics.ProxyReporter
 
 	var endpoint *route.Endpoint
 	var response *http.Response
@@ -87,7 +87,7 @@ var _ = Describe("CompositeReporter", func() {
 		Expect(callTime).To(Equal(responseTime))
 		Expect(callDuration).To(Equal(responseDuration))
 
-		callEndpoint, callDuration = fakeProxyReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+		callEndpoint, _, _, callDuration = fakeProxyReporter.CaptureRoutingResponseLatencyArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
 		Expect(callDuration).To(Equal(responseDuration))
 	})

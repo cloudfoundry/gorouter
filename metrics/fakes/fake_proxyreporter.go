@@ -39,11 +39,13 @@ type FakeProxyReporter struct {
 	captureRoutingResponseArgsForCall []struct {
 		statusCode int
 	}
-	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, d time.Duration)
+	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
 	captureRoutingResponseLatencyMutex       sync.RWMutex
 	captureRoutingResponseLatencyArgsForCall []struct {
-		b *route.Endpoint
-		d time.Duration
+		b          *route.Endpoint
+		statusCode int
+		t          time.Time
+		d          time.Duration
 	}
 	CaptureRouteServiceResponseStub        func(res *http.Response)
 	captureRouteServiceResponseMutex       sync.RWMutex
@@ -204,16 +206,18 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseArgsForCall(i int) int {
 	return fake.captureRoutingResponseArgsForCall[i].statusCode
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.Lock()
 	fake.captureRoutingResponseLatencyArgsForCall = append(fake.captureRoutingResponseLatencyArgsForCall, struct {
-		b *route.Endpoint
-		d time.Duration
-	}{b, d})
-	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, d})
+		b          *route.Endpoint
+		statusCode int
+		t          time.Time
+		d          time.Duration
+	}{b, statusCode, t, d})
+	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, statusCode, t, d})
 	fake.captureRoutingResponseLatencyMutex.Unlock()
 	if fake.CaptureRoutingResponseLatencyStub != nil {
-		fake.CaptureRoutingResponseLatencyStub(b, d)
+		fake.CaptureRoutingResponseLatencyStub(b, statusCode, t, d)
 	}
 }
 
@@ -223,10 +227,10 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyCallCount() int {
 	return len(fake.captureRoutingResponseLatencyArgsForCall)
 }
 
-func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, time.Duration) {
+func (fake *FakeProxyReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, int, time.Time, time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.RLock()
 	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
-	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].d
+	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].statusCode, fake.captureRoutingResponseLatencyArgsForCall[i].t, fake.captureRoutingResponseLatencyArgsForCall[i].d
 }
 
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(res *http.Response) {

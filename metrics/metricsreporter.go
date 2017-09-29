@@ -65,7 +65,8 @@ func (m *MetricsReporter) CaptureRoutingResponse(statusCode int) {
 	m.Batcher.BatchIncrementCounter("responses")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration) {
+func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int, _ time.Time, d time.Duration) {
+	//this function has extra arguments to match varz reporter
 	latency := float64(d / time.Millisecond)
 	unit := "ms"
 	m.Sender.SendValue("latency", latency, unit)

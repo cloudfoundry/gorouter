@@ -13,13 +13,13 @@ import (
 )
 
 type reporterHandler struct {
-	reporter metrics.CombinedReporter
+	reporter metrics.ProxyReporter
 	logger   logger.Logger
 }
 
 // NewReporter creates a new handler that handles reporting backend
 // responses to metrics
-func NewReporter(reporter metrics.CombinedReporter, logger logger.Logger) negroni.Handler {
+func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.Handler {
 	return &reporterHandler{
 		reporter: reporter,
 		logger:   logger,

@@ -27,7 +27,7 @@ type ProxyReporter interface {
 	CaptureBadGateway()
 	CaptureRoutingRequest(b *route.Endpoint)
 	CaptureRoutingResponse(statusCode int)
-	CaptureRoutingResponseLatency(b *route.Endpoint, d time.Duration)
+	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
 	CaptureRouteServiceResponse(res *http.Response)
 	CaptureWebSocketUpdate()
 	CaptureWebSocketFailure()
@@ -44,22 +44,6 @@ type RouteRegistryReporter interface {
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged)
 	CaptureUnregistryMessage(msg ComponentTagged)
-}
-
-//go:generate counterfeiter -o fakes/fake_combinedreporter.go . CombinedReporter
-type CombinedReporter interface {
-	CaptureBackendExhaustedConns()
-	CaptureBackendInvalidID()
-	CaptureBackendInvalidTLSCert()
-	CaptureBackendTLSHandshakeFailed()
-	CaptureBadRequest()
-	CaptureBadGateway()
-	CaptureRoutingRequest(b *route.Endpoint)
-	CaptureRoutingResponse(statusCode int)
-	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
-	CaptureRouteServiceResponse(res *http.Response)
-	CaptureWebSocketUpdate()
-	CaptureWebSocketFailure()
 }
 
 type CompositeReporter struct {
@@ -84,5 +68,5 @@ func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint) {
 
 func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	c.VarzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
-	c.ProxyReporter.CaptureRoutingResponseLatency(b, d)
+	c.ProxyReporter.CaptureRoutingResponseLatency(b, 0, time.Time{}, d)
 }

@@ -22,13 +22,13 @@ const (
 
 type lookupHandler struct {
 	registry           registry.Registry
-	reporter           metrics.CombinedReporter
+	reporter           metrics.ProxyReporter
 	logger             logger.Logger
 	maxConnsPerBackend int64
 }
 
 // NewLookup creates a handler responsible for looking up a route.
-func NewLookup(registry registry.Registry, rep metrics.CombinedReporter, logger logger.Logger, maxConnsPerBackend int64) negroni.Handler {
+func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger logger.Logger, maxConnsPerBackend int64) negroni.Handler {
 	return &lookupHandler{
 		registry:           registry,
 		reporter:           rep,

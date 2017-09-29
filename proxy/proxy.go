@@ -41,7 +41,7 @@ type proxy struct {
 	ip                       string
 	traceKey                 string
 	logger                   logger.Logger
-	reporter                 metrics.CombinedReporter
+	reporter                 metrics.ProxyReporter
 	accessLogger             access_log.AccessLogger
 	secureCookies            bool
 	heartbeatOK              *int32
@@ -102,7 +102,7 @@ func NewProxy(
 	accessLogger access_log.AccessLogger,
 	c *config.Config,
 	registry registry.Registry,
-	reporter metrics.CombinedReporter,
+	reporter metrics.ProxyReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	tlsConfig *tls.Config,
 	heartbeatOK *int32,

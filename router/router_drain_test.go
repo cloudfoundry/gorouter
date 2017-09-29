@@ -40,7 +40,7 @@ var _ = Describe("Router", func() {
 		config     *cfg.Config
 		p          proxy.Proxy
 
-		combinedReporter metrics.CombinedReporter
+		combinedReporter metrics.ProxyReporter
 		mbusClient       *nats.Conn
 		registry         *rregistry.RouteRegistry
 		varz             vvarz.Varz
