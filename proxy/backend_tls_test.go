@@ -217,9 +217,9 @@ var _ = Describe("Backend TLS", func() {
 			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
 		})
 
-		It("returns a successful 200 OK response from the backend (only works for Go1.8 and before)", func() {
+		It("returns a HTTP 503 response (requires Go 1.9 or later)", func() {
 			resp := registerAppAndTest()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
 		})
 	})
 
