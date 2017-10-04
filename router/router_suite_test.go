@@ -23,7 +23,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 	return nil
 }, func([]byte) {
-	SetDefaultEventuallyTimeout(15 * time.Second)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)
 	SetDefaultConsistentlyPollingInterval(10 * time.Millisecond)
