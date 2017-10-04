@@ -40,8 +40,8 @@ import (
 	"time"
 )
 
-const defaultPruneInterval = 1
-const defaultPruneThreshold = 2
+const defaultPruneInterval = 100 * time.Millisecond
+const defaultPruneThreshold = 200 * time.Millisecond
 
 var _ = Describe("Router Integration", func() {
 
@@ -59,19 +59,19 @@ var _ = Describe("Router Integration", func() {
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
 
-	configDrainSetup := func(cfg *config.Config, pruneInterval, pruneThreshold, drainWait int) {
+	configDrainSetup := func(cfg *config.Config, pruneInterval, pruneThreshold time.Duration, drainWait int) {
 		// ensure the threshold is longer than the interval that we check,
 		// because we set the route's timestamp to time.Now() on the interval
 		// as part of pausing
-		cfg.PruneStaleDropletsInterval = time.Duration(pruneInterval) * time.Second
-		cfg.DropletStaleThreshold = time.Duration(pruneThreshold) * time.Second
+		cfg.PruneStaleDropletsInterval = pruneInterval
+		cfg.DropletStaleThreshold = pruneThreshold
 		cfg.StartResponseDelayInterval = 1 * time.Second
 		cfg.EndpointTimeout = 5 * time.Second
-		cfg.DrainTimeout = 1 * time.Second
+		cfg.DrainTimeout = 200 * time.Millisecond
 		cfg.DrainWait = time.Duration(drainWait) * time.Second
 	}
 
-	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, maxBackendConns int64, natsPorts ...uint16) *config.Config {
+	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold time.Duration, drainWait int, suspendPruning bool, maxBackendConns int64, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
@@ -93,7 +93,7 @@ var _ = Describe("Router Integration", func() {
 		writeConfig(cfg, cfgFile)
 		return cfg
 	}
-	createIsoSegConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
+	createIsoSegConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold time.Duration, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
@@ -296,7 +296,7 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			cfg, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+			cfg, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), natsPort)
 
 		})
 		JustBeforeEach(func() {
@@ -541,7 +541,7 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when ssl is enabled", func() {
 			BeforeEach(func() {
-				config, _ := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
+				config, _ := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), natsPort)
 				writeConfig(config, cfgFile)
 			})
 
@@ -656,7 +656,7 @@ var _ = Describe("Router Integration", func() {
 		runningApp.VerifyAppStatus(200)
 
 		// Give enough time to register multiple times
-		time.Sleep(heartbeatInterval * 3)
+		time.Sleep(heartbeatInterval * 2)
 
 		// kill registration ticker => kill app (must be before stopping NATS since app.Register is fake and queues messages in memory)
 		zombieTicker.Stop()
@@ -666,7 +666,7 @@ var _ = Describe("Router Integration", func() {
 		staleCheckInterval := config.PruneStaleDropletsInterval
 		staleThreshold := config.DropletStaleThreshold
 		// Give router time to make a bad decision (i.e. prune routes)
-		time.Sleep(10 * (staleCheckInterval + staleThreshold))
+		time.Sleep(3 * (staleCheckInterval + staleThreshold))
 
 		// While NATS is down all routes should go down
 		zombieApp.VerifyAppStatus(404)
@@ -685,51 +685,22 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when nats server shuts down and comes back up", func() {
 		It("should not panic, log the disconnection, and reconnect", func() {
-			localIP, err := localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
 			statusPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
-			config.NatsClientPingInterval = 1 * time.Second
+			config.NatsClientPingInterval = 200 * time.Millisecond
 			writeConfig(config, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
 
-			mbusClient, err := newMessageBus(config)
-			Expect(err).ToNot(HaveOccurred())
-
-			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
-			zombieApp.Register()
-			zombieApp.Listen()
-
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-
-			Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
-
-			heartbeatInterval := 200 * time.Millisecond
-			zombieTicker := time.NewTicker(heartbeatInterval)
-
-			go func() {
-				for {
-					select {
-					case <-zombieTicker.C:
-						zombieApp.Register()
-					}
-				}
-			}()
-
-			zombieApp.VerifyAppStatus(200)
-
 			natsRunner.Stop()
-
 			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
-			Eventually(gorouterSession, time.Second*25).Should(Say("nats-connection-still-disconnected"))
+			Eventually(gorouterSession).Should(Say("nats-connection-still-disconnected"))
 			natsRunner.Start()
-			Eventually(gorouterSession, time.Second*5).Should(Say("nats-connection-reconnected"))
-			Consistently(gorouterSession, time.Second*25).ShouldNot(Say("nats-connection-still-disconnected"))
-			Consistently(gorouterSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
+			Eventually(gorouterSession).Should(Say("nats-connection-reconnected"))
+			Consistently(gorouterSession, 500*time.Millisecond).ShouldNot(Say("nats-connection-still-disconnected"))
+			Consistently(gorouterSession.ExitCode, 2*time.Second).ShouldNot(Equal(1))
 		})
 	})
 
@@ -741,8 +712,8 @@ var _ = Describe("Router Integration", func() {
 			proxyPort      uint16
 			statusPort     uint16
 			natsRunner2    *test_util.NATSRunner
-			pruneInterval  int
-			pruneThreshold int
+			pruneInterval  time.Duration
+			pruneThreshold time.Duration
 		)
 
 		BeforeEach(func() {
@@ -753,8 +724,8 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			pruneInterval = 2
-			pruneThreshold = 10
+			pruneInterval = 2 * time.Second
+			pruneThreshold = 10 * time.Second
 			config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
 		})
 
@@ -796,15 +767,13 @@ var _ = Describe("Router Integration", func() {
 			runningApp.VerifyAppStatus(200)
 
 			// Give enough time to register multiple times
-			time.Sleep(heartbeatInterval * 3)
+			time.Sleep(heartbeatInterval * 2)
 
 			natsRunner.Stop()
 			natsRunner2.Start()
 
-			staleCheckInterval := config.PruneStaleDropletsInterval
-			staleThreshold := config.DropletStaleThreshold
 			// Give router time to make a bad decision (i.e. prune routes)
-			sleepTime := (2 * staleCheckInterval) + (2 * staleThreshold)
+			sleepTime := (2 * defaultPruneInterval) + (2 * defaultPruneThreshold)
 			time.Sleep(sleepTime)
 
 			// Expect not to have pruned the routes as it fails over to next NAT server
@@ -824,10 +793,11 @@ var _ = Describe("Router Integration", func() {
 				proxyPort = test_util.NextAvailPort()
 
 				cfgFile = filepath.Join(tmpdir, "config.yml")
-				pruneInterval = 2
-				pruneThreshold = 10
+				pruneInterval = 200 * time.Millisecond
+				pruneThreshold = 1000 * time.Millisecond
 				suspendPruningIfNatsUnavailable := true
 				config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, 0, natsPort, natsPort2)
+				config.NatsClientPingInterval = 200 * time.Millisecond
 			})
 
 			It("does not prune routes when nats is unavailable", func() {
@@ -856,21 +826,17 @@ var _ = Describe("Router Integration", func() {
 						}
 					}
 				}()
-
 				runningApp.VerifyAppStatus(200)
 
 				// Give enough time to register multiple times
 				time.Sleep(heartbeatInterval * 3)
-
 				natsRunner.Stop()
-
 				staleCheckInterval := config.PruneStaleDropletsInterval
 				staleThreshold := config.DropletStaleThreshold
 
 				// Give router time to make a bad decision (i.e. prune routes)
 				sleepTime := (2 * staleCheckInterval) + (2 * staleThreshold)
 				time.Sleep(sleepTime)
-
 				// Expect not to have pruned the routes after nats goes away
 				runningApp.VerifyAppStatus(200)
 			})
@@ -1111,6 +1077,9 @@ var _ = Describe("Router Integration", func() {
 			})
 
 			Context("when the uaa is not available", func() {
+				BeforeEach(func() {
+					config.TokenFetcherRetryInterval = 100 * time.Millisecond
+				})
 				It("gorouter exits with non-zero code", func() {
 					writeConfig(config, cfgFile)
 
@@ -1173,6 +1142,7 @@ func hostnameAndPort(url string) (string, int) {
 func newMessageBus(c *config.Config) (*nats.Conn, error) {
 	natsMembers := make([]string, len(c.Nats))
 	options := nats.DefaultOptions
+	options.PingInterval = 200 * time.Millisecond
 	for _, info := range c.Nats {
 		uri := url.URL{
 			Scheme: "nats",

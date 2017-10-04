@@ -165,7 +165,7 @@ type Config struct {
 	// These fields are populated by the `Process` function.
 	Ip                     string        `yaml:"-"`
 	RouteServiceEnabled    bool          `yaml:"-"`
-	NatsClientPingInterval time.Duration `yaml:"-"`
+	NatsClientPingInterval time.Duration `yaml:"nats_client_ping_interval"`
 	Backends               BackendConfig `yaml:"backends"`
 	ExtraHeadersToLog      []string      `yaml:"extra_headers_to_log"`
 
@@ -207,6 +207,13 @@ var defaultConfig = Config{
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 	FrontendIdleTimeout:                       900 * time.Second,
 
+	// To avoid routes getting purged because of unresponsive NATS server
+	// we need to set the ping interval of nats client such that it fails over
+	// to next NATS server before dropletstalethreshold is hit. We are hardcoding the ping interval
+	// to 20 sec because the operators cannot set the value of DropletStaleThreshold and StartResponseDelayInterval
+	// ping_interval = ((DropletStaleThreshold- StartResponseDelayInterval)-minimumRegistrationInterval+(2 * number_of_nats_servers))/3
+	NatsClientPingInterval: 20 * time.Second,
+
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,
 
@@ -236,13 +243,6 @@ func (c *Config) Process() {
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
 	}
-
-	// To avoid routes getting purged because of unresponsive NATS server
-	// we need to set the ping interval of nats client such that it fails over
-	// to next NATS server before dropletstalethreshold is hit. We are hardcoding the ping interval
-	// to 20 sec because the operators cannot set the value of DropletStaleThreshold and StartResponseDelayInterval
-	// ping_interval = ((DropletStaleThreshold- StartResponseDelayInterval)-minimumRegistrationInterval+(2 * number_of_nats_servers))/3
-	c.NatsClientPingInterval = 20 * time.Second
 
 	if c.DrainTimeout == 0 || c.DrainTimeout == defaultConfig.EndpointTimeout {
 		c.DrainTimeout = c.EndpointTimeout
