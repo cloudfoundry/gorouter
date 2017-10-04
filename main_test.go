@@ -569,7 +569,7 @@ var _ = Describe("Router Integration", func() {
 						time.Sleep(5 * time.Millisecond)
 					}
 				}()
-				Eventually(grouter).Should(Say("gorouter.stopped"))
+				Eventually(grouter, 5*time.Second).Should(Say("gorouter.stopped"))
 			})
 		})
 	})
@@ -602,6 +602,9 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	It("has Nats connectivity", func() {
+		SetDefaultEventuallyTimeout(5 * time.Second)
+		defer SetDefaultEventuallyTimeout(1 * time.Second)
+
 		localIP, err := localip.LocalIP()
 		Expect(err).ToNot(HaveOccurred())
 

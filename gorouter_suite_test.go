@@ -25,7 +25,6 @@ var _ = BeforeSuite(func() {
 	path, err := gexec.Build("code.cloudfoundry.org/gorouter", "-race")
 	Expect(err).ToNot(HaveOccurred())
 	gorouterPath = path
-	SetDefaultEventuallyTimeout(15 * time.Second)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)
 	SetDefaultConsistentlyPollingInterval(10 * time.Millisecond)
