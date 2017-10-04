@@ -150,7 +150,7 @@ var _ = Describe("Router", func() {
 			return appRegistered(registry, app)
 		}).Should(BeTrue())
 
-		drainTimeout := 1 * time.Second
+		drainTimeout := 100 * time.Millisecond
 
 		go func() {
 			defer GinkgoRecover()
@@ -206,7 +206,7 @@ var _ = Describe("Router", func() {
 		config.SSLPort = sslPort
 		config.SSLCertificates = []tls.Certificate{defaultCert, cert2}
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
-		config.EndpointTimeout = 5 * time.Second
+		config.EndpointTimeout = 1 * time.Second
 
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
