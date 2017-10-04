@@ -304,6 +304,19 @@ var _ = Describe("Pool", func() {
 	Context("PruneEndpoints", func() {
 		defaultThreshold := 1 * time.Minute
 
+		Context("when the pool contains tls endpoints", func() {
+			BeforeEach(func() {
+				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 60, "", modTag, "", true)
+				pool.Put(e1)
+			})
+			It("does not prune the tls endpoints", func() {
+				pool.MarkUpdated(time.Now().Add(-2 * defaultThreshold))
+				Expect(pool.IsEmpty()).To(Equal(false))
+				prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+				Expect(pool.IsEmpty()).To(Equal(false))
+				Expect(len(prunedEndpoints)).To(Equal(0))
+			})
+		})
 		Context("when an endpoint has a custom stale time", func() {
 			Context("when custom stale threshold is greater than default threshold", func() {
 				It("prunes the endpoint", func() {

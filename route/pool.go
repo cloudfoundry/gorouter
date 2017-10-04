@@ -224,6 +224,11 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) []*Endpoint {
 	for i := 0; i < last; {
 		e := p.endpoints[i]
 
+		if e.endpoint.useTls {
+			i++
+			continue
+		}
+
 		staleTime := now.Add(-defaultThreshold)
 		if e.endpoint.staleThreshold > 0 && e.endpoint.staleThreshold < defaultThreshold {
 			staleTime = now.Add(-e.endpoint.staleThreshold)
