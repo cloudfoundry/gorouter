@@ -130,7 +130,9 @@ var _ = Describe("Router Integration", func() {
 		var eventsSessionLogs []byte
 		Eventually(func() string {
 			logAdd, err := ioutil.ReadAll(session.Out)
-			Expect(err).ToNot(HaveOccurred(), "Gorouter session closed")
+			if err != nil {
+				return ""
+			}
 			eventsSessionLogs = append(eventsSessionLogs, logAdd...)
 			return string(eventsSessionLogs)
 		}, 70*time.Second).Should(SatisfyAll(
@@ -693,7 +695,7 @@ var _ = Describe("Router Integration", func() {
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
-			config.NatsClientPingInterval = 200 * time.Millisecond
+			config.NatsClientPingInterval = 100 * time.Millisecond
 			writeConfig(config, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
 
@@ -701,7 +703,7 @@ var _ = Describe("Router Integration", func() {
 			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
 			Eventually(gorouterSession).Should(Say("nats-connection-still-disconnected"))
 			natsRunner.Start()
-			Eventually(gorouterSession).Should(Say("nats-connection-reconnected"))
+			Eventually(gorouterSession, 2*time.Second).Should(Say("nats-connection-reconnected"))
 			Consistently(gorouterSession, 500*time.Millisecond).ShouldNot(Say("nats-connection-still-disconnected"))
 			Consistently(gorouterSession.ExitCode, 2*time.Second).ShouldNot(Equal(1))
 		})
