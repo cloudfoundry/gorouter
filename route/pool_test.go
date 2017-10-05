@@ -1,7 +1,6 @@
 package route_test
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -82,7 +81,7 @@ var _ = Describe("Pool", func() {
 			b := pool.Put(endpoint)
 			Expect(b).To(BeTrue())
 
-			prunedEndpoints := pool.PruneEndpoints(time.Second)
+			prunedEndpoints := pool.PruneEndpoints()
 			Expect(prunedEndpoints).To(BeEmpty())
 		})
 
@@ -312,55 +311,37 @@ var _ = Describe("Pool", func() {
 			It("does not prune the tls endpoints", func() {
 				pool.MarkUpdated(time.Now().Add(-2 * defaultThreshold))
 				Expect(pool.IsEmpty()).To(Equal(false))
-				prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+				prunedEndpoints := pool.PruneEndpoints()
 				Expect(pool.IsEmpty()).To(Equal(false))
 				Expect(len(prunedEndpoints)).To(Equal(0))
 			})
 		})
-		Context("when an endpoint has a custom stale time", func() {
-			Context("when custom stale threshold is greater than default threshold", func() {
-				It("prunes the endpoint", func() {
-					customThreshold := int(defaultThreshold.Seconds()) + 20
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, customThreshold, "", modTag, "", false)
-					pool.Put(e1)
 
-					updateTime, _ := time.ParseDuration(fmt.Sprintf("%ds", customThreshold-10))
-					pool.MarkUpdated(time.Now().Add(-updateTime))
+		Context("when an endpoint has passed the stale threshold", func() {
+			It("prunes the endpoint", func() {
+				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 20, "", modTag, "", false)
 
-					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(true))
-					Expect(prunedEndpoints).To(ConsistOf(e1))
-				})
+				pool.Put(e1)
+				pool.MarkUpdated(time.Now().Add(-25 * time.Second))
+
+				Expect(pool.IsEmpty()).To(Equal(false))
+				prunedEndpoints := pool.PruneEndpoints()
+				Expect(pool.IsEmpty()).To(Equal(true))
+				Expect(prunedEndpoints).To(ConsistOf(e1))
 			})
+		})
 
-			Context("and it has passed the stale threshold", func() {
-				It("prunes the endpoint", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 20, "", modTag, "", false)
+		Context("when an endpoint has not passed the stale threshold", func() {
+			It("does NOT prune the endpoint", func() {
+				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 20, "", modTag, "", false)
 
-					pool.Put(e1)
-					pool.MarkUpdated(time.Now().Add(-25 * time.Second))
+				pool.Put(e1)
+				pool.MarkUpdated(time.Now())
 
-					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(true))
-					Expect(prunedEndpoints).To(ConsistOf(e1))
-				})
-			})
-
-			Context("and it has not passed the stale threshold", func() {
-				It("does NOT prune the endpoint", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 20, "", modTag, "", false)
-
-					pool.Put(e1)
-					pool.MarkUpdated(time.Now())
-
-					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
-					Expect(pool.IsEmpty()).To(Equal(false))
-					Expect(prunedEndpoints).To(BeEmpty())
-				})
-
+				Expect(pool.IsEmpty()).To(Equal(false))
+				prunedEndpoints := pool.PruneEndpoints()
+				Expect(pool.IsEmpty()).To(Equal(false))
+				Expect(prunedEndpoints).To(BeEmpty())
 			})
 		})
 
@@ -376,7 +357,7 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints()
 					Expect(pool.IsEmpty()).To(Equal(true))
 					Expect(prunedEndpoints).To(ConsistOf(e1, e2))
 				})
@@ -384,16 +365,16 @@ var _ = Describe("Pool", func() {
 			Context("and only one passes the stale threshold", func() {
 				It("prunes the endpoints", func() {
 					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
-					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", "", nil, 30, "", modTag, "", false)
+					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", "", nil, 60, "", modTag, "", false)
 
 					pool.Put(e1)
 					pool.Put(e2)
-					pool.MarkUpdated(time.Now().Add(-31 * time.Second))
+					pool.MarkUpdated(time.Now())
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints()
 					Expect(pool.IsEmpty()).To(Equal(false))
-					Expect(prunedEndpoints).To(ConsistOf(e2))
+					Expect(prunedEndpoints).To(ConsistOf(e1))
 				})
 			})
 		})
@@ -407,7 +388,7 @@ var _ = Describe("Pool", func() {
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints()
 					Expect(pool.IsEmpty()).To(Equal(true))
 					Expect(prunedEndpoints).To(ConsistOf(e1))
 				})
@@ -415,13 +396,13 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 120, "", modTag, "", false)
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
 
 					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints(defaultThreshold)
+					prunedEndpoints := pool.PruneEndpoints()
 					Expect(pool.IsEmpty()).To(Equal(false))
 					Expect(prunedEndpoints).To(BeEmpty())
 				})
@@ -431,20 +412,20 @@ var _ = Describe("Pool", func() {
 
 	Context("MarkUpdated", func() {
 		It("updates all endpoints", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", nil, 120, "", modTag, "", false)
 
 			pool.Put(e1)
 
-			threshold := 1 * time.Second
-			pool.PruneEndpoints(threshold)
+			pool.PruneEndpoints()
 			Expect(pool.IsEmpty()).To(BeFalse())
 
 			pool.MarkUpdated(time.Now())
-			prunedEndpoints := pool.PruneEndpoints(threshold)
+			prunedEndpoints := pool.PruneEndpoints()
 			Expect(pool.IsEmpty()).To(BeFalse())
 			Expect(prunedEndpoints).To(BeEmpty())
 
-			prunedEndpoints = pool.PruneEndpoints(0)
+			pool.MarkUpdated(time.Now().Add(-120 * time.Second))
+			prunedEndpoints = pool.PruneEndpoints()
 			Expect(pool.IsEmpty()).To(BeTrue())
 			Expect(prunedEndpoints).To(ConsistOf(e1))
 		})

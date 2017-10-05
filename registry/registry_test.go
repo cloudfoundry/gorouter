@@ -1041,9 +1041,10 @@ var _ = Describe("RouteRegistry", func() {
 		Context("when stale threshold is less than pruning cycle", func() {
 			BeforeEach(func() {
 				configObj = config.DefaultConfig()
-				configObj.PruneStaleDropletsInterval = 500 * time.Millisecond
-				configObj.DropletStaleThreshold = 45 * time.Millisecond
+				configObj.PruneStaleDropletsInterval = 5000 * time.Millisecond
+				configObj.DropletStaleThreshold = 500 * time.Millisecond
 				reporter = new(fakes.FakeRouteRegistryReporter)
+				fooEndpoint.StaleThreshold = configObj.DropletStaleThreshold
 
 				r = NewRouteRegistry(logger, configObj, reporter)
 			})

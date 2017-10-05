@@ -54,7 +54,7 @@ type Endpoint struct {
 	addr                 string
 	Tags                 map[string]string
 	PrivateInstanceId    string
-	staleThreshold       time.Duration
+	StaleThreshold       time.Duration
 	RouteServiceUrl      string
 	PrivateInstanceIndex string
 	ModificationTag      models.ModificationTag
@@ -115,7 +115,7 @@ func NewEndpoint(
 		useTls:               useTLS,
 		PrivateInstanceId:    privateInstanceId,
 		PrivateInstanceIndex: privateInstanceIndex,
-		staleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
+		StaleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
 		RouteServiceUrl:      routeServiceUrl,
 		ModificationTag:      modificationTag,
 		Stats:                NewStats(),
@@ -213,7 +213,7 @@ func (p *Pool) FilteredPool(maxConnsPerBackend int64) *Pool {
 	return filteredPool
 }
 
-func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) []*Endpoint {
+func (p *Pool) PruneEndpoints() []*Endpoint {
 	p.lock.Lock()
 
 	last := len(p.endpoints)
@@ -229,10 +229,7 @@ func (p *Pool) PruneEndpoints(defaultThreshold time.Duration) []*Endpoint {
 			continue
 		}
 
-		staleTime := now.Add(-defaultThreshold)
-		if e.endpoint.staleThreshold > 0 && e.endpoint.staleThreshold < defaultThreshold {
-			staleTime = now.Add(-e.endpoint.staleThreshold)
-		}
+		staleTime := now.Add(-e.endpoint.StaleThreshold)
 
 		if e.updated.Before(staleTime) {
 			p.removeEndpoint(e)
@@ -364,7 +361,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	jsonObj.Address = e.addr
 	jsonObj.TLS = e.IsTLS()
 	jsonObj.RouteServiceUrl = e.RouteServiceUrl
-	jsonObj.TTL = int(e.staleThreshold.Seconds())
+	jsonObj.TTL = int(e.StaleThreshold.Seconds())
 	jsonObj.Tags = e.Tags
 	jsonObj.IsolationSegment = e.IsolationSegment
 	jsonObj.PrivateInstanceId = e.PrivateInstanceId

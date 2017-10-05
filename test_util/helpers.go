@@ -35,7 +35,7 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 		route.Uri(path),
 		route.NewEndpoint(
 			cfg.AppId, host, uint16(port), cfg.InstanceId, cfg.InstanceIndex,
-			nil, -1, cfg.RouteServiceUrl, models.ModificationTag{}, "",
+			nil, cfg.StaleThreshold, cfg.RouteServiceUrl, models.ModificationTag{}, "",
 			(cfg.TLSConfig != nil),
 		),
 	)
@@ -64,6 +64,9 @@ func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandl
 	if rcfg.InstanceIndex == "" {
 		rcfg.InstanceIndex = "2"
 	}
+	if rcfg.StaleThreshold == 0 {
+		rcfg.StaleThreshold = 120
+	}
 	RegisterAddr(reg, path, ln.Addr().String(), rcfg)
 
 	return ln
@@ -74,6 +77,7 @@ type RegisterConfig struct {
 	InstanceId      string
 	InstanceIndex   string
 	AppId           string
+	StaleThreshold  int
 	TLSConfig       *tls.Config
 	IgnoreTLSConfig bool
 }

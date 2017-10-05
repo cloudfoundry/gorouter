@@ -95,6 +95,10 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
 
+	if endpoint.StaleThreshold > r.dropletStaleThreshold || endpoint.StaleThreshold == 0 {
+		endpoint.StaleThreshold = r.dropletStaleThreshold
+	}
+
 	endpointAdded := pool.Put(endpoint)
 
 	r.timeOfLastUpdate = t
@@ -274,7 +278,7 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 	r.pruningStatus = CONNECTED
 
 	r.byURI.EachNodeWithPool(func(t *container.Trie) {
-		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
+		endpoints := t.Pool.PruneEndpoints()
 		t.Snip()
 		if len(endpoints) > 0 {
 			addresses := []string{}
