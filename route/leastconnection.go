@@ -84,6 +84,6 @@ func (r *LeastConnection) next() *Endpoint {
 
 func (r *LeastConnection) EndpointFailed() {
 	if r.lastEndpoint != nil {
-		r.pool.endpointFailed(r.lastEndpoint)
+		r.pool.EndpointFailed(r.lastEndpoint)
 	}
 }

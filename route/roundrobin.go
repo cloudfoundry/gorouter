@@ -83,7 +83,7 @@ func (r *RoundRobin) next() *Endpoint {
 
 func (r *RoundRobin) EndpointFailed() {
 	if r.lastEndpoint != nil {
-		r.pool.endpointFailed(r.lastEndpoint)
+		r.pool.EndpointFailed(r.lastEndpoint)
 	}
 }
 

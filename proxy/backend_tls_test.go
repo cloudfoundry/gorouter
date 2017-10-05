@@ -78,8 +78,21 @@ var _ = Describe("Backend TLS", func() {
 		}
 	})
 
+	Context("when the route is expired and the backend fails instance id validation", func() {
+		BeforeEach(func() {
+			var err error
+			caCertPool, err = x509.SystemCertPool()
+			Expect(err).ToNot(HaveOccurred())
+
+			registerConfig.StaleThreshold = -1
+		})
+		It("prunes the route", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(526))
+		})
+	})
 	Context("when the backend does not require a client certificate", func() {
-		It("makes an mTLS connection with the backend", func() {
+		It("makes a TLS connection with the backend", func() {
 			resp := registerAppAndTest()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
@@ -109,6 +122,15 @@ var _ = Describe("Backend TLS", func() {
 			It("returns a HTTP 496 status code", func() {
 				resp := registerAppAndTest()
 				Expect(resp.StatusCode).To(Equal(496))
+			})
+			Context("when the route is expired and the backend fails with a retryable error", func() {
+				BeforeEach(func() {
+					registerConfig.StaleThreshold = -1
+				})
+				It("prunes the route and returns a HTTP 496 status code", func() {
+					resp := registerAppAndTest()
+					Expect(resp.StatusCode).To(Equal(496))
+				})
 			})
 		})
 	})

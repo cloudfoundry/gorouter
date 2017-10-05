@@ -180,6 +180,29 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
+	Context("EndpointFailed", func() {
+		It("prunes tls routes that have already expired", func() {
+			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "idx-1", nil, 1, "", models.ModificationTag{}, "", true)
+			pool.Put(endpoint)
+
+			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+
+			pool.EndpointFailed(endpoint)
+
+			Expect(pool.IsEmpty()).To(BeTrue())
+		})
+		It("does not prune non-tls routes that have already expired", func() {
+			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "idx-1", nil, 1, "", models.ModificationTag{}, "", false)
+			pool.Put(endpoint)
+
+			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+
+			pool.EndpointFailed(endpoint)
+
+			Expect(pool.IsEmpty()).To(BeFalse())
+		})
+	})
+
 	Context("Remove", func() {
 		It("removes endpoints", func() {
 			endpoint := &route.Endpoint{}

@@ -120,12 +120,13 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	logger := rt.logger
+	var selectEndpointErr error
 	for retry := 0; retry < handler.MaxRetries; retry++ {
 		logger = rt.logger
 
 		if reqInfo.RouteServiceURL == nil {
-			endpoint, err = rt.selectEndpoint(iter, request)
-			if err != nil {
+			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
+			if selectEndpointErr != nil {
 				break
 			}
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
@@ -181,10 +182,15 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 	reqInfo.StoppedAt = time.Now()
 
-	if err != nil {
-		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
-		logger.Error("endpoint-failed", zap.Error(err))
-		return nil, err
+	finalErr := err
+	if finalErr == nil {
+		finalErr = selectEndpointErr
+	}
+
+	if finalErr != nil {
+		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
+		logger.Error("endpoint-failed", zap.Error(finalErr))
+		return nil, finalErr
 	}
 
 	if res != nil && endpoint.PrivateInstanceId != "" {

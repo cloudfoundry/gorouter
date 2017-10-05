@@ -314,10 +314,18 @@ func (p *Pool) MarkUpdated(t time.Time) {
 	p.lock.Unlock()
 }
 
-func (p *Pool) endpointFailed(endpoint *Endpoint) {
+func (p *Pool) EndpointFailed(endpoint *Endpoint) {
 	p.lock.Lock()
 	e := p.index[endpoint.CanonicalAddr()]
 	if e != nil {
+		if e.endpoint.useTls {
+			now := time.Now()
+			staleTime := now.Add(-e.endpoint.StaleThreshold)
+
+			if e.updated.Before(staleTime) {
+				p.removeEndpoint(e)
+			}
+		}
 		e.failed()
 	}
 	p.lock.Unlock()
