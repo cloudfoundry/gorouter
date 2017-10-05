@@ -14,6 +14,7 @@ var DefaultRetryOnAny = []Classifier{
 	UntrustedCert,
 }
 
+// Classify returns true on errors that are retryable
 func (rc *Retriable) Classify(err error) bool {
 	for _, classifier := range rc.RetryOnAny {
 		if classifier.Classify(err) {
