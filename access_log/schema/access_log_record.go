@@ -79,6 +79,7 @@ func (b *recordBuffer) WriteDashOrStringValue(s string) {
 // AccessLogRecord represents a single access log line
 type AccessLogRecord struct {
 	Request              *http.Request
+	HeadersOverride      http.Header
 	StatusCode           int
 	RouteEndpoint        *route.Endpoint
 	StartedAt            time.Time
@@ -116,6 +117,11 @@ func (r *AccessLogRecord) makeRecord() []byte {
 		destIPandPort = r.RouteEndpoint.CanonicalAddr()
 	}
 
+	headers := r.Request.Header
+	if r.HeadersOverride != nil {
+		headers = r.HeadersOverride
+	}
+
 	b := new(recordBuffer)
 
 	b.WriteString(r.Request.Host)
@@ -127,19 +133,19 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteDashOrIntValue(r.StatusCode)
 	b.WriteIntValue(r.RequestBytesReceived)
 	b.WriteIntValue(r.BodyBytesSent)
-	b.WriteDashOrStringValue(r.Request.Header.Get("Referer"))
-	b.WriteDashOrStringValue(r.Request.Header.Get("User-Agent"))
+	b.WriteDashOrStringValue(headers.Get("Referer"))
+	b.WriteDashOrStringValue(headers.Get("User-Agent"))
 	b.WriteDashOrStringValue(r.Request.RemoteAddr)
 	b.WriteDashOrStringValue(destIPandPort)
 
 	b.WriteString(`x_forwarded_for:`)
-	b.WriteDashOrStringValue(r.Request.Header.Get("X-Forwarded-For"))
+	b.WriteDashOrStringValue(headers.Get("X-Forwarded-For"))
 
 	b.WriteString(`x_forwarded_proto:`)
-	b.WriteDashOrStringValue(r.Request.Header.Get("X-Forwarded-Proto"))
+	b.WriteDashOrStringValue(headers.Get("X-Forwarded-Proto"))
 
 	b.WriteString(`vcap_request_id:`)
-	b.WriteDashOrStringValue(r.Request.Header.Get("X-Vcap-Request-Id"))
+	b.WriteDashOrStringValue(headers.Get("X-Vcap-Request-Id"))
 
 	b.WriteString(`response_time:`)
 	b.WriteDashOrFloatValue(r.responseTime())

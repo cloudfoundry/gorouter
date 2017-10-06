@@ -72,6 +72,39 @@ var _ = Describe("AccessLogRecord", func() {
 			Expect(record.LogMessage()).To(Equal(recordString))
 		})
 
+		Context("with HeadersOverride specified", func() {
+			BeforeEach(func() {
+				record.HeadersOverride = http.Header{
+					"Referer":                    []string{"FooReferer"},
+					"User-Agent":                 []string{"FooUserAgent"},
+					"X-Forwarded-For":            []string{"FooProxy1, FooProxy2"},
+					"X-Forwarded-Proto":          []string{"FooOriginalRequestProto"},
+					handlers.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
+				}
+			})
+			It("Makes a record with all values", func() {
+				recordString := "FakeRequestHost - " +
+					"[2000-01-01T00:00:00.000+0000] " +
+					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
+					"200 " +
+					"30 " +
+					"23 " +
+					`"FooReferer" ` +
+					`"FooUserAgent" ` +
+					`"FakeRemoteAddr" ` +
+					`"1.2.3.4:1234" ` +
+					`x_forwarded_for:"FooProxy1, FooProxy2" ` +
+					`x_forwarded_proto:"FooOriginalRequestProto" ` +
+					`vcap_request_id:"abc-123-xyz-pdq" ` +
+					`response_time:60 ` +
+					`app_id:"FakeApplicationId" ` +
+					`app_index:"3"` +
+					"\n"
+
+				Expect(record.LogMessage()).To(Equal(recordString))
+			})
+		})
+
 		Context("with values missing", func() {
 			BeforeEach(func() {
 				record.Request.Header = http.Header{}

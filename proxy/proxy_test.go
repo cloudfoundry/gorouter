@@ -1154,7 +1154,7 @@ var _ = Describe("Proxy", func() {
 			//since the building of the log record happens throughout the life of the request
 			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
 			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"-" x_forwarded_proto:"-" vcap_request_id:`))
+			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
 			Expect(string(payload)).To(ContainSubstring(`response_time:`))
 			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
 			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
@@ -1163,29 +1163,16 @@ var _ = Describe("Proxy", func() {
 
 		It("Logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
 			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
-				req, body := conn.ReadRequest()
-				Expect(req.Method).To(Equal("POST"))
-				Expect(req.URL.Path).To(Equal("/"))
-				Expect(req.ProtoMajor).To(Equal(1))
-				Expect(req.ProtoMinor).To(Equal(1))
-
-				Expect(body).To(Equal("ABCD"))
-
-				rsp := test_util.NewResponse(200)
-				out := &bytes.Buffer{}
-				out.WriteString("DEFG")
-				rsp.Body = ioutil.NopCloser(out)
-				conn.WriteResponse(rsp)
-			}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
+				conn.ReadRequest()
+				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
+			})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
 
-			body := &bytes.Buffer{}
-			body.WriteString("ABCD")
-			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
-			req.Header.Set("X-Forwarded-For", "1.2.3.4")
-			req.Header.Set("X-Forwarded-Proto", "https")
+			req := test_util.NewRequest("POST", "test", "/", nil)
+			req.Header.Add("X-Forwarded-For", "1.2.3.4")
+			req.Header.Add("X-Forwarded-Proto", "https")
 			conn.WriteRequest(req)
 
 			resp, _ := conn.ReadResponse()
@@ -1200,11 +1187,9 @@ var _ = Describe("Proxy", func() {
 			//make sure the record includes all the data
 			//since the building of the log record happens throughout the life of the request
 			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"1.2.3.4" x_forwarded_proto:"https" vcap_request_id:`))
+			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 0 0 "-"`))
+			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"1.2.3.4, 127.0.0.1" x_forwarded_proto:"https" vcap_request_id:`))
 			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
-			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
 			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
 		})
 

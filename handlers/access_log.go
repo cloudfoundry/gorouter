@@ -54,6 +54,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		a.logger.Fatal("request-info-err", zap.Error(err))
 		return
 	}
+	alr.HeadersOverride = reqInfo.BackendReqHeaders
 	alr.RouteEndpoint = reqInfo.RouteEndpoint
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()

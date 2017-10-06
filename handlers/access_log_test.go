@@ -26,6 +26,7 @@ var _ = Describe("AccessLog", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
+		fakeLogger        *logger_fakes.FakeLogger
 		accessLogger      *fakes.FakeAccessLogger
 		extraHeadersToLog []string
 
@@ -34,8 +35,13 @@ var _ = Describe("AccessLog", func() {
 		reqChan chan *http.Request
 	)
 	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "", false)
+	testHeaders := http.Header{
+		"Foo":               []string{"foobar"},
+		"X-Forwarded-For":   []string{"1.2.3.4"},
+		"X-Forwarded-Proto": []string{"https"},
+	}
 
-	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	nextHandler := negroni.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 		_, err := ioutil.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -45,6 +51,10 @@ var _ = Describe("AccessLog", func() {
 		reqInfo, err := handlers.ContextRequestInfo(req)
 		if err == nil {
 			reqInfo.RouteEndpoint = testEndpoint
+		}
+
+		if next != nil {
+			next(rw, req)
 		}
 
 		reqChan <- req
@@ -65,13 +75,13 @@ var _ = Describe("AccessLog", func() {
 
 		accessLogger = &fakes.FakeAccessLogger{}
 
-		fakeLogger := new(logger_fakes.FakeLogger)
+		fakeLogger = new(logger_fakes.FakeLogger)
 
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.Use(handlers.NewProxyWriter(fakeLogger))
 		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, fakeLogger))
-		handler.UseHandlerFunc(nextHandler)
+		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
 
@@ -101,16 +111,41 @@ var _ = Describe("AccessLog", func() {
 		Expect(alr.BodyBytesSent).To(Equal(37))
 		Expect(alr.StatusCode).To(Equal(http.StatusTeapot))
 		Expect(alr.RouteEndpoint).To(Equal(testEndpoint))
+		Expect(alr.HeadersOverride).To(BeNil())
+	})
+
+	Context("when there are backend request headers on the context", func() {
+		BeforeEach(func() {
+			extraHeadersHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				reqInfo, err := handlers.ContextRequestInfo(req)
+				if err == nil {
+					reqInfo.BackendReqHeaders = testHeaders
+				}
+			})
+
+			handler.UseHandlerFunc(extraHeadersHandler)
+		})
+		It("uses those headers instead", func() {
+			handler.ServeHTTP(resp, req)
+
+			Expect(accessLogger.LogCallCount()).To(Equal(1))
+
+			alr := accessLogger.LogArgsForCall(0)
+
+			Expect(alr.Request.Header).To(Equal(req.Header))
+			Expect(alr.Request.Method).To(Equal(req.Method))
+			Expect(alr.Request.URL).To(Equal(req.URL))
+			Expect(alr.Request.RemoteAddr).To(Equal(req.RemoteAddr))
+			Expect(alr.HeadersOverride).To(Equal(testHeaders))
+		})
 	})
 
 	Context("when request info is not set on the request context", func() {
-		var fakeLogger *logger_fakes.FakeLogger
 		BeforeEach(func() {
-			fakeLogger = new(logger_fakes.FakeLogger)
 			handler = negroni.New()
 			handler.UseFunc(testProxyWriterHandler)
 			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, fakeLogger))
-			handler.UseHandler(nextHandler)
+			handler.Use(nextHandler)
 		})
 		It("calls Fatal on the logger", func() {
 			handler.ServeHTTP(resp, req)

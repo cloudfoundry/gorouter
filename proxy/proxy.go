@@ -274,6 +274,13 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 		target.Header.Set("X-Forwarded-Proto", scheme)
 	}
 
+	reqInfo, err := handlers.ContextRequestInfo(target)
+	if err != nil {
+		p.logger.Fatal("request-info-err", zap.Error(err))
+		return
+	}
+	reqInfo.BackendReqHeaders = target.Header
+
 	target.URL.Scheme = "http"
 	target.URL.Host = target.Host
 	target.URL.RawQuery = ""

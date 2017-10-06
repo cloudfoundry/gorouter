@@ -26,6 +26,8 @@ type RequestInfo struct {
 	ProxyResponseWriter    utils.ProxyResponseWriter
 	RouteServiceURL        *url.URL
 	IsInternalRouteService bool
+
+	BackendReqHeaders http.Header
 }
 
 // ContextRequestInfo gets the RequestInfo from the request Context
