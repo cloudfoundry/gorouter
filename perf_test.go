@@ -41,7 +41,7 @@ var _ = Describe("AccessLogRecord", func() {
 				str := strconv.Itoa(i)
 				r.Register(
 					route.Uri("bench.vcap.me."+str),
-					route.NewEndpoint("", "localhost", uint16(i), "", "", nil, -1, "", models.ModificationTag{}, "", false),
+					route.NewEndpoint("", "localhost", uint16(i), "", "", "", nil, -1, "", models.ModificationTag{}, "", false),
 				)
 			}
 		})

@@ -41,6 +41,7 @@ var _ = Describe("RouteRegistry", func() {
 		r = NewRouteRegistry(logger, configObj, reporter)
 		modTag = models.ModificationTag{}
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
+			"san1",
 			"id1", "0",
 			map[string]string{
 				"runtime":   "ruby18",
@@ -48,12 +49,14 @@ var _ = Describe("RouteRegistry", func() {
 			}, -1, "", modTag, "", false)
 
 		barEndpoint = route.NewEndpoint("54321", "192.168.1.2", 4321,
+			"san1",
 			"id2", "0", map[string]string{
 				"runtime":   "javascript",
 				"framework": "node",
 			}, -1, "https://my-rs.com", modTag, "", false)
 
 		bar2Endpoint = route.NewEndpoint("54321", "192.168.1.3", 1234,
+			"san1",
 			"id3", "0", map[string]string{
 				"runtime":   "javascript",
 				"framework": "node",
@@ -96,8 +99,8 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("ignores case", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-				m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+				m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", "", "", nil, -1, "", modTag, "", false)
 
 				r.Register("foo", m1)
 				r.Register("FOO", m2)
@@ -106,8 +109,8 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("allows multiple uris for the same endpoint", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-				m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+				m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				r.Register("foo", m1)
 				r.Register("bar", m2)
@@ -117,7 +120,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("allows routes with paths", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				r.Register("foo", m1)
 				r.Register("foo/v1", m1)
@@ -128,7 +131,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("excludes query strings in routes without context path", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				// discards query string
 				r.Register("dora.app.com?foo=bar", m1)
@@ -142,7 +145,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("excludes query strings in routes with context path", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				// discards query string
 				r.Register("dora.app.com/snarf?foo=bar", m1)
@@ -156,7 +159,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("remembers the context path properly with case (RFC 3986, Section 6.2.2.1)", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				r.Register("dora.app.com/app/UP/we/Go", m1)
 
@@ -169,7 +172,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("remembers host and path so that pools can be compared", func() {
-				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 				r.Register("dora.app.com/app", m1)
 				r.Register("golang.app.com/app", m1)
@@ -211,6 +214,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			It("logs register message with IsolationSegment when it's provided", func() {
 				isoSegEndpoint := route.NewEndpoint("12345", "192.168.1.1", 1234,
+					"san1",
 					"id1", "0",
 					map[string]string{
 						"runtime":   "ruby18",
@@ -304,7 +308,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			BeforeEach(func() {
 				modTag = models.ModificationTag{Guid: "abc"}
-				endpoint = route.NewEndpoint("", "1.1.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				endpoint = route.NewEndpoint("", "1.1.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 				r.Register("foo.com", endpoint)
 			})
 
@@ -327,7 +331,7 @@ var _ = Describe("RouteRegistry", func() {
 
 					BeforeEach(func() {
 						modTag.Increment()
-						endpoint2 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+						endpoint2 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 						r.Register("foo.com", endpoint2)
 					})
 
@@ -347,7 +351,7 @@ var _ = Describe("RouteRegistry", func() {
 
 						BeforeEach(func() {
 							modTag2 = models.ModificationTag{Guid: "abc", Index: 0}
-							endpoint3 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", nil, -1, "", modTag2, "", false)
+							endpoint3 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", "", nil, -1, "", modTag2, "", false)
 							r.Register("foo.com", endpoint3)
 						})
 
@@ -366,7 +370,7 @@ var _ = Describe("RouteRegistry", func() {
 				Context("when modification tag guid changes", func() {
 					BeforeEach(func() {
 						modTag.Guid = "def"
-						endpoint2 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+						endpoint2 = route.NewEndpoint("", "1.1.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 						r.Register("foo.com", endpoint2)
 					})
 
@@ -435,8 +439,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("ignores uri case and matches endpoint", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m1)
 			r.Unregister("FOO", m2)
@@ -445,8 +449,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("removes the specific url/endpoint combo", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m1)
 			r.Register("bar", m1)
@@ -571,7 +575,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("removes a route with a path", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo/bar", m1)
 			r.Unregister("foo/bar", m1)
@@ -580,7 +584,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("only unregisters the exact uri", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m1)
 			r.Register("foo/bar", m1)
@@ -597,7 +601,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("excludes query strings in routes", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("dora.app.com", m1)
 
@@ -632,6 +636,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			It("logs unregister message with IsolationSegment when it's provided", func() {
 				isoSegEndpoint := route.NewEndpoint("12345", "192.168.1.1", 1234,
+					"san1",
 					"id1", "0",
 					map[string]string{
 						"runtime":   "ruby18",
@@ -654,7 +659,7 @@ var _ = Describe("RouteRegistry", func() {
 					Guid:  "abc",
 					Index: 10,
 				}
-				endpoint = route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				endpoint = route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 				r.Register("foo.com", endpoint)
 				Expect(r.NumEndpoints()).To(Equal(1))
 			})
@@ -669,7 +674,7 @@ var _ = Describe("RouteRegistry", func() {
 					Guid:  "abc",
 					Index: 8,
 				}
-				endpoint2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag2, "", false)
+				endpoint2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag2, "", false)
 				r.Unregister("foo.com", endpoint2)
 				Expect(r.NumEndpoints()).To(Equal(1))
 			})
@@ -678,7 +683,7 @@ var _ = Describe("RouteRegistry", func() {
 
 	Context("Lookup", func() {
 		It("case insensitive lookup", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m)
 
@@ -691,8 +696,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("selects one of the routes", func() {
-			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", "", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("bar", m1)
 			r.Register("barr", m1)
@@ -712,8 +717,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("selects the outer most wild card route if one exists", func() {
-			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag, "", false)
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("*.outer.wild.card", app1)
 			r.Register("*.wild.card", app2)
@@ -732,8 +737,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("prefers full URIs to wildcard routes", func() {
-			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag, "", false)
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("not.wild.card", app1)
 			r.Register("*.wild.card", app2)
@@ -746,8 +751,8 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("sends lookup metrics to the reporter", func() {
-			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
-			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag, "", false)
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("not.wild.card", app1)
 			r.Register("*.wild.card", app2)
@@ -764,7 +769,7 @@ var _ = Describe("RouteRegistry", func() {
 			var m *route.Endpoint
 
 			BeforeEach(func() {
-				m = route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+				m = route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 			})
 
 			It("using context path and query string", func() {
@@ -794,7 +799,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("selects a route even with extra paths in the lookup argument", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m)
 
@@ -806,7 +811,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("selects a route even with a query string in the lookup argument", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m)
 
@@ -818,7 +823,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("fails to lookup when there is a percent without two hexadecimals following in the url", func() {
-			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", m)
 
@@ -834,8 +839,8 @@ var _ = Describe("RouteRegistry", func() {
 		)
 
 		BeforeEach(func() {
-			m1 := route.NewEndpoint("app-1-ID", "192.168.1.1", 1234, "", "0", nil, -1, "", modTag, "", false)
-			m2 := route.NewEndpoint("app-2-ID", "192.168.1.2", 1235, "", "0", nil, -1, "", modTag, "", false)
+			m1 := route.NewEndpoint("app-1-ID", "192.168.1.1", 1234, "", "", "0", nil, -1, "", modTag, "", false)
+			m2 := route.NewEndpoint("app-2-ID", "192.168.1.2", 1235, "", "", "0", nil, -1, "", modTag, "", false)
 
 			r.Register("bar.com/foo", m1)
 			r.Register("bar.com/foo", m2)
@@ -996,7 +1001,7 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		It("skips fresh droplets", func() {
-			endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag, "", false)
+			endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
 
 			r.Register("foo", endpoint)
 			r.Register("bar", endpoint)
@@ -1077,7 +1082,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("does not log the route info for fresh routes when pruning", func() {
-				endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, 60, "", modTag, "", false)
+				endpoint := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, 60, "", modTag, "", false)
 				r.Register("foo.com/bar", endpoint)
 				Expect(r.NumUris()).To(Equal(1))
 
@@ -1101,7 +1106,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				// add endpoints
 				for i := 0; i < totalRoutes; i++ {
-					e := route.NewEndpoint("12345", "192.168.1.1", uint16(1024+i), "id1", "", nil, -1, "", modTag, "", false)
+					e := route.NewEndpoint("12345", "192.168.1.1", uint16(1024+i), "san1", "id1", "", nil, -1, "", modTag, "", false)
 					r.Register(route.Uri(fmt.Sprintf("foo-%d", i)), e)
 				}
 
@@ -1173,7 +1178,7 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	It("marshals", func() {
-		m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "https://my-routeService.com", modTag, "", false)
+		m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "https://my-routeService.com", modTag, "", false)
 		r.Register("foo", m)
 
 		marshalled, err := json.Marshal(r)

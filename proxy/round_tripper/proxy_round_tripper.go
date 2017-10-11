@@ -44,7 +44,7 @@ func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory)
 	e.Lock()
 	if e.RoundTripper == nil {
 
-		e.RoundTripper = roundTripperFactory.New(e.PrivateInstanceId)
+		e.RoundTripper = roundTripperFactory.New(e.ServerCertDomainSAN)
 	}
 	e.Unlock()
 

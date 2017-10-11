@@ -34,7 +34,7 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 	reg.Register(
 		route.Uri(path),
 		route.NewEndpoint(
-			cfg.AppId, host, uint16(port), cfg.InstanceId, cfg.InstanceIndex,
+			cfg.AppId, host, uint16(port), cfg.ServerCertDomainSAN, cfg.InstanceId, cfg.InstanceIndex,
 			nil, cfg.StaleThreshold, cfg.RouteServiceUrl, models.ModificationTag{}, "",
 			(cfg.TLSConfig != nil),
 		),
@@ -73,13 +73,14 @@ func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandl
 }
 
 type RegisterConfig struct {
-	RouteServiceUrl string
-	InstanceId      string
-	InstanceIndex   string
-	AppId           string
-	StaleThreshold  int
-	TLSConfig       *tls.Config
-	IgnoreTLSConfig bool
+	RouteServiceUrl     string
+	ServerCertDomainSAN string
+	InstanceId          string
+	InstanceIndex       string
+	AppId               string
+	StaleThreshold      int
+	TLSConfig           *tls.Config
+	IgnoreTLSConfig     bool
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {

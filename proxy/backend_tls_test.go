@@ -55,14 +55,14 @@ var _ = Describe("Backend TLS", func() {
 	BeforeEach(func() {
 		var err error
 
-		privateInstanceId, _ := uuid.GenerateUUID()
+		serverCertDomainSAN, _ := uuid.GenerateUUID()
 		// Clear proxy's CA cert pool
 		proxyCertPool := freshProxyCACertPool()
 
 		// Clear backend app's CA cert pool
 		backendCACertPool := x509.NewCertPool()
 
-		backendCertChain := createCertAndAddCA(test_util.CertNames{CommonName: privateInstanceId}, proxyCertPool)
+		backendCertChain := createCertAndAddCA(test_util.CertNames{CommonName: serverCertDomainSAN}, proxyCertPool)
 		clientCertChain := createCertAndAddCA(test_util.CertNames{CommonName: "gorouter"}, backendCACertPool)
 
 		backendTLSConfig := backendCertChain.AsTLSConfig()
@@ -72,13 +72,14 @@ var _ = Describe("Backend TLS", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		registerConfig = test_util.RegisterConfig{
-			TLSConfig:  backendTLSConfig,
-			InstanceId: privateInstanceId,
-			AppId:      "app-1",
+			TLSConfig:           backendTLSConfig,
+			ServerCertDomainSAN: serverCertDomainSAN,
+			InstanceId:          "instance-1",
+			AppId:               "app-1",
 		}
 	})
 
-	Context("when the route is expired and the backend fails instance id validation", func() {
+	Context("when the route is expired and the backend fails server cert domain SAN validation", func() {
 		BeforeEach(func() {
 			var err error
 			caCertPool, err = x509.SystemCertPool()
@@ -148,9 +149,9 @@ var _ = Describe("Backend TLS", func() {
 		})
 	})
 
-	Context("when the backend instance id does not match the common name on the backend's cert", func() {
+	Context("when the backend server cert domain SAN does not match the common name on the backend's cert", func() {
 		BeforeEach(func() {
-			registerConfig.InstanceId = "foo-instance"
+			registerConfig.ServerCertDomainSAN = "foo-san"
 		})
 
 		It("returns a HTTP 503 Service Unavailable error", func() {
@@ -163,7 +164,7 @@ var _ = Describe("Backend TLS", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
 			backendCertChain := createCertAndAddCA(test_util.CertNames{
-				SANs: test_util.SubjectAltNames{DNS: registerConfig.InstanceId},
+				SANs: test_util.SubjectAltNames{DNS: registerConfig.ServerCertDomainSAN},
 			}, proxyCertPool)
 			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
 
@@ -196,7 +197,7 @@ var _ = Describe("Backend TLS", func() {
 			proxyCertPool := freshProxyCACertPool()
 			backendCertChain := createCertAndAddCA(test_util.CertNames{
 				CommonName: "foo",
-				SANs:       test_util.SubjectAltNames{DNS: registerConfig.InstanceId},
+				SANs:       test_util.SubjectAltNames{DNS: registerConfig.ServerCertDomainSAN},
 			}, proxyCertPool)
 			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
 		})
@@ -239,9 +240,9 @@ var _ = Describe("Backend TLS", func() {
 		})
 	})
 
-	Context("when the backend registration does not include instance id", func() {
+	Context("when the backend registration does not include server cert domain SAN", func() {
 		BeforeEach(func() {
-			registerConfig.InstanceId = ""
+			registerConfig.ServerCertDomainSAN = ""
 		})
 
 		It("fails to validate (backends registering with a tls_port MUST provide a name that we can validate on their server certificate)", func() {

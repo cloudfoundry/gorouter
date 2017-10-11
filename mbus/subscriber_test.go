@@ -216,6 +216,7 @@ var _ = Describe("Subscriber", func() {
 					Host:                 "host",
 					App:                  "app",
 					TLSPort:              1999,
+					ServerCertDomainSAN:  "san",
 					PrivateInstanceID:    "id",
 					PrivateInstanceIndex: "index",
 					Port:                 1111,
@@ -232,7 +233,7 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1999, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", true)
+				expectedEndpoint := route.NewEndpoint("app", "host", 1999, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", true)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
@@ -248,6 +249,7 @@ var _ = Describe("Subscriber", func() {
 					Host:                    "host",
 					App:                     "app",
 					TLSPort:                 1999,
+					ServerCertDomainSAN:     "san",
 					PrivateInstanceID:       "id",
 					PrivateInstanceIndex:    "index",
 					StaleThresholdInSeconds: 120,
@@ -277,6 +279,7 @@ var _ = Describe("Subscriber", func() {
 					Host:                 "host",
 					App:                  "app",
 					TLSPort:              1999,
+					ServerCertDomainSAN:  "san",
 					PrivateInstanceID:    "id",
 					PrivateInstanceIndex: "index",
 					Port:                 1111,
@@ -293,7 +296,7 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 
 				err = natsClient.Publish("router.unregister", data)
@@ -301,7 +304,7 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.UnregisterCallCount).Should(Equal(1))
 				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
@@ -310,6 +313,7 @@ var _ = Describe("Subscriber", func() {
 				msg := mbus.RegistryMessage{
 					Host:                 "host",
 					App:                  "app",
+					ServerCertDomainSAN:  "san",
 					PrivateInstanceID:    "id",
 					PrivateInstanceIndex: "index",
 					Port:                 1111,
@@ -326,7 +330,7 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 
 				err = natsClient.Publish("router.unregister", data)
@@ -334,7 +338,7 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.UnregisterCallCount).Should(Equal(1))
 				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
@@ -351,6 +355,7 @@ var _ = Describe("Subscriber", func() {
 				Host:                 "host",
 				App:                  "app",
 				RouteServiceURL:      "url",
+				ServerCertDomainSAN:  "san",
 				PrivateInstanceID:    "id",
 				PrivateInstanceIndex: "index",
 				Port:                 1111,
@@ -381,6 +386,7 @@ var _ = Describe("Subscriber", func() {
 				Host:                 "host",
 				App:                  "app",
 				RouteServiceURL:      "https://url.example.com",
+				ServerCertDomainSAN:  "san",
 				PrivateInstanceID:    "id",
 				PrivateInstanceIndex: "index",
 				Port:                 1111,
@@ -395,6 +401,7 @@ var _ = Describe("Subscriber", func() {
 			msg := mbus.RegistryMessage{
 				Host:                 "host",
 				App:                  "app1",
+				ServerCertDomainSAN:  "san",
 				PrivateInstanceID:    "id",
 				PrivateInstanceIndex: "index",
 				Port:                 1112,
@@ -439,6 +446,7 @@ var _ = Describe("Subscriber", func() {
 				Host:                 "host",
 				App:                  "app",
 				RouteServiceURL:      "https://url.example.com",
+				ServerCertDomainSAN:  "san",
 				PrivateInstanceID:    "id",
 				PrivateInstanceIndex: "index",
 				Port:                 1111,

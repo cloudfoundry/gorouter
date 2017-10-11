@@ -98,7 +98,8 @@ func (a *TestApp) Port() uint16 {
 	return a.port
 }
 
-func (a *TestApp) TlsRegister(privateInstanceId string) {
+func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
+	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host:    "127.0.0.1",
 		TlsPort: a.port,
@@ -109,8 +110,9 @@ func (a *TestApp) TlsRegister(privateInstanceId string) {
 		App:     "0",
 		StaleThresholdInSeconds: 1,
 
-		RouteServiceUrl:   a.routeService,
-		PrivateInstanceId: privateInstanceId,
+		RouteServiceUrl:     a.routeService,
+		ServerCertDomainSAN: serverCertDomainSAN,
+		PrivateInstanceId:   uuid,
 	}
 
 	b, _ := json.Marshal(rm)
@@ -223,6 +225,7 @@ type registerMessage struct {
 	App                     string            `json:"app"`
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
-	RouteServiceUrl   string `json:"route_service_url"`
-	PrivateInstanceId string `json:"private_instance_id"`
+	RouteServiceUrl     string `json:"route_service_url"`
+	ServerCertDomainSAN string `json:"server_cert_domain_san"`
+	PrivateInstanceId   string `json:"private_instance_id"`
 }

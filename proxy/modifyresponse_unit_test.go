@@ -36,7 +36,7 @@ var _ = Describe("modifyResponse", func() {
 		reqInfo, err = handlers.ContextRequestInfo(modifiedReq)
 		Expect(err).ToNot(HaveOccurred())
 		reqInfo.RouteEndpoint = route.NewEndpoint(
-			"app-id", "1.2.3.4", 5678, "id-1", "idx-1", nil,
+			"app-id", "1.2.3.4", 5678, "san-1", "id-1", "idx-1", nil,
 			120, "", models.ModificationTag{}, "", false,
 		)
 		reqInfo.RoutePool = route.NewPool(0, "foo.com", "context-path")

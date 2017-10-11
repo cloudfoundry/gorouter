@@ -97,7 +97,7 @@ var _ = Describe("Router", func() {
 		Eventually(closeChannel).Should(BeClosed())
 
 		var result bool
-		Eventually(resultCh, 5 * time.Second).Should(Receive(&result))
+		Eventually(resultCh, 5*time.Second).Should(Receive(&result))
 		Expect(result).To(BeFalse())
 
 		blocker <- false

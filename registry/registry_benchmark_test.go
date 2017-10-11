@@ -30,7 +30,7 @@ var batcher = metricbatcher.New(sender, 5*time.Second)
 var reporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 
 var fooEndpoint = route.NewEndpoint(
-	"12345", "192.168.1.1", 1234, "id1", "0", map[string]string{}, -1, "",
+	"12345", "192.168.1.1", 1234, "san1", "id1", "0", map[string]string{}, -1, "",
 	models.ModificationTag{}, "", false,
 )
 

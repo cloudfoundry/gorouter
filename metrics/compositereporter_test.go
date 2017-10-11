@@ -29,7 +29,7 @@ var _ = Describe("CompositeReporter", func() {
 		fakeProxyReporter = new(fakes.FakeProxyReporter)
 
 		composite = &metrics.CompositeReporter{VarzReporter: fakeVarzReporter, ProxyReporter: fakeProxyReporter}
-		endpoint = route.NewEndpoint("someId", "host", 2222, "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
+		endpoint = route.NewEndpoint("someId", "host", 2222, "serverCertDomainSAN", "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
 		responseDuration = time.Second

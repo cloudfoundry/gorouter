@@ -204,16 +204,16 @@ var _ = Describe("Router Integration", func() {
 
 	Describe("TLS to backends", func() {
 		var (
-			cfg               *config.Config
-			statusPort        uint16
-			proxyPort         uint16
-			cfgFile           string
-			privateInstanceId string
-			backendCertChain  test_util.CertChain // server cert presented by backend to gorouter
-			clientCertChain   test_util.CertChain // client cert presented by gorouter to backend
-			backendTLSConfig  *tls.Config
-			localIP           string
-			mbusClient        *nats.Conn
+			cfg                 *config.Config
+			statusPort          uint16
+			proxyPort           uint16
+			cfgFile             string
+			serverCertDomainSAN string
+			backendCertChain    test_util.CertChain // server cert presented by backend to gorouter
+			clientCertChain     test_util.CertChain // client cert presented by gorouter to backend
+			backendTLSConfig    *tls.Config
+			localIP             string
+			mbusClient          *nats.Conn
 		)
 
 		BeforeEach(func() {
@@ -225,8 +225,8 @@ var _ = Describe("Router Integration", func() {
 			cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 			cfg.SkipSSLValidation = false
 
-			privateInstanceId, _ = uuid.GenerateUUID()
-			backendCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: privateInstanceId})
+			serverCertDomainSAN, _ = uuid.GenerateUUID()
+			backendCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: serverCertDomainSAN})
 			cfg.CACerts = string(backendCertChain.CACertPEM)
 
 			clientCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
@@ -261,7 +261,7 @@ var _ = Describe("Router Integration", func() {
 		})
 		It("successfully establishes a mutual TLS connection with backend", func() {
 			runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
-			runningApp1.TlsRegister(privateInstanceId)
+			runningApp1.TlsRegister(serverCertDomainSAN)
 			runningApp1.TlsListen(backendTLSConfig)
 			heartbeatInterval := 200 * time.Millisecond
 			runningTicker := time.NewTicker(heartbeatInterval)
@@ -271,7 +271,7 @@ var _ = Describe("Router Integration", func() {
 				for {
 					select {
 					case <-runningTicker.C:
-						runningApp1.TlsRegister(privateInstanceId)
+						runningApp1.TlsRegister(serverCertDomainSAN)
 					case <-done:
 						return
 					}

@@ -53,6 +53,7 @@ type Endpoint struct {
 	ApplicationId        string
 	addr                 string
 	Tags                 map[string]string
+	ServerCertDomainSAN  string
 	PrivateInstanceId    string
 	StaleThreshold       time.Duration
 	RouteServiceUrl      string
@@ -99,6 +100,7 @@ func NewEndpoint(
 	appId,
 	host string,
 	port uint16,
+	serverCertDomainSAN string,
 	privateInstanceId string,
 	privateInstanceIndex string,
 	tags map[string]string,
@@ -113,6 +115,7 @@ func NewEndpoint(
 		addr:                 fmt.Sprintf("%s:%d", host, port),
 		Tags:                 tags,
 		useTls:               useTLS,
+		ServerCertDomainSAN:  serverCertDomainSAN,
 		PrivateInstanceId:    privateInstanceId,
 		PrivateInstanceIndex: privateInstanceIndex,
 		StaleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
@@ -164,13 +167,15 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 			}
 
 			oldEndpoint := e.endpoint
-			if oldEndpoint.PrivateInstanceId == endpoint.PrivateInstanceId {
-				endpoint.RoundTripper = oldEndpoint.RoundTripper
-				e.endpoint = endpoint
-			} else {
+			e.endpoint = endpoint
+
+			if oldEndpoint.PrivateInstanceId != endpoint.PrivateInstanceId {
 				delete(p.index, oldEndpoint.PrivateInstanceId)
-				e.endpoint = endpoint
 				p.index[endpoint.PrivateInstanceId] = e
+			}
+
+			if oldEndpoint.ServerCertDomainSAN == endpoint.ServerCertDomainSAN {
+				endpoint.RoundTripper = oldEndpoint.RoundTripper
 			}
 		}
 	} else {
@@ -357,13 +362,14 @@ func (e *endpointElem) failed() {
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	var jsonObj struct {
-		Address           string            `json:"address"`
-		TLS               bool              `json:"tls"`
-		TTL               int               `json:"ttl"`
-		RouteServiceUrl   string            `json:"route_service_url,omitempty"`
-		Tags              map[string]string `json:"tags"`
-		IsolationSegment  string            `json:"isolation_segment,omitempty"`
-		PrivateInstanceId string            `json:"private_instance_id,omitempty"`
+		Address             string            `json:"address"`
+		TLS                 bool              `json:"tls"`
+		TTL                 int               `json:"ttl"`
+		RouteServiceUrl     string            `json:"route_service_url,omitempty"`
+		Tags                map[string]string `json:"tags"`
+		IsolationSegment    string            `json:"isolation_segment,omitempty"`
+		PrivateInstanceId   string            `json:"private_instance_id,omitempty"`
+		ServerCertDomainSAN string            `json:"server_cert_domain_san,omitempty"`
 	}
 
 	jsonObj.Address = e.addr
@@ -373,6 +379,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	jsonObj.Tags = e.Tags
 	jsonObj.IsolationSegment = e.IsolationSegment
 	jsonObj.PrivateInstanceId = e.PrivateInstanceId
+	jsonObj.ServerCertDomainSAN = e.ServerCertDomainSAN
 	return json.Marshal(jsonObj)
 }
 

@@ -34,7 +34,7 @@ var _ = Describe("AccessLog", func() {
 
 		reqChan chan *http.Request
 	)
-	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "", false)
+	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "server-cert-domain-san-123", "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "", false)
 	testHeaders := http.Header{
 		"Foo":               []string{"foobar"},
 		"X-Forwarded-For":   []string{"1.2.3.4"},

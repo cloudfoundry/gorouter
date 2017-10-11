@@ -28,6 +28,7 @@ type RegistryMessage struct {
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 	RouteServiceURL         string            `json:"route_service_url"`
 	PrivateInstanceID       string            `json:"private_instance_id"`
+	ServerCertDomainSAN     string            `json:"server_cert_domain_san"`
 	PrivateInstanceIndex    string            `json:"private_instance_index"`
 	IsolationSegment        string            `json:"isolation_segment"`
 }
@@ -41,6 +42,7 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 		rm.App,
 		rm.Host,
 		port,
+		rm.ServerCertDomainSAN,
 		rm.PrivateInstanceID,
 		rm.PrivateInstanceIndex,
 		rm.Tags,

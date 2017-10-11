@@ -116,7 +116,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("for normal routes", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
+				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
 					map[string]string{}, 0, "", models.ModificationTag{}, "", false)
 
 				added := routePool.Put(endpoint)
@@ -141,7 +141,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("with route service URL configured for the route", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
+				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
 					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
 
 				added := routePool.Put(endpoint)
@@ -165,7 +165,7 @@ var _ = Describe("Route Service Handler", func() {
 	Context("with Route Services enabled", func() {
 		Context("for normal routes", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "id", "1",
+				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
 					map[string]string{}, 0, "", models.ModificationTag{}, "", false)
 
 				added := routePool.Put(endpoint)
@@ -190,7 +190,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("with route service URL configured for the route", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
 					"https://route-service.com", models.ModificationTag{}, "", false,
 				)
 				added := routePool.Put(endpoint)
@@ -515,7 +515,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("when a TCP request an app bound to a route service", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
 					"https://goodrouteservice.com", models.ModificationTag{}, "", false,
 				)
 
@@ -537,7 +537,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("when a websocket request an app bound to a route service", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
 					"https://goodrouteservice.com", models.ModificationTag{}, "", false,
 				)
 
@@ -560,7 +560,7 @@ var _ = Describe("Route Service Handler", func() {
 		Context("when a bad route service url is used", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "id", "1", map[string]string{}, 0,
+					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
 					"https://bad%20service.com", models.ModificationTag{}, "", false,
 				)
 
