@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+
+	"context"
 )
 
 var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
@@ -18,6 +20,10 @@ var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
 var Dial = ClassifierFunc(func(err error) bool {
 	ne, ok := err.(*net.OpError)
 	return ok && ne.Op == "dial"
+})
+
+var ContextCancelled = ClassifierFunc(func(err error) bool {
+	return err == context.Canceled
 })
 
 var ConnectionResetOnRead = ClassifierFunc(func(err error) bool {

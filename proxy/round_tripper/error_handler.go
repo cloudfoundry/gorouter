@@ -33,6 +33,7 @@ var DefaultErrorSpecs = []ErrorSpec{
 	{fails.HostnameMismatch, HostnameErrorMessage, http.StatusServiceUnavailable, handleHostnameMismatch},
 	{fails.UntrustedCert, InvalidCertificateMessage, 526, handleUntrustedCert},
 	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496, nil},
+	{fails.ContextCancelled, ContextCancelledMessage, 499, nil},
 }
 
 type ErrorHandler struct {

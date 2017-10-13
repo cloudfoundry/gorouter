@@ -28,6 +28,7 @@ const (
 	InvalidCertificateMessage = "526 Invalid SSL Certificate"
 	SSLHandshakeMessage       = "525 SSL Handshake Failed"
 	SSLCertRequiredMessage    = "496 SSL Certificate Required"
+	ContextCancelledMessage   = "499 Request Cancelled"
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper

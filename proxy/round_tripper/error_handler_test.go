@@ -13,6 +13,8 @@ import (
 
 	"crypto/x509"
 
+	"context"
+
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
@@ -162,6 +164,16 @@ var _ = Describe("HandleError", func() {
 
 			It("Emits a backend_tls_handshake_failed metric", func() {
 				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
+			})
+		})
+		Context("Context Cancelled Error", func() {
+			BeforeEach(func() {
+				err = context.Canceled
+				errorHandler.HandleError(responseWriter, err)
+			})
+
+			It("Has a 499 Status Code", func() {
+				Expect(responseWriter.Status()).To(Equal(499))
 			})
 		})
 	})

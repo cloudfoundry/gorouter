@@ -12,6 +12,8 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/test_util"
 
+	"golang.org/x/net/context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -95,6 +97,18 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 			_, err = testTransport.RoundTrip(req)
 			Expect(err).To(HaveOccurred())
 			Expect(fails.AttemptedTLSWithNonTLSBackend(err)).To(BeFalse())
+		})
+	})
+
+	Describe("Cancel Request after some time", func() {
+		It("matches error with cancelled connections", func() {
+			req, _ := http.NewRequest("GET", server.URL, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancellableReq := req.WithContext(ctx)
+			cancel()
+			_, err := testTransport.RoundTrip(cancellableReq)
+			Expect(err).To(HaveOccurred())
+			Expect(fails.ContextCancelled(err)).To(BeTrue())
 		})
 	})
 
