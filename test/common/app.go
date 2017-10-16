@@ -5,7 +5,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/gomega"
 
@@ -15,6 +14,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 type TestApp struct {
@@ -33,7 +34,7 @@ type TestApp struct {
 func NewTestApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string, routeService string) *TestApp {
 	app := new(TestApp)
 
-	port, _ := localip.LocalPort()
+	port := test_util.NextAvailPort()
 
 	app.port = port
 	app.rPort = rPort

@@ -16,6 +16,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	"github.com/uber-go/zap"
@@ -135,11 +136,7 @@ func (c *VcapComponent) Start() error {
 			return err
 		}
 
-		port, err := localip.LocalPort()
-		if err != nil {
-			log.Error("error-getting-localPort", zap.Error(err))
-			return err
-		}
+		port := test_util.NextAvailPort()
 
 		c.Varz.Host = fmt.Sprintf("%s:%d", host, port)
 	}

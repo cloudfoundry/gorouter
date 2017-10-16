@@ -7,7 +7,6 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats"
 
-	"code.cloudfoundry.org/localip"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -35,8 +34,7 @@ var _ = Describe("Component", func() {
 	)
 
 	BeforeEach(func() {
-		port, err := localip.LocalPort()
-		Expect(err).ToNot(HaveOccurred())
+		port := test_util.NextAvailPort()
 
 		varz = &health.Varz{
 			GenericVarz: health.GenericVarz{
