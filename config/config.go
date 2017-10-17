@@ -149,6 +149,7 @@ type Config struct {
 	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval"`
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
+	EndpointDialTimeout             time.Duration `yaml:"-"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout"`
 
@@ -195,6 +196,7 @@ var defaultConfig = Config{
 	MinTLSVersion: tls.VersionTLS12,
 
 	EndpointTimeout:     60 * time.Second,
+	EndpointDialTimeout: 5 * time.Second,
 	RouteServiceTimeout: 60 * time.Second,
 
 	PublishStartMessageInterval:               30 * time.Second,

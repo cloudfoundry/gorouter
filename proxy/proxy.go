@@ -49,6 +49,7 @@ type proxy struct {
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
 	defaultLoadBalance       string
+	endpointDialTimeout      time.Duration
 	bufferPool               httputil.BufferPool
 }
 
@@ -120,12 +121,13 @@ func NewProxy(
 		healthCheckUserAgent:     c.HealthCheckUserAgent,
 		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 		defaultLoadBalance:       c.LoadBalance,
+		endpointDialTimeout:      c.EndpointDialTimeout,
 		bufferPool:               NewBufferPool(),
 	}
 
 	httpTransportTemplate := &http.Transport{
 		Dial: func(network, addr string) (net.Conn, error) {
-			conn, err := net.DialTimeout(network, addr, 5*time.Second)
+			conn, err := net.DialTimeout(network, addr, p.endpointDialTimeout)
 			if err != nil {
 				return conn, err
 			}
@@ -232,7 +234,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	if err != nil {
 		p.logger.Fatal("request-info-err", zap.Error(err))
 	}
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger)
+	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout)
 
 	if reqInfo.RoutePool == nil {
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))

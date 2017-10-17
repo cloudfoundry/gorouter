@@ -31,15 +31,18 @@ type RequestHandler struct {
 
 	request  *http.Request
 	response utils.ProxyResponseWriter
+
+	endpointDialTimeout time.Duration
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger) *RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
 	return &RequestHandler{
-		logger:   requestLogger,
-		reporter: r,
-		request:  request,
-		response: response,
+		logger:              requestLogger,
+		reporter:            r,
+		request:             request,
+		response:            response,
+		endpointDialTimeout: endpointDialTimeout,
 	}
 }
 
@@ -147,7 +150,7 @@ func (h *RequestHandler) serveTcp(
 		}
 
 		iter.PreRequest(endpoint)
-		connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), 5*time.Second)
+		connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
 		iter.PostRequest(endpoint)
 		if err == nil {
 			break

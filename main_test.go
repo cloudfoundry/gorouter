@@ -40,8 +40,8 @@ import (
 	"time"
 )
 
-const defaultPruneInterval = 100 * time.Millisecond
-const defaultPruneThreshold = 200 * time.Millisecond
+const defaultPruneInterval = 50 * time.Millisecond
+const defaultPruneThreshold = 100 * time.Millisecond
 
 var _ = Describe("Router Integration", func() {
 
@@ -67,6 +67,7 @@ var _ = Describe("Router Integration", func() {
 		cfg.DropletStaleThreshold = pruneThreshold
 		cfg.StartResponseDelayInterval = 1 * time.Second
 		cfg.EndpointTimeout = 5 * time.Second
+		cfg.EndpointDialTimeout = 10 * time.Millisecond
 		cfg.DrainTimeout = 200 * time.Millisecond
 		cfg.DrainWait = time.Duration(drainWait) * time.Second
 	}
@@ -757,7 +758,7 @@ var _ = Describe("Router Integration", func() {
 
 			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
-			heartbeatInterval := 200 * time.Millisecond
+			heartbeatInterval := defaultPruneThreshold / 2
 			runningTicker := time.NewTicker(heartbeatInterval)
 
 			go func() {

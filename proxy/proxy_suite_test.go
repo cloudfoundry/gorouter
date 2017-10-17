@@ -60,6 +60,7 @@ var _ = BeforeEach(func() {
 	conf = config.DefaultConfig()
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
+	conf.EndpointDialTimeout = 50 * time.Millisecond
 	fakeReporter = &fakes.FakeCombinedReporter{}
 })
 
