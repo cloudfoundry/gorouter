@@ -125,7 +125,8 @@ The format of the `router.register` message is as follows:
   "app": "some_app_guid",
   "stale_threshold_in_seconds": 120,
   "private_instance_id": "some_app_instance_id",
-  "isolation_segment": "some_iso_seg_name"
+  "isolation_segment": "some_iso_seg_name",
+  "server_cert_domain_san": "some_subject_alternative_name"
 }
 ```
 
@@ -138,6 +139,8 @@ The format of the `router.register` message is as follows:
 `isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec) for more information.
 
 `tls_port` is the port that Gorouter will use to attempt TLS connections with the registered backends. `router.backends.tls_pem` must be configured with a certificate authority used to generate the certificates for the backend. If `router.backend.enable_tls` has been set to true, the router will prefer `tls_port` over `port` if present. Otherwise, `port` will be preferred, and messages with only `tls_port` will be rejected with an error message in the logs.
+
+`server_cert_domain_san` indicates a string that Gorouter will look for in a Subject Alternative Name (SAN) of the TLS certificate hosted by the backend to validate instance identity. Used when `tls_port` is provided in the registration message and Gorouter is configured to inititate TLS connections to backends (manifest property `backends.enable_tls: true`). When the value of `server_cert_domain_san` does not match a SAN in the server certificate, and route TTL has not expired, Gorouter will mark the backend unhealthy for 30s and retry another backend. If the valiation fails after TTL has expired, Gorouter will prune the backend and retry another backend for the route if one exists.
 
 Additionally, if the `host` and `tls_port` pair matches an already registered `host` and `port` pair, the previously registered route will be overwritten and Gorouter will now attempt TLS connections with the `host` and `tls_port` pair. The same is also true if the `host` and `port` pair matches an already registered `host` and `tls_port` pair, except Gorouter will no longer attempt TLS connections with the backend.
 
