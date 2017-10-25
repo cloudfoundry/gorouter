@@ -76,7 +76,9 @@ var _ = JustBeforeEach(func() {
 	go accessLog.Run()
 
 	conf.EnableSSL = true
-	conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+	if len(conf.CipherSuites) == 0 {
+		conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+	}
 
 	tlsConfig := &tls.Config{
 		CipherSuites:       conf.CipherSuites,

@@ -177,7 +177,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 	})
 
 	Describe("RemoteHandshakeFailure", func() {
-		Context("whent the cipher suites aren't compatible", func() {
+		Context("when the cipher suites aren't compatible", func() {
 			BeforeEach(func() {
 				tlsServer.TLS.CipherSuites = []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}
 			})

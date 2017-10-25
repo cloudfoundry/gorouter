@@ -2,6 +2,7 @@ package round_tripper_test
 
 import (
 	"errors"
+	"net"
 	"net/http/httptest"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -152,7 +153,7 @@ var _ = Describe("HandleError", func() {
 			})
 		})
 
-		Context("SSL Handshake Error", func() {
+		Context("Attempted TLS with non-TLS backend error", func() {
 			BeforeEach(func() {
 				err = tls.RecordHeaderError{Msg: "bad handshake"}
 				errorHandler.HandleError(responseWriter, err)
@@ -166,6 +167,22 @@ var _ = Describe("HandleError", func() {
 				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
 			})
 		})
+
+		Context("Remote handshake failure", func() {
+			BeforeEach(func() {
+				err = &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")}
+				errorHandler.HandleError(responseWriter, err)
+			})
+
+			It("Has a 525 Status Code", func() {
+				Expect(responseWriter.Status()).To(Equal(525))
+			})
+
+			It("Emits a backend_tls_handshake_failed metric", func() {
+				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
+			})
+		})
+
 		Context("Context Cancelled Error", func() {
 			BeforeEach(func() {
 				err = context.Canceled

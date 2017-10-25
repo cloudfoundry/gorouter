@@ -34,6 +34,7 @@ var DefaultErrorSpecs = []ErrorSpec{
 	{fails.UntrustedCert, InvalidCertificateMessage, 526, handleUntrustedCert},
 	{fails.RemoteFailedCertCheck, SSLCertRequiredMessage, 496, nil},
 	{fails.ContextCancelled, ContextCancelledMessage, 499, nil},
+	{fails.RemoteHandshakeFailure, SSLHandshakeMessage, 525, handleSSLHandshake},
 }
 
 type ErrorHandler struct {

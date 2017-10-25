@@ -258,4 +258,14 @@ var _ = Describe("Backend TLS", func() {
 			Expect(resp.StatusCode).To(Equal(525))
 		})
 	})
+
+	Context("when no cipher suites are shared between gorouter and backend", func() {
+		BeforeEach(func() {
+			conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}
+		})
+		It("returns a HTTP 525 SSL Handshake error", func() {
+			resp := registerAppAndTest()
+			Expect(resp.StatusCode).To(Equal(525))
+		})
+	})
 })
