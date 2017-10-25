@@ -163,6 +163,9 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
 		if e.endpoint != endpoint {
+			e.endpoint.Lock()
+			defer e.endpoint.Unlock()
+
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
 				return false
 			}
