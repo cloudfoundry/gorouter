@@ -452,7 +452,7 @@ var _ = Describe("Router", func() {
 				// drain in progress, continue with current request
 				blocker <- false
 
-				Eventually(drainDone).Should(BeClosed())
+				Eventually(drainDone, drainWait + drainTimeout * (9/10)).Should(BeClosed())
 				Eventually(clientDone).Should(BeClosed())
 			})
 		})
