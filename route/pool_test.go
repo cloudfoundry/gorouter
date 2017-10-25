@@ -6,6 +6,10 @@ import (
 
 	"crypto/tls"
 
+	"crypto/x509"
+
+	"net"
+
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
@@ -181,23 +185,35 @@ var _ = Describe("Pool", func() {
 	})
 
 	Context("EndpointFailed", func() {
-		It("prunes tls routes that have already expired", func() {
+		It("prunes tls routes on hostname mismatch errors", func() {
 			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", true)
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
 
-			pool.EndpointFailed(endpoint)
+			pool.EndpointFailed(endpoint, x509.HostnameError{})
 
 			Expect(pool.IsEmpty()).To(BeTrue())
 		})
+
+		It("does not prune tls routes on connection errors", func() {
+			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", true)
+			pool.Put(endpoint)
+
+			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+
+			pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
+
+			Expect(pool.IsEmpty()).To(BeFalse())
+		})
+
 		It("does not prune non-tls routes that have already expired", func() {
 			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", false)
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
 
-			pool.EndpointFailed(endpoint)
+			pool.EndpointFailed(endpoint, x509.HostnameError{})
 
 			Expect(pool.IsEmpty()).To(BeFalse())
 		})

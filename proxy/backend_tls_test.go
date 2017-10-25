@@ -79,13 +79,11 @@ var _ = Describe("Backend TLS", func() {
 		}
 	})
 
-	Context("when the route is expired and the backend fails server cert domain SAN validation", func() {
+	Context("when the backend fails server cert domain SAN validation", func() {
 		BeforeEach(func() {
 			var err error
 			caCertPool, err = x509.SystemCertPool()
 			Expect(err).ToNot(HaveOccurred())
-
-			registerConfig.StaleThreshold = -1
 		})
 		It("prunes the route", func() {
 			resp := registerAppAndTest()

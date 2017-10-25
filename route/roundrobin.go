@@ -81,9 +81,9 @@ func (r *RoundRobin) next() *Endpoint {
 	}
 }
 
-func (r *RoundRobin) EndpointFailed() {
+func (r *RoundRobin) EndpointFailed(err error) {
 	if r.lastEndpoint != nil {
-		r.pool.EndpointFailed(r.lastEndpoint)
+		r.pool.EndpointFailed(r.lastEndpoint, err)
 	}
 }
 

@@ -141,7 +141,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			if err == nil || !rt.retryableClassifier.Classify(err) {
 				break
 			}
-			iter.EndpointFailed()
+			iter.EndpointFailed(err)
 			logger.Error("backend-endpoint-failed", zap.Error(err))
 		} else {
 			logger.Debug(

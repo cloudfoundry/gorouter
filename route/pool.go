@@ -12,6 +12,7 @@ import (
 	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/routing-api/models"
 )
 
@@ -68,7 +69,7 @@ type Endpoint struct {
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
 	Next() *Endpoint
-	EndpointFailed()
+	EndpointFailed(err error)
 	PreRequest(e *Endpoint)
 	PostRequest(e *Endpoint)
 }
@@ -319,21 +320,19 @@ func (p *Pool) MarkUpdated(t time.Time) {
 	p.lock.Unlock()
 }
 
-func (p *Pool) EndpointFailed(endpoint *Endpoint) {
+func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 	p.lock.Lock()
+	defer p.lock.Unlock()
 	e := p.index[endpoint.CanonicalAddr()]
-	if e != nil {
-		if e.endpoint.useTls {
-			now := time.Now()
-			staleTime := now.Add(-e.endpoint.StaleThreshold)
+	if e == nil {
+		return
+	}
 
-			if e.updated.Before(staleTime) {
-				p.removeEndpoint(e)
-			}
-		}
+	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
+		p.removeEndpoint(e)
+	} else {
 		e.failed()
 	}
-	p.lock.Unlock()
 }
 
 func (p *Pool) Each(f func(endpoint *Endpoint)) {

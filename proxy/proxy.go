@@ -146,13 +146,10 @@ func NewProxy(
 	roundTripperFactory := &RoundTripperFactoryImpl{
 		Template: httpTransportTemplate,
 	}
-	retryableClassififer := &fails.Retriable{
-		RetryOnAny: fails.DefaultRetryOnAny,
-	}
 
 	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
-		Transport:      p.proxyRoundTripper(roundTripperFactory, retryableClassififer, c.Port),
+		Transport:      p.proxyRoundTripper(roundTripperFactory, fails.RetriableClassifiers, c.Port),
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
@@ -310,8 +307,8 @@ func (i *wrappedIterator) Next() *route.Endpoint {
 	return e
 }
 
-func (i *wrappedIterator) EndpointFailed() {
-	i.nested.EndpointFailed()
+func (i *wrappedIterator) EndpointFailed(err error) {
+	i.nested.EndpointFailed(err)
 }
 func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
 	i.nested.PreRequest(e)

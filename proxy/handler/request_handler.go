@@ -156,7 +156,7 @@ func (h *RequestHandler) serveTcp(
 			break
 		}
 
-		iter.EndpointFailed()
+		iter.EndpointFailed(err)
 		onConnectionFailed(err)
 
 		retry++

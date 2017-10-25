@@ -1,10 +1,8 @@
 package fails
 
-type Retriable struct {
-	RetryOnAny []Classifier
-}
+type ClassifierGroup []Classifier
 
-var DefaultRetryOnAny = []Classifier{
+var RetriableClassifiers = ClassifierGroup{
 	AttemptedTLSWithNonTLSBackend,
 	Dial,
 	ConnectionResetOnRead,
@@ -14,9 +12,13 @@ var DefaultRetryOnAny = []Classifier{
 	UntrustedCert,
 }
 
+var PrunableClassifiers = ClassifierGroup{
+	HostnameMismatch,
+}
+
 // Classify returns true on errors that are retryable
-func (rc *Retriable) Classify(err error) bool {
-	for _, classifier := range rc.RetryOnAny {
+func (cg ClassifierGroup) Classify(err error) bool {
+	for _, classifier := range cg {
 		if classifier.Classify(err) {
 			return true
 		}

@@ -1,6 +1,7 @@
 package route_test
 
 import (
+	"errors"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -146,7 +147,7 @@ var _ = Describe("RoundRobin", func() {
 			n := iter.Next()
 			Expect(n).ToNot(BeNil())
 
-			iter.EndpointFailed()
+			iter.EndpointFailed(errors.New("failed"))
 
 			nn1 := iter.Next()
 			nn2 := iter.Next()
@@ -164,9 +165,9 @@ var _ = Describe("RoundRobin", func() {
 
 			iter := route.NewRoundRobin(pool, "")
 			n1 := iter.Next()
-			iter.EndpointFailed()
+			iter.EndpointFailed(errors.New("failed"))
 			n2 := iter.Next()
-			iter.EndpointFailed()
+			iter.EndpointFailed(errors.New("failed"))
 			Expect(n1).ToNot(Equal(n2))
 
 			n1 = iter.Next()
@@ -187,7 +188,7 @@ var _ = Describe("RoundRobin", func() {
 			n2 := iter.Next()
 			Expect(n1).ToNot(Equal(n2))
 
-			iter.EndpointFailed()
+			iter.EndpointFailed(errors.New("failed"))
 
 			n1 = iter.Next()
 			n2 = iter.Next()
