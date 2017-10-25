@@ -7,9 +7,9 @@ The Cloud Foundry team uses GitHub and accepts contributions via
 
 Follow these steps to make a contribution to any of our open source repositories:
 
-1. Ensure that you have completed our CLA Agreement for
-  [individuals](http://www.cloudfoundry.org/individualcontribution.pdf) or
-  [corporations](http://www.cloudfoundry.org/corpcontribution.pdf).
+1. Ensure that you have completed our [CLA Agreement](https://cla.pivotal.io/) for
+  [individuals](https://cla.pivotal.io/sign/pivotal/icla) or
+  [corporations](https://cla.pivotal.io/sign/pivotal/ccla).
 
 1. Set your name and email (these should match the information on your submitted CLA)
 
