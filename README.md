@@ -378,8 +378,8 @@ The router's logging is specified in its YAML configuration file. It supports th
 * `fatal` - A fatal error has occurred that makes gorouter unable to handle any requests.
 Examples: the router can't bind to its TCP port, a CF component has published invalid data to the router.
 * `error` - An unexpected error has occurred. Examples: the router failed to fetch token from UAA service.
-* `info`, `debug` - An expected event has occurred. Examples: a new CF component was registered with the router, the router has begun
-to prune routes for stale droplets.
+* `info`  - An expected event has occurred. Examples: the router started or exited, the router has begun to prune routes for stale droplets.
+* `debug` - A lower-level event has occurred. Examples: route registration, route unregistration.
 
 Sample log message in gorouter.
 
