@@ -58,7 +58,7 @@ var _ = Describe("Lookup", func() {
 		handler.ServeHTTP(resp, req)
 	})
 
-	Context("when there are no endpoints", func() {
+	Context("when there is no pool that matches the request", func() {
 		It("sends a bad request metric", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
 		})
@@ -77,11 +77,40 @@ var _ = Describe("Lookup", func() {
 		})
 	})
 
-	Context("when there are endpoints", func() {
+	Context("when there is a pool that matches the request, but it has no endpoints", func() {
 		var pool *route.Pool
 
 		BeforeEach(func() {
 			pool = route.NewPool(2*time.Minute, "example.com", "/")
+			reg.LookupReturns(pool)
+		})
+
+		It("sends a bad request metric", func() {
+			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+		})
+
+		It("Sets X-Cf-RouterError to unknown_route", func() {
+			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+		})
+
+		It("returns a 404 NotFound and does not call next", func() {
+			Expect(nextCalled).To(BeFalse())
+			Expect(resp.Code).To(Equal(http.StatusNotFound))
+		})
+
+		It("has a meaningful response", func() {
+			Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') does not exist"))
+		})
+
+	})
+
+	Context("when there is a pool that matches the request, and it has endpoints", func() {
+		var pool *route.Pool
+
+		BeforeEach(func() {
+			pool = route.NewPool(2*time.Minute, "example.com", "/")
+			exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+			pool.Put(exampleEndpoint)
 			reg.LookupReturns(pool)
 		})
 
@@ -173,7 +202,7 @@ var _ = Describe("Lookup", func() {
 			Expect(nextCalled).To(BeTrue())
 			requestInfo, err := handlers.ContextRequestInfo(nextRequest)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(requestInfo.RoutePool).To(Equal(pool))
+			Expect(requestInfo.RoutePool.IsEmpty()).To(BeFalse())
 		})
 
 		Context("when a specific instance is requested", func() {

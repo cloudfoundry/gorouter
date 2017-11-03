@@ -1407,7 +1407,7 @@ var _ = Describe("Proxy", func() {
 				}
 			}
 
-			It("responds with a 502 BadGateway", func() {
+			It("responds with a 404 NotFound", func() {
 				ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
 					conn.CheckLine("GET / HTTP/1.1")
 					resp := test_util.NewResponse(http.StatusOK)
@@ -1428,7 +1428,7 @@ var _ = Describe("Proxy", func() {
 				res, _ := conn.ReadResponse()
 				log.SetOutput(os.Stderr)
 				Expect(buf).NotTo(ContainSubstring("multiple response.WriteHeader calls"))
-				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(res.StatusCode).To(Equal(http.StatusNotFound))
 			})
 		})
 	})
@@ -2013,8 +2013,8 @@ var _ = Describe("Proxy", func() {
 				conn.WriteRequest(req)
 
 				res, _ := conn.ReadResponse()
-				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-				Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+				Expect(res.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(fakeReporter.CaptureBadRequestCallCount()).To(Equal(1))
 				Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 				Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
 			})

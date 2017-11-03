@@ -39,12 +39,12 @@ func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger log
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	pool := l.lookup(r)
-	if pool == nil {
+	if pool == nil || pool.IsEmpty() {
 		l.handleMissingRoute(rw, r)
 		return
 	}
 
-	if l.maxConnsPerBackend > 0 && !pool.IsEmpty() {
+	if l.maxConnsPerBackend > 0 {
 		newPool := pool.FilteredPool(l.maxConnsPerBackend)
 		if newPool.IsEmpty() {
 			l.handleOverloadedRoute(rw, r)
