@@ -94,6 +94,8 @@ type Pool struct {
 	nextIdx           int
 	overloaded        bool
 
+	MaxIdx int
+
 	random *rand.Rand
 }
 
@@ -137,6 +139,7 @@ func NewPool(retryAfterFailure time.Duration, host, contextPath string) *Pool {
 		index:             make(map[string]*endpointElem),
 		retryAfterFailure: retryAfterFailure,
 		nextIdx:           -1,
+		MaxIdx:            -1,
 		host:              host,
 		contextPath:       contextPath,
 		random:            rand.New(rand.NewSource(time.Now().UnixNano())),

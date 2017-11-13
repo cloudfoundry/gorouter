@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"fmt"
@@ -16,8 +17,8 @@ import (
 )
 
 const (
-	CfInstanceIdHeader = "X-CF-InstanceID"
-	CfAppInstance      = "X-CF-APP-INSTANCE"
+	CfInstanceIdHeader = router_http.CfInstanceIdHeader
+	CfAppInstance      = router_http.CfAppInstance
 )
 
 type lookupHandler struct {
@@ -38,7 +39,7 @@ func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger log
 }
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	pool := l.lookup(r)
+	pool := l.lookup(rw, r)
 	if pool == nil || pool.IsEmpty() {
 		l.handleMissingRoute(rw, r)
 		return
@@ -90,7 +91,7 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 	)
 }
 
-func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
+func (l *lookupHandler) lookup(rw http.ResponseWriter, r *http.Request) *route.Pool {
 	requestPath := r.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
@@ -104,7 +105,13 @@ func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
 			return nil
 		}
 
-		return l.registry.LookupWithInstance(uri, appID, appIndex)
+		p := l.registry.LookupWithInstance(uri, appID, appIndex)
+		if p.MaxIdx >= 0 {
+			// FIXME: return the desired number of instances instead of the highest
+			// instance index currently running (see gorouter#197)
+			rw.Header().Set(router_http.CfAppInstanceMax, strconv.Itoa(p.MaxIdx))
+		}
+		return p
 	}
 
 	return l.registry.Lookup(uri)

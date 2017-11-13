@@ -9,6 +9,7 @@ const (
 	VcapTraceHeader       = "X-Vcap-Trace"
 	CfInstanceIdHeader    = "X-CF-InstanceID"
 	CfAppInstance         = "X-CF-APP-INSTANCE"
+	CfAppInstanceMax      = "X-CF-APP-INSTANCE-MAX"
 	CfRouterError         = "X-Cf-RouterError"
 )
 

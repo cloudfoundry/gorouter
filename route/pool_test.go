@@ -46,6 +46,11 @@ var _ = Describe("Pool", func() {
 		pool = route.NewPool(2*time.Minute, "", "")
 		modTag = models.ModificationTag{}
 	})
+
+	It("has the expected MaxIdx", func() {
+		Expect(pool.MaxIdx).To(Equal(-1))
+	})
+
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
 			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")

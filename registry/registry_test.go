@@ -894,11 +894,11 @@ var _ = Describe("RouteRegistry", func() {
 				appIndex = "94"
 			})
 
-			It("returns a nil pool", func() {
+			It("returns an empty pool", func() {
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(2))
 				p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-				Expect(p).To(BeNil())
+				Expect(p.IsEmpty()).To(BeTrue())
 			})
 		})
 
@@ -908,11 +908,11 @@ var _ = Describe("RouteRegistry", func() {
 				appIndex = "0"
 			})
 
-			It("returns a nil pool ", func() {
+			It("returns an empty pool ", func() {
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(2))
 				p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-				Expect(p).To(BeNil())
+				Expect(p.IsEmpty()).To(BeTrue())
 			})
 		})
 	})
