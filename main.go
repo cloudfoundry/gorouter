@@ -51,12 +51,21 @@ func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
 	flag.Parse()
 
-	c := config.DefaultConfig()
-	logCounter := schema.NewLogCounter()
+	c, err := config.DefaultConfig()
+	if err != nil {
+		fmt.Println("Error loading config:", err)
+		os.Exit(1)
+	}
 
 	if configFile != "" {
-		c = config.InitConfigFromFile(configFile)
+		c, err = config.InitConfigFromFile(configFile)
+		if err != nil {
+			fmt.Println("Error loading config:", err)
+			os.Exit(1)
+		}
 	}
+
+	logCounter := schema.NewLogCounter()
 
 	prefix := "gorouter.stdout"
 	if c.Logging.Syslog != "" {
@@ -66,7 +75,7 @@ func main() {
 
 	logger.Info("starting")
 
-	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
 	}
@@ -214,7 +223,7 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 		c.RouteServiceRecommendHttps,
 	)
 
-	tlsConfig := &tls.Config{
+	backendTLSConfig := &tls.Config{
 		CipherSuites:       c.CipherSuites,
 		InsecureSkipVerify: c.SkipSSLValidation,
 		RootCAs:            c.CAPool,
@@ -222,7 +231,7 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 	}
 
 	return proxy.NewProxy(logger, accessLogger, c, registry,
-		reporter, routeServiceConfig, tlsConfig, &healthCheck)
+		reporter, routeServiceConfig, backendTLSConfig, &healthCheck)
 }
 
 func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {

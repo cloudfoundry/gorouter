@@ -110,76 +110,78 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type Config struct {
-	Status                   StatusConfig  `yaml:"status"`
-	Nats                     []NatsConfig  `yaml:"nats"`
-	Logging                  LoggingConfig `yaml:"logging"`
-	Port                     uint16        `yaml:"port"`
-	Index                    uint          `yaml:"index"`
-	Zone                     string        `yaml:"zone"`
-	GoMaxProcs               int           `yaml:"go_max_procs,omitempty"`
-	Tracing                  Tracing       `yaml:"tracing"`
-	TraceKey                 string        `yaml:"trace_key"`
-	AccessLog                AccessLog     `yaml:"access_log"`
-	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
-	DebugAddr                string        `yaml:"debug_addr"`
-	EnablePROXY              bool          `yaml:"enable_proxy"`
-	EnableSSL                bool          `yaml:"enable_ssl"`
-	SSLPort                  uint16        `yaml:"ssl_port"`
-	DisableHTTP              bool          `yaml:"disable_http"`
-	SSLCertificates          []tls.Certificate
-	TLSPEM                   []TLSPem `yaml:"tls_pem"`
-	CACerts                  string   `yaml:"ca_certs"`
-	CAPool                   *x509.CertPool
-	SkipSSLValidation        bool     `yaml:"skip_ssl_validation"`
-	ForwardedClientCert      string   `yaml:"forwarded_client_cert"`
-	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https"`
-	IsolationSegments        []string `yaml:"isolation_segments"`
-	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode"`
+	Status                   StatusConfig      `yaml:"status,omitempty"`
+	Nats                     []NatsConfig      `yaml:"nats,omitempty"`
+	Logging                  LoggingConfig     `yaml:"logging,omitempty"`
+	Port                     uint16            `yaml:"port,omitempty"`
+	Index                    uint              `yaml:"index,omitempty"`
+	Zone                     string            `yaml:"zone,omitempty"`
+	GoMaxProcs               int               `yaml:"go_max_procs,omitempty"`
+	Tracing                  Tracing           `yaml:"tracing,omitempty"`
+	TraceKey                 string            `yaml:"trace_key,omitempty"`
+	AccessLog                AccessLog         `yaml:"access_log,omitempty"`
+	EnableAccessLogStreaming bool              `yaml:"enable_access_log_streaming,omitempty"`
+	DebugAddr                string            `yaml:"debug_addr,omitempty"`
+	EnablePROXY              bool              `yaml:"enable_proxy,omitempty"`
+	EnableSSL                bool              `yaml:"enable_ssl,omitempty"`
+	SSLPort                  uint16            `yaml:"ssl_port,omitempty"`
+	DisableHTTP              bool              `yaml:"disable_http,omitempty"`
+	SSLCertificates          []tls.Certificate `yaml:"-"`
+	TLSPEM                   []TLSPem          `yaml:"tls_pem,omitempty"`
+	CACerts                  string            `yaml:"ca_certs,omitempty"`
+	CAPool                   *x509.CertPool    `yaml:"-"`
+	SkipSSLValidation        bool              `yaml:"skip_ssl_validation,omitempty"`
+	ForwardedClientCert      string            `yaml:"forwarded_client_cert,omitempty"`
+	ForceForwardedProtoHttps bool              `yaml:"force_forwarded_proto_https,omitempty"`
+	IsolationSegments        []string          `yaml:"isolation_segments,omitempty"`
+	RoutingTableShardingMode string            `yaml:"routing_table_sharding_mode,omitempty"`
 
-	CipherString        string `yaml:"cipher_suites"`
-	CipherSuites        []uint16
-	MinTLSVersionString string `yaml:"min_tls_version"`
-	MinTLSVersion       uint16
+	CipherString                      string             `yaml:"cipher_suites,omitempty"`
+	CipherSuites                      []uint16           `yaml:"-"`
+	MinTLSVersionString               string             `yaml:"min_tls_version,omitempty"`
+	MinTLSVersion                     uint16             `yaml:"-"`
+	ClientCertificateValidationString string             `yaml:"client_certificate_validation,omitempty"`
+	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
 
-	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold"`
-	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval"`
-	SuspendPruningIfNatsUnavailable bool          `yaml:"suspend_pruning_if_nats_unavailable"`
-	PruneStaleDropletsInterval      time.Duration `yaml:"prune_stale_droplets_interval"`
-	DropletStaleThreshold           time.Duration `yaml:"droplet_stale_threshold"`
-	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval"`
-	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval"`
-	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
+	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
+	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval,omitempty"`
+	SuspendPruningIfNatsUnavailable bool          `yaml:"suspend_pruning_if_nats_unavailable,omitempty"`
+	PruneStaleDropletsInterval      time.Duration `yaml:"prune_stale_droplets_interval,omitempty"`
+	DropletStaleThreshold           time.Duration `yaml:"droplet_stale_threshold,omitempty"`
+	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval,omitempty"`
+	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval,omitempty"`
+	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout,omitempty"`
 	EndpointDialTimeout             time.Duration `yaml:"-"`
-	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
-	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout"`
+	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout,omitempty"`
+	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout,omitempty"`
 
 	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies        bool          `yaml:"secure_cookies"`
+	SecureCookies        bool          `yaml:"secure_cookies,omitempty"`
 	HealthCheckUserAgent string        `yaml:"healthcheck_user_agent,omitempty"`
 
-	OAuth                      OAuthConfig      `yaml:"oauth"`
-	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
-	RouteServiceSecret         string           `yaml:"route_services_secret"`
-	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only"`
-	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https"`
+	OAuth                      OAuthConfig      `yaml:"oauth,omitempty"`
+	RoutingApi                 RoutingApiConfig `yaml:"routing_api,omitempty"`
+	RouteServiceSecret         string           `yaml:"route_services_secret,omitempty"`
+	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only,omitempty"`
+	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https,omitempty"`
 	// These fields are populated by the `Process` function.
 	Ip                     string        `yaml:"-"`
 	RouteServiceEnabled    bool          `yaml:"-"`
-	NatsClientPingInterval time.Duration `yaml:"nats_client_ping_interval"`
-	Backends               BackendConfig `yaml:"backends"`
-	ExtraHeadersToLog      []string      `yaml:"extra_headers_to_log"`
+	NatsClientPingInterval time.Duration `yaml:"nats_client_ping_interval,omitempty"`
+	Backends               BackendConfig `yaml:"backends,omitempty"`
+	ExtraHeadersToLog      []string      `yaml:"extra_headers_to_log,omitempty"`
 
-	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries"`
-	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval"`
-	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time"`
+	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries,omitempty"`
+	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval,omitempty"`
+	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time,omitempty"`
 
-	PidFile     string `yaml:"pid_file"`
-	LoadBalance string `yaml:"balancing_algorithm"`
+	PidFile     string `yaml:"pid_file,omitempty"`
+	LoadBalance string `yaml:"balancing_algorithm,omitempty"`
 
-	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
-	MaxIdleConns        int  `yaml:"max_idle_conns"`
-	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host"`
+	DisableKeepAlives   bool `yaml:"disable_keep_alives,omitempty"`
+	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
+	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
 }
 
 var defaultConfig = Config{
@@ -227,15 +229,17 @@ var defaultConfig = Config{
 	MaxIdleConnsPerHost: 2,
 }
 
-func DefaultConfig() *Config {
+func DefaultConfig() (*Config, error) {
 	c := defaultConfig
-	c.Process()
+	err := c.Process()
+	if err != nil {
+		return nil, fmt.Errorf("invalid default config: %s", err)
+	}
 
-	return &c
+	return &c, nil
 }
 
-func (c *Config) Process() {
-	var err error
+func (c *Config) Process() error {
 
 	if c.GoMaxProcs == -1 {
 		c.GoMaxProcs = runtime.NumCPU()
@@ -250,21 +254,33 @@ func (c *Config) Process() {
 		c.DrainTimeout = c.EndpointTimeout
 	}
 
-	c.Ip, err = localip.LocalIP()
-	if err != nil {
-		panic(err)
+	var localIPErr error
+	c.Ip, localIPErr = localip.LocalIP()
+	if localIPErr != nil {
+		return localIPErr
 	}
 
 	if c.Backends.CertChain != "" && c.Backends.PrivateKey != "" {
 		certificate, err := tls.X509KeyPair([]byte(c.Backends.CertChain), []byte(c.Backends.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
-			panic(errMsg)
+			return fmt.Errorf(errMsg)
 		}
 		c.Backends.ClientAuthCertificate = certificate
 	}
 
 	if c.EnableSSL {
+		switch c.ClientCertificateValidationString {
+		case "none":
+			c.ClientCertificateValidation = tls.NoClientCert
+		case "request":
+			c.ClientCertificateValidation = tls.VerifyClientCertIfGiven
+		case "require":
+			c.ClientCertificateValidation = tls.RequireAndVerifyClientCert
+		default:
+			return fmt.Errorf(`router.client_certificate_validation must be one 'none', 'request' or 'require'.`)
+		}
+
 		switch c.MinTLSVersionString {
 		case "TLSv1.0":
 			c.MinTLSVersion = tls.VersionTLS10
@@ -273,31 +289,35 @@ func (c *Config) Process() {
 		case "TLSv1.2", "":
 			c.MinTLSVersion = tls.VersionTLS12
 		default:
-			panic(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
+			return fmt.Errorf(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
 		}
 
 		if len(c.TLSPEM) == 0 {
-			panic("router.tls_pem must be provided if router.enable_ssl is set to true")
+			return fmt.Errorf("router.tls_pem must be provided if router.enable_ssl is set to true")
 		}
 
 		for _, v := range c.TLSPEM {
 			if len(v.PrivateKey) == 0 || len(v.CertChain) == 0 {
-				panic("Error parsing PEM blocks of router.tls_pem, missing cert or key.")
+				return fmt.Errorf("Error parsing PEM blocks of router.tls_pem, missing cert or key.")
 			}
 
 			certificate, err := tls.X509KeyPair([]byte(v.CertChain), []byte(v.PrivateKey))
 			if err != nil {
 				errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
-				panic(errMsg)
+				return fmt.Errorf(errMsg)
 			}
 			c.SSLCertificates = append(c.SSLCertificates, certificate)
 
 		}
-		c.CipherSuites = c.processCipherSuites()
+		var err error
+		c.CipherSuites, err = c.processCipherSuites()
+		if err != nil {
+			return err
+		}
 	} else {
 		if c.DisableHTTP {
 			errMsg := fmt.Sprintf("neither http nor https listener is enabled: router.enable_ssl: %t, router.disable_http: %t", c.EnableSSL, c.DisableHTTP)
-			panic(errMsg)
+			return fmt.Errorf(errMsg)
 		}
 	}
 
@@ -315,11 +335,11 @@ func (c *Config) Process() {
 	}
 	if !validLb {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
-		panic(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	if c.LoadBalancerHealthyThreshold < 0 {
 		errMsg := fmt.Sprintf("Invalid load balancer healthy threshold: %s", c.LoadBalancerHealthyThreshold)
-		panic(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	validForwardedClientCertMode := false
@@ -331,7 +351,7 @@ func (c *Config) Process() {
 	}
 	if !validForwardedClientCertMode {
 		errMsg := fmt.Sprintf("Invalid forwarded client cert mode: %s. Allowed values are %s", c.ForwardedClientCert, AllowedForwardedClientCertModes)
-		panic(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	validShardMode := false
@@ -343,19 +363,20 @@ func (c *Config) Process() {
 	}
 	if !validShardMode {
 		errMsg := fmt.Sprintf("Invalid sharding mode: %s. Allowed values are %s", c.RoutingTableShardingMode, AllowedShardingModes)
-		panic(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	if c.RoutingTableShardingMode == SHARD_SEGMENTS && len(c.IsolationSegments) == 0 {
-		panic("Expected isolation segments; routing table sharding mode set to segments and none provided.")
+		return fmt.Errorf("Expected isolation segments; routing table sharding mode set to segments and none provided.")
 	}
 
 	if err := c.buildCertPool(); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
-func (c *Config) processCipherSuites() []uint16 {
+func (c *Config) processCipherSuites() ([]uint16, error) {
 	cipherMap := map[string]uint16{
 		"RC4-SHA":                                 0x0005, // openssl formatted values
 		"DES-CBC3-SHA":                            0x000a,
@@ -406,7 +427,7 @@ func (c *Config) processCipherSuites() []uint16 {
 	var ciphers []string
 
 	if len(strings.TrimSpace(c.CipherString)) == 0 {
-		panic("must specify list of cipher suite when ssl is enabled")
+		return nil, fmt.Errorf("must specify list of cipher suite when ssl is enabled")
 	} else {
 		ciphers = strings.Split(c.CipherString, ":")
 	}
@@ -429,7 +450,7 @@ func (c *Config) buildCertPool() error {
 	return nil
 }
 
-func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) []uint16 {
+func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) ([]uint16, error) {
 	ciphers := []uint16{}
 	for _, cipher := range cipherStrs {
 		if val, ok := cipherMap[cipher]; ok {
@@ -440,11 +461,11 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 				supportedCipherSuites = append(supportedCipherSuites, key)
 			}
 			errMsg := fmt.Sprintf("Invalid cipher string configuration: %s, please choose from %v", cipher, supportedCipherSuites)
-			panic(errMsg)
+			return nil, fmt.Errorf(errMsg)
 		}
 	}
 
-	return ciphers
+	return ciphers, nil
 }
 
 func (c *Config) NatsServers() []string {
@@ -470,21 +491,26 @@ func (c *Config) Initialize(configYAML []byte) error {
 	return yaml.Unmarshal(configYAML, &c)
 }
 
-func InitConfigFromFile(path string) *Config {
-	var c *Config = DefaultConfig()
-	var e error
-
-	b, e := ioutil.ReadFile(path)
-	if e != nil {
-		panic(e.Error())
+func InitConfigFromFile(path string) (*Config, error) {
+	c, err := DefaultConfig()
+	if err != nil {
+		return nil, err
 	}
 
-	e = c.Initialize(b)
-	if e != nil {
-		panic(e.Error())
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
 
-	c.Process()
+	err = c.Initialize(b)
+	if err != nil {
+		return nil, err
+	}
 
-	return c
+	err = c.Process()
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }

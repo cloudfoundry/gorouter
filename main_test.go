@@ -174,6 +174,20 @@ var _ = Describe("Router Integration", func() {
 		}
 	})
 
+	Context("when config is invalid", func() {
+		It("fails to start", func() {
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			writeConfig(&config.Config{EnableSSL: true}, cfgFile)
+
+			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
+			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+			Eventually(gorouterSession, 5*time.Second).Should(Exit(1))
+			Eventually(func() string {
+				return string(gorouterSession.Out.Contents())
+			}).Should(ContainSubstring(`Error loading config`))
+		})
+	})
+
 	Context("IsolationSegments", func() {
 		var (
 			statusPort uint16

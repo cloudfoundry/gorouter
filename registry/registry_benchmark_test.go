@@ -50,7 +50,11 @@ func setupLogger() logger.Logger {
 	}
 }
 func setupConfig() *config.Config {
-	c := config.DefaultConfig()
+	c, err := config.DefaultConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	c.PruneStaleDropletsInterval = 50 * time.Millisecond
 	c.DropletStaleThreshold = 24 * time.Millisecond
 	c.IsolationSegments = []string{"foo", "bar"}

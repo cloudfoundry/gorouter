@@ -56,7 +56,9 @@ var _ = Describe("RouteFetcher", func() {
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("test")
-		cfg = config.DefaultConfig()
+		var err error
+		cfg, err = config.DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
 		cfg.PruneStaleDropletsInterval = 2 * time.Millisecond
 
 		retryInterval := 0

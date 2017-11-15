@@ -129,7 +129,9 @@ var _ = Describe("AccessLog", func() {
 		BeforeEach(func() {
 			logger = test_util.NewTestZapLogger("test")
 
-			cfg = config.DefaultConfig()
+			var err error
+			cfg, err = config.DefaultConfig()
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("creates null access loger if no access log and loggregator is disabled", func() {

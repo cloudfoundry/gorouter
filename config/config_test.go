@@ -13,6 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
 	"time"
@@ -22,7 +23,9 @@ var _ = Describe("Config", func() {
 	var config *Config
 
 	BeforeEach(func() {
-		config = DefaultConfig()
+		var err error
+		config, err = DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Describe("Initialize", func() {
@@ -33,7 +36,8 @@ var _ = Describe("Config", func() {
 			})
 
 			It("can override the load balance strategy", func() {
-				cfg := DefaultConfig()
+				cfg, err := DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
 				var b = []byte(`
 balancing_algorithm: least-connection
 `)
@@ -43,12 +47,13 @@ balancing_algorithm: least-connection
 			})
 
 			It("does not allow an invalid load balance strategy", func() {
-				cfg := DefaultConfig()
+				cfg, err := DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
 				var b = []byte(`
 balancing_algorithm: foo-bar
 `)
 				cfg.Initialize(b)
-				Expect(cfg.Process).To(Panic())
+				Expect(cfg.Process()).To(MatchError("Invalid load balancing algorithm foo-bar. Allowed values are [round-robin least-connection]"))
 			})
 		})
 
@@ -511,7 +516,7 @@ token_fetcher_retry_interval: 10s
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 
-			config.Process()
+			Expect(config.Process()).To(Succeed())
 
 			Expect(config.PublishStartMessageInterval).To(Equal(1 * time.Second))
 			Expect(config.PruneStaleDropletsInterval).To(Equal(2 * time.Second))
@@ -524,18 +529,17 @@ token_fetcher_retry_interval: 10s
 		})
 
 		Context("When LoadBalancerHealthyThreshold is provided", func() {
-			It("panics when an invalid duration string is given", func() {
+			It("returns a meaningful error when an invalid duration string is given", func() {
 				var b = []byte("load_balancer_healthy_threshold: -5s")
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(config.Process).To(Panic())
+				Expect(config.Process()).To(MatchError("Invalid load balancer healthy threshold: -5s"))
 			})
 
 			It("fails to initialize a non time string", func() {
 				var b = []byte("load_balancer_healthy_threshold: test")
-				err := config.Initialize(b)
-				Expect(err).To(HaveOccurred())
+				Expect(config.Initialize(b)).To(MatchError(ContainSubstring("cannot unmarshal")))
 			})
 
 			It("process the string into a valid duration", func() {
@@ -555,7 +559,7 @@ extra_headers_to_log:
 
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
-			config.Process()
+			Expect(config.Process()).To(Succeed())
 
 			Expect(config.ExtraHeadersToLog).To(ContainElement("something"))
 			Expect(config.ExtraHeadersToLog).To(ContainElement("x-b3-trace-id"))
@@ -570,7 +574,7 @@ secure_cookies: false
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				config.Process()
+				Expect(config.Process()).To(Succeed())
 
 				Expect(config.SecureCookies).To(BeFalse())
 			})
@@ -609,7 +613,7 @@ nats:
 				It("disables route services", func() {
 					err := config.Initialize(configYaml)
 					Expect(err).ToNot(HaveOccurred())
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.RouteServiceEnabled).To(BeFalse())
 				})
 			})
@@ -622,7 +626,7 @@ route_services_secret: my-route-service-secret
 `)
 						err := config.Initialize(configYaml)
 						Expect(err).ToNot(HaveOccurred())
-						config.Process()
+						Expect(config.Process()).To(Succeed())
 					})
 
 					It("enables route services", func() {
@@ -642,7 +646,7 @@ route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
 `)
 						err := config.Initialize(configYaml)
 						Expect(err).ToNot(HaveOccurred())
-						config.Process()
+						Expect(config.Process()).To(Succeed())
 					})
 
 					It("enables route services", func() {
@@ -665,7 +669,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 `)
 						err := config.Initialize(configYaml)
 						Expect(err).ToNot(HaveOccurred())
-						config.Process()
+						Expect(config.Process()).To(Succeed())
 					})
 
 					It("does NOT enabled route services", func() {
@@ -685,7 +689,7 @@ routing_api:
 				It("reports the routing api as enabled", func() {
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.RoutingApiEnabled()).To(BeTrue())
 				})
 			})
@@ -694,7 +698,7 @@ routing_api:
 				It("reports the routing api as disabled", func() {
 					err := config.Initialize([]byte{})
 					Expect(err).ToNot(HaveOccurred())
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.RoutingApiEnabled()).To(BeFalse())
 				})
 			})
@@ -704,14 +708,18 @@ routing_api:
 			var (
 				expectedCAPEMs           []string
 				expectedSSLCertificates  []tls.Certificate
-				tlsPEM1YML               []byte
-				rootCA1YML               []byte
-				rootCA2YML               []byte
 				keyPEM1, certPEM1        []byte
 				rootRSAPEM, rootECDSAPEM []byte
-				tlsPEMYML                []byte
 				expectedTLSPEMs          []TLSPem
+				configSnippet            *Config
 			)
+
+			createYMLSnippet := func(snippet *Config) []byte {
+				cfgBytes, err := yaml.Marshal(snippet)
+				Expect(err).ToNot(HaveOccurred())
+				return cfgBytes
+			}
+
 			BeforeEach(func() {
 				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
@@ -730,9 +738,6 @@ routing_api:
 					PrivateKey: string(certChain.PrivKeyPEM),
 				}
 				expectedTLSPEMs = []TLSPem{tlsPem1, tlsPem2, tlsPemCertChain}
-				var err error
-				tlsPEMYML, err = yaml.Marshal(expectedTLSPEMs)
-				Expect(err).ToNot(HaveOccurred())
 
 				cert1, err := tls.X509KeyPair(certPEM1, keyPEM1)
 				Expect(err).ToNot(HaveOccurred())
@@ -751,94 +756,95 @@ routing_api:
 					string(rootECDSAPEM),
 				}
 
-				rootCA1Array := []string{string(rootRSAPEM)}
-				rootCA2Array := []string{string(rootECDSAPEM)}
-				rootCA1YML, err = yaml.Marshal(rootCA1Array)
-				Expect(err).ToNot(HaveOccurred())
-				rootCA2YML, err = yaml.Marshal(rootCA2Array)
-				Expect(err).ToNot(HaveOccurred())
+				configSnippet = &Config{
+					EnableSSL:                         true,
+					MinTLSVersionString:               "TLSv1.0",
+					ClientCertificateValidationString: "none",
+					CipherString:                      "ECDHE-RSA-AES128-GCM-SHA256",
+					TLSPEM:                            expectedTLSPEMs,
+				}
+
+			})
+
+			Context("when valid value for client_certificate_validation is set", func() {
+
+				DescribeTable("client certificate validation",
+					func(clientCertValidation string, expectedAuthType tls.ClientAuthType) {
+						configSnippet.ClientCertificateValidationString = clientCertValidation
+						configBytes := createYMLSnippet(configSnippet)
+						err := config.Initialize(configBytes)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(config.Process()).To(Succeed())
+						Expect(config.ClientCertificateValidation).To(Equal(expectedAuthType))
+					},
+					Entry("none", "none", tls.NoClientCert),
+					Entry("request", "request", tls.VerifyClientCertIfGiven),
+					Entry("require", "require", tls.RequireAndVerifyClientCert),
+				)
+
+				Context("when ClientCertificateValidation is invalid", func() {
+					BeforeEach(func() {
+						configSnippet.ClientCertificateValidationString = "meow"
+					})
+					It("returns a meaningful error", func() {
+						configBytes := createYMLSnippet(configSnippet)
+						err := config.Initialize(configBytes)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(config.Process()).To(MatchError("router.client_certificate_validation must be one 'none', 'request' or 'require'."))
+					})
+				})
 
 			})
 
 			Context("when valid value for min_tls_version is set", func() {
+				BeforeEach(func() {
+					configSnippet.MinTLSVersionString = "TLSv1.1"
+				})
 				It("populates MinTLSVersion", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-min_tls_version: TLSv1.1
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s
-`, tlsPEMYML))
-					err := config.Initialize(b)
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.MinTLSVersion).To(Equal(uint16(tls.VersionTLS11)))
 				})
 			})
 			Context("when invalid value for min_tls_version is set", func() {
-				It("errors", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-min_tls_version: fake-tls
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s
-`, tlsPEMYML))
-					err := config.Initialize(b)
+				BeforeEach(func() {
+					configSnippet.MinTLSVersionString = "fake-tls"
+				})
+				It("returns a meaningful error", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(config.Process).To(Panic())
+					Expect(config.Process()).To(MatchError(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`))
 				})
 			})
 			Context("when min_tls_version is not set", func() {
+				BeforeEach(func() {
+					configSnippet.MinTLSVersionString = ""
+				})
 				It("sets the default to TLSv1.2", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s
-`, tlsPEMYML))
-					err := config.Initialize(b)
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.MinTLSVersion).To(Equal(uint16(tls.VersionTLS12)))
 				})
 			})
 
 			Context("when a valid CACerts is provided", func() {
-				var caCertsYML []byte
 				BeforeEach(func() {
-					caCertsYML, _ = yaml.Marshal(string(rootRSAPEM) + "\n" + string(rootECDSAPEM))
+					configSnippet.CACerts = string(rootRSAPEM) + string(rootECDSAPEM)
 				})
-				It("populates the CACerts field", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-tls_pem:
-%s
-ca_certs: %s
-`, tlsPEMYML, caCertsYML))
-					err := config.Initialize(b)
+
+				It("populates the CACerts and CAPool property", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
-					config.Process()
-					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "\n")))
-				})
-
-				It("populates the CAPool property", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-tls_pem:
-%s
-ca_certs: %s
-`, tlsPEMYML, caCertsYML))
-					err := config.Initialize(b)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(config.EnableSSL).To(Equal(true))
-					config.Process()
-					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "\n")))
+					Expect(config.Process()).To(Succeed())
+					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "")))
 
 					certDER, _ := pem.Decode([]byte(config.CACerts))
 					Expect(err).NotTo(HaveOccurred())
@@ -848,20 +854,15 @@ ca_certs: %s
 				})
 			})
 
-			Context("When it is given a valid tls_pem value", func() {
+			Context("when it is given a valid tls_pem value", func() {
 				It("populates the TLSPEM field and generates the SSLCertificates", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s`, tlsPEMYML))
-
-					err := config.Initialize(b)
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
 
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.TLSPEM).To(ConsistOf(expectedTLSPEMs))
 
 					Expect(config.SSLCertificates).To(ConsistOf(expectedSSLCertificates))
@@ -869,8 +870,6 @@ tls_pem:
 			})
 
 			Context("PEM with ECDSA cipher algorithm", func() {
-				var tlsECPEMYML []byte
-
 				BeforeEach(func() {
 					keyPEM, certPEM := test_util.CreateECKeyPair("parsnip.com")
 					cert, err := tls.X509KeyPair(certPEM, keyPEM)
@@ -882,211 +881,191 @@ tls_pem:
 							PrivateKey: string(keyPEM),
 						},
 					}
-
-					tlsECPEMYML, err = yaml.Marshal(expectedTLSPEMs)
-					Expect(err).ToNot(HaveOccurred())
+					configSnippet.TLSPEM = expectedTLSPEMs
 
 					expectedSSLCertificates = []tls.Certificate{cert}
 				})
 
 				It("supports ECDSA PEM block", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: ECDHE-ECDSA-AES256-GCM-SHA384
-tls_pem:
-%s
-`, tlsECPEMYML))
-					err := config.Initialize(b)
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.EnableSSL).To(Equal(true))
 
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.TLSPEM).To(ConsistOf(expectedTLSPEMs))
 
 					Expect(config.SSLCertificates).To(ConsistOf(expectedSSLCertificates))
 				})
 			})
 
-			Context("When TLSPEM is invalid", func() {
-				It("fails to validate if TLSPEM is missing", func() {
-					var b = []byte(`
-enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256`)
-					err := config.Initialize(b)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(config.Process).To(Panic())
+			Context("when TLSPEM is missing", func() {
+				BeforeEach(func() {
+					configSnippet.TLSPEM = nil
 				})
+				It("fails to validate", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(config.Process()).To(MatchError("router.tls_pem must be provided if router.enable_ssl is set to true"))
+				})
+			})
 
-				It("fails to validate if TLSPEM does not contain both key and cert", func() {
+			Context("when TLSPEM does not contain both key and cert", func() {
+
+				BeforeEach(func() {
 					keyPEM, _ := test_util.CreateECKeyPair("parsnip.com")
 					tlsPEMArray := []TLSPem{TLSPem{PrivateKey: string(keyPEM)}}
-					partialTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
-					Expect(err).ToNot(HaveOccurred())
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s`, partialTLSPEMYML))
-					err = config.Initialize(b)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(config.Process).To(Panic())
+					configSnippet.TLSPEM = tlsPEMArray
 				})
+				It("fails to validate", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).ToNot(HaveOccurred())
 
-				It("fails to validate if TLSPEM does not contains a supported type", func() {
-					invalidPEM := []byte(fmt.Sprintf(`
------BEGIN INVALID-----
-dGVzdA==
------END INVALID-----`))
+					Expect(config.Process()).To(MatchError("Error parsing PEM blocks of router.tls_pem, missing cert or key."))
+				})
+			})
+
+			Context("TLSPEM does not contain a supported type", func() {
+				BeforeEach(func() {
+					invalidPEMString := "-----BEGIN INVALID-----\ndGVzdA==\n-----END INVALID-----"
+					invalidPEM := []byte(invalidPEMString)
 					tlsPEMArray := []TLSPem{TLSPem{
 						PrivateKey: string(keyPEM1),
 						CertChain:  string(invalidPEM),
 					}}
-					invalidTLSPEMYML, err := yaml.Marshal(&tlsPEMArray)
-					Expect(err).ToNot(HaveOccurred())
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: ECDHE-RSA-AES128-GCM-SHA256
-tls_pem:
-%s`, invalidTLSPEMYML))
-					err = config.Initialize(b)
+					configSnippet.TLSPEM = tlsPEMArray
+				})
+
+				It("fails to validate", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(config.Process).To(Panic())
-				})
-			})
-			Context("When it is given valid cipher suites", func() {
-				Context("of openssl format", func() {
-					It("Construct the proper array of cipher suites", func() {
-						var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: RC4-SHA:DES-CBC3-SHA:AES128-SHA:AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-ECDSA-RC4-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-RC4-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-CHACHA20-POLY1305
-tls_pem:
-%s
-`, tlsPEMYML))
-
-						expectedSuites := []uint16{
-							tls.TLS_RSA_WITH_RC4_128_SHA,
-							tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
-							tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-							tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-						}
-
-						err := config.Initialize(b)
-						Expect(err).ToNot(HaveOccurred())
-
-						config.Process()
-
-						Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
-					})
-				})
-				Context("of RFC format", func() {
-					It("Construct the proper array of cipher suites", func() {
-						var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-cipher_suites: TLS_RSA_WITH_RC4_128_SHA:TLS_RSA_WITH_3DES_EDE_CBC_SHA:TLS_RSA_WITH_AES_128_CBC_SHA:TLS_RSA_WITH_AES_256_CBC_SHA:TLS_RSA_WITH_AES_128_GCM_SHA256:TLS_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_RC4_128_SHA:TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
-tls_pem:
-%s
-`, tlsPEMYML))
-
-						expectedSuites := []uint16{
-							tls.TLS_RSA_WITH_RC4_128_SHA,
-							tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
-							tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-							tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-							tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-							tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-						}
-
-						err := config.Initialize(b)
-						Expect(err).ToNot(HaveOccurred())
-
-						config.Process()
-
-						Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
-					})
+					Expect(config.Process()).To(MatchError(HavePrefix("Error loading key pair: ")))
 				})
 			})
 
-			Context("When it is given invalid cipher suites", func() {
-				var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-tls_pem:
-%s
-cipher_suites: potato
-`, tlsPEM1YML))
+			Context("when cipher suites are of openssl format", func() {
+				BeforeEach(func() {
+					configSnippet.CipherString = "RC4-SHA:DES-CBC3-SHA:AES128-SHA:AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-ECDSA-RC4-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-RC4-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-CHACHA20-POLY1305"
+				})
+				It("constructs the proper array of cipher suites", func() {
+					expectedSuites := []uint16{
+						tls.TLS_RSA_WITH_RC4_128_SHA,
+						tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+						tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+						tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+					}
 
-				It("panics", func() {
-					err := config.Initialize(b)
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(config.Process).To(Panic())
+					Expect(config.Process()).To(Succeed())
+
+					Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
+				})
+			})
+			Context("when cipher suites are of RFC format", func() {
+				BeforeEach(func() {
+					configSnippet.CipherString = "TLS_RSA_WITH_RC4_128_SHA:TLS_RSA_WITH_3DES_EDE_CBC_SHA:TLS_RSA_WITH_AES_128_CBC_SHA:TLS_RSA_WITH_AES_256_CBC_SHA:TLS_RSA_WITH_AES_128_GCM_SHA256:TLS_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_RC4_128_SHA:TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"
+				})
+				It("constructs the proper array of cipher suites", func() {
+					expectedSuites := []uint16{
+						tls.TLS_RSA_WITH_RC4_128_SHA,
+						tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+						tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+						tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+					}
+
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.Process()).To(Succeed())
+
+					Expect(config.CipherSuites).To(ConsistOf(expectedSuites))
 				})
 			})
 
-			Context("When it is given an unsupported cipher suite", func() {
-				var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-tls_pem:
-%s
-cipher_suites: TLS_RSA_WITH_RC4_1280_SHA
-`, tlsPEM1YML))
+			Context("when cipher suites are invalid", func() {
+				BeforeEach(func() {
+					configSnippet.CipherString = "potato"
+				})
 
-				It("panics", func() {
-					err := config.Initialize(b)
+				It("returns a meaningful error", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(config.Process).To(Panic())
+					Expect(config.Process()).To(MatchError(HavePrefix("Invalid cipher string configuration: potato, please choose from")))
 				})
 			})
 
-			Context("When given no cipher suites", func() {
-				var b = []byte(fmt.Sprintf(`
-enable_ssl: true
-tls_pem:
-%s
-`, tlsPEM1YML))
+			Context("when an unsupported cipher suite is provided", func() {
+				BeforeEach(func() {
+					configSnippet.CipherString = "TLS_RSA_WITH_RC4_1280_SHA"
+				})
 
-				It("panics", func() {
-					err := config.Initialize(b)
+				It("returns a meaningful error", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(config.Process).To(Panic())
+					Expect(config.Process()).To(MatchError(HavePrefix("Invalid cipher string configuration: TLS_RSA_WITH_RC4_1280_SHA, please choose from")))
+				})
+			})
+
+			Context("no cipher suites are provided", func() {
+				BeforeEach(func() {
+					configSnippet.CipherString = ""
+				})
+
+				It("returns a meaningful error", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).ToNot(HaveOccurred())
+
+					Expect(config.Process()).To(MatchError("must specify list of cipher suite when ssl is enabled"))
 				})
 			})
 		})
@@ -1100,19 +1079,19 @@ disable_http: false
 `))
 					err := config.Initialize(b)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(config.Process).ToNot(Panic())
+					Expect(config.Process()).To(Succeed())
 					Expect(config.DisableHTTP).To(BeFalse())
 				})
 			})
 			Context("When disable_http is set to true", func() {
-				It("panics", func() {
+				It("returns a meaningful error", func() {
 					var b = []byte(fmt.Sprintf(`
 enable_ssl: false
 disable_http: true
 `))
 					err := config.Initialize(b)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(config.Process).To(Panic())
+					Expect(config.Process()).To(MatchError(HavePrefix("neither http nor https listener is enabled")))
 				})
 			})
 		})
@@ -1124,7 +1103,7 @@ disable_http: true
 					err := config.Initialize(b)
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(config.Process).ToNot(Panic())
+					Expect(config.Process()).To(Succeed())
 				})
 			})
 			Context("sharding mode `segments`", func() {
@@ -1141,16 +1120,16 @@ disable_http: true
 						err := config.Initialize(b)
 						Expect(err).ToNot(HaveOccurred())
 
-						Expect(config.Process).ToNot(Panic())
+						Expect(config.Process()).To(Succeed())
 					})
 				})
 
 				Context("without isolation segments provided", func() {
-					It("fails", func() {
+					It("returns a meaningful error", func() {
 						err := config.Initialize(b)
 						Expect(err).ToNot(HaveOccurred())
 
-						Expect(config.Process).To(Panic())
+						Expect(config.Process()).To(MatchError("Expected isolation segments; routing table sharding mode set to segments and none provided."))
 					})
 				})
 			})
@@ -1168,7 +1147,7 @@ disable_http: true
 						err := config.Initialize(b)
 						Expect(err).ToNot(HaveOccurred())
 
-						Expect(config.Process).ToNot(Panic())
+						Expect(config.Process()).To(Succeed())
 					})
 				})
 			})
@@ -1177,11 +1156,11 @@ disable_http: true
 		Context("When given a routing_table_sharding_mode that is not supported ", func() {
 			var b = []byte(`routing_table_sharding_mode: foo`)
 
-			It("panics", func() {
+			It("returns a meaningful error", func() {
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(config.Process).To(Panic())
+				Expect(config.Process()).To(MatchError("Invalid sharding mode: foo. Allowed values are [all segments shared-and-segments]"))
 			})
 		})
 
@@ -1224,11 +1203,11 @@ disable_http: true
 		Context("When given a forwarded_client_cert value that is not supported ", func() {
 			var b = []byte(`forwarded_client_cert: foo`)
 
-			It("panics", func() {
+			It("returns a meaningful error", func() {
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(config.Process).To(Panic())
+				Expect(config.Process()).To(MatchError("Invalid forwarded client cert mode: foo. Allowed values are [always_forward forward sanitize_set]"))
 			})
 		})
 
@@ -1243,7 +1222,7 @@ drain_timeout: 15s
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				config.Process()
+				Expect(config.Process()).To(Succeed())
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 				Expect(config.RouteServiceTimeout).To(Equal(10 * time.Second))
@@ -1258,7 +1237,7 @@ endpoint_timeout: 10s
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
-				config.Process()
+				Expect(config.Process()).To(Succeed())
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(10 * time.Second))
@@ -1288,7 +1267,7 @@ endpoint_timeout: 10s
 					Expect(err).ToNot(HaveOccurred())
 					Expect(config.Backends.TLSPem).To(Equal(expectedTLSPEM))
 
-					config.Process()
+					Expect(config.Process()).To(Succeed())
 					Expect(config.Backends.ClientAuthCertificate).To(Equal(certChain.AsTLSConfig().Certificates[0]))
 				})
 
@@ -1302,11 +1281,11 @@ endpoint_timeout: 10s
 						})
 					})
 
-					It("panics", func() {
+					It("returns a meaningful error", func() {
 						err := config.Initialize(cfgYaml)
 						Expect(err).ToNot(HaveOccurred())
 
-						Expect(config.Process).To(Panic())
+						Expect(config.Process()).To(MatchError("Error loading key pair: tls: failed to find any PEM data in certificate input"))
 					})
 				})
 			})

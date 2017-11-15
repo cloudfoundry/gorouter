@@ -31,7 +31,9 @@ var _ = Describe("RouteRegistry", func() {
 	BeforeEach(func() {
 
 		logger = test_util.NewTestZapLogger("test")
-		configObj = config.DefaultConfig()
+		var err error
+		configObj, err = config.DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
 		configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 		configObj.DropletStaleThreshold = 24 * time.Millisecond
 		configObj.IsolationSegments = []string{"foo", "bar"}
@@ -1046,7 +1048,9 @@ var _ = Describe("RouteRegistry", func() {
 
 		Context("when stale threshold is less than pruning cycle", func() {
 			BeforeEach(func() {
-				configObj = config.DefaultConfig()
+				var err error
+				configObj, err = config.DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
 				configObj.PruneStaleDropletsInterval = 100 * time.Millisecond
 				configObj.DropletStaleThreshold = 50 * time.Millisecond
 				configObj.EndpointDialTimeout = 10 * time.Millisecond
@@ -1075,7 +1079,9 @@ var _ = Describe("RouteRegistry", func() {
 
 		Context("when stale threshold is greater than pruning cycle", func() {
 			BeforeEach(func() {
-				configObj = config.DefaultConfig()
+				var err error
+				configObj, err = config.DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
 				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 				configObj.DropletStaleThreshold = 1 * time.Second
 				reporter = new(fakes.FakeRouteRegistryReporter)

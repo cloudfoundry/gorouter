@@ -56,8 +56,8 @@ var _ = BeforeEach(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	cryptoPrev = nil
-
-	conf = config.DefaultConfig()
+	conf, err = config.DefaultConfig()
+	Expect(err).ToNot(HaveOccurred())
 	conf.TraceKey = "my_trace_key"
 	conf.EndpointTimeout = 500 * time.Millisecond
 	conf.EndpointDialTimeout = 50 * time.Millisecond

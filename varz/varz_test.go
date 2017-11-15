@@ -25,7 +25,9 @@ var _ = Describe("Varz", func() {
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("test")
-		Registry = registry.NewRouteRegistry(logger, config.DefaultConfig(), new(fakes.FakeRouteRegistryReporter))
+		cfg, err := config.DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
+		Registry = registry.NewRouteRegistry(logger, cfg, new(fakes.FakeRouteRegistryReporter))
 		Varz = NewVarz(Registry)
 	})
 

@@ -138,12 +138,14 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 	}
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
+	c.ClientCertificateValidationString = "none"
 
 	return c, clientTrustedCertPool
 }
 
 func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
-	c := config.DefaultConfig()
+	c, err := config.DefaultConfig()
+	Expect(err).ToNot(HaveOccurred())
 
 	c.Port = proxyPort
 	c.Index = 2

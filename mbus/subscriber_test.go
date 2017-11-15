@@ -53,8 +53,9 @@ var _ = Describe("Subscriber", func() {
 		l = test_util.NewTestZapLogger("mbus-test")
 
 		reconnected = make(chan mbus.Signal)
-
-		cfg = config.DefaultConfig()
+		var err error
+		cfg, err = config.DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
 		cfg.Index = 4321
 		cfg.StartResponseDelayInterval = 60 * time.Second
 		cfg.DropletStaleThreshold = 120 * time.Second
