@@ -3,15 +3,12 @@ package main
 import (
 	"crypto/tls"
 	"errors"
-	"net/url"
-	"sync/atomic"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -90,8 +87,8 @@ func main() {
 	}
 
 	logger.Info("setting-up-nats-connection")
-	startMsgChan := make(chan struct{})
-	natsClient := connectToNatsServer(logger.Session("nats"), c, startMsgChan)
+	natsReconnected := make(chan mbus.Signal)
+	natsClient := mbus.Connect(c, natsReconnected, logger.Session("nats"))
 
 	var routingAPIClient routing_api.Client
 
@@ -143,7 +140,7 @@ func main() {
 		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
 
-	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan)
+	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, logger.Session("subscriber"))
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
@@ -303,115 +300,6 @@ func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Con
 		logger.Fatal("initialize-token-fetcher-error", zap.Error(err))
 	}
 	return uaaClient
-}
-
-func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomic.Value, startMsg chan<- struct{}) nats.Options {
-	natsServers := c.NatsServers()
-
-	options := nats.DefaultOptions
-	options.Servers = natsServers
-	options.PingInterval = c.NatsClientPingInterval
-	options.MaxReconnect = -1
-	connectedChan := make(chan struct{})
-
-	options.ClosedCB = func(conn *nats.Conn) {
-		logger.Fatal(
-			"nats-connection-closed",
-			zap.Error(errors.New("unexpected close")),
-			zap.Object("last_error", conn.LastError()),
-		)
-	}
-
-	options.DisconnectedCB = func(conn *nats.Conn) {
-		hostStr := natsHost.Load().(string)
-		logger.Info("nats-connection-disconnected", zap.String("nats-host", hostStr))
-
-		go func() {
-			ticker := time.NewTicker(c.NatsClientPingInterval)
-
-			for {
-				select {
-				case <-connectedChan:
-					return
-				case <-ticker.C:
-					logger.Info("nats-connection-still-disconnected")
-				}
-			}
-		}()
-	}
-
-	options.ReconnectedCB = func(conn *nats.Conn) {
-		connectedChan <- struct{}{}
-
-		natsURL, err := url.Parse(conn.ConnectedUrl())
-		natsHostStr := ""
-		if err != nil {
-			logger.Error("nats-url-parse-error", zap.Error(err))
-		} else {
-			natsHostStr = natsURL.Host
-		}
-		natsHost.Store(natsHostStr)
-
-		logger.Info("nats-connection-reconnected", zap.String("nats-host", natsHostStr))
-		startMsg <- struct{}{}
-	}
-
-	return options
-}
-
-func connectToNatsServer(logger goRouterLogger.Logger, c *config.Config, startMsg chan<- struct{}) *nats.Conn {
-	var natsClient *nats.Conn
-	var natsHost atomic.Value
-	var err error
-
-	options := natsOptions(logger, c, &natsHost, startMsg)
-	attempts := 3
-	for attempts > 0 {
-		natsClient, err = options.Connect()
-		if err == nil {
-			break
-		} else {
-			attempts--
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-
-	if err != nil {
-		logger.Fatal("nats-connection-error", zap.Error(err))
-	}
-
-	var natsHostStr string
-	natsURL, err := url.Parse(natsClient.ConnectedUrl())
-	if err == nil {
-		natsHostStr = natsURL.Host
-	}
-
-	logger.Info("Successfully-connected-to-nats", zap.String("host", natsHostStr))
-
-	natsHost.Store(natsHostStr)
-	return natsClient
-}
-
-func createSubscriber(
-	logger goRouterLogger.Logger,
-	c *config.Config,
-	natsClient *nats.Conn,
-	registry rregistry.Registry,
-	startMsgChan chan struct{},
-) ifrit.Runner {
-
-	guid, err := uuid.GenerateUUID()
-	if err != nil {
-		logger.Fatal("failed-to-generate-uuid", zap.Error(err))
-	}
-
-	opts := &mbus.SubscriberOpts{
-		ID: fmt.Sprintf("%d-%s", c.Index, guid),
-		MinimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
-		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
-		AcceptTLS:                        c.Backends.EnableTLS,
-	}
-	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts)
 }
 
 func createLogger(component string, level string) (goRouterLogger.Logger, lager.LogLevel) {

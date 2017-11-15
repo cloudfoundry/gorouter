@@ -2,15 +2,19 @@ package mbus_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"code.cloudfoundry.org/routing-api/models"
 
 	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
-	"code.cloudfoundry.org/gorouter/registry/fakes"
+	mbusFakes "code.cloudfoundry.org/gorouter/mbus/fakes"
+	registryFakes "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
@@ -24,17 +28,17 @@ import (
 var _ = Describe("Subscriber", func() {
 	var (
 		sub     *mbus.Subscriber
-		subOpts *mbus.SubscriberOpts
+		cfg     *config.Config
 		process ifrit.Process
 
-		registry *fakes.FakeRegistry
+		registry *registryFakes.FakeRegistry
 
-		natsRunner   *test_util.NATSRunner
-		natsPort     uint16
-		natsClient   *nats.Conn
-		startMsgChan chan struct{}
+		natsRunner  *test_util.NATSRunner
+		natsPort    uint16
+		natsClient  *nats.Conn
+		reconnected chan mbus.Signal
 
-		logger logger.Logger
+		l logger.Logger
 	)
 
 	BeforeEach(func() {
@@ -44,19 +48,18 @@ var _ = Describe("Subscriber", func() {
 		natsRunner.Start()
 		natsClient = natsRunner.MessageBus
 
-		registry = new(fakes.FakeRegistry)
+		registry = new(registryFakes.FakeRegistry)
 
-		logger = test_util.NewTestZapLogger("mbus-test")
+		l = test_util.NewTestZapLogger("mbus-test")
 
-		startMsgChan = make(chan struct{})
+		reconnected = make(chan mbus.Signal)
 
-		subOpts = &mbus.SubscriberOpts{
-			ID: "Fake-Subscriber-ID",
-			MinimumRegisterIntervalInSeconds: 60,
-			PruneThresholdInSeconds:          120,
-		}
+		cfg = config.DefaultConfig()
+		cfg.Index = 4321
+		cfg.StartResponseDelayInterval = 60 * time.Second
+		cfg.DropletStaleThreshold = 120 * time.Second
 
-		sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 	})
 
 	AfterEach(func() {
@@ -98,19 +101,35 @@ var _ = Describe("Subscriber", func() {
 		err = json.Unmarshal(msg.Data, &startMsg)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(startMsg.Id).To(Equal(subOpts.ID))
+		Expect(startMsg.Id).To(HavePrefix("4321-"))
 		Expect(startMsg.Hosts).ToNot(BeEmpty())
-		Expect(startMsg.MinimumRegisterIntervalInSeconds).To(Equal(subOpts.MinimumRegisterIntervalInSeconds))
-		Expect(startMsg.PruneThresholdInSeconds).To(Equal(subOpts.PruneThresholdInSeconds))
+		Expect(startMsg.MinimumRegisterIntervalInSeconds).To(Equal(int(cfg.StartResponseDelayInterval.Seconds())))
+		Expect(startMsg.PruneThresholdInSeconds).To(Equal(int(cfg.DropletStaleThreshold.Seconds())))
 	})
 
-	It("errors when publish start message fails", func() {
-		sub = mbus.NewSubscriber(logger, nil, registry, startMsgChan, subOpts)
+	It("errors when mbus client is nil", func() {
+		sub = mbus.NewSubscriber(nil, registry, cfg, reconnected, l)
 		process = ifrit.Invoke(sub)
 
 		var err error
 		Eventually(process.Wait()).Should(Receive(&err))
-		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("subscriber: nil mbus client"))
+	})
+
+	Context("when publish start message fails", func() {
+		var fakeClient *mbusFakes.FakeClient
+		BeforeEach(func() {
+			fakeClient = new(mbusFakes.FakeClient)
+			fakeClient.PublishReturns(errors.New("potato"))
+		})
+		It("errors", func() {
+			sub = mbus.NewSubscriber(fakeClient, registry, cfg, reconnected, l)
+			process = ifrit.Invoke(sub)
+
+			var err error
+			Eventually(process.Wait()).Should(Receive(&err))
+			Expect(err).To(MatchError("potato"))
+		})
 	})
 
 	Context("when reconnecting", func() {
@@ -129,7 +148,7 @@ var _ = Describe("Subscriber", func() {
 			reconnectedCbs = append(reconnectedCbs, natsClient.Opts.ReconnectedCB)
 			reconnectedCbs = append(reconnectedCbs, func(_ *nats.Conn) {
 				atomic.StoreUint32(&atomicReconnect, 1)
-				startMsgChan <- struct{}{}
+				reconnected <- mbus.Signal{}
 			})
 
 			natsClient.Opts.ReconnectedCB = func(conn *nats.Conn) {
@@ -153,10 +172,10 @@ var _ = Describe("Subscriber", func() {
 			err = json.Unmarshal(msg.Data, &startMsg)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(startMsg.Id).To(Equal(subOpts.ID))
+			Expect(startMsg.Id).To(HavePrefix("4321-"))
 			Expect(startMsg.Hosts).ToNot(BeEmpty())
-			Expect(startMsg.MinimumRegisterIntervalInSeconds).To(Equal(subOpts.MinimumRegisterIntervalInSeconds))
-			Expect(startMsg.PruneThresholdInSeconds).To(Equal(subOpts.PruneThresholdInSeconds))
+			Expect(startMsg.MinimumRegisterIntervalInSeconds).To(Equal(int(cfg.StartResponseDelayInterval.Seconds())))
+			Expect(startMsg.PruneThresholdInSeconds).To(Equal(int(cfg.DropletStaleThreshold.Seconds())))
 		})
 	})
 
@@ -183,16 +202,16 @@ var _ = Describe("Subscriber", func() {
 			err = json.Unmarshal(msg.Data, &message)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(message.Id).To(Equal(subOpts.ID))
+			Expect(message.Id).To(HavePrefix("4321-"))
 			Expect(message.Hosts).ToNot(BeEmpty())
-			Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(subOpts.MinimumRegisterIntervalInSeconds))
-			Expect(message.PruneThresholdInSeconds).To(Equal(subOpts.PruneThresholdInSeconds))
+			Expect(message.MinimumRegisterIntervalInSeconds).To(Equal(int(cfg.StartResponseDelayInterval.Seconds())))
+			Expect(message.PruneThresholdInSeconds).To(Equal(int(cfg.DropletStaleThreshold.Seconds())))
 		})
 	})
 
 	Context("when the message cannot be unmarshaled", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -203,10 +222,10 @@ var _ = Describe("Subscriber", func() {
 		})
 	})
 
-	Describe("AcceptTLS is enabled", func() {
+	Context("when TLS is enabled for backends", func() {
 		BeforeEach(func() {
-			subOpts.AcceptTLS = true
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			cfg.Backends.EnableTLS = true
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -238,7 +257,7 @@ var _ = Describe("Subscriber", func() {
 			})
 		})
 	})
-	Describe("AcceptTLS is disabled", func() {
+	Context("when TLS is disabled for backends", func() {
 		BeforeEach(func() {
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
@@ -264,13 +283,13 @@ var _ = Describe("Subscriber", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				Consistently(registry.RegisterCallCount).Should(BeZero())
-				Expect(logger).To(gbytes.Say("Unable to register route"))
+				Expect(l).To(gbytes.Say("Unable to register route"))
 
 				err = natsClient.Publish("router.unregister", data)
 				Expect(err).ToNot(HaveOccurred())
 
 				Consistently(registry.UnregisterCallCount).Should(BeZero())
-				Expect(logger).To(gbytes.Say("Unable to unregister route"))
+				Expect(l).To(gbytes.Say("Unable to unregister route"))
 			})
 		})
 		Context("when the message contains a regular port and a tls port", func() {
@@ -346,7 +365,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message contains an http url for route services", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -375,7 +394,7 @@ var _ = Describe("Subscriber", func() {
 	})
 	Context("when a route is unregistered", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(logger, natsClient, registry, startMsgChan, subOpts)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})

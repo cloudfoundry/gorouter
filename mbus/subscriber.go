@@ -3,10 +3,13 @@ package mbus
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/common"
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
@@ -73,41 +76,58 @@ func (rm *RegistryMessage) port(acceptTLS bool) (uint16, bool, error) {
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
 type Subscriber struct {
-	logger        logger.Logger
-	natsClient    *nats.Conn
-	startMsgChan  <-chan struct{}
-	opts          *SubscriberOpts
+	mbusClient    Client
 	routeRegistry registry.Registry
+	reconnected   <-chan Signal
+
+	params    startMessageParams
+	acceptTLS bool
+
+	logger logger.Logger
 }
 
-// SubscriberOpts contains configuration for Subscriber struct
-type SubscriberOpts struct {
-	ID                               string
-	MinimumRegisterIntervalInSeconds int
-	PruneThresholdInSeconds          int
-	AcceptTLS                        bool
+type startMessageParams struct {
+	id                               string
+	minimumRegisterIntervalInSeconds int
+	pruneThresholdInSeconds          int
 }
 
 // NewSubscriber returns a new Subscriber
 func NewSubscriber(
-	logger logger.Logger,
-	natsClient *nats.Conn,
+	mbusClient Client,
 	routeRegistry registry.Registry,
-	startMsgChan <-chan struct{},
-	opts *SubscriberOpts,
+	c *config.Config,
+	reconnected <-chan Signal,
+	l logger.Logger,
 ) *Subscriber {
+	guid, err := uuid.GenerateUUID()
+	if err != nil {
+		l.Fatal("failed-to-generate-uuid", zap.Error(err))
+	}
+
 	return &Subscriber{
-		logger:        logger,
-		natsClient:    natsClient,
+		mbusClient:    mbusClient,
 		routeRegistry: routeRegistry,
-		startMsgChan:  startMsgChan,
-		opts:          opts,
+
+		params: startMessageParams{
+			id: fmt.Sprintf("%d-%s", c.Index, guid),
+			minimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
+			pruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
+		},
+		acceptTLS: c.Backends.EnableTLS,
+
+		reconnected: reconnected,
+
+		logger: l,
 	}
 }
 
 // Run manages the lifecycle of the subscriber process
 func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	s.logger.Info("subscriber-starting")
+	if s.mbusClient == nil {
+		return errors.New("subscriber: nil mbus client")
+	}
 	err := s.sendStartMessage()
 	if err != nil {
 		return err
@@ -125,7 +145,7 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 	s.logger.Info("subscriber-started")
 	for {
 		select {
-		case <-s.startMsgChan:
+		case <-s.reconnected:
 			err := s.sendStartMessage()
 			if err != nil {
 				s.logger.Error("failed-to-send-start-message", zap.Error(err))
@@ -138,16 +158,16 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 }
 
 func (s *Subscriber) subscribeToGreetMessage() error {
-	_, err := s.natsClient.Subscribe("router.greet", func(msg *nats.Msg) {
+	_, err := s.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
 		response, _ := s.startMessage()
-		_ = s.natsClient.Publish(msg.Reply, response)
+		_ = s.mbusClient.Publish(msg.Reply, response)
 	})
 
 	return err
 }
 
 func (s *Subscriber) subscribeRoutes() error {
-	natsSubscriber, err := s.natsClient.Subscribe("router.*", func(message *nats.Msg) {
+	natsSubscriber, err := s.mbusClient.Subscribe("router.*", func(message *nats.Msg) {
 		msg, regErr := createRegistryMessage(message.Data)
 		if regErr != nil {
 			s.logger.Error("validation-error",
@@ -173,7 +193,7 @@ func (s *Subscriber) subscribeRoutes() error {
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint(s.opts.AcceptTLS)
+	endpoint, err := msg.makeEndpoint(s.acceptTLS)
 	if err != nil {
 		s.logger.Error("Unable to register route",
 			zap.Error(err),
@@ -188,7 +208,7 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 }
 
 func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint(s.opts.AcceptTLS)
+	endpoint, err := msg.makeEndpoint(s.acceptTLS)
 	if err != nil {
 		s.logger.Error("Unable to unregister route",
 			zap.Error(err),
@@ -208,10 +228,10 @@ func (s *Subscriber) startMessage() ([]byte, error) {
 	}
 
 	d := common.RouterStart{
-		Id:    s.opts.ID,
+		Id:    s.params.id,
 		Hosts: []string{host},
-		MinimumRegisterIntervalInSeconds: s.opts.MinimumRegisterIntervalInSeconds,
-		PruneThresholdInSeconds:          s.opts.PruneThresholdInSeconds,
+		MinimumRegisterIntervalInSeconds: s.params.minimumRegisterIntervalInSeconds,
+		PruneThresholdInSeconds:          s.params.pruneThresholdInSeconds,
 	}
 	message, err := json.Marshal(d)
 	if err != nil {
@@ -227,7 +247,7 @@ func (s *Subscriber) sendStartMessage() error {
 		return err
 	}
 	// Send start message once at start
-	return s.natsClient.Publish("router.start", message)
+	return s.mbusClient.Publish("router.start", message)
 }
 
 func createRegistryMessage(data []byte) (*RegistryMessage, error) {

@@ -99,12 +99,8 @@ var _ = Describe("Router", func() {
 		router, err = initializeRouter(config, registry, varz, mbusClient, logger)
 		Expect(err).ToNot(HaveOccurred())
 
-		opts := &mbus.SubscriberOpts{
-			ID: "test",
-			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
-			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
-		}
-		subscriber := mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts)
+		config.Index = 4321
+		subscriber := mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber"))
 
 		members := grouper.Members{
 			{Name: "subscriber", Runner: subscriber},

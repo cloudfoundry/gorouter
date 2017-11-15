@@ -227,12 +227,8 @@ var _ = Describe("Router", func() {
 		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
 		Expect(err).ToNot(HaveOccurred())
 
-		opts := &mbus.SubscriberOpts{
-			ID: "test",
-			MinimumRegisterIntervalInSeconds: int(config.StartResponseDelayInterval.Seconds()),
-			PruneThresholdInSeconds:          int(config.DropletStaleThreshold.Seconds()),
-		}
-		subscriber = ifrit.Background(mbus.NewSubscriber(logger.Session("subscriber"), mbusClient, registry, nil, opts))
+		config.Index = 4321
+		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber")))
 		<-subscriber.Ready()
 	})
 
