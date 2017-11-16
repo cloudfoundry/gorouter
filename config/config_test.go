@@ -766,7 +766,7 @@ routing_api:
 
 			})
 
-			Context("when valid value for client_certificate_validation is set", func() {
+			Context("when valid value for client_cert_validation is set", func() {
 
 				DescribeTable("client certificate validation",
 					func(clientCertValidation string, expectedAuthType tls.ClientAuthType) {
@@ -790,7 +790,7 @@ routing_api:
 						configBytes := createYMLSnippet(configSnippet)
 						err := config.Initialize(configBytes)
 						Expect(err).NotTo(HaveOccurred())
-						Expect(config.Process()).To(MatchError("router.client_certificate_validation must be one 'none', 'request' or 'require'."))
+						Expect(config.Process()).To(MatchError("router.client_cert_validation must be one of 'none', 'request' or 'require'."))
 					})
 				})
 

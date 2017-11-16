@@ -257,7 +257,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 			CipherSuites: r.config.CipherSuites,
 			MinVersion:   r.config.MinTLSVersion,
 			ClientCAs:    rootCAs,
-			ClientAuth:   tls.VerifyClientCertIfGiven,
+			ClientAuth:   r.config.ClientCertificateValidation,
 		}
 
 		tlsConfig.BuildNameToCertificate()

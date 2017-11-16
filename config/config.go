@@ -140,7 +140,7 @@ type Config struct {
 	CipherSuites                      []uint16           `yaml:"-"`
 	MinTLSVersionString               string             `yaml:"min_tls_version,omitempty"`
 	MinTLSVersion                     uint16             `yaml:"-"`
-	ClientCertificateValidationString string             `yaml:"client_certificate_validation,omitempty"`
+	ClientCertificateValidationString string             `yaml:"client_cert_validation,omitempty"`
 	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
@@ -278,7 +278,7 @@ func (c *Config) Process() error {
 		case "require":
 			c.ClientCertificateValidation = tls.RequireAndVerifyClientCert
 		default:
-			return fmt.Errorf(`router.client_certificate_validation must be one 'none', 'request' or 'require'.`)
+			return fmt.Errorf(`router.client_cert_validation must be one of 'none', 'request' or 'require'.`)
 		}
 
 		switch c.MinTLSVersionString {
