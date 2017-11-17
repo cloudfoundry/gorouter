@@ -14,6 +14,7 @@ var RetriableClassifiers = ClassifierGroup{
 
 var PrunableClassifiers = ClassifierGroup{
 	HostnameMismatch,
+	AttemptedTLSWithNonTLSBackend,
 }
 
 // Classify returns true on errors that are retryable

@@ -85,7 +85,7 @@ var _ = Describe("Backend TLS", func() {
 			caCertPool, err = x509.SystemCertPool()
 			Expect(err).ToNot(HaveOccurred())
 		})
-		It("prunes the route", func() {
+		It("responds with a 526 status code", func() {
 			resp := registerAppAndTest()
 			Expect(resp.StatusCode).To(Equal(526))
 		})
