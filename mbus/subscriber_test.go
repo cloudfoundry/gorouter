@@ -117,6 +117,24 @@ var _ = Describe("Subscriber", func() {
 		Expect(err).To(MatchError("subscriber: nil mbus client"))
 	})
 
+	Context("Pending", func() {
+		It("returns the subscription Pending value", func() {
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+			msgs, err := sub.Pending()
+			Expect(msgs).To(BeNumerically(">=", 0))
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		Context("when subscription is nil", func() {
+			It("returns an error", func() {
+				msgs, err := sub.Pending()
+				Expect(msgs).To(Equal(-1))
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
 	Context("when publish start message fails", func() {
 		var fakeClient *mbusFakes.FakeClient
 		BeforeEach(func() {
@@ -258,6 +276,7 @@ var _ = Describe("Subscriber", func() {
 			})
 		})
 	})
+
 	Context("when TLS is disabled for backends", func() {
 		BeforeEach(func() {
 			process = ifrit.Invoke(sub)
@@ -293,6 +312,7 @@ var _ = Describe("Subscriber", func() {
 				Expect(l).To(gbytes.Say("Unable to unregister route"))
 			})
 		})
+
 		Context("when the message contains a regular port and a tls port", func() {
 			It("endpoint is constructed with the regular port and useTls set to false and unregister succeeds with regular port", func() {
 				msg := mbus.RegistryMessage{
@@ -328,6 +348,7 @@ var _ = Describe("Subscriber", func() {
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
+
 		Context("when the message contains just a regular port", func() {
 			It("endpoint is constructed with the regular port and useTls set to false, unregister succeeds", func() {
 				msg := mbus.RegistryMessage{
@@ -393,6 +414,7 @@ var _ = Describe("Subscriber", func() {
 			Consistently(registry.RegisterCallCount).Should(BeZero())
 		})
 	})
+
 	Context("when a route is unregistered", func() {
 		BeforeEach(func() {
 			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
@@ -503,4 +525,5 @@ var _ = Describe("Subscriber", func() {
 			}
 		})
 	})
+
 })

@@ -35,7 +35,7 @@ var _ = Describe("FileDescriptor", func() {
 		Expect(os.RemoveAll(procPath)).To(Succeed())
 	})
 
-	It("exists when os signal is received", func() {
+	It("exits when os signal is received", func() {
 		fdMonitor := monitor.NewFileDescriptor(procPath, ch, sender, logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())

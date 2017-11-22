@@ -78,6 +78,7 @@ func (rm *RegistryMessage) port(acceptTLS bool) (uint16, bool, error) {
 type Subscriber struct {
 	mbusClient    Client
 	routeRegistry registry.Registry
+	subscription  *nats.Subscription
 	reconnected   <-chan Signal
 
 	params    startMessageParams
@@ -136,13 +137,14 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 	if err != nil {
 		return err
 	}
-	err = s.subscribeRoutes()
+	s.subscription, err = s.subscribeRoutes()
 	if err != nil {
 		return err
 	}
 
 	close(ready)
 	s.logger.Info("subscriber-started")
+
 	for {
 		select {
 		case <-s.reconnected:
@@ -157,6 +159,16 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 	}
 }
 
+func (s *Subscriber) Pending() (int, error) {
+	if s.subscription == nil {
+		s.logger.Error("failed-to-get-subscription")
+		return -1, errors.New("NATS subscription is nil, Subscriber must be invoked")
+	}
+
+	msgs, _, err := s.subscription.Pending()
+	return msgs, err
+}
+
 func (s *Subscriber) subscribeToGreetMessage() error {
 	_, err := s.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
 		response, _ := s.startMessage()
@@ -166,8 +178,8 @@ func (s *Subscriber) subscribeToGreetMessage() error {
 	return err
 }
 
-func (s *Subscriber) subscribeRoutes() error {
-	natsSubscriber, err := s.mbusClient.Subscribe("router.*", func(message *nats.Msg) {
+func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
+	natsSubscription, err := s.mbusClient.Subscribe("router.*", func(message *nats.Msg) {
 		msg, regErr := createRegistryMessage(message.Data)
 		if regErr != nil {
 			s.logger.Error("validation-error",
@@ -188,8 +200,9 @@ func (s *Subscriber) subscribeRoutes() error {
 	})
 
 	// Pending limits are set to twice the defaults
-	natsSubscriber.SetPendingLimits(131072, 131072*1024)
-	return err
+	natsSubscription.SetPendingLimits(131072, 131072*1024)
+
+	return natsSubscription, err
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {

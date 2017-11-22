@@ -150,9 +150,11 @@ func main() {
 	}
 
 	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, logger.Session("subscriber"))
+	natsMonitor := initializeNATSMonitor(subscriber, sender, logger)
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
+	members = append(members, grouper.Member{Name: "natsMonitor", Runner: natsMonitor})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
 
 	group := grouper.NewOrdered(os.Interrupt, members)
@@ -173,6 +175,16 @@ func initializeFDMonitor(sender *metric_sender.MetricSender, logger goRouterLogg
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
 	return monitor.NewFileDescriptor(path, ticker.C, sender, logger.Session("FileDescriptor"))
+}
+
+func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger goRouterLogger.Logger) *monitor.NATSMonitor {
+	ticker := time.NewTicker(time.Second * 5)
+	return &monitor.NATSMonitor{
+		Subscriber: subscriber,
+		Sender:     sender,
+		TickChan:   ticker.C,
+		Logger:     logger.Session("NATSMonitor"),
+	}
 }
 
 func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsReporter {
