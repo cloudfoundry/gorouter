@@ -117,13 +117,38 @@ var _ = Describe("Subscriber", func() {
 		Expect(err).To(MatchError("subscriber: nil mbus client"))
 	})
 
-	Context("Pending", func() {
+	Describe("Pending", func() {
 		It("returns the subscription Pending value", func() {
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
-			msgs, err := sub.Pending()
-			Expect(msgs).To(BeNumerically(">=", 0))
+
+			signal := make(chan struct{})
+			registry.RegisterStub = func(uri route.Uri, endpoint *route.Endpoint) {
+				<-signal
+			}
+
+			msg := mbus.RegistryMessage{Port: 8080, Uris: []route.Uri{"foo.example.com"}}
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
 			Expect(err).ToNot(HaveOccurred())
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() int {
+				msgs, err := sub.Pending()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(1))
+
+			signal <- struct{}{}
+
+			Eventually(func() int {
+				msgs, err := sub.Pending()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(0))
 		})
 
 		Context("when subscription is nil", func() {
