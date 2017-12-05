@@ -30,7 +30,7 @@ func (n *NATSMonitor) Run(signals <-chan os.Signal, ready chan<- struct{}) error
 			if err != nil {
 				n.Logger.Error("error-retrieving-nats-subscription-pending-messages", zap.Error(err))
 			}
-			chainer := n.Sender.Value("buffered_messages", float64(queuedMsgs), "")
+			chainer := n.Sender.Value("buffered_messages", float64(queuedMsgs), "message")
 			err = chainer.Send()
 			if err != nil {
 				n.Logger.Error("error-sending-nats-monitor-metric", zap.Error(err))

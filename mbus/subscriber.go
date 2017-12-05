@@ -76,10 +76,11 @@ func (rm *RegistryMessage) port(acceptTLS bool) (uint16, bool, error) {
 
 // Subscriber subscribes to NATS for all router.* messages and handles them
 type Subscriber struct {
-	mbusClient    Client
-	routeRegistry registry.Registry
-	subscription  *nats.Subscription
-	reconnected   <-chan Signal
+	mbusClient       Client
+	routeRegistry    registry.Registry
+	subscription     *nats.Subscription
+	reconnected      <-chan Signal
+	natsPendingLimit int
 
 	params    startMessageParams
 	acceptTLS bool
@@ -117,9 +118,9 @@ func NewSubscriber(
 		},
 		acceptTLS: c.Backends.EnableTLS,
 
-		reconnected: reconnected,
-
-		logger: l,
+		reconnected:      reconnected,
+		natsPendingLimit: c.NatsClientMessageBufferSize,
+		logger:           l,
 	}
 }
 
@@ -199,10 +200,16 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 		}
 	})
 
-	// Pending limits are set to twice the defaults
-	natsSubscription.SetPendingLimits(131072, 131072*1024)
+	if err != nil {
+		return nil, err
+	}
 
-	return natsSubscription, err
+	err = natsSubscription.SetPendingLimits(s.natsPendingLimit, s.natsPendingLimit*1024)
+	if err != nil {
+		return nil, fmt.Errorf("subscriber: SetPendingLimits: %s", err)
+	}
+
+	return natsSubscription, nil
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {

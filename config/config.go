@@ -166,11 +166,12 @@ type Config struct {
 	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only,omitempty"`
 	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https,omitempty"`
 	// These fields are populated by the `Process` function.
-	Ip                     string        `yaml:"-"`
-	RouteServiceEnabled    bool          `yaml:"-"`
-	NatsClientPingInterval time.Duration `yaml:"nats_client_ping_interval,omitempty"`
-	Backends               BackendConfig `yaml:"backends,omitempty"`
-	ExtraHeadersToLog      []string      `yaml:"extra_headers_to_log,omitempty"`
+	Ip                          string        `yaml:"-"`
+	RouteServiceEnabled         bool          `yaml:"-"`
+	NatsClientPingInterval      time.Duration `yaml:"nats_client_ping_interval,omitempty"`
+	NatsClientMessageBufferSize int           `yaml:"-"`
+	Backends                    BackendConfig `yaml:"backends,omitempty"`
+	ExtraHeadersToLog           []string      `yaml:"extra_headers_to_log,omitempty"`
 
 	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries,omitempty"`
 	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval,omitempty"`
@@ -217,6 +218,8 @@ var defaultConfig = Config{
 	// to 20 sec because the operators cannot set the value of DropletStaleThreshold and StartResponseDelayInterval
 	// ping_interval = ((DropletStaleThreshold- StartResponseDelayInterval)-minimumRegistrationInterval+(2 * number_of_nats_servers))/3
 	NatsClientPingInterval: 20 * time.Second,
+	// This is set to twice the defaults from the NATS library
+	NatsClientMessageBufferSize: 131072,
 
 	HealthCheckUserAgent: "HTTP-Monitor/1.1",
 	LoadBalance:          LOAD_BALANCE_RR,

@@ -117,6 +117,16 @@ var _ = Describe("Subscriber", func() {
 		Expect(err).To(MatchError("subscriber: nil mbus client"))
 	})
 
+	It("errors when pending limit is 0", func() {
+		cfg.NatsClientMessageBufferSize = 0
+		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+		process = ifrit.Invoke(sub)
+
+		var err error
+		Eventually(process.Wait()).Should(Receive(&err))
+		Expect(err).To(MatchError("subscriber: SetPendingLimits: nats: invalid argument"))
+	})
+
 	Describe("Pending", func() {
 		It("returns the subscription Pending value", func() {
 			process = ifrit.Invoke(sub)

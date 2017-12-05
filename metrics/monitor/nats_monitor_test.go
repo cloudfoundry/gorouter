@@ -61,7 +61,7 @@ var _ = Describe("NATSMonitor", func() {
 		Expect(sender.ValueCallCount()).To(BeNumerically(">=", 1))
 		name, _, unit := sender.ValueArgsForCall(0)
 		Expect(name).To(Equal("buffered_messages"))
-		Expect(unit).To(Equal(""))
+		Expect(unit).To(Equal("message"))
 
 		Expect(valueChainer.SendCallCount()).To(BeNumerically(">=", 1))
 	})
