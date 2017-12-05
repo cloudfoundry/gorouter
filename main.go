@@ -26,7 +26,7 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 	"github.com/uber-go/zap"
 
 	"flag"

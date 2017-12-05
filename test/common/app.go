@@ -5,7 +5,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 	. "github.com/onsi/gomega"
 
 	"encoding/json"

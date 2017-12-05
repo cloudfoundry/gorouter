@@ -5,7 +5,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

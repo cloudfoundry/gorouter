@@ -17,7 +17,7 @@ import (
 	"code.cloudfoundry.org/routing-api/models"
 
 	"github.com/mailru/easyjson"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 	"github.com/uber-go/zap"
 )
 

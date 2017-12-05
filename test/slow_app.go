@@ -7,7 +7,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test/common"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 )
 
 func NewSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {
