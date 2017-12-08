@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/routing-api/models"
-
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -306,7 +304,18 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1999, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", true)
+				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+					Host:                    "host",
+					AppId:                   "app",
+					Port:                    1999,
+					UseTLS:                  true,
+					ServerCertDomainSAN:     "san",
+					PrivateInstanceId:       "id",
+					PrivateInstanceIndex:    "index",
+					StaleThresholdInSeconds: 120,
+					Tags: map[string]string{"key": "value"},
+				})
+
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
@@ -371,7 +380,18 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+					Host:                    "host",
+					AppId:                   "app",
+					Port:                    1111,
+					UseTLS:                  false,
+					ServerCertDomainSAN:     "san",
+					PrivateInstanceId:       "id",
+					PrivateInstanceIndex:    "index",
+					StaleThresholdInSeconds: 120,
+					Tags: map[string]string{"key": "value"},
+				})
+
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 
 				err = natsClient.Publish("router.unregister", data)
@@ -379,7 +399,6 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.UnregisterCallCount).Should(Equal(1))
 				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})
@@ -406,7 +425,18 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.RegisterCallCount).Should(Equal(1))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
+				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+					Host:                    "host",
+					AppId:                   "app",
+					Port:                    1111,
+					UseTLS:                  false,
+					ServerCertDomainSAN:     "san",
+					PrivateInstanceId:       "id",
+					PrivateInstanceIndex:    "index",
+					StaleThresholdInSeconds: 120,
+					Tags: map[string]string{"key": "value"},
+				})
+
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 
 				err = natsClient.Publish("router.unregister", data)
@@ -414,7 +444,6 @@ var _ = Describe("Subscriber", func() {
 
 				Eventually(registry.UnregisterCallCount).Should(Equal(1))
 				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				expectedEndpoint = route.NewEndpoint("app", "host", 1111, "san", "id", "index", map[string]string{"key": "value"}, 120, "", models.ModificationTag{}, "", false)
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 		})

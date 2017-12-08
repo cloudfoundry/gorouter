@@ -21,7 +21,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -101,8 +100,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
 			routerIP = "127.0.0.1"
 
-			endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "serverCertDomainSAN", "instanceId", "1",
-				map[string]string{}, 0, "", models.ModificationTag{}, "", false)
+			endpoint = route.NewEndpoint(&route.EndpointOpts{
+				AppId:                "appId",
+				Host:                 "1.1.1.1",
+				Port:                 9090,
+				PrivateInstanceId:    "instanceId",
+				PrivateInstanceIndex: "1",
+			})
 
 			added := routePool.Put(endpoint)
 			Expect(added).To(BeTrue())
@@ -409,8 +413,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 					routePool.Remove(ep)
 				}
 				Expect(routePool.IsEmpty()).To(BeTrue())
-				endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "serverCertDomainSAN", "instanceId", "1",
-					map[string]string{}, 0, "", models.ModificationTag{}, "", true /* use TLS */)
+				endpoint = route.NewEndpoint(&route.EndpointOpts{
+					Host:   "1.1.1.1",
+					Port:   9090,
+					UseTLS: true,
+				})
+
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 				transport.RoundTripReturns(
@@ -429,8 +437,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("when the backend is registered with a non-tls port", func() {
 				BeforeEach(func() {
-					endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "serverCertDomainSAN", "instanceId", "1",
-						map[string]string{}, 0, "", models.ModificationTag{}, "", false /* do not use TLS */)
+					endpoint = route.NewEndpoint(&route.EndpointOpts{
+						Host: "1.1.1.1",
+						Port: 9090,
+					})
 
 					added := routePool.Put(endpoint)
 					Expect(added).To(BeTrue())
@@ -461,8 +471,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			It("does not re-use transports between endpoints", func() {
-				endpoint = route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "serverCertDomainSAN-2", "instanceId-2", "2",
-					map[string]string{}, 0, "", models.ModificationTag{}, "", true /* use TLS */)
+				endpoint = route.NewEndpoint(&route.EndpointOpts{
+					Host: "1.1.1.1", Port: 9091, UseTLS: true, PrivateInstanceId: "instanceId-2",
+				})
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 				_, err := proxyRoundTripper.RoundTrip(req)
@@ -620,10 +631,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 					return resp, nil
 				}
 
-				endpoint1 = route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "san-1", "id-1", "2",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
-				endpoint2 = route.NewEndpoint("appId", "1.1.1.1", uint16(9092), "san-2", "id-2", "3",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
+				endpoint1 = route.NewEndpoint(&route.EndpointOpts{
+					Host: "1.1.1.1", Port: 9091, PrivateInstanceId: "id-1",
+				})
+				endpoint2 = route.NewEndpoint(&route.EndpointOpts{
+					Host: "1.1.1.1", Port: 9092, PrivateInstanceId: "id-2",
+				})
 
 				added := routePool.Put(endpoint1)
 				Expect(added).To(BeTrue())
@@ -682,8 +695,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						removed = routePool.Remove(endpoint2)
 						Expect(removed).To(BeTrue())
 
-						new_endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9091), "san-5", "id-5", "2",
-							map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
+						new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 						added := routePool.Put(new_endpoint)
 						Expect(added).To(BeTrue())
 					})

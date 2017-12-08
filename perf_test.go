@@ -13,7 +13,6 @@ import (
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +41,12 @@ var _ = Describe("AccessLogRecord", func() {
 				str := strconv.Itoa(i)
 				r.Register(
 					route.Uri("bench.vcap.me."+str),
-					route.NewEndpoint("", "localhost", uint16(i), "", "", "", nil, -1, "", models.ModificationTag{}, "", false),
+					route.NewEndpoint(&route.EndpointOpts{
+						Host: "localhost",
+						Port: uint16(i),
+						StaleThresholdInSeconds: -1,
+						UseTLS:                  false,
+					}),
 				)
 			}
 		})

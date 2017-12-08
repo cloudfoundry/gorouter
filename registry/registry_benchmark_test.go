@@ -18,7 +18,6 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 )
 
 var testLogger = setupLogger()
@@ -29,10 +28,7 @@ var sender = metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 var batcher = metricbatcher.New(sender, 5*time.Second)
 var reporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 
-var fooEndpoint = route.NewEndpoint(
-	"12345", "192.168.1.1", 1234, "san1", "id1", "0", map[string]string{}, -1, "",
-	models.ModificationTag{}, "", false,
-)
+var fooEndpoint = route.NewEndpoint(&route.EndpointOpts{})
 
 func setupLogger() logger.Logger {
 	sink := &test_util.TestZapSink{

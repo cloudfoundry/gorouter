@@ -2,7 +2,6 @@ package container_test
 
 import (
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/routing-api/models"
 
 	"code.cloudfoundry.org/gorouter/registry/container"
 	. "github.com/onsi/ginkgo"
@@ -12,13 +11,11 @@ import (
 var _ = Describe("Trie", func() {
 
 	var (
-		r      *container.Trie
-		modTag models.ModificationTag
+		r *container.Trie
 	)
 
 	BeforeEach(func() {
 		r = container.NewTrie()
-		modTag = models.ModificationTag{}
 	})
 
 	Describe(".Find", func() {
@@ -271,8 +268,8 @@ var _ = Describe("Trie", func() {
 				count += 1
 			}
 
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
-			e2 := route.NewEndpoint("", "192.168.1.1", 4321, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
+			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
 			p1 := route.NewPool(42, "", "")
 			p2 := route.NewPool(42, "", "")
 			p3 := route.NewPool(42, "", "")
@@ -299,7 +296,7 @@ var _ = Describe("Trie", func() {
 
 	Describe(".Snip", func() {
 		It("removes a branch from the trie", func() {
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{})
 			p1 := route.NewPool(42, "", "")
 			p2 := route.NewPool(42, "", "")
 			p1.Put(e1)
@@ -324,7 +321,7 @@ var _ = Describe("Trie", func() {
 		It("deletes empty pools", func() {
 			p1 := route.NewPool(42, "", "")
 			p2 := route.NewPool(42, "", "")
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{})
 			p2.Put(e1)
 
 			fooNode := r.Insert("/foo", p1)
@@ -341,8 +338,8 @@ var _ = Describe("Trie", func() {
 		It("returns the number of endpoints", func() {
 			Expect(r.EndpointCount()).To(Equal(0))
 
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
-			e2 := route.NewEndpoint("", "192.168.1.1", 4321, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
+			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
 			p := route.NewPool(42, "", "")
 			p.Put(e1)
 			p.Put(e2)
@@ -352,8 +349,8 @@ var _ = Describe("Trie", func() {
 		})
 
 		It("counts the uniques leaf endpoints", func() {
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
-			e2 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
+			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 			p1 := route.NewPool(42, "", "")
 			p2 := route.NewPool(42, "", "")
 			p1.Put(e1)
@@ -367,8 +364,8 @@ var _ = Describe("Trie", func() {
 
 	Describe(".ToMap", func() {
 		It("Can be represented by a map", func() {
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
-			e2 := route.NewEndpoint("", "192.168.1.1", 4321, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
+			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
 			p1 := route.NewPool(42, "", "")
 			p2 := route.NewPool(42, "", "")
 			p1.Put(e1)
@@ -386,7 +383,7 @@ var _ = Describe("Trie", func() {
 
 	Describe(".ToPath", func() {
 		It("Returns full URI", func() {
-			e1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{})
 			p1 := route.NewPool(42, "", "")
 			p1.Put(e1)
 			node1 := r.Insert("foo.com", p1)

@@ -8,7 +8,6 @@ import (
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -35,10 +34,7 @@ var _ = Describe("modifyResponse", func() {
 		})
 		reqInfo, err = handlers.ContextRequestInfo(modifiedReq)
 		Expect(err).ToNot(HaveOccurred())
-		reqInfo.RouteEndpoint = route.NewEndpoint(
-			"app-id", "1.2.3.4", 5678, "san-1", "id-1", "idx-1", nil,
-			120, "", models.ModificationTag{}, "", false,
-		)
+		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 		reqInfo.RoutePool = route.NewPool(0, "foo.com", "context-path")
 		resp.Request = modifiedReq
 	})

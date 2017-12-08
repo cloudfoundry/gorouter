@@ -97,33 +97,36 @@ type Pool struct {
 	random *rand.Rand
 }
 
-func NewEndpoint(
-	appId,
-	host string,
-	port uint16,
-	serverCertDomainSAN string,
-	privateInstanceId string,
-	privateInstanceIndex string,
-	tags map[string]string,
-	staleThresholdInSeconds int,
-	routeServiceUrl string,
-	modificationTag models.ModificationTag,
-	isolationSegment string,
-	useTLS bool,
-) *Endpoint {
+type EndpointOpts struct {
+	AppId                   string
+	Host                    string
+	Port                    uint16
+	ServerCertDomainSAN     string
+	PrivateInstanceId       string
+	PrivateInstanceIndex    string
+	Tags                    map[string]string
+	StaleThresholdInSeconds int
+	RouteServiceUrl         string
+	ModificationTag         models.ModificationTag
+	IsolationSegment        string
+	UseTLS                  bool
+	EndpointUpdatedAt       time.Time
+}
+
+func NewEndpoint(opts *EndpointOpts) *Endpoint {
 	return &Endpoint{
-		ApplicationId:        appId,
-		addr:                 fmt.Sprintf("%s:%d", host, port),
-		Tags:                 tags,
-		useTls:               useTLS,
-		ServerCertDomainSAN:  serverCertDomainSAN,
-		PrivateInstanceId:    privateInstanceId,
-		PrivateInstanceIndex: privateInstanceIndex,
-		StaleThreshold:       time.Duration(staleThresholdInSeconds) * time.Second,
-		RouteServiceUrl:      routeServiceUrl,
-		ModificationTag:      modificationTag,
+		ApplicationId:        opts.AppId,
+		addr:                 fmt.Sprintf("%s:%d", opts.Host, opts.Port),
+		Tags:                 opts.Tags,
+		useTls:               opts.UseTLS,
+		ServerCertDomainSAN:  opts.ServerCertDomainSAN,
+		PrivateInstanceId:    opts.PrivateInstanceId,
+		PrivateInstanceIndex: opts.PrivateInstanceIndex,
+		StaleThreshold:       time.Duration(opts.StaleThresholdInSeconds) * time.Second,
+		RouteServiceUrl:      opts.RouteServiceUrl,
+		ModificationTag:      opts.ModificationTag,
 		Stats:                NewStats(),
-		IsolationSegment:     isolationSegment,
+		IsolationSegment:     opts.IsolationSegment,
 	}
 }
 

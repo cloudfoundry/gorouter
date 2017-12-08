@@ -158,20 +158,16 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 func (r *RouteFetcher) HandleEvent(e routing_api.Event) {
 	eventRoute := e.Route
 	uri := route.Uri(eventRoute.Route)
-	endpoint := route.NewEndpoint(
-		eventRoute.LogGuid,
-		eventRoute.IP,
-		uint16(eventRoute.Port),
-		eventRoute.LogGuid,
-		"",
-		"",
-		nil,
-		eventRoute.GetTTL(),
-		eventRoute.RouteServiceUrl,
-		eventRoute.ModificationTag,
-		"",
-		false, /* routing api routes will not register https backends */
-	)
+	endpoint := route.NewEndpoint(&route.EndpointOpts{
+		AppId:                   eventRoute.LogGuid,
+		Host:                    eventRoute.IP,
+		Port:                    uint16(eventRoute.Port),
+		ServerCertDomainSAN:     eventRoute.LogGuid,
+		StaleThresholdInSeconds: eventRoute.GetTTL(),
+		RouteServiceUrl:         eventRoute.RouteServiceUrl,
+		ModificationTag:         eventRoute.ModificationTag,
+		UseTLS:                  false,
+	})
 	switch e.Action {
 	case "Delete":
 		r.RouteRegistry.Unregister(uri, endpoint)
@@ -231,20 +227,17 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range r.endpoints {
 		r.RouteRegistry.Register(
 			route.Uri(aRoute.Route),
-			route.NewEndpoint(
-				aRoute.LogGuid,
-				aRoute.IP,
-				uint16(aRoute.Port),
-				aRoute.LogGuid,
-				"",
-				"",
-				nil,
-				aRoute.GetTTL(),
-				aRoute.RouteServiceUrl,
-				aRoute.ModificationTag,
-				"",
-				false,
-			))
+			route.NewEndpoint(&route.EndpointOpts{
+				AppId:                   aRoute.LogGuid,
+				Host:                    aRoute.IP,
+				Port:                    uint16(aRoute.Port),
+				ServerCertDomainSAN:     aRoute.LogGuid,
+				StaleThresholdInSeconds: aRoute.GetTTL(),
+				RouteServiceUrl:         aRoute.RouteServiceUrl,
+				ModificationTag:         aRoute.ModificationTag,
+				UseTLS:                  false,
+			}),
+		)
 	}
 }
 
@@ -269,20 +262,17 @@ func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 	for _, aRoute := range diff {
 		r.RouteRegistry.Unregister(
 			route.Uri(aRoute.Route),
-			route.NewEndpoint(
-				aRoute.LogGuid,
-				aRoute.IP,
-				uint16(aRoute.Port),
-				aRoute.LogGuid,
-				"",
-				"",
-				nil,
-				aRoute.GetTTL(),
-				aRoute.RouteServiceUrl,
-				aRoute.ModificationTag,
-				"",
-				false,
-			))
+			route.NewEndpoint(&route.EndpointOpts{
+				AppId:                   aRoute.LogGuid,
+				Host:                    aRoute.IP,
+				Port:                    uint16(aRoute.Port),
+				ServerCertDomainSAN:     aRoute.LogGuid,
+				StaleThresholdInSeconds: aRoute.GetTTL(),
+				RouteServiceUrl:         aRoute.RouteServiceUrl,
+				ModificationTag:         aRoute.ModificationTag,
+				UseTLS:                  false,
+			}),
+		)
 	}
 }
 

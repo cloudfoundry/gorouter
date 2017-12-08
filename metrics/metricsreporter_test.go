@@ -6,7 +6,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/routing-api/models"
 
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
@@ -22,7 +21,7 @@ var _ = Describe("MetricsReporter", func() {
 	)
 
 	BeforeEach(func() {
-		endpoint = route.NewEndpoint("someId", "host", 2222, "serverCertDomainSAN", "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
+		endpoint = route.NewEndpoint(&route.EndpointOpts{Tags: map[string]string{}})
 		sender = new(fakes.MetricSender)
 		batcher = new(fakes.MetricBatcher)
 		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}

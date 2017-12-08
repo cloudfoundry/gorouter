@@ -147,18 +147,15 @@ var _ = Describe("RouteFetcher", func() {
 				uri, endpoint := registry.RegisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(expectedRoute.Route)))
 				Expect(endpoint).To(Equal(
-					route.NewEndpoint(expectedRoute.LogGuid,
-						expectedRoute.IP, uint16(expectedRoute.Port),
-						expectedRoute.LogGuid,
-						"",
-						"",
-						nil,
-						*expectedRoute.TTL,
-						expectedRoute.RouteServiceUrl,
-						expectedRoute.ModificationTag,
-						"",
-						false,
-					)))
+					route.NewEndpoint(&route.EndpointOpts{
+						AppId:                   expectedRoute.LogGuid,
+						Host:                    expectedRoute.IP,
+						Port:                    uint16(expectedRoute.Port),
+						ServerCertDomainSAN:     expectedRoute.LogGuid,
+						StaleThresholdInSeconds: *expectedRoute.TTL,
+						RouteServiceUrl:         expectedRoute.RouteServiceUrl,
+						ModificationTag:         expectedRoute.ModificationTag,
+					})))
 			}
 		})
 
@@ -222,19 +219,15 @@ var _ = Describe("RouteFetcher", func() {
 				uri, endpoint := registry.UnregisterArgsForCall(i)
 				Expect(uri).To(Equal(route.Uri(expectedRoute.Route)))
 				Expect(endpoint).To(Equal(
-					route.NewEndpoint(expectedRoute.LogGuid,
-						expectedRoute.IP,
-						uint16(expectedRoute.Port),
-						expectedRoute.LogGuid,
-						"",
-						"",
-						nil,
-						*expectedRoute.TTL,
-						expectedRoute.RouteServiceUrl,
-						expectedRoute.ModificationTag,
-						"",
-						false,
-					)))
+					route.NewEndpoint(&route.EndpointOpts{
+						AppId:                   expectedRoute.LogGuid,
+						Host:                    expectedRoute.IP,
+						Port:                    uint16(expectedRoute.Port),
+						ServerCertDomainSAN:     expectedRoute.LogGuid,
+						StaleThresholdInSeconds: *expectedRoute.TTL,
+						RouteServiceUrl:         expectedRoute.RouteServiceUrl,
+						ModificationTag:         expectedRoute.ModificationTag,
+					})))
 			}
 		})
 
@@ -460,20 +453,16 @@ var _ = Describe("RouteFetcher", func() {
 				uri, endpoint := registry.RegisterArgsForCall(0)
 				Expect(uri).To(Equal(route.Uri(eventRoute.Route)))
 				Expect(endpoint).To(Equal(
-					route.NewEndpoint(
-						eventRoute.LogGuid,
-						eventRoute.IP,
-						uint16(eventRoute.Port),
-						eventRoute.LogGuid,
-						"",
-						"",
-						nil,
-						*eventRoute.TTL,
-						eventRoute.RouteServiceUrl,
-						eventRoute.ModificationTag,
-						"",
-						false,
-					)))
+					route.NewEndpoint(&route.EndpointOpts{
+						AppId:                   eventRoute.LogGuid,
+						Host:                    eventRoute.IP,
+						Port:                    uint16(eventRoute.Port),
+						ServerCertDomainSAN:     eventRoute.LogGuid,
+						StaleThresholdInSeconds: *eventRoute.TTL,
+						RouteServiceUrl:         eventRoute.RouteServiceUrl,
+						ModificationTag:         eventRoute.ModificationTag,
+					})))
+
 			})
 		})
 
@@ -498,20 +487,16 @@ var _ = Describe("RouteFetcher", func() {
 				uri, endpoint := registry.UnregisterArgsForCall(0)
 				Expect(uri).To(Equal(route.Uri(eventRoute.Route)))
 				Expect(endpoint).To(Equal(
-					route.NewEndpoint(
-						eventRoute.LogGuid,
-						eventRoute.IP,
-						uint16(eventRoute.Port),
-						eventRoute.LogGuid,
-						"",
-						"",
-						nil,
-						*eventRoute.TTL,
-						eventRoute.RouteServiceUrl,
-						eventRoute.ModificationTag,
-						"",
-						false,
-					)))
+					route.NewEndpoint(&route.EndpointOpts{
+						AppId:                   eventRoute.LogGuid,
+						Host:                    eventRoute.IP,
+						Port:                    uint16(eventRoute.Port),
+						ServerCertDomainSAN:     eventRoute.LogGuid,
+						StaleThresholdInSeconds: *eventRoute.TTL,
+						RouteServiceUrl:         eventRoute.RouteServiceUrl,
+						ModificationTag:         eventRoute.ModificationTag,
+					})))
+
 			})
 		})
 	})

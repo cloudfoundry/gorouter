@@ -2,7 +2,6 @@ package metrics_test
 
 import (
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -29,7 +28,7 @@ var _ = Describe("CompositeReporter", func() {
 		fakeProxyReporter = new(fakes.FakeProxyReporter)
 
 		composite = &metrics.CompositeReporter{VarzReporter: fakeVarzReporter, ProxyReporter: fakeProxyReporter}
-		endpoint = route.NewEndpoint("someId", "host", 2222, "serverCertDomainSAN", "privateId", "2", map[string]string{}, 30, "", models.ModificationTag{}, "", false)
+		endpoint = route.NewEndpoint(&route.EndpointOpts{})
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
 		responseDuration = time.Second

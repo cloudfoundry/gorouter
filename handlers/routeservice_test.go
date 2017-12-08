@@ -14,7 +14,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
@@ -116,8 +115,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("for normal routes", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
-					map[string]string{}, 0, "", models.ModificationTag{}, "", false)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{})
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -141,9 +139,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("with route service URL configured for the route", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
-					map[string]string{}, 0, "route-service.com", models.ModificationTag{}, "", false)
-
+				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "route-service.com"})
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 			})
@@ -165,9 +161,7 @@ var _ = Describe("Route Service Handler", func() {
 	Context("with Route Services enabled", func() {
 		Context("for normal routes", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("appId", "1.1.1.1", uint16(9090), "san", "id", "1",
-					map[string]string{}, 0, "", models.ModificationTag{}, "", false)
-
+				endpoint := route.NewEndpoint(&route.EndpointOpts{})
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 			})
@@ -189,10 +183,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("with route service URL configured for the route", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
-					"https://route-service.com", models.ModificationTag{}, "", false,
-				)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://route-service.com"})
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 			})
@@ -514,10 +505,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("when a TCP request an app bound to a route service", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
-					"https://goodrouteservice.com", models.ModificationTag{}, "", false,
-				)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodrouteservice.com"})
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -536,10 +524,7 @@ var _ = Describe("Route Service Handler", func() {
 		})
 		Context("when a websocket request an app bound to a route service", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
-					"https://goodrouteservice.com", models.ModificationTag{}, "", false,
-				)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodrouteservice.com"})
 
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
@@ -559,11 +544,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		Context("when a bad route service url is used", func() {
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint(
-					"appId", "1.1.1.1", uint16(9090), "san", "id", "1", map[string]string{}, 0,
-					"https://bad%20service.com", models.ModificationTag{}, "", false,
-				)
-
+				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://bad%20service.com"})
 				added := routePool.Put(endpoint)
 				Expect(added).To(BeTrue())
 

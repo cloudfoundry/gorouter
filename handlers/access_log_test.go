@@ -12,7 +12,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -34,7 +33,10 @@ var _ = Describe("AccessLog", func() {
 
 		reqChan chan *http.Request
 	)
-	testEndpoint := route.NewEndpoint("app-id-123", "host", 1234, "server-cert-domain-san-123", "instance-id-123", "2", nil, 120, "", models.ModificationTag{}, "", false)
+	testEndpoint := route.NewEndpoint(&route.EndpointOpts{
+		Host: "host",
+		Port: 1234,
+	})
 	testHeaders := http.Header{
 		"Foo":               []string{"foobar"},
 		"X-Forwarded-For":   []string{"1.2.3.4"},

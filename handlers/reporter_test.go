@@ -12,7 +12,6 @@ import (
 	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -50,9 +49,7 @@ var _ = Describe("Reporter Handler", func() {
 
 			reqInfo, err := handlers.ContextRequestInfo(req)
 			Expect(err).NotTo(HaveOccurred())
-			reqInfo.RouteEndpoint = route.NewEndpoint(
-				"appID", "blah", uint16(1234), "san", "id", "1", nil, 0, "",
-				models.ModificationTag{}, "", false)
+			reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{AppId: "appID", PrivateInstanceIndex: "1", PrivateInstanceId: "id"})
 			reqInfo.StoppedAt = time.Now()
 
 			nextCalled = true
@@ -101,9 +98,7 @@ var _ = Describe("Reporter Handler", func() {
 
 				reqInfo, err := handlers.ContextRequestInfo(req)
 				Expect(err).NotTo(HaveOccurred())
-				reqInfo.RouteEndpoint = route.NewEndpoint(
-					"appID", "blah", uint16(1234), "san", "id", "1", nil, 0, "",
-					models.ModificationTag{}, "", false)
+				reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{AppId: "appID"})
 
 				nextCalled = true
 			})

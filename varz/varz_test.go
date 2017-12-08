@@ -8,7 +8,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -79,7 +78,7 @@ var _ = Describe("Varz", func() {
 	It("has urls", func() {
 		Expect(findValue(Varz, "urls")).To(Equal(float64(0)))
 
-		var fooReg = route.NewEndpoint("12345", "192.168.1.1", 1234, "", "", "", map[string]string{}, -1, "", models.ModificationTag{}, "", false)
+		var fooReg = route.NewEndpoint(&route.EndpointOpts{})
 
 		// Add a route
 		Registry.Register("foo.vcap.me", fooReg)

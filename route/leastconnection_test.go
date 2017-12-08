@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -37,7 +36,7 @@ var _ = Describe("LeastConnection", func() {
 				endpoints = make([]*route.Endpoint, 0)
 				for i := 0; i < total; i++ {
 					ip := fmt.Sprintf("10.0.1.%d", i)
-					e := route.NewEndpoint("", ip, 60000, "", "", "", nil, -1, "", models.ModificationTag{}, "", false)
+					e := route.NewEndpoint(&route.EndpointOpts{Host: ip, Port: 60000})
 					endpoints = append(endpoints, e)
 					pool.Put(e)
 				}
@@ -127,7 +126,8 @@ var _ = Describe("LeastConnection", func() {
 
 	Context("PreRequest", func() {
 		It("increments the NumberConnections counter", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "", "foo", "", nil, -1, "", models.ModificationTag{}, "", false)
+			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4"})
+
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
 			iter := route.NewLeastConnection(pool, "foo")
@@ -138,7 +138,8 @@ var _ = Describe("LeastConnection", func() {
 
 	Context("PostRequest", func() {
 		It("decrements the NumberConnections counter", func() {
-			endpointFoo := route.NewEndpoint("", "1.2.3.4", 1234, "", "foo", "", nil, -1, "", models.ModificationTag{}, "", false)
+			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4"})
+
 			endpointFoo.Stats = &route.Stats{
 				NumberConnections: route.NewCounter(int64(1)),
 			}

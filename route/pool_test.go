@@ -21,7 +21,7 @@ var _ = Describe("Endpoint", func() {
 		Context("when endpoint created is using TLS port", func() {
 			var endpoint *route.Endpoint
 			BeforeEach(func() {
-				endpoint = route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", models.ModificationTag{}, "", true)
+				endpoint = route.NewEndpoint(&route.EndpointOpts{UseTLS: true})
 			})
 			It("should return false", func() {
 				Expect(endpoint.IsTLS()).To(BeTrue())
@@ -30,7 +30,7 @@ var _ = Describe("Endpoint", func() {
 		Context("when endpoint created is not using TLS port", func() {
 			var endpoint *route.Endpoint
 			BeforeEach(func() {
-				endpoint = route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", models.ModificationTag{}, "", false)
+				endpoint = route.NewEndpoint(&route.EndpointOpts{UseTLS: false})
 			})
 			It("should return false", func() {
 				Expect(endpoint.IsTLS()).To(BeFalse())
@@ -40,11 +40,9 @@ var _ = Describe("Endpoint", func() {
 })
 var _ = Describe("Pool", func() {
 	var pool *route.Pool
-	var modTag models.ModificationTag
 
 	BeforeEach(func() {
 		pool = route.NewPool(2*time.Minute, "", "")
-		modTag = models.ModificationTag{}
 	})
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
@@ -78,7 +76,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles duplicate endpoints", func() {
-			endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 1, "", modTag, "", false)
+			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", StaleThresholdInSeconds: 1})
+
 			pool.Put(endpoint)
 			pool.MarkUpdated(time.Now().Add(-(10 * time.Minute)))
 
@@ -90,24 +89,28 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("handles equivalent (duplicate) endpoints", func() {
-			endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-			endpoint2 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+			endpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+			endpoint2 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 
 			pool.Put(endpoint1)
 			Expect(pool.Put(endpoint2)).To(BeTrue())
 		})
 
 		Context("with modification tags", func() {
+			var modTag models.ModificationTag
 			var modTag2 models.ModificationTag
 
 			BeforeEach(func() {
+				modTag = models.ModificationTag{}
 				modTag2 = models.ModificationTag{Guid: "abc"}
-				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
+
 				Expect(pool.Put(endpoint1)).To(BeTrue())
 			})
 
 			It("updates an endpoint with modification tag", func() {
-				endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag2, "", false)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
+
 				Expect(pool.Put(endpoint)).To(BeTrue())
 				Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
 			})
@@ -115,13 +118,13 @@ var _ = Describe("Pool", func() {
 			Context("when modification_tag is older", func() {
 				BeforeEach(func() {
 					modTag.Increment()
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag2, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
 					pool.Put(endpoint)
 				})
 
 				It("doesnt update an endpoint", func() {
 					olderModTag := models.ModificationTag{Guid: "abc"}
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", olderModTag, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
 					Expect(pool.Put(endpoint)).To(BeFalse())
 					Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
@@ -134,7 +137,7 @@ var _ = Describe("Pool", func() {
 				roundTripper *http.Transport
 			)
 			BeforeEach(func() {
-				endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "server-cert-domain-san-1", "", "", nil, 1, "", modTag, "", false)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 				pool.Put(endpoint)
 				roundTripper = &http.Transport{TLSClientConfig: &tls.Config{ServerName: "server-cert-domain-san-1"}}
 				pool.Each(func(e *route.Endpoint) {
@@ -142,7 +145,7 @@ var _ = Describe("Pool", func() {
 				})
 			})
 			It("preserves roundTrippers on duplicate endpoints", func() {
-				sameEndpointRegisteredTwice := route.NewEndpoint("", "1.2.3.4", 5678, "server-cert-domain-san-1", "", "", nil, 1, "", modTag, "", false)
+				sameEndpointRegisteredTwice := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 				pool.Put(sameEndpointRegisteredTwice)
 				pool.Each(func(e *route.Endpoint) {
 					Expect(e.RoundTripper).To(Equal(roundTripper))
@@ -150,7 +153,7 @@ var _ = Describe("Pool", func() {
 			})
 
 			It("clears roundTrippers if the server cert domain SAN changes", func() {
-				endpointWithSameAddressButDifferentId := route.NewEndpoint("", "1.2.3.4", 5678, "server-cert-domain-san-2", "", "", nil, 1, "", modTag, "", false)
+				endpointWithSameAddressButDifferentId := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ServerCertDomainSAN: "some-new-san"})
 				pool.Put(endpointWithSameAddressButDifferentId)
 				pool.Each(func(e *route.Endpoint) {
 					Expect(e.RoundTripper).To(BeNil())
@@ -186,7 +189,7 @@ var _ = Describe("Pool", func() {
 
 	Context("EndpointFailed", func() {
 		It("prunes tls routes on hostname mismatch errors", func() {
-			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", true)
+			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
@@ -197,7 +200,7 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("does not prune tls routes on connection errors", func() {
-			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", true)
+			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
@@ -208,7 +211,7 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("does not prune non-tls routes that have already expired", func() {
-			endpoint := route.NewEndpoint("", "1.2.3.4", 1234, "foo", "", "idx-1", nil, 1, "", models.ModificationTag{}, "", false)
+			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: false})
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
@@ -233,30 +236,33 @@ var _ = Describe("Pool", func() {
 			endpoint := &route.Endpoint{}
 
 			b := pool.Remove(endpoint)
+
 			Expect(b).To(BeFalse())
 		})
 
 		Context("with modification tags", func() {
+			var modTag models.ModificationTag
 			BeforeEach(func() {
 				modTag = models.ModificationTag{Guid: "abc"}
-				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
+
 				Expect(pool.Put(endpoint1)).To(BeTrue())
 			})
 
 			It("removes an endpoint with modification tag", func() {
-				endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 				Expect(pool.Remove(endpoint)).To(BeTrue())
 				Expect(pool.IsEmpty()).To(BeTrue())
 			})
 
 			Context("when modification_tag is the same", func() {
 				BeforeEach(func() {
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 					pool.Put(endpoint)
 				})
 
 				It("removes an endpoint", func() {
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 
 					Expect(pool.Remove(endpoint)).To(BeTrue())
 					Expect(pool.IsEmpty()).To(BeTrue())
@@ -266,13 +272,13 @@ var _ = Describe("Pool", func() {
 			Context("when modification_tag is older", func() {
 				BeforeEach(func() {
 					modTag.Increment()
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 					pool.Put(endpoint)
 				})
 
 				It("doesnt remove an endpoint", func() {
 					olderModTag := models.ModificationTag{Guid: "abc"}
-					endpoint := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", olderModTag, "", false)
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
 					Expect(pool.Remove(endpoint)).To(BeFalse())
 					Expect(pool.IsEmpty()).To(BeFalse())
@@ -283,13 +289,15 @@ var _ = Describe("Pool", func() {
 		Context("Filtered pool", func() {
 			It("returns copy of the pool with non overloaded endpoints", func() {
 				Expect(pool.IsEmpty()).To(BeTrue())
-				endpoint1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
 				endpoint1.Stats.NumberConnections.Increment()
 				endpoint1.Stats.NumberConnections.Increment()
 				endpoint1.Stats.NumberConnections.Increment()
+
 				Expect(pool.Put(endpoint1)).To(BeTrue())
 
-				endpoint2 := route.NewEndpoint("", "1.3.5.6", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				endpoint2 := route.NewEndpoint(&route.EndpointOpts{Port: 5679})
+
 				Expect(pool.Put(endpoint2)).To(BeTrue())
 				// verify the pool before filter has 2 endpoints
 				var len int
@@ -344,7 +352,7 @@ var _ = Describe("Pool", func() {
 
 		Context("when the pool contains tls endpoints", func() {
 			BeforeEach(func() {
-				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 60, "", modTag, "", true)
+				e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: true, StaleThresholdInSeconds: 60})
 				pool.Put(e1)
 			})
 			It("does not prune the tls endpoints", func() {
@@ -358,7 +366,7 @@ var _ = Describe("Pool", func() {
 
 		Context("when an endpoint has passed the stale threshold", func() {
 			It("prunes the endpoint", func() {
-				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 20, "", modTag, "", false)
+				e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: false, StaleThresholdInSeconds: 20})
 
 				pool.Put(e1)
 				pool.MarkUpdated(time.Now().Add(-25 * time.Second))
@@ -372,7 +380,7 @@ var _ = Describe("Pool", func() {
 
 		Context("when an endpoint has not passed the stale threshold", func() {
 			It("does NOT prune the endpoint", func() {
-				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 20, "", modTag, "", false)
+				e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: false, StaleThresholdInSeconds: 20})
 
 				pool.Put(e1)
 				pool.MarkUpdated(time.Now())
@@ -388,8 +396,8 @@ var _ = Describe("Pool", func() {
 			Context("and they both pass the stale threshold", func() {
 				It("prunes the endpoints", func() {
 					customThreshold := int(30 * time.Second)
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", "", "", nil, customThreshold, "", modTag, "", false)
+					e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678, StaleThresholdInSeconds: -1})
+					e2 := route.NewEndpoint(&route.EndpointOpts{Port: 1234, StaleThresholdInSeconds: customThreshold})
 
 					pool.Put(e1)
 					pool.Put(e2)
@@ -403,8 +411,8 @@ var _ = Describe("Pool", func() {
 			})
 			Context("and only one passes the stale threshold", func() {
 				It("prunes the endpoints", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-					e2 := route.NewEndpoint("", "1.2.3.4", 1234, "", "", "", nil, 60, "", modTag, "", false)
+					e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678, StaleThresholdInSeconds: -1})
+					e2 := route.NewEndpoint(&route.EndpointOpts{Port: 1234, StaleThresholdInSeconds: 60})
 
 					pool.Put(e1)
 					pool.Put(e2)
@@ -421,7 +429,7 @@ var _ = Describe("Pool", func() {
 		Context("when an endpoint does NOT have a custom stale time", func() {
 			Context("and it has passed the stale threshold", func() {
 				It("prunes the endpoint", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
+					e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now().Add(-(defaultThreshold + 1)))
@@ -435,7 +443,7 @@ var _ = Describe("Pool", func() {
 
 			Context("and it has not passed the stale threshold", func() {
 				It("does NOT prune the endpoint", func() {
-					e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 120, "", modTag, "", false)
+					e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678, StaleThresholdInSeconds: 120})
 
 					pool.Put(e1)
 					pool.MarkUpdated(time.Now())
@@ -451,7 +459,7 @@ var _ = Describe("Pool", func() {
 
 	Context("MarkUpdated", func() {
 		It("updates all endpoints", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, 120, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678, StaleThresholdInSeconds: 120})
 
 			pool.Put(e1)
 
@@ -472,8 +480,8 @@ var _ = Describe("Pool", func() {
 
 	Context("Each", func() {
 		It("applies a function to each endpoint", func() {
-			e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-			e2 := route.NewEndpoint("", "5.6.7.8", 1234, "", "", "", nil, -1, "", modTag, "", false)
+			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 			pool.Put(e1)
 			pool.Put(e2)
 
@@ -490,8 +498,8 @@ var _ = Describe("Pool", func() {
 	Context("Stats", func() {
 		Context("NumberConnections", func() {
 			It("increments number of connections", func() {
-				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-				e2 := route.NewEndpoint("", "5.6.7.8", 5678, "", "", "", nil, -1, "", modTag, "", false)
+				e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 
 				// endpoint 1
 				e1.Stats.NumberConnections.Increment()
@@ -507,8 +515,7 @@ var _ = Describe("Pool", func() {
 			})
 
 			It("decrements number of connections", func() {
-				e1 := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "", modTag, "", false)
-
+				e1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
 				e1.Stats.NumberConnections.Increment()
 				Expect(e1.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 				e1.Stats.NumberConnections.Decrement()
@@ -518,8 +525,22 @@ var _ = Describe("Pool", func() {
 	})
 
 	It("marshals json", func() {
-		e := route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", nil, -1, "https://my-rs.com", modTag, "", false)
-		e2 := route.NewEndpoint("", "5.6.7.8", 5678, "pvt_test_san", "pvt_test_instance_id", "", nil, -1, "", modTag, "", true)
+		e := route.NewEndpoint(&route.EndpointOpts{
+			Host:                    "1.2.3.4",
+			Port:                    5678,
+			RouteServiceUrl:         "https://my-rs.com",
+			StaleThresholdInSeconds: -1,
+		})
+
+		e2 := route.NewEndpoint(&route.EndpointOpts{
+			Host: "5.6.7.8",
+			Port: 5678,
+			StaleThresholdInSeconds: -1,
+			ServerCertDomainSAN:     "pvt_test_san",
+			PrivateInstanceId:       "pvt_test_instance_id",
+			UseTLS:                  true,
+		})
+
 		pool.Put(e)
 		pool.Put(e2)
 
@@ -534,7 +555,13 @@ var _ = Describe("Pool", func() {
 		BeforeEach(func() {
 			sample_tags := map[string]string{
 				"some-key": "some-value"}
-			e = route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", sample_tags, -1, "https://my-rs.com", modTag, "", false)
+			e = route.NewEndpoint(&route.EndpointOpts{
+				Host:                    "1.2.3.4",
+				Port:                    5678,
+				RouteServiceUrl:         "https://my-rs.com",
+				StaleThresholdInSeconds: -1,
+				Tags: sample_tags,
+			})
 		})
 		It("marshals json ", func() {
 			pool.Put(e)
@@ -548,7 +575,14 @@ var _ = Describe("Pool", func() {
 		var e *route.Endpoint
 		BeforeEach(func() {
 			sample_tags := map[string]string{}
-			e = route.NewEndpoint("", "1.2.3.4", 5678, "", "", "", sample_tags, -1, "https://my-rs.com", modTag, "", false)
+			e = route.NewEndpoint(&route.EndpointOpts{
+				Host:                    "1.2.3.4",
+				Port:                    5678,
+				RouteServiceUrl:         "https://my-rs.com",
+				StaleThresholdInSeconds: -1,
+				Tags: sample_tags,
+			})
+
 		})
 		It("marshals json ", func() {
 			pool.Put(e)

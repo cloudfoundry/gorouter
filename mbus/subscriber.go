@@ -43,20 +43,20 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 	if err != nil {
 		return nil, err
 	}
-	return route.NewEndpoint(
-		rm.App,
-		rm.Host,
-		port,
-		rm.ServerCertDomainSAN,
-		rm.PrivateInstanceID,
-		rm.PrivateInstanceIndex,
-		rm.Tags,
-		rm.StaleThresholdInSeconds,
-		rm.RouteServiceURL,
-		models.ModificationTag{},
-		rm.IsolationSegment,
-		useTls,
-	), nil
+	return route.NewEndpoint(&route.EndpointOpts{
+		AppId:                rm.App,
+		Host:                 rm.Host,
+		Port:                 port,
+		ServerCertDomainSAN:  rm.ServerCertDomainSAN,
+		PrivateInstanceId:    rm.PrivateInstanceID,
+		PrivateInstanceIndex: rm.PrivateInstanceIndex,
+		Tags:                 rm.Tags,
+		StaleThresholdInSeconds: rm.StaleThresholdInSeconds,
+		RouteServiceUrl:         rm.RouteServiceURL,
+		ModificationTag:         models.ModificationTag{},
+		IsolationSegment:        rm.IsolationSegment,
+		UseTLS:                  useTls,
+	}), nil
 }
 
 // ValidateMessage checks to ensure the registry message is valid

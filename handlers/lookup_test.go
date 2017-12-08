@@ -118,12 +118,12 @@ var _ = Describe("Lookup", func() {
 			BeforeEach(func() {
 				maxConnections = 0
 				pool = route.NewPool(2*time.Minute, "example.com", "/")
-				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.3.5.6", Port: 5679})
 				for i := 0; i < 5; i++ {
 					testEndpoint.Stats.NumberConnections.Increment()
 				}
 				pool.Put(testEndpoint)
-				testEndpoint1 := route.NewEndpoint("testid2", "1.2.3.6", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.6", Port: 5679})
 				pool.Put(testEndpoint1)
 				reg.LookupReturns(pool)
 			})
@@ -145,12 +145,12 @@ var _ = Describe("Lookup", func() {
 		Context("when conn limit is reached for an endpoint", func() {
 			BeforeEach(func() {
 				pool = route.NewPool(2*time.Minute, "example.com", "/")
-				testEndpoint := route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint := route.NewEndpoint(&route.EndpointOpts{AppId: "testid1", Host: "1.3.5.6", Port: 5679})
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
 				pool.Put(testEndpoint)
-				testEndpoint1 := route.NewEndpoint("testid2", "1.4.6.7", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint1 := route.NewEndpoint(&route.EndpointOpts{AppId: "testid2", Host: "1.2.3.6", Port: 5679})
 				pool.Put(testEndpoint1)
 				reg.LookupReturns(pool)
 			})
@@ -176,12 +176,12 @@ var _ = Describe("Lookup", func() {
 			var testEndpoint *route.Endpoint
 			BeforeEach(func() {
 				pool = route.NewPool(2*time.Minute, "example.com", "/")
-				testEndpoint = route.NewEndpoint("testid1", "1.3.5.6", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.3.5.6", Port: 5679})
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
 				pool.Put(testEndpoint)
-				testEndpoint1 := route.NewEndpoint("testid2", "1.4.6.7", 5679, "", "", "", nil, -1, "", modTag, "", false)
+				testEndpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.4.6.7", Port: 5679})
 				testEndpoint1.Stats.NumberConnections.Increment()
 				testEndpoint1.Stats.NumberConnections.Increment()
 				testEndpoint1.Stats.NumberConnections.Increment()

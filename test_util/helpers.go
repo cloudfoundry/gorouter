@@ -22,7 +22,6 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/routing-api/models"
 )
 
 func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg RegisterConfig) {
@@ -33,11 +32,17 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 	Expect(err).NotTo(HaveOccurred())
 	reg.Register(
 		route.Uri(path),
-		route.NewEndpoint(
-			cfg.AppId, host, uint16(port), cfg.ServerCertDomainSAN, cfg.InstanceId, cfg.InstanceIndex,
-			nil, cfg.StaleThreshold, cfg.RouteServiceUrl, models.ModificationTag{}, "",
-			(cfg.TLSConfig != nil),
-		),
+		route.NewEndpoint(&route.EndpointOpts{
+			AppId:                   cfg.AppId,
+			Host:                    host,
+			Port:                    uint16(port),
+			ServerCertDomainSAN:     cfg.ServerCertDomainSAN,
+			PrivateInstanceIndex:    cfg.InstanceIndex,
+			PrivateInstanceId:       cfg.InstanceId,
+			StaleThresholdInSeconds: cfg.StaleThreshold,
+			RouteServiceUrl:         cfg.RouteServiceUrl,
+			UseTLS:                  cfg.TLSConfig != nil,
+		}),
 	)
 }
 

@@ -5,7 +5,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/routing-api/models"
 
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
@@ -22,7 +21,13 @@ var _ = Describe("AccessLogRecord", func() {
 		record   *schema.AccessLogRecord
 	)
 	BeforeEach(func() {
-		endpoint = route.NewEndpoint("FakeApplicationId", "1.2.3.4", 1234, "", "", "3", nil, 0, "", models.ModificationTag{}, "", false)
+		endpoint = route.NewEndpoint(&route.EndpointOpts{
+			AppId:                "FakeApplicationId",
+			Host:                 "1.2.3.4",
+			Port:                 1234,
+			PrivateInstanceIndex: "3",
+		})
+
 		record = &schema.AccessLogRecord{
 			Request: &http.Request{
 				Host:   "FakeRequestHost",
