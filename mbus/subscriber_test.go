@@ -163,7 +163,61 @@ var _ = Describe("Subscriber", func() {
 			It("returns an error", func() {
 				msgs, err := sub.Pending()
 				Expect(msgs).To(Equal(-1))
-				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError("NATS subscription is nil, Subscriber must be invoked"))
+			})
+		})
+	})
+
+	Describe("Dropped", func() {
+		BeforeEach(func() {
+			cfg.NatsClientMessageBufferSize = 1
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+		})
+		It("returns the subscription Dropped value", func() {
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+
+			signal := make(chan struct{})
+			registry.RegisterStub = func(uri route.Uri, endpoint *route.Endpoint) {
+				<-signal
+			}
+
+			msg := mbus.RegistryMessage{Port: 8080, Uris: []route.Uri{"foo.example.com"}}
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() int {
+				msgs, err := sub.Dropped()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(0))
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() int {
+				msgs, err := sub.Dropped()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(1))
+
+			signal <- struct{}{}
+
+			Eventually(func() int {
+				msgs, err := sub.Dropped()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(1))
+		})
+
+		Context("when subscription is nil", func() {
+			It("returns an error", func() {
+				msgs, err := sub.Dropped()
+				Expect(msgs).To(Equal(-1))
+				Expect(err).To(MatchError("NATS subscription is nil, Subscriber must be invoked"))
 			})
 		})
 	})

@@ -19,6 +19,17 @@ type FakeSubscriber struct {
 		result1 int
 		result2 error
 	}
+	DroppedStub        func() (int, error)
+	droppedMutex       sync.RWMutex
+	droppedArgsForCall []struct{}
+	droppedReturns     struct {
+		result1 int
+		result2 error
+	}
+	droppedReturnsOnCall map[int]struct {
+		result1 int
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -66,11 +77,56 @@ func (fake *FakeSubscriber) PendingReturnsOnCall(i int, result1 int, result2 err
 	}{result1, result2}
 }
 
+func (fake *FakeSubscriber) Dropped() (int, error) {
+	fake.droppedMutex.Lock()
+	ret, specificReturn := fake.droppedReturnsOnCall[len(fake.droppedArgsForCall)]
+	fake.droppedArgsForCall = append(fake.droppedArgsForCall, struct{}{})
+	fake.recordInvocation("Dropped", []interface{}{})
+	fake.droppedMutex.Unlock()
+	if fake.DroppedStub != nil {
+		return fake.DroppedStub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fake.droppedReturns.result1, fake.droppedReturns.result2
+}
+
+func (fake *FakeSubscriber) DroppedCallCount() int {
+	fake.droppedMutex.RLock()
+	defer fake.droppedMutex.RUnlock()
+	return len(fake.droppedArgsForCall)
+}
+
+func (fake *FakeSubscriber) DroppedReturns(result1 int, result2 error) {
+	fake.DroppedStub = nil
+	fake.droppedReturns = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeSubscriber) DroppedReturnsOnCall(i int, result1 int, result2 error) {
+	fake.DroppedStub = nil
+	if fake.droppedReturnsOnCall == nil {
+		fake.droppedReturnsOnCall = make(map[int]struct {
+			result1 int
+			result2 error
+		})
+	}
+	fake.droppedReturnsOnCall[i] = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeSubscriber) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.pendingMutex.RLock()
 	defer fake.pendingMutex.RUnlock()
+	fake.droppedMutex.RLock()
+	defer fake.droppedMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

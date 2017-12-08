@@ -53,51 +53,71 @@ var _ = Describe("NATSMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("sends a metric on a time interval", func() {
-		subscriber.PendingReturns(0, nil)
+	It("sends a buffered_messages metric on a time interval", func() {
+		subscriber.PendingReturns(1000, nil)
 		ch <- time.Time{}
 		ch <- time.Time{} // an extra tick is to make sure the time ticked at least once
 
+		Expect(subscriber.PendingCallCount()).To(BeNumerically(">=", 1))
 		Expect(sender.ValueCallCount()).To(BeNumerically(">=", 1))
-		name, _, unit := sender.ValueArgsForCall(0)
+		name, val, unit := sender.ValueArgsForCall(0)
 		Expect(name).To(Equal("buffered_messages"))
 		Expect(unit).To(Equal("message"))
 
 		Expect(valueChainer.SendCallCount()).To(BeNumerically(">=", 1))
+		Expect(val).To(Equal(float64(1000)))
 	})
 
-	Context("when sending a metric fails", func() {
-		BeforeEach(func() {
-			valueChainer.SendReturns(errors.New("send failed"))
-		})
-		It("should log an error when Send fails", func() {
-			ch <- time.Time{}
-			ch <- time.Time{}
-
-			Expect(logger).To(gbytes.Say("error-sending-nats-monitor-metric"))
-		})
-	})
-
-	It("gets the number of queued messages for a given NATS subscription", func() {
+	It("sends a total_dropped_messages metric on a time interval", func() {
+		subscriber.DroppedReturns(2000, nil)
 		ch <- time.Time{}
-		ch <- time.Time{}
+		ch <- time.Time{} // an extra tick is to make sure the time ticked at least once
 
-		Expect(subscriber.PendingCallCount()).To(BeNumerically(">=", 1))
+		Expect(subscriber.DroppedCallCount()).To(BeNumerically(">=", 1))
+		name, val, unit := sender.ValueArgsForCall(1)
+		Expect(name).To(Equal("total_dropped_messages"))
+		Expect(unit).To(Equal("message"))
+		Expect(valueChainer.SendCallCount()).To(BeNumerically(">=", 1))
+		Expect(val).To(Equal(float64(2000)))
 	})
 
-	Context("when Pending returns a value", func() {
+	Context("when sending buffered_messages metric fails", func() {
 		BeforeEach(func() {
-			subscriber.PendingReturns(1000, nil)
+			first := true
+			valueChainer.SendStub = func() error {
+				if first {
+					return errors.New("failed")
+				}
+				first = false
+
+				return nil
+			}
 		})
-		It("passes that value to the metric Sender", func() {
+		It("should log an error", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(sender.ValueCallCount()).To(BeNumerically(">=", 1))
-			_, val, _ := sender.ValueArgsForCall(0)
+			Expect(logger).To(gbytes.Say("error-sending-buffered-messages-metric"))
+		})
+	})
 
-			Expect(subscriber.PendingCallCount()).To(BeNumerically(">=", 1))
-			Expect(val).To(Equal(float64(1000)))
+	Context("when sending total_dropped_messages metric fails", func() {
+		BeforeEach(func() {
+			first := true
+			valueChainer.SendStub = func() error {
+				if !first {
+					return errors.New("failed")
+				}
+				first = false
+
+				return nil
+			}
+		})
+		It("should log an error", func() {
+			ch <- time.Time{}
+			ch <- time.Time{}
+
+			Expect(logger).To(gbytes.Say("error-sending-total-dropped-messages-metric"))
 		})
 	})
 
@@ -105,12 +125,23 @@ var _ = Describe("NATSMonitor", func() {
 		BeforeEach(func() {
 			subscriber.PendingReturns(-1, errors.New("failed"))
 		})
-
 		It("should log an error when it fails to retrieve queued messages", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
 			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-pending-messages"))
+		})
+	})
+
+	Context("when it fails to retrieve dropped messages", func() {
+		BeforeEach(func() {
+			subscriber.DroppedReturns(-1, errors.New("failed"))
+		})
+		It("should log an error when it fails to retrieve queued messages", func() {
+			ch <- time.Time{}
+			ch <- time.Time{}
+
+			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-dropped-messages"))
 		})
 	})
 })
