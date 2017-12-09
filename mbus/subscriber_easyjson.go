@@ -18,7 +18,125 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(in *jlexer.Lexer, out *RegistryMessage) {
+func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(in *jlexer.Lexer, out *startMessageParams) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(out *jwriter.Writer, in startMessageParams) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v startMessageParams) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v startMessageParams) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *startMessageParams) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *startMessageParams) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(l, v)
+}
+func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus1(in *jlexer.Lexer, out *Subscriber) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus1(out *jwriter.Writer, in Subscriber) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v Subscriber) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus1(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Subscriber) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus1(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *Subscriber) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus1(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Subscriber) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus1(l, v)
+}
+func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus2(in *jlexer.Lexer, out *RegistryMessage) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -100,6 +218,8 @@ func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(in *jlexer.Lexer, out
 			out.PrivateInstanceIndex = string(in.String())
 		case "isolation_segment":
 			out.IsolationSegment = string(in.String())
+		case "endpoint_updated_at_ns":
+			out.EndpointUpdatedAtNs = int64(in.Int64())
 		default:
 			in.SkipRecursive()
 		}
@@ -110,7 +230,7 @@ func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(in *jlexer.Lexer, out
 		in.Consumed()
 	}
 }
-func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(out *jwriter.Writer, in RegistryMessage) {
+func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus2(out *jwriter.Writer, in RegistryMessage) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -212,29 +332,35 @@ func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(out *jwriter.Writer, 
 	first = false
 	out.RawString("\"isolation_segment\":")
 	out.String(string(in.IsolationSegment))
+	if !first {
+		out.RawByte(',')
+	}
+	first = false
+	out.RawString("\"endpoint_updated_at_ns\":")
+	out.Int64(int64(in.EndpointUpdatedAtNs))
 	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
 func (v RegistryMessage) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(&w, v)
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus2(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v RegistryMessage) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus(w, v)
+	easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus2(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *RegistryMessage) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(&r, v)
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus2(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *RegistryMessage) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus(l, v)
+	easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus2(l, v)
 }

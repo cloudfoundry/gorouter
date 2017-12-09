@@ -73,6 +73,28 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
 		})
 
+		Context("when the endpoint has an UpdatedAt timestamp", func() {
+			BeforeEach(func() {
+				fooEndpoint.UpdatedAt = time.Now().Add(-3 * time.Second)
+			})
+			It("emits a route registration latency metric", func() {
+				r.Register("foo", fooEndpoint)
+				Expect(reporter.CaptureRouteRegistrationLatencyCallCount()).To(Equal(1))
+				latency := reporter.CaptureRouteRegistrationLatencyArgsForCall(0)
+				Expect(latency).To(BeNumerically("~", 3*time.Second, 1*time.Millisecond))
+			})
+		})
+
+		Context("when the endpoint has a zero UpdatedAt timestamp", func() {
+			BeforeEach(func() {
+				fooEndpoint.UpdatedAt = time.Time{}
+			})
+			It("emits a route registration latency metric", func() {
+				r.Register("foo", fooEndpoint)
+				Expect(reporter.CaptureRouteRegistrationLatencyCallCount()).To(Equal(0))
+			})
+		})
+
 		Context("uri", func() {
 			It("records and tracks time of last update", func() {
 				r.Register("foo", fooEndpoint)
@@ -929,7 +951,6 @@ var _ = Describe("RouteRegistry", func() {
 			time.Sleep(2 * configObj.PruneStaleDropletsInterval)
 
 			Expect(r.NumUris()).To(Equal(0))
-			r.MarshalJSON()
 			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
 		})
 
@@ -1094,7 +1115,6 @@ var _ = Describe("RouteRegistry", func() {
 				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
 
 				Expect(r.NumUris()).To(Equal(1))
-				r.MarshalJSON()
 				Expect(logger).ToNot(gbytes.Say(`prune.*"log_level":0.*foo.com/bar`))
 			})
 		})

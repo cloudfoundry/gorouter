@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/uuid"
@@ -21,6 +22,7 @@ import (
 	"github.com/uber-go/zap"
 )
 
+//go:generate easyjson --all subscriber.go
 // RegistryMessage defines the format of a route registration/unregistration
 // easyjson:json
 type RegistryMessage struct {
@@ -36,6 +38,7 @@ type RegistryMessage struct {
 	ServerCertDomainSAN     string            `json:"server_cert_domain_san"`
 	PrivateInstanceIndex    string            `json:"private_instance_index"`
 	IsolationSegment        string            `json:"isolation_segment"`
+	EndpointUpdatedAtNs     int64             `json:"endpoint_updated_at_ns"`
 }
 
 func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error) {
@@ -43,6 +46,11 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 	if err != nil {
 		return nil, err
 	}
+	var updatedAt time.Time
+	if rm.EndpointUpdatedAtNs != 0 {
+		updatedAt = time.Unix(0, rm.EndpointUpdatedAtNs)
+	}
+
 	return route.NewEndpoint(&route.EndpointOpts{
 		AppId:                rm.App,
 		Host:                 rm.Host,
@@ -56,6 +64,7 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 		ModificationTag:         models.ModificationTag{},
 		IsolationSegment:        rm.IsolationSegment,
 		UseTLS:                  useTls,
+		UpdatedAt:               updatedAt,
 	}), nil
 }
 

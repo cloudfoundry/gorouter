@@ -106,7 +106,11 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	r.reporter.CaptureRegistryMessage(endpoint)
 
-	if endpointAdded {
+	if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
+		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
+	}
+
+	if endpointAdded >= route.UPDATED {
 		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
 	} else {
 		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)

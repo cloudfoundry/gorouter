@@ -459,4 +459,13 @@ var _ = Describe("MetricsReporter", func() {
 		})
 	})
 
+	It("sends route registration latency", func() {
+		metricReporter.CaptureRouteRegistrationLatency(2 * time.Second)
+		Expect(sender.SendValueCallCount()).To(Equal(1))
+		name, value, unit := sender.SendValueArgsForCall(0)
+		Expect(name).To(Equal("route_registration_latency"))
+		Expect(value).To(BeEquivalentTo(2000))
+		Expect(unit).To(Equal("ms"))
+	})
+
 })

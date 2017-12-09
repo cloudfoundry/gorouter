@@ -20,6 +20,14 @@ type Counter struct {
 	value int64
 }
 
+type PoolPutResult int
+
+const (
+	UNMODIFIED = PoolPutResult(iota)
+	UPDATED
+	ADDED
+)
+
 func NewCounter(initial int64) *Counter {
 	return &Counter{initial}
 }
@@ -64,6 +72,7 @@ type Endpoint struct {
 	IsolationSegment     string
 	useTls               bool
 	RoundTripper         ProxyRoundTripper
+	UpdatedAt            time.Time
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -110,7 +119,7 @@ type EndpointOpts struct {
 	ModificationTag         models.ModificationTag
 	IsolationSegment        string
 	UseTLS                  bool
-	EndpointUpdatedAt       time.Time
+	UpdatedAt               time.Time
 }
 
 func NewEndpoint(opts *EndpointOpts) *Endpoint {
@@ -127,6 +136,7 @@ func NewEndpoint(opts *EndpointOpts) *Endpoint {
 		ModificationTag:      opts.ModificationTag,
 		Stats:                NewStats(),
 		IsolationSegment:     opts.IsolationSegment,
+		UpdatedAt:            opts.UpdatedAt,
 	}
 }
 
@@ -159,18 +169,20 @@ func (p *Pool) ContextPath() string {
 }
 
 // Returns true if endpoint was added or updated, false otherwise
-func (p *Pool) Put(endpoint *Endpoint) bool {
+func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	var result PoolPutResult
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
+		result = UPDATED
 		if e.endpoint != endpoint {
 			e.endpoint.Lock()
 			defer e.endpoint.Unlock()
 
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
-				return false
+				return UNMODIFIED
 			}
 
 			oldEndpoint := e.endpoint
@@ -186,6 +198,7 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 			}
 		}
 	} else {
+		result = ADDED
 		e = &endpointElem{
 			endpoint: endpoint,
 			index:    len(p.endpoints),
@@ -199,7 +212,7 @@ func (p *Pool) Put(endpoint *Endpoint) bool {
 
 	e.updated = time.Now()
 
-	return true
+	return result
 }
 
 func (p *Pool) RouteServiceUrl() string {

@@ -43,6 +43,7 @@ type RouteRegistryReporter interface {
 	CaptureRoutesPruned(prunedRoutes uint64)
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged)
+	CaptureRouteRegistrationLatency(t time.Duration)
 	CaptureUnregistryMessage(msg ComponentTagged)
 }
 

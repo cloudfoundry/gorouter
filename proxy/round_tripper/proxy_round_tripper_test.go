@@ -109,7 +109,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			added := routePool.Put(endpoint)
-			Expect(added).To(BeTrue())
+			Expect(added).To(Equal(route.ADDED))
 
 			combinedReporter = new(fakes.FakeCombinedReporter)
 
@@ -420,7 +420,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				added := routePool.Put(endpoint)
-				Expect(added).To(BeTrue())
+				Expect(added).To(Equal(route.ADDED))
 				transport.RoundTripReturns(
 					&http.Response{StatusCode: http.StatusTeapot}, nil,
 				)
@@ -443,7 +443,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					added := routePool.Put(endpoint)
-					Expect(added).To(BeTrue())
+					Expect(added).To(Equal(route.UPDATED))
 					transport.RoundTripReturns(
 						&http.Response{StatusCode: http.StatusTeapot}, nil,
 					)
@@ -475,7 +475,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Host: "1.1.1.1", Port: 9091, UseTLS: true, PrivateInstanceId: "instanceId-2",
 				})
 				added := routePool.Put(endpoint)
-				Expect(added).To(BeTrue())
+				Expect(added).To(Equal(route.ADDED))
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(1))
@@ -639,9 +639,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				added := routePool.Put(endpoint1)
-				Expect(added).To(BeTrue())
+				Expect(added).To(Equal(route.ADDED))
 				added = routePool.Put(endpoint2)
-				Expect(added).To(BeTrue())
+				Expect(added).To(Equal(route.ADDED))
 				removed := routePool.Remove(endpoint)
 				Expect(removed).To(BeTrue())
 			})
@@ -697,7 +697,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 						new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 						added := routePool.Put(new_endpoint)
-						Expect(added).To(BeTrue())
+						Expect(added).To(Equal(route.ADDED))
 					})
 
 					It("will select a new backend and update the vcap cookie id", func() {

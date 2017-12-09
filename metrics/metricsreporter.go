@@ -82,6 +82,10 @@ func (m *MetricsReporter) CaptureLookupTime(t time.Duration) {
 	m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
 }
 
+func (m *MetricsReporter) CaptureRouteRegistrationLatency(t time.Duration) {
+	m.Sender.SendValue("route_registration_latency", float64(t/time.Millisecond), "ms")
+}
+
 func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64) {
 	m.Sender.SendValue("total_routes", float64(totalRoutes), "")
 	m.Sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")

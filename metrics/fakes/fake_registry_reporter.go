@@ -30,6 +30,11 @@ type FakeRouteRegistryReporter struct {
 	captureRegistryMessageArgsForCall []struct {
 		msg metrics.ComponentTagged
 	}
+	CaptureRouteRegistrationLatencyStub        func(t time.Duration)
+	captureRouteRegistrationLatencyMutex       sync.RWMutex
+	captureRouteRegistrationLatencyArgsForCall []struct {
+		t time.Duration
+	}
 	CaptureUnregistryMessageStub        func(msg metrics.ComponentTagged)
 	captureUnregistryMessageMutex       sync.RWMutex
 	captureUnregistryMessageArgsForCall []struct {
@@ -136,6 +141,30 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) 
 	return fake.captureRegistryMessageArgsForCall[i].msg
 }
 
+func (fake *FakeRouteRegistryReporter) CaptureRouteRegistrationLatency(t time.Duration) {
+	fake.captureRouteRegistrationLatencyMutex.Lock()
+	fake.captureRouteRegistrationLatencyArgsForCall = append(fake.captureRouteRegistrationLatencyArgsForCall, struct {
+		t time.Duration
+	}{t})
+	fake.recordInvocation("CaptureRouteRegistrationLatency", []interface{}{t})
+	fake.captureRouteRegistrationLatencyMutex.Unlock()
+	if fake.CaptureRouteRegistrationLatencyStub != nil {
+		fake.CaptureRouteRegistrationLatencyStub(t)
+	}
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureRouteRegistrationLatencyCallCount() int {
+	fake.captureRouteRegistrationLatencyMutex.RLock()
+	defer fake.captureRouteRegistrationLatencyMutex.RUnlock()
+	return len(fake.captureRouteRegistrationLatencyArgsForCall)
+}
+
+func (fake *FakeRouteRegistryReporter) CaptureRouteRegistrationLatencyArgsForCall(i int) time.Duration {
+	fake.captureRouteRegistrationLatencyMutex.RLock()
+	defer fake.captureRouteRegistrationLatencyMutex.RUnlock()
+	return fake.captureRouteRegistrationLatencyArgsForCall[i].t
+}
+
 func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(msg metrics.ComponentTagged) {
 	fake.captureUnregistryMessageMutex.Lock()
 	fake.captureUnregistryMessageArgsForCall = append(fake.captureUnregistryMessageArgsForCall, struct {
@@ -171,6 +200,8 @@ func (fake *FakeRouteRegistryReporter) Invocations() map[string][][]interface{} 
 	defer fake.captureLookupTimeMutex.RUnlock()
 	fake.captureRegistryMessageMutex.RLock()
 	defer fake.captureRegistryMessageMutex.RUnlock()
+	fake.captureRouteRegistrationLatencyMutex.RLock()
+	defer fake.captureRouteRegistrationLatencyMutex.RUnlock()
 	fake.captureUnregistryMessageMutex.RLock()
 	defer fake.captureUnregistryMessageMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
