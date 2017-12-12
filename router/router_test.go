@@ -59,13 +59,14 @@ var _ = Describe("Router", func() {
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 
-		mbusClient *nats.Conn
-		registry   *rregistry.RouteRegistry
-		varz       vvarz.Varz
-		router     *Router
-		logger     logger.Logger
-		statusPort uint16
-		natsPort   uint16
+		mbusClient   *nats.Conn
+		registry     *rregistry.RouteRegistry
+		varz         vvarz.Varz
+		router       *Router
+		logger       logger.Logger
+		statusPort   uint16
+		natsPort     uint16
+		fakeReporter *fakeMetrics.FakeRouteRegistryReporter
 	)
 
 	BeforeEach(func() {
@@ -86,7 +87,8 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
+		fakeReporter = new(fakeMetrics.FakeRouteRegistryReporter)
+		registry = rregistry.NewRouteRegistry(logger, config, fakeReporter)
 		varz = vvarz.NewVarz(registry)
 
 	})

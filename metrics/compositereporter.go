@@ -44,6 +44,7 @@ type RouteRegistryReporter interface {
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged)
 	CaptureRouteRegistrationLatency(t time.Duration)
+	UnmuzzleRouteRegistrationLatency()
 	CaptureUnregistryMessage(msg ComponentTagged)
 }
 
