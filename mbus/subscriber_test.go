@@ -169,9 +169,15 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	Describe("Dropped", func() {
+		var droppedMsgs func() int
 		BeforeEach(func() {
 			cfg.NatsClientMessageBufferSize = 1
 			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			droppedMsgs = func() int {
+				msgs, errs := sub.Dropped()
+				Expect(errs).ToNot(HaveOccurred())
+				return msgs
+			}
 		})
 		It("returns the subscription Dropped value", func() {
 			process = ifrit.Invoke(sub)
@@ -189,28 +195,19 @@ var _ = Describe("Subscriber", func() {
 			err = natsClient.Publish("router.register", data)
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() int {
-				msgs, err := sub.Dropped()
-				Expect(err).ToNot(HaveOccurred())
-				return msgs
-			}).Should(Equal(0))
+			Eventually(droppedMsgs).Should(Equal(0))
 
 			err = natsClient.Publish("router.register", data)
 			Expect(err).ToNot(HaveOccurred())
+			// second router.register to guarantee it is dropped
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() int {
-				msgs, err := sub.Dropped()
-				Expect(err).ToNot(HaveOccurred())
-				return msgs
-			}).Should(Equal(1))
+			Eventually(droppedMsgs).Should(BeNumerically(">", 0))
 
 			signal <- struct{}{}
 
-			Eventually(func() int {
-				msgs, err := sub.Dropped()
-				Expect(err).ToNot(HaveOccurred())
-				return msgs
-			}).Should(Equal(1))
+			Eventually(droppedMsgs).Should(BeNumerically(">", 0))
 		})
 
 		Context("when subscription is nil", func() {
