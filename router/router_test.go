@@ -239,7 +239,7 @@ var _ = Describe("Router", func() {
 		app.Unregister()
 	})
 
-	It("sticky session", func() {
+	It("Sticky sessions allow multiple consecutive requests to reach the same instance of an app", func() {
 		apps := make([]*testcommon.TestApp, 10)
 		for i := range apps {
 			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, config.Port, mbusClient, nil)
