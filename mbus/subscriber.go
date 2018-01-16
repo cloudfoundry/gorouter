@@ -48,7 +48,7 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 	}
 	var updatedAt time.Time
 	if rm.EndpointUpdatedAtNs != 0 {
-		updatedAt = time.Unix(0, rm.EndpointUpdatedAtNs)
+		updatedAt = time.Unix(0, rm.EndpointUpdatedAtNs).UTC()
 	}
 
 	return route.NewEndpoint(&route.EndpointOpts{

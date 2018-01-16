@@ -393,9 +393,10 @@ var _ = Describe("Subscriber", func() {
 		expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
 			Host:      "host",
 			Port:      1111,
-			UpdatedAt: time.Unix(0, 1234),
+			UpdatedAt: time.Unix(0, 1234).UTC(),
 		})
 
+		Expect(originalEndpoint.UpdatedAt).To(Equal(expectedEndpoint.UpdatedAt))
 		Expect(originalEndpoint).To(Equal(expectedEndpoint))
 	})
 
