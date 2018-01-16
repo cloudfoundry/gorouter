@@ -83,12 +83,6 @@ var _ = Describe("RouteRegistry", func() {
 				latency := reporter.CaptureRouteRegistrationLatencyArgsForCall(0)
 				Expect(latency).To(BeNumerically("~", 3*time.Second, 1*time.Millisecond))
 			})
-
-			It("Unmuzzles CaptureRouteRegistryLatency metric", func() {
-				r.UnmuzzleReporter()
-				Expect(reporter.UnmuzzleRouteRegistrationLatencyCallCount()).To(Equal(1))
-			})
-
 		})
 
 		Context("when the endpoint has a zero UpdatedAt timestamp", func() {

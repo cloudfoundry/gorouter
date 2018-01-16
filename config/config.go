@@ -155,6 +155,8 @@ type Config struct {
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout,omitempty"`
 	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout,omitempty"`
 
+	RouteLatencyMetricMuzzleDuration time.Duration `yaml:"route_latency_metric_muzzle_duration,omitempty"`
+
 	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
 	SecureCookies        bool          `yaml:"secure_cookies,omitempty"`
@@ -211,6 +213,7 @@ var defaultConfig = Config{
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 	FrontendIdleTimeout:                       900 * time.Second,
+	RouteLatencyMetricMuzzleDuration:          20 * time.Second,
 
 	// To avoid routes getting purged because of unresponsive NATS server
 	// we need to set the ping interval of nats client such that it fails over

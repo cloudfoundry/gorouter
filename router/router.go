@@ -150,7 +150,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	r.logger.Debug("Sleeping before returning success on /health endpoint to preload routing table", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
 	time.Sleep(r.config.StartResponseDelayInterval)
-	r.registry.UnmuzzleReporter()
 
 	handler := gorouterHandler{handler: r.proxy, logger: r.logger}
 

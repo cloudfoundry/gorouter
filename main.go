@@ -161,6 +161,11 @@ func main() {
 
 	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
 
+	go func() {
+		time.Sleep(c.RouteLatencyMetricMuzzleDuration) // this way we avoid reporting metrics for pre-existing routes
+		metricsReporter.UnmuzzleRouteRegistrationLatency()
+	}()
+
 	err = <-monitor.Wait()
 	if err != nil {
 		logger.Error("gorouter.exited-with-failure", zap.Error(err))

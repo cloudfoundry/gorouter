@@ -12,6 +12,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test/common"
@@ -94,6 +95,7 @@ var _ = Describe("Router Integration", func() {
 		writeConfig(cfg, cfgFile)
 		return cfg
 	}
+
 	createIsoSegConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold time.Duration, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
 		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
 
@@ -298,6 +300,7 @@ var _ = Describe("Router Integration", func() {
 			runningApp1.VerifyAppStatus(200)
 		})
 	})
+
 	Describe("Frontend TLS", func() {
 		var (
 			cfg              *config.Config
@@ -616,6 +619,89 @@ var _ = Describe("Router Integration", func() {
 		gorouterSession = startGorouterSession(cfgFile)
 
 		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Router registered successfully"))
+	})
+
+	Describe("metrics emitted", func() {
+		var (
+			fakeMetron            test_util.FakeMetron
+			statusPort, proxyPort uint16
+		)
+
+		BeforeEach(func() {
+			fakeMetron = test_util.NewFakeMetron()
+			statusPort = test_util.NextAvailPort()
+			proxyPort = test_util.NextAvailPort()
+		})
+		AfterEach(func() {
+			Expect(fakeMetron.Close()).To(Succeed())
+		})
+
+		It("emits route registration latency metrics, but only after a waiting period", func() {
+			cfgFile := filepath.Join(tmpdir, "config.yml")
+			cfg := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg.Logging.MetronAddress = fakeMetron.Address()
+			cfg.RouteLatencyMetricMuzzleDuration = 2 * time.Second
+			writeConfig(cfg, cfgFile)
+
+			mbusClient, err := newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			sendRegistration := func(port int, url string) error {
+				rm := mbus.RegistryMessage{
+					Host: "127.0.0.1",
+					Port: uint16(port),
+					Uris: []route.Uri{route.Uri(url)},
+					Tags: nil,
+					App:  "0",
+					StaleThresholdInSeconds: 1,
+					EndpointUpdatedAtNs:     time.Now().Add(-10 * time.Second).UnixNano(),
+					// simulate 10 seconds of latency on NATS message
+				}
+
+				b, _ := json.Marshal(rm)
+				return mbusClient.Publish("router.register", b)
+			}
+
+			gorouterSession = startGorouterSession(cfgFile)
+
+			counter := 0
+			Consistently(func() error {
+				err := sendRegistration(5000+counter, "http://something")
+				if err != nil {
+					return err
+				}
+				counter++
+				// check that the latency metric is not emitted
+				metricEvents := fakeMetron.AllEvents()
+				for _, event := range metricEvents {
+					if event.Name == "route_registration_latency" {
+						return fmt.Errorf("got unexpected latency event: %v", event)
+					}
+				}
+				return nil
+			}, "1s", "100ms").Should(Succeed())
+
+			counter = 0
+			var measuredLatency_ms float64
+			Eventually(func() error {
+				err := sendRegistration(6000+counter, "http://something")
+				if err != nil {
+					return err
+				}
+				counter++
+				metricEvents := fakeMetron.AllEvents()
+				for _, event := range metricEvents {
+					if event.Name != "route_registration_latency" {
+						continue
+					}
+					measuredLatency_ms = event.Value
+					return nil
+				}
+				return fmt.Errorf("expected metric not found yet")
+			}, "4s", "100ms").Should(Succeed())
+
+			Expect(measuredLatency_ms).To(BeNumerically(">=", 10000))
+			Expect(measuredLatency_ms).To(BeNumerically("<=", 14000))
+		})
 	})
 
 	It("has Nats connectivity", func() {
@@ -1159,6 +1245,7 @@ func hostnameAndPort(url string) (string, int) {
 	port, _ := strconv.Atoi(parts[1])
 	return hostname, port
 }
+
 func newMessageBus(c *config.Config) (*nats.Conn, error) {
 	natsMembers := make([]string, len(c.Nats))
 	options := nats.DefaultOptions
