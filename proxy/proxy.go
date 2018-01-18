@@ -79,13 +79,7 @@ type RoundTripperFactoryImpl struct {
 }
 
 func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.ProxyRoundTripper {
-	customTLSConfig := &tls.Config{
-		CipherSuites:       t.Template.TLSClientConfig.CipherSuites,
-		InsecureSkipVerify: t.Template.TLSClientConfig.InsecureSkipVerify,
-		RootCAs:            t.Template.TLSClientConfig.RootCAs,
-		ServerName:         expectedServerName,
-		Certificates:       t.Template.TLSClientConfig.Certificates,
-	}
+	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, t.Template.TLSClientConfig)
 
 	newTransport := &http.Transport{
 		Dial:                t.Template.Dial,

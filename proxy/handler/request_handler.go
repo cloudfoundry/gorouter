@@ -35,7 +35,7 @@ type RequestHandler struct {
 
 	endpointDialTimeout time.Duration
 
-	tlsConfig *tls.Config
+	tlsConfigTemplate *tls.Config
 }
 
 func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config) *RequestHandler {
@@ -46,7 +46,7 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 		request:             request,
 		response:            response,
 		endpointDialTimeout: endpointDialTimeout,
-		tlsConfig:           tlsConfig,
+		tlsConfigTemplate:   tlsConfig,
 	}
 }
 
@@ -160,9 +160,8 @@ func (h *RequestHandler) serveTcp(
 		iter.PreRequest(endpoint)
 
 		if endpoint.IsTLS() {
-			tlsConfigLocal := *h.tlsConfig
-			tlsConfigLocal.ServerName = endpoint.ServerCertDomainSAN
-			connection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), &tlsConfigLocal)
+			tlsConfigLocal := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, h.tlsConfigTemplate)
+			connection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), tlsConfigLocal)
 		} else {
 			connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
 		}
