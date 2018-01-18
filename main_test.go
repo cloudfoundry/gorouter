@@ -299,6 +299,48 @@ var _ = Describe("Router Integration", func() {
 			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }, "2s").Should(BeTrue())
 			runningApp1.VerifyAppStatus(200)
 		})
+
+		Context("websockets and TLS interaction", func() {
+			assertWebsocketSuccess := func(wsApp *common.TestApp) {
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+				Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
+
+				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", cfg.Port))
+				Expect(err).NotTo(HaveOccurred())
+
+				x := test_util.NewHttpConn(conn)
+
+				req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+				req.Header.Set("Upgrade", "websocket")
+				req.Header.Set("Connection", "upgrade")
+				x.WriteRequest(req)
+
+				resp, _ := x.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
+
+				x.WriteLine("hello from client")
+				x.CheckLine("hello from server")
+
+				x.Close()
+			}
+
+			It("successfully connects with both websockets and TLS to backends", func() {
+				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, time.Millisecond, "")
+				wsApp.TlsRegister(serverCertDomainSAN)
+				wsApp.TlsListen(backendTLSConfig)
+
+				assertWebsocketSuccess(wsApp)
+			})
+
+			It("successfully connects with websockets but not TLS to backends", func() {
+				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, time.Millisecond, "")
+				wsApp.Register()
+				wsApp.Listen()
+
+				assertWebsocketSuccess(wsApp)
+			})
+		})
 	})
 
 	Describe("Frontend TLS", func() {

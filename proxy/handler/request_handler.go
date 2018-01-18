@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -33,9 +34,11 @@ type RequestHandler struct {
 	response utils.ProxyResponseWriter
 
 	endpointDialTimeout time.Duration
+
+	tlsConfig *tls.Config
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration) *RequestHandler {
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config) *RequestHandler {
 	requestLogger := setupLogger(request, logger)
 	return &RequestHandler{
 		logger:              requestLogger,
@@ -43,6 +46,7 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 		request:             request,
 		response:            response,
 		endpointDialTimeout: endpointDialTimeout,
+		tlsConfig:           tlsConfig,
 	}
 }
 
@@ -140,6 +144,10 @@ func (h *RequestHandler) serveTcp(
 		onConnectionFailed = nilConnFailureCB
 	}
 
+	dialer := &net.Dialer{
+		Timeout: h.endpointDialTimeout, // untested
+	}
+
 	retry := 0
 	for {
 		endpoint = iter.Next()
@@ -150,7 +158,15 @@ func (h *RequestHandler) serveTcp(
 		}
 
 		iter.PreRequest(endpoint)
-		connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
+
+		if endpoint.IsTLS() {
+			tlsConfigLocal := *h.tlsConfig
+			tlsConfigLocal.ServerName = endpoint.ServerCertDomainSAN
+			connection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), &tlsConfigLocal)
+		} else {
+			connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
+		}
+
 		iter.PostRequest(endpoint)
 		if err == nil {
 			break

@@ -51,6 +51,7 @@ type proxy struct {
 	defaultLoadBalance       string
 	endpointDialTimeout      time.Duration
 	bufferPool               httputil.BufferPool
+	backendTLSConfig         *tls.Config
 }
 
 func NewDropsondeRoundTripper(p round_tripper.ProxyRoundTripper) round_tripper.ProxyRoundTripper {
@@ -123,6 +124,7 @@ func NewProxy(
 		defaultLoadBalance:       c.LoadBalance,
 		endpointDialTimeout:      c.EndpointDialTimeout,
 		bufferPool:               NewBufferPool(),
+		backendTLSConfig:         tlsConfig,
 	}
 
 	httpTransportTemplate := &http.Transport{
@@ -231,7 +233,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	if err != nil {
 		p.logger.Fatal("request-info-err", zap.Error(err))
 	}
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout)
+	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout, p.backendTLSConfig)
 
 	if reqInfo.RoutePool == nil {
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
