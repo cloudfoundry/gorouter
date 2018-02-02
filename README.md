@@ -1,7 +1,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
 
 # GoRouter
-This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
+This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry/routing-release) as submodule.
 
 **Note**: This repository should be imported as `code.cloudfoundry.org/gorouter`.
 
@@ -18,10 +18,10 @@ The following instructions may help you get started with gorouter.
 
 ### Setup
 
-GoRouter dependencies are managed with [routing-release](https://github.com/cloudfoundry-incubator/routing-release#). Do not clone the gorouter repo directly; instead, follow instructions at https://github.com/cloudfoundry-incubator/routing-release#get-the-code (summarized below).
+GoRouter dependencies are managed with [routing-release](https://github.com/cloudfoundry/routing-release#). Do not clone the gorouter repo directly; instead, follow instructions at https://github.com/cloudfoundry/routing-release#get-the-code (summarized below).
 
 ```bash
-git clone https://github.com/cloudfoundry-incubator/routing-release
+git clone https://github.com/cloudfoundry/routing-release
 cd routing-release
 ./scripts/update
 cd src/code.cloudfoundry.org/gorouter
@@ -78,13 +78,13 @@ gorouter
 
 ## Performance
 
-See [Routing Release 0.144.0 Release Notes](https://github.com/cloudfoundry-incubator/routing-release/releases/tag/0.144.0)
+See [Routing Release 0.144.0 Release Notes](https://github.com/cloudfoundry/routing-release/releases/tag/0.144.0)
 
 ## Dynamic Routing Table
 
 Gorouters routing table is updated dynamically via the NATS message bus. NATS can be deployed via BOSH with ([cf-release](https://github.com/cloudfoundry/cf-release)) or standalone using [nats-release](https://github.com/cloudfoundry/nats-release).
 
-To add or remove a record from the routing table, a NATS client must send register or unregister messages. Records in the routing table have a maximum TTL of 120 seconds, so clients must heartbeat registration messages periodically; we recommend every 20s. [Route Registrar](https://github.com/cloudfoundry/route-registrar) is a BOSH job that comes with [Routing Release](https://github.com/cloudfoundry-incubator/routing-release) that automates this process.
+To add or remove a record from the routing table, a NATS client must send register or unregister messages. Records in the routing table have a maximum TTL of 120 seconds, so clients must heartbeat registration messages periodically; we recommend every 20s. [Route Registrar](https://github.com/cloudfoundry/route-registrar) is a BOSH job that comes with [Routing Release](https://github.com/cloudfoundry/routing-release) that automates this process.
 
 When deployed with Cloud Foundry, registration of routes for apps pushed to CF occurs automatically without user involvement. For details, see [Routes and Domains](https://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html).
 
@@ -136,7 +136,7 @@ The format of the `router.register` message is as follows:
 
 `private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
 
-`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec) for more information.
+`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec) for more information.
 
 `tls_port` is the port that Gorouter will use to attempt TLS connections with the registered backends. Supported only when `router.backend.enable_tls: true` is configured in the manifest. `router.ca_certs` may be optionally configured with a CA, for backends certificates signed by custom CAs. For mutual authentication with backends, `router.backends.tls_pem` may be optionally provided. When `router.backend.enable_tls: true`, Gorouter will prefer `tls_port` over `port` if present in the NATS message. Otherwise, `port` will be preferred, and messages with only `tls_port` will be rejected and an error message logged.
 
@@ -280,7 +280,7 @@ properties:
       user: paronymy61-polaric
 ```
 
-If `router.status.user` is not set in the manifest, the default is `router-status` as can be seen from [the job spec](https://github.com/cloudfoundry-incubator/routing-release/blob/develop/jobs/gorouter/spec).
+If `router.status.user` is not set in the manifest, the default is `router-status` as can be seen from [the job spec](https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec).
 
 Or on the Gorouter VM under `/var/vcap/jobs/gorouter/config/gorouter.yml`:
 

@@ -22,7 +22,7 @@ ping configured NATS servers.
 
 `MinimumRegistrationInterval`: Expect interval for
 gorouter clients to send the routing info. (eg: [Route
-Registrar](https://github.com/cloudfoundry-incubator/route-registrar))
+Registrar](https://github.com/cloudfoundry/route-registrar))
 
 In a deployment with multiple NATS servers, if one of the servers becomes
 unhealthy `gorouter` should fail over to a healthy server(if any available)
