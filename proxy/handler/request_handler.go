@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -36,6 +37,8 @@ type RequestHandler struct {
 	endpointDialTimeout time.Duration
 
 	tlsConfigTemplate *tls.Config
+
+	forwarder *Forwarder
 }
 
 func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config) *RequestHandler {
@@ -47,6 +50,10 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 		response:            response,
 		endpointDialTimeout: endpointDialTimeout,
 		tlsConfigTemplate:   tlsConfig,
+		forwarder: &Forwarder{
+			BackendReadTimeout: endpointDialTimeout, // TODO: different values?
+			Logger:             requestLogger,
+		},
 	}
 }
 
@@ -77,13 +84,13 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	h.logger.Info("handling-tcp-request", zap.String("Upgrade", "tcp"))
 
 	onConnectionFailed := func(err error) { h.logger.Error("tcp-connection-failed", zap.Error(err)) }
-	err := h.serveTcp(iter, nil, onConnectionFailed)
+	backendStatusCode, err := h.serveTcp(iter, nil, onConnectionFailed)
 	if err != nil {
 		h.logger.Error("tcp-request-failed", zap.Error(err))
 		h.writeStatus(http.StatusBadGateway, "TCP forwarding to endpoint failed.")
 		return
 	}
-	h.response.SetStatus(http.StatusSwitchingProtocols)
+	h.response.SetStatus(backendStatusCode)
 }
 
 func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
@@ -99,7 +106,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	}
 	onConnectionFailed := func(err error) { h.logger.Error("websocket-connection-failed", zap.Error(err)) }
 
-	err := h.serveTcp(iter, onConnectionSucceeded, onConnectionFailed)
+	backendStatusCode, err := h.serveTcp(iter, onConnectionSucceeded, onConnectionFailed)
 
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
@@ -107,7 +114,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 		h.reporter.CaptureWebSocketFailure()
 		return
 	}
-	h.response.SetStatus(http.StatusSwitchingProtocols)
+	h.response.SetStatus(backendStatusCode)
 	h.reporter.CaptureWebSocketUpdate()
 }
 
@@ -132,9 +139,9 @@ func (h *RequestHandler) serveTcp(
 	iter route.EndpointIterator,
 	onConnectionSucceeded connSuccessCB,
 	onConnectionFailed connFailureCB,
-) error {
+) (int, error) {
 	var err error
-	var connection net.Conn
+	var backendConnection net.Conn
 	var endpoint *route.Endpoint
 
 	if onConnectionSucceeded == nil {
@@ -154,16 +161,16 @@ func (h *RequestHandler) serveTcp(
 		if endpoint == nil {
 			err = NoEndpointsAvailable
 			h.HandleBadGateway(err, h.request)
-			return err
+			return 0, err
 		}
 
 		iter.PreRequest(endpoint)
 
 		if endpoint.IsTLS() {
 			tlsConfigLocal := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, h.tlsConfigTemplate)
-			connection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), tlsConfigLocal)
+			backendConnection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), tlsConfigLocal)
 		} else {
-			connection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
+			backendConnection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
 		}
 
 		iter.PostRequest(endpoint)
@@ -176,27 +183,27 @@ func (h *RequestHandler) serveTcp(
 
 		retry++
 		if retry == MaxRetries {
-			return err
+			return 0, err
 		}
 	}
-	if connection == nil {
-		return nil
+	if backendConnection == nil {
+		return 0, nil
 	}
-	defer connection.Close()
+	defer backendConnection.Close()
 
-	err = onConnectionSucceeded(connection, endpoint)
+	err = onConnectionSucceeded(backendConnection, endpoint)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	client, _, err := h.hijack()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer client.Close()
 
-	forwardIO(client, connection)
-	return nil
+	backendStatusCode := h.forwarder.ForwardIO(client, backendConnection)
+	return backendStatusCode, nil
 }
 
 func (h *RequestHandler) setupRequest(endpoint *route.Endpoint) {
@@ -241,17 +248,66 @@ func (h *RequestHandler) hijack() (client net.Conn, io *bufio.ReadWriter, err er
 	return h.response.Hijack()
 }
 
-func forwardIO(a, b net.Conn) {
+type Forwarder struct {
+	BackendReadTimeout time.Duration
+	Logger             logger.Logger
+}
+
+// ForwardIO sets up websocket forwarding with a backend
+//
+// It returns after one of the connections closes.
+//
+// If the backend response code is not 101 Switching Protocols, then
+// ForwardIO will return immediately, allowing the caller to close the connections.
+func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 	done := make(chan bool, 2)
 
 	copy := func(dst io.Writer, src io.Reader) {
 		// don't care about errors here
-		io.Copy(dst, src)
+		_, _ = io.Copy(dst, src)
 		done <- true
 	}
 
-	go copy(a, b)
-	go copy(b, a)
+	headerWasRead := make(chan struct{})
+	headerBytes := &bytes.Buffer{}
+	teedReader := io.TeeReader(backendConn, headerBytes)
+	var resp *http.Response
+	var err error
+	go func() {
+		resp, err = http.ReadResponse(bufio.NewReader(teedReader), nil)
+		headerWasRead <- struct{}{}
+	}()
+
+	select {
+	case <-headerWasRead:
+		if err != nil {
+			return 0
+		}
+	case <-time.After(f.BackendReadTimeout):
+		f.Logger.Error("websocket-forwardio", zap.Error(errors.New("timeout waiting for http response from backend")))
+		return 0
+	}
+
+	// we always write the header...
+	_, err = io.Copy(clientConn, headerBytes) // don't care about errors
+	if err != nil {
+		f.Logger.Error("websocket-copy", zap.Error(err))
+		return 0
+	}
+
+	if !isValidWebsocketResponse(resp) {
+		return resp.StatusCode
+	}
+
+	// only now do we start copying body data
+	go copy(clientConn, backendConn)
+	go copy(backendConn, clientConn)
 
 	<-done
+	return http.StatusSwitchingProtocols
+}
+
+func isValidWebsocketResponse(resp *http.Response) bool {
+	ok := resp.StatusCode == http.StatusSwitchingProtocols
+	return ok
 }

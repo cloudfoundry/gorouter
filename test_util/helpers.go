@@ -10,10 +10,12 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -422,3 +424,23 @@ func CreateECCert(cname string) tls.Certificate {
 	Expect(err).ToNot(HaveOccurred())
 	return tlsCert
 }
+
+type HangingReadCloser struct {
+	mu        sync.Mutex
+	readCalls int
+}
+
+func (h *HangingReadCloser) Read(p []byte) (n int, err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.readCalls++
+
+	if h.readCalls < 2 {
+		p[0] = '!'
+		return 1, nil
+	}
+	time.Sleep(1000 * time.Second)
+	return 0, errors.New("hanging read closer ran out of time")
+}
+
+func (h *HangingReadCloser) Close() error { return nil }

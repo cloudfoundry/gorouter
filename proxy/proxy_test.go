@@ -1787,7 +1787,7 @@ var _ = Describe("Proxy", func() {
 	Describe("TCP Upgrade Connections", func() {
 		It("upgrades a Tcp request", func() {
 			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-				conn.WriteLine("hello")
+				conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
 				conn.CheckLine("hello from client")
 				conn.WriteLine("hello from server")
 				conn.Close()
@@ -1803,6 +1803,8 @@ var _ = Describe("Proxy", func() {
 
 			conn.WriteRequest(req)
 
+			conn.CheckLine("HTTP/1.1 101 Switching Protocols")
+			conn.CheckLine("")
 			conn.CheckLine("hello")
 			conn.WriteLine("hello from client")
 			conn.CheckLine("hello from server")
@@ -1811,7 +1813,7 @@ var _ = Describe("Proxy", func() {
 		})
 		It("logs the response time and status code 101 in the access logs", func() {
 			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-				conn.WriteLine("hello")
+				conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
 				conn.CheckLine("hello from client")
 				conn.WriteLine("hello from server")
 				conn.Close()
@@ -1827,6 +1829,8 @@ var _ = Describe("Proxy", func() {
 
 			conn.WriteRequest(req)
 
+			conn.CheckLine("HTTP/1.1 101 Switching Protocols")
+			conn.CheckLine("")
 			conn.CheckLine("hello")
 			conn.WriteLine("hello from client")
 			conn.CheckLine("hello from server")
@@ -1846,9 +1850,14 @@ var _ = Describe("Proxy", func() {
 		})
 		It("does not emit a latency metric", func() {
 			var wg sync.WaitGroup
+			first := true
 			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
 				defer wg.Done()
 				defer conn.Close()
+				if first {
+					conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
+					first = false
+				}
 				for {
 					_, err := conn.Write([]byte("Hello"))
 					if err != nil {

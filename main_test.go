@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"io"
 	"path"
 	"regexp"
 	"strconv"
@@ -339,6 +340,50 @@ var _ = Describe("Router Integration", func() {
 				wsApp.Listen()
 
 				assertWebsocketSuccess(wsApp)
+			})
+
+			It("closes connections with backends that respond with non 101-status code", func() {
+				wsApp := test.NewHangingWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, "")
+				wsApp.Register()
+				wsApp.Listen()
+
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+				Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
+
+				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", cfg.Port))
+				Expect(err).NotTo(HaveOccurred())
+
+				x := test_util.NewHttpConn(conn)
+
+				req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+				req.Header.Set("Upgrade", "websocket")
+				req.Header.Set("Connection", "upgrade")
+				x.WriteRequest(req)
+
+				responseChan := make(chan *http.Response)
+				go func() {
+					defer GinkgoRecover()
+					resp, err := http.ReadResponse(x.Reader, &http.Request{})
+					Expect(err).NotTo(HaveOccurred())
+					defer resp.Body.Close()
+					responseChan <- resp
+				}()
+
+				var resp *http.Response
+				Eventually(responseChan, "9s").Should(Receive(&resp))
+				Expect(resp.StatusCode).To(Equal(404))
+
+				// client-side conn should have been closed
+				// we verify this by trying to read from it, and checking that
+				//  - the read does not block
+				//  - the read returns no data
+				//  - the read returns an error EOF
+				n, err := conn.Read(make([]byte, 100))
+				Expect(n).To(Equal(0))
+				Expect(err).To(Equal(io.EOF))
+
+				x.Close()
 			})
 		})
 	})
