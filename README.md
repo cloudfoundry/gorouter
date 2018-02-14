@@ -406,7 +406,7 @@ If an user wants to send requests to a specific app instance, the header `X-CF-A
 
 ## Supported Cipher Suites
 
-The Gorouter supports both RFC and OpenSSL formatted values. Refer to [golang 1.7](https://github.com/golang/go/blob/release-branch.go1.7/src/crypto/tls/cipher_suites.go#L269-L285) for the list of supported cipher suites for Gorouter. Refer to [this documentation](https://testssl.sh/openssl-rfc.mapping.html) for a list of OpenSSL RFC mappings.
+The Gorouter supports both RFC and OpenSSL formatted values. Refer to [golang 1.9](https://github.com/golang/go/blob/release-branch.go1.9/src/crypto/tls/cipher_suites.go#L369-L390) for the list of supported cipher suites for Gorouter. Refer to [this documentation](https://testssl.sh/openssl-rfc.mapping.html) for a list of OpenSSL RFC mappings.
 Example configurations enabling the TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 cipher suite for Gorouter:
 
 ```
