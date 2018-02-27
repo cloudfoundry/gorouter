@@ -364,7 +364,8 @@ var _ = Describe("Router Integration", func() {
 				responseChan := make(chan *http.Response)
 				go func() {
 					defer GinkgoRecover()
-					resp, err := http.ReadResponse(x.Reader, &http.Request{})
+					var resp *http.Response
+					resp, err = http.ReadResponse(x.Reader, &http.Request{})
 					Expect(err).NotTo(HaveOccurred())
 					defer resp.Body.Close()
 					responseChan <- resp
