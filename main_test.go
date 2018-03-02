@@ -1042,6 +1042,10 @@ var _ = Describe("Router Integration", func() {
 			session                        *Session
 			config                         *config.Config
 			statusPort, proxyPort, sslPort uint16
+			caForClientToTrust             *x509.CertPool
+			routeServiceSrv                *httptest.Server
+			localIP                        string
+			client                         http.Client
 		)
 
 		BeforeEach(func() {
@@ -1049,64 +1053,79 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 			sslPort = test_util.NextAvailPort()
 
-			config, _ = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+			config, caForClientToTrust = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
 			config.RouteServiceSecret = "route-service-secret"
 			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
 
+			rsKey, rsCert := test_util.CreateKeyPair("test.routeservice.com")
+			config.CACerts = string(rsCert)
+			rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)
+			Expect(err).ToNot(HaveOccurred())
+
+			routeServiceSrv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			}))
+
+			routeServiceSrv.TLS = &tls.Config{
+				Certificates: []tls.Certificate{rsTLSCert},
+				ServerName:   "test.routeservice.com",
+			}
+			routeServiceSrv.StartTLS()
+
+			client = http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs:    caForClientToTrust,
+						ServerName: "potato.com",
+					},
+				},
+			}
 		})
 
 		JustBeforeEach(func() {
 			cfgFile := filepath.Join(tmpdir, "config.yml")
 			writeConfig(config, cfgFile)
 			session = startGorouterSession(cfgFile)
+
+			mbusClient, err := newMessageBus(config)
+			Expect(err).ToNot(HaveOccurred())
+
+			runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceSrv.URL)
+			runningApp.Register()
+			runningApp.Listen()
+
+			localIP, err = localip.LocalIP()
+			Expect(err).ToNot(HaveOccurred())
+
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+
+			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 		})
 
 		AfterEach(func() {
 			stopGorouter(session)
+			routeServiceSrv.Close()
 		})
 
-		Context("When an HTTPS request is destined to an app bound to route service", func() {
-			var rsKey, rsCert []byte
-			BeforeEach(func() {
-				rsKey, rsCert = test_util.CreateKeyPair("test.routeservice.com")
-				config.CACerts = string(rsCert)
-			})
+		Context("when a request is destined to an app bound to an HTTPS route service", func() {
 			It("successfully connects to the route service", func() {
-				rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)
-				Expect(err).ToNot(HaveOccurred())
-
-				routeServiceSrv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusTeapot)
-				}))
-
-				routeServiceSrv.TLS = &tls.Config{
-					Certificates: []tls.Certificate{rsTLSCert},
-					ServerName:   "test.routeservice.com",
-				}
-				routeServiceSrv.StartTLS()
-				defer routeServiceSrv.Close()
-
-				mbusClient, err := newMessageBus(config)
-				Expect(err).ToNot(HaveOccurred())
-
-				runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceSrv.URL)
-				runningApp.Register()
-				runningApp.Listen()
-
-				localIP, err := localip.LocalIP()
-				Expect(err).ToNot(HaveOccurred())
-
-				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-
-				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
-
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
 				Expect(err).ToNot(HaveOccurred())
 				req.Host = "demo.vcap.me"
-				client := http.DefaultClient
 				res, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+			})
+
+			Context("when the client connects with HTTPS", func() {
+				It("successfully connects to the route service", func() {
+					req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
+					Expect(err).ToNot(HaveOccurred())
+					req.Host = "demo.vcap.me"
+					res, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+				})
 			})
 		})
 	})
