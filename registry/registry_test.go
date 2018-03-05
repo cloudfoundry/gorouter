@@ -81,7 +81,7 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("foo", fooEndpoint)
 				Expect(reporter.CaptureRouteRegistrationLatencyCallCount()).To(Equal(1))
 				latency := reporter.CaptureRouteRegistrationLatencyArgsForCall(0)
-				Expect(latency).To(BeNumerically("~", 3*time.Second, 1*time.Millisecond))
+				Expect(latency).To(BeNumerically("~", 3*time.Second, 10*time.Millisecond))
 			})
 		})
 
