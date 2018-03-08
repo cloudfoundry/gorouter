@@ -32,39 +32,21 @@ type RouteServicesServer struct {
 }
 
 func NewRouteServicesServer() (*RouteServicesServer, error) {
-	caDER, caPriv, err := createCA()
+	caCert, caPriv, err := createCA()
 	if err != nil {
 		return nil, fmt.Errorf("create ca: %s", err)
 	}
+	rootCertPool := x509.NewCertPool()
+	rootCertPool.AddCert(caCert)
 
-	clientDER, clientPriv, err := createCertificate(caDER, caPriv, isClient)
+	clientCert, err := createCertificate(caCert, caPriv, isClient)
 	if err != nil {
 		return nil, fmt.Errorf("create client certificate: %s", err)
 	}
 
-	serverDER, serverPriv, err := createCertificate(caDER, caPriv, isServer)
+	serverCert, err := createCertificate(caCert, caPriv, isServer)
 	if err != nil {
 		return nil, fmt.Errorf("create server certificate: %s", err)
-	}
-
-	rootCertPool := x509.NewCertPool()
-
-	caPEM := pem.EncodeToMemory(&pem.Block{
-		Type: "CERTIFICATE", Bytes: caDER,
-	})
-
-	if ok := rootCertPool.AppendCertsFromPEM(caPEM); !ok {
-		return nil, fmt.Errorf("appendinding certs: could not append root cert")
-	}
-
-	clientCert, err := tls.X509KeyPair(clientDER, clientPriv)
-	if err != nil {
-		return nil, fmt.Errorf("making x509 key pair for client: %s", err)
-	}
-
-	serverCert, err := tls.X509KeyPair(serverDER, serverPriv)
-	if err != nil {
-		return nil, fmt.Errorf("making x509 key pair for server: %s", err)
 	}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -129,7 +111,7 @@ func (rc RouteServiceRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	return rc.transport.RoundTrip(req)
 }
 
-func createCA() ([]byte, *ecdsa.PrivateKey, error) {
+func createCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	caPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generate key: %s", err)
@@ -145,33 +127,33 @@ func createCA() ([]byte, *ecdsa.PrivateKey, error) {
 		return nil, nil, fmt.Errorf("creating certificate: %s", err)
 	}
 
-	return caDER, caPriv, nil
-}
-
-func createCertificate(caCert []byte, caPriv *ecdsa.PrivateKey, certType CertType) ([]byte, []byte, error) {
-	certPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caCert, err := x509.ParseCertificate(caDER)
 	if err != nil {
-		return nil, nil, fmt.Errorf("generate key: %s", err)
+		return nil, nil, fmt.Errorf("parsing ca cert: %s", err)
 	}
 
-	rootCert, err := x509.ParseCertificate(caCert)
+	return caCert, caPriv, nil
+}
+
+func createCertificate(rootCert *x509.Certificate, caPriv *ecdsa.PrivateKey, certType CertType) (tls.Certificate, error) {
+	certPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse certificate: %s", err)
+		return tls.Certificate{}, fmt.Errorf("generate key: %s", err)
 	}
 
 	certTemplate, err := createCertTemplate(certType)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create cert template: %s", err)
+		return tls.Certificate{}, fmt.Errorf("create cert template: %s", err)
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &certPriv.PublicKey, caPriv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("x509 create certificate: %s", err)
+		return tls.Certificate{}, fmt.Errorf("x509 create certificate: %s", err)
 	}
 
 	privBytes, err := x509.MarshalECPrivateKey(certPriv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("marshal ec private key: %s", err)
+		return tls.Certificate{}, fmt.Errorf("marshal ec private key: %s", err)
 	}
 
 	keyPEM := pem.EncodeToMemory(&pem.Block{
@@ -182,7 +164,12 @@ func createCertificate(caCert []byte, caPriv *ecdsa.PrivateKey, certType CertTyp
 		Type: "CERTIFICATE", Bytes: certDER,
 	})
 
-	return certPEM, keyPEM, nil
+	x509KeyPair, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("making x509 key pair: %s", err)
+	}
+
+	return x509KeyPair, nil
 }
 
 func createCertTemplate(certType CertType) (x509.Certificate, error) {
