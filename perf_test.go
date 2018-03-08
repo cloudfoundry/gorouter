@@ -10,6 +10,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/gorouter/varz"
@@ -33,8 +34,9 @@ var _ = Describe("AccessLogRecord", func() {
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())
 
+		rss := router.NewRouteServicesServer()
 		proxy.NewProxy(logger, accesslog, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
-			&tls.Config{}, nil)
+			&tls.Config{}, nil, rss.GetRoundTripper())
 
 		b.Time("RegisterTime", func() {
 			for i := 0; i < 1000; i++ {
@@ -51,5 +53,4 @@ var _ = Describe("AccessLogRecord", func() {
 			}
 		})
 	}, 10)
-
 })

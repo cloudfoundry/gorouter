@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,6 +25,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -59,14 +61,15 @@ var _ = Describe("Router", func() {
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 
-		mbusClient   *nats.Conn
-		registry     *rregistry.RouteRegistry
-		varz         vvarz.Varz
-		router       *Router
-		logger       logger.Logger
-		statusPort   uint16
-		natsPort     uint16
-		fakeReporter *fakeMetrics.FakeRouteRegistryReporter
+		mbusClient          *nats.Conn
+		registry            *rregistry.RouteRegistry
+		varz                vvarz.Varz
+		router              *Router
+		logger              logger.Logger
+		statusPort          uint16
+		natsPort            uint16
+		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
+		routeServicesServer *sharedfakes.RouteServicesServer
 	)
 
 	BeforeEach(func() {
@@ -85,12 +88,13 @@ var _ = Describe("Router", func() {
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
 
+		routeServicesServer = &sharedfakes.RouteServicesServer{}
+
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("router-test")
 		fakeReporter = new(fakeMetrics.FakeRouteRegistryReporter)
 		registry = rregistry.NewRouteRegistry(logger, config, fakeReporter)
 		varz = vvarz.NewVarz(registry)
-
 	})
 
 	JustBeforeEach(func() {
@@ -99,7 +103,7 @@ var _ = Describe("Router", func() {
 		Expect(err).ToNot(HaveOccurred())
 		config.PidFile = f.Name()
 
-		router, err = initializeRouter(config, registry, varz, mbusClient, logger)
+		router, err = initializeRouter(config, registry, varz, mbusClient, logger, routeServicesServer)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
@@ -128,7 +132,6 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
-
 	})
 
 	It("creates a pidfile on startup", func() {
@@ -136,6 +139,66 @@ var _ = Describe("Router", func() {
 			_, err := os.Stat(config.PidFile)
 			return err == nil
 		}).Should(BeTrue())
+	})
+
+	Describe("Route Services Server", func() {
+		It("starts the Route Services Server", func() {
+			Expect(routeServicesServer.ServeCallCount()).To(Equal(1))
+		})
+
+		It("shuts down the server properly", func() {
+			router.Stop()
+			router = nil
+			Expect(routeServicesServer.StopCallCount()).To(Equal(1))
+		})
+
+		Context("when an error occurs immediately during serve", func() {
+			It("causes the router not to run", func() {
+				rss := &sharedfakes.RouteServicesServer{}
+				rss.ServeReturns(errors.New("serve error"))
+				natsPort := test_util.NextAvailPort()
+				proxyPort := test_util.NextAvailPort()
+				statusPort = test_util.NextAvailPort()
+
+				c := test_util.SpecConfig(statusPort, proxyPort, natsPort)
+				c.StartResponseDelayInterval = 1 * time.Second
+
+				rtr, err := initializeRouter(c, registry, varz, mbusClient, logger, rss)
+				Expect(err).NotTo(HaveOccurred())
+
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+
+				err = rtr.Run(signals, readyChan)
+				Expect(err).To(MatchError(errors.New("serve error")))
+			})
+		})
+
+		Context("when an error occurs after some time serving", func() {
+			It("causes the route to shut down", func() {
+				natsPort := test_util.NextAvailPort()
+				proxyPort := test_util.NextAvailPort()
+				statusPort = test_util.NextAvailPort()
+
+				c := test_util.SpecConfig(statusPort, proxyPort, natsPort)
+				c.StartResponseDelayInterval = 1 * time.Second
+
+				rss := &sharedfakes.RouteServicesServer{}
+				rss.ServeStub = func(server *http.Server, errChan chan error) error {
+					errChan <- errors.New("a shutdown error")
+					return nil
+				}
+
+				rtr, err := initializeRouter(c, registry, varz, mbusClient, logger, rss)
+				Expect(err).NotTo(HaveOccurred())
+
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+
+				go rtr.Run(signals, readyChan)
+				Eventually(func() int { return rss.StopCallCount() }, "3s").Should(Equal(2))
+			})
+		})
 	})
 
 	Context("when StartResponseDelayInterval is set", func() {
@@ -153,7 +216,7 @@ var _ = Describe("Router", func() {
 			c.StartResponseDelayInterval = 1 * time.Second
 
 			// Create a second router to test the health check in parallel to startup
-			rtr, err = initializeRouter(c, registry, varz, mbusClient, logger)
+			rtr, err = initializeRouter(c, registry, varz, mbusClient, logger, routeServicesServer)
 
 			Expect(err).ToNot(HaveOccurred())
 			healthCheckWithEndpointReceives := func() int {
@@ -1800,20 +1863,21 @@ func badCertTemplate(cname string) (*x509.Certificate, error) {
 	return &tmpl, nil
 }
 
-func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger) (*Router, error) {
+func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
 
+	rt := &sharedfakes.RoundTripper{}
 	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, nil)
+		routeServiceConfig, &tls.Config{}, nil, rt)
 
 	var healthCheck int32
 	healthCheck = 0
 	logcounter := schema.NewLogCounter()
-	return NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, nil)
+	return NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, nil, routeServicesServer)
 }
 
 func readVarz(v vvarz.Varz) map[string]interface{} {

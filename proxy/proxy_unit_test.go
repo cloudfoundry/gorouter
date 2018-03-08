@@ -7,6 +7,7 @@ import (
 	"time"
 
 	fakelogger "code.cloudfoundry.org/gorouter/access_log/fakes"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -57,9 +58,10 @@ var _ = Describe("Proxy Unit tests", func() {
 			proxyReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 			combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyReporter}
 
+			rt := &sharedfakes.RoundTripper{}
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
-				routeServiceConfig, tlsConfig, nil)
+				routeServiceConfig, tlsConfig, nil, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
 

@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/access_log"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -219,12 +220,15 @@ var _ = Describe("Router", func() {
 		metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 		combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+
+		rt := &sharedfakes.RoundTripper{}
 		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt)
 
 		errChan := make(chan error, 2)
 		var err error
-		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
+		rss := &sharedfakes.RouteServicesServer{}
+		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
@@ -463,12 +467,14 @@ var _ = Describe("Router", func() {
 				var healthCheck int32
 				healthCheck = 0
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+				rt := &sharedfakes.RoundTripper{}
 				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck)
+					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt)
 
 				errChan = make(chan error, 2)
 				var err error
-				rtr, err = router.NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, errChan)
+				rss := &sharedfakes.RouteServicesServer{}
+				rtr, err = router.NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
 				runRouter(rtr)
 			})

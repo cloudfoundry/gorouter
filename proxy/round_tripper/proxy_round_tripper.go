@@ -2,7 +2,6 @@ package round_tripper
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -68,6 +67,7 @@ func NewProxyRoundTripper(
 	secureCookies bool,
 	localPort uint16,
 	errorHandler errorHandler,
+	routeServicesClient http.RoundTripper,
 ) ProxyRoundTripper {
 	return &roundTripper{
 		logger:              logger,
@@ -78,6 +78,7 @@ func NewProxyRoundTripper(
 		roundTripperFactory: roundTripperFactory,
 		retryableClassifier: retryableClassifier,
 		errorHandler:        errorHandler,
+		routeServicesClient: routeServicesClient,
 	}
 }
 
@@ -90,6 +91,7 @@ type roundTripper struct {
 	roundTripperFactory RoundTripperFactory
 	retryableClassifier fails.Classifier
 	errorHandler        errorHandler
+	routeServicesClient http.RoundTripper
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -155,14 +157,16 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			request.Host = reqInfo.RouteServiceURL.Host
 			request.URL = new(url.URL)
 			*request.URL = *reqInfo.RouteServiceURL
+
+			var tr http.RoundTripper
+			tr = GetRoundTripper(endpoint, rt.roundTripperFactory)
 			if reqInfo.IsInternalRouteService {
 				// note: this *looks* like it breaks TLS to internal route service backends,
 				// but in fact it is right!  this hairpins back on the gorouter, and the subsequent
 				// request from the gorouter will go to a backend using TLS (if tls_port is set on that endpoint)
-				request.URL.Scheme = "http"
-				request.URL.Host = fmt.Sprintf("localhost:%d", rt.localPort)
+				tr = rt.routeServicesClient
 			}
-			tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
+
 			res, err = tr.RoundTrip(request)
 			if err == nil {
 				if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {

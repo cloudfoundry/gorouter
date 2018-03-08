@@ -136,12 +136,30 @@ func main() {
 		}
 	}
 
-	proxy := buildProxy(logger.Session("proxy"), c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
+	routeServiceConfig := routeservice.NewRouteServiceConfig(
+		logger.Session("proxy"),
+		c.RouteServiceEnabled,
+		c.RouteServiceTimeout,
+		crypto,
+		cryptoPrev,
+		c.RouteServiceRecommendHttps,
+	)
+
+	backendTLSConfig := &tls.Config{
+		CipherSuites:       c.CipherSuites,
+		InsecureSkipVerify: c.SkipSSLValidation,
+		RootCAs:            c.CAPool,
+		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
+	}
+
+	rss := router.NewRouteServicesServer()
 	healthCheck = 0
-	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil)
+	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper())
+	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
+
 	members := grouper.Members{}
 
 	if c.RoutingApiEnabled() {
@@ -225,30 +243,6 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 		logger.Fatal("error-creating-route-service-crypto", zap.Error(err))
 	}
 	return crypto
-}
-
-func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry,
-	accessLogger access_log.AccessLogger, reporter metrics.ProxyReporter,
-	crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
-
-	routeServiceConfig := routeservice.NewRouteServiceConfig(
-		logger,
-		c.RouteServiceEnabled,
-		c.RouteServiceTimeout,
-		crypto,
-		cryptoPrev,
-		c.RouteServiceRecommendHttps,
-	)
-
-	backendTLSConfig := &tls.Config{
-		CipherSuites:       c.CipherSuites,
-		InsecureSkipVerify: c.SkipSSLValidation,
-		RootCAs:            c.CAPool,
-		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
-	}
-
-	return proxy.NewProxy(logger, accessLogger, c, registry,
-		reporter, routeServiceConfig, backendTLSConfig, &healthCheck)
 }
 
 func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {

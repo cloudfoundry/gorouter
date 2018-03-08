@@ -1095,7 +1095,69 @@ var _ = Describe("Router Integration", func() {
 			stopGorouter(session)
 		})
 
-		Context("when the route service is not hosted on the platform", func() {
+		Context("when the route service is hosted on the platform (internal, has a route as an app)", func() {
+			var routeSvcApp *common.TestApp
+
+			BeforeEach(func() {
+				mbusClient, err := newMessageBus(config)
+				Expect(err).ToNot(HaveOccurred())
+
+				routeSvcApp = common.NewTestApp([]route.Uri{"some-route-service.vcap.me"}, proxyPort, mbusClient, nil, "")
+				routeSvcApp.AddHandler("/rs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(477)
+				}))
+				routeServiceURL = "https://some-route-service.vcap.me/rs"
+			})
+
+			It("successfully connects to the route service", func() {
+				routeSvcApp.Register()
+				routeSvcApp.Listen()
+				verifyAppRunning(routeSvcApp)
+
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.Host = "demo.vcap.me"
+				res, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res.StatusCode).To(Equal(477))
+			})
+
+			Context("when the client connects with HTTPS", func() {
+				It("successfully connects to the route service", func() {
+					routeSvcApp.Register()
+					routeSvcApp.Listen()
+					verifyAppRunning(routeSvcApp)
+
+					req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
+					Expect(err).ToNot(HaveOccurred())
+					req.Host = "demo.vcap.me"
+					res, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(477))
+				})
+
+				Context("when the gorouter has http disabled", func() {
+					BeforeEach(func() {
+						config.DisableHTTP = true
+					})
+
+					It("successfully connects to the route service", func() {
+						routeSvcApp.Register()
+						routeSvcApp.Listen()
+						verifyAppRunning(routeSvcApp)
+
+						req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
+						Expect(err).ToNot(HaveOccurred())
+						req.Host = "demo.vcap.me"
+						res, err := client.Do(req)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(res.StatusCode).To(Equal(477))
+					})
+				})
+			})
+		})
+
+		Context("when the route service is not hosted on the platform (external)", func() {
 			BeforeEach(func() {
 				routeServiceSrv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusTeapot)

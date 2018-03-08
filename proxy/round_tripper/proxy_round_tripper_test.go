@@ -11,13 +11,13 @@ import (
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/common/uuid"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
-
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -63,6 +63,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			routerIP            string
 			combinedReporter    *fakes.FakeCombinedReporter
 			roundTripperFactory *FakeRoundTripperFactory
+			routeServicesClient *sharedfakes.RoundTripper
 			retryableClassifier *errorClassifierFakes.Classifier
 			errorHandler        *roundtripperfakes.ErrorHandler
 
@@ -118,11 +119,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			retryableClassifier = &errorClassifierFakes.Classifier{}
 			retryableClassifier.ClassifyReturns(false)
+			routeServicesClient = &sharedfakes.RoundTripper{}
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				roundTripperFactory, retryableClassifier,
 				logger, "",
 				combinedReporter, false,
-				1234, errorHandler,
+				1234, errorHandler, routeServicesClient,
 			)
 		})
 
@@ -130,6 +132,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			BeforeEach(func() {
 				req = test_util.NewRequest("GET", "myapp.com", "/", nil)
 			})
+
 			It("returns an error", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err.Error()).To(ContainSubstring("RequestInfo not set on context"))
@@ -140,6 +143,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			BeforeEach(func() {
 				reqInfo.RoutePool = nil
 			})
+
 			It("returns an error", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err.Error()).To(ContainSubstring("RoutePool not set on context"))
@@ -150,6 +154,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			BeforeEach(func() {
 				reqInfo.ProxyResponseWriter = nil
 			})
+
 			It("returns an error", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err.Error()).To(ContainSubstring("ProxyResponseWriter not set on context"))
@@ -160,6 +165,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			BeforeEach(func() {
 				transport.RoundTripReturns(resp.Result(), nil)
 			})
+
 			It("Sends X-cf headers", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
@@ -409,9 +415,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 				routePool.Each(func(endpoint *route.Endpoint) {
 					oldEndpoints = append(oldEndpoints, endpoint)
 				})
+
 				for _, ep := range oldEndpoints {
 					routePool.Remove(ep)
 				}
+
 				Expect(routePool.IsEmpty()).To(BeTrue())
 				endpoint = route.NewEndpoint(&route.EndpointOpts{
 					Host:   "1.1.1.1",
@@ -425,6 +433,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					&http.Response{StatusCode: http.StatusTeapot}, nil,
 				)
 			})
+
 			It("should set request URL scheme to https", func() {
 				resp, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
@@ -448,6 +457,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						&http.Response{StatusCode: http.StatusTeapot}, nil,
 					)
 				})
+
 				It("should set request URL scheme to http", func() {
 					resp, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
@@ -465,6 +475,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(1))
+
 				_, err = proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(1))
@@ -476,12 +487,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 				added := routePool.Put(endpoint)
 				Expect(added).To(Equal(route.ADDED))
+
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(1))
+
 				_, err = proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(2))
+
 				_, err = proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(roundTripperFactory.Calls).To(Equal(2))
@@ -511,7 +525,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			It("does not capture the routing request in metrics", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
-
 				Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(0))
 			})
 
@@ -522,10 +535,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 					)
 
 				})
+
 				It("logs the response error", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-
 					Expect(logger.Buffer()).To(gbytes.Say(`response.*status-code":418`))
 				})
 			})
@@ -537,13 +550,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 					transport.RoundTripReturns(nil, nil)
 				})
 
-				It("routes the request to the configured local address", func() {
+				It("uses the route services round tripper to make the request", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(BeNil())
+					Expect(transport.RoundTripCallCount()).To(Equal(0))
+					Expect(routeServicesClient.RoundTripCallCount()).To(Equal(1))
 
-					Expect(transport.RoundTripCallCount()).To(Equal(1))
-					outReq := transport.RoundTripArgsForCall(0)
-					Expect(outReq.URL.Host).To(Equal("localhost:1234"))
+					outReq := routeServicesClient.RoundTripArgsForCall(0)
 					Expect(outReq.Host).To(Equal(routeServiceURL.Host))
 				})
 			})
@@ -559,6 +572,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("calls the error handler", func() {
 					proxyRoundTripper.RoundTrip(req)
 					Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
+
 					_, err := errorHandler.HandleErrorArgsForCall(0)
 					Expect(err).To(Equal(dialError))
 				})
@@ -603,7 +617,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 				})
 			})
-
 		})
 
 		Context("when sticky session", func() {
@@ -612,6 +625,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				endpoint1     *route.Endpoint
 				endpoint2     *route.Endpoint
 			)
+
 			BeforeEach(func() {
 				sessionCookie = &http.Cookie{
 					Name: round_tripper.StickyCookieKey,

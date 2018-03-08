@@ -102,6 +102,7 @@ func NewProxy(
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	tlsConfig *tls.Config,
 	heartbeatOK *int32,
+	routeServicesClient http.RoundTripper,
 ) Proxy {
 
 	p := &proxy{
@@ -143,9 +144,19 @@ func NewProxy(
 		Template: httpTransportTemplate,
 	}
 
+	prt := round_tripper.NewProxyRoundTripper(
+		roundTripperFactory, fails.RetriableClassifiers, p.logger,
+		p.defaultLoadBalance, p.reporter, p.secureCookies, c.Port,
+		&round_tripper.ErrorHandler{
+			MetricReporter: p.reporter,
+			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
+		},
+		routeServicesClient,
+	)
+
 	rproxy := &httputil.ReverseProxy{
 		Director:       p.setupProxyRequest,
-		Transport:      p.proxyRoundTripper(roundTripperFactory, fails.RetriableClassifiers, c.Port),
+		Transport:      prt,
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
@@ -184,18 +195,6 @@ func hostWithoutPort(req *http.Request) string {
 	}
 
 	return host
-}
-
-func (p *proxy) proxyRoundTripper(roundTripperFactory round_tripper.RoundTripperFactory,
-	retryableClassifier fails.Classifier, port uint16) round_tripper.ProxyRoundTripper {
-	return round_tripper.NewProxyRoundTripper(
-		roundTripperFactory, retryableClassifier, p.logger,
-		p.defaultLoadBalance, p.reporter, p.secureCookies, port,
-		&round_tripper.ErrorHandler{
-			MetricReporter: p.reporter,
-			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
-		},
-	)
 }
 
 type bufferPool struct {

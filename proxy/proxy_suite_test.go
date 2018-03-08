@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
@@ -26,21 +27,24 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+//go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper
+
 var (
-	r              *registry.RouteRegistry
-	p              proxy.Proxy
-	fakeReporter   *fakes.FakeCombinedReporter
-	conf           *config.Config
-	proxyServer    net.Listener
-	accessLog      access_log.AccessLogger
-	accessLogFile  *test_util.FakeFile
-	crypto         secure.Crypto
-	testLogger     logger.Logger
-	cryptoPrev     secure.Crypto
-	caCertPool     *x509.CertPool
-	recommendHttps bool
-	heartbeatOK    int32
-	fakeEmitter    *fake.FakeEventEmitter
+	r                       *registry.RouteRegistry
+	p                       proxy.Proxy
+	fakeReporter            *fakes.FakeCombinedReporter
+	conf                    *config.Config
+	proxyServer             net.Listener
+	accessLog               access_log.AccessLogger
+	accessLogFile           *test_util.FakeFile
+	crypto                  secure.Crypto
+	testLogger              logger.Logger
+	cryptoPrev              secure.Crypto
+	caCertPool              *x509.CertPool
+	recommendHttps          bool
+	heartbeatOK             int32
+	fakeEmitter             *fake.FakeEventEmitter
+	fakeRouteServicesClient *sharedfakes.RoundTripper
 )
 
 func TestProxy(t *testing.T) {
@@ -107,7 +111,9 @@ var _ = JustBeforeEach(func() {
 	Expect(err).ToNot(HaveOccurred())
 	conf.Port = uint16(intPort)
 
-	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK)
+	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
+
+	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)

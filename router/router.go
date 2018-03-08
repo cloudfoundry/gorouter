@@ -43,6 +43,12 @@ const (
 
 var noDeadline = time.Time{}
 
+//go:generate counterfeiter -o ../fakes/route_services_server.go --fake-name RouteServicesServer . rss
+type rss interface {
+	Serve(server *http.Server, errChan chan error) error
+	Stop()
+}
+
 type Router struct {
 	config     *config.Config
 	proxy      proxy.Proxy
@@ -51,26 +57,27 @@ type Router struct {
 	varz       varz.Varz
 	component  *common.VcapComponent
 
-	listener         net.Listener
-	tlsListener      net.Listener
-	closeConnections bool
-	connLock         sync.Mutex
-	idleConns        map[net.Conn]struct{}
-	activeConns      map[net.Conn]struct{}
-	drainDone        chan struct{}
-	serveDone        chan struct{}
-	tlsServeDone     chan struct{}
-	stopping         bool
-	stopLock         sync.Mutex
-	uptimeMonitor    *monitor.Uptime
-	HeartbeatOK      *int32
-	logger           logger.Logger
-	errChan          chan error
-	NatsHost         *atomic.Value
+	listener            net.Listener
+	tlsListener         net.Listener
+	closeConnections    bool
+	connLock            sync.Mutex
+	idleConns           map[net.Conn]struct{}
+	activeConns         map[net.Conn]struct{}
+	drainDone           chan struct{}
+	serveDone           chan struct{}
+	tlsServeDone        chan struct{}
+	stopping            bool
+	stopLock            sync.Mutex
+	uptimeMonitor       *monitor.Uptime
+	HeartbeatOK         *int32
+	logger              logger.Logger
+	errChan             chan error
+	NatsHost            *atomic.Value
+	routeServicesServer rss
 }
 
 func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
+	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
 
 	var host string
 	if cfg.Status.Port != 0 {
@@ -103,24 +110,25 @@ func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClie
 
 	routerErrChan := errChan
 	if routerErrChan == nil {
-		routerErrChan = make(chan error, 2)
+		routerErrChan = make(chan error, 3)
 	}
 
 	router := &Router{
-		config:       cfg,
-		proxy:        p,
-		mbusClient:   mbusClient,
-		registry:     r,
-		varz:         v,
-		component:    component,
-		serveDone:    make(chan struct{}),
-		tlsServeDone: make(chan struct{}),
-		idleConns:    make(map[net.Conn]struct{}),
-		activeConns:  make(map[net.Conn]struct{}),
-		logger:       logger,
-		errChan:      routerErrChan,
-		HeartbeatOK:  heartbeatOK,
-		stopping:     false,
+		config:              cfg,
+		proxy:               p,
+		mbusClient:          mbusClient,
+		registry:            r,
+		varz:                v,
+		component:           component,
+		serveDone:           make(chan struct{}),
+		tlsServeDone:        make(chan struct{}),
+		idleConns:           make(map[net.Conn]struct{}),
+		activeConns:         make(map[net.Conn]struct{}),
+		logger:              logger,
+		errChan:             routerErrChan,
+		HeartbeatOK:         heartbeatOK,
+		stopping:            false,
+		routeServicesServer: routeServicesServer,
 	}
 
 	if err := router.component.Start(); err != nil {
@@ -165,6 +173,11 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 	err = r.serveHTTPS(server, r.errChan)
+	if err != nil {
+		r.errChan <- err
+		return err
+	}
+	err = r.routeServicesServer.Serve(server, r.errChan)
 	if err != nil {
 		r.errChan <- err
 		return err
@@ -403,6 +416,8 @@ func (r *Router) stopListening() {
 		r.tlsListener.Close()
 		<-r.tlsServeDone
 	}
+
+	r.routeServicesServer.Stop()
 }
 
 func (r *Router) RegisterComponent() {

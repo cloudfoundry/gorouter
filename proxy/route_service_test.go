@@ -375,10 +375,8 @@ var _ = Describe("Route Services", func() {
 	})
 
 	Context("when the route service is a CF app", func() {
-
 		Context("when registration message does not contain tls_port", func() {
 			It("successfully looks up the route service and sends the request", func() {
-
 				routeServiceHandler := func(conn *test_util.HttpConn) {
 					defer GinkgoRecover()
 					resp := test_util.NewResponse(http.StatusOK)
@@ -402,22 +400,27 @@ var _ = Describe("Route Services", func() {
 
 				rsListener := test_util.RegisterHandler(r, "route_service.com", routeServiceHandler, test_util.RegisterConfig{AppId: "my-route-service-app-id"})
 				appListener := test_util.RegisterHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
-					defer GinkgoRecover()
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					Fail("Should not get here")
+					conn.Close()
 				}, test_util.RegisterConfig{RouteServiceUrl: "https://route_service.com"})
+
 				defer func() {
 					Expect(rsListener.Close()).ToNot(HaveErrored())
 					Expect(appListener.Close()).ToNot(HaveErrored())
 				}()
-				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "my_app.com", "", nil)
-				conn.WriteRequest(req)
+				fakeRouteServicesClient.RoundTripStub = func(r *http.Request) (*http.Response, error) {
+					return &http.Response{
+						Request:    r,
+						Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
+						StatusCode: http.StatusOK,
+						Header:     make(map[string][]string),
+					}, nil
+				}
+
+				conn := dialProxy(proxyServer)
+				conn.WriteRequest(test_util.NewRequest("GET", "my_app.com", "", nil))
 
 				res, _ := readResponse(conn)
-
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
 		})
@@ -463,16 +466,24 @@ var _ = Describe("Route Services", func() {
 						Certificates: []tls.Certificate{rsTLSCert},
 					},
 				})
+
 				appListener := test_util.RegisterHandler(r, "my_app.com", func(conn *test_util.HttpConn) {
-					defer GinkgoRecover()
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					Fail("Should not get here")
+					conn.Close()
 				}, test_util.RegisterConfig{RouteServiceUrl: "https://route_service.com"})
 				defer func() {
 					Expect(rsListener.Close()).ToNot(HaveErrored())
 					Expect(appListener.Close()).ToNot(HaveErrored())
 				}()
+
+				fakeRouteServicesClient.RoundTripStub = func(r *http.Request) (*http.Response, error) {
+					return &http.Response{
+						Request:    r,
+						Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
+						StatusCode: http.StatusOK,
+						Header:     make(map[string][]string),
+					}, nil
+				}
+
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "my_app.com", "", nil)
