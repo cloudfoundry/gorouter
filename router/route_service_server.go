@@ -197,7 +197,7 @@ func createCertTemplate(certType CertType) (x509.Certificate, error) {
 		Subject:               pkix.Name{Organization: []string{"Route Services"}},
 		SignatureAlgorithm:    x509.ECDSAWithSHA256,
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(1, 0, 0), // valid for one year
+		NotAfter:              time.Now().AddDate(10, 0, 0), // valid for ten years: hopefully no one tries to run a single gorouter for that long without restarting!
 		BasicConstraintsValid: true,
 		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 	}
