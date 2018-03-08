@@ -25,7 +25,10 @@ var _ = Describe("RouteServicesServer", func() {
 				}),
 			}
 
-			rss = router.NewRouteServicesServer()
+			var err error
+			rss, err = router.NewRouteServicesServer()
+			Expect(err).NotTo(HaveOccurred())
+
 			roundTripper = rss.GetRoundTripper()
 			errChan = make(chan error)
 		})

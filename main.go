@@ -152,7 +152,10 @@ func main() {
 		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
 	}
 
-	rss := router.NewRouteServicesServer()
+	rss, err := router.NewRouteServicesServer()
+	if err != nil {
+		logger.Fatal("new-route-services-server", zap.Error(err))
+	}
 	healthCheck = 0
 	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper())
 	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)

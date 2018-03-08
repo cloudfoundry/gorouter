@@ -31,10 +31,21 @@ type RouteServicesServer struct {
 	serverCert tls.Certificate
 }
 
-func NewRouteServicesServer() *RouteServicesServer {
-	caDER, caPriv := createCA()
-	clientDER, clientPriv := createCertificate(caDER, caPriv, isClient)
-	serverDER, serverPriv := createCertificate(caDER, caPriv, isServer)
+func NewRouteServicesServer() (*RouteServicesServer, error) {
+	caDER, caPriv, err := createCA()
+	if err != nil {
+		return nil, fmt.Errorf("create ca: %s", err)
+	}
+
+	clientDER, clientPriv, err := createCertificate(caDER, caPriv, isClient)
+	if err != nil {
+		return nil, fmt.Errorf("create client certificate: %s", err)
+	}
+
+	serverDER, serverPriv, err := createCertificate(caDER, caPriv, isServer)
+	if err != nil {
+		return nil, fmt.Errorf("create server certificate: %s", err)
+	}
 
 	rootCertPool := x509.NewCertPool()
 
@@ -43,27 +54,27 @@ func NewRouteServicesServer() *RouteServicesServer {
 	})
 
 	if ok := rootCertPool.AppendCertsFromPEM(caPEM); !ok {
-		panic("could not append root cert")
+		return nil, fmt.Errorf("appendinding certs: could not append root cert")
 	}
 
 	clientCert, err := tls.X509KeyPair(clientDER, clientPriv)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("making x509 key pair for client: %s", err)
 	}
 
 	serverCert, err := tls.X509KeyPair(serverDER, serverPriv)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("making x509 key pair for server: %s", err)
 	}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("starting local listener: %s", err)
 	}
 
 	_, port, err := net.SplitHostPort(l.Addr().String())
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("splitting host and port: %s", err)
 	}
 
 	return &RouteServicesServer{
@@ -72,7 +83,7 @@ func NewRouteServicesServer() *RouteServicesServer {
 		rootCA:     rootCertPool,
 		clientCert: clientCert,
 		serverCert: serverCert,
-	}
+	}, nil
 }
 
 func (rs *RouteServicesServer) Serve(server *http.Server, errChan chan error) error {
@@ -118,43 +129,49 @@ func (rc RouteServiceRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	return rc.transport.RoundTrip(req)
 }
 
-func createCA() ([]byte, *ecdsa.PrivateKey) {
+func createCA() ([]byte, *ecdsa.PrivateKey, error) {
 	caPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("generate key: %s", err)
 	}
 
-	tmpl := createCertTemplate(isCA)
+	tmpl, err := createCertTemplate(isCA)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create cert template: %s", err)
+	}
 
 	caDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &caPriv.PublicKey, caPriv)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("creating certificate: %s", err)
 	}
 
-	return caDER, caPriv
+	return caDER, caPriv, nil
 }
 
-func createCertificate(caCert []byte, caPriv *ecdsa.PrivateKey, certType CertType) ([]byte, []byte) {
+func createCertificate(caCert []byte, caPriv *ecdsa.PrivateKey, certType CertType) ([]byte, []byte, error) {
 	certPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("generate key: %s", err)
 	}
 
 	rootCert, err := x509.ParseCertificate(caCert)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("parse certificate: %s", err)
 	}
 
-	certTemplate := createCertTemplate(certType)
+	certTemplate, err := createCertTemplate(certType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create cert template: %s", err)
+	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &certPriv.PublicKey, caPriv)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("x509 create certificate: %s", err)
 	}
 
 	privBytes, err := x509.MarshalECPrivateKey(certPriv)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("marshal ec private key: %s", err)
 	}
 
 	keyPEM := pem.EncodeToMemory(&pem.Block{
@@ -165,14 +182,14 @@ func createCertificate(caCert []byte, caPriv *ecdsa.PrivateKey, certType CertTyp
 		Type: "CERTIFICATE", Bytes: certDER,
 	})
 
-	return certPEM, keyPEM
+	return certPEM, keyPEM, nil
 }
 
-func createCertTemplate(certType CertType) x509.Certificate {
+func createCertTemplate(certType CertType) (x509.Certificate, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		panic(err)
+		return x509.Certificate{}, fmt.Errorf("random int: %s", err)
 	}
 
 	tmpl := x509.Certificate{
@@ -196,5 +213,5 @@ func createCertTemplate(certType CertType) x509.Certificate {
 		tmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 	}
 
-	return tmpl
+	return tmpl, err
 }
