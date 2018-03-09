@@ -34,7 +34,8 @@ var _ = Describe("AccessLogRecord", func() {
 		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())
 
-		rss := router.NewRouteServicesServer()
+		rss, err := router.NewRouteServicesServer()
+		Expect(err).ToNot(HaveOccurred())
 		proxy.NewProxy(logger, accesslog, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
 			&tls.Config{}, nil, rss.GetRoundTripper())
 
