@@ -139,15 +139,6 @@ func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClie
 	return router, nil
 }
 
-type gorouterHandler struct {
-	handler http.Handler
-	logger  logger.Logger
-}
-
-func (h *gorouterHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	h.handler.ServeHTTP(res, req)
-}
-
 func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
@@ -159,10 +150,8 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.logger.Debug("Sleeping before returning success on /health endpoint to preload routing table", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
 	time.Sleep(r.config.StartResponseDelayInterval)
 
-	handler := gorouterHandler{handler: r.proxy, logger: r.logger}
-
 	server := &http.Server{
-		Handler:     &handler,
+		Handler:     r.proxy,
 		ConnState:   r.HandleConnState,
 		IdleTimeout: r.config.FrontendIdleTimeout,
 	}
