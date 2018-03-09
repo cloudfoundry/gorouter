@@ -21,10 +21,12 @@ func TestGorouter(t *testing.T) {
 	RunSpecs(t, "Gorouter Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
 	path, err := gexec.Build("code.cloudfoundry.org/gorouter", "-race")
 	Expect(err).ToNot(HaveOccurred())
-	gorouterPath = path
+	return []byte(path)
+}, func(data []byte) {
+	gorouterPath = string(data)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)
 	SetDefaultConsistentlyPollingInterval(10 * time.Millisecond)
@@ -32,9 +34,10 @@ var _ = BeforeSuite(func() {
 	oauthServer.HTTPTestServer.StartTLS()
 })
 
-var _ = AfterSuite(func() {
+var _ = SynchronizedAfterSuite(func() {
 	if oauthServer != nil {
 		oauthServer.Close()
 	}
+}, func() {
 	gexec.CleanupBuildArtifacts()
 })
