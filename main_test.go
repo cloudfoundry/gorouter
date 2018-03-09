@@ -135,6 +135,9 @@ var _ = Describe("Router Integration", func() {
 		Eventually(func() string {
 			logAdd, err := ioutil.ReadAll(session.Out)
 			if err != nil {
+				if session.ExitCode() >= 0 {
+					Fail("gorouter quit early!")
+				}
 				return ""
 			}
 			eventsSessionLogs = append(eventsSessionLogs, logAdd...)
