@@ -50,6 +50,7 @@ type proxy struct {
 	forceForwardedProtoHttps bool
 	defaultLoadBalance       string
 	endpointDialTimeout      time.Duration
+	endpointTimeout          time.Duration
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
 }
@@ -118,21 +119,13 @@ func NewProxy(
 		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
 		defaultLoadBalance:       c.LoadBalance,
 		endpointDialTimeout:      c.EndpointDialTimeout,
+		endpointTimeout:          c.EndpointTimeout,
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         tlsConfig,
 	}
 
 	httpTransportTemplate := &http.Transport{
-		Dial: func(network, addr string) (net.Conn, error) {
-			conn, err := net.DialTimeout(network, addr, p.endpointDialTimeout)
-			if err != nil {
-				return conn, err
-			}
-			if c.EndpointTimeout > 0 {
-				err = conn.SetDeadline(time.Now().Add(c.EndpointTimeout))
-			}
-			return conn, err
-		},
+		Dial:                (&net.Dialer{Timeout: c.EndpointDialTimeout}).Dial,
 		DisableKeepAlives:   c.DisableKeepAlives,
 		MaxIdleConns:        c.MaxIdleConns,
 		IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
@@ -152,6 +145,7 @@ func NewProxy(
 			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
 		},
 		routeServicesClient,
+		p.endpointTimeout,
 	)
 
 	rproxy := &httputil.ReverseProxy{
