@@ -1534,21 +1534,3 @@ func setupTlsServer() *ghttp.Server {
 		})
 	return oauthServer
 }
-
-func newTlsListener(listener net.Listener) net.Listener {
-	caCertsPath := path.Join("test", "assets", "certs")
-	caCertsPath, err := filepath.Abs(caCertsPath)
-	Expect(err).ToNot(HaveOccurred())
-
-	public := filepath.Join(caCertsPath, "server.pem")
-	private := filepath.Join(caCertsPath, "server.key")
-	cert, err := tls.LoadX509KeyPair(public, private)
-	Expect(err).ToNot(HaveOccurred())
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
-	}
-
-	return tls.NewListener(listener, tlsConfig)
-}
