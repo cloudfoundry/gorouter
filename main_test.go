@@ -49,6 +49,8 @@ const localIP = "127.0.0.1"
 var _ = Describe("Router Integration", func() {
 
 	var (
+		cfg                                      *config.Config
+		cfgFile                                  string
 		tmpdir                                   string
 		natsPort, statusPort, proxyPort, sslPort uint16
 		natsRunner                               *test_util.NATSRunner
@@ -162,6 +164,7 @@ var _ = Describe("Router Integration", func() {
 		var err error
 		tmpdir, err = ioutil.TempDir("", "gorouter")
 		Expect(err).ToNot(HaveOccurred())
+		cfgFile = filepath.Join(tmpdir, "config.yml")
 
 		statusPort = test_util.NextAvailPort()
 		proxyPort = test_util.NextAvailPort()
@@ -187,7 +190,6 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when config is invalid", func() {
 		It("fails to start", func() {
-			cfgFile := filepath.Join(tmpdir, "config.yml")
 			writeConfig(&config.Config{EnableSSL: true}, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -200,11 +202,7 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("IsolationSegments", func() {
-		var (
-			cfgFile string
-		)
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			createIsoSegConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, []string{"is1", "is2"}, natsPort)
 		})
 
@@ -225,8 +223,6 @@ var _ = Describe("Router Integration", func() {
 
 	Describe("TLS to backends", func() {
 		var (
-			cfg                 *config.Config
-			cfgFile             string
 			serverCertDomainSAN string
 			backendCertChain    test_util.CertChain // server cert presented by backend to gorouter
 			clientCertChain     test_util.CertChain // client cert presented by gorouter to backend
@@ -235,7 +231,6 @@ var _ = Describe("Router Integration", func() {
 		)
 
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 10, natsPort)
 			cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 			cfg.SkipSSLValidation = false
@@ -387,13 +382,10 @@ var _ = Describe("Router Integration", func() {
 
 	Describe("Frontend TLS", func() {
 		var (
-			cfg             *config.Config
-			cfgFile         string
 			clientTLSConfig *tls.Config
 			mbusClient      *nats.Conn
 		)
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			cfg, clientTLSConfig = createSSLConfig(natsPort)
 
 		})
@@ -450,11 +442,8 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("Drain", func() {
-		var cfg *config.Config
-		var cfgFile string
 
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
 		})
 
@@ -650,7 +639,6 @@ var _ = Describe("Router Integration", func() {
 
 	Context("When Dropsonde is misconfigured", func() {
 		It("fails to start", func() {
-			cfgFile := filepath.Join(tmpdir, "config.yml")
 			cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			cfg.Logging.MetronAddress = ""
 			writeConfig(cfg, cfgFile)
@@ -662,7 +650,6 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	It("logs component logs", func() {
-		cfgFile := filepath.Join(tmpdir, "config.yml")
 		createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
@@ -683,7 +670,6 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("emits route registration latency metrics, but only after a waiting period", func() {
-			cfgFile := filepath.Join(tmpdir, "config.yml")
 			cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			cfg.Logging.MetronAddress = fakeMetron.Address()
 			cfg.RouteLatencyMetricMuzzleDuration = 2 * time.Second
@@ -754,7 +740,6 @@ var _ = Describe("Router Integration", func() {
 		SetDefaultEventuallyTimeout(5 * time.Second)
 		defer SetDefaultEventuallyTimeout(1 * time.Second)
 
-		cfgFile := filepath.Join(tmpdir, "config.yml")
 		cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
@@ -831,7 +816,6 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when nats server shuts down and comes back up", func() {
 		It("should not panic, log the disconnection, and reconnect", func() {
-			cfgFile := filepath.Join(tmpdir, "config.yml")
 			cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			cfg.NatsClientPingInterval = 100 * time.Millisecond
 			writeConfig(cfg, cfgFile)
@@ -849,8 +833,6 @@ var _ = Describe("Router Integration", func() {
 
 	Context("multiple nats server", func() {
 		var (
-			cfg            *config.Config
-			cfgFile        string
 			natsPort2      uint16
 			natsRunner2    *test_util.NATSRunner
 			pruneInterval  time.Duration
@@ -861,7 +843,6 @@ var _ = Describe("Router Integration", func() {
 			natsPort2 = test_util.NextAvailPort()
 			natsRunner2 = test_util.NewNATSRunner(int(natsPort2))
 
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			pruneInterval = 2 * time.Second
 			pruneThreshold = 10 * time.Second
 			cfg = createConfig(cfgFile, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
@@ -927,7 +908,6 @@ var _ = Describe("Router Integration", func() {
 				natsPort2 = test_util.NextAvailPort()
 				natsRunner2 = test_util.NewNATSRunner(int(natsPort2))
 
-				cfgFile = filepath.Join(tmpdir, "config.yml")
 				pruneInterval = 200 * time.Millisecond
 				pruneThreshold = 1000 * time.Millisecond
 				suspendPruningIfNatsUnavailable := true
@@ -981,7 +961,6 @@ var _ = Describe("Router Integration", func() {
 	Describe("route services", func() {
 		var (
 			session         *Session
-			cfg             *config.Config
 			clientTLSConfig *tls.Config
 			routeServiceSrv *httptest.Server
 			client          http.Client
@@ -1007,7 +986,6 @@ var _ = Describe("Router Integration", func() {
 		}
 
 		JustBeforeEach(func() {
-			cfgFile := filepath.Join(tmpdir, "config.yml")
 			writeConfig(cfg, cfgFile)
 			session = startGorouterSession(cfgFile)
 
@@ -1150,7 +1128,6 @@ var _ = Describe("Router Integration", func() {
 	Context("when no oauth config is specified", func() {
 		Context("and routing api is disabled", func() {
 			It("is able to start up", func() {
-				cfgFile := filepath.Join(tmpdir, "config.yml")
 				cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 				cfg.OAuth = config.OAuthConfig{}
 				writeConfig(cfg, cfgFile)
@@ -1163,14 +1140,7 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("when routing api is disabled", func() {
-		var (
-			cfgFile string
-			cfg     *config.Config
-		)
-
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
-
 			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			writeConfig(cfg, cfgFile)
 		})
@@ -1184,15 +1154,12 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when the routing api is enabled", func() {
 		var (
-			cfg              *config.Config
 			routingApiServer *ghttp.Server
-			cfgFile          string
 			responseBytes    []byte
 			verifyAuthHeader http.HandlerFunc
 		)
 
 		BeforeEach(func() {
-			cfgFile = filepath.Join(tmpdir, "config.yml")
 			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 			responseBytes = []byte(`[{
