@@ -120,11 +120,11 @@ var _ = Describe("Router Integration", func() {
 		return cfg
 	}
 
-	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *x509.CertPool) {
-		cfg, clientTrustedCAs := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
+	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+		cfg, clientTLSConfig := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
 
 		configDrainSetup(cfg, defaultPruneInterval, defaultPruneThreshold, 0)
-		return cfg, clientTrustedCAs
+		return cfg, clientTLSConfig
 	}
 
 	startGorouterSession := func(cfgFile string) *Session {
@@ -394,20 +394,20 @@ var _ = Describe("Router Integration", func() {
 
 	Describe("Frontend TLS", func() {
 		var (
-			cfg              *config.Config
-			statusPort       uint16
-			proxyPort        uint16
-			cfgFile          string
-			clientTrustedCAs *x509.CertPool
-			mbusClient       *nats.Conn
-			localIP          string
+			cfg             *config.Config
+			statusPort      uint16
+			proxyPort       uint16
+			cfgFile         string
+			clientTLSConfig *tls.Config
+			mbusClient      *nats.Conn
+			localIP         string
 		)
 		BeforeEach(func() {
 			statusPort = test_util.NextAvailPort()
 			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			cfg, clientTrustedCAs = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), natsPort)
 
 		})
 		JustBeforeEach(func() {
@@ -441,12 +441,7 @@ var _ = Describe("Router Integration", func() {
 				}
 			}()
 			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
-			tlsConfig := &tls.Config{
-				RootCAs:    clientTrustedCAs,
-				ServerName: "potato.com",
-			}
-			t := &http.Transport{TLSClientConfig: tlsConfig}
-			client := &http.Client{Transport: t}
+			client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
 			resp, err := client.Get(fmt.Sprintf("https://test.vcap.me:%d", cfg.SSLPort))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -456,15 +451,8 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 
 			dialTls := func(version uint16) error {
-
-				tlsConfig := &tls.Config{
-					MaxVersion: version,
-					RootCAs:    clientTrustedCAs,
-					ServerName: "potato.com",
-				}
-
-				t := &http.Transport{TLSClientConfig: tlsConfig}
-				client := &http.Client{Transport: t}
+				clientTLSConfig.MaxVersion = version
+				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
 				_, err := client.Get(fmt.Sprintf("https://localhost:%d", cfg.SSLPort))
 				return err
 			}
@@ -1045,7 +1033,7 @@ var _ = Describe("Router Integration", func() {
 			session                        *Session
 			config                         *config.Config
 			statusPort, proxyPort, sslPort uint16
-			caForClientToTrust             *x509.CertPool
+			clientTLSConfig                *tls.Config
 			routeServiceSrv                *httptest.Server
 			localIP                        string
 			client                         http.Client
@@ -1057,16 +1045,13 @@ var _ = Describe("Router Integration", func() {
 			proxyPort = test_util.NextAvailPort()
 			sslPort = test_util.NextAvailPort()
 
-			config, caForClientToTrust = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+			config, clientTLSConfig = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
 			config.RouteServiceSecret = "route-service-secret"
 			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
 
 			client = http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						RootCAs:    caForClientToTrust,
-						ServerName: "potato.com",
-					},
+					TLSClientConfig: clientTLSConfig,
 				},
 			}
 

@@ -121,7 +121,7 @@ func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Confi
 	return generateConfig(statusPort, proxyPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *x509.CertPool) {
+func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
 	c := generateConfig(statusPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
@@ -147,7 +147,10 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 	c.ClientCertificateValidationString = "none"
 
-	return c, clientTrustedCertPool
+	return c, &tls.Config{
+		RootCAs:    clientTrustedCertPool,
+		ServerName: "potato.com",
+	}
 }
 
 func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
