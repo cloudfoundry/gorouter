@@ -434,10 +434,10 @@ var _ = Describe("Router Integration", func() {
 				return err
 			}
 
-			Expect(dialTls(tls.VersionSSL30)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS10)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS11)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS12)).ToNot(HaveOccurred())
+			Expect(dialTls(tls.VersionSSL30)).NotTo(Succeed())
+			Expect(dialTls(tls.VersionTLS10)).NotTo(Succeed())
+			Expect(dialTls(tls.VersionTLS11)).NotTo(Succeed())
+			Expect(dialTls(tls.VersionTLS12)).To(Succeed())
 		})
 	})
 
