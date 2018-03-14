@@ -44,6 +44,7 @@ import (
 
 const defaultPruneInterval = 50 * time.Millisecond
 const defaultPruneThreshold = 100 * time.Millisecond
+const localIP = "127.0.0.1"
 
 var _ = Describe("Router Integration", func() {
 
@@ -55,8 +56,8 @@ var _ = Describe("Router Integration", func() {
 		oauthServerURL                           string
 	)
 
-	writeConfig := func(config *config.Config, cfgFile string) {
-		cfgBytes, err := yaml.Marshal(config)
+	writeConfig := func(cfg *config.Config, cfgFile string) {
+		cfgBytes, err := yaml.Marshal(cfg)
 		Expect(err).ToNot(HaveOccurred())
 		ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 	}
@@ -230,7 +231,6 @@ var _ = Describe("Router Integration", func() {
 			backendCertChain    test_util.CertChain // server cert presented by backend to gorouter
 			clientCertChain     test_util.CertChain // client cert presented by gorouter to backend
 			backendTLSConfig    *tls.Config
-			localIP             string
 			mbusClient          *nats.Conn
 		)
 
@@ -264,7 +264,6 @@ var _ = Describe("Router Integration", func() {
 		JustBeforeEach(func() {
 			var err error
 			writeConfig(cfg, cfgFile)
-			localIP, err = localip.LocalIP()
 			mbusClient, err = newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -392,7 +391,6 @@ var _ = Describe("Router Integration", func() {
 			cfgFile         string
 			clientTLSConfig *tls.Config
 			mbusClient      *nats.Conn
-			localIP         string
 		)
 		BeforeEach(func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
@@ -403,8 +401,6 @@ var _ = Describe("Router Integration", func() {
 			var err error
 			writeConfig(cfg, cfgFile)
 			mbusClient, err = newMessageBus(cfg)
-			Expect(err).ToNot(HaveOccurred())
-			localIP, err = localip.LocalIP()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -454,17 +450,12 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("Drain", func() {
-		var config *config.Config
-		var localIP string
+		var cfg *config.Config
 		var cfgFile string
 
 		BeforeEach(func() {
-			var err error
-			localIP, err = localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
+			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
 		})
 
 		JustBeforeEach(func() {
@@ -484,7 +475,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("waits for all requests to finish", func() {
-			mbusClient, err := newMessageBus(config)
+			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			requestMade := make(chan bool)
@@ -503,7 +494,7 @@ var _ = Describe("Router Integration", func() {
 			})
 			longApp.Register()
 			longApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 			Eventually(func() bool {
 				return appRegistered(routesUri, longApp)
@@ -548,7 +539,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("returns error when the gorouter terminates before a request completes", func() {
-			mbusClient, err := newMessageBus(config)
+			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
@@ -560,7 +551,7 @@ var _ = Describe("Router Integration", func() {
 			})
 			timeoutApp.Register()
 			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
 
 			go func() {
@@ -586,7 +577,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("prevents new connections", func() {
-			mbusClient, err := newMessageBus(config)
+			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
@@ -597,7 +588,7 @@ var _ = Describe("Router Integration", func() {
 			})
 			timeoutApp.Register()
 			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
 
 			go func() {
@@ -624,8 +615,8 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when ssl is enabled", func() {
 			BeforeEach(func() {
-				config, _ := createSSLConfig(natsPort)
-				writeConfig(config, cfgFile)
+				cfg, _ := createSSLConfig(natsPort)
+				writeConfig(cfg, cfgFile)
 			})
 
 			It("drains properly", func() {
@@ -660,9 +651,9 @@ var _ = Describe("Router Integration", func() {
 	Context("When Dropsonde is misconfigured", func() {
 		It("fails to start", func() {
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
-			config.Logging.MetronAddress = ""
-			writeConfig(config, cfgFile)
+			cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg.Logging.MetronAddress = ""
+			writeConfig(cfg, cfgFile)
 
 			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
@@ -763,15 +754,12 @@ var _ = Describe("Router Integration", func() {
 		SetDefaultEventuallyTimeout(5 * time.Second)
 		defer SetDefaultEventuallyTimeout(1 * time.Second)
 
-		localIP, err := localip.LocalIP()
-		Expect(err).ToNot(HaveOccurred())
-
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		config := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+		cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
-		mbusClient, err := newMessageBus(config)
+		mbusClient, err := newMessageBus(cfg)
 		Expect(err).ToNot(HaveOccurred())
 
 		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
@@ -790,7 +778,7 @@ var _ = Describe("Router Integration", func() {
 		runningApp.Register()
 		runningApp.Listen()
 
-		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 		Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
 		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
@@ -821,8 +809,8 @@ var _ = Describe("Router Integration", func() {
 
 		natsRunner.Stop()
 
-		staleCheckInterval := config.PruneStaleDropletsInterval
-		staleThreshold := config.DropletStaleThreshold
+		staleCheckInterval := cfg.PruneStaleDropletsInterval
+		staleThreshold := cfg.DropletStaleThreshold
 		// Give router time to make a bad decision (i.e. prune routes)
 		time.Sleep(3 * (staleCheckInterval + staleThreshold))
 
@@ -844,9 +832,9 @@ var _ = Describe("Router Integration", func() {
 	Context("when nats server shuts down and comes back up", func() {
 		It("should not panic, log the disconnection, and reconnect", func() {
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
-			config.NatsClientPingInterval = 100 * time.Millisecond
-			writeConfig(config, cfgFile)
+			cfg := createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg.NatsClientPingInterval = 100 * time.Millisecond
+			writeConfig(cfg, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
 
 			natsRunner.Stop()
@@ -861,7 +849,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("multiple nats server", func() {
 		var (
-			config         *config.Config
+			cfg            *config.Config
 			cfgFile        string
 			natsPort2      uint16
 			natsRunner2    *test_util.NATSRunner
@@ -876,7 +864,7 @@ var _ = Describe("Router Integration", func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			pruneInterval = 2 * time.Second
 			pruneThreshold = 10 * time.Second
-			config = createConfig(cfgFile, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
+			cfg = createConfig(cfgFile, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
 		})
 
 		AfterEach(func() {
@@ -891,14 +879,14 @@ var _ = Describe("Router Integration", func() {
 			localIP, err := localip.LocalIP()
 			Expect(err).ToNot(HaveOccurred())
 
-			mbusClient, err := newMessageBus(config)
+			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
 			runningApp.Register()
 			runningApp.Listen()
 
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
@@ -943,22 +931,22 @@ var _ = Describe("Router Integration", func() {
 				pruneInterval = 200 * time.Millisecond
 				pruneThreshold = 1000 * time.Millisecond
 				suspendPruningIfNatsUnavailable := true
-				config = createConfig(cfgFile, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, 0, natsPort, natsPort2)
-				config.NatsClientPingInterval = 200 * time.Millisecond
+				cfg = createConfig(cfgFile, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, 0, natsPort, natsPort2)
+				cfg.NatsClientPingInterval = 200 * time.Millisecond
 			})
 
 			It("does not prune routes when nats is unavailable", func() {
 				localIP, err := localip.LocalIP()
 				Expect(err).ToNot(HaveOccurred())
 
-				mbusClient, err := newMessageBus(config)
+				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
 				runningApp.Register()
 				runningApp.Listen()
 
-				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 
 				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
@@ -978,8 +966,8 @@ var _ = Describe("Router Integration", func() {
 				// Give enough time to register multiple times
 				time.Sleep(heartbeatInterval * 3)
 				natsRunner.Stop()
-				staleCheckInterval := config.PruneStaleDropletsInterval
-				staleThreshold := config.DropletStaleThreshold
+				staleCheckInterval := cfg.PruneStaleDropletsInterval
+				staleThreshold := cfg.DropletStaleThreshold
 
 				// Give router time to make a bad decision (i.e. prune routes)
 				sleepTime := (2 * staleCheckInterval) + (2 * staleThreshold)
@@ -993,42 +981,37 @@ var _ = Describe("Router Integration", func() {
 	Describe("route services", func() {
 		var (
 			session         *Session
-			config          *config.Config
+			cfg             *config.Config
 			clientTLSConfig *tls.Config
 			routeServiceSrv *httptest.Server
-			localIP         string
 			client          http.Client
 			routeServiceURL string
 		)
 
 		BeforeEach(func() {
 
-			config, clientTLSConfig = createSSLConfig(natsPort)
-			config.RouteServiceSecret = "route-service-secret"
-			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
+			cfg, clientTLSConfig = createSSLConfig(natsPort)
+			cfg.RouteServiceSecret = "route-service-secret"
+			cfg.RouteServiceSecretPrev = "my-previous-route-service-secret"
 
 			client = http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: clientTLSConfig,
 				},
 			}
-
-			var err error
-			localIP, err = localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		verifyAppRunning := func(runningApp *common.TestApp) {
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 		}
 
 		JustBeforeEach(func() {
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			writeConfig(config, cfgFile)
+			writeConfig(cfg, cfgFile)
 			session = startGorouterSession(cfgFile)
 
-			mbusClient, err := newMessageBus(config)
+			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
 			runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceURL)
@@ -1045,7 +1028,7 @@ var _ = Describe("Router Integration", func() {
 			var routeSvcApp *common.TestApp
 
 			BeforeEach(func() {
-				mbusClient, err := newMessageBus(config)
+				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				routeSvcApp = common.NewTestApp([]route.Uri{"some-route-service.vcap.me"}, proxyPort, mbusClient, nil, "")
@@ -1084,7 +1067,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the gorouter has http disabled", func() {
 					BeforeEach(func() {
-						config.DisableHTTP = true
+						cfg.DisableHTTP = true
 					})
 
 					It("successfully connects to the route service", func() {
@@ -1110,7 +1093,7 @@ var _ = Describe("Router Integration", func() {
 				}))
 
 				rsKey, rsCert := test_util.CreateKeyPair("test.routeservice.com")
-				config.CACerts = string(rsCert)
+				cfg.CACerts = string(rsCert)
 				rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1148,7 +1131,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the gorouter has http disabled", func() {
 					BeforeEach(func() {
-						config.DisableHTTP = true
+						cfg.DisableHTTP = true
 					})
 
 					It("successfully connects to the route service", func() {
@@ -1201,7 +1184,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when the routing api is enabled", func() {
 		var (
-			config           *config.Config
+			cfg              *config.Config
 			routingApiServer *ghttp.Server
 			cfgFile          string
 			responseBytes    []byte
@@ -1210,7 +1193,7 @@ var _ = Describe("Router Integration", func() {
 
 		BeforeEach(func() {
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg = createConfig(cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 			responseBytes = []byte(`[{
 				"guid": "abc123",
@@ -1256,7 +1239,7 @@ var _ = Describe("Router Integration", func() {
 			)
 			routingApiServer.Start()
 
-			config.RoutingApi.Uri, config.RoutingApi.Port = uriAndPort(routingApiServer.URL())
+			cfg.RoutingApi.Uri, cfg.RoutingApi.Port = uriAndPort(routingApiServer.URL())
 
 		})
 		AfterEach(func() {
@@ -1268,8 +1251,8 @@ var _ = Describe("Router Integration", func() {
 				verifyAuthHeader = func(rw http.ResponseWriter, r *http.Request) {}
 			})
 			It("uses the no-op token fetcher", func() {
-				config.RoutingApi.AuthDisabled = true
-				writeConfig(config, cfgFile)
+				cfg.RoutingApi.AuthDisabled = true
+				writeConfig(cfg, cfgFile)
 
 				// note, this will start with routing api, but will not be able to connect
 				session := startGorouterSession(cfgFile)
@@ -1293,18 +1276,18 @@ var _ = Describe("Router Integration", func() {
 							),
 						)
 					}
-					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(oauthServerURL)
+					cfg.OAuth.TokenEndpoint, cfg.OAuth.Port = hostnameAndPort(oauthServerURL)
 				})
 
 				It("fetches a token from uaa", func() {
-					writeConfig(config, cfgFile)
+					writeConfig(cfg, cfgFile)
 
 					session := startGorouterSession(cfgFile)
 					defer stopGorouter(session)
 					Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
 				})
 				It("does not exit", func() {
-					writeConfig(config, cfgFile)
+					writeConfig(cfg, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
@@ -1316,10 +1299,10 @@ var _ = Describe("Router Integration", func() {
 
 			Context("when the uaa is not available", func() {
 				BeforeEach(func() {
-					config.TokenFetcherRetryInterval = 100 * time.Millisecond
+					cfg.TokenFetcherRetryInterval = 100 * time.Millisecond
 				})
 				It("gorouter exits with non-zero code", func() {
-					writeConfig(config, cfgFile)
+					writeConfig(cfg, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
@@ -1332,11 +1315,11 @@ var _ = Describe("Router Integration", func() {
 
 			Context("when routing api is not available", func() {
 				BeforeEach(func() {
-					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(oauthServerURL)
+					cfg.OAuth.TokenEndpoint, cfg.OAuth.Port = hostnameAndPort(oauthServerURL)
 				})
 				It("gorouter exits with non-zero code", func() {
 					routingApiServer.Close()
-					writeConfig(config, cfgFile)
+					writeConfig(cfg, cfgFile)
 
 					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
@@ -1350,8 +1333,8 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when tls for uaa is disabled", func() {
 			It("fails fast", func() {
-				config.OAuth.Port = -1
-				writeConfig(config, cfgFile)
+				cfg.OAuth.Port = -1
+				writeConfig(cfg, cfgFile)
 
 				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
