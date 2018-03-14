@@ -138,6 +138,8 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			logger.Debug("backend", zap.Int("attempt", retry))
 			if endpoint.IsTLS() {
 				request.URL.Scheme = "https"
+			} else {
+				request.URL.Scheme = "http"
 			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
 			if err == nil || !rt.retryableClassifier.Classify(err) {

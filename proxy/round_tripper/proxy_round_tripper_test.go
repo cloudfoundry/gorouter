@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/access_log/schema"
@@ -407,6 +408,55 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 			})
 
+		})
+
+		Context("when there are a mixture of tls and non-tls backends", func() {
+			BeforeEach(func() {
+				tlsEndpoint := route.NewEndpoint(&route.EndpointOpts{
+					Host:   "2.2.2.2",
+					Port:   20222,
+					UseTLS: true,
+				})
+				Expect(routePool.Put(tlsEndpoint)).To(Equal(route.ADDED))
+
+				nonTLSEndpoint := route.NewEndpoint(&route.EndpointOpts{
+					Host:   "3.3.3.3",
+					Port:   30333,
+					UseTLS: false,
+				})
+				Expect(routePool.Put(nonTLSEndpoint)).To(Equal(route.ADDED))
+			})
+
+			Context("when retrying different backends", func() {
+				var (
+					recordedRequests map[string]string
+					mutex            sync.Mutex
+				)
+
+				BeforeEach(func() {
+					recordedRequests = map[string]string{}
+					transport.RoundTripStub = func(r *http.Request) (*http.Response, error) {
+						mutex.Lock()
+						defer mutex.Unlock()
+						recordedRequests[r.URL.Host] = r.URL.Scheme
+						return nil, errors.New("potato")
+					}
+					retryableClassifier.ClassifyReturns(true)
+				})
+
+				It("uses the correct url scheme (protocol) for each backend", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Expect(transport.RoundTripCallCount()).To(Equal(3))
+					Expect(retryableClassifier.ClassifyCallCount()).To(Equal(3))
+
+					Expect(recordedRequests).To(Equal(map[string]string{
+						"1.1.1.1:9090":  "http",
+						"2.2.2.2:20222": "https",
+						"3.3.3.3:30333": "http",
+					}))
+				})
+			})
 		})
 
 		Context("when backend is registered with a tls port", func() {
