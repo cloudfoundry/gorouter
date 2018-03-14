@@ -50,83 +50,90 @@ func (f *FakeRoundTripperFactory) New(expectedServerName string) round_tripper.P
 }
 
 var _ = Describe("ProxyRoundTripper", func() {
-	Context("RoundTrip", func() {
-		var (
-			proxyRoundTripper   round_tripper.ProxyRoundTripper
-			routePool           *route.Pool
-			transport           *roundtripperfakes.FakeProxyRoundTripper
-			logger              *test_util.TestZapLogger
-			req                 *http.Request
-			reqBody             *testBody
-			resp                *httptest.ResponseRecorder
-			alr                 *schema.AccessLogRecord
-			routerIP            string
-			combinedReporter    *fakes.FakeCombinedReporter
-			roundTripperFactory *FakeRoundTripperFactory
-			routeServicesClient *sharedfakes.RoundTripper
-			retryableClassifier *errorClassifierFakes.Classifier
-			errorHandler        *roundtripperfakes.ErrorHandler
+	var (
+		proxyRoundTripper   round_tripper.ProxyRoundTripper
+		routePool           *route.Pool
+		transport           *roundtripperfakes.FakeProxyRoundTripper
+		logger              *test_util.TestZapLogger
+		req                 *http.Request
+		reqBody             *testBody
+		resp                *httptest.ResponseRecorder
+		alr                 *schema.AccessLogRecord
+		routerIP            string
+		combinedReporter    *fakes.FakeCombinedReporter
+		roundTripperFactory *FakeRoundTripperFactory
+		routeServicesClient *sharedfakes.RoundTripper
+		retryableClassifier *errorClassifierFakes.Classifier
+		errorHandler        *roundtripperfakes.ErrorHandler
+		timeout             time.Duration
 
-			reqInfo *handlers.RequestInfo
+		reqInfo *handlers.RequestInfo
 
-			endpoint *route.Endpoint
+		endpoint *route.Endpoint
 
-			dialError = &net.OpError{
-				Err: errors.New("error"),
-				Op:  "dial",
-			}
-		)
+		dialError = &net.OpError{
+			Err: errors.New("error"),
+			Op:  "dial",
+		}
+	)
 
-		BeforeEach(func() {
-			routePool = route.NewPool(1*time.Second, "myapp.com", "")
-			resp = httptest.NewRecorder()
-			alr = &schema.AccessLogRecord{}
-			proxyWriter := utils.NewProxyResponseWriter(resp)
-			reqBody = new(testBody)
-			req = test_util.NewRequest("GET", "myapp.com", "/", reqBody)
-			req.URL.Scheme = "http"
+	BeforeEach(func() {
+		routePool = route.NewPool(1*time.Second, "myapp.com", "")
+		resp = httptest.NewRecorder()
+		alr = &schema.AccessLogRecord{}
+		proxyWriter := utils.NewProxyResponseWriter(resp)
+		reqBody = new(testBody)
+		req = test_util.NewRequest("GET", "myapp.com", "/", reqBody)
+		req.URL.Scheme = "http"
 
-			handlers.NewRequestInfo().ServeHTTP(nil, req, func(_ http.ResponseWriter, transformedReq *http.Request) {
-				req = transformedReq
-			})
+		timeout = 0 * time.Millisecond
 
-			var err error
-			reqInfo, err = handlers.ContextRequestInfo(req)
-			Expect(err).ToNot(HaveOccurred())
-
-			reqInfo.RoutePool = routePool
-			reqInfo.ProxyResponseWriter = proxyWriter
-
-			logger = test_util.NewTestZapLogger("test")
-			transport = new(roundtripperfakes.FakeProxyRoundTripper)
-			routerIP = "127.0.0.1"
-
-			endpoint = route.NewEndpoint(&route.EndpointOpts{
-				AppId:                "appId",
-				Host:                 "1.1.1.1",
-				Port:                 9090,
-				PrivateInstanceId:    "instanceId",
-				PrivateInstanceIndex: "1",
-			})
-
-			added := routePool.Put(endpoint)
-			Expect(added).To(Equal(route.ADDED))
-
-			combinedReporter = new(fakes.FakeCombinedReporter)
-
-			errorHandler = &roundtripperfakes.ErrorHandler{}
-
-			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
-			retryableClassifier = &errorClassifierFakes.Classifier{}
-			retryableClassifier.ClassifyReturns(false)
-			routeServicesClient = &sharedfakes.RoundTripper{}
-			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
-				roundTripperFactory, retryableClassifier,
-				logger, "",
-				combinedReporter, false,
-				1234, errorHandler, routeServicesClient,
-			)
+		handlers.NewRequestInfo().ServeHTTP(nil, req, func(_ http.ResponseWriter, transformedReq *http.Request) {
+			req = transformedReq
 		})
+
+		var err error
+		reqInfo, err = handlers.ContextRequestInfo(req)
+		Expect(err).ToNot(HaveOccurred())
+
+		reqInfo.RoutePool = routePool
+		reqInfo.ProxyResponseWriter = proxyWriter
+
+		logger = test_util.NewTestZapLogger("test")
+		transport = new(roundtripperfakes.FakeProxyRoundTripper)
+		routerIP = "127.0.0.1"
+
+		endpoint = route.NewEndpoint(&route.EndpointOpts{
+			AppId:                "appId",
+			Host:                 "1.1.1.1",
+			Port:                 9090,
+			PrivateInstanceId:    "instanceId",
+			PrivateInstanceIndex: "1",
+		})
+
+		added := routePool.Put(endpoint)
+		Expect(added).To(Equal(route.ADDED))
+
+		combinedReporter = new(fakes.FakeCombinedReporter)
+
+		errorHandler = &roundtripperfakes.ErrorHandler{}
+
+		roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
+		retryableClassifier = &errorClassifierFakes.Classifier{}
+		retryableClassifier.ClassifyReturns(false)
+		routeServicesClient = &sharedfakes.RoundTripper{}
+	})
+
+	JustBeforeEach(func() {
+		proxyRoundTripper = round_tripper.NewProxyRoundTripper(
+			roundTripperFactory, retryableClassifier,
+			logger, "",
+			combinedReporter, false,
+			1234, errorHandler, routeServicesClient,
+			timeout,
+		)
+	})
+	Context("RoundTrip", func() {
 
 		Context("when RequestInfo is not set on the request context", func() {
 			BeforeEach(func() {
@@ -677,7 +684,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("and previous session", func() {
 				var cookies []*http.Cookie
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					resp, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -730,6 +737,113 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 		})
 
+		Context("when endpoint timeout is not 0", func() {
+			var reqCh chan *http.Request
+			BeforeEach(func() {
+				timeout = 10 * time.Millisecond
+				reqCh = make(chan *http.Request, 1)
+
+				transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+					reqCh <- req
+					return &http.Response{}, nil
+				}
+			})
+
+			It("sets a timeout on the request context", func() {
+				proxyRoundTripper.RoundTrip(req)
+				var request *http.Request
+				Eventually(reqCh).Should(Receive(&request))
+
+				_, deadlineSet := request.Context().Deadline()
+				Expect(deadlineSet).To(BeTrue())
+				Eventually(func() string {
+					err := request.Context().Err()
+					if err != nil {
+						return err.Error()
+					}
+					return ""
+				}).Should(ContainSubstring("deadline exceeded"))
+			})
+
+			Context("when the round trip errors the deadline is cancelled", func() {
+				BeforeEach(func() {
+					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+						reqCh <- req
+						return &http.Response{}, errors.New("boom!")
+					}
+				})
+
+				It("sets a timeout on the request context", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					var request *http.Request
+					Eventually(reqCh).Should(Receive(&request))
+
+					err = request.Context().Err()
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("canceled"))
+				})
+			})
+
+			Context("when route service url is not nil", func() {
+
+				var routeServiceURL *url.URL
+				BeforeEach(func() {
+					var err error
+					routeServiceURL, err = url.Parse("https://foo.com")
+					Expect(err).ToNot(HaveOccurred())
+					reqInfo.RouteServiceURL = routeServiceURL
+					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+						reqCh <- req
+						Expect(req.Host).To(Equal(routeServiceURL.Host))
+						Expect(req.URL).To(Equal(routeServiceURL))
+						return nil, nil
+					}
+				})
+
+				It("sets a timeout on the request context", func() {
+					proxyRoundTripper.RoundTrip(req)
+					var request *http.Request
+					Eventually(reqCh).Should(Receive(&request))
+
+					_, deadlineSet := request.Context().Deadline()
+					Expect(deadlineSet).To(BeTrue())
+					Eventually(func() string {
+						err := request.Context().Err()
+						if err != nil {
+							return err.Error()
+						}
+						return ""
+					}).Should(ContainSubstring("deadline exceeded"))
+				})
+
+				Context("when the round trip errors the deadline is cancelled", func() {
+					BeforeEach(func() {
+						transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+							reqCh <- req
+							Expect(req.Host).To(Equal(routeServiceURL.Host))
+							Expect(req.URL).To(Equal(routeServiceURL))
+							return &http.Response{}, errors.New("boom!")
+						}
+					})
+
+					It("sets a timeout on the request context", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(HaveOccurred())
+						var request *http.Request
+						Eventually(reqCh).Should(Receive(&request))
+
+						err = request.Context().Err()
+						Expect(err).ToNot(BeNil())
+						Expect(err.Error()).To(ContainSubstring("canceled"))
+					})
+				})
+
+			})
+		})
+	})
+
+	Context("CancelRequest", func() {
 		It("can cancel requests", func() {
 			reqInfo.RouteEndpoint = endpoint
 			proxyRoundTripper.CancelRequest(req)
