@@ -67,31 +67,31 @@ func NewProxyRoundTripper(
 	secureCookies bool,
 	localPort uint16,
 	errorHandler errorHandler,
-	routeServicesClient http.RoundTripper,
+	routeServicesTransport http.RoundTripper,
 ) ProxyRoundTripper {
 	return &roundTripper{
-		logger:              logger,
-		defaultLoadBalance:  defaultLoadBalance,
-		combinedReporter:    combinedReporter,
-		secureCookies:       secureCookies,
-		localPort:           localPort,
-		roundTripperFactory: roundTripperFactory,
-		retryableClassifier: retryableClassifier,
-		errorHandler:        errorHandler,
-		routeServicesClient: routeServicesClient,
+		logger:                 logger,
+		defaultLoadBalance:     defaultLoadBalance,
+		combinedReporter:       combinedReporter,
+		secureCookies:          secureCookies,
+		localPort:              localPort,
+		roundTripperFactory:    roundTripperFactory,
+		retryableClassifier:    retryableClassifier,
+		errorHandler:           errorHandler,
+		routeServicesTransport: routeServicesTransport,
 	}
 }
 
 type roundTripper struct {
-	logger              logger.Logger
-	defaultLoadBalance  string
-	combinedReporter    metrics.ProxyReporter
-	secureCookies       bool
-	localPort           uint16
-	roundTripperFactory RoundTripperFactory
-	retryableClassifier fails.Classifier
-	errorHandler        errorHandler
-	routeServicesClient http.RoundTripper
+	logger                 logger.Logger
+	defaultLoadBalance     string
+	combinedReporter       metrics.ProxyReporter
+	secureCookies          bool
+	localPort              uint16
+	roundTripperFactory    RoundTripperFactory
+	retryableClassifier    fails.Classifier
+	errorHandler           errorHandler
+	routeServicesTransport http.RoundTripper
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -166,7 +166,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				// note: this *looks* like it breaks TLS to internal route service backends,
 				// but in fact it is right!  this hairpins back on the gorouter, and the subsequent
 				// request from the gorouter will go to a backend using TLS (if tls_port is set on that endpoint)
-				tr = rt.routeServicesClient
+				tr = rt.routeServicesTransport
 			}
 
 			res, err = tr.RoundTrip(request)

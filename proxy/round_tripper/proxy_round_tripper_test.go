@@ -53,20 +53,20 @@ func (f *FakeRoundTripperFactory) New(expectedServerName string) round_tripper.P
 var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
-			proxyRoundTripper   round_tripper.ProxyRoundTripper
-			routePool           *route.Pool
-			transport           *roundtripperfakes.FakeProxyRoundTripper
-			logger              *test_util.TestZapLogger
-			req                 *http.Request
-			reqBody             *testBody
-			resp                *httptest.ResponseRecorder
-			alr                 *schema.AccessLogRecord
-			routerIP            string
-			combinedReporter    *fakes.FakeCombinedReporter
-			roundTripperFactory *FakeRoundTripperFactory
-			routeServicesClient *sharedfakes.RoundTripper
-			retryableClassifier *errorClassifierFakes.Classifier
-			errorHandler        *roundtripperfakes.ErrorHandler
+			proxyRoundTripper      round_tripper.ProxyRoundTripper
+			routePool              *route.Pool
+			transport              *roundtripperfakes.FakeProxyRoundTripper
+			logger                 *test_util.TestZapLogger
+			req                    *http.Request
+			reqBody                *testBody
+			resp                   *httptest.ResponseRecorder
+			alr                    *schema.AccessLogRecord
+			routerIP               string
+			combinedReporter       *fakes.FakeCombinedReporter
+			roundTripperFactory    *FakeRoundTripperFactory
+			routeServicesTransport *sharedfakes.RoundTripper
+			retryableClassifier    *errorClassifierFakes.Classifier
+			errorHandler           *roundtripperfakes.ErrorHandler
 
 			reqInfo *handlers.RequestInfo
 
@@ -120,12 +120,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			retryableClassifier = &errorClassifierFakes.Classifier{}
 			retryableClassifier.ClassifyReturns(false)
-			routeServicesClient = &sharedfakes.RoundTripper{}
+			routeServicesTransport = &sharedfakes.RoundTripper{}
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				roundTripperFactory, retryableClassifier,
 				logger, "",
 				combinedReporter, false,
-				1234, errorHandler, routeServicesClient,
+				1234, errorHandler, routeServicesTransport,
 			)
 		})
 
@@ -604,9 +604,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(BeNil())
 					Expect(transport.RoundTripCallCount()).To(Equal(0))
-					Expect(routeServicesClient.RoundTripCallCount()).To(Equal(1))
+					Expect(routeServicesTransport.RoundTripCallCount()).To(Equal(1))
 
-					outReq := routeServicesClient.RoundTripArgsForCall(0)
+					outReq := routeServicesTransport.RoundTripArgsForCall(0)
 					Expect(outReq.Host).To(Equal(routeServiceURL.Host))
 				})
 			})

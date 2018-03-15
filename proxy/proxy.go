@@ -102,7 +102,7 @@ func NewProxy(
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	tlsConfig *tls.Config,
 	heartbeatOK *int32,
-	routeServicesClient http.RoundTripper,
+	routeServicesTransport http.RoundTripper,
 ) Proxy {
 
 	p := &proxy{
@@ -151,7 +151,7 @@ func NewProxy(
 			MetricReporter: p.reporter,
 			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
 		},
-		routeServicesClient,
+		routeServicesTransport,
 	)
 
 	rproxy := &httputil.ReverseProxy{
