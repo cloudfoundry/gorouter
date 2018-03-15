@@ -268,432 +268,175 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
-	Describe("Request Header Handling", func() {
-		Describe("X-Forwarded-Client-Cert", func() {
-			Context("when ForwardedClientCert is set to sanitize_set", func() {
-				BeforeEach(func() {
-					conf.ForwardedClientCert = config.SANITIZE_SET
-				})
+	Describe("proxying the request headers", func() {
+		var (
+			receivedHeaders  chan http.Header
+			extraRegisterCfg []test_util.RegisterConfig
+			fakeResponseBody string
+			fakeResponseCode int
+			ln               net.Listener
+			req              *http.Request
+		)
 
-				It("removes xfcc header in sanitize_set mode", func() {
-					var expectedReq *http.Request
-					ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-						var err error
-						expectedReq, err = http.ReadRequest(conn.Reader)
-						Expect(err).NotTo(HaveOccurred())
-
-						resp := test_util.NewResponse(http.StatusOK)
-						conn.WriteResponse(resp)
-						conn.WriteLine("hello from server")
-						conn.Close()
-					})
-					defer ln.Close()
-
-					req := test_util.NewRequest("GET", "xfcc", "/", nil)
-					req.Host = "xfcc"
-					req.Header.Add("X-Forwarded-Client-Cert", "foo")
-					req.Header.Add("X-Forwarded-Client-Cert", "bar")
-
-					conn := dialProxy(proxyServer)
-					conn.WriteRequest(req)
-					conn.ReadResponse()
-
-					Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-				})
-			})
-
-			Context("when ForwardedClientCert is set to forward", func() {
-				BeforeEach(func() {
-					conf.ForwardedClientCert = config.FORWARD
-				})
-
-				It("removes xfcc header in forward mode when not mTLS", func() {
-					var expectedReq *http.Request
-					ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-						var err error
-						expectedReq, err = http.ReadRequest(conn.Reader)
-						Expect(err).NotTo(HaveOccurred())
-
-						resp := test_util.NewResponse(http.StatusOK)
-						conn.WriteResponse(resp)
-						conn.WriteLine("hello from server")
-						conn.Close()
-					})
-					defer ln.Close()
-
-					req := test_util.NewRequest("GET", "xfcc", "/", nil)
-					req.Host = "xfcc"
-					req.Header.Add("X-Forwarded-Client-Cert", "foo")
-					req.Header.Add("X-Forwarded-Client-Cert", "bar")
-
-					conn := dialProxy(proxyServer)
-					conn.WriteRequest(req)
-					conn.ReadResponse()
-
-					Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-				})
-			})
-			It("does not sanitize xfcc header when ForwardedClientCert is set to default [always_forward]", func() {
-				var expectedReq *http.Request
-				ln := test_util.RegisterHandler(r, "xfcc", func(conn *test_util.HttpConn) {
-					var err error
-					expectedReq, err = http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.WriteLine("hello from server")
-					conn.Close()
-				})
-				defer ln.Close()
-
-				req := test_util.NewRequest("GET", "xfcc", "/", nil)
-				req.Host = "xfcc"
-				req.Header.Add("X-Forwarded-Client-Cert", "foo")
-				req.Header.Add("X-Forwarded-Client-Cert", "bar")
-
-				conn := dialProxy(proxyServer)
-				conn.WriteRequest(req)
-				conn.ReadResponse()
-
-				Expect(expectedReq.Header["X-Forwarded-Client-Cert"]).To(ConsistOf("foo", "bar"))
-			})
+		BeforeEach(func() {
+			receivedHeaders = make(chan http.Header)
+			extraRegisterCfg = nil
+			fakeResponseBody = ""
+			fakeResponseCode = http.StatusOK
 		})
 
-		Describe("Content-type", func() {
-			It("Content-type is not set by proxy", func() {
-				ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
-					_, err := http.ReadRequest(x.Reader)
-					Expect(err).NotTo(HaveOccurred())
+		JustBeforeEach(func() {
+			ln = test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+				req, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
 
-					resp := test_util.NewResponse(http.StatusOK)
-					x.WriteResponse(resp)
-					x.WriteLine("hello from server")
-					x.Close()
-				})
-				defer ln.Close()
+				resp := test_util.NewResponse(fakeResponseCode)
+				conn.WriteResponse(resp)
+				if fakeResponseBody != "" {
+					conn.WriteLine(fakeResponseBody)
+				}
+				conn.Close()
 
-				x := dialProxy(proxyServer)
+				receivedHeaders <- req.Header
+			}, extraRegisterCfg...)
 
-				req := test_util.NewRequest("GET", "content-test", "/", nil)
-				req.Host = "content-test"
-				x.WriteRequest(req)
-
-				resp, _ := x.ReadResponse()
-				h, present := resp.Header["Content-Type"]
-				Expect(h).To(BeNil())
-				Expect(present).To(BeFalse())
-				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-			})
-
-			It("Content-type xml is not set by proxy", func() {
-				ln := test_util.RegisterHandler(r, "content-test", func(x *test_util.HttpConn) {
-					_, err := http.ReadRequest(x.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					x.WriteResponse(resp)
-					x.WriteLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-					x.Close()
-				})
-				defer ln.Close()
-
-				x := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "content-test", "/", nil)
-				req.Host = "content-test"
-				x.WriteRequest(req)
-
-				resp, _ := x.ReadResponse()
-
-				h, present := resp.Header["Content-Type"]
-				Expect(present).To(BeFalse())
-				Expect(h).To(BeNil())
-				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-			})
-
-			It("Content-type header is not set for an HTTP 204 response", func() {
-				ln := test_util.RegisterHandler(r, "no-content-test", func(x *test_util.HttpConn) {
-					_, err := http.ReadRequest(x.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusNoContent)
-					x.WriteResponse(resp)
-					x.Close()
-				})
-				defer ln.Close()
-
-				x := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "no-content-test", "/", nil)
-				req.Host = "no-content-test"
-				x.WriteRequest(req)
-
-				resp, _ := x.ReadResponse()
-
-				h, present := resp.Header["Content-Type"]
-				Expect(present).To(BeFalse())
-				Expect(h).To(BeNil())
-				Expect(responseContains(resp, "Content-Type:")).To(BeFalse())
-			})
+			req = test_util.NewRequest("GET", "app", "/", nil)
 		})
+
+		AfterEach(func() {
+			ln.Close()
+		})
+
+		// proxies request, returns the value of the X-Forwarded-Proto header
+		getProxiedHeaders := func(req *http.Request) http.Header {
+			conn := dialProxy(proxyServer)
+			conn.WriteRequest(req)
+			defer conn.ReadResponse()
+
+			var headers http.Header
+			Eventually(receivedHeaders).Should(Receive(&headers))
+			return headers
+		}
 
 		Describe("X-Forwarded-Proto", func() {
 			It("adds X-Forwarded-Proto if not present", func() {
-				done := make(chan string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get("X-Forwarded-Proto")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(Equal("http"))
-
-				conn.ReadResponse()
+				Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("http"))
 			})
 
 			It("doesn't overwrite X-Forwarded-Proto if present", func() {
-				done := make(chan string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get("X-Forwarded-Proto")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
 				req.Header.Set("X-Forwarded-Proto", "https")
-				conn.WriteRequest(req)
-
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(Equal("https"))
-
-				conn.ReadResponse()
+				Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("https"))
 			})
 
 			Context("Force Forwarded Proto HTTPS config option is set", func() {
 				BeforeEach(func() {
 					conf.ForceForwardedProtoHttps = true
 				})
-				It("uses config option for X-Forwarded-Proto if present", func() {
-					done := make(chan string)
-
-					ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-						req, err := http.ReadRequest(conn.Reader)
-						Expect(err).NotTo(HaveOccurred())
-
-						resp := test_util.NewResponse(http.StatusOK)
-						conn.WriteResponse(resp)
-						conn.Close()
-
-						done <- req.Header.Get("X-Forwarded-Proto")
-					})
-					defer ln.Close()
-
-					conn := dialProxy(proxyServer)
-
-					req := test_util.NewRequest("GET", "app", "/", nil)
-					conn.WriteRequest(req)
-
-					var answer string
-					Eventually(done).Should(Receive(&answer))
-					Expect(answer).To(Equal("https"))
-
-					conn.ReadResponse()
+				It("forces the X-Forwarded-Proto header to https", func() {
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("https"))
 				})
 			})
 		})
 
 		Describe("X-Forwarded-For", func() {
-			It("X-Forwarded-For is added", func() {
-				done := make(chan bool)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get("X-Forwarded-For") == "127.0.0.1"
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				var answer bool
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(BeTrue())
-
-				conn.ReadResponse()
+			It("sets X-Forwarded-For", func() {
+				Expect(getProxiedHeaders(req).Get("X-Forwarded-For")).To(Equal("127.0.0.1"))
 			})
-
-			It("X-Forwarded-For is appended", func() {
-				done := make(chan bool)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get("X-Forwarded-For") == "1.2.3.4, 127.0.0.1"
+			Context("when the header is already set", func() {
+				It("appends the client IP", func() {
+					req.Header.Add("X-Forwarded-For", "1.2.3.4")
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-For")).To(Equal("1.2.3.4, 127.0.0.1"))
 				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				req.Header.Add("X-Forwarded-For", "1.2.3.4")
-				conn.WriteRequest(req)
-
-				var answer bool
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(BeTrue())
-
-				conn.ReadResponse()
 			})
 		})
 
 		Describe("X-Request-Start", func() {
-			It("X-Request-Start is appended", func() {
-				done := make(chan string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get("X-Request-Start")
-				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
-
-				conn.ReadResponse()
+			It("appends X-Request-Start", func() {
+				Expect(getProxiedHeaders(req).Get("X-Request-Start")).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
 			})
 
-			It("X-Request-Start is not overwritten", func() {
-				done := make(chan []string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header[http.CanonicalHeaderKey("X-Request-Start")]
+			Context("when the header is already set", func() {
+				It("does not modify the header", func() {
+					req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
+					req.Header.Add("X-Request-Start", "user-set2")
+					Expect(getProxiedHeaders(req)["X-Request-Start"]).To(Equal([]string{"", "user-set2"}))
 				})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
-				req.Header.Add("X-Request-Start", "user-set2")
-				conn.WriteRequest(req)
-
-				var answer []string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(Equal([]string{"", "user-set2"}))
-
-				conn.ReadResponse()
 			})
 		})
 
 		Describe("X-CF-InstanceID", func() {
-			It("X-CF-InstanceID header is added literally if present in the routing endpoint", func() {
-				done := make(chan string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get(router_http.CfInstanceIdHeader)
-				}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
-
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(Equal("fake-instance-id"))
-
-				conn.ReadResponse()
+			Context("when the instance is registered with an instance id", func() {
+				BeforeEach(func() {
+					extraRegisterCfg = []test_util.RegisterConfig{{InstanceId: "fake-instance-id"}}
+				})
+				It("sets the X-CF-InstanceID header", func() {
+					Expect(getProxiedHeaders(req).Get(router_http.CfInstanceIdHeader)).To(Equal("fake-instance-id"))
+				})
 			})
 
-			It("X-CF-InstanceID header is added with host:port information if NOT present in the routing endpoint", func() {
-				done := make(chan string)
-
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-					req, err := http.ReadRequest(conn.Reader)
-					Expect(err).NotTo(HaveOccurred())
-
-					resp := test_util.NewResponse(http.StatusOK)
-					conn.WriteResponse(resp)
-					conn.Close()
-
-					done <- req.Header.Get(router_http.CfInstanceIdHeader)
+			Context("when the instance is not registered with an explicit instance id", func() {
+				It("sets the X-CF-InstanceID header with the backend host:port", func() {
+					Expect(getProxiedHeaders(req).Get(router_http.CfInstanceIdHeader)).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
 				})
-				defer ln.Close()
+			})
+		})
 
-				conn := dialProxy(proxyServer)
+		Describe("Content-type", func() {
+			It("does not set the Content-Type header", func() {
+				Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+			})
 
-				req := test_util.NewRequest("GET", "app", "/", nil)
-				conn.WriteRequest(req)
+			Context("when the response body is XML", func() {
+				BeforeEach(func() {
+					fakeResponseBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+				})
+				It("still does not set the Content-Type header", func() {
+					Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+				})
+			})
 
-				var answer string
-				Eventually(done).Should(Receive(&answer))
-				Expect(answer).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
+			Context("when the response code is 204", func() {
+				BeforeEach(func() {
+					fakeResponseCode = http.StatusNoContent
+				})
+				It("still does not set the Content-Type header", func() {
+					Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+				})
+			})
+		})
 
-				conn.ReadResponse()
+		Describe("X-Forwarded-Client-Cert", func() {
+			Context("when gorouter is configured with ForwardedClientCert == sanitize_set", func() {
+				BeforeEach(func() {
+					conf.ForwardedClientCert = config.SANITIZE_SET
+				})
+				It("removes xfcc header", func() {
+					req.Header.Add("X-Forwarded-Client-Cert", "foo")
+					req.Header.Add("X-Forwarded-Client-Cert", "bar")
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+				})
+			})
+
+			Context("when ForwardedClientCert is set to forward but the request is not mTLS", func() {
+				BeforeEach(func() {
+					conf.ForwardedClientCert = config.FORWARD
+				})
+				It("removes xfcc header", func() {
+					req.Header.Add("X-Forwarded-Client-Cert", "foo")
+					req.Header.Add("X-Forwarded-Client-Cert", "bar")
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+				})
+			})
+
+			Context("when ForwardedClientCert is set to always_forward", func() {
+				BeforeEach(func() {
+					conf.ForwardedClientCert = config.ALWAYS_FORWARD
+				})
+				It("leaves the xfcc header intact", func() {
+					req.Header.Add("X-Forwarded-Client-Cert", "foo")
+					req.Header.Add("X-Forwarded-Client-Cert", "bar")
+					Expect(getProxiedHeaders(req)).To(HaveKeyWithValue("X-Forwarded-Client-Cert", []string{"foo", "bar"}))
+				})
 			})
 		})
 	})
