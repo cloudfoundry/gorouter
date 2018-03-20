@@ -142,11 +142,17 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				request.URL.Scheme = "http"
 			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter)
-			if err == nil || !rt.retryableClassifier.Classify(err) {
-				break
+
+			if err != nil {
+				iter.EndpointFailed(err)
+				logger.Error("backend-endpoint-failed", zap.Error(err))
+
+				if rt.retryableClassifier.Classify(err) {
+					continue
+				}
 			}
-			iter.EndpointFailed(err)
-			logger.Error("backend-endpoint-failed", zap.Error(err))
+
+			break
 		} else {
 			logger.Debug(
 				"route-service",
@@ -170,20 +176,22 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			}
 
 			res, err = tr.RoundTrip(request)
-			if err == nil {
-				if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
-					logger.Info(
-						"route-service-response",
-						zap.String("endpoint", request.URL.String()),
-						zap.Int("status-code", res.StatusCode),
-					)
+			if err != nil {
+				logger.Error("route-service-connection-failed", zap.Error(err))
+
+				if rt.retryableClassifier.Classify(err) {
+					continue
 				}
-				break
 			}
-			if !rt.retryableClassifier.Classify(err) {
-				break
+
+			if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
+				logger.Info(
+					"route-service-response",
+					zap.String("endpoint", request.URL.String()),
+					zap.Int("status-code", res.StatusCode),
+				)
 			}
-			logger.Error("route-service-connection-failed", zap.Error(err))
+			break
 		}
 	}
 
@@ -196,7 +204,6 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 	if finalErr != nil {
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
-		logger.Error("endpoint-failed", zap.Error(finalErr))
 		return nil, finalErr
 	}
 

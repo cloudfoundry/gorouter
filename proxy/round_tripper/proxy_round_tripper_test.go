@@ -3,6 +3,7 @@ package round_tripper_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -176,25 +177,38 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 		})
 
-		Context("when backend is unavailable due to a retryable error", func() {
+		Context("when some backends fail", func() {
 			BeforeEach(func() {
-				transport.RoundTripReturns(nil, errors.New("potato"))
+				transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+					switch transport.RoundTripCallCount() {
+					case 1:
+						return nil, errors.New("potato")
+					case 2:
+						return nil, errors.New("potato")
+					case 3:
+						return &http.Response{StatusCode: http.StatusTeapot}, nil
+					default:
+						return nil, nil
+					}
+				}
+
 				retryableClassifier.ClassifyReturns(true)
 			})
 
-			It("retries 3 times", func() {
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
+			It("retries until success", func() {
+				res, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).NotTo(HaveOccurred())
 				Expect(transport.RoundTripCallCount()).To(Equal(3))
-				Expect(retryableClassifier.ClassifyCallCount()).To(Equal(3))
+				Expect(retryableClassifier.ClassifyCallCount()).To(Equal(2))
 
 				Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+				Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 			})
 
 			It("captures each routing request to the backend", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred())
 
 				Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(3))
 				for i := 0; i < 3; i++ {
@@ -202,29 +216,42 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 			})
 
-			It("logs the error and reports the endpoint failure", func() {
-				// TODO: Test "iter.EndpointFailed"
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
+			It("logs the error and removes offending backend", func() {
+				for i := 0; i < 2; i++ {
+					endpoint = route.NewEndpoint(&route.EndpointOpts{
+						AppId:                fmt.Sprintf("appID%d", i),
+						Host:                 fmt.Sprintf("%d, %d, %d, %d", i, i, i, i),
+						Port:                 9090,
+						PrivateInstanceId:    fmt.Sprintf("instanceID%d", i),
+						PrivateInstanceIndex: fmt.Sprintf("%d", i),
+					})
 
-				for i := 0; i < 3; i++ {
+					Expect(routePool.Put(endpoint)).To(Equal(route.ADDED))
+				}
+
+				res, err := proxyRoundTripper.RoundTrip(req)
+				Expect(err).NotTo(HaveOccurred())
+
+				iter := routePool.Endpoints("", "")
+				ep1 := iter.Next()
+				ep2 := iter.Next()
+				Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
+
+				for i := 0; i < 2; i++ {
 					Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
 				}
+				Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 			})
 
-			It("calls the error handler", func() {
+			It("does not call the error handler", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
-				Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
-				_, err = errorHandler.HandleErrorArgsForCall(0)
-				Expect(err).To(MatchError("potato"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(errorHandler.HandleErrorCallCount()).To(Equal(0))
 			})
 
 			It("does not log anything about route services", func() {
 				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).To(HaveOccurred())
-
-				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
@@ -266,12 +293,27 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 			})
 
-			It("does not log the error or report the endpoint failure", func() {
-				// TODO: Test "iter.EndpointFailed"
+			It("does log the error and reports the endpoint failure", func() {
+				endpoint = route.NewEndpoint(&route.EndpointOpts{
+					AppId:                "appId2",
+					Host:                 "2.2.2.2",
+					Port:                 8080,
+					PrivateInstanceId:    "instanceId2",
+					PrivateInstanceIndex: "2",
+				})
+
+				added := routePool.Put(endpoint)
+				Expect(added).To(Equal(route.ADDED))
+
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(MatchError("potato"))
 
-				Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
+				iter := routePool.Endpoints("", "")
+				ep1 := iter.Next()
+				ep2 := iter.Next()
+				Expect(ep1).To(Equal(ep2))
+
+				Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
 			})
 		})
 
@@ -314,68 +356,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			It("does not report the endpoint failure", func() {
-				// TODO: Test "iter.EndpointFailed"
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).To(MatchError(handler.NoEndpointsAvailable))
 
 				Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
-			})
-		})
-
-		Context("when the first request to the backend fails", func() {
-			var firstRequest bool
-			BeforeEach(func() {
-				firstRequest = true
-				transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
-					var err error
-					err = nil
-					if firstRequest {
-						err = dialError
-						firstRequest = false
-					}
-					return nil, err
-				}
-				retryableClassifier.ClassifyReturns(true)
-			})
-
-			It("retries 2 times", func() {
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(transport.RoundTripCallCount()).To(Equal(2))
-				Expect(resp.Code).To(Equal(http.StatusOK))
-
-				Expect(combinedReporter.CaptureBadGatewayCallCount()).To(Equal(0))
-
-				Expect(reqBody.closeCount).To(Equal(1))
-
-				Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
-				Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
-			})
-
-			It("logs one error and reports the endpoint failure", func() {
-				// TODO: Test "iter.EndpointFailed"
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
-				Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
-			})
-
-			It("captures each routing request to the backend", func() {
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(2))
-				for i := 0; i < 2; i++ {
-					Expect(combinedReporter.CaptureRoutingRequestArgsForCall(i)).To(Equal(endpoint))
-				}
-			})
-
-			It("does not log anything about route services", func() {
-				_, err := proxyRoundTripper.RoundTrip(req)
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 			})
 		})
 
@@ -394,7 +378,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			It("does not log an error or report the endpoint failure", func() {
-				// TODO: Test "iter.EndpointFailed"
 				_, err := proxyRoundTripper.RoundTrip(req)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -658,12 +641,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(err).To(MatchError("banana"))
 					})
 
-					It("does not log the error or report the endpoint failure", func() {
-						// TODO: Test "iter.EndpointFailed"
+					It("logs the error", func() {
 						_, err := proxyRoundTripper.RoundTrip(req)
 						Expect(err).To(MatchError("banana"))
 
-						Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service-connection-failed`))
+						Expect(logger.Buffer()).To(gbytes.Say(`route-service-connection-failed`))
 					})
 				})
 			})
