@@ -1,6 +1,7 @@
 package round_tripper
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -68,6 +69,7 @@ func NewProxyRoundTripper(
 	localPort uint16,
 	errorHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
+	endpointTimeout time.Duration,
 ) ProxyRoundTripper {
 	return &roundTripper{
 		logger:                 logger,
@@ -79,6 +81,7 @@ func NewProxyRoundTripper(
 		retryableClassifier:    retryableClassifier,
 		errorHandler:           errorHandler,
 		routeServicesTransport: routeServicesTransport,
+		endpointTimeout:        endpointTimeout,
 	}
 }
 
@@ -92,6 +95,7 @@ type roundTripper struct {
 	retryableClassifier    fails.Classifier
 	errorHandler           errorHandler
 	routeServicesTransport http.RoundTripper
+	endpointTimeout        time.Duration
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -175,7 +179,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				tr = rt.routeServicesTransport
 			}
 
-			res, err = tr.RoundTrip(request)
+			res, err = rt.timedRoundTrip(tr, request)
 			if err != nil {
 				logger.Error("route-service-connection-failed", zap.Error(err))
 
@@ -191,6 +195,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 					zap.Int("status-code", res.StatusCode),
 				)
 			}
+
 			break
 		}
 	}
@@ -242,11 +247,37 @@ func (rt *roundTripper) backendRoundTrip(
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
 	tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
-	res, err := tr.RoundTrip(request)
+	res, err := rt.timedRoundTrip(tr, request)
 
 	// decrement connection stats
 	iter.PostRequest(endpoint)
 	return res, err
+}
+
+func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request) (*http.Response, error) {
+	if rt.endpointTimeout <= 0 {
+		return tr.RoundTrip(request)
+	}
+
+	reqCtx, cancel := context.WithTimeout(request.Context(), rt.endpointTimeout)
+	request = request.WithContext(reqCtx)
+
+	// unfortunately if the cancel function above is not called that
+	// results in a vet error
+	go func() {
+		select {
+		case <-reqCtx.Done():
+			cancel()
+		}
+	}()
+
+	resp, err := tr.RoundTrip(request)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	return resp, err
 }
 
 func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request) (*route.Endpoint, error) {
