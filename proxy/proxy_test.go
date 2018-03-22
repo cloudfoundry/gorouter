@@ -33,7 +33,6 @@ import (
 )
 
 var _ = Describe("Proxy", func() {
-
 	Describe("Supported HTTP Protocol Versions", func() {
 		It("responds to http/1.0", func() {
 			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
@@ -637,6 +636,7 @@ var _ = Describe("Proxy", func() {
 			BeforeEach(func() {
 				conf.Backends.MaxConns = 2
 			})
+
 			It("responds with 503 after conn limit is reached ", func() {
 				ln := test_util.RegisterHandler(r, "sleep", func(x *test_util.HttpConn) {
 					defer GinkgoRecover()
@@ -679,6 +679,7 @@ var _ = Describe("Proxy", func() {
 				Expect(atomic.LoadInt32(&badGatewayCount)).To(Equal(int32(1)))
 			})
 		})
+
 		It("request terminates with slow response", func() {
 			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
@@ -701,7 +702,7 @@ var _ = Describe("Proxy", func() {
 			resp, _ := readResponse(conn)
 
 			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(2*time.Second)))
 		})
 
 		It("proxy closes connections with slow apps", func() {
@@ -741,7 +742,7 @@ var _ = Describe("Proxy", func() {
 			resp, _ := readResponse(conn)
 
 			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(800*time.Millisecond)))
+			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(2*time.Second)))
 
 			var err error
 			Eventually(serverResult).Should(Receive(&err))

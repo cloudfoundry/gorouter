@@ -63,7 +63,7 @@ var _ = BeforeEach(func() {
 	conf, err = config.DefaultConfig()
 	Expect(err).ToNot(HaveOccurred())
 	conf.TraceKey = "my_trace_key"
-	conf.EndpointTimeout = 5 * time.Second
+	conf.EndpointTimeout = 1 * time.Second
 	conf.EndpointDialTimeout = 50 * time.Millisecond
 	fakeReporter = &fakes.FakeCombinedReporter{}
 })
