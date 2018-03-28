@@ -974,7 +974,7 @@ var _ = Describe("Proxy", func() {
 					Expect(req.Header.Get(router_http.CfAppInstance)).To(BeEmpty())
 
 					resp := test_util.NewResponse(http.StatusOK)
-					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
+					resp.Body = ioutil.NopCloser(strings.NewReader("Hello World: App2"))
 					conn.WriteResponse(resp)
 
 					conn.Close()
@@ -994,24 +994,91 @@ var _ = Describe("Proxy", func() {
 					Eventually(done).Should(Receive())
 					_, b := conn.ReadResponse()
 					return b
-				}).Should(Equal("Hellow World: App2"))
+				}).Should(Equal("Hello World: App2"))
 			})
 
-			It("returns a 404 if it cannot find the specified instance", func() {
+			It("includes the max instance index in the response headers", func() {
+				done := make(chan struct{})
+				// app handlers for app.vcap.me
+				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("Instance should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id", InstanceIndex: "5"})
+				defer ln.Close()
+
+				ln = test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("Instance should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-2-id", InstanceIndex: "7"})
+				defer ln.Close()
+
+				ln = test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					_, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					resp := test_util.NewResponse(http.StatusOK)
+					conn.WriteResponse(resp)
+					conn.Close()
+
+					done <- struct{}{}
+				}, test_util.RegisterConfig{AppId: "app-2-id", InstanceIndex: "3"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/yadda", nil)
+				req.Header.Set(router_http.CfAppInstance, "app-2-id:3")
+
+				conn.WriteRequest(req)
+
+				Eventually(done).Should(Receive())
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(resp.Header.Get(router_http.CfAppInstanceMax)).To(Equal("7"))
+			})
+
+			It("returns a 404 and max instance index if it cannot find the specified instance", func() {
 				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
-				}, test_util.RegisterConfig{AppId: "app-1-id"})
+				}, test_util.RegisterConfig{AppId: "app-1-id", InstanceIndex: "5"})
+				defer ln.Close()
+
+				ln = test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id", InstanceIndex: "3"})
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
-				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
+				req.Header.Set(router_http.CfAppInstance, "app-1-id:1")
 				conn.WriteRequest(req)
 
 				resp, _ := conn.ReadResponse()
 				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+				Expect(resp.Header.Get(router_http.CfAppInstanceMax)).To(Equal("5"))
+			})
+
+			It("returns a 404 and no max instance index if it cannot find the specified app", func() {
+				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id", InstanceIndex: "5"})
+				defer ln.Close()
+
+				ln = test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+					Fail("App should not have received request")
+				}, test_util.RegisterConfig{AppId: "app-1-id", InstanceIndex: "3"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
+				req.Header.Set(router_http.CfAppInstance, "app-2-id:3")
+				conn.WriteRequest(req)
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+				Expect(resp.Header.Get(router_http.CfAppInstanceMax)).To(BeEmpty())
 			})
 		})
 

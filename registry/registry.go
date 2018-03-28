@@ -2,6 +2,7 @@ package registry
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -183,19 +184,22 @@ func (r *RouteRegistry) endpointInRouterShard(endpoint *route.Endpoint) bool {
 }
 
 func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.Pool {
-	uri = uri.RouteKey()
 	p := r.Lookup(uri)
-
 	if p == nil {
 		return nil
 	}
 
-	var surgicalPool *route.Pool
+	surgicalPool := route.NewPool(0, p.Host(), p.ContextPath())
 
 	p.Each(func(e *route.Endpoint) {
-		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
-			surgicalPool = route.NewPool(0, p.Host(), p.ContextPath())
-			surgicalPool.Put(e)
+		if e.ApplicationId == appID {
+			idx, err := strconv.Atoi(e.PrivateInstanceIndex)
+			if idx > surgicalPool.MaxIdx && err == nil {
+				surgicalPool.MaxIdx = idx
+			}
+			if e.PrivateInstanceIndex == appIndex {
+				surgicalPool.Put(e)
+			}
 		}
 	})
 
