@@ -22,7 +22,6 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		resp         *httptest.ResponseRecorder
 		req          *http.Request
 		nextHandler  http.HandlerFunc
-		nextRequest  *http.Request
 		handler      negroni.Handler
 		vcapIdHeader string
 	)
@@ -30,7 +29,6 @@ var _ = Describe("Set Vcap Request Id header", func() {
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		vcapIdHeader = req.Header.Get(handlers.VcapRequestIdHeader)
 		nextCalled = true
-		nextRequest = req
 	})
 
 	BeforeEach(func() {

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -61,8 +60,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			req                    *http.Request
 			reqBody                *testBody
 			resp                   *httptest.ResponseRecorder
-			alr                    *schema.AccessLogRecord
-			routerIP               string
 			combinedReporter       *fakes.FakeCombinedReporter
 			roundTripperFactory    *FakeRoundTripperFactory
 			routeServicesTransport *sharedfakes.RoundTripper
@@ -83,7 +80,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 		BeforeEach(func() {
 			routePool = route.NewPool(1*time.Second, "myapp.com", "")
 			resp = httptest.NewRecorder()
-			alr = &schema.AccessLogRecord{}
 			proxyWriter := utils.NewProxyResponseWriter(resp)
 			reqBody = new(testBody)
 			req = test_util.NewRequest("GET", "myapp.com", "/", reqBody)
@@ -104,7 +100,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			logger = test_util.NewTestZapLogger("test")
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
-			routerIP = "127.0.0.1"
 
 			endpoint = route.NewEndpoint(&route.EndpointOpts{
 				AppId:                "appId",

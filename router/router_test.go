@@ -1267,7 +1267,7 @@ var _ = Describe("Router", func() {
 
 	Context("serving https", func() {
 		var (
-			cert, key []byte
+			cert []byte
 
 			client          *http.Client
 			tlsClientConfig *tls.Config
@@ -1277,7 +1277,6 @@ var _ = Describe("Router", func() {
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
-			key = certChain.PrivKeyPEM
 
 			rootCAs := x509.NewCertPool()
 			rootCAs.AddCert(certChain.CACert)

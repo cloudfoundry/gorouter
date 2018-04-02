@@ -11,7 +11,6 @@ import (
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -30,7 +29,6 @@ var _ = Describe("Lookup", func() {
 		nextCalled     bool
 		nextRequest    *http.Request
 		maxConnections int64
-		modTag         models.ModificationTag
 	)
 
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
@@ -41,7 +39,6 @@ var _ = Describe("Lookup", func() {
 	BeforeEach(func() {
 		nextCalled = false
 		nextRequest = &http.Request{}
-		modTag = models.ModificationTag{}
 		maxConnections = 2
 		logger = new(logger_fakes.FakeLogger)
 		rep = &fakes.FakeCombinedReporter{}

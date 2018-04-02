@@ -51,14 +51,6 @@ var _ = Describe("Clientcert", func() {
 		})
 
 		Context("when there is a tls connection with no client certs", func() {
-			var (
-				tlsConfig  *tls.Config
-				httpClient *http.Client
-			)
-			BeforeEach(func() {
-				httpClient = &http.Client{}
-			})
-
 			It("strips the xfcc headers from the request", func() {
 
 				tlsCert1 := test_util.CreateCert("client_cert.com")
@@ -66,7 +58,7 @@ var _ = Describe("Clientcert", func() {
 				servertlsConfig := &tls.Config{
 					Certificates: []tls.Certificate{tlsCert1},
 				}
-				tlsConfig = &tls.Config{
+				tlsConfig := &tls.Config{
 					InsecureSkipVerify: true,
 				}
 
@@ -97,14 +89,6 @@ var _ = Describe("Clientcert", func() {
 		})
 
 		Context("when there is a mtls connection with client certs", func() {
-			var (
-				tlsConfig  *tls.Config
-				httpClient *http.Client
-			)
-			BeforeEach(func() {
-				httpClient = &http.Client{}
-			})
-
 			It("sanitizes the xfcc headers from the request", func() {
 				privKey, certDER := test_util.CreateCertDER("client_cert1.com")
 
@@ -124,7 +108,7 @@ var _ = Describe("Clientcert", func() {
 					ClientCAs:    certPool,
 					ClientAuth:   tls.RequestClientCert,
 				}
-				tlsConfig = &tls.Config{
+				tlsConfig := &tls.Config{
 					Certificates: []tls.Certificate{tlsCert},
 					RootCAs:      certPool,
 				}
@@ -184,14 +168,6 @@ var _ = Describe("Clientcert", func() {
 		})
 
 		Context("when there is a tls connection with no client certs", func() {
-			var (
-				tlsConfig  *tls.Config
-				httpClient *http.Client
-			)
-			BeforeEach(func() {
-				httpClient = &http.Client{}
-			})
-
 			It("strips the xfcc headers from the request", func() {
 
 				tlsCert1 := test_util.CreateCert("client_cert.com")
@@ -199,7 +175,7 @@ var _ = Describe("Clientcert", func() {
 				servertlsConfig := &tls.Config{
 					Certificates: []tls.Certificate{tlsCert1},
 				}
-				tlsConfig = &tls.Config{
+				tlsConfig := &tls.Config{
 					InsecureSkipVerify: true,
 				}
 
@@ -230,14 +206,6 @@ var _ = Describe("Clientcert", func() {
 		})
 
 		Context("when there is a mtls connection with client certs", func() {
-			var (
-				tlsConfig  *tls.Config
-				httpClient *http.Client
-			)
-			BeforeEach(func() {
-				httpClient = &http.Client{}
-			})
-
 			It("forwards the xfcc headers from the request", func() {
 				privKey, certDER := test_util.CreateCertDER("client_cert1.com")
 
@@ -257,7 +225,7 @@ var _ = Describe("Clientcert", func() {
 					ClientCAs:    certPool,
 					ClientAuth:   tls.RequestClientCert,
 				}
-				tlsConfig = &tls.Config{
+				tlsConfig := &tls.Config{
 					Certificates: []tls.Certificate{tlsCert},
 					RootCAs:      certPool,
 				}
