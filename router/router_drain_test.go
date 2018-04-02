@@ -52,7 +52,7 @@ var _ = Describe("Router", func() {
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
-		app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
 		resultCh := make(chan bool, 2)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +130,7 @@ var _ = Describe("Router", func() {
 	}
 
 	testRouterDrain := func(config *cfg.Config, mbusClient *nats.Conn, registry *rregistry.RouteRegistry, initiateDrain func()) {
-		app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		blocker := make(chan bool)
 		resultCh := make(chan bool, 2)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +258,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("waits until the last request completes", func() {
-			app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 			blocker := make(chan bool)
 			drainDone := make(chan struct{})
 			clientDone := make(chan struct{})
@@ -315,7 +315,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("times out if it takes too long", func() {
-			app := common.NewTestApp([]route.Uri{"draintimeout.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := common.NewTestApp([]route.Uri{"draintimeout." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 2)
@@ -361,7 +361,7 @@ var _ = Describe("Router", func() {
 
 		Context("with http and https servers", func() {
 			It("it drains and stops the router", func() {
-				app := common.NewTestApp([]route.Uri{"drain.vcap.me"}, config.Port, mbusClient, nil, "")
+				app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 				blocker := make(chan bool)
 				drainDone := make(chan struct{})
 				clientDone := make(chan struct{})

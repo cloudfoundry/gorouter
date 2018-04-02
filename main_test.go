@@ -269,7 +269,7 @@ var _ = Describe("Router Integration", func() {
 			gorouterSession.Kill()
 		})
 		It("successfully establishes a mutual TLS connection with backend", func() {
-			runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 			runningApp1.TlsRegister(serverCertDomainSAN)
 			runningApp1.TlsListen(backendTLSConfig)
 			heartbeatInterval := 200 * time.Millisecond
@@ -298,12 +298,12 @@ var _ = Describe("Router Integration", func() {
 
 				Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
 
-				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", cfg.Port))
+				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, cfg.Port))
 				Expect(err).NotTo(HaveOccurred())
 
 				x := test_util.NewHttpConn(conn)
 
-				req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+				req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
 				req.Header.Set("Upgrade", "websocket")
 				req.Header.Set("Connection", "upgrade")
 				x.WriteRequest(req)
@@ -318,7 +318,7 @@ var _ = Describe("Router Integration", func() {
 			}
 
 			It("successfully connects with both websockets and TLS to backends", func() {
-				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, time.Millisecond, "")
+				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, proxyPort, mbusClient, time.Millisecond, "")
 				wsApp.TlsRegister(serverCertDomainSAN)
 				wsApp.TlsListen(backendTLSConfig)
 
@@ -326,7 +326,7 @@ var _ = Describe("Router Integration", func() {
 			})
 
 			It("successfully connects with websockets but not TLS to backends", func() {
-				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, time.Millisecond, "")
+				wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, proxyPort, mbusClient, time.Millisecond, "")
 				wsApp.Register()
 				wsApp.Listen()
 
@@ -334,7 +334,7 @@ var _ = Describe("Router Integration", func() {
 			})
 
 			It("closes connections with backends that respond with non 101-status code", func() {
-				wsApp := test.NewHangingWebSocketApp([]route.Uri{"ws-app.vcap.me"}, proxyPort, mbusClient, "")
+				wsApp := test.NewHangingWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, proxyPort, mbusClient, "")
 				wsApp.Register()
 				wsApp.Listen()
 
@@ -342,12 +342,12 @@ var _ = Describe("Router Integration", func() {
 
 				Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
 
-				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", cfg.Port))
+				conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, cfg.Port))
 				Expect(err).NotTo(HaveOccurred())
 
 				x := test_util.NewHttpConn(conn)
 
-				req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+				req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
 				req.Header.Set("Upgrade", "websocket")
 				req.Header.Set("Connection", "upgrade")
 				x.WriteRequest(req)
@@ -398,7 +398,7 @@ var _ = Describe("Router Integration", func() {
 
 		It("forwards incoming TLS requests to backends", func() {
 			gorouterSession = startGorouterSession(cfgFile)
-			runningApp1 := test.NewGreetApp([]route.Uri{"test.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 			runningApp1.Register()
 			runningApp1.Listen()
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
@@ -419,7 +419,7 @@ var _ = Describe("Router Integration", func() {
 			}()
 			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
 			client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
-			resp, err := client.Get(fmt.Sprintf("https://test.vcap.me:%d", cfg.SSLPort))
+			resp, err := client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
@@ -471,7 +471,7 @@ var _ = Describe("Router Integration", func() {
 			requestProcessing := make(chan bool)
 			responseRead := make(chan bool)
 
-			longApp := common.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil, "")
+			longApp := common.NewTestApp([]route.Uri{"longapp." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				requestMade <- true
 				<-requestProcessing
@@ -533,7 +533,7 @@ var _ = Describe("Router Integration", func() {
 
 			blocker := make(chan bool)
 			resultCh := make(chan error, 1)
-			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
+			timeoutApp := common.NewTestApp([]route.Uri{"timeout." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -570,7 +570,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
-			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
+			timeoutApp := common.NewTestApp([]route.Uri{"timeout." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 				<-blocker
@@ -747,11 +747,11 @@ var _ = Describe("Router Integration", func() {
 		mbusClient, err := newMessageBus(cfg)
 		Expect(err).ToNot(HaveOccurred())
 
-		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+		zombieApp := test.NewGreetApp([]route.Uri{"zombie." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 		zombieApp.Register()
 		zombieApp.Listen()
 
-		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
 			traceHeader := r.Header.Get(handlers.B3TraceIdHeader)
@@ -809,7 +809,7 @@ var _ = Describe("Router Integration", func() {
 		zombieApp.VerifyAppStatus(404)
 		runningApp.VerifyAppStatus(200)
 
-		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander.vcap.me", proxyPort, "some-path")
+		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander."+test_util.LocalhostDNS, proxyPort, "some-path")
 		_, err = http.Get(uri)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -863,7 +863,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
-			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp := test.NewGreetApp([]route.Uri{"demo." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 			runningApp.Register()
 			runningApp.Listen()
 
@@ -922,7 +922,7 @@ var _ = Describe("Router Integration", func() {
 				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
-				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+				runningApp := test.NewGreetApp([]route.Uri{"demo." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 				runningApp.Register()
 				runningApp.Listen()
 
@@ -992,7 +992,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
-			runningApp := common.NewTestApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil, routeServiceURL)
+			runningApp := common.NewTestApp([]route.Uri{"demo." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, routeServiceURL)
 			runningApp.Register()
 			runningApp.Listen()
 			verifyAppRunning(runningApp)
@@ -1009,11 +1009,11 @@ var _ = Describe("Router Integration", func() {
 				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
-				routeSvcApp = common.NewTestApp([]route.Uri{"some-route-service.vcap.me"}, proxyPort, mbusClient, nil, "")
+				routeSvcApp = common.NewTestApp([]route.Uri{"some-route-service." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 				routeSvcApp.AddHandler("/rs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(477)
 				}))
-				routeServiceURL = "https://some-route-service.vcap.me/rs"
+				routeServiceURL = fmt.Sprintf("https://some-route-service.%s/rs", test_util.LocalhostDNS)
 			})
 
 			It("successfully connects to the route service", func() {
@@ -1023,7 +1023,7 @@ var _ = Describe("Router Integration", func() {
 
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
 				Expect(err).ToNot(HaveOccurred())
-				req.Host = "demo.vcap.me"
+				req.Host = "demo." + test_util.LocalhostDNS
 				res, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(477))
@@ -1037,7 +1037,7 @@ var _ = Describe("Router Integration", func() {
 
 					req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 					Expect(err).ToNot(HaveOccurred())
-					req.Host = "demo.vcap.me"
+					req.Host = "demo." + test_util.LocalhostDNS
 					res, err := client.Do(req)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(res.StatusCode).To(Equal(477))
@@ -1055,7 +1055,7 @@ var _ = Describe("Router Integration", func() {
 
 						req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 						Expect(err).ToNot(HaveOccurred())
-						req.Host = "demo.vcap.me"
+						req.Host = "demo." + test_util.LocalhostDNS
 						res, err := client.Do(req)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(res.StatusCode).To(Equal(477))
@@ -1091,7 +1091,7 @@ var _ = Describe("Router Integration", func() {
 			It("successfully connects to the route service", func() {
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
 				Expect(err).ToNot(HaveOccurred())
-				req.Host = "demo.vcap.me"
+				req.Host = "demo." + test_util.LocalhostDNS
 				res, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusTeapot))
@@ -1101,7 +1101,7 @@ var _ = Describe("Router Integration", func() {
 				It("successfully connects to the route service", func() {
 					req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 					Expect(err).ToNot(HaveOccurred())
-					req.Host = "demo.vcap.me"
+					req.Host = "demo." + test_util.LocalhostDNS
 					res, err := client.Do(req)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
@@ -1115,7 +1115,7 @@ var _ = Describe("Router Integration", func() {
 					It("successfully connects to the route service", func() {
 						req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 						Expect(err).ToNot(HaveOccurred())
-						req.Host = "demo.vcap.me"
+						req.Host = "demo." + test_util.LocalhostDNS
 						res, err := client.Do(req)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(res.StatusCode).To(Equal(http.StatusTeapot))

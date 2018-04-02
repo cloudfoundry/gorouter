@@ -115,8 +115,8 @@ The format of the `router.register` message is as follows:
   "port": 4567,
   "tls_port": 1234,
   "uris": [
-    "my_first_url.vcap.me",
-    "my_second_url.vcap.me"
+    "my_first_url.localhost.routing.cf-app.com",
+    "my_second_url.localhost.routing.cf-app.com"
   ],
   "tags": {
     "another_key": "another_value",
@@ -160,29 +160,29 @@ $ nohup ruby -rsinatra -e 'get("/") { "Hello!" }' &
 
 Send a register message
 ```
-$ nats-pub 'router.register' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+$ nats-pub 'router.register' '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.localhost.routing.cf-app.com","my_second_url.localhost.routing.cf-app.com"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
 
-Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
+Published [router.register] : '{"host":"127.0.0.1","port":4567,"uris":["my_first_url.localhost.routing.cf-app.com","my_second_url.localhost.routing.cf-app.com"],"tags":{"another_key":"another_value","some_key":"some_value"}}'
 ```
 
 See that it works!
 ```
-$ curl my_first_url.vcap.me:8081
+$ curl my_first_url.localhost.routing.cf-app.com:8081
 Hello!
 ```
 
 Unregister the route
 ```
-$ nats-pub 'router.unregister' '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+$ nats-pub 'router.unregister' '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.localhost.routing.cf-app.com","my_second_url.localhost.routing.cf-app.com"]}'
 
-Published [router.unregister] : '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.vcap.me","my_second_url.vcap.me"]}'
+Published [router.unregister] : '{"host":"127.0.0.1","port":4567,"tls_port":1234,"uris":["my_first_url.localhost.routing.cf-app.com","my_second_url.localhost.routing.cf-app.com"]}'
 ```
 
 See that the route is gone
 
 ```
-$ curl my_first_url.vcap.me:8081
-404 Not Found: Requested route ('my_first_url.vcap.me') does not exist.
+$ curl my_first_url.localhost.routing.cf-app.com:8081
+404 Not Found: Requested route ('my_first_url.localhost.routing.cf-app.com') does not exist.
 ```
 
 If `router.backends.enable_tls` has been set to true, `tls_port` will be used as the definitive port when unregistering a route if present, otherwise `port` will be used. If `router.backends.enable_tls` is set to false, `port` will be preferred and any requests with only `tls_port` will be rejected and an error logged to the gorouter logs.

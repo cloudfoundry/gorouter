@@ -81,8 +81,8 @@ var _ = Describe("Varz", func() {
 		var fooReg = route.NewEndpoint(&route.EndpointOpts{})
 
 		// Add a route
-		Registry.Register("foo.vcap.me", fooReg)
-		Registry.Register("fooo.vcap.me", fooReg)
+		Registry.Register("foo."+test_util.LocalhostDNS, fooReg)
+		Registry.Register("fooo."+test_util.LocalhostDNS, fooReg)
 
 		Expect(findValue(Varz, "urls")).To(Equal(float64(2)))
 	})

@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"crypto/tls"
+	"fmt"
 	"strconv"
 
 	"code.cloudfoundry.org/gorouter/access_log"
@@ -43,7 +44,7 @@ var _ = Describe("AccessLogRecord", func() {
 			for i := 0; i < 1000; i++ {
 				str := strconv.Itoa(i)
 				r.Register(
-					route.Uri("bench.vcap.me."+str),
+					route.Uri(fmt.Sprintf("bench.%s.%s", test_util.LocalhostDNS, str)),
 					route.NewEndpoint(&route.EndpointOpts{
 						Host: "localhost",
 						Port: uint16(i),

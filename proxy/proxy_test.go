@@ -961,13 +961,12 @@ var _ = Describe("Proxy", func() {
 		Context("when the request has X-CF-APP-INSTANCE", func() {
 			It("lookups the route to that specific app index and id", func() {
 				done := make(chan struct{})
-				// app handler for app.vcap.me
-				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
 				}, test_util.RegisterConfig{AppId: "app-1-id"})
 				defer ln.Close()
 
-				ln2 := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+				ln2 := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -985,7 +984,7 @@ var _ = Describe("Proxy", func() {
 
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "app.vcap.me", "/chat", nil)
+				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/chat", nil)
 				req.Header.Set(router_http.CfAppInstance, "app-2-id:2")
 
 				Consistently(func() string {
@@ -998,14 +997,14 @@ var _ = Describe("Proxy", func() {
 			})
 
 			It("returns a 404 if it cannot find the specified instance", func() {
-				ln := test_util.RegisterHandler(r, "app.vcap.me", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
 				}, test_util.RegisterConfig{AppId: "app-1-id"})
 				defer ln.Close()
 
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "app.vcap.me", "/", nil)
+				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/", nil)
 				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
 				conn.WriteRequest(req)
 

@@ -249,7 +249,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("registry contains last updated varz", func() {
-		app1 := test.NewGreetApp([]route.Uri{"test1.vcap.me"}, config.Port, mbusClient, nil)
+		app1 := test.NewGreetApp([]route.Uri{"test1." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 		app1.RegisterAndListen()
 
 		Eventually(func() bool {
@@ -259,7 +259,7 @@ var _ = Describe("Router", func() {
 		time.Sleep(100 * time.Millisecond)
 		initialUpdateTime := fetchRecursively(readVarz(varz), "ms_since_last_registry_update").(float64)
 
-		app2 := test.NewGreetApp([]route.Uri{"test2.vcap.me"}, config.Port, mbusClient, nil)
+		app2 := test.NewGreetApp([]route.Uri{"test2." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 		app2.RegisterAndListen()
 		Eventually(func() bool {
 			return appRegistered(registry, app2)
@@ -271,7 +271,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("varz", func() {
-		app := test.NewGreetApp([]route.Uri{"count.vcap.me"}, config.Port, mbusClient, map[string]string{"framework": "rails"})
+		app := test.NewGreetApp([]route.Uri{"count." + test_util.LocalhostDNS}, config.Port, mbusClient, map[string]string{"framework": "rails"})
 		app.RegisterAndListen()
 		additionalRequests := 100
 		go app.RegisterRepeatedly(100 * time.Millisecond)
@@ -281,11 +281,11 @@ var _ = Describe("Router", func() {
 		}).Should(BeTrue())
 
 		// Send seed request
-		sendRequests("count.vcap.me", config.Port, 1)
+		sendRequests("count."+test_util.LocalhostDNS, config.Port, 1)
 		initial_varz := readVarz(varz)
 
 		// Send requests
-		sendRequests("count.vcap.me", config.Port, additionalRequests)
+		sendRequests("count."+test_util.LocalhostDNS, config.Port, additionalRequests)
 		updated_varz := readVarz(varz)
 
 		// Verify varz update
@@ -305,7 +305,7 @@ var _ = Describe("Router", func() {
 	It("Sticky sessions allow multiple consecutive requests to reach the same instance of an app", func() {
 		apps := make([]*testcommon.TestApp, 10)
 		for i := range apps {
-			apps[i] = test.NewStickyApp([]route.Uri{"sticky.vcap.me"}, config.Port, mbusClient, nil)
+			apps[i] = test.NewStickyApp([]route.Uri{"sticky." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			apps[i].RegisterAndListen()
 		}
 
@@ -314,8 +314,8 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 		}
-		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky.vcap.me", config.Port)
-		port2 := getAppPortWithSticky("sticky.vcap.me", config.Port, sessionCookie, vcapCookie)
+		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky."+test_util.LocalhostDNS, config.Port)
+		port2 := getAppPortWithSticky("sticky."+test_util.LocalhostDNS, config.Port, sessionCookie, vcapCookie)
 
 		Expect(port1).To(Equal(port2))
 		Expect(vcapCookie.Path).To(Equal("/"))
@@ -328,7 +328,7 @@ var _ = Describe("Router", func() {
 	Context("when websocket request is bound to RouteService URL", func() {
 		It("the request should respond with a 503", func() {
 			app := test.NewWebSocketApp(
-				[]route.Uri{"ws-app.vcap.me"},
+				[]route.Uri{"ws-app." + test_util.LocalhostDNS},
 				config.Port,
 				mbusClient,
 				1*time.Second,
@@ -339,12 +339,12 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
+			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, config.Port))
 			Expect(err).NotTo(HaveOccurred())
 
 			x := test_util.NewHttpConn(conn)
 
-			req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
 
@@ -359,7 +359,7 @@ var _ = Describe("Router", func() {
 
 	Context("Stop", func() {
 		It("no longer proxies http", func() {
-			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"greet." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -409,7 +409,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("no longer proxies https", func() {
-			app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"greet." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				_, err := ioutil.ReadAll(r.Body)
@@ -422,7 +422,7 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("https://greet.vcap.me:%d/", config.SSLPort)
+			host := fmt.Sprintf("https://greet.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 
 			req, err := http.NewRequest("GET", host, nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -449,7 +449,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("handles a PUT request", func() {
-		app := testcommon.NewTestApp([]route.Uri{"greet.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"greet." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 		var rr *http.Request
 		var msg string
@@ -485,7 +485,7 @@ var _ = Describe("Router", func() {
 	})
 
 	It("supports 100 Continue", func() {
-		app := testcommon.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"foo." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		rCh := make(chan *http.Request)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
@@ -502,7 +502,7 @@ var _ = Describe("Router", func() {
 			return appRegistered(registry, app)
 		}).Should(BeTrue())
 
-		host := fmt.Sprintf("foo.vcap.me:%d", config.Port)
+		host := fmt.Sprintf("foo.%s:%d", test_util.LocalhostDNS, config.Port)
 		conn, err := net.DialTimeout("tcp", host, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		defer conn.Close()
@@ -528,7 +528,7 @@ var _ = Describe("Router", func() {
 
 	It("X-Vcap-Request-Id header is overwritten", func() {
 		done := make(chan string)
-		app := testcommon.NewTestApp([]route.Uri{"foo.vcap.me"}, config.Port, mbusClient, nil, "")
+		app := testcommon.NewTestApp([]route.Uri{"foo." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())
@@ -549,7 +549,7 @@ var _ = Describe("Router", func() {
 
 		httpConn := test_util.NewHttpConn(conn)
 
-		req := test_util.NewRequest("GET", "foo.vcap.me", "/", nil)
+		req := test_util.NewRequest("GET", "foo."+test_util.LocalhostDNS, "/", nil)
 		req.Header.Add(handlers.VcapRequestIdHeader, "A-BOGUS-REQUEST-ID")
 
 		httpConn.WriteRequest(req)
@@ -599,7 +599,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("sets the X-Forwarded-For header", func() {
-			app := testcommon.NewTestApp([]route.Uri{"proxy.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"proxy." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			rCh := make(chan string)
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -610,7 +610,7 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("proxy.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("proxy.%s:%d", test_util.LocalhostDNS, config.Port)
 			conn, err := net.DialTimeout("tcp", host, 10*time.Second)
 			Expect(err).ToNot(HaveOccurred())
 			defer conn.Close()
@@ -627,13 +627,13 @@ var _ = Describe("Router", func() {
 		})
 
 		It("sets the x-Forwarded-Proto header to https", func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
+			uri := fmt.Sprintf("https://test.%s:%d/forwardedprotoheader", test_util.LocalhostDNS, config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -654,13 +654,13 @@ var _ = Describe("Router", func() {
 
 	Context("HTTP keep-alive", func() {
 		It("reuses the same connection on subsequent calls", func() {
-			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"keepalive." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
@@ -685,13 +685,13 @@ var _ = Describe("Router", func() {
 		})
 
 		It("resets the idle timeout on activity", func() {
-			app := test.NewGreetApp([]route.Uri{"keepalive.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"keepalive." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
@@ -731,7 +731,7 @@ var _ = Describe("Router", func() {
 			// create an app that takes 3/4 of the deadline to respond
 			// during an active connection
 			app := test.NewSlowApp(
-				[]route.Uri{"keepalive.vcap.me"},
+				[]route.Uri{"keepalive." + test_util.LocalhostDNS},
 				config.Port,
 				mbusClient,
 				config.EndpointTimeout/4*3,
@@ -741,7 +741,7 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("keepalive.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
 			conn, err := net.Dial("tcp", host)
@@ -773,7 +773,7 @@ var _ = Describe("Router", func() {
 		Context("http", func() {
 			JustBeforeEach(func() {
 				app := test.NewSlowApp(
-					[]route.Uri{"slow-app.vcap.me"},
+					[]route.Uri{"slow-app." + test_util.LocalhostDNS},
 					config.Port,
 					mbusClient,
 					1*time.Second,
@@ -786,7 +786,7 @@ var _ = Describe("Router", func() {
 			})
 
 			It("terminates before receiving headers", func() {
-				uri := fmt.Sprintf("http://slow-app.vcap.me:%d", config.Port)
+				uri := fmt.Sprintf("http://slow-app.%s:%d", test_util.LocalhostDNS, config.Port)
 				req, _ := http.NewRequest("GET", uri, nil)
 				client := http.Client{}
 				resp, err := client.Do(req)
@@ -800,7 +800,7 @@ var _ = Describe("Router", func() {
 			})
 
 			It("terminates before receiving the body", func() {
-				uri := fmt.Sprintf("http://slow-app.vcap.me:%d/hello", config.Port)
+				uri := fmt.Sprintf("http://slow-app.%s:%d/hello", test_util.LocalhostDNS, config.Port)
 				req, _ := http.NewRequest("GET", uri, nil)
 				client := http.Client{}
 				resp, err := client.Do(req)
@@ -817,7 +817,7 @@ var _ = Describe("Router", func() {
 
 		It("websockets do not terminate", func() {
 			app := test.NewWebSocketApp(
-				[]route.Uri{"ws-app.vcap.me"},
+				[]route.Uri{"ws-app." + test_util.LocalhostDNS},
 				config.Port,
 				mbusClient,
 				1*time.Second,
@@ -828,12 +828,12 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.vcap.me:%d", config.Port))
+			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, config.Port))
 			Expect(err).NotTo(HaveOccurred())
 
 			x := test_util.NewHttpConn(conn)
 
-			req := test_util.NewRequest("GET", "ws-app.vcap.me", "/chat", nil)
+			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
 
@@ -851,7 +851,7 @@ var _ = Describe("Router", func() {
 
 	Context("multiple open connections", func() {
 		It("does not return an error handling connections", func() {
-			app := testcommon.NewTestApp([]route.Uri{"app.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"app." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			rCh := make(chan string)
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -862,7 +862,7 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("app.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("app.%s:%d", test_util.LocalhostDNS, config.Port)
 			existingConn, err := net.DialTimeout("tcp", host, 10*time.Second)
 			Expect(err).ToNot(HaveOccurred())
 			defer existingConn.Close()
@@ -885,7 +885,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("does not hang while handling new connection", func() {
-			app := testcommon.NewTestApp([]route.Uri{"app.vcap.me"}, config.Port, mbusClient, nil, "")
+			app := testcommon.NewTestApp([]route.Uri{"app." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			rCh := make(chan string)
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
@@ -896,7 +896,7 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			host := fmt.Sprintf("app.vcap.me:%d", config.Port)
+			host := fmt.Sprintf("app.%s:%d", test_util.LocalhostDNS, config.Port)
 			existingConn, err := net.DialTimeout("tcp", host, 10*time.Second)
 			Expect(err).ToNot(HaveOccurred())
 			defer existingConn.Close()
@@ -923,7 +923,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("does not serve http traffic", func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
@@ -960,10 +960,10 @@ var _ = Describe("Router", func() {
 		BeforeEach(func() {
 			receivedReqChan = make(chan *http.Request, 1)
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d/record_headers", config.SSLPort)
+			uri := fmt.Sprintf("https://test.%s:%d/record_headers", test_util.LocalhostDNS, config.SSLPort)
 			req, _ = http.NewRequest("GET", uri, nil)
 
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*.vcap.me"})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*." + test_util.LocalhostDNS})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
@@ -983,7 +983,7 @@ var _ = Describe("Router", func() {
 		})
 
 		JustBeforeEach(func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.AddHandler("/record_headers", func(w http.ResponseWriter, r *http.Request) {
 				receivedReqChan <- r
 				w.WriteHeader(http.StatusTeapot)
@@ -1027,7 +1027,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with out any TLS", func() {
 					BeforeEach(func() {
-						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						uri := fmt.Sprintf("http://test.%s:%d/record_headers", test_util.LocalhostDNS, config.Port)
 						req, _ = http.NewRequest("GET", uri, nil)
 						req.Header.Set("X-Forwarded-Client-Cert", "potato")
 					})
@@ -1111,7 +1111,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with out any TLS", func() {
 					BeforeEach(func() {
-						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						uri := fmt.Sprintf("http://test.%s:%d/record_headers", test_util.LocalhostDNS, config.Port)
 						req, _ = http.NewRequest("GET", uri, nil)
 						req.Header.Set("X-Forwarded-Client-Cert", "potato")
 					})
@@ -1197,7 +1197,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with out any TLS", func() {
 					BeforeEach(func() {
-						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						uri := fmt.Sprintf("http://test.%s:%d/record_headers", test_util.LocalhostDNS, config.Port)
 						req, _ = http.NewRequest("GET", uri, nil)
 						req.Header.Set("X-Forwarded-Client-Cert", "potato")
 					})
@@ -1250,7 +1250,7 @@ var _ = Describe("Router", func() {
 
 				Context("when the client connects with out any TLS", func() {
 					BeforeEach(func() {
-						uri := fmt.Sprintf("http://test.vcap.me:%d/record_headers", config.Port)
+						uri := fmt.Sprintf("http://test.%s:%d/record_headers", test_util.LocalhostDNS, config.Port)
 						req, _ = http.NewRequest("GET", uri, nil)
 						req.Header.Set("X-Forwarded-Client-Cert", "potato")
 					})
@@ -1273,7 +1273,7 @@ var _ = Describe("Router", func() {
 			tlsClientConfig *tls.Config
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test.vcap.me"})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
@@ -1290,13 +1290,13 @@ var _ = Describe("Router", func() {
 		})
 
 		It("serves ssl traffic", func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
+			uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 
 			resp, err := client.Do(req)
@@ -1314,13 +1314,13 @@ var _ = Describe("Router", func() {
 		It("fails when the client uses an unsupported cipher suite", func() {
 			tlsClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA}
 
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+			uri := fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 
 			_, err := client.Do(req)
@@ -1329,13 +1329,13 @@ var _ = Describe("Router", func() {
 		})
 
 		It("sets the x-Forwarded-Proto header to https", func() {
-			app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 			app.RegisterAndListen()
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 
-			uri := fmt.Sprintf("https://test.vcap.me:%d/forwardedprotoheader", config.SSLPort)
+			uri := fmt.Sprintf("https://test.%s:%d/forwardedprotoheader", test_util.LocalhostDNS, config.SSLPort)
 			req, _ := http.NewRequest("GET", uri, nil)
 
 			resp, err := client.Do(req)
@@ -1359,13 +1359,13 @@ var _ = Describe("Router", func() {
 				certPool.AppendCertsFromPEM(cert)
 				tlsClientConfig.RootCAs = certPool
 
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
 
 				resp, err := client.Do(req)
@@ -1377,16 +1377,16 @@ var _ = Describe("Router", func() {
 
 		Context("when a supported server name is provided", func() {
 			BeforeEach(func() {
-				tlsClientConfig.ServerName = "test.vcap.me"
+				tlsClientConfig.ServerName = "test." + test_util.LocalhostDNS
 			})
 			It("return 200 Ok status", func() {
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("https://test.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
 
 				resp, err := client.Do(req)
@@ -1401,14 +1401,14 @@ var _ = Describe("Router", func() {
 			})
 
 			It("retrieves the correct certificate for the client", func() {
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 
 				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -1416,20 +1416,20 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test.vcap.me"))
+				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
 
 			})
 			Context("with certificate chain", func() {
 				BeforeEach(func() {
-					chainRootCaCert, chainRootCaKey, rootPEM, err := createRootCA("a.vcap.me")
+					chainRootCaCert, chainRootCaKey, rootPEM, err := createRootCA("a." + test_util.LocalhostDNS)
 					Expect(err).ToNot(HaveOccurred())
 					intermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 					Expect(err).ToNot(HaveOccurred())
-					intermediateTmpl, err := certTemplate("b.vcap.me")
+					intermediateTmpl, err := certTemplate("b." + test_util.LocalhostDNS)
 					Expect(err).ToNot(HaveOccurred())
 					intermediateCert, intermediatePEM, err := createCert(intermediateTmpl, chainRootCaCert, &intermediateKey.PublicKey, chainRootCaKey)
 					Expect(err).ToNot(HaveOccurred())
-					leafTmpl, err := certTemplate("c.vcap.me")
+					leafTmpl, err := certTemplate("c." + test_util.LocalhostDNS)
 					Expect(err).ToNot(HaveOccurred())
 					leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
 					Expect(err).ToNot(HaveOccurred())
@@ -1446,17 +1446,17 @@ var _ = Describe("Router", func() {
 
 				})
 				It("return 200 Ok status", func() {
-					app := test.NewGreetApp([]route.Uri{"c.vcap.me"}, config.Port, mbusClient, nil)
+					app := test.NewGreetApp([]route.Uri{"c." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 
 					app.RegisterAndListen()
 					Eventually(func() bool {
 						return appRegistered(registry, app)
 					}).Should(BeTrue())
 
-					uri := fmt.Sprintf("c.vcap.me:%d", config.SSLPort)
+					uri := fmt.Sprintf("c.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 					tlsConfig := &tls.Config{
 						InsecureSkipVerify: true,
-						ServerName:         "c.vcap.me",
+						ServerName:         "c." + test_util.LocalhostDNS,
 					}
 					conn, err := tls.Dial("tcp", uri, tlsConfig)
 					Expect(err).ToNot(HaveOccurred())
@@ -1464,9 +1464,9 @@ var _ = Describe("Router", func() {
 					cstate := conn.ConnectionState()
 					certs := cstate.PeerCertificates
 					Expect(len(certs)).To(Equal(3))
-					Expect(certs[0].Subject.CommonName).To(Equal("c.vcap.me"))
-					Expect(certs[1].Subject.CommonName).To(Equal("b.vcap.me"))
-					Expect(certs[2].Subject.CommonName).To(Equal("a.vcap.me"))
+					Expect(certs[0].Subject.CommonName).To(Equal("c." + test_util.LocalhostDNS))
+					Expect(certs[1].Subject.CommonName).To(Equal("b." + test_util.LocalhostDNS))
+					Expect(certs[2].Subject.CommonName).To(Equal("a." + test_util.LocalhostDNS))
 
 				})
 
@@ -1478,14 +1478,14 @@ var _ = Describe("Router", func() {
 				tlsClientConfig.ServerName = "not-here.com"
 				tlsClientConfig.InsecureSkipVerify = true
 
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 
 				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -1503,34 +1503,34 @@ var _ = Describe("Router", func() {
 			})
 
 			It("uses a cert that matches the hostname", func() {
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("test.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("test.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 
 				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test.vcap.me"))
+				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
 			})
 
 			It("uses the default cert when hostname does not match any cert", func() {
 				tlsClientConfig.InsecureSkipVerify = true
 
-				app := test.NewGreetApp([]route.Uri{"notexist.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"notexist." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("notexist.vcap.me:%d", config.SSLPort)
+				uri := fmt.Sprintf("notexist.%s:%d", test_util.LocalhostDNS, config.SSLPort)
 
 				conn, err := tls.Dial("tcp", uri, tlsClientConfig)
 				Expect(err).ToNot(HaveOccurred())
@@ -1547,13 +1547,13 @@ var _ = Describe("Router", func() {
 			})
 
 			It("fails the connection", func() {
-				app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
 
-				uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
+				uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 				req, _ := http.NewRequest("GET", uri, nil)
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{
@@ -1593,13 +1593,13 @@ var _ = Describe("Router", func() {
 
 			Context("when the client cert is valid", func() {
 				It("successfully serves SSL traffic if the certificate is valid", func() {
-					app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+					app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 					app.RegisterAndListen()
 					Eventually(func() bool {
 						return appRegistered(registry, app)
 					}).Should(BeTrue())
 
-					uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
+					uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 					req, _ := http.NewRequest("GET", uri, nil)
 
 					tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
@@ -1628,13 +1628,13 @@ var _ = Describe("Router", func() {
 
 				Context("when gorouter is configured with ClientAuth = NoClientCert", func() {
 					Specify("the connection succeeds because the client cert is ignored", func() {
-						app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+						app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 						app.RegisterAndListen()
 						Eventually(func() bool {
 							return appRegistered(registry, app)
 						}).Should(BeTrue())
 
-						uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
+						uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 						req, _ := http.NewRequest("GET", uri, nil)
 						tr := &http.Transport{
 							TLSClientConfig: &tls.Config{
@@ -1660,13 +1660,13 @@ var _ = Describe("Router", func() {
 						config.ClientCertificateValidation = tls.VerifyClientCertIfGiven
 					})
 					It("fails the connection", func() {
-						app := test.NewGreetApp([]route.Uri{"test.vcap.me"}, config.Port, mbusClient, nil)
+						app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 						app.RegisterAndListen()
 						Eventually(func() bool {
 							return appRegistered(registry, app)
 						}).Should(BeTrue())
 
-						uri := fmt.Sprintf("https://test.vcap.me:%d/", config.SSLPort)
+						uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
 						req, _ := http.NewRequest("GET", uri, nil)
 						tr := &http.Transport{
 							TLSClientConfig: &tls.Config{
@@ -1695,7 +1695,7 @@ var _ = Describe("Router", func() {
 				config.FrontendIdleTimeout = 500 * time.Millisecond
 			})
 			It("closes the TCP connection", func() {
-				conn, err := net.Dial("tcp", fmt.Sprintf("some-app.vcap.me:%d", config.Port))
+				conn, err := net.Dial("tcp", fmt.Sprintf("some-app.%s:%d", test_util.LocalhostDNS, config.Port))
 				Expect(err).NotTo(HaveOccurred())
 
 				_, err = conn.Write([]byte("GET /index.html HTTP/1.1\nHost: www.example.com\n\n"))
