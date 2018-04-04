@@ -349,9 +349,15 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 
 	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
 		p.removeEndpoint(e)
-	} else {
-		e.failed()
+		return
 	}
+
+	if fails.FailableClassifiers.Classify(err) {
+		e.failed()
+		return
+	}
+
+	return
 }
 
 func (p *Pool) Each(f func(endpoint *Endpoint)) {

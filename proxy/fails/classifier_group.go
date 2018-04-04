@@ -12,6 +12,8 @@ var RetriableClassifiers = ClassifierGroup{
 	UntrustedCert,
 }
 
+var FailableClassifiers = RetriableClassifiers
+
 var PrunableClassifiers = ClassifierGroup{
 	HostnameMismatch,
 	AttemptedTLSWithNonTLSBackend,

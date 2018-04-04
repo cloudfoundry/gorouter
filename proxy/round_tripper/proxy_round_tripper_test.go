@@ -185,9 +185,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
 						switch transport.RoundTripCallCount() {
 						case 1:
-							return nil, errors.New("potato")
+							return nil, &net.OpError{Op: "dial", Err: errors.New("something")}
 						case 2:
-							return nil, errors.New("potato")
+							return nil, &net.OpError{Op: "dial", Err: errors.New("something")}
 						case 3:
 							return &http.Response{StatusCode: http.StatusTeapot}, nil
 						default:
@@ -260,13 +260,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("when backend is unavailable due to non-retryable error", func() {
 				BeforeEach(func() {
-					transport.RoundTripReturns(nil, errors.New("potato"))
+					transport.RoundTripReturns(nil, &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})
 					retryableClassifier.ClassifyReturns(false)
 				})
 
 				It("does not retry", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError("potato"))
+					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 					Expect(transport.RoundTripCallCount()).To(Equal(1))
 
 					Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
@@ -275,7 +275,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				It("captures each routing request to the backend", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError("potato"))
+					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
 					Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
 					Expect(combinedReporter.CaptureRoutingRequestArgsForCall(0)).To(Equal(endpoint))
@@ -286,12 +286,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).To(HaveOccurred())
 					Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
 					_, err = errorHandler.HandleErrorArgsForCall(0)
-					Expect(err).To(MatchError("potato"))
+					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 				})
 
 				It("does not log anything about route services", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError("potato"))
+					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
 					Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 				})
@@ -309,7 +309,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(added).To(Equal(route.ADDED))
 
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError("potato"))
+					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
 					iter := routePool.Endpoints("", "")
 					ep1 := iter.Next()
