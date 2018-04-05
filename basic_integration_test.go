@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -43,66 +44,109 @@ var _ = Describe("Basic integration tests", func() {
 	// each high-level feature gets a describe block
 	Describe("modifications of X-Forwarded-Proto header", func() {
 		// we scope testCase to the high-level feature
-		type testCase struct {
-			// gorouter configuration options
+
+		type gorouterConfig struct {
 			forceForwardedProtoHTTPS bool
 			sanitizeForwardedProto   bool
+		}
 
-			// client behavior
+		type testCase struct {
 			clientRequestScheme string
 			clientRequestHeader string
 
 			expectBackendToSeeHeader string
 		}
 
-		testCases := []testCase{
-			//  | FFPH      | SFP       | port   | client header| received  |
-			//  |-----------|-----------|--------|--------------|-----------|
-			{false, false, "http", "http", "http"},
-			{false, false, "http", "https", "https"},
-			{false, false, "https", "http", "http"},
-			{false, false, "https", "https", "https"},
-			{false, true, "http", "http", "http"},
-			{false, true, "http", "https", "http"}, // new feature here!
-			{false, true, "https", "http", "https"},
-			{false, true, "https", "https", "https"},
-			{true, false, "http", "http", "https"},
-			{true, false, "http", "https", "https"},
-			{true, false, "https", "http", "https"},
-			{true, false, "https", "https", "https"},
-			{true, true, "http", "http", "https"},
-			{true, true, "http", "https", "https"},
-			{true, true, "https", "http", "https"},
-			{true, true, "https", "https", "https"},
+		//  | FFPH      | SFP       |
+		//  |-----------|-----------|
+		testCases := map[gorouterConfig][]testCase{
+			{false, false}: {
+				//  | port   | client header| received  |
+				//  |--------|--------------|-----------|
+				{"http", "http", "http"},
+				{"http", "https", "https"},
+				{"https", "http", "http"},
+				{"https", "https", "https"},
+			},
+
+			{false, true}: {
+				{"http", "http", "http"},
+				{"http", "https", "http"}, // new feature here!
+				{"https", "http", "https"},
+				{"https", "https", "https"},
+			},
+
+			{true, false}: {
+				{"http", "http", "https"},
+				{"http", "https", "https"},
+				{"https", "http", "https"},
+				{"https", "https", "https"},
+			},
+
+			{true, true}: {
+				{"http", "http", "https"},
+				{"http", "https", "https"},
+				{"https", "http", "https"},
+				{"https", "https", "https"},
+			},
 		}
 
-		for i, tc := range testCases {
-			testCase := tc
-			It(fmt.Sprintf("case %d: %v: sets the header correctly", i, testCase), func() {
-				testState.cfg.ForceForwardedProtoHttps = testCase.forceForwardedProtoHTTPS
-				testState.cfg.SanitizeForwardedProto = testCase.sanitizeForwardedProto
+		for gc, tcs := range testCases {
+			gorouterConfig := gc
+			testCases := tcs
+
+			It(fmt.Sprintf("gorouter config %v: sets the headers correctly", gorouterConfig), func() {
+				testState.cfg.ForceForwardedProtoHttps = gorouterConfig.forceForwardedProtoHTTPS
+				testState.cfg.SanitizeForwardedProto = gorouterConfig.sanitizeForwardedProto
 				testState.StartGorouter()
 
-				receivedHeaders := make(chan http.Header, 1)
-				testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					receivedHeaders <- r.Header
-					w.WriteHeader(200)
-				}))
-				defer testApp.Close()
-				hostname := fmt.Sprintf("basic-app-%d.some.domain", i)
-				testState.register(testApp, hostname)
-
-				req := testState.newRequest(testCase.clientRequestScheme, hostname)
-				if testCase.clientRequestHeader != "" {
+				doRequest := func(testCase testCase, hostname string) {
+					req := testState.newRequest(testCase.clientRequestScheme, hostname)
 					req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
-				}
-				resp, err := testState.client.Do(req)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(200))
-				resp.Body.Close()
 
-				gotHeader := <-receivedHeaders
-				Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+					resp, err := testState.client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(200))
+					resp.Body.Close()
+				}
+
+				for i, testCase := range testCases {
+					By(fmt.Sprintf("case %d: %v", i, testCase), func() {
+						hostname := fmt.Sprintf("basic-app-%d.some.domain", i)
+
+						receivedHeaders := make(chan http.Header, 1)
+						testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							receivedHeaders <- r.Header
+							w.WriteHeader(200)
+						}))
+						defer testApp.Close()
+						testState.register(testApp, hostname)
+
+						doRequest(testCase, hostname)
+
+						gotHeader := <-receivedHeaders
+						Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+					})
+
+					By(fmt.Sprintf("case %d via external route service", i), func() {
+						hostname := fmt.Sprintf("basic-app-%d-via-external-route-service.some.domain", i)
+
+						receivedHeaders := make(chan http.Header, 1)
+						routeService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							receivedHeaders <- r.Header
+							w.WriteHeader(200)
+						}))
+						routeService.TLS = testState.trustedExternalServiceTLS
+						routeService.StartTLS()
+						defer routeService.Close()
+						testState.registerAsExternalRouteService(routeService, testState.trustedExternalServiceHostname, hostname)
+
+						doRequest(testCase, hostname)
+
+						gotHeader := <-receivedHeaders
+						Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+					})
+				}
 			})
 		}
 	})
@@ -111,8 +155,10 @@ var _ = Describe("Basic integration tests", func() {
 
 type testState struct {
 	// these get set by the constructor
-	cfg    *config.Config
-	client *http.Client
+	cfg                            *config.Config
+	client                         *http.Client
+	trustedExternalServiceHostname string
+	trustedExternalServiceTLS      *tls.Config
 
 	// these get set when gorouter is started
 	tmpdir          string
@@ -142,13 +188,29 @@ func (s *testState) register(backend *httptest.Server, routeURI string) {
 		RouteServiceURL:         "",
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 	}
+	s.registerAndWait(rm)
+}
 
+func (s *testState) registerAsExternalRouteService(routeServiceServer *httptest.Server, routeServiceHostname string, routeURI string) {
+	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
+	rm := mbus.RegistryMessage{
+		Host: "169.254.255.255", // blackhole: traffic should just go to the route service
+		Port: uint16(4),         // blackhole: no one uses port 4
+		Uris: []route.Uri{route.Uri(routeURI)},
+		StaleThresholdInSeconds: 1,
+		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, serverPort),
+		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
+	}
+	s.registerAndWait(rm)
+}
+
+func (s *testState) registerAndWait(rm mbus.RegistryMessage) {
 	b, _ := json.Marshal(rm)
 	s.mbusClient.Publish("router.register", b)
 
 	routesUri := fmt.Sprintf("http://%s:%s@127.0.0.1:%d/routes", s.cfg.Status.User, s.cfg.Status.Pass, s.cfg.Status.Port)
 	Eventually(func() (bool, error) {
-		return routeExists(routesUri, routeURI)
+		return routeExists(routesUri, string(rm.Uris[0]))
 	}).Should(BeTrue())
 }
 
@@ -170,6 +232,12 @@ func NewTestState() *testState {
 
 	cfg.SuspendPruningIfNatsUnavailable = true
 
+	externalRouteServiceHostname := "external-route-service.localhost.routing.cf-app.com"
+	routeServiceKey, routeServiceCert := test_util.CreateKeyPair(externalRouteServiceHostname)
+	routeServiceTLSCert, err := tls.X509KeyPair(routeServiceCert, routeServiceKey)
+	Expect(err).ToNot(HaveOccurred())
+	cfg.CACerts = string(routeServiceCert)
+
 	uaaCACertsPath, err := filepath.Abs(filepath.Join("test", "assets", "certs", "uaa-ca.pem"))
 	Expect(err).ToNot(HaveOccurred())
 
@@ -186,6 +254,10 @@ func NewTestState() *testState {
 			Transport: &http.Transport{
 				TLSClientConfig: clientTLSConfig,
 			},
+		},
+		trustedExternalServiceHostname: externalRouteServiceHostname,
+		trustedExternalServiceTLS: &tls.Config{
+			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
 	}
 }
