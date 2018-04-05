@@ -89,9 +89,10 @@ var _ = Describe("Basic integration tests", func() {
 					w.WriteHeader(200)
 				}))
 				defer testApp.Close()
-				testState.register(testApp, "basic-app.some.domain")
+				hostname := fmt.Sprintf("basic-app-%d.some.domain", i)
+				testState.register(testApp, hostname)
 
-				req := testState.newRequest(testCase.clientRequestScheme, "basic-app.some.domain")
+				req := testState.newRequest(testCase.clientRequestScheme, hostname)
 				if testCase.clientRequestHeader != "" {
 					req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
 				}
