@@ -335,6 +335,16 @@ var _ = Describe("Proxy", func() {
 					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("https"))
 				})
 			})
+
+			Context("when the sanitize forwarded proto option is enabled", func() {
+				BeforeEach(func() {
+					conf.SanitizeForwardedProto = true
+				})
+				It("prevents an http client from spoofing the X-Forwarded-Proto header", func() {
+					req.Header.Set("X-Forwarded-Proto", "https")
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("http"))
+				})
+			})
 		})
 
 		Describe("X-Forwarded-For", func() {

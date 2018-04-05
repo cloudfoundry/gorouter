@@ -48,6 +48,7 @@ type proxy struct {
 	routeServiceConfig       *routeservice.RouteServiceConfig
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
+	sanitizeForwardedProto   bool
 	defaultLoadBalance       string
 	endpointDialTimeout      time.Duration
 	endpointTimeout          time.Duration
@@ -117,6 +118,7 @@ func NewProxy(
 		routeServiceConfig:       routeServiceConfig,
 		healthCheckUserAgent:     c.HealthCheckUserAgent,
 		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
+		sanitizeForwardedProto:   c.SanitizeForwardedProto,
 		defaultLoadBalance:       c.LoadBalance,
 		endpointDialTimeout:      c.EndpointDialTimeout,
 		endpointTimeout:          c.EndpointTimeout,
@@ -254,7 +256,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 func (p *proxy) setupProxyRequest(target *http.Request) {
 	if p.forceForwardedProtoHttps {
 		target.Header.Set("X-Forwarded-Proto", "https")
-	} else if target.Header.Get("X-Forwarded-Proto") == "" {
+	} else if p.sanitizeForwardedProto || target.Header.Get("X-Forwarded-Proto") == "" {
 		scheme := "http"
 		if target.TLS != nil {
 			scheme = "https"

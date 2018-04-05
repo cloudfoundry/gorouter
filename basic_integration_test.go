@@ -80,7 +80,7 @@ var _ = Describe("Basic integration tests", func() {
 			testCase := tc
 			It(fmt.Sprintf("case %d: %v: sets the header correctly", i, testCase), func() {
 				testState.cfg.ForceForwardedProtoHttps = testCase.forceForwardedProtoHTTPS
-				// testState.cfg.SanitizeForwardedProto = testCase.sanitizeForwardedProto  <-- implement this!
+				testState.cfg.SanitizeForwardedProto = testCase.sanitizeForwardedProto
 				testState.StartGorouter()
 
 				receivedHeaders := make(chan http.Header, 1)

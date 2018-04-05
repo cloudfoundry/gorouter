@@ -133,6 +133,7 @@ type Config struct {
 	SkipSSLValidation        bool              `yaml:"skip_ssl_validation,omitempty"`
 	ForwardedClientCert      string            `yaml:"forwarded_client_cert,omitempty"`
 	ForceForwardedProtoHttps bool              `yaml:"force_forwarded_proto_https,omitempty"`
+	SanitizeForwardedProto   bool              `yaml:"sanitize_forwarded_proto,omitempty"`
 	IsolationSegments        []string          `yaml:"isolation_segments,omitempty"`
 	RoutingTableShardingMode string            `yaml:"routing_table_sharding_mode,omitempty"`
 
