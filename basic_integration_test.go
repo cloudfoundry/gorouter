@@ -70,7 +70,7 @@ var _ = Describe("Basic integration tests", func() {
 			{true, false, "http", "https", "https"},
 			{true, false, "https", "http", "https"},
 			{true, false, "https", "https", "https"},
-			{true, false, "http", "http", "https"},
+			{true, true, "http", "http", "https"},
 			{true, true, "http", "https", "https"},
 			{true, true, "https", "http", "https"},
 			{true, true, "https", "https", "https"},
