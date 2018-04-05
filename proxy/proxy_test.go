@@ -286,7 +286,7 @@ var _ = Describe("Proxy", func() {
 
 		JustBeforeEach(func() {
 			ln = test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
-				req, err := http.ReadRequest(conn.Reader)
+				tmpReq, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp := test_util.NewResponse(fakeResponseCode)
@@ -296,7 +296,7 @@ var _ = Describe("Proxy", func() {
 				}
 				conn.Close()
 
-				receivedHeaders <- req.Header
+				receivedHeaders <- tmpReq.Header
 			}, extraRegisterCfg...)
 
 			req = test_util.NewRequest("GET", "app", "/", nil)
