@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -29,6 +30,7 @@ type RouteServicesServer struct {
 	rootCA     *x509.CertPool
 	clientCert tls.Certificate
 	serverCert tls.Certificate
+	servers    []*http.Server
 }
 
 func NewRouteServicesServer() (*RouteServicesServer, error) {
@@ -68,7 +70,26 @@ func NewRouteServicesServer() (*RouteServicesServer, error) {
 	}, nil
 }
 
+func (rs *RouteServicesServer) ArrivedViaARouteServicesServer(req *http.Request) bool {
+	if reqRS, ok := req.Context().Value(arrivedViaRSS).(*RouteServicesServer); ok {
+		return reqRS == rs
+	}
+	return false
+}
+
+type key int
+
+const arrivedViaRSS key = 0
+
 func (rs *RouteServicesServer) Serve(server *http.Server, errChan chan error) error {
+	existingHandler := server.Handler
+	clonedServerVal := *server
+	clonedServerPtr := &clonedServerVal
+	clonedServerPtr.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqWithData := r.WithContext(context.WithValue(r.Context(), arrivedViaRSS, rs))
+		existingHandler.ServeHTTP(w, reqWithData)
+	})
+
 	tlsConfig := &tls.Config{
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{rs.serverCert},
@@ -76,7 +97,7 @@ func (rs *RouteServicesServer) Serve(server *http.Server, errChan chan error) er
 	}
 
 	go func() {
-		err := server.Serve(tls.NewListener(rs.listener, tlsConfig))
+		err := clonedServerPtr.Serve(tls.NewListener(rs.listener, tlsConfig))
 		errChan <- err
 	}()
 
