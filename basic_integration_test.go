@@ -128,7 +128,7 @@ var _ = Describe("Basic integration tests", func() {
 						Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
 					})
 
-					By(fmt.Sprintf("case %d via external route service", i), func() {
+					By(fmt.Sprintf("case %d: %v via external route service", i, testCase), func() {
 						hostname := fmt.Sprintf("basic-app-%d-via-external-route-service.some.domain", i)
 
 						receivedHeaders := make(chan http.Header, 1)
@@ -140,6 +140,23 @@ var _ = Describe("Basic integration tests", func() {
 						routeService.StartTLS()
 						defer routeService.Close()
 						testState.registerAsExternalRouteService(routeService, testState.trustedExternalServiceHostname, hostname)
+
+						doRequest(testCase, hostname)
+
+						gotHeader := <-receivedHeaders
+						Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+					})
+
+					By(fmt.Sprintf("case %d: %v via internal route service", i, testCase), func() {
+						hostname := fmt.Sprintf("basic-app-%d-via-internal-route-service.some.domain", i)
+
+						receivedHeaders := make(chan http.Header, 1)
+						routeService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							receivedHeaders <- r.Header
+							w.WriteHeader(200)
+						}))
+						defer routeService.Close()
+						testState.registerAsInternalRouteService(routeService, hostname)
 
 						doRequest(testCase, hostname)
 
@@ -202,6 +219,13 @@ func (s *testState) registerAsExternalRouteService(routeServiceServer *httptest.
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 	}
 	s.registerAndWait(rm)
+}
+
+func (s *testState) registerAsInternalRouteService(routeServiceServer *httptest.Server, routeURI string) {
+	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
+	internalRouteServiceHostname := fmt.Sprintf("some-internal-route-service-%d.some.domain", serverPort)
+	s.register(routeServiceServer, internalRouteServiceHostname)                                 // the route service is just an app registered normally
+	s.registerAsExternalRouteService(routeServiceServer, internalRouteServiceHostname, routeURI) // register
 }
 
 func (s *testState) registerAndWait(rm mbus.RegistryMessage) {
