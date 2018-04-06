@@ -179,37 +179,14 @@ func NewProxy(
 	n.Use(handlers.NewLookup(registry, reporter, logger, c.Backends.MaxConns))
 	n.Use(handlers.NewRouteService(routeServiceConfig, logger, registry))
 	n.Use(p)
-	n.Use(&sanitize{
-		skipSanitization:         p.skipSanitization,
-		forceForwardedProtoHttps: p.forceForwardedProtoHttps,
-		sanitizeForwardedProto:   p.sanitizeForwardedProto,
+	n.Use(&handlers.XForwardedProto{
+		SkipSanitization:         p.skipSanitization,
+		ForceForwardedProtoHttps: p.forceForwardedProtoHttps,
+		SanitizeForwardedProto:   p.sanitizeForwardedProto,
 	})
 	n.UseHandler(rproxy)
 
 	return n
-}
-
-type sanitize struct {
-	skipSanitization         func(req *http.Request) bool
-	forceForwardedProtoHttps bool
-	sanitizeForwardedProto   bool
-}
-
-func (s *sanitize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	newReq := new(http.Request)
-	*newReq = *r
-	if !s.skipSanitization(r) {
-		if s.forceForwardedProtoHttps {
-			newReq.Header.Set("X-Forwarded-Proto", "https")
-		} else if s.sanitizeForwardedProto || newReq.Header.Get("X-Forwarded-Proto") == "" {
-			scheme := "http"
-			if newReq.TLS != nil {
-				scheme = "https"
-			}
-			newReq.Header.Set("X-Forwarded-Proto", scheme)
-		}
-	}
-	next(rw, newReq)
 }
 
 func hostWithoutPort(req *http.Request) string {

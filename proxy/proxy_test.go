@@ -317,60 +317,6 @@ var _ = Describe("Proxy", func() {
 			return headers
 		}
 
-		Describe("X-Forwarded-Proto", func() {
-			It("adds X-Forwarded-Proto if not present", func() {
-				Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("http"))
-			})
-
-			It("doesn't overwrite X-Forwarded-Proto if present", func() {
-				req.Header.Set("X-Forwarded-Proto", "https")
-				Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("https"))
-			})
-
-			Context("Force Forwarded Proto HTTPS config option is set", func() {
-				BeforeEach(func() {
-					conf.ForceForwardedProtoHttps = true
-				})
-				It("forces the X-Forwarded-Proto header to https", func() {
-					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("https"))
-				})
-			})
-
-			Context("when the sanitize forwarded proto option is enabled", func() {
-				BeforeEach(func() {
-					conf.SanitizeForwardedProto = true
-				})
-				It("prevents an http client from spoofing the X-Forwarded-Proto header", func() {
-					req.Header.Set("X-Forwarded-Proto", "https")
-					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("http"))
-				})
-			})
-
-			Context("when the request header should not be modified", func() {
-				BeforeEach(func() {
-					skipSanitization = func(req *http.Request) bool { return true }
-				})
-				Context("when sanitize is set", func() {
-					BeforeEach(func() {
-						conf.SanitizeForwardedProto = true
-					})
-					It("leaves ignores the sanitize option", func() {
-						req.Header.Set("X-Forwarded-Proto", "potato")
-						Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("potato"))
-					})
-				})
-				Context("when force is set", func() {
-					BeforeEach(func() {
-						conf.ForceForwardedProtoHttps = true
-					})
-					It("leaves ignores the sanitize option", func() {
-						req.Header.Set("X-Forwarded-Proto", "potato")
-						Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("potato"))
-					})
-				})
-			})
-		})
-
 		Describe("X-Forwarded-For", func() {
 			It("sets X-Forwarded-For", func() {
 				Expect(getProxiedHeaders(req).Get("X-Forwarded-For")).To(Equal("127.0.0.1"))
