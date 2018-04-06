@@ -157,7 +157,7 @@ func main() {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
 	healthCheck = 0
-	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper())
+	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper(), rss.ArrivedViaARouteServicesServer)
 	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))

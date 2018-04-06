@@ -3,6 +3,7 @@ package proxy_test
 import (
 	"bytes"
 	"crypto/tls"
+	"net/http"
 	"net/http/httptest"
 	"time"
 
@@ -60,8 +61,10 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			rt := &sharedfakes.RoundTripper{}
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+
+			skipSanitization = func(req *http.Request) bool { return false }
 			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
-				routeServiceConfig, tlsConfig, nil, rt)
+				routeServiceConfig, tlsConfig, nil, rt, skipSanitization)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
 

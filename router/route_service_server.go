@@ -81,15 +81,13 @@ type key int
 
 const arrivedViaRSS key = 0
 
-func (rs *RouteServicesServer) Serve(server *http.Server, errChan chan error) error {
-	existingHandler := server.Handler
-	clonedServerVal := *server
-	clonedServerPtr := &clonedServerVal
-	clonedServerPtr.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqWithData := r.WithContext(context.WithValue(r.Context(), arrivedViaRSS, rs))
-		existingHandler.ServeHTTP(w, reqWithData)
-	})
-
+func (rs *RouteServicesServer) Serve(handler http.Handler, errChan chan error) error {
+	localServer := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reqWithData := r.WithContext(context.WithValue(r.Context(), arrivedViaRSS, rs))
+			handler.ServeHTTP(w, reqWithData)
+		}),
+	}
 	tlsConfig := &tls.Config{
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{rs.serverCert},
@@ -97,7 +95,7 @@ func (rs *RouteServicesServer) Serve(server *http.Server, errChan chan error) er
 	}
 
 	go func() {
-		err := clonedServerPtr.Serve(tls.NewListener(rs.listener, tlsConfig))
+		err := localServer.Serve(tls.NewListener(rs.listener, tlsConfig))
 		errChan <- err
 	}()
 

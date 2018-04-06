@@ -345,6 +345,30 @@ var _ = Describe("Proxy", func() {
 					Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("http"))
 				})
 			})
+
+			Context("when the request header should not be modified", func() {
+				BeforeEach(func() {
+					skipSanitization = func(req *http.Request) bool { return true }
+				})
+				Context("when sanitize is set", func() {
+					BeforeEach(func() {
+						conf.SanitizeForwardedProto = true
+					})
+					It("leaves ignores the sanitize option", func() {
+						req.Header.Set("X-Forwarded-Proto", "potato")
+						Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("potato"))
+					})
+				})
+				Context("when force is set", func() {
+					BeforeEach(func() {
+						conf.ForceForwardedProtoHttps = true
+					})
+					It("leaves ignores the sanitize option", func() {
+						req.Header.Set("X-Forwarded-Proto", "potato")
+						Expect(getProxiedHeaders(req).Get("X-Forwarded-Proto")).To(Equal("potato"))
+					})
+				})
+			})
 		})
 
 		Describe("X-Forwarded-For", func() {

@@ -222,8 +222,9 @@ var _ = Describe("Router", func() {
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 		rt := &sharedfakes.RoundTripper{}
+		skipSanitize := func(*http.Request) bool { return false }
 		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt)
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt, skipSanitize)
 
 		errChan := make(chan error, 2)
 		var err error
@@ -468,8 +469,9 @@ var _ = Describe("Router", func() {
 				healthCheck = 0
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
+				skipSanitize := func(*http.Request) bool { return false }
 				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt)
+					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt, skipSanitize)
 
 				errChan = make(chan error, 2)
 				var err error

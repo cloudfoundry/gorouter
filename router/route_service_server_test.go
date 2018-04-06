@@ -12,17 +12,15 @@ import (
 var _ = Describe("RouteServicesServer", func() {
 	var (
 		rss     *router.RouteServicesServer
-		server  *http.Server
+		handler http.Handler
 		errChan chan error
 		req     *http.Request
 	)
 
 	BeforeEach(func() {
-		server = &http.Server{
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusTeapot)
-			}),
-		}
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+		})
 
 		var err error
 		rss, err = router.NewRouteServicesServer()
@@ -30,7 +28,7 @@ var _ = Describe("RouteServicesServer", func() {
 
 		errChan = make(chan error)
 
-		Expect(rss.Serve(server, errChan)).To(Succeed())
+		Expect(rss.Serve(handler, errChan)).To(Succeed())
 
 		req, err = http.NewRequest("GET", "/foo", nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -61,16 +59,14 @@ var _ = Describe("RouteServicesServer", func() {
 			rss, err = router.NewRouteServicesServer()
 			Expect(err).NotTo(HaveOccurred())
 
-			server = &http.Server{
-				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if rss.ArrivedViaARouteServicesServer(r) {
-						w.WriteHeader(200)
-					} else {
-						w.WriteHeader(401)
-					}
-				}),
-			}
-			Expect(rss.Serve(server, errChan)).To(Succeed())
+			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if rss.ArrivedViaARouteServicesServer(r) {
+					w.WriteHeader(200)
+				} else {
+					w.WriteHeader(401)
+				}
+			})
+			Expect(rss.Serve(handler, errChan)).To(Succeed())
 		})
 
 		It("returns true for requests that arrived via the RouteServicesServer", func() {
@@ -86,7 +82,7 @@ var _ = Describe("RouteServicesServer", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			otherErrChan := make(chan error)
-			Expect(otherRSS.Serve(server, otherErrChan)).To(Succeed())
+			Expect(otherRSS.Serve(handler, otherErrChan)).To(Succeed())
 
 			resp, err := otherRSS.GetRoundTripper().RoundTrip(req)
 			Expect(err).NotTo(HaveOccurred())

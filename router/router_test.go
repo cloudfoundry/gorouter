@@ -184,7 +184,7 @@ var _ = Describe("Router", func() {
 				c.StartResponseDelayInterval = 1 * time.Second
 
 				rss := &sharedfakes.RouteServicesServer{}
-				rss.ServeStub = func(server *http.Server, errChan chan error) error {
+				rss.ServeStub = func(handler http.Handler, errChan chan error) error {
 					errChan <- errors.New("a shutdown error")
 					return nil
 				}
@@ -1870,8 +1870,9 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
 
 	rt := &sharedfakes.RoundTripper{}
+	skipSanitize := func(*http.Request) bool { return false }
 	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, nil, rt)
+		routeServiceConfig, &tls.Config{}, nil, rt, skipSanitize)
 
 	var healthCheck int32
 	healthCheck = 0

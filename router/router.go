@@ -45,7 +45,7 @@ var noDeadline = time.Time{}
 
 //go:generate counterfeiter -o ../fakes/route_services_server.go --fake-name RouteServicesServer . rss
 type rss interface {
-	Serve(server *http.Server, errChan chan error) error
+	Serve(handler http.Handler, errChan chan error) error
 	Stop()
 }
 
@@ -166,7 +166,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		r.errChan <- err
 		return err
 	}
-	err = r.routeServicesServer.Serve(server, r.errChan)
+	err = r.routeServicesServer.Serve(r.proxy, r.errChan)
 	if err != nil {
 		r.errChan <- err
 		return err

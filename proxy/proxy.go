@@ -54,6 +54,7 @@ type proxy struct {
 	endpointTimeout          time.Duration
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
+	skipSanitization         func(req *http.Request) bool
 }
 
 func NewDropsondeRoundTripper(p round_tripper.ProxyRoundTripper) round_tripper.ProxyRoundTripper {
@@ -105,6 +106,7 @@ func NewProxy(
 	tlsConfig *tls.Config,
 	heartbeatOK *int32,
 	routeServicesTransport http.RoundTripper,
+	skipSanitization func(req *http.Request) bool,
 ) Proxy {
 
 	p := &proxy{
@@ -124,6 +126,7 @@ func NewProxy(
 		endpointTimeout:          c.EndpointTimeout,
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         tlsConfig,
+		skipSanitization:         skipSanitization,
 	}
 
 	httpTransportTemplate := &http.Transport{
@@ -254,14 +257,16 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 }
 
 func (p *proxy) setupProxyRequest(target *http.Request) {
-	if p.forceForwardedProtoHttps {
-		target.Header.Set("X-Forwarded-Proto", "https")
-	} else if p.sanitizeForwardedProto || target.Header.Get("X-Forwarded-Proto") == "" {
-		scheme := "http"
-		if target.TLS != nil {
-			scheme = "https"
+	if !p.skipSanitization(target) {
+		if p.forceForwardedProtoHttps {
+			target.Header.Set("X-Forwarded-Proto", "https")
+		} else if p.sanitizeForwardedProto || target.Header.Get("X-Forwarded-Proto") == "" {
+			scheme := "http"
+			if target.TLS != nil {
+				scheme = "https"
+			}
+			target.Header.Set("X-Forwarded-Proto", scheme)
 		}
-		target.Header.Set("X-Forwarded-Proto", scheme)
 	}
 
 	reqInfo, err := handlers.ContextRequestInfo(target)

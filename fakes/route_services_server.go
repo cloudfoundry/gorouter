@@ -7,10 +7,10 @@ import (
 )
 
 type RouteServicesServer struct {
-	ServeStub        func(server *http.Server, errChan chan error) error
+	ServeStub        func(handler http.Handler, errChan chan error) error
 	serveMutex       sync.RWMutex
 	serveArgsForCall []struct {
-		server  *http.Server
+		handler http.Handler
 		errChan chan error
 	}
 	serveReturns struct {
@@ -26,17 +26,17 @@ type RouteServicesServer struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *RouteServicesServer) Serve(server *http.Server, errChan chan error) error {
+func (fake *RouteServicesServer) Serve(handler http.Handler, errChan chan error) error {
 	fake.serveMutex.Lock()
 	ret, specificReturn := fake.serveReturnsOnCall[len(fake.serveArgsForCall)]
 	fake.serveArgsForCall = append(fake.serveArgsForCall, struct {
-		server  *http.Server
+		handler http.Handler
 		errChan chan error
-	}{server, errChan})
-	fake.recordInvocation("Serve", []interface{}{server, errChan})
+	}{handler, errChan})
+	fake.recordInvocation("Serve", []interface{}{handler, errChan})
 	fake.serveMutex.Unlock()
 	if fake.ServeStub != nil {
-		return fake.ServeStub(server, errChan)
+		return fake.ServeStub(handler, errChan)
 	}
 	if specificReturn {
 		return ret.result1
@@ -50,10 +50,10 @@ func (fake *RouteServicesServer) ServeCallCount() int {
 	return len(fake.serveArgsForCall)
 }
 
-func (fake *RouteServicesServer) ServeArgsForCall(i int) (*http.Server, chan error) {
+func (fake *RouteServicesServer) ServeArgsForCall(i int) (http.Handler, chan error) {
 	fake.serveMutex.RLock()
 	defer fake.serveMutex.RUnlock()
-	return fake.serveArgsForCall[i].server, fake.serveArgsForCall[i].errChan
+	return fake.serveArgsForCall[i].handler, fake.serveArgsForCall[i].errChan
 }
 
 func (fake *RouteServicesServer) ServeReturns(result1 error) {

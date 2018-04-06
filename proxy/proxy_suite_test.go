@@ -45,6 +45,7 @@ var (
 	heartbeatOK             int32
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
+	skipSanitization        func(req *http.Request) bool
 )
 
 func TestProxy(t *testing.T) {
@@ -66,6 +67,7 @@ var _ = BeforeEach(func() {
 	conf.EndpointTimeout = 1 * time.Second
 	conf.EndpointDialTimeout = 50 * time.Millisecond
 	fakeReporter = &fakes.FakeCombinedReporter{}
+	skipSanitization = func(*http.Request) bool { return false }
 })
 
 var _ = JustBeforeEach(func() {
@@ -113,7 +115,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient)
+	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient, skipSanitization)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)
