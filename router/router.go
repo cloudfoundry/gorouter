@@ -26,7 +26,6 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
-	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
 	"github.com/armon/go-proxyproto"
@@ -51,7 +50,7 @@ type rss interface {
 
 type Router struct {
 	config     *config.Config
-	proxy      proxy.Proxy
+	handler    http.Handler
 	mbusClient *nats.Conn
 	registry   *registry.RouteRegistry
 	varz       varz.Varz
@@ -76,7 +75,7 @@ type Router struct {
 	routeServicesServer rss
 }
 
-func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
+func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, mbusClient *nats.Conn, r *registry.RouteRegistry,
 	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
 
 	var host string
@@ -115,7 +114,7 @@ func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClie
 
 	router := &Router{
 		config:              cfg,
-		proxy:               p,
+		handler:             handler,
 		mbusClient:          mbusClient,
 		registry:            r,
 		varz:                v,
@@ -151,7 +150,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	time.Sleep(r.config.StartResponseDelayInterval)
 
 	server := &http.Server{
-		Handler:     r.proxy,
+		Handler:     r.handler,
 		ConnState:   r.HandleConnState,
 		IdleTimeout: r.config.FrontendIdleTimeout,
 	}
@@ -166,7 +165,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		r.errChan <- err
 		return err
 	}
-	err = r.routeServicesServer.Serve(r.proxy, r.errChan)
+	err = r.routeServicesServer.Serve(r.handler, r.errChan)
 	if err != nil {
 		r.errChan <- err
 		return err
