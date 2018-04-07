@@ -922,18 +922,9 @@ var _ = Describe("Router", func() {
 			config.DisableHTTP = true
 		})
 
-		It("does not serve http traffic", func() {
-			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
-			app.RegisterAndListen()
-			Eventually(func() bool {
-				return appRegistered(registry, app)
-			}).Should(BeTrue())
-
-			req, err := http.NewRequest("GET", app.Endpoint(), nil)
-			Expect(err).ToNot(HaveOccurred())
-			client := http.Client{}
-			_, err = client.Do(req)
-			Expect(err).To(HaveOccurred())
+		It("does refuses connections to the HTTP port", func() {
+			_, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", config.Port))
+			Expect(err).To(MatchError(ContainSubstring("connection refused")))
 		})
 	})
 
@@ -1371,6 +1362,17 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resp).ToNot(BeNil())
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+		})
+
+		Context("when frontend SSL is disabled", func() {
+			BeforeEach(func() {
+				config.EnableSSL = false
+			})
+
+			It("refuses connections to the SSL port", func() {
+				_, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", config.SSLPort))
+				Expect(err.Error()).To(ContainSubstring("connection refused"))
 			})
 		})
 

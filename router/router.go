@@ -240,93 +240,95 @@ func (r *Router) DrainAndStop() {
 }
 
 func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
-	if r.config.EnableSSL {
-		rootCAs, err := x509.SystemCertPool()
-		if err != nil {
-			rootCAs = nil
-		}
-		if err == nil {
-			if r.config.CACerts != "" {
-				if ok := rootCAs.AppendCertsFromPEM([]byte(r.config.CACerts)); !ok {
-					r.logger.Fatal("servehttps-certpool-error",
-						zap.Error(fmt.Errorf("error adding a CA cert to cert pool")))
-				}
-			}
-		}
-
-		tlsConfig := &tls.Config{
-			Certificates: r.config.SSLCertificates,
-			CipherSuites: r.config.CipherSuites,
-			MinVersion:   r.config.MinTLSVersion,
-			ClientCAs:    rootCAs,
-			ClientAuth:   r.config.ClientCertificateValidation,
-		}
-
-		tlsConfig.BuildNameToCertificate()
-
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
-		if err != nil {
-			r.logger.Fatal("tls-listener-error", zap.Error(err))
-			return err
-		}
-
-		if r.config.EnablePROXY {
-			listener = &proxyproto.Listener{
-				Listener:           listener,
-				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
-			}
-		}
-
-		r.tlsListener = tls.NewListener(listener, tlsConfig)
-
-		r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
-
-		go func() {
-			err := server.Serve(r.tlsListener)
-			r.stopLock.Lock()
-			if !r.stopping {
-				errChan <- err
-			}
-			r.stopLock.Unlock()
-			close(r.tlsServeDone)
-		}()
-	} else {
+	if !r.config.EnableSSL {
 		r.logger.Info("tls-listener-not-enabled")
+		return nil
 	}
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		rootCAs = nil
+	}
+	if err == nil {
+		if r.config.CACerts != "" {
+			if ok := rootCAs.AppendCertsFromPEM([]byte(r.config.CACerts)); !ok {
+				r.logger.Fatal("servehttps-certpool-error",
+					zap.Error(fmt.Errorf("error adding a CA cert to cert pool")))
+			}
+		}
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: r.config.SSLCertificates,
+		CipherSuites: r.config.CipherSuites,
+		MinVersion:   r.config.MinTLSVersion,
+		ClientCAs:    rootCAs,
+		ClientAuth:   r.config.ClientCertificateValidation,
+	}
+
+	tlsConfig.BuildNameToCertificate()
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
+	if err != nil {
+		r.logger.Fatal("tls-listener-error", zap.Error(err))
+		return err
+	}
+
+	if r.config.EnablePROXY {
+		listener = &proxyproto.Listener{
+			Listener:           listener,
+			ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+		}
+	}
+
+	r.tlsListener = tls.NewListener(listener, tlsConfig)
+
+	r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
+
+	go func() {
+		err := server.Serve(r.tlsListener)
+		r.stopLock.Lock()
+		if !r.stopping {
+			errChan <- err
+		}
+		r.stopLock.Unlock()
+		close(r.tlsServeDone)
+	}()
 	return nil
 }
 
 func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
-	if !r.config.DisableHTTP {
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
-		if err != nil {
-			r.logger.Fatal("tcp-listener-error", zap.Error(err))
-			return err
-		}
-
-		r.listener = listener
-		if r.config.EnablePROXY {
-			r.listener = &proxyproto.Listener{
-				Listener:           listener,
-				ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
-			}
-		}
-
-		r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
-
-		go func() {
-			err := server.Serve(r.listener)
-			r.stopLock.Lock()
-			if !r.stopping {
-				errChan <- err
-			}
-			r.stopLock.Unlock()
-
-			close(r.serveDone)
-		}()
-	} else {
+	if r.config.DisableHTTP {
 		r.logger.Info("tcp-listener-disabled")
+		return nil
 	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
+	if err != nil {
+		r.logger.Fatal("tcp-listener-error", zap.Error(err))
+		return err
+	}
+
+	r.listener = listener
+	if r.config.EnablePROXY {
+		r.listener = &proxyproto.Listener{
+			Listener:           listener,
+			ProxyHeaderTimeout: proxyProtocolHeaderTimeout,
+		}
+	}
+
+	r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
+
+	go func() {
+		err := server.Serve(r.listener)
+		r.stopLock.Lock()
+		if !r.stopping {
+			errChan <- err
+		}
+		r.stopLock.Unlock()
+
+		close(r.serveDone)
+	}()
 	return nil
 }
 
