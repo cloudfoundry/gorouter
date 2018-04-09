@@ -26,7 +26,7 @@ import (
 
 var _ = Describe("Proxy Unit tests", func() {
 	var (
-		proxyObj         proxy.Proxy
+		proxyObj         http.Handler
 		fakeAccessLogger *fakelogger.FakeAccessLogger
 		logger           logger.Logger
 		resp             utils.ProxyResponseWriter

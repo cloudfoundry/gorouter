@@ -33,10 +33,6 @@ const (
 	StickyCookieKey = "JSESSIONID"
 )
 
-type Proxy interface {
-	ServeHTTP(responseWriter http.ResponseWriter, request *http.Request)
-}
-
 type proxy struct {
 	ip                       string
 	traceKey                 string
@@ -107,7 +103,7 @@ func NewProxy(
 	heartbeatOK *int32,
 	routeServicesTransport http.RoundTripper,
 	skipSanitization func(req *http.Request) bool,
-) Proxy {
+) http.Handler {
 
 	p := &proxy{
 		accessLogger:             accessLogger,

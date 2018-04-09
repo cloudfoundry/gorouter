@@ -31,7 +31,7 @@ import (
 
 var (
 	r                       *registry.RouteRegistry
-	p                       proxy.Proxy
+	p                       http.Handler
 	fakeReporter            *fakes.FakeCombinedReporter
 	conf                    *config.Config
 	proxyServer             net.Listener

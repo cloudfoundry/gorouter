@@ -39,7 +39,7 @@ var _ = Describe("Router", func() {
 		logger     logger.Logger
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
-		p          proxy.Proxy
+		p          http.Handler
 
 		combinedReporter metrics.ProxyReporter
 		mbusClient       *nats.Conn
