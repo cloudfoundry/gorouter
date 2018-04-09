@@ -71,7 +71,6 @@ type Router struct {
 	HeartbeatOK         *int32
 	logger              logger.Logger
 	errChan             chan error
-	NatsHost            *atomic.Value
 	routeServicesServer rss
 }
 
