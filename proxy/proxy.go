@@ -53,45 +53,6 @@ type proxy struct {
 	skipSanitization         func(req *http.Request) bool
 }
 
-func NewDropsondeRoundTripper(p round_tripper.ProxyRoundTripper) round_tripper.ProxyRoundTripper {
-	return &dropsondeRoundTripper{
-		p: p,
-		d: dropsonde.InstrumentedRoundTripper(p),
-	}
-}
-
-type dropsondeRoundTripper struct {
-	p round_tripper.ProxyRoundTripper
-	d http.RoundTripper
-}
-
-func (d *dropsondeRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	return d.d.RoundTrip(r)
-}
-
-func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
-	d.p.CancelRequest(r)
-}
-
-type RoundTripperFactoryImpl struct {
-	Template *http.Transport
-}
-
-func (t *RoundTripperFactoryImpl) New(expectedServerName string) round_tripper.ProxyRoundTripper {
-	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, t.Template.TLSClientConfig)
-
-	newTransport := &http.Transport{
-		Dial:                t.Template.Dial,
-		DisableKeepAlives:   t.Template.DisableKeepAlives,
-		MaxIdleConns:        t.Template.MaxIdleConns,
-		IdleConnTimeout:     t.Template.IdleConnTimeout,
-		MaxIdleConnsPerHost: t.Template.MaxIdleConnsPerHost,
-		DisableCompression:  t.Template.DisableCompression,
-		TLSClientConfig:     customTLSConfig,
-	}
-	return NewDropsondeRoundTripper(newTransport)
-}
-
 func NewProxy(
 	logger logger.Logger,
 	accessLogger access_log.AccessLogger,
@@ -125,17 +86,16 @@ func NewProxy(
 		skipSanitization:         skipSanitization,
 	}
 
-	httpTransportTemplate := &http.Transport{
-		Dial:                (&net.Dialer{Timeout: c.EndpointDialTimeout}).Dial,
-		DisableKeepAlives:   c.DisableKeepAlives,
-		MaxIdleConns:        c.MaxIdleConns,
-		IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
-		MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
-		DisableCompression:  true,
-		TLSClientConfig:     tlsConfig,
-	}
-	roundTripperFactory := &RoundTripperFactoryImpl{
-		Template: httpTransportTemplate,
+	roundTripperFactory := &round_tripper.FactoryImpl{
+		Template: &http.Transport{
+			Dial:                (&net.Dialer{Timeout: c.EndpointDialTimeout}).Dial,
+			DisableKeepAlives:   c.DisableKeepAlives,
+			MaxIdleConns:        c.MaxIdleConns,
+			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
+			MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
+			DisableCompression:  true,
+			TLSClientConfig:     tlsConfig,
+		},
 	}
 
 	prt := round_tripper.NewProxyRoundTripper(
