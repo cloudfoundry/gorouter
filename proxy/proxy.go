@@ -145,18 +145,6 @@ func NewProxy(
 	return n
 }
 
-func hostWithoutPort(req *http.Request) string {
-	host := req.Host
-
-	// Remove :<port>
-	pos := strings.Index(host, ":")
-	if pos >= 0 {
-		host = host[0:pos]
-	}
-
-	return host
-}
-
 type bufferPool struct {
 	pool *sync.Pool
 }
