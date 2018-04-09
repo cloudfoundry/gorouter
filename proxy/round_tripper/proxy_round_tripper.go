@@ -162,7 +162,9 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				zap.Int("attempt", retry),
 			)
 
-			endpoint = newRouteServiceEndpoint()
+			endpoint = &route.Endpoint{
+				Tags: map[string]string{},
+			}
 			reqInfo.RouteEndpoint = endpoint
 			request.Host = reqInfo.RouteServiceURL.Host
 			request.URL = new(url.URL)
@@ -341,10 +343,4 @@ func getStickySession(request *http.Request) string {
 		}
 	}
 	return ""
-}
-
-func newRouteServiceEndpoint() *route.Endpoint {
-	return &route.Endpoint{
-		Tags: map[string]string{},
-	}
 }
