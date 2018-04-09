@@ -57,8 +57,6 @@ type errorHandler interface {
 	HandleError(utils.ProxyResponseWriter, error)
 }
 
-type AfterRoundTrip func(req *http.Request, rsp *http.Response, endpoint *route.Endpoint, err error)
-
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
 	retryableClassifier fails.Classifier,
