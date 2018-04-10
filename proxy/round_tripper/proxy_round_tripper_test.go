@@ -127,7 +127,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				roundTripperFactory, retryableClassifier,
 				logger, "",
 				combinedReporter, false,
-				1234, errorHandler, routeServicesTransport,
+				errorHandler, routeServicesTransport,
 				timeout,
 			)
 		})
