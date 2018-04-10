@@ -64,7 +64,6 @@ func NewProxyRoundTripper(
 	defaultLoadBalance string,
 	combinedReporter metrics.ProxyReporter,
 	secureCookies bool,
-	localPort uint16,
 	errorHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
 	endpointTimeout time.Duration,
@@ -74,7 +73,6 @@ func NewProxyRoundTripper(
 		defaultLoadBalance:     defaultLoadBalance,
 		combinedReporter:       combinedReporter,
 		secureCookies:          secureCookies,
-		localPort:              localPort,
 		roundTripperFactory:    roundTripperFactory,
 		retryableClassifier:    retryableClassifier,
 		errorHandler:           errorHandler,
@@ -88,7 +86,6 @@ type roundTripper struct {
 	defaultLoadBalance     string
 	combinedReporter       metrics.ProxyReporter
 	secureCookies          bool
-	localPort              uint16
 	roundTripperFactory    RoundTripperFactory
 	retryableClassifier    fails.Classifier
 	errorHandler           errorHandler
