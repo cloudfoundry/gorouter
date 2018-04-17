@@ -42,8 +42,12 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	}
 
 	routeServiceURL := reqInfo.RoutePool.RouteServiceUrl()
+	if routeServiceURL == "" {
+		next(rw, req)
+		return
+	}
 	// Attempted to use a route service when it is not supported
-	if routeServiceURL != "" && !r.config.RouteServiceEnabled() {
+	if !r.config.RouteServiceEnabled() {
 		r.logger.Info("route-service-unsupported")
 
 		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
@@ -55,7 +59,7 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		)
 		return
 	}
-	if routeServiceURL != "" && IsTcpUpgrade(req) {
+	if IsTcpUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
 		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
@@ -67,7 +71,7 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		)
 		return
 	}
-	if routeServiceURL != "" && IsWebSocketUpgrade(req) {
+	if IsWebSocketUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
 		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
@@ -80,73 +84,71 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		return
 	}
 
-	if routeServiceURL != "" {
-		rsSignature := req.Header.Get(routeservice.HeaderKeySignature)
+	rsSignature := req.Header.Get(routeservice.HeaderKeySignature)
 
-		var recommendedScheme string
+	var recommendedScheme string
 
-		if r.config.RouteServiceRecommendHttps() {
-			recommendedScheme = "https"
-		} else {
-			recommendedScheme = "http"
+	if r.config.RouteServiceRecommendHttps() {
+		recommendedScheme = "https"
+	} else {
+		recommendedScheme = "http"
+	}
+
+	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
+	if hasBeenToRouteService(routeServiceURL, rsSignature) {
+		// A request from a route service destined for a backend instances
+		validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+		if err != nil {
+			r.logger.Error("signature-validation-failed", zap.Error(err))
+
+			writeStatus(
+				rw,
+				http.StatusBadRequest,
+				"Failed to validate Route Service Signature",
+				r.logger,
+			)
+			return
 		}
+		err = r.validateRouteServicePool(validatedSig, reqInfo)
+		if err != nil {
+			r.logger.Error("signature-validation-failed", zap.Error(err))
 
-		forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
-		if hasBeenToRouteService(routeServiceURL, rsSignature) {
-			// A request from a route service destined for a backend instances
-			validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
-			if err != nil {
-				r.logger.Error("signature-validation-failed", zap.Error(err))
+			writeStatus(
+				rw,
+				http.StatusBadRequest,
+				"Failed to validate Route Service Signature",
+				r.logger,
+			)
+			return
+		}
+		// Remove the headers since the backend should not see it
+		req.Header.Del(routeservice.HeaderKeySignature)
+		req.Header.Del(routeservice.HeaderKeyMetadata)
+		req.Header.Del(routeservice.HeaderKeyForwardedURL)
+	} else {
+		var err error
+		routeServiceArgs, err := r.config.Request(routeServiceURL, forwardedURLRaw)
+		if err != nil {
+			r.logger.Error("route-service-failed", zap.Error(err))
 
-				writeStatus(
-					rw,
-					http.StatusBadRequest,
-					"Failed to validate Route Service Signature",
-					r.logger,
-				)
-				return
-			}
-			err = r.validateRouteServicePool(validatedSig, reqInfo)
-			if err != nil {
-				r.logger.Error("signature-validation-failed", zap.Error(err))
+			writeStatus(
+				rw,
+				http.StatusInternalServerError,
+				"Route service request failed.",
+				r.logger,
+			)
+			return
+		}
+		req.Header.Set(routeservice.HeaderKeySignature, routeServiceArgs.Signature)
+		req.Header.Set(routeservice.HeaderKeyMetadata, routeServiceArgs.Metadata)
+		req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
 
-				writeStatus(
-					rw,
-					http.StatusBadRequest,
-					"Failed to validate Route Service Signature",
-					r.logger,
-				)
-				return
-			}
-			// Remove the headers since the backend should not see it
-			req.Header.Del(routeservice.HeaderKeySignature)
-			req.Header.Del(routeservice.HeaderKeyMetadata)
-			req.Header.Del(routeservice.HeaderKeyForwardedURL)
-		} else {
-			var err error
-			routeServiceArgs, err := r.config.Request(routeServiceURL, forwardedURLRaw)
-			if err != nil {
-				r.logger.Error("route-service-failed", zap.Error(err))
+		reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
 
-				writeStatus(
-					rw,
-					http.StatusInternalServerError,
-					"Route service request failed.",
-					r.logger,
-				)
-				return
-			}
-			req.Header.Set(routeservice.HeaderKeySignature, routeServiceArgs.Signature)
-			req.Header.Set(routeservice.HeaderKeyMetadata, routeServiceArgs.Metadata)
-			req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
-
-			reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
-
-			rsu := routeServiceArgs.ParsedUrl
-			uri := route.Uri(hostWithoutPort(rsu.Host) + rsu.EscapedPath())
-			if r.registry.Lookup(uri) != nil {
-				reqInfo.IsInternalRouteService = true
-			}
+		rsu := routeServiceArgs.ParsedUrl
+		uri := route.Uri(hostWithoutPort(rsu.Host) + rsu.EscapedPath())
+		if r.registry.Lookup(uri) != nil {
+			reqInfo.IsInternalRouteService = true
 		}
 	}
 
