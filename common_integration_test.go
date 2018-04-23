@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
@@ -32,6 +33,8 @@ type testState struct {
 	client                         *http.Client
 	trustedExternalServiceHostname string
 	trustedExternalServiceTLS      *tls.Config
+
+	trustedClientTLSConfig *tls.Config
 
 	// these get set when gorouter is started
 	tmpdir          string
@@ -64,6 +67,11 @@ func NewTestState() *testState {
 	Expect(err).ToNot(HaveOccurred())
 	cfg.CACerts = string(routeServiceCert)
 
+	clientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	clientTLSCert, err := tls.X509KeyPair(clientCertChain.CertPEM, clientCertChain.PrivKeyPEM)
+	Expect(err).NotTo(HaveOccurred())
+	cfg.CACerts = cfg.CACerts + string(clientCertChain.CACertPEM)
+
 	uaaCACertsPath, err := filepath.Abs(filepath.Join("test", "assets", "certs", "uaa-ca.pem"))
 	Expect(err).ToNot(HaveOccurred())
 
@@ -85,14 +93,17 @@ func NewTestState() *testState {
 		trustedExternalServiceTLS: &tls.Config{
 			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
+		trustedClientTLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{clientTLSCert},
+		},
 	}
 }
 
-func (s *testState) newRequest(scheme, hostname string) *http.Request {
-	req, err := http.NewRequest("GET", scheme+"://"+hostname, nil)
+func (s *testState) newRequest(url string) *http.Request {
+	req, err := http.NewRequest("GET", url, nil)
 	Expect(err).NotTo(HaveOccurred())
 	port := s.cfg.Port
-	if scheme == "https" {
+	if strings.HasPrefix(url, "https") {
 		port = s.cfg.SSLPort
 	}
 	req.URL.Host = fmt.Sprintf("127.0.0.1:%d", port)

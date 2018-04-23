@@ -1534,6 +1534,7 @@ var _ = Describe("Proxy", func() {
 
 			conn.Close()
 		})
+
 		It("logs the response time and status code 101 in the access logs", func() {
 			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
 				conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
@@ -1571,6 +1572,7 @@ var _ = Describe("Proxy", func() {
 
 			conn.Close()
 		})
+
 		It("does not emit a latency metric", func() {
 			var wg sync.WaitGroup
 			first := true
@@ -1607,6 +1609,7 @@ var _ = Describe("Proxy", func() {
 
 			Consistently(fakeReporter.CaptureRoutingResponseLatencyCallCount, 1).Should(Equal(0))
 		})
+
 		Context("when the connection to the backend fails", func() {
 			It("logs a 502 BadGateway", func() {
 				test_util.RegisterAddr(r, "tcp-handler", "192.0.2.1:1234", test_util.RegisterConfig{
@@ -1752,7 +1755,6 @@ var _ = Describe("Proxy", func() {
 			})
 		})
 	})
-
 })
 
 // HACK: this is used to silence any http warnings in logs

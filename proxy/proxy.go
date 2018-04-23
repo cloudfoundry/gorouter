@@ -116,15 +116,13 @@ func NewProxy(
 		ModifyResponse: p.modifyResponse,
 	}
 
+	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, logger, registry)
 	zipkinHandler := handlers.NewZipkin(c.Tracing.EnableZipkin, c.ExtraHeadersToLog, logger)
 	n := negroni.New()
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
 	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
-	if c.ForwardedClientCert != config.ALWAYS_FORWARD {
-		n.Use(handlers.NewClientCert(c.ForwardedClientCert))
-	}
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 
@@ -132,7 +130,13 @@ func NewProxy(
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger, c.Backends.MaxConns))
-	n.Use(handlers.NewRouteService(routeServiceConfig, logger, registry))
+	n.Use(handlers.NewClientCert(
+		SkipSanitizationFactory(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
+		ForceDeleteXFCCHeaderFactory(routeServiceHandler.(*handlers.RouteService), c.ForwardedClientCert),
+		c.ForwardedClientCert,
+		logger,
+	))
+	n.Use(routeServiceHandler)
 	n.Use(p)
 	n.Use(&handlers.XForwardedProto{
 		SkipSanitization:         p.skipSanitization,
@@ -142,6 +146,30 @@ func NewProxy(
 	n.UseHandler(rproxy)
 
 	return n
+}
+
+type ArrivedViaRouteServiceValidator interface {
+	ValidatedArrivedViaRouteService(req *http.Request) (bool, error)
+}
+
+func SkipSanitizationFactory(arrivedViaRouteServicesServer func(*http.Request) bool, arrivedViaRouteServiceValidator ArrivedViaRouteServiceValidator) func(*http.Request) (bool, error) {
+	return func(req *http.Request) (bool, error) {
+		validatedArrivedViaRouteService, err := arrivedViaRouteServiceValidator.ValidatedArrivedViaRouteService(req)
+		if err != nil {
+			return false, err
+		}
+		return arrivedViaRouteServicesServer(req) || (validatedArrivedViaRouteService && req.TLS != nil), nil
+	}
+}
+
+func ForceDeleteXFCCHeaderFactory(arrivedViaRouteServiceValidator ArrivedViaRouteServiceValidator, forwardedClientCert string) func(*http.Request) (bool, error) {
+	return func(req *http.Request) (bool, error) {
+		ValidatedArrivedViaRouteService, err := arrivedViaRouteServiceValidator.ValidatedArrivedViaRouteService(req)
+		if err != nil {
+			return false, err
+		}
+		return ValidatedArrivedViaRouteService && forwardedClientCert != config.SANITIZE_SET, nil
+	}
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {

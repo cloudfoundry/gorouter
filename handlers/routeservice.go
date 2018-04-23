@@ -15,7 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 )
 
-type routeService struct {
+type RouteService struct {
 	config   *routeservice.RouteServiceConfig
 	logger   logger.Logger
 	registry registry.Registry
@@ -23,14 +23,14 @@ type routeService struct {
 
 // NewRouteService creates a handler responsible for handling route services
 func NewRouteService(config *routeservice.RouteServiceConfig, logger logger.Logger, routeRegistry registry.Registry) negroni.Handler {
-	return &routeService{
+	return &RouteService{
 		config:   config,
 		logger:   logger,
 		registry: routeRegistry,
 	}
 }
 
-func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
 		r.logger.Fatal("request-info-err", zap.Error(err))
@@ -84,8 +84,6 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		return
 	}
 
-	rsSignature := req.Header.Get(routeservice.HeaderKeySignature)
-
 	var recommendedScheme string
 
 	if r.config.RouteServiceRecommendHttps() {
@@ -95,32 +93,19 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	}
 
 	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
-	if hasBeenToRouteService(routeServiceURL, rsSignature) {
-		// A request from a route service destined for a backend instances
-		validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
-		if err != nil {
-			r.logger.Error("signature-validation-failed", zap.Error(err))
+	hasBeenToRouteService, err := r.ValidatedArrivedViaRouteService(req)
+	if err != nil {
+		r.logger.Error("signature-validation-failed", zap.Error(err))
+		writeStatus(
+			rw,
+			http.StatusBadRequest,
+			"Failed to validate Route Service Signature",
+			r.logger,
+		)
+		return
+	}
 
-			writeStatus(
-				rw,
-				http.StatusBadRequest,
-				"Failed to validate Route Service Signature",
-				r.logger,
-			)
-			return
-		}
-		err = r.validateRouteServicePool(validatedSig, reqInfo)
-		if err != nil {
-			r.logger.Error("signature-validation-failed", zap.Error(err))
-
-			writeStatus(
-				rw,
-				http.StatusBadRequest,
-				"Failed to validate Route Service Signature",
-				r.logger,
-			)
-			return
-		}
+	if hasBeenToRouteService {
 		// Remove the headers since the backend should not see it
 		req.Header.Del(routeservice.HeaderKeySignature)
 		req.Header.Del(routeservice.HeaderKeyMetadata)
@@ -155,7 +140,46 @@ func (r *routeService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 }
 
-func (r *routeService) validateRouteServicePool(validatedSig *routeservice.Signature, reqInfo *RequestInfo) error {
+func (r *RouteService) ValidatedArrivedViaRouteService(req *http.Request) (bool, error) {
+	reqInfo, err := ContextRequestInfo(req)
+	if err != nil {
+		r.logger.Fatal("request-info-err", zap.Error(err))
+		return false, err
+	}
+	if reqInfo.RoutePool == nil {
+		err = errors.New("failed-to-access-RoutePool")
+		r.logger.Fatal("request-info-err", zap.Error(err))
+		return false, err
+	}
+
+	var recommendedScheme string
+
+	if r.config.RouteServiceRecommendHttps() {
+		recommendedScheme = "https"
+	} else {
+		recommendedScheme = "http"
+	}
+
+	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
+	routeServiceURL := reqInfo.RoutePool.RouteServiceUrl()
+	rsSignature := req.Header.Get(routeservice.HeaderKeySignature)
+
+	if hasBeenToRouteService(routeServiceURL, rsSignature) {
+		// A request from a route service destined for a backend instances
+		validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+		if err != nil {
+			return false, err
+		}
+		err = r.validateRouteServicePool(validatedSig, reqInfo)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *RouteService) validateRouteServicePool(validatedSig *routeservice.Signature, reqInfo *RequestInfo) error {
 	forwardedURL, err := url.Parse(validatedSig.ForwardedUrl)
 	if err != nil {
 		return err

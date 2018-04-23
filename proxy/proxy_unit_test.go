@@ -3,6 +3,7 @@ package proxy_test
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 )
@@ -33,7 +35,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		combinedReporter metrics.ProxyReporter
 	)
 
-	Context("ServeHTTP", func() {
+	Describe("ServeHTTP", func() {
 		BeforeEach(func() {
 			tlsConfig := &tls.Config{
 				CipherSuites:       conf.CipherSuites,
@@ -114,4 +116,115 @@ var _ = Describe("Proxy Unit tests", func() {
 			})
 		})
 	})
+
+	Describe("SkipSanitizationFactory", func() {
+		DescribeTable("the returned function",
+			func(arrivedViaRouteServicesServer func(*http.Request) bool, arrivedViaRouteServiceValidator proxy.ArrivedViaRouteServiceValidator, reqTLS *tls.ConnectionState, expectedValue bool, expectedErr error) {
+				skipSanitizationFunc := proxy.SkipSanitizationFactory(arrivedViaRouteServicesServer, arrivedViaRouteServiceValidator)
+				skipSanitization, err := skipSanitizationFunc(&http.Request{TLS: reqTLS})
+				if expectedErr != nil {
+					Expect(err).To(Equal(expectedErr))
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+				Expect(skipSanitization).To(Equal(expectedValue))
+			},
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (false, nil), req.TLS == nil",
+				falseArrivedViaRouteServicesServer, falseFakeArrivedViaRouteServiceValidator, nil, false, nil),
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (false, nil), req.TLS != nil",
+				falseArrivedViaRouteServicesServer, falseFakeArrivedViaRouteServiceValidator, &tls.ConnectionState{}, false, nil),
+			Entry("arrivedViaRouteServicesServer returns true, arrivedViaRouteServiceValidator returns (false, nil), req.TLS == nil",
+				trueArrivedViaRouteServicesServer, falseFakeArrivedViaRouteServiceValidator, nil, true, nil),
+			Entry("arrivedViaRouteServicesServer returns true, arrivedViaRouteServiceValidator returns (false, nil), req.TLS != nil",
+				trueArrivedViaRouteServicesServer, falseFakeArrivedViaRouteServiceValidator, &tls.ConnectionState{}, true, nil),
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (true, nil), req.TLS == nil",
+				falseArrivedViaRouteServicesServer, trueFakeArrivedViaRouteServiceValidator, nil, false, nil),
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (true, nil), req.TLS != nil",
+				falseArrivedViaRouteServicesServer, trueFakeArrivedViaRouteServiceValidator, &tls.ConnectionState{}, true, nil),
+			Entry("arrivedViaRouteServicesServer returns true, arrivedViaRouteServiceValidator returns (true, nil), req.TLS == nil",
+				trueArrivedViaRouteServicesServer, trueFakeArrivedViaRouteServiceValidator, nil, true, nil),
+			Entry("arrivedViaRouteServicesServer returns true, arrivedViaRouteServiceValidator returns (true, nil), req.TLS != nil",
+				trueArrivedViaRouteServicesServer, trueFakeArrivedViaRouteServiceValidator, &tls.ConnectionState{}, true, nil),
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (false, error), req.TLS == nil",
+				falseArrivedViaRouteServicesServer, errorFakeHasBeenToRouteServiceValidator, nil, false, errors.New("Bad route service validator")),
+			Entry("arrivedViaRouteServicesServer returns false, arrivedViaRouteServiceValidator returns (false, error), req.TLS != nil",
+				falseArrivedViaRouteServicesServer, errorFakeHasBeenToRouteServiceValidator, &tls.ConnectionState{}, false, errors.New("Bad route service validator")),
+		)
+	})
+
+	Describe("ForceDeleteXFCCHeaderFactory", func() {
+		DescribeTable("the returned function",
+			func(arrivedViaRouteServiceValidator proxy.ArrivedViaRouteServiceValidator, forwardedClientCert string, expectedValue bool, expectedErr error) {
+				forceDeleteXFCCHeaderFunc := proxy.ForceDeleteXFCCHeaderFactory(arrivedViaRouteServiceValidator, forwardedClientCert)
+				forceDelete, err := forceDeleteXFCCHeaderFunc(&http.Request{})
+				if expectedErr != nil {
+					Expect(err).To(Equal(expectedErr))
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+				Expect(forceDelete).To(Equal(expectedValue))
+			},
+			Entry("arrivedViaRouteServiceValidator returns (false, nil), forwardedClientCert == sanitize_set",
+				falseFakeArrivedViaRouteServiceValidator, "sanitize_set", false, nil),
+			Entry("arrivedViaRouteServiceValidator returns (false, nil), forwardedClientCert != sanitize_set",
+				falseFakeArrivedViaRouteServiceValidator, "", false, nil),
+			Entry("arrivedViaRouteServiceValidator returns (true, nil), forwardedClientCert == sanitize_set",
+				trueFakeArrivedViaRouteServiceValidator, "sanitize_set", false, nil),
+			Entry("arrivedViaRouteServiceValidator returns (true, nil), forwardedClientCert != sanitize_set",
+				trueFakeArrivedViaRouteServiceValidator, "", true, nil),
+			Entry("arrivedViaRouteServiceValidator returns (false, error), forwardedClientCert == sanitize_set",
+				errorFakeHasBeenToRouteServiceValidator, "sanitize_set", false, errors.New("Bad route service validator")),
+			Entry("arrivedViaRouteServiceValidator returns (false, error), forwardedClientCert != sanitize_set",
+				errorFakeHasBeenToRouteServiceValidator, "", false, errors.New("Bad route service validator")),
+		)
+	})
 })
+
+var falseFakeArrivedViaRouteServiceValidator = &fakeHasBeenToRouteServiceValidator{
+	ValidatedHasBeenToRouteServiceCall: call{
+		Returns: returns{
+			Value: false,
+			Error: nil,
+		},
+	},
+}
+
+var trueFakeArrivedViaRouteServiceValidator = &fakeHasBeenToRouteServiceValidator{
+	ValidatedHasBeenToRouteServiceCall: call{
+		Returns: returns{
+			Value: true,
+			Error: nil,
+		},
+	},
+}
+var errorFakeHasBeenToRouteServiceValidator = &fakeHasBeenToRouteServiceValidator{
+	ValidatedHasBeenToRouteServiceCall: call{
+		Returns: returns{
+			Value: true,
+			Error: errors.New("Bad route service validator"),
+		},
+	},
+}
+
+var falseArrivedViaRouteServicesServer = func(*http.Request) bool {
+	return false
+}
+
+var trueArrivedViaRouteServicesServer = func(*http.Request) bool {
+	return true
+}
+
+type fakeHasBeenToRouteServiceValidator struct {
+	ValidatedHasBeenToRouteServiceCall call
+}
+type call struct {
+	Returns returns
+}
+type returns struct {
+	Value bool
+	Error error
+}
+
+func (h *fakeHasBeenToRouteServiceValidator) ValidatedArrivedViaRouteService(req *http.Request) (bool, error) {
+	return h.ValidatedHasBeenToRouteServiceCall.Returns.Value, h.ValidatedHasBeenToRouteServiceCall.Returns.Error
+}

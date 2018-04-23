@@ -7,33 +7,68 @@ import (
 
 	"code.cloudfoundry.org/gorouter/config"
 
+	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
 
 const xfcc = "X-Forwarded-Client-Cert"
 
 type clientCert struct {
-	forwardingMode string
+	skipSanitization  func(req *http.Request) (bool, error)
+	forceDeleteHeader func(req *http.Request) (bool, error)
+	forwardingMode    string
+	logger            logger.Logger
 }
 
-func NewClientCert(forwardingMode string) negroni.Handler {
+func NewClientCert(skipSanitization, forceDeleteHeader func(req *http.Request) (bool, error), forwardingMode string, logger logger.Logger) negroni.Handler {
 	return &clientCert{
-		forwardingMode: forwardingMode,
+		skipSanitization:  skipSanitization,
+		forceDeleteHeader: forceDeleteHeader,
+		forwardingMode:    forwardingMode,
+		logger:            logger,
 	}
 }
 
 func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if c.forwardingMode == config.FORWARD {
-		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+	skip, err := c.skipSanitization(r)
+	if err != nil {
+		c.logger.Error("signature-validation-failed", zap.Error(err))
+		writeStatus(
+			rw,
+			http.StatusBadRequest,
+			"Failed to validate Route Service Signature",
+			c.logger,
+		)
+		return
+	}
+	if !skip {
+		switch c.forwardingMode {
+		case config.FORWARD:
+			if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+				r.Header.Del(xfcc)
+			}
+		case config.SANITIZE_SET:
 			r.Header.Del(xfcc)
+			if r.TLS != nil {
+				sanitizeHeader(r)
+			}
 		}
 	}
 
-	if c.forwardingMode == config.SANITIZE_SET {
+	delete, err := c.forceDeleteHeader(r)
+	if err != nil {
+		c.logger.Error("signature-validation-failed", zap.Error(err))
+		writeStatus(
+			rw,
+			http.StatusBadRequest,
+			"Failed to validate Route Service Signature",
+			c.logger,
+		)
+		return
+	}
+	if delete {
 		r.Header.Del(xfcc)
-		if r.TLS != nil {
-			sanitizeHeader(r)
-		}
 	}
 	next(rw, r)
 }

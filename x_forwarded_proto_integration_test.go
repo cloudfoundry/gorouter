@@ -80,7 +80,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 			testState.StartGorouter()
 
 			doRequest := func(testCase testCase, hostname string) {
-				req := testState.newRequest(testCase.clientRequestScheme, hostname)
+				req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
 				req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
 
 				resp, err := testState.client.Do(req)
