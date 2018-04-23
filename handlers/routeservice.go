@@ -17,16 +17,16 @@ import (
 
 type RouteService struct {
 	config   *routeservice.RouteServiceConfig
-	logger   logger.Logger
 	registry registry.Registry
+	logger   logger.Logger
 }
 
 // NewRouteService creates a handler responsible for handling route services
-func NewRouteService(config *routeservice.RouteServiceConfig, logger logger.Logger, routeRegistry registry.Registry) negroni.Handler {
+func NewRouteService(config *routeservice.RouteServiceConfig, routeRegistry registry.Registry, logger logger.Logger) negroni.Handler {
 	return &RouteService{
 		config:   config,
-		logger:   logger,
 		registry: routeRegistry,
+		logger:   logger,
 	}
 }
 
@@ -93,7 +93,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	}
 
 	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
-	hasBeenToRouteService, err := r.ValidatedArrivedViaRouteService(req)
+	hasBeenToRouteService, err := r.ArrivedViaRouteService(req)
 	if err != nil {
 		r.logger.Error("signature-validation-failed", zap.Error(err))
 		writeStatus(
@@ -140,7 +140,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 }
 
-func (r *RouteService) ValidatedArrivedViaRouteService(req *http.Request) (bool, error) {
+func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
 		r.logger.Fatal("request-info-err", zap.Error(err))

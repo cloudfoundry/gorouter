@@ -665,7 +665,7 @@ var _ = Describe("Proxy", func() {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
-				time.Sleep(1 * time.Second)
+				time.Sleep(2 * time.Second)
 				resp := test_util.NewResponse(http.StatusOK)
 				conn.WriteResponse(resp)
 				conn.Close()

@@ -2,7 +2,6 @@ package test
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -62,14 +61,12 @@ func NewHangingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Con
 		resp.Header.Set("Upgrade", "websocket")
 		resp.Header.Set("Connection", "upgrade")
 
-		fmt.Println("setting body")
 		resp.Body = ioutil.NopCloser(io.MultiReader(
 			bytes.NewBufferString("\r\nbeginning of the response body goes here\r\n\r\n"),
 			bytes.NewBuffer(make([]byte, 10024)), // bigger than the internal buffer of the http stdlib
 			bytes.NewBufferString("\r\nmore response here, probably won't be seen by client\r\n"),
 			&test_util.HangingReadCloser{}),
 		)
-		fmt.Println("writing response")
 		x.WriteResponse(resp)
 		panic("you won't get here in a test")
 	})

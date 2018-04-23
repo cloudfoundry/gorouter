@@ -126,7 +126,7 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 
 	c.EnableSSL = true
 
-	potatoCertchain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato.com"}) // TODO: should we pass in the SANs?
+	potatoCertchain := CreateSignedCertWithRootCA(CertNames{SANs: SubjectAltNames{DNS: "potato.com", IP: c.Ip}})
 	potato2Certchain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato2.com"})
 
 	clientTrustedCertPool := x509.NewCertPool()

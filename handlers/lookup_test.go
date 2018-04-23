@@ -50,7 +50,7 @@ var _ = Describe("Lookup", func() {
 
 	JustBeforeEach(func() {
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewLookup(reg, rep, logger, maxConnections))
+		handler.Use(handlers.NewLookup(reg, rep, maxConnections, logger))
 		handler.UseHandler(nextHandler)
 		handler.ServeHTTP(resp, req)
 	})
@@ -271,7 +271,7 @@ var _ = Describe("Lookup", func() {
 		Context("when request info is not set on the request context", func() {
 			BeforeEach(func() {
 				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, logger, 0))
+				handler.Use(handlers.NewLookup(reg, rep, 0, logger))
 				handler.UseHandler(nextHandler)
 			})
 			It("calls Fatal on the logger", func() {

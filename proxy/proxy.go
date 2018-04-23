@@ -55,7 +55,7 @@ type proxy struct {
 func NewProxy(
 	logger logger.Logger,
 	accessLogger access_log.AccessLogger,
-	c *config.Config,
+	cfg *config.Config,
 	registry registry.Registry,
 	reporter metrics.ProxyReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
@@ -67,19 +67,19 @@ func NewProxy(
 
 	p := &proxy{
 		accessLogger:             accessLogger,
-		traceKey:                 c.TraceKey,
-		ip:                       c.Ip,
+		traceKey:                 cfg.TraceKey,
+		ip:                       cfg.Ip,
 		logger:                   logger,
 		reporter:                 reporter,
-		secureCookies:            c.SecureCookies,
+		secureCookies:            cfg.SecureCookies,
 		heartbeatOK:              heartbeatOK, // 1->true, 0->false
 		routeServiceConfig:       routeServiceConfig,
-		healthCheckUserAgent:     c.HealthCheckUserAgent,
-		forceForwardedProtoHttps: c.ForceForwardedProtoHttps,
-		sanitizeForwardedProto:   c.SanitizeForwardedProto,
-		defaultLoadBalance:       c.LoadBalance,
-		endpointDialTimeout:      c.EndpointDialTimeout,
-		endpointTimeout:          c.EndpointTimeout,
+		healthCheckUserAgent:     cfg.HealthCheckUserAgent,
+		forceForwardedProtoHttps: cfg.ForceForwardedProtoHttps,
+		sanitizeForwardedProto:   cfg.SanitizeForwardedProto,
+		defaultLoadBalance:       cfg.LoadBalance,
+		endpointDialTimeout:      cfg.EndpointDialTimeout,
+		endpointTimeout:          cfg.EndpointTimeout,
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         tlsConfig,
 		skipSanitization:         skipSanitization,
@@ -87,11 +87,11 @@ func NewProxy(
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
 		Template: &http.Transport{
-			Dial:                (&net.Dialer{Timeout: c.EndpointDialTimeout}).Dial,
-			DisableKeepAlives:   c.DisableKeepAlives,
-			MaxIdleConns:        c.MaxIdleConns,
+			Dial:                (&net.Dialer{Timeout: cfg.EndpointDialTimeout}).Dial,
+			DisableKeepAlives:   cfg.DisableKeepAlives,
+			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
-			MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
+			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
 			DisableCompression:  true,
 			TLSClientConfig:     tlsConfig,
 		},
@@ -116,8 +116,8 @@ func NewProxy(
 		ModifyResponse: p.modifyResponse,
 	}
 
-	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, logger, registry)
-	zipkinHandler := handlers.NewZipkin(c.Tracing.EnableZipkin, c.ExtraHeadersToLog, logger)
+	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
+	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, cfg.ExtraHeadersToLog, logger)
 	n := negroni.New()
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
@@ -125,15 +125,14 @@ func NewProxy(
 	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
-
-	n.Use(handlers.NewProxyHealthcheck(c.HealthCheckUserAgent, p.heartbeatOK, logger))
+	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
-	n.Use(handlers.NewLookup(registry, reporter, logger, c.Backends.MaxConns))
+	n.Use(handlers.NewLookup(registry, reporter, cfg.Backends.MaxConns, logger))
 	n.Use(handlers.NewClientCert(
-		SkipSanitizationFactory(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
-		ForceDeleteXFCCHeaderFactory(routeServiceHandler.(*handlers.RouteService), c.ForwardedClientCert),
-		c.ForwardedClientCert,
+		SkipSanitize(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
+		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
+		cfg.ForwardedClientCert,
 		logger,
 	))
 	n.Use(routeServiceHandler)
@@ -148,27 +147,27 @@ func NewProxy(
 	return n
 }
 
-type ArrivedViaRouteServiceValidator interface {
-	ValidatedArrivedViaRouteService(req *http.Request) (bool, error)
+type RouteServiceValidator interface {
+	ArrivedViaRouteService(req *http.Request) (bool, error)
 }
 
-func SkipSanitizationFactory(arrivedViaRouteServicesServer func(*http.Request) bool, arrivedViaRouteServiceValidator ArrivedViaRouteServiceValidator) func(*http.Request) (bool, error) {
+func SkipSanitize(arrivedViaRouteServicesServer func(*http.Request) bool, routeServiceValidator RouteServiceValidator) func(*http.Request) (bool, error) {
 	return func(req *http.Request) (bool, error) {
-		validatedArrivedViaRouteService, err := arrivedViaRouteServiceValidator.ValidatedArrivedViaRouteService(req)
+		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
 		if err != nil {
 			return false, err
 		}
-		return arrivedViaRouteServicesServer(req) || (validatedArrivedViaRouteService && req.TLS != nil), nil
+		return arrivedViaRouteServicesServer(req) || (valid && req.TLS != nil), nil
 	}
 }
 
-func ForceDeleteXFCCHeaderFactory(arrivedViaRouteServiceValidator ArrivedViaRouteServiceValidator, forwardedClientCert string) func(*http.Request) (bool, error) {
+func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwardedClientCert string) func(*http.Request) (bool, error) {
 	return func(req *http.Request) (bool, error) {
-		ValidatedArrivedViaRouteService, err := arrivedViaRouteServiceValidator.ValidatedArrivedViaRouteService(req)
+		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
 		if err != nil {
 			return false, err
 		}
-		return ValidatedArrivedViaRouteService && forwardedClientCert != config.SANITIZE_SET, nil
+		return valid && forwardedClientCert != config.SANITIZE_SET, nil
 	}
 }
 
