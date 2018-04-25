@@ -13,6 +13,7 @@ import (
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -20,1109 +21,176 @@ import (
 
 var _ = Describe("Clientcert", func() {
 	var (
-		nextReq           *http.Request
-		n                 *negroni.Negroni
-		clientCertHandler negroni.Handler
-		nextHandler       http.HandlerFunc
-		logger            *logger_fakes.FakeLogger
+		stripCertNoTLS   = true
+		noStripCertNoTLS = false
+		stripCertTLS     = true
+		noStripCertTLS   = false
+		stripCertMTLS    = ""
+		xfccSanitizeMTLS = "xfcc"
+		certSanitizeMTLS = "cert"
+
+		forceDeleteHeader      = func(req *http.Request) (bool, error) { return true, nil }
+		dontForceDeleteHeader  = func(req *http.Request) (bool, error) { return false, nil }
+		errorForceDeleteHeader = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
+		skipSanitization       = func(req *http.Request) (bool, error) { return true, nil }
+		dontSkipSanitization   = func(req *http.Request) (bool, error) { return false, nil }
+		errorSkipSanitization  = func(req *http.Request) (bool, error) { return false, errors.New("skipSanitization error") }
 	)
 
-	BeforeEach(func() {
-		logger = new(logger_fakes.FakeLogger)
-	})
+	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) (bool, error), errorCase string) {
+		logger := new(logger_fakes.FakeLogger)
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger)
 
-	Context("when forceDeleteHeader is set to false", func() {
-		forceDeleteHeader := func(req *http.Request) (bool, error) {
-			return false, nil
+		nextHandlerWasCalled := false
+		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
+
+		n := negroni.New()
+		n.Use(clientCertHandler)
+		n.UseHandlerFunc(nextHandler)
+
+		req := test_util.NewRequest("GET", "xyz.com", "", nil)
+		rw := httptest.NewRecorder()
+		clientCertHandler.ServeHTTP(rw, req, nextHandler)
+
+		message, zapFields := logger.ErrorArgsForCall(0)
+		Expect(message).To(Equal("signature-validation-failed"))
+		switch errorCase {
+		case "sanitizeError":
+			Expect(zapFields).To(ContainElement(zap.Error(errors.New("skipSanitization error"))))
+		case "forceDeleteError":
+			Expect(zapFields).To(ContainElement(zap.Error(errors.New("forceDelete error"))))
+		default:
+			Fail("Unexpected error case")
 		}
+		Expect(rw.Code).To(Equal(http.StatusBadRequest))
+		Expect(rw.HeaderMap).NotTo(HaveKey("Connection"))
+		Expect(rw.Body).To(ContainSubstring("Failed to validate Route Service Signature"))
 
-		Context("when ForwardedClientCert is set to always_forward", func() {
-			BeforeEach(func() {
-				nextReq = &http.Request{}
-				clientCertHandler = handlers.NewClientCert(func(*http.Request) (bool, error) { return false, nil }, forceDeleteHeader, config.ALWAYS_FORWARD, logger)
-				n = negroni.New()
-				n.Use(clientCertHandler)
-				nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-					nextReq = r
-				})
-				n.UseHandlerFunc(nextHandler)
-			})
+		Expect(nextHandlerWasCalled).To(BeFalse())
+	},
+		Entry("forceDelete returns an error", errorForceDeleteHeader, skipSanitization, "forceDeleteError"),
+		Entry("skipSanitization returns an error", forceDeleteHeader, errorSkipSanitization, "sanitizeError"),
+	)
 
-			It("passes along any xfcc header that it recieves", func() {
-				req := test_util.NewRequest("GET", "xyz.com", "", nil)
-				req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-				req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
+	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) (bool, error), forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
+		logger := new(logger_fakes.FakeLogger)
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger)
 
-				rw := httptest.NewRecorder()
-				clientCertHandler.ServeHTTP(rw, req, nextHandler)
+		nextReq := &http.Request{}
+		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextReq = r })
+
+		n := negroni.New()
+		n.Use(clientCertHandler)
+		n.UseHandlerFunc(nextHandler)
+
+		By("when there is no tls connection", func() {
+			req := test_util.NewRequest("GET", "xyz.com", "", nil)
+			req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
+			rw := httptest.NewRecorder()
+			clientCertHandler.ServeHTTP(rw, req, nextHandler)
+
+			if noTLSCertStrip {
+				Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
+			} else {
 				Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(Equal([]string{
 					"trusted-xfcc-header",
-					"another-trusted-xfcc-header",
 				}))
-			})
-		})
-
-		Context("when skipSanitization is set to false", func() {
-			skipSanitization := func(req *http.Request) (bool, error) {
-				return false, nil
 			}
-
-			Context("when ForwardedClientCert is set to sanitize_set", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-				})
-
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "other-fake-cert")
-					})
-
-					It("strips any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips the xfcc headers from the request", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(BeEmpty())
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("sanitizes the xfcc headers from the request", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(ConsistOf(sanitize(certPEM)))
-					})
-				})
-			})
-
-			Context("when ForwardedClientCert is set to forward", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.FORWARD, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-
-				})
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "other-fake-cert")
-					})
-
-					It("strips any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips the xfcc headers from the request", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(BeEmpty())
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("forwards the xfcc headers from the request", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(ConsistOf("fake-cert"))
-					})
-				})
-			})
 		})
 
-		Context("when skipSanitization is set to true", func() {
-			skipSanitization := func(req *http.Request) (bool, error) {
-				return true, nil
+		By("when there is a tls connection with no client certs", func() {
+			tlsCert1 := test_util.CreateCert("client_cert.com")
+			servertlsConfig := &tls.Config{
+				Certificates: []tls.Certificate{tlsCert1},
 			}
+			tlsConfig := &tls.Config{InsecureSkipVerify: true}
 
-			Context("when ForwardedClientCert is set to sanitize_set", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-				})
+			server := httptest.NewUnstartedServer(n)
+			server.TLS = servertlsConfig
+			server.StartTLS()
+			defer server.Close()
 
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-					})
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+			client := &http.Client{Transport: transport}
 
-					It("does not strip any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(Equal([]string{
-							"trusted-xfcc-header",
-							"another-trusted-xfcc-header",
-						}))
-					})
-				})
+			req, err := http.NewRequest("GET", server.URL, nil)
+			Expect(err).NotTo(HaveOccurred())
 
-				Context("when there is a tls connection with no client certs", func() {
-					It("does not strip the xfcc headers from the request", func() {
+			req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
+			_, err = client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
 
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(Equal([]string{
-							"trusted-xfcc-header",
-							"another-trusted-xfcc-header",
-						}))
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("does not sanitize the xfcc headers from the request", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(Equal([]string{
-							"trusted-xfcc-header",
-							"another-trusted-xfcc-header",
-						}))
-					})
-				})
-			})
-
-			Context("when ForwardedClientCert is set to forward", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.FORWARD, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-
-				})
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-					})
-
-					It("does not strip any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(Equal([]string{
-							"trusted-xfcc-header",
-							"another-trusted-xfcc-header",
-						}))
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("does not strip the xfcc headers from the request", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(Equal([]string{
-							"trusted-xfcc-header",
-							"another-trusted-xfcc-header",
-						}))
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("forwards the xfcc headers from the request", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(ConsistOf("trusted-xfcc-header"))
-					})
-				})
-			})
-		})
-	})
-
-	Context("when forceDeleteHeader is set to true", func() {
-		forceDeleteHeader := func(req *http.Request) (bool, error) {
-			return true, nil
-		}
-
-		Context("when ForwardedClientCert is set to always_forward", func() {
-			BeforeEach(func() {
-				nextReq = &http.Request{}
-				clientCertHandler = handlers.NewClientCert(func(*http.Request) (bool, error) { return false, nil }, forceDeleteHeader, config.ALWAYS_FORWARD, logger)
-				n = negroni.New()
-				n.Use(clientCertHandler)
-				nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-					nextReq = r
-				})
-				n.UseHandlerFunc(nextHandler)
-			})
-
-			It("strips any xfcc header that it recieves", func() {
-				req := test_util.NewRequest("GET", "xyz.com", "", nil)
-				req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-				req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-				rw := httptest.NewRecorder()
-				clientCertHandler.ServeHTTP(rw, req, nextHandler)
+			if TLSCertStrip {
 				Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-			})
+			} else {
+				Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(Equal([]string{
+					"trusted-xfcc-header",
+				}))
+			}
 		})
+		By("when there is a mtls connection with client certs", func() {
+			privKey, certDER := test_util.CreateCertDER("client_cert1.com")
+			keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
 
-		Context("when skipSanitization is set to false", func() {
-			skipSanitization := func(req *http.Request) (bool, error) {
-				return false, nil
+			tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+			Expect(err).ToNot(HaveOccurred())
+
+			x509Cert, err := x509.ParseCertificate(certDER)
+			Expect(err).ToNot(HaveOccurred())
+
+			certPool := x509.NewCertPool()
+			certPool.AddCert(x509Cert)
+
+			servertlsConfig := &tls.Config{
+				Certificates: []tls.Certificate{tlsCert},
+				ClientCAs:    certPool,
+				ClientAuth:   tls.RequestClientCert,
+			}
+			tlsConfig := &tls.Config{
+				Certificates: []tls.Certificate{tlsCert},
+				RootCAs:      certPool,
 			}
 
-			Context("when ForwardedClientCert is set to sanitize_set", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-				})
+			server := httptest.NewUnstartedServer(n)
+			server.TLS = servertlsConfig
+			server.StartTLS()
+			defer server.Close()
 
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "other-fake-cert")
-					})
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+			client := &http.Client{Transport: transport}
 
-					It("strips any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(BeEmpty())
-					})
-				})
+			req, err := http.NewRequest("GET", server.URL, nil)
+			Expect(err).NotTo(HaveOccurred())
 
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips the xfcc headers from the request", func() {
+			req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
+			_, err = client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
 
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						headerCerts := nextReq.Header["X-Forwarded-Client-Cert"]
-						Expect(headerCerts).To(BeEmpty())
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("strips the xfcc headers from the request", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-			})
-
-			Context("when ForwardedClientCert is set to forward", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.FORWARD, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-
-				})
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "other-fake-cert")
-					})
-
-					It("strips any xfcc headers in the request", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips the xfcc headers from the request", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert2")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("strips any xfcc header that it recieves", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "fake-cert")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-			})
-		})
-
-		Context("when skipSanitization is set to true", func() {
-			skipSanitization := func(req *http.Request) (bool, error) {
-				return true, nil
+			switch mTLSCertStrip {
+			case "":
+				Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
+			case "xfcc":
+				Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(Equal([]string{"trusted-xfcc-header"}))
+			case "cert":
+				Expect(nextReq.Header["X-Forwarded-Client-Cert"]).To(ConsistOf(sanitize(certPEM)))
+			default:
+				Fail("Unexpected mTLSCertStrip case")
 			}
-
-			Context("when ForwardedClientCert is set to sanitize_set", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-				})
-
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-					})
-
-					It("strips any xfcc header that it recieves", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips any xfcc header that it recieves", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("strips any xfcc header that it recieves", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-			})
-
-			Context("when ForwardedClientCert is set to forward", func() {
-				BeforeEach(func() {
-					nextReq = &http.Request{}
-					clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.FORWARD, logger)
-					n = negroni.New()
-					n.Use(clientCertHandler)
-					nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-						nextReq = r
-					})
-					n.UseHandlerFunc(nextHandler)
-				})
-
-				Context("when there is no tls connection", func() {
-					var req *http.Request
-					BeforeEach(func() {
-						req = test_util.NewRequest("GET", "xyz.com", "", nil)
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-					})
-
-					It("strips any xfcc header that it recieves", func() {
-						rw := httptest.NewRecorder()
-						clientCertHandler.ServeHTTP(rw, req, nextHandler)
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a tls connection with no client certs", func() {
-					It("strips any xfcc header that it recieves", func() {
-
-						tlsCert1 := test_util.CreateCert("client_cert.com")
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert1},
-						}
-						tlsConfig := &tls.Config{
-							InsecureSkipVerify: true,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-						req.Header.Add("X-Forwarded-Client-Cert", "another-trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-
-				Context("when there is a mtls connection with client certs", func() {
-					It("strips any xfcc header that it recieves", func() {
-						privKey, certDER := test_util.CreateCertDER("client_cert1.com")
-
-						keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)
-
-						tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-						Expect(err).ToNot(HaveOccurred())
-
-						x509Cert, err := x509.ParseCertificate(certDER)
-						Expect(err).ToNot(HaveOccurred())
-
-						certPool := x509.NewCertPool()
-						certPool.AddCert(x509Cert)
-
-						servertlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							ClientCAs:    certPool,
-							ClientAuth:   tls.RequestClientCert,
-						}
-						tlsConfig := &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      certPool,
-						}
-
-						server := httptest.NewUnstartedServer(n)
-						server.TLS = servertlsConfig
-
-						server.StartTLS()
-						defer server.Close()
-
-						transport := &http.Transport{
-							TLSClientConfig: tlsConfig,
-						}
-
-						req, err := http.NewRequest("GET", server.URL, nil)
-						Expect(err).NotTo(HaveOccurred())
-
-						// set original req x-for-cert
-						req.Header.Add("X-Forwarded-Client-Cert", "trusted-xfcc-header")
-
-						client := &http.Client{Transport: transport}
-						_, err = client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(nextReq.Header).NotTo(HaveKey("X-Forwarded-Client-Cert"))
-					})
-				})
-			})
 		})
-	})
-
-	Context("when skipSanitization returns an error", func() {
-		skipSanitization := func(req *http.Request) (bool, error) {
-			return false, errors.New("skipSanitization error")
-		}
-
-		It("logs the error, writes the response, and returns", func() {
-			forceDeleteHeader := func(req *http.Request) (bool, error) {
-				return false, nil
-			}
-
-			clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-			n = negroni.New()
-			n.Use(clientCertHandler)
-			nextHandlerWasCalled := false
-			nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
-			n.UseHandlerFunc(nextHandler)
-
-			req := test_util.NewRequest("GET", "xyz.com", "", nil)
-			rw := httptest.NewRecorder()
-
-			clientCertHandler.ServeHTTP(rw, req, nextHandler)
-
-			message, zapFields := logger.ErrorArgsForCall(0)
-			Expect(message).To(Equal("signature-validation-failed"))
-			Expect(zapFields).To(ContainElement(zap.Error(errors.New("skipSanitization error"))))
-
-			Expect(rw.Code).To(Equal(http.StatusBadRequest))
-			Expect(rw.HeaderMap).NotTo(HaveKey("Connection"))
-			Expect(rw.Body).To(ContainSubstring("Failed to validate Route Service Signature"))
-
-			Expect(nextHandlerWasCalled).To(BeFalse())
-		})
-	})
-
-	Context("when forceDelete returns an error", func() {
-		forceDeleteHeader := func(req *http.Request) (bool, error) {
-			return false, errors.New("forceDelete error")
-		}
-
-		It("logs the error, writes the response, and returns", func() {
-			skipSanitization := func(req *http.Request) (bool, error) {
-				return false, nil
-			}
-
-			clientCertHandler = handlers.NewClientCert(skipSanitization, forceDeleteHeader, config.SANITIZE_SET, logger)
-			n = negroni.New()
-			n.Use(clientCertHandler)
-			nextHandlerWasCalled := false
-			nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
-			n.UseHandlerFunc(nextHandler)
-
-			req := test_util.NewRequest("GET", "xyz.com", "", nil)
-			rw := httptest.NewRecorder()
-
-			clientCertHandler.ServeHTTP(rw, req, nextHandler)
-
-			message, zapFields := logger.ErrorArgsForCall(0)
-			Expect(message).To(Equal("signature-validation-failed"))
-			Expect(zapFields).To(ContainElement(zap.Error(errors.New("forceDelete error"))))
-
-			Expect(rw.Code).To(Equal(http.StatusBadRequest))
-			Expect(rw.HeaderMap).NotTo(HaveKey("Connection"))
-			Expect(rw.Body).To(ContainSubstring("Failed to validate Route Service Signature"))
-
-			Expect(nextHandlerWasCalled).To(BeFalse())
-		})
-	})
+	},
+		Entry("when forceDeleteHeader, skipSanitization, and config.SANITIZE_SET", forceDeleteHeader, skipSanitization, config.SANITIZE_SET, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when forceDeleteHeader, skipSanitization, and config.FORWARD", forceDeleteHeader, skipSanitization, config.FORWARD, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when forceDeleteHeader, skipSanitization, and config.ALWAYS_FORWARD", forceDeleteHeader, skipSanitization, config.ALWAYS_FORWARD, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when forceDeleteHeader, dontSkipSanitization, and config.SANITIZE_SET", forceDeleteHeader, dontSkipSanitization, config.SANITIZE_SET, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when forceDeleteHeader, dontSkipSanitization, and config.FORWARD", forceDeleteHeader, dontSkipSanitization, config.FORWARD, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when forceDeleteHeader, dontSkipSanitization, and config.ALWAYS_FORWARD", forceDeleteHeader, dontSkipSanitization, config.ALWAYS_FORWARD, stripCertNoTLS, stripCertTLS, stripCertMTLS),
+		Entry("when dontForceDeleteHeader, skipSanitization, and config.SANITIZE_SET", dontForceDeleteHeader, skipSanitization, config.SANITIZE_SET, noStripCertNoTLS, noStripCertTLS, xfccSanitizeMTLS),
+		Entry("when dontForceDeleteHeader, skipSanitization, and config.FORWARD", dontForceDeleteHeader, skipSanitization, config.FORWARD, noStripCertNoTLS, noStripCertTLS, xfccSanitizeMTLS),
+		Entry("when dontForceDeleteHeader, skipSanitization, and config.ALWAYS_FORWARD", dontForceDeleteHeader, skipSanitization, config.ALWAYS_FORWARD, noStripCertNoTLS, noStripCertTLS, xfccSanitizeMTLS),
+		Entry("when dontForceDeleteHeader, dontSkipSanitization, and config.SANITIZE_SET", dontForceDeleteHeader, dontSkipSanitization, config.SANITIZE_SET, stripCertNoTLS, stripCertTLS, certSanitizeMTLS),
+		Entry("when dontForceDeleteHeader, dontSkipSanitization, and config.FORWARD", dontForceDeleteHeader, dontSkipSanitization, config.FORWARD, stripCertNoTLS, stripCertTLS, xfccSanitizeMTLS),
+		Entry("when dontForceDeleteHeader, dontSkipSanitization, and config.ALWAYS_FORWARD", dontForceDeleteHeader, dontSkipSanitization, config.ALWAYS_FORWARD, noStripCertNoTLS, noStripCertTLS, xfccSanitizeMTLS),
+	)
 })
 
 func sanitize(cert []byte) string {
