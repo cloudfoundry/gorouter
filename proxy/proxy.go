@@ -135,13 +135,14 @@ func NewProxy(
 		cfg.ForwardedClientCert,
 		logger,
 	))
-	n.Use(routeServiceHandler)
-	n.Use(p)
 	n.Use(&handlers.XForwardedProto{
-		SkipSanitization:         p.skipSanitization,
+		SkipSanitization:         SkipSanitizeXFP(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
 		ForceForwardedProtoHttps: p.forceForwardedProtoHttps,
 		SanitizeForwardedProto:   p.sanitizeForwardedProto,
+		Logger:                   logger,
 	})
+	n.Use(routeServiceHandler)
+	n.Use(p)
 	n.UseHandler(rproxy)
 
 	return n
@@ -149,6 +150,16 @@ func NewProxy(
 
 type RouteServiceValidator interface {
 	ArrivedViaRouteService(req *http.Request) (bool, error)
+}
+
+func SkipSanitizeXFP(arrivedViaRouteServicesServer func(*http.Request) bool, routeServiceValidator RouteServiceValidator) func(*http.Request) (bool, error) {
+	return func(req *http.Request) (bool, error) {
+		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
+		if err != nil {
+			return false, err
+		}
+		return valid || arrivedViaRouteServicesServer(req), nil
+	}
 }
 
 func SkipSanitize(arrivedViaRouteServicesServer func(*http.Request) bool, routeServiceValidator RouteServiceValidator) func(*http.Request) (bool, error) {

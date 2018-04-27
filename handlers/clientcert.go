@@ -62,7 +62,7 @@ func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 		writeStatus(
 			rw,
 			http.StatusBadRequest,
-			"Failed to validate Route Service Signature",
+			"Failed to validate Route Service Signature for x-forwarded-client-cert",
 			c.logger,
 		)
 		return

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 
+	"code.cloudfoundry.org/gorouter/routeservice"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -30,53 +32,68 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 	}
 
 	type testCase struct {
-		clientRequestScheme string
-		clientRequestHeader string
-
+		clientRequestScheme      string
+		clientRequestHeader      string
 		expectBackendToSeeHeader string
 	}
 
-	//  | FFPH      | SFP       |
-	//  |-----------|-----------|
+	type rsTestCase struct {
+		clientRequestScheme string
+		clientRequestHeader string
+		expectBackendHeader string
+		rsRequestScheme     string
+		expectedRsHeader    string
+	}
+
+	//  | Force Forwarded Proto HTTPS  | Sanitze Forwarded Proto |
+	//  |-----------------------------|-------------------------|
 	testCases := map[gorouterConfig][]testCase{
 		{false, false}: {
-			//  | port   | client header| received  |
-			//  |--------|--------------|-----------|
+			//  | client scheme | client header| received  |
+			//  |---------------|--------------|-----------|
+			{"http", "", "http"},
 			{"http", "http", "http"},
 			{"http", "https", "https"},
+			{"https", "", "https"},
 			{"https", "http", "http"},
 			{"https", "https", "https"},
 		},
 
 		{false, true}: {
+			{"http", "", "http"},
 			{"http", "http", "http"},
-			{"http", "https", "http"}, // new feature here!
+			{"http", "https", "http"},
+			{"https", "", "https"},
 			{"https", "http", "https"},
 			{"https", "https", "https"},
 		},
 
 		{true, false}: {
+			{"http", "", "https"},
 			{"http", "http", "https"},
 			{"http", "https", "https"},
+			{"https", "", "https"},
 			{"https", "http", "https"},
 			{"https", "https", "https"},
 		},
 
 		{true, true}: {
+			{"http", "", "https"},
 			{"http", "http", "https"},
 			{"http", "https", "https"},
+			{"https", "", "https"},
 			{"https", "http", "https"},
 			{"https", "https", "https"},
 		},
 	}
 
 	for gc, tcs := range testCases {
-		gorouterConfig := gc
+		goroutercfg := gc
 		testCases := tcs
 
-		It(fmt.Sprintf("gorouter config %v: sets the headers correctly", gorouterConfig), func() {
-			testState.cfg.ForceForwardedProtoHttps = gorouterConfig.forceForwardedProtoHTTPS
-			testState.cfg.SanitizeForwardedProto = gorouterConfig.sanitizeForwardedProto
+		It(fmt.Sprintf("gorouter config %+v: sets the headers correctly", goroutercfg), func() {
+			testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
+			testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
 			testState.StartGorouter()
 
 			doRequest := func(testCase testCase, hostname string) {
@@ -105,40 +122,163 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 
 				gotHeader := <-receivedHeaders
 				Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+			}
+		})
+	}
+	//  | Force Forwarded Proto HTTPS  | Sanitze Forwarded Proto |
+	//  |-----------------------------|-------------------------|
+	rsTestCases := map[gorouterConfig][]rsTestCase{
+		{false, false}: {
+			//  | client scheme   | client header| expected backend header | route service scheme | expected route service header |
+			//  |-----------------|--------------|-------------------------|----------------------|-------------------------------|
+			{"http", "", "http", "http", "http"},
+			{"http", "", "http", "https", "http"},
+			{"http", "http", "http", "http", "http"},
+			{"http", "http", "http", "https", "http"},
+			{"http", "https", "https", "http", "https"},
+			{"http", "https", "https", "https", "https"},
+			{"https", "", "https", "http", "https"},
+			{"https", "", "https", "https", "https"},
+			{"https", "http", "http", "http", "http"},
+			{"https", "http", "http", "https", "http"},
+			{"https", "https", "https", "http", "https"},
+			{"https", "https", "https", "https", "https"},
+		},
 
-				By(fmt.Sprintf("case %d: %v via external route service", i, testCase))
-				hostname = fmt.Sprintf("basic-app-%d-via-external-route-service.some.domain", i)
+		{false, true}: {
+			{"http", "", "http", "http", "http"},
+			{"http", "", "http", "https", "http"},
+			{"http", "http", "http", "http", "http"},
+			{"http", "http", "http", "https", "http"},
+			{"http", "https", "http", "http", "http"},
+			{"http", "https", "http", "https", "http"},
+			{"https", "", "https", "http", "https"},
+			{"https", "", "https", "https", "https"},
+			{"https", "http", "https", "http", "https"},
+			{"https", "http", "https", "https", "https"},
+			{"https", "https", "https", "http", "https"},
+			{"https", "https", "https", "https", "https"},
+		},
 
-				receivedHeaders = make(chan http.Header, 1)
-				routeService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					receivedHeaders <- r.Header
+		{true, false}: {
+			{"http", "", "https", "http", "https"},
+			{"http", "", "https", "https", "https"},
+			{"http", "http", "https", "http", "https"},
+			{"http", "http", "https", "https", "https"},
+			{"http", "https", "https", "http", "https"},
+			{"http", "https", "https", "https", "https"},
+			{"https", "", "https", "http", "https"},
+			{"https", "", "https", "https", "https"},
+			{"https", "http", "https", "http", "https"},
+			{"https", "http", "https", "https", "https"},
+			{"https", "https", "https", "http", "https"},
+			{"https", "https", "https", "https", "https"},
+		},
+
+		{true, true}: {
+			{"http", "", "https", "http", "https"},
+			{"http", "", "https", "https", "https"},
+			{"http", "http", "https", "http", "https"},
+			{"http", "http", "https", "https", "https"},
+			{"http", "https", "https", "http", "https"},
+			{"http", "https", "https", "https", "https"},
+			{"https", "", "https", "http", "https"},
+			{"https", "", "https", "https", "https"},
+			{"https", "http", "https", "http", "https"},
+			{"https", "http", "https", "https", "https"},
+			{"https", "https", "https", "http", "https"},
+			{"https", "https", "https", "https", "https"},
+		},
+	}
+	for gc, tcs := range rsTestCases {
+		goroutercfg := gc
+		rsInternalTestCases := tcs
+		It(fmt.Sprintf("gorouter config: %+v sets the headers correctly", goroutercfg), func() {
+			testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
+			testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
+			testState.StartGorouter()
+
+			doRequest := func(testCase rsTestCase, hostname string) {
+				req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
+				req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
+				resp, err := testState.client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(200))
+				resp.Body.Close()
+			}
+
+			for i, testCase := range rsInternalTestCases {
+				By(fmt.Sprintf("case %d: %+v", i, testCase))
+				hostname := fmt.Sprintf("basic-app-%d.some.domain", i)
+
+				appReceivedHeaders := make(chan http.Header, 1)
+				testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					appReceivedHeaders <- r.Header
 					w.WriteHeader(200)
 				}))
-				routeService.TLS = testState.trustedExternalServiceTLS
-				routeService.StartTLS()
-				defer routeService.Close()
-				testState.registerWithExternalRouteService(testApp, routeService, testState.trustedExternalServiceHostname, hostname)
+				defer testApp.Close()
+				testState.register(testApp, hostname)
+
+				externalRsHeaders := make(chan http.Header, 1)
+				externalRouteService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					externalRsHeaders <- r.Header
+					w.WriteHeader(200)
+					url, err := url.Parse(r.Header.Get(routeservice.HeaderKeyForwardedURL))
+					Expect(err).ToNot(HaveOccurred())
+					newRequest := testState.newRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
+
+					// routes service does not change headers
+					for k, v := range r.Header {
+						newRequest.Header[k] = v
+					}
+					resp, err := testState.client.Do(newRequest)
+					Expect(err).NotTo(HaveOccurred())
+					defer resp.Body.Close()
+				}))
+
+				externalRouteService.TLS = testState.trustedExternalServiceTLS
+				externalRouteService.StartTLS()
+				defer externalRouteService.Close()
+
+				By("registering external route service")
+				testState.registerWithExternalRouteService(testApp, externalRouteService, testState.trustedExternalServiceHostname, hostname)
 
 				doRequest(testCase, hostname)
+				expectedBackendHeader := <-appReceivedHeaders
+				Expect(expectedBackendHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendHeader}))
 
-				gotHeader = <-receivedHeaders
-				Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+				expectedRsHeader := <-externalRsHeaders
+				Expect(expectedRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
 
-				By(fmt.Sprintf("case %d: %v via internal route service", i, testCase))
+				By("registering internal route service")
+				internalRsHeaders := make(chan http.Header, 1)
+				internalRouteService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					internalRsHeaders <- r.Header
+					w.WriteHeader(200)
+					url, err := url.Parse(r.Header.Get(routeservice.HeaderKeyForwardedURL))
+					Expect(err).ToNot(HaveOccurred())
+					newRequest := testState.newRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
+
+					// route service does not change headers
+					for k, v := range r.Header {
+						newRequest.Header[k] = v
+					}
+
+					resp, err := testState.client.Do(newRequest)
+					Expect(err).NotTo(HaveOccurred())
+					defer resp.Body.Close()
+				}))
+				defer internalRouteService.Close()
 				hostname = fmt.Sprintf("basic-app-%d-via-internal-route-service.some.domain", i)
-
-				receivedHeaders = make(chan http.Header, 1)
-				routeService = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					receivedHeaders <- r.Header
-					w.WriteHeader(200)
-				}))
-				defer routeService.Close()
-				testState.registerWithInternalRouteService(testApp, routeService, hostname)
+				testState.registerWithInternalRouteService(testApp, internalRouteService, hostname)
 
 				doRequest(testCase, hostname)
 
-				gotHeader = <-receivedHeaders
-				Expect(gotHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendToSeeHeader}))
+				expectedBackendHeader = <-appReceivedHeaders
+				Expect(expectedBackendHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendHeader}))
+
+				expectedInternalRsHeader := <-internalRsHeaders
+				Expect(expectedInternalRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
 			}
 		})
 	}
