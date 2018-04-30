@@ -1,4 +1,4 @@
-package main_test
+package integration
 
 import (
 	"crypto/tls"
@@ -83,7 +83,7 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
 		tempCfg.SuspendPruningIfNatsUnavailable = suspendPruning
-		caCertsPath := filepath.Join("test", "assets", "certs", "uaa-ca.pem")
+		caCertsPath := filepath.Join(testAssets, "certs", "uaa-ca.pem")
 		caCertsPath, err := filepath.Abs(caCertsPath)
 		Expect(err).ToNot(HaveOccurred())
 		tempCfg.LoadBalancerHealthyThreshold = 0
@@ -106,7 +106,7 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
 		tempCfg.SuspendPruningIfNatsUnavailable = suspendPruning
-		caCertsPath := filepath.Join("test", "assets", "certs", "uaa-ca.pem")
+		caCertsPath := filepath.Join(testAssets, "certs", "uaa-ca.pem")
 		caCertsPath, err := filepath.Abs(caCertsPath)
 		Expect(err).ToNot(HaveOccurred())
 		tempCfg.LoadBalancerHealthyThreshold = 0
@@ -1381,7 +1381,7 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 func setupTlsServer() *ghttp.Server {
 	oauthServer := ghttp.NewUnstartedServer()
 
-	caCertsPath := path.Join("test", "assets", "certs")
+	caCertsPath := path.Join(testAssets, "certs")
 	caCertsPath, err := filepath.Abs(caCertsPath)
 	Expect(err).ToNot(HaveOccurred())
 

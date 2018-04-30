@@ -1,6 +1,7 @@
-package main_test
+package integration
 
 import (
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -14,12 +15,8 @@ import (
 var (
 	gorouterPath string
 	oauthServer  *ghttp.Server
+	testAssets   = filepath.Join("../test", "assets")
 )
-
-func TestGorouter(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Gorouter Suite")
-}
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	path, err := gexec.Build("code.cloudfoundry.org/gorouter", "-race")
@@ -41,3 +38,8 @@ var _ = SynchronizedAfterSuite(func() {
 }, func() {
 	gexec.CleanupBuildArtifacts()
 })
+
+func TestIntegration(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Integration Suite")
+}
