@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -1873,7 +1873,7 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 
 	rt := &sharedfakes.RoundTripper{}
 	skipSanitize := func(*http.Request) bool { return false }
-	p := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
+	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
 		routeServiceConfig, &tls.Config{}, nil, rt, skipSanitize)
 
 	var healthCheck int32

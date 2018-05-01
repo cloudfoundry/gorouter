@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -223,7 +223,7 @@ var _ = Describe("Router", func() {
 
 		rt := &sharedfakes.RoundTripper{}
 		skipSanitize := func(*http.Request) bool { return false }
-		p = proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
+		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt, skipSanitize)
 
 		errChan := make(chan error, 2)
@@ -470,7 +470,7 @@ var _ = Describe("Router", func() {
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
 				skipSanitize := func(*http.Request) bool { return false }
-				proxy := proxy.NewProxy(logger, &access_log.NullAccessLogger{}, config, registry, combinedReporter,
+				proxy := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt, skipSanitize)
 
 				errChan = make(chan error, 2)
