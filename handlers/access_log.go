@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
@@ -16,7 +16,7 @@ import (
 )
 
 type accessLog struct {
-	accessLogger      access_log.AccessLogger
+	accessLogger      accesslog.AccessLogger
 	extraHeadersToLog []string
 	logger            logger.Logger
 }
@@ -24,7 +24,7 @@ type accessLog struct {
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
 func NewAccessLog(
-	accessLogger access_log.AccessLogger,
+	accessLogger accesslog.AccessLogger,
 	extraHeadersToLog []string,
 	logger logger.Logger,
 ) negroni.Handler {

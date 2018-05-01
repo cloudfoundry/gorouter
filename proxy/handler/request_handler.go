@@ -2,11 +2,9 @@ package handler
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -38,34 +36,55 @@ type RequestHandler struct {
 
 	tlsConfigTemplate *tls.Config
 
-	forwarder *Forwarder
+	forwarder         *Forwarder
+	disableXFFLogging bool
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config) *RequestHandler {
-	requestLogger := setupLogger(request, logger)
-	return &RequestHandler{
-		logger:              requestLogger,
+func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config, opts ...func(*RequestHandler)) *RequestHandler {
+	reqHandler := &RequestHandler{
 		reporter:            r,
 		request:             request,
 		response:            response,
 		endpointDialTimeout: endpointDialTimeout,
 		tlsConfigTemplate:   tlsConfig,
-		forwarder: &Forwarder{
-			BackendReadTimeout: endpointDialTimeout, // TODO: different values?
-			Logger:             requestLogger,
-		},
 	}
+
+	for _, option := range opts {
+		option(reqHandler)
+	}
+
+	requestLogger := setupLogger(reqHandler.disableXFFLogging, request, logger)
+	reqHandler.forwarder = &Forwarder{
+		BackendReadTimeout: endpointDialTimeout, // TODO: different values?
+		Logger:             requestLogger,
+	}
+	reqHandler.logger = requestLogger
+
+	return reqHandler
 }
 
-func setupLogger(request *http.Request, logger logger.Logger) logger.Logger {
-	tmpLogger := logger.Session("request-handler")
-	return tmpLogger.With(
+func setupLogger(disableXFFLogging bool, request *http.Request, logger logger.Logger) logger.Logger {
+	fields := []zap.Field{
 		zap.String("RemoteAddr", request.RemoteAddr),
 		zap.String("Host", request.Host),
 		zap.String("Path", request.URL.Path),
-		zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"]),
 		zap.Object("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"]),
-	)
+	}
+	if !disableXFFLogging {
+		// Preserve the ordering in zap fields
+		fields = append(fields, zap.Field{})
+		copy(fields[3:], fields[2:])
+		fields[3] = zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"])
+	}
+
+	l := logger.Session("request-handler").With(fields...)
+	return l
+}
+
+func DisableXFFLogging(t bool) func(*RequestHandler) {
+	return func(h *RequestHandler) {
+		h.disableXFFLogging = t
+	}
 }
 
 func (h *RequestHandler) Logger() logger.Logger {
@@ -246,68 +265,4 @@ func SetRequestXCfInstanceId(request *http.Request, endpoint *route.Endpoint) {
 
 func (h *RequestHandler) hijack() (client net.Conn, io *bufio.ReadWriter, err error) {
 	return h.response.Hijack()
-}
-
-type Forwarder struct {
-	BackendReadTimeout time.Duration
-	Logger             logger.Logger
-}
-
-// ForwardIO sets up websocket forwarding with a backend
-//
-// It returns after one of the connections closes.
-//
-// If the backend response code is not 101 Switching Protocols, then
-// ForwardIO will return immediately, allowing the caller to close the connections.
-func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
-	done := make(chan bool, 2)
-
-	copy := func(dst io.Writer, src io.Reader) {
-		// don't care about errors here
-		_, _ = io.Copy(dst, src)
-		done <- true
-	}
-
-	headerWasRead := make(chan struct{})
-	headerBytes := &bytes.Buffer{}
-	teedReader := io.TeeReader(backendConn, headerBytes)
-	var resp *http.Response
-	var err error
-	go func() {
-		resp, err = http.ReadResponse(bufio.NewReader(teedReader), nil)
-		headerWasRead <- struct{}{}
-	}()
-
-	select {
-	case <-headerWasRead:
-		if err != nil {
-			return 0
-		}
-	case <-time.After(f.BackendReadTimeout):
-		f.Logger.Error("websocket-forwardio", zap.Error(errors.New("timeout waiting for http response from backend")))
-		return 0
-	}
-
-	// we always write the header...
-	_, err = io.Copy(clientConn, headerBytes) // don't care about errors
-	if err != nil {
-		f.Logger.Error("websocket-copy", zap.Error(err))
-		return 0
-	}
-
-	if !isValidWebsocketResponse(resp) {
-		return resp.StatusCode
-	}
-
-	// only now do we start copying body data
-	go copy(clientConn, backendConn)
-	go copy(backendConn, clientConn)
-
-	<-done
-	return http.StatusSwitchingProtocols
-}
-
-func isValidWebsocketResponse(resp *http.Response) bool {
-	ok := resp.StatusCode == http.StatusSwitchingProtocols
-	return ok
 }

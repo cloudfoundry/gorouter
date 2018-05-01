@@ -1,4 +1,4 @@
-package access_log
+package accesslog
 
 import (
 	"io"
@@ -10,14 +10,14 @@ import (
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 
 	"os"
 )
 
-//go:generate counterfeiter -o fakes/fake_access_logger.go . AccessLogger
+//go:generate counterfeiter -o fakes/accesslogger.go . AccessLogger
 type AccessLogger interface {
 	Run()
 	Stop()
@@ -37,11 +37,11 @@ type FileAndLoggregatorAccessLogger struct {
 	stopCh                  chan struct{}
 	writer                  io.Writer
 	writerCount             int
+	disableXFFLogging       bool
 	logger                  logger.Logger
 }
 
 func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (AccessLogger, error) {
-
 	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
@@ -59,7 +59,7 @@ func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (Acc
 	}
 
 	if config.AccessLog.EnableStreaming {
-		syslogWriter, err := syslog.Dial("", "", syslog.LOG_INFO, config.Logging.Syslog)
+		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.LOG_INFO, config.Logging.Syslog)
 		if err != nil {
 			logger.Error("error-creating-syslog-writer", zap.Error(err))
 			return nil, err
@@ -72,20 +72,17 @@ func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (Acc
 		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
 	}
 
-	accessLogger := NewFileAndLoggregatorAccessLogger(logger, dropsondeSourceInstance, writers...)
-	go accessLogger.Run()
-	return accessLogger, nil
-}
-
-func NewFileAndLoggregatorAccessLogger(logger logger.Logger, dropsondeSourceInstance string, ws ...io.Writer) *FileAndLoggregatorAccessLogger {
-	a := &FileAndLoggregatorAccessLogger{
+	accessLogger := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
 		channel:                 make(chan schema.AccessLogRecord, 1024),
 		stopCh:                  make(chan struct{}),
+		disableXFFLogging:       config.Logging.DisableLogForwardedFor,
 		logger:                  logger,
 	}
-	configureWriters(a, ws)
-	return a
+	configureWriters(accessLogger, writers)
+
+	go accessLogger.Run()
+	return accessLogger, nil
 }
 
 func (x *FileAndLoggregatorAccessLogger) Run() {
@@ -123,6 +120,7 @@ func (x *FileAndLoggregatorAccessLogger) Stop() {
 }
 
 func (x *FileAndLoggregatorAccessLogger) Log(r schema.AccessLogRecord) {
+	r.DisableXFFLogging = x.disableXFFLogging
 	x.channel <- r
 }
 

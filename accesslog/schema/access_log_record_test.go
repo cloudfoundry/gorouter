@@ -3,12 +3,13 @@ package schema_test
 import (
 	"bytes"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/handlers"
 
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 
 	"net/http"
 	"net/url"
@@ -20,6 +21,7 @@ var _ = Describe("AccessLogRecord", func() {
 		endpoint *route.Endpoint
 		record   *schema.AccessLogRecord
 	)
+
 	BeforeEach(func() {
 		endpoint = route.NewEndpoint(&route.EndpointOpts{
 			AppId:                "FakeApplicationId",
@@ -56,25 +58,27 @@ var _ = Describe("AccessLogRecord", func() {
 
 	Describe("LogMessage", func() {
 		It("Makes a record with all values", func() {
-			recordString := "FakeRequestHost - " +
-				"[2000-01-01T00:00:00.000+0000] " +
-				`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-				"200 " +
-				"30 " +
-				"23 " +
-				`"FakeReferer" ` +
-				`"FakeUserAgent" ` +
-				`"FakeRemoteAddr" ` +
-				`"1.2.3.4:1234" ` +
-				`x_forwarded_for:"FakeProxy1, FakeProxy2" ` +
-				`x_forwarded_proto:"FakeOriginalRequestProto" ` +
-				`vcap_request_id:"abc-123-xyz-pdq" ` +
-				`response_time:60 ` +
-				`app_id:"FakeApplicationId" ` +
-				`app_index:"3"` +
-				"\n"
+			r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+			Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+			Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+			Eventually(r).Should(gbytes.Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
+			Eventually(r).Should(gbytes.Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
+			Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
+			Eventually(r).Should(gbytes.Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+			Eventually(r).Should(gbytes.Say(`app_index:"3"\n`))
+		})
 
-			Expect(record.LogMessage()).To(Equal(recordString))
+		Context("when DisableXFFLogging is specified", func() {
+			It("does not write x_forwarded_for as part of the access log", func() {
+				record.HeadersOverride = http.Header{
+					"X-Forwarded-For": []string{"FooProxy1, FooProxy2"},
+				}
+
+				record.DisableXFFLogging = true
+
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(gbytes.Say(`x_forwarded_for:"FooProxy1, FooProxy2" `))
+			})
 		})
 
 		Context("with HeadersOverride specified", func() {
@@ -87,26 +91,16 @@ var _ = Describe("AccessLogRecord", func() {
 					handlers.VcapRequestIdHeader: []string{"abc-123-xyz-pdq"},
 				}
 			})
-			It("Makes a record with all values", func() {
-				recordString := "FakeRequestHost - " +
-					"[2000-01-01T00:00:00.000+0000] " +
-					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-					"200 " +
-					"30 " +
-					"23 " +
-					`"FooReferer" ` +
-					`"FooUserAgent" ` +
-					`"FakeRemoteAddr" ` +
-					`"1.2.3.4:1234" ` +
-					`x_forwarded_for:"FooProxy1, FooProxy2" ` +
-					`x_forwarded_proto:"FooOriginalRequestProto" ` +
-					`vcap_request_id:"abc-123-xyz-pdq" ` +
-					`response_time:60 ` +
-					`app_id:"FakeApplicationId" ` +
-					`app_index:"3"` +
-					"\n"
 
-				Expect(record.LogMessage()).To(Equal(recordString))
+			It("Makes a record with all values", func() {
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`200 30 23 "FooReferer" "FooUserAgent" "FakeRemoteAddr" `))
+				Eventually(r).Should(gbytes.Say(`"1.2.3.4:1234" x_forwarded_for:"FooProxy1, FooProxy2" `))
+				Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"FooOriginalRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(gbytes.Say(`app_index:"3"\n`))
 			})
 		})
 
@@ -122,26 +116,16 @@ var _ = Describe("AccessLogRecord", func() {
 				record.FinishedAt = time.Time{}
 				record.RequestBytesReceived = 0
 			})
-			It("makes a record", func() {
-				recordString := "FakeRequestHost - " +
-					"[2000-01-01T00:00:00.000+0000] " +
-					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-					`"-" ` +
-					"0 " +
-					"0 " +
-					`"-" ` +
-					`"-" ` +
-					`"FakeRemoteAddr" ` +
-					`"-" ` +
-					`x_forwarded_for:"-" ` +
-					`x_forwarded_proto:"-" ` +
-					`vcap_request_id:"-" ` +
-					`response_time:"-" ` +
-					`app_id:"FakeApplicationId" ` +
-					`app_index:"-"` +
-					"\n"
 
-				Expect(record.LogMessage()).To(Equal(recordString))
+			It("makes a record", func() {
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`"-" 0 0 "-" "-" "FakeRemoteAddr" `))
+				Eventually(r).Should(gbytes.Say(`"-" x_forwarded_for:"-" `))
+				Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"-" `))
+				Eventually(r).Should(gbytes.Say(`vcap_request_id:"-" response_time:"-" app_id:"FakeApplicationId" `))
+				Eventually(r).Should(gbytes.Say(`app_index:"-"\n`))
 			})
 		})
 
@@ -149,6 +133,7 @@ var _ = Describe("AccessLogRecord", func() {
 			BeforeEach(func() {
 				record = &schema.AccessLogRecord{}
 			})
+
 			It("does not create a log message", func() {
 				Expect(record.LogMessage()).To(Equal(""))
 			})
@@ -161,30 +146,17 @@ var _ = Describe("AccessLogRecord", func() {
 				record.Request.Header.Set("If-Match", "737060cd8c284d8af7ad3082f209582d")
 				record.ExtraHeadersToLog = []string{"Cache-Control", "Accept-Encoding", "If-Match", "Doesnt-Exist"}
 			})
-			It("appends extra headers", func() {
-				recordString := "FakeRequestHost - " +
-					"[2000-01-01T00:00:00.000+0000] " +
-					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-					`200 ` +
-					"30 " +
-					"23 " +
-					`"FakeReferer" ` +
-					`"FakeUserAgent" ` +
-					`"FakeRemoteAddr" ` +
-					`"1.2.3.4:1234" ` +
-					`x_forwarded_for:"FakeProxy1, FakeProxy2" ` +
-					`x_forwarded_proto:"FakeOriginalRequestProto" ` +
-					`vcap_request_id:"abc-123-xyz-pdq" ` +
-					`response_time:60 ` +
-					`app_id:"FakeApplicationId" ` +
-					`app_index:"3" ` +
-					`cache_control:"no-cache" ` +
-					`accept_encoding:"gzip, deflate" ` +
-					`if_match:"737060cd8c284d8af7ad3082f209582d" ` +
-					`doesnt_exist:"-"` +
-					"\n"
 
-				Expect(record.LogMessage()).To(Equal(recordString))
+			It("appends extra headers", func() {
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
+				Eventually(r).Should(gbytes.Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
+				Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(gbytes.Say(`app_index:"3" cache_control:"no-cache" accept_encoding:"gzip, deflate" `))
+				Eventually(r).Should(gbytes.Say(`if_match:"737060cd8c284d8af7ad3082f209582d" doesnt_exist:"-"\n`))
 			})
 		})
 
@@ -216,53 +188,32 @@ var _ = Describe("AccessLogRecord", func() {
 					ExtraHeadersToLog:    []string{},
 				}
 
-				recordString := "FakeRequestHost - " +
-					"[2000-01-01T00:00:00.000+0000] " +
-					`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-					"200 " +
-					"30 " +
-					"23 " +
-					`"FakeReferer" ` +
-					`"FakeUserAgent" ` +
-					`"FakeRemoteAddr" ` +
-					`"1.2.3.4:1234" ` +
-					`x_forwarded_for:"FakeProxy1, FakeProxy2" ` +
-					`x_forwarded_proto:"FakeOriginalRequestProto" ` +
-					`vcap_request_id:"abc-123-xyz-pdq" ` +
-					`response_time:60 ` +
-					`app_id:"FakeApplicationId" ` +
-					`app_index:"3"` +
-					"\n"
-
-				Expect(record.LogMessage()).To(Equal(recordString))
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
+				Eventually(r).Should(gbytes.Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
+				Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
+				Eventually(r).Should(gbytes.Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(gbytes.Say(`app_index:"3"\n`))
 			})
 		})
 	})
 
 	Describe("WriteTo", func() {
 		It("writes the correct log line to the io.Writer", func() {
-			recordString := "FakeRequestHost - " +
-				"[2000-01-01T00:00:00.000+0000] " +
-				`"FakeRequestMethod http://example.com/request FakeRequestProto" ` +
-				"200 " +
-				"30 " +
-				"23 " +
-				`"FakeReferer" ` +
-				`"FakeUserAgent" ` +
-				`"FakeRemoteAddr" ` +
-				`"1.2.3.4:1234" ` +
-				`x_forwarded_for:"FakeProxy1, FakeProxy2" ` +
-				`x_forwarded_proto:"FakeOriginalRequestProto" ` +
-				`vcap_request_id:"abc-123-xyz-pdq" ` +
-				`response_time:60 ` +
-				`app_id:"FakeApplicationId" ` +
-				`app_index:"3"` +
-				"\n"
-
 			b := new(bytes.Buffer)
 			_, err := record.WriteTo(b)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(b.String()).To(Equal(recordString))
+
+			r := gbytes.BufferReader(b)
+			Eventually(r).Should(gbytes.Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+			Eventually(r).Should(gbytes.Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
+			Eventually(r).Should(gbytes.Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
+			Eventually(r).Should(gbytes.Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
+			Eventually(r).Should(gbytes.Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
+			Eventually(r).Should(gbytes.Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+			Eventually(r).Should(gbytes.Say(`app_index:"3"\n`))
 		})
 	})
 
@@ -272,22 +223,27 @@ var _ = Describe("AccessLogRecord", func() {
 			BeforeEach(func() {
 				emptyRecord.RouteEndpoint = new(route.Endpoint)
 			})
+
 			It("returns empty string", func() {
 				Expect(emptyRecord.ApplicationID()).To(Equal(""))
 			})
 		})
+
 		Context("when RouteEndpoint.ApplicationId is empty", func() {
 			BeforeEach(func() {
 				emptyRecord.RouteEndpoint = new(route.Endpoint)
 			})
+
 			It("returns empty string", func() {
 				Expect(emptyRecord.ApplicationID()).To(Equal(""))
 			})
 		})
+
 		Context("when RouteEndpoint.ApplicationId is set", func() {
 			BeforeEach(func() {
 				emptyRecord.RouteEndpoint = endpoint
 			})
+
 			It("returns the application ID", func() {
 				Expect(emptyRecord.ApplicationID()).To(Equal("FakeApplicationId"))
 			})

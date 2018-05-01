@@ -4,8 +4,8 @@ package fakes
 import (
 	"sync"
 
-	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/access_log/schema"
+	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
 )
 
 type FakeAccessLogger struct {
@@ -108,4 +108,4 @@ func (fake *FakeAccessLogger) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ access_log.AccessLogger = new(FakeAccessLogger)
+var _ accesslog.AccessLogger = new(FakeAccessLogger)

@@ -81,10 +81,13 @@ type BackendConfig struct {
 }
 
 type LoggingConfig struct {
-	Syslog             string `yaml:"syslog"`
-	Level              string `yaml:"level"`
-	LoggregatorEnabled bool   `yaml:"loggregator_enabled"`
-	MetronAddress      string `yaml:"metron_address"`
+	Syslog                 string `yaml:"syslog"`
+	SyslogAddr             string
+	SyslogNetwork          string
+	Level                  string `yaml:"level"`
+	LoggregatorEnabled     bool   `yaml:"loggregator_enabled"`
+	MetronAddress          string `yaml:"metron_address"`
+	DisableLogForwardedFor bool   `yaml:"disable_log_forwarded_for"`
 
 	// This field is populated by the `Process` function.
 	JobName string `yaml:"-"`

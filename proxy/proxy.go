@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -37,7 +37,7 @@ type proxy struct {
 	traceKey                 string
 	logger                   logger.Logger
 	reporter                 metrics.ProxyReporter
-	accessLogger             access_log.AccessLogger
+	accessLogger             accesslog.AccessLogger
 	secureCookies            bool
 	heartbeatOK              *int32
 	routeServiceConfig       *routeservice.RouteServiceConfig
@@ -50,11 +50,12 @@ type proxy struct {
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
 	skipSanitization         func(req *http.Request) bool
+	disableXFFLogging        bool
 }
 
 func NewProxy(
 	logger logger.Logger,
-	accessLogger access_log.AccessLogger,
+	accessLogger accesslog.AccessLogger,
 	cfg *config.Config,
 	registry registry.Registry,
 	reporter metrics.ProxyReporter,
@@ -83,6 +84,7 @@ func NewProxy(
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         tlsConfig,
 		skipSanitization:         skipSanitization,
+		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
 	}
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
@@ -189,7 +191,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	if err != nil {
 		p.logger.Fatal("request-info-err", zap.Error(err))
 	}
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout, p.backendTLSConfig)
+	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout, p.backendTLSConfig, handler.DisableXFFLogging(p.disableXFFLogging))
 
 	if reqInfo.RoutePool == nil {
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))

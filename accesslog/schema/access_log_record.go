@@ -88,6 +88,7 @@ type AccessLogRecord struct {
 	BodyBytesSent        int
 	RequestBytesReceived int
 	ExtraHeadersToLog    []string
+	DisableXFFLogging    bool
 	record               []byte
 }
 
@@ -138,8 +139,10 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteDashOrStringValue(r.Request.RemoteAddr)
 	b.WriteDashOrStringValue(destIPandPort)
 
-	b.WriteString(`x_forwarded_for:`)
-	b.WriteDashOrStringValue(headers.Get("X-Forwarded-For"))
+	if !r.DisableXFFLogging {
+		b.WriteString(`x_forwarded_for:`)
+		b.WriteDashOrStringValue(headers.Get("X-Forwarded-For"))
+	}
 
 	b.WriteString(`x_forwarded_proto:`)
 	b.WriteDashOrStringValue(headers.Get("X-Forwarded-Proto"))

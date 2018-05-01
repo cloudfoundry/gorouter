@@ -6,7 +6,7 @@ import (
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
@@ -122,7 +122,7 @@ func main() {
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
 
-	accessLogger, err := access_log.CreateRunningAccessLogger(logger.Session("access-log"), c)
+	accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Session("access-log"), c)
 	if err != nil {
 		logger.Fatal("error-creating-access-logger", zap.Error(err))
 	}

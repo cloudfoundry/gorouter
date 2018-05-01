@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -32,7 +32,7 @@ var _ = Describe("AccessLogRecord", func() {
 		Expect(err).ToNot(HaveOccurred())
 		r := registry.NewRouteRegistry(logger, c, new(fakes.FakeRouteRegistryReporter))
 		combinedReporter := &metrics.CompositeReporter{VarzReporter: varz.NewVarz(r), ProxyReporter: metricsReporter}
-		accesslog, err := access_log.CreateRunningAccessLogger(logger, c)
+		accesslog, err := accesslog.CreateRunningAccessLogger(logger, c)
 		Expect(err).ToNot(HaveOccurred())
 
 		rss, err := router.NewRouteServicesServer()
