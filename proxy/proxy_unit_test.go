@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	fakelogger "code.cloudfoundry.org/gorouter/access_log/fakes"
+	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"

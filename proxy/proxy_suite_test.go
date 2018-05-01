@@ -3,11 +3,13 @@ package proxy_test
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
-	"code.cloudfoundry.org/gorouter/access_log"
+	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -32,10 +34,11 @@ import (
 var (
 	r                       *registry.RouteRegistry
 	p                       http.Handler
+	f                       *os.File
 	fakeReporter            *fakes.FakeCombinedReporter
 	conf                    *config.Config
 	proxyServer             net.Listener
-	accessLog               access_log.AccessLogger
+	al                      accesslog.AccessLogger
 	accessLogFile           *test_util.FakeFile
 	crypto                  secure.Crypto
 	testLogger              logger.Logger
@@ -77,9 +80,12 @@ var _ = JustBeforeEach(func() {
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 
-	accessLogFile = new(test_util.FakeFile)
-	accessLog = access_log.NewFileAndLoggregatorAccessLogger(testLogger, "", accessLogFile)
-	go accessLog.Run()
+	f, err = ioutil.TempFile("", "fakeFile")
+	Expect(err).NotTo(HaveOccurred())
+	conf.AccessLog.File = f.Name()
+	al, err = accesslog.CreateRunningAccessLogger(testLogger, conf)
+	Expect(err).NotTo(HaveOccurred())
+	go al.Run()
 
 	conf.EnableSSL = true
 	if len(conf.CipherSuites) == 0 {
@@ -115,7 +121,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, accessLog, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient, skipSanitization)
+	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient, skipSanitization)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)
@@ -123,8 +129,9 @@ var _ = JustBeforeEach(func() {
 
 var _ = AfterEach(func() {
 	proxyServer.Close()
-	accessLog.Stop()
+	al.Stop()
 	caCertPool = nil
+	os.Remove(f.Name())
 })
 
 func shouldEcho(input string, expected string) {

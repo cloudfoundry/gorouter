@@ -868,21 +868,25 @@ var _ = Describe("Proxy", func() {
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
 			//make sure the record includes all the data
 			//since the building of the log record happens throughout the life of the request
-			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
-			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
-			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring(`app_id:"456"`))
-			Expect(string(payload)).To(ContainSubstring(`app_index:"2"`))
-			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
+			b, err := ioutil.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
+			Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
+			Expect(string(b)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+			Expect(string(b)).To(ContainSubstring(`response_time:`))
+			Expect(string(b)).To(ContainSubstring(`app_id:"456"`))
+			Expect(string(b)).To(ContainSubstring(`app_index:"2"`))
+			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
 		It("Logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
@@ -902,19 +906,23 @@ var _ = Describe("Proxy", func() {
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
 			//make sure the record includes all the data
 			//since the building of the log record happens throughout the life of the request
-			Expect(strings.HasPrefix(string(payload), "test - [")).To(BeTrue())
-			Expect(string(payload)).To(ContainSubstring(`"POST / HTTP/1.1" 200 0 0 "-"`))
-			Expect(string(payload)).To(ContainSubstring(`x_forwarded_for:"1.2.3.4, 127.0.0.1" x_forwarded_proto:"https" vcap_request_id:`))
-			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(payload[len(payload)-1]).To(Equal(byte('\n')))
+			b, err := ioutil.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
+			Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 0 0 "-"`))
+			Expect(string(b)).To(ContainSubstring(`x_forwarded_for:"1.2.3.4, 127.0.0.1" x_forwarded_proto:"https" vcap_request_id:`))
+			Expect(string(b)).To(ContainSubstring(`response_time:`))
+			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
 		It("Logs a request when it exits early", func() {
@@ -928,14 +936,17 @@ var _ = Describe("Proxy", func() {
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
-			var payload []byte
-			Eventually(func() int {
-				n, e := accessLogFile.Read(&payload)
-				Expect(e).ToNot(HaveOccurred())
-				return n
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
-			Expect(string(payload)).To(MatchRegexp("^test.*\n"))
+			b, err := ioutil.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(b)).To(MatchRegexp("^test.*\n"))
 		})
 
 		Context("when the request has X-CF-APP-INSTANCE", func() {
@@ -1023,13 +1034,18 @@ var _ = Describe("Proxy", func() {
 
 				conn.ReadResponse()
 
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				Expect(string(payload)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
+				b, err := ioutil.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(string(b)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
 			})
 		})
 	})
@@ -1385,15 +1401,20 @@ var _ = Describe("Proxy", func() {
 			conn.WriteLine("hello from client")
 			conn.CheckLine("hello from server")
 
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
-			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 101"))
-			responseTime := parseResponseTimeFromLog(string(payload))
+			b, err := ioutil.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(b)).To(ContainSubstring(`response_time:`))
+			Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 101"))
+			responseTime := parseResponseTimeFromLog(string(b))
 			Expect(responseTime).To(BeNumerically(">", 0))
 
 			conn.Close()
@@ -1489,15 +1510,20 @@ var _ = Describe("Proxy", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				Expect(string(payload)).To(ContainSubstring(`response_time:`))
-				Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 502"))
-				responseTime := parseResponseTimeFromLog(string(payload))
+				b, err := ioutil.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(string(b)).To(ContainSubstring(`response_time:`))
+				Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 502"))
+				responseTime := parseResponseTimeFromLog(string(b))
 				Expect(responseTime).To(BeNumerically(">", 0))
 
 				Expect(fakeReporter.CaptureWebSocketUpdateCallCount()).To(Equal(0))
@@ -1559,15 +1585,20 @@ var _ = Describe("Proxy", func() {
 			conn.WriteLine("hello from client")
 			conn.CheckLine("hello from server")
 
-			var payload []byte
-			Eventually(func() int {
-				accessLogFile.Read(&payload)
-				return len(payload)
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
-			Expect(string(payload)).To(ContainSubstring(`response_time:`))
-			Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 101"))
-			responseTime := parseResponseTimeFromLog(string(payload))
+			b, err := ioutil.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(b)).To(ContainSubstring(`response_time:`))
+			Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 101"))
+			responseTime := parseResponseTimeFromLog(string(b))
 			Expect(responseTime).To(BeNumerically(">", 0))
 
 			conn.Close()
@@ -1629,15 +1660,20 @@ var _ = Describe("Proxy", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
-				var payload []byte
-				Eventually(func() int {
-					accessLogFile.Read(&payload)
-					return len(payload)
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				Expect(string(payload)).To(ContainSubstring(`response_time:`))
-				Expect(string(payload)).To(ContainSubstring("HTTP/1.1\" 502"))
-				responseTime := parseResponseTimeFromLog(string(payload))
+				b, err := ioutil.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(string(b)).To(ContainSubstring(`response_time:`))
+				Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 502"))
+				responseTime := parseResponseTimeFromLog(string(b))
 				Expect(responseTime).To(BeNumerically(">", 0))
 
 				conn.Close()
