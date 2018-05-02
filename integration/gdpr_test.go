@@ -62,7 +62,8 @@ var _ = Describe("GDPR", func() {
 			f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(string(f)).NotTo(ContainSubstring("x_forwarded_for"))
+			Expect(string(f)).To(ContainSubstring(`x_forwarded_for:"-"`))
+			Expect(string(f)).NotTo(ContainSubstring("192.168.0.1"))
 		})
 
 		It("omits x-forwarded-for from stdout", func() {
@@ -99,7 +100,8 @@ var _ = Describe("GDPR", func() {
 
 			x.Close()
 
-			Expect(string(testState.gorouterSession.Out.Contents())).NotTo(ContainSubstring("X-Forwarded-For"))
+			Expect(string(testState.gorouterSession.Out.Contents())).To(ContainSubstring(`"X-Forwarded-For":"-"`))
+			Expect(string(testState.gorouterSession.Out.Contents())).NotTo(ContainSubstring("192.168.0.1"))
 		})
 	})
 

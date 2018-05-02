@@ -69,18 +69,16 @@ func setupLogger(disableXFFLogging, disableSourceIPLogging bool, request *http.R
 		zap.String("RemoteAddr", request.RemoteAddr),
 		zap.String("Host", request.Host),
 		zap.String("Path", request.URL.Path),
+		zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"]),
 		zap.Object("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"]),
 	}
-
+	// Specific indexes below is to preserve the schema in the log line
 	if disableSourceIPLogging {
 		fields[0] = zap.String("RemoteAddr", "-")
 	}
 
-	if !disableXFFLogging {
-		// Preserve the ordering in zap fields
-		fields = append(fields, zap.Field{})
-		copy(fields[3:], fields[2:])
-		fields[3] = zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"])
+	if disableXFFLogging {
+		fields[3] = zap.Object("X-Forwarded-For", "-")
 	}
 
 	l := logger.Session("request-handler").With(fields...)

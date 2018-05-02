@@ -53,14 +53,14 @@ var _ = Describe("RequestHandler", func() {
 		Describe("HandleBadGateway", func() {
 			It("does not include the X-Forwarded-For header in log output", func() {
 				rh.HandleBadGateway(nil, req)
-				Consistently(logger.Buffer()).ShouldNot(gbytes.Say("X-Forwarded-For"))
+				Eventually(logger.Buffer()).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
 			})
 		})
 
 		Describe("HandleTCPRequest", func() {
 			It("does not include the X-Forwarded-For header in log output", func() {
 				rh.HandleTcpRequest(&iter.FakeEndpointIterator{})
-				Consistently(logger.Buffer()).ShouldNot(gbytes.Say("X-Forwarded-For"))
+				Eventually(logger.Buffer()).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
 			})
 
 			Context("when serveTcp returns an error", func() {
@@ -69,7 +69,7 @@ var _ = Describe("RequestHandler", func() {
 					i.NextReturns(nil)
 					rh.HandleTcpRequest(i)
 					Eventually(logger.Buffer()).Should(gbytes.Say("tcp-request-failed"))
-					Consistently(logger.Buffer()).ShouldNot(gbytes.Say("X-Forwarded-For"))
+					Eventually(logger.Buffer()).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
 				})
 			})
 		})
@@ -77,7 +77,7 @@ var _ = Describe("RequestHandler", func() {
 		Describe("HandleTCPRequest", func() {
 			It("does not include the X-Forwarded-For header in log output", func() {
 				rh.HandleWebSocketRequest(&iter.FakeEndpointIterator{})
-				Consistently(logger.Buffer()).ShouldNot(gbytes.Say("X-Forwarded-For"))
+				Eventually(logger.Buffer()).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
 			})
 		})
 	})

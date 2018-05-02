@@ -85,7 +85,7 @@ var _ = Describe("AccessLogRecord", func() {
 				record.DisableXFFLogging = true
 
 				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
-				Consistently(r).ShouldNot(gbytes.Say(`x_forwarded_for:"FooProxy1, FooProxy2" `))
+				Eventually(r).Should(gbytes.Say(`x_forwarded_for:"-"`))
 			})
 		})
 

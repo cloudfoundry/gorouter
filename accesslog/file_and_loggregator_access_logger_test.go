@@ -198,7 +198,7 @@ var _ = Describe("AccessLog", func() {
 				go accessLogger.Run()
 				accessLogger.Log(*CreateAccessLogRecord())
 
-				Consistently(contents).ShouldNot(Receive(ContainSubstring("x_forwarded_for")))
+				Eventually(contents).Should(Receive(ContainSubstring(`x_forwarded_for:"-"`)))
 
 				accessLogger.Stop()
 			})

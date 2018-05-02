@@ -146,8 +146,10 @@ func (r *AccessLogRecord) makeRecord() []byte {
 
 	b.WriteDashOrStringValue(destIPandPort)
 
-	if !r.DisableXFFLogging {
-		b.WriteString(`x_forwarded_for:`)
+	b.WriteString(`x_forwarded_for:`)
+	if r.DisableXFFLogging {
+		b.WriteDashOrStringValue("-")
+	} else {
 		b.WriteDashOrStringValue(headers.Get("X-Forwarded-For"))
 	}
 
