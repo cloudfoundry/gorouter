@@ -68,12 +68,20 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(gbytes.Say(`app_index:"3"\n`))
 		})
 
+		Context("when DisableSourceIPLogging is specified", func() {
+			It("does not write RemoteAddr as part of the access log", func() {
+				record.DisableSourceIPLogging = true
+
+				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(gbytes.Say("FakeRemoteAddr"))
+			})
+		})
+
 		Context("when DisableXFFLogging is specified", func() {
 			It("does not write x_forwarded_for as part of the access log", func() {
 				record.HeadersOverride = http.Header{
 					"X-Forwarded-For": []string{"FooProxy1, FooProxy2"},
 				}
-
 				record.DisableXFFLogging = true
 
 				r := gbytes.BufferReader(bytes.NewBufferString(record.LogMessage()))

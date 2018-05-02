@@ -201,7 +201,56 @@ var _ = Describe("AccessLog", func() {
 				Consistently(contents).ShouldNot(Receive(ContainSubstring("x_forwarded_for")))
 
 				accessLogger.Stop()
+			})
+		})
 
+		Context("when DisableLogSourceIP is set to true", func() {
+			var (
+				syslogServer net.Listener
+				serverAddr   string
+			)
+
+			BeforeEach(func() {
+				logger = test_util.NewTestZapLogger("test")
+
+				var err error
+				cfg, err = config.DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
+
+				syslogServer, err = net.Listen("tcp", ":0")
+				Expect(err).NotTo(HaveOccurred())
+				serverAddr = syslogServer.Addr().String()
+			})
+
+			AfterEach(func() {
+				syslogServer.Close()
+			})
+
+			It("does not include RemoteAddr header in the records", func() {
+				cfg.Index = 42
+				cfg.AccessLog.EnableStreaming = true
+				cfg.Logging = config.LoggingConfig{
+					Syslog:             "foo",
+					SyslogAddr:         serverAddr,
+					SyslogNetwork:      "tcp",
+					LoggregatorEnabled: true,
+					DisableLogSourceIP: true,
+				}
+
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, cfg)
+				Expect(err).ToNot(HaveOccurred())
+
+				b := make(chan string, 1)
+				go runSyslogServer(syslogServer, b)
+
+				go accessLogger.Run()
+				accessLogger.Log(*CreateAccessLogRecord())
+
+				contents := <-b
+				Expect(contents).NotTo(ContainSubstring("1.2.3.4:5678"))
+				Expect(contents).To(ContainSubstring(`"user-agent" "-"`))
+
+				accessLogger.Stop()
 			})
 		})
 

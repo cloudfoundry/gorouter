@@ -51,6 +51,7 @@ type proxy struct {
 	backendTLSConfig         *tls.Config
 	skipSanitization         func(req *http.Request) bool
 	disableXFFLogging        bool
+	disableSourceIPLogging   bool
 }
 
 func NewProxy(
@@ -85,6 +86,7 @@ func NewProxy(
 		backendTLSConfig:         tlsConfig,
 		skipSanitization:         skipSanitization,
 		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
+		disableSourceIPLogging:   cfg.Logging.DisableLogSourceIP,
 	}
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
@@ -191,7 +193,16 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	if err != nil {
 		p.logger.Fatal("request-info-err", zap.Error(err))
 	}
-	handler := handler.NewRequestHandler(request, proxyWriter, p.reporter, p.logger, p.endpointDialTimeout, p.backendTLSConfig, handler.DisableXFFLogging(p.disableXFFLogging))
+	handler := handler.NewRequestHandler(
+		request,
+		proxyWriter,
+		p.reporter,
+		p.logger,
+		p.endpointDialTimeout,
+		p.backendTLSConfig,
+		handler.DisableXFFLogging(p.disableXFFLogging),
+		handler.DisableSourceIPLogging(p.disableSourceIPLogging),
+	)
 
 	if reqInfo.RoutePool == nil {
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))

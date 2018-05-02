@@ -38,6 +38,7 @@ type FileAndLoggregatorAccessLogger struct {
 	writer                  io.Writer
 	writerCount             int
 	disableXFFLogging       bool
+	disableSourceIPLogging  bool
 	logger                  logger.Logger
 }
 
@@ -77,6 +78,7 @@ func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (Acc
 		channel:                 make(chan schema.AccessLogRecord, 1024),
 		stopCh:                  make(chan struct{}),
 		disableXFFLogging:       config.Logging.DisableLogForwardedFor,
+		disableSourceIPLogging:  config.Logging.DisableLogSourceIP,
 		logger:                  logger,
 	}
 	configureWriters(accessLogger, writers)
@@ -121,6 +123,7 @@ func (x *FileAndLoggregatorAccessLogger) Stop() {
 
 func (x *FileAndLoggregatorAccessLogger) Log(r schema.AccessLogRecord) {
 	r.DisableXFFLogging = x.disableXFFLogging
+	r.DisableSourceIPLogging = x.disableSourceIPLogging
 	x.channel <- r
 }
 

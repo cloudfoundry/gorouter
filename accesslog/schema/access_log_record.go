@@ -78,18 +78,19 @@ func (b *recordBuffer) WriteDashOrStringValue(s string) {
 
 // AccessLogRecord represents a single access log line
 type AccessLogRecord struct {
-	Request              *http.Request
-	HeadersOverride      http.Header
-	StatusCode           int
-	RouteEndpoint        *route.Endpoint
-	StartedAt            time.Time
-	FirstByteAt          time.Time
-	FinishedAt           time.Time
-	BodyBytesSent        int
-	RequestBytesReceived int
-	ExtraHeadersToLog    []string
-	DisableXFFLogging    bool
-	record               []byte
+	Request                *http.Request
+	HeadersOverride        http.Header
+	StatusCode             int
+	RouteEndpoint          *route.Endpoint
+	StartedAt              time.Time
+	FirstByteAt            time.Time
+	FinishedAt             time.Time
+	BodyBytesSent          int
+	RequestBytesReceived   int
+	ExtraHeadersToLog      []string
+	DisableXFFLogging      bool
+	DisableSourceIPLogging bool
+	record                 []byte
 }
 
 func (r *AccessLogRecord) formatStartedAt() string {
@@ -136,7 +137,13 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteIntValue(r.BodyBytesSent)
 	b.WriteDashOrStringValue(headers.Get("Referer"))
 	b.WriteDashOrStringValue(headers.Get("User-Agent"))
-	b.WriteDashOrStringValue(r.Request.RemoteAddr)
+
+	if r.DisableSourceIPLogging {
+		b.WriteDashOrStringValue("-")
+	} else {
+		b.WriteDashOrStringValue(r.Request.RemoteAddr)
+	}
+
 	b.WriteDashOrStringValue(destIPandPort)
 
 	if !r.DisableXFFLogging {

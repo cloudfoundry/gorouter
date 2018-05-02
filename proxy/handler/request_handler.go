@@ -36,8 +36,9 @@ type RequestHandler struct {
 
 	tlsConfigTemplate *tls.Config
 
-	forwarder         *Forwarder
-	disableXFFLogging bool
+	forwarder              *Forwarder
+	disableXFFLogging      bool
+	disableSourceIPLogging bool
 }
 
 func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config, opts ...func(*RequestHandler)) *RequestHandler {
@@ -53,7 +54,7 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 		option(reqHandler)
 	}
 
-	requestLogger := setupLogger(reqHandler.disableXFFLogging, request, logger)
+	requestLogger := setupLogger(reqHandler.disableXFFLogging, reqHandler.disableSourceIPLogging, request, logger)
 	reqHandler.forwarder = &Forwarder{
 		BackendReadTimeout: endpointDialTimeout, // TODO: different values?
 		Logger:             requestLogger,
@@ -63,13 +64,18 @@ func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter
 	return reqHandler
 }
 
-func setupLogger(disableXFFLogging bool, request *http.Request, logger logger.Logger) logger.Logger {
+func setupLogger(disableXFFLogging, disableSourceIPLogging bool, request *http.Request, logger logger.Logger) logger.Logger {
 	fields := []zap.Field{
 		zap.String("RemoteAddr", request.RemoteAddr),
 		zap.String("Host", request.Host),
 		zap.String("Path", request.URL.Path),
 		zap.Object("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"]),
 	}
+
+	if disableSourceIPLogging {
+		fields[0] = zap.String("RemoteAddr", "-")
+	}
+
 	if !disableXFFLogging {
 		// Preserve the ordering in zap fields
 		fields = append(fields, zap.Field{})
@@ -84,6 +90,12 @@ func setupLogger(disableXFFLogging bool, request *http.Request, logger logger.Lo
 func DisableXFFLogging(t bool) func(*RequestHandler) {
 	return func(h *RequestHandler) {
 		h.disableXFFLogging = t
+	}
+}
+
+func DisableSourceIPLogging(t bool) func(*RequestHandler) {
+	return func(h *RequestHandler) {
+		h.disableSourceIPLogging = t
 	}
 }
 

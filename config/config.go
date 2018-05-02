@@ -88,6 +88,7 @@ type LoggingConfig struct {
 	LoggregatorEnabled     bool   `yaml:"loggregator_enabled"`
 	MetronAddress          string `yaml:"metron_address"`
 	DisableLogForwardedFor bool   `yaml:"disable_log_forwarded_for"`
+	DisableLogSourceIP     bool   `yaml:"disable_log_source_ip"`
 
 	// This field is populated by the `Process` function.
 	JobName string `yaml:"-"`
