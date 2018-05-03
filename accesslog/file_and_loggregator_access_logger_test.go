@@ -48,7 +48,6 @@ var _ = Describe("AccessLog", func() {
 
 				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, cfg)
 				Expect(err).ToNot(HaveOccurred())
-				go accessLogger.Run()
 
 				accessLogger.Log(*CreateAccessLogRecord())
 
@@ -77,7 +76,6 @@ var _ = Describe("AccessLog", func() {
 				accessLogRecord := CreateAccessLogRecord()
 				accessLogRecord.RouteEndpoint = routeEndpoint
 				accessLogger.Log(*accessLogRecord)
-				go accessLogger.Run()
 
 				Consistently(fakeLogSender.GetLogs).Should(HaveLen(0))
 
@@ -123,7 +121,6 @@ var _ = Describe("AccessLog", func() {
 				contents := make(chan string, 1)
 				go runSyslogServer(syslogServer, contents)
 
-				go accessLogger.Run()
 				accessLogger.Log(*CreateAccessLogRecord())
 
 				Eventually(contents).Should(Receive(ContainSubstring("foo.bar")))
@@ -147,7 +144,6 @@ var _ = Describe("AccessLog", func() {
 				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
-				go accessLogger.Run()
 				accessLogger.Log(*CreateAccessLogRecord())
 
 				Eventually(gbytes.BufferReader(gbytes.TimeoutReader(stdout, time.Second))).Should(gbytes.Say("foo.bar"))
@@ -195,7 +191,6 @@ var _ = Describe("AccessLog", func() {
 				contents := make(chan string, 1)
 				go runSyslogServer(syslogServer, contents)
 
-				go accessLogger.Run()
 				accessLogger.Log(*CreateAccessLogRecord())
 
 				Eventually(contents).Should(Receive(ContainSubstring(`x_forwarded_for:"-"`)))
@@ -243,7 +238,6 @@ var _ = Describe("AccessLog", func() {
 				b := make(chan string, 1)
 				go runSyslogServer(syslogServer, b)
 
-				go accessLogger.Run()
 				accessLogger.Log(*CreateAccessLogRecord())
 
 				contents := <-b
