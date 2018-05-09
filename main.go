@@ -24,6 +24,7 @@ import (
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/go-nats"
@@ -122,7 +123,11 @@ func main() {
 	varz := rvarz.NewVarz(registry)
 	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
 
-	accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Session("access-log"), c)
+	accessLogger, err := accesslog.CreateRunningAccessLogger(
+		logger.Session("access-log"),
+		log_sender.NewLogSender(dropsonde.AutowiredEmitter()),
+		c,
+	)
 	if err != nil {
 		logger.Fatal("error-creating-access-logger", zap.Error(err))
 	}
@@ -200,7 +205,7 @@ func initializeFDMonitor(sender *metric_sender.MetricSender, logger goRouterLogg
 	pid := os.Getpid()
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
-	return monitor.NewFileDescriptor(path, ticker.C, sender, logger.Session("FileDescriptor"))
+	return monitor.NewFileDescriptor(path, ticker, sender, logger.Session("FileDescriptor"))
 }
 
 func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger goRouterLogger.Logger) *monitor.NATSMonitor {

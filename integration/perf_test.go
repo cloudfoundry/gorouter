@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 )
 
 var _ = Describe("AccessLogRecord", func() {
@@ -27,12 +28,13 @@ var _ = Describe("AccessLogRecord", func() {
 		sender := new(fakes.MetricSender)
 		batcher := new(fakes.MetricBatcher)
 		metricsReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
+		ls := fake.NewFakeLogSender()
 		logger := test_util.NewTestZapLogger("test")
 		c, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
 		r := registry.NewRouteRegistry(logger, c, new(fakes.FakeRouteRegistryReporter))
 		combinedReporter := &metrics.CompositeReporter{VarzReporter: varz.NewVarz(r), ProxyReporter: metricsReporter}
-		accesslog, err := accesslog.CreateRunningAccessLogger(logger, c)
+		accesslog, err := accesslog.CreateRunningAccessLogger(logger, ls, c)
 		Expect(err).ToNot(HaveOccurred())
 
 		rss, err := router.NewRouteServicesServer()

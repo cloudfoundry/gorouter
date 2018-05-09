@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 // Involves scrubbing client IPs, for more info on GDPR: https://www.eugdpr.org/
@@ -59,11 +60,13 @@ var _ = Describe("GDPR", func() {
 
 			Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
 
+			Eventually(func() ([]byte, error) {
+				return ioutil.ReadFile(testState.cfg.AccessLog.File)
+			}).Should(ContainSubstring(`x_forwarded_for:"-"`))
+
 			f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
 			Expect(err).NotTo(HaveOccurred())
-
-			Expect(string(f)).To(ContainSubstring(`x_forwarded_for:"-"`))
-			Expect(string(f)).NotTo(ContainSubstring("192.168.0.1"))
+			Expect(f).NotTo(ContainSubstring("192.168.0.1"))
 		})
 
 		It("omits x-forwarded-for from stdout", func() {
@@ -77,9 +80,9 @@ var _ = Describe("GDPR", func() {
 			wsApp.Register()
 			wsApp.Listen()
 
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
-			Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
+			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, testState.cfg.Port))
 			Expect(err).NotTo(HaveOccurred())
@@ -100,8 +103,8 @@ var _ = Describe("GDPR", func() {
 
 			x.Close()
 
-			Expect(string(testState.gorouterSession.Out.Contents())).To(ContainSubstring(`"X-Forwarded-For":"-"`))
-			Expect(string(testState.gorouterSession.Out.Contents())).NotTo(ContainSubstring("192.168.0.1"))
+			Eventually(gbytes.BufferReader(testState.gorouterSession.Out)).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
+			Expect(testState.gorouterSession.Out.Contents()).ToNot(ContainSubstring("192.168.0.1"))
 		})
 	})
 
@@ -133,10 +136,9 @@ var _ = Describe("GDPR", func() {
 
 			Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
 
-			f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(string(f)).To(ContainSubstring("\"foo-agent\" \"-\""))
+			Eventually(func() ([]byte, error) {
+				return ioutil.ReadFile(testState.cfg.AccessLog.File)
+			}).Should(ContainSubstring(`"foo-agent" "-"`))
 		})
 
 		It("omits RemoteAddr from stdout", func() {
@@ -150,9 +152,9 @@ var _ = Describe("GDPR", func() {
 			wsApp.Register()
 			wsApp.Listen()
 
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
-			Eventually(func() bool { return appRegistered(routesUri, wsApp) }, "2s").Should(BeTrue())
+			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, testState.cfg.Port))
 			Expect(err).NotTo(HaveOccurred())
@@ -172,7 +174,7 @@ var _ = Describe("GDPR", func() {
 
 			x.Close()
 
-			Expect(string(testState.gorouterSession.Out.Contents())).To(ContainSubstring(`"RemoteAddr":"-"`))
+			Eventually(gbytes.BufferReader(testState.gorouterSession.Out)).Should(gbytes.Say(`"RemoteAddr":"-"`))
 		})
 	})
 })

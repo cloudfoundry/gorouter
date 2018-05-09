@@ -25,6 +25,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
+	fakelogsender "github.com/cloudfoundry/dropsonde/log_sender/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -40,6 +41,7 @@ var (
 	proxyServer             net.Listener
 	al                      accesslog.AccessLogger
 	accessLogFile           *test_util.FakeFile
+	ls                      *fakelogsender.FakeLogSender
 	crypto                  secure.Crypto
 	testLogger              logger.Logger
 	cryptoPrev              secure.Crypto
@@ -83,7 +85,8 @@ var _ = JustBeforeEach(func() {
 	f, err = ioutil.TempFile("", "fakeFile")
 	Expect(err).NotTo(HaveOccurred())
 	conf.AccessLog.File = f.Name()
-	al, err = accesslog.CreateRunningAccessLogger(testLogger, conf)
+	ls = fakelogsender.NewFakeLogSender()
+	al, err = accesslog.CreateRunningAccessLogger(testLogger, ls, conf)
 	Expect(err).NotTo(HaveOccurred())
 	go al.Run()
 

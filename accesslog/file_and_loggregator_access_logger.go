@@ -7,7 +7,6 @@ import (
 
 	"strconv"
 
-	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
@@ -22,6 +21,10 @@ type AccessLogger interface {
 	Run()
 	Stop()
 	Log(record schema.AccessLogRecord)
+}
+
+type logsender interface {
+	SendAppLog(appID, message, sourceType, sourceInstance string) error
 }
 
 type NullAccessLogger struct {
@@ -40,9 +43,10 @@ type FileAndLoggregatorAccessLogger struct {
 	disableXFFLogging       bool
 	disableSourceIPLogging  bool
 	logger                  logger.Logger
+	ls                      logsender
 }
 
-func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (AccessLogger, error) {
+func CreateRunningAccessLogger(logger logger.Logger, ls logsender, config *config.Config) (AccessLogger, error) {
 	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
@@ -80,6 +84,7 @@ func CreateRunningAccessLogger(logger logger.Logger, config *config.Config) (Acc
 		disableXFFLogging:       config.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging:  config.Logging.DisableLogSourceIP,
 		logger:                  logger,
+		ls:                      ls,
 	}
 	configureWriters(accessLogger, writers)
 
@@ -98,7 +103,10 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 				}
 			}
 			if x.dropsondeSourceInstance != "" && record.ApplicationID() != "" {
-				logs.SendAppLog(record.ApplicationID(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
+				err := x.ls.SendAppLog(record.ApplicationID(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
+				if err != nil {
+					x.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
+				}
 			}
 		case <-x.stopCh:
 			return

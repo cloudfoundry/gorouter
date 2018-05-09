@@ -17,15 +17,12 @@ trap printStatus EXIT
 # install gnatsd
 go get -v github.com/nats-io/gnatsd
 
+go vet ./...
+go tool vet --shadow .
+
 # install ginkgo
 go install -v github.com/onsi/ginkgo/ginkgo
 echo -e "\n Formatting packages..."
 
 go fmt ./...
 ginkgo -keepGoing -trace -p -progress -r -failOnPending -randomizeAllSpecs -race "$@"
-
-# Installing dependencies needed by go vet
-go install .
-
-go vet ./...
-go tool vet --shadow .

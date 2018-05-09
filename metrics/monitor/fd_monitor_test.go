@@ -20,23 +20,24 @@ import (
 var _ = Describe("FileDescriptor", func() {
 	var (
 		sender   *fakes.MetricSender
-		ch       chan time.Time
 		procPath string
+		tr       *time.Ticker
 		logger   logger.Logger
 	)
 
 	BeforeEach(func() {
-		sender = new(fakes.MetricSender)
-		ch = make(chan time.Time)
+		tr = time.NewTicker(1 * time.Second)
+		sender = &fakes.MetricSender{}
 		logger = test_util.NewTestZapLogger("test")
 	})
 
 	AfterEach(func() {
+		tr.Stop()
 		Expect(os.RemoveAll(procPath)).To(Succeed())
 	})
 
 	It("exits when os signal is received", func() {
-		fdMonitor := monitor.NewFileDescriptor(procPath, ch, sender, logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
@@ -49,16 +50,11 @@ var _ = Describe("FileDescriptor", func() {
 
 	It("monitors all the open file descriptors for a given pid", func() {
 		procPath = createTestPath("", 10)
-		fdMonitor := monitor.NewFileDescriptor(procPath, ch, sender, logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
-		ch <- time.Time{}
-		ch <- time.Time{}
-
-		time.Sleep(1 * time.Millisecond)
-
-		Eventually(sender.SendValueCallCount()).Should(Equal(2))
+		Eventually(sender.SendValueCallCount, "2s").Should(Equal(1))
 		name, value, unit := sender.SendValueArgsForCall(0)
 		Expect(name).To(Equal("file_descriptors"))
 		Expect(value).To(BeEquivalentTo(10))
@@ -67,18 +63,12 @@ var _ = Describe("FileDescriptor", func() {
 		// create some more FDs
 		createTestPath(procPath, 20)
 
-		ch <- time.Time{}
-		ch <- time.Time{}
-
-		time.Sleep(1 * time.Millisecond)
-
-		Eventually(sender.SendValueCallCount()).Should(Equal(4))
-		name, value, unit = sender.SendValueArgsForCall(2)
+		Eventually(sender.SendValueCallCount, "2s").Should(Equal(2))
+		name, value, unit = sender.SendValueArgsForCall(1)
 		Expect(name).To(Equal("file_descriptors"))
 		Expect(value).To(BeEquivalentTo(20))
 		Expect(unit).To(Equal("file"))
 	})
-
 })
 
 func createTestPath(path string, symlink int) string {

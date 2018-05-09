@@ -690,7 +690,8 @@ var _ = Describe("Proxy", func() {
 			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
-				timesToTick := 2
+				timesToTick := 5
+				// sleep to force a dial timeout
 				time.Sleep(1 * time.Second)
 
 				conn.WriteLines([]string{
@@ -700,6 +701,7 @@ var _ = Describe("Proxy", func() {
 
 				for i := 0; i < timesToTick; i++ {
 					_, err := conn.Conn.Write([]byte("x"))
+					// expect an error due to closed connection
 					if err != nil {
 						serverResult <- err
 						return
@@ -725,7 +727,7 @@ var _ = Describe("Proxy", func() {
 			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(2*time.Second)))
 
 			var err error
-			Eventually(serverResult).Should(Receive(&err))
+			Eventually(serverResult, "2s").Should(Receive(&err))
 			Expect(err).NotTo(BeNil())
 		})
 
@@ -1511,9 +1513,9 @@ var _ = Describe("Proxy", func() {
 				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
 				Eventually(func() (int64, error) {
-					fi, err := f.Stat()
-					if err != nil {
-						return 0, err
+					fi, fErr := f.Stat()
+					if fErr != nil {
+						return 0, fErr
 					}
 					return fi.Size(), nil
 				}).ShouldNot(BeZero())
@@ -1661,9 +1663,9 @@ var _ = Describe("Proxy", func() {
 				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
 				Eventually(func() (int64, error) {
-					fi, err := f.Stat()
-					if err != nil {
-						return 0, err
+					fi, fErr := f.Stat()
+					if fErr != nil {
+						return 0, fErr
 					}
 					return fi.Size(), nil
 				}).ShouldNot(BeZero())
