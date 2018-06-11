@@ -57,6 +57,8 @@ type RouteRegistry struct {
 
 	routingTableShardingMode string
 	isolationSegments        []string
+
+	maxConnsPerBackend int64
 }
 
 func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
@@ -72,6 +74,8 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 
 	r.routingTableShardingMode = c.RoutingTableShardingMode
 	r.isolationSegments = c.IsolationSegments
+
+	r.maxConnsPerBackend = c.Backends.MaxConns
 
 	return r
 }
@@ -90,7 +94,12 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	pool := r.byURI.Find(routekey)
 	if pool == nil {
 		host, contextPath := splitHostAndContextPath(uri)
-		pool = route.NewPool(r.dropletStaleThreshold/4, host, contextPath)
+		pool = route.NewPool(&route.PoolOpts{
+			RetryAfterFailure:  r.dropletStaleThreshold / 4,
+			Host:               host,
+			ContextPath:        contextPath,
+			MaxConnsPerBackend: r.maxConnsPerBackend,
+		})
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
@@ -194,7 +203,12 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
-			surgicalPool = route.NewPool(0, p.Host(), p.ContextPath())
+			surgicalPool = route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  0,
+				Host:               p.Host(),
+				ContextPath:        p.ContextPath(),
+				MaxConnsPerBackend: p.MaxConnsPerBackend(),
+			})
 			surgicalPool.Put(e)
 		}
 	})

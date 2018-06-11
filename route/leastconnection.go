@@ -21,18 +21,33 @@ func NewLeastConnection(p *Pool, initial string) EndpointIterator {
 }
 
 func (r *LeastConnection) Next() *Endpoint {
-	var e *Endpoint
+	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
 		r.initialEndpoint = ""
+
+		if e != nil && e.isOverloaded() {
+			e = nil
+		}
 	}
 
-	if e == nil {
-		e = r.next()
+	if e != nil {
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
+		r.lastEndpoint = e.endpoint
+		return e.endpoint
 	}
 
-	r.lastEndpoint = e
-	return e
+	e = r.next()
+	if e != nil {
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
+		r.lastEndpoint = e.endpoint
+		return e.endpoint
+	}
+
+	r.lastEndpoint = nil
+	return nil
 }
 
 func (r *LeastConnection) PreRequest(e *Endpoint) {
@@ -43,11 +58,11 @@ func (r *LeastConnection) PostRequest(e *Endpoint) {
 	e.Stats.NumberConnections.Decrement()
 }
 
-func (r *LeastConnection) next() *Endpoint {
+func (r *LeastConnection) next() *endpointElem {
 	r.pool.lock.Lock()
 	defer r.pool.lock.Unlock()
 
-	var selected *Endpoint
+	var selected *endpointElem
 
 	// none
 	total := len(r.pool.endpoints)
@@ -57,7 +72,12 @@ func (r *LeastConnection) next() *Endpoint {
 
 	// single endpoint
 	if total == 1 {
-		return r.pool.endpoints[0].endpoint
+		e := r.pool.endpoints[0]
+		if e.isOverloaded() {
+			return nil
+		}
+
+		return e
 	}
 
 	// more than 1 endpoint
@@ -67,15 +87,18 @@ func (r *LeastConnection) next() *Endpoint {
 
 	for i := 0; i < total; i++ {
 		randIdx := randIndices[i]
-		cur := r.pool.endpoints[randIdx].endpoint
+		cur := r.pool.endpoints[randIdx]
+		if cur.isOverloaded() {
+			continue
+		}
 
 		// our first is the least
-		if i == 0 {
+		if i == 0 || selected == nil {
 			selected = cur
 			continue
 		}
 
-		if cur.Stats.NumberConnections.Count() < selected.Stats.NumberConnections.Count() {
+		if cur.endpoint.Stats.NumberConnections.Count() < selected.endpoint.Stats.NumberConnections.Count() {
 			selected = cur
 		}
 	}

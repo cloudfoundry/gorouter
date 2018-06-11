@@ -19,22 +19,38 @@ func NewRoundRobin(p *Pool, initial string) EndpointIterator {
 }
 
 func (r *RoundRobin) Next() *Endpoint {
-	var e *Endpoint
+	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
 		r.initialEndpoint = ""
+
+		if e != nil && e.isOverloaded() {
+			e = nil
+		}
 	}
 
-	if e == nil {
-		e = r.next()
+	if e != nil {
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
+		r.lastEndpoint = e.endpoint
+		return e.endpoint
 	}
 
-	r.lastEndpoint = e
+	e = r.next()
+	if e != nil {
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
+		r.lastEndpoint = e.endpoint
+		return e.endpoint
+	}
 
-	return e
+	r.lastEndpoint = nil
+	return nil
 }
 
-func (r *RoundRobin) next() *Endpoint {
+var max int
+
+func (r *RoundRobin) next() *endpointElem {
 	r.pool.lock.Lock()
 	defer r.pool.lock.Unlock()
 
@@ -59,6 +75,13 @@ func (r *RoundRobin) next() *Endpoint {
 			curIdx = 0
 		}
 
+		if e.isOverloaded() {
+			if curIdx == startIdx {
+				return nil
+			}
+			continue
+		}
+
 		if e.failedAt != nil {
 			curTime := time.Now()
 			if curTime.Sub(*e.failedAt) > r.pool.retryAfterFailure {
@@ -69,7 +92,7 @@ func (r *RoundRobin) next() *Endpoint {
 
 		if e.failedAt == nil {
 			r.pool.nextIdx = curIdx
-			return e.endpoint
+			return e
 		}
 
 		if curIdx == startIdx {

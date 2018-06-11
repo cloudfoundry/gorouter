@@ -21,19 +21,17 @@ const (
 )
 
 type lookupHandler struct {
-	registry           registry.Registry
-	reporter           metrics.ProxyReporter
-	maxConnsPerBackend int64
-	logger             logger.Logger
+	registry registry.Registry
+	reporter metrics.ProxyReporter
+	logger   logger.Logger
 }
 
 // NewLookup creates a handler responsible for looking up a route.
-func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, maxConnsPerBackend int64, logger logger.Logger) negroni.Handler {
+func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger logger.Logger) negroni.Handler {
 	return &lookupHandler{
-		registry:           registry,
-		reporter:           rep,
-		maxConnsPerBackend: maxConnsPerBackend,
-		logger:             logger,
+		registry: registry,
+		reporter: rep,
+		logger:   logger,
 	}
 }
 
@@ -44,13 +42,9 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		return
 	}
 
-	if l.maxConnsPerBackend > 0 {
-		newPool := pool.FilteredPool(l.maxConnsPerBackend)
-		if newPool.IsEmpty() {
-			l.handleOverloadedRoute(rw, r)
-			return
-		}
-		pool = newPool
+	if pool.IsOverloaded() {
+		l.handleOverloadedRoute(rw, r)
+		return
 	}
 
 	requestInfo, err := ContextRequestInfo(r)

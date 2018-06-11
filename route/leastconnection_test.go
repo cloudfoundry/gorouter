@@ -13,7 +13,12 @@ var _ = Describe("LeastConnection", func() {
 	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "", "")
+		pool = route.NewPool(
+			&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "",
+				ContextPath:        "",
+				MaxConnsPerBackend: 0})
 	})
 
 	Describe("Next", func() {
@@ -119,6 +124,84 @@ var _ = Describe("LeastConnection", func() {
 						"10.0.1.3:60000",
 					}
 					Expect(okRandoms).Should(ContainElement(iter.Next().CanonicalAddr()))
+				})
+			})
+
+			Context("when some endpoints are overloaded", func() {
+				var (
+					epOne, epTwo *route.Endpoint
+				)
+
+				BeforeEach(func() {
+					pool = route.NewPool(&route.PoolOpts{
+						RetryAfterFailure:  2 * time.Minute,
+						Host:               "",
+						ContextPath:        "",
+						MaxConnsPerBackend: 2,
+					})
+
+					epOne = route.NewEndpoint(&route.EndpointOpts{Host: "5.5.5.5", Port: 5555, PrivateInstanceId: "private-label-1"})
+					pool.Put(epOne)
+					// epTwo is always overloaded
+					epTwo = route.NewEndpoint(&route.EndpointOpts{Host: "2.2.2.2", Port: 2222, PrivateInstanceId: "private-label-2"})
+					epTwo.Stats.NumberConnections.Increment()
+					epTwo.Stats.NumberConnections.Increment()
+					pool.Put(epTwo)
+				})
+
+				Context("when there is no initial endpoint", func() {
+					Context("when all endpoints are overloaded", func() {
+						It("returns nil", func() {
+							epOne.Stats.NumberConnections.Increment()
+							epOne.Stats.NumberConnections.Increment()
+							iter := route.NewLeastConnection(pool, "")
+
+							Consistently(func() *route.Endpoint {
+								return iter.Next()
+							}).Should(BeNil())
+						})
+					})
+
+					Context("when there is only one endpoint", func() {
+						Context("when that endpoint is overload", func() {
+							It("returns no endpoint", func() {
+								Expect(pool.Remove(epOne)).To(BeTrue())
+								iter := route.NewLeastConnection(pool, "")
+
+								Consistently(func() *route.Endpoint {
+									return iter.Next()
+								}).Should(BeNil())
+							})
+						})
+					})
+				})
+
+				Context("when there is an initial endpoint", func() {
+					var iter route.EndpointIterator
+					BeforeEach(func() {
+						iter = route.NewLeastConnection(pool, "private-label-2")
+					})
+
+					Context("when the initial endpoint is overloaded", func() {
+						Context("when there is an unencumbered endpoint", func() {
+							It("returns the unencumbered endpoint", func() {
+								Expect(iter.Next()).To(Equal(epOne))
+								Expect(iter.Next()).To(Equal(epOne))
+							})
+						})
+
+						Context("when there isn't an unencumbered endpoint", func() {
+							BeforeEach(func() {
+								epOne.Stats.NumberConnections.Increment()
+								epOne.Stats.NumberConnections.Increment()
+							})
+							It("returns nil", func() {
+								Consistently(func() *route.Endpoint {
+									return iter.Next()
+								}).Should(BeNil())
+							})
+						})
+					})
 				})
 			})
 		})

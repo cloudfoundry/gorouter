@@ -3,6 +3,7 @@ package proxy_test
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -838,6 +839,70 @@ var _ = Describe("Proxy", func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			}
+		})
+
+		Context("when a TLS handshake occurs", func() {
+			var nl net.Listener
+			JustBeforeEach(func() {
+				conf.Backends.EnableTLS = true
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "instance-id"})
+				backendCert, err := tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				caCertPool = x509.NewCertPool()
+				caCertPool.AppendCertsFromPEM(certChain.CACertPEM)
+
+				nl = test_util.RegisterHandler(r, "backend-with-different-instance-id", func(conn *test_util.HttpConn) {
+					_, err := http.ReadRequest(conn.Reader)
+					Expect(err).To(HaveOccurred())
+					resp := test_util.NewResponse(http.StatusServiceUnavailable)
+					conn.WriteResponse(resp)
+					conn.Close()
+				}, test_util.RegisterConfig{
+					ServerCertDomainSAN: "a-different-instance-id",
+					InstanceId:          "a-different-instance-id",
+					AppId:               "some-app-id",
+					TLSConfig: &tls.Config{
+						Certificates: []tls.Certificate{backendCert},
+					},
+				})
+			})
+
+			AfterEach(func() {
+				nl.Close()
+			})
+
+			Context("when the server cert does not match the client", func() {
+				It("prunes the route", func() {
+					for _, status := range []int{http.StatusServiceUnavailable, http.StatusNotFound} {
+						body := &bytes.Buffer{}
+						body.WriteString("use an actual body")
+						conn := dialProxy(proxyServer)
+						req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", ioutil.NopCloser(body))
+						conn.WriteRequest(req)
+						resp, _ := conn.ReadResponse()
+						Expect(resp.StatusCode).To(Equal(status))
+					}
+				})
+
+				Context("when MaxConns is > 0", func() {
+					BeforeEach(func() {
+						conf.Backends.MaxConns = 2
+					})
+
+					It("prunes the route", func() {
+						for _, status := range []int{http.StatusServiceUnavailable, http.StatusNotFound} {
+							body := &bytes.Buffer{}
+							body.WriteString("use an actual body")
+							conn := dialProxy(proxyServer)
+							req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", ioutil.NopCloser(body))
+							conn.WriteRequest(req)
+							resp, _ := conn.ReadResponse()
+							Expect(resp.StatusCode).To(Equal(status))
+						}
+					})
+				})
+			})
 		})
 	})
 

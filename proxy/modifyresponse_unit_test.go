@@ -35,7 +35,12 @@ var _ = Describe("modifyResponse", func() {
 		reqInfo, err = handlers.ContextRequestInfo(modifiedReq)
 		Expect(err).ToNot(HaveOccurred())
 		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
-		reqInfo.RoutePool = route.NewPool(0, "foo.com", "context-path")
+		reqInfo.RoutePool = route.NewPool(&route.PoolOpts{
+			RetryAfterFailure:  0,
+			Host:               "foo.com",
+			ContextPath:        "context-path",
+			MaxConnsPerBackend: 0,
+		})
 		resp.Request = modifiedReq
 	})
 	Context("when Request is not attached to the response", func() {

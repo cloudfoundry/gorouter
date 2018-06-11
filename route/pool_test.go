@@ -42,27 +42,73 @@ var _ = Describe("Pool", func() {
 	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "", "")
+		pool = route.NewPool(&route.PoolOpts{
+			RetryAfterFailure:  2 * time.Minute,
+			Host:               "",
+			ContextPath:        "",
+			MaxConnsPerBackend: 0,
+		})
 	})
+
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
-			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
-			p2 := route.NewPool(2*time.Minute, "foo.com", "/path")
+			p1 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
+			p2 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeTrue())
 		})
 		It("returns false if the hosts are the same but paths are different", func() {
-			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
-			p2 := route.NewPool(2*time.Minute, "foo.com", "/other")
+			p1 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
+			p2 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/other",
+				MaxConnsPerBackend: 0,
+			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
 		})
 		It("returns false if the paths are the same but hosts are different", func() {
-			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
-			p2 := route.NewPool(2*time.Minute, "bar.com", "/path")
+			p1 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
+			p2 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "bar.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
 		})
 		It("returns false if the both hosts and paths on the pools are different", func() {
-			p1 := route.NewPool(2*time.Minute, "foo.com", "/path")
-			p2 := route.NewPool(2*time.Minute, "bar.com", "/other")
+			p1 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "foo.com",
+				ContextPath:        "/path",
+				MaxConnsPerBackend: 0,
+			})
+			p2 := route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "bar.com",
+				ContextPath:        "/other",
+				MaxConnsPerBackend: 0,
+			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
 		})
 	})
@@ -285,43 +331,74 @@ var _ = Describe("Pool", func() {
 				})
 			})
 		})
+	})
 
-		Context("Filtered pool", func() {
-			It("returns copy of the pool with non overloaded endpoints", func() {
-				Expect(pool.IsEmpty()).To(BeTrue())
-				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
-				endpoint1.Stats.NumberConnections.Increment()
-				endpoint1.Stats.NumberConnections.Increment()
-				endpoint1.Stats.NumberConnections.Increment()
-
-				Expect(pool.Put(endpoint1)).To(Equal(route.ADDED))
-
-				endpoint2 := route.NewEndpoint(&route.EndpointOpts{Port: 5679})
-
-				Expect(pool.Put(endpoint2)).To(Equal(route.ADDED))
-				// verify the pool before filter has 2 endpoints
-				var len int
-				pool.Each(func(endpoint *route.Endpoint) {
-					len++
+	Context("IsOverloaded", func() {
+		Context("when MaxConnsPerBackend is not set (unlimited)", func() {
+			BeforeEach(func() {
+				pool = route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 0,
 				})
-				Expect(len).To(Equal(2))
+			})
 
-				newPool := pool.FilteredPool(1)
-				Expect(newPool).NotTo(BeNil())
+			Context("when all endpoints are overloaded", func() {
+				It("returns false", func() {
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+					endpoint.Stats.NumberConnections.Increment()
+					endpoint.Stats.NumberConnections.Increment()
+					pool.Put(endpoint)
 
-				// verify the original pool has both endpoints
-				len = 0
-				pool.Each(func(endpoint *route.Endpoint) {
-					len++
+					Expect(pool.IsOverloaded()).To(BeFalse())
 				})
-				Expect(len).To(Equal(2))
+			})
 
-				// verify newpool has an endpoint
-				newPoolLen := 0
-				newPool.Each(func(endpoint *route.Endpoint) {
-					newPoolLen++
+			Context("when all endpoints are not overloaded", func() {
+				It("returns false", func() {
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+					endpoint.Stats.NumberConnections.Increment()
+					pool.Put(endpoint)
+					Expect(pool.IsOverloaded()).To(BeFalse())
 				})
-				Expect(newPoolLen).To(Equal(1))
+			})
+		})
+
+		BeforeEach(func() {
+			pool = route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "",
+				ContextPath:        "",
+				MaxConnsPerBackend: 2,
+			})
+		})
+
+		Context("when pool is empty", func() {
+			It("returns true", func() {
+				Expect(pool.IsOverloaded()).To(BeTrue())
+			})
+		})
+
+		Context("when MaxConnsPerBackend is set", func() {
+			Context("when all endpoints are overloaded", func() {
+				It("returns true", func() {
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+					endpoint.Stats.NumberConnections.Increment()
+					endpoint.Stats.NumberConnections.Increment()
+					pool.Put(endpoint)
+
+					Expect(pool.IsOverloaded()).To(BeTrue())
+				})
+			})
+
+			Context("when all endpoints are not overloaded", func() {
+				It("returns false", func() {
+					endpoint := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+					endpoint.Stats.NumberConnections.Increment()
+					pool.Put(endpoint)
+					Expect(pool.IsOverloaded()).To(BeFalse())
+				})
 			})
 		})
 	})

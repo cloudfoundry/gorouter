@@ -46,12 +46,12 @@ var _ = Describe("Lookup", func() {
 		handler = negroni.New()
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(handlers.NewLookup(reg, rep, logger))
+		handler.UseHandler(nextHandler)
 	})
 
 	JustBeforeEach(func() {
-		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewLookup(reg, rep, maxConnections, logger))
-		handler.UseHandler(nextHandler)
 		handler.ServeHTTP(resp, req)
 	})
 
@@ -78,7 +78,12 @@ var _ = Describe("Lookup", func() {
 		var pool *route.Pool
 
 		BeforeEach(func() {
-			pool = route.NewPool(2*time.Minute, "example.com", "/")
+			pool = route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "example.com",
+				ContextPath:        "/",
+				MaxConnsPerBackend: maxConnections,
+			})
 			reg.LookupReturns(pool)
 		})
 
@@ -102,19 +107,14 @@ var _ = Describe("Lookup", func() {
 	})
 
 	Context("when there is a pool that matches the request, and it has endpoints", func() {
-		var pool *route.Pool
-
-		BeforeEach(func() {
-			pool = route.NewPool(2*time.Minute, "example.com", "/")
-			exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
-			pool.Put(exampleEndpoint)
-			reg.LookupReturns(pool)
-		})
-
-		Context("when conn limit is set to zero (unlimited)", func() {
+		Context("when conn limit is set to unlimited", func() {
 			BeforeEach(func() {
-				maxConnections = 0
-				pool = route.NewPool(2*time.Minute, "example.com", "/")
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: 0,
+				})
 				testEndpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.3.5.6", Port: 5679})
 				for i := 0; i < 5; i++ {
 					testEndpoint.Stats.NumberConnections.Increment()
@@ -141,7 +141,12 @@ var _ = Describe("Lookup", func() {
 
 		Context("when conn limit is reached for an endpoint", func() {
 			BeforeEach(func() {
-				pool = route.NewPool(2*time.Minute, "example.com", "/")
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
 				testEndpoint := route.NewEndpoint(&route.EndpointOpts{AppId: "testid1", Host: "1.3.5.6", Port: 5679})
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
@@ -152,27 +157,23 @@ var _ = Describe("Lookup", func() {
 				reg.LookupReturns(pool)
 			})
 
-			It("does not include the overloaded backend in the pool", func() {
+			It("calls next with the pool", func() {
 				Expect(nextCalled).To(BeTrue())
 				requestInfo, err := handlers.ContextRequestInfo(nextRequest)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(requestInfo.RoutePool.IsEmpty()).To(BeFalse())
-				len := 0
-				var expectedAppId string
-				requestInfo.RoutePool.Each(func(endpoint *route.Endpoint) {
-					expectedAppId = endpoint.ApplicationId
-					len++
-				})
-				Expect(len).To(Equal(1))
-				Expect(expectedAppId).To(Equal("testid2"))
-				Expect(resp.Code).To(Equal(http.StatusOK))
 			})
 		})
 
 		Context("when conn limit is reached for all requested endpoints", func() {
 			var testEndpoint *route.Endpoint
 			BeforeEach(func() {
-				pool = route.NewPool(2*time.Minute, "example.com", "/")
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
 				testEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.3.5.6", Port: 5679})
 				testEndpoint.Stats.NumberConnections.Increment()
 				testEndpoint.Stats.NumberConnections.Increment()
@@ -185,6 +186,7 @@ var _ = Describe("Lookup", func() {
 				pool.Put(testEndpoint1)
 				reg.LookupReturns(pool)
 			})
+
 			It("returns a 503", func() {
 				Expect(nextCalled).To(BeFalse())
 				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
@@ -195,15 +197,18 @@ var _ = Describe("Lookup", func() {
 			})
 		})
 
-		It("calls next with the pool", func() {
-			Expect(nextCalled).To(BeTrue())
-			requestInfo, err := handlers.ContextRequestInfo(nextRequest)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(requestInfo.RoutePool.IsEmpty()).To(BeFalse())
-		})
-
 		Context("when a specific instance is requested", func() {
 			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
 				req.Header.Add("X-CF-App-Instance", "app-guid:instance-id")
 
 				reg.LookupWithInstanceReturns(pool)
@@ -221,6 +226,16 @@ var _ = Describe("Lookup", func() {
 
 		Context("when an invalid instance header is requested", func() {
 			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
 				req.Header.Add("X-CF-App-Instance", "app-guid:instance-id:invalid-part")
 
 				reg.LookupWithInstanceReturns(pool)
@@ -238,6 +253,16 @@ var _ = Describe("Lookup", func() {
 
 		Context("when given an incomplete app instance header", func() {
 			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
 				appInstanceHeader := "app-id:"
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
 				reg.LookupWithInstanceReturns(pool)
@@ -254,6 +279,16 @@ var _ = Describe("Lookup", func() {
 
 		Context("when only the app id is given", func() {
 			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
 				appInstanceHeader := "app-id"
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
 				reg.LookupWithInstanceReturns(pool)
@@ -271,8 +306,23 @@ var _ = Describe("Lookup", func() {
 		Context("when request info is not set on the request context", func() {
 			BeforeEach(func() {
 				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, 0, logger))
+				handler.Use(handlers.NewLookup(reg, rep, logger))
 				handler.UseHandler(nextHandler)
+
+				pool := route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: 0,
+				})
+				testEndpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.3.5.6", Port: 5679})
+				for i := 0; i < 5; i++ {
+					testEndpoint.Stats.NumberConnections.Increment()
+				}
+				pool.Put(testEndpoint)
+				testEndpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.6", Port: 5679})
+				pool.Put(testEndpoint1)
+				reg.LookupReturns(pool)
 			})
 			It("calls Fatal on the logger", func() {
 				Expect(logger.FatalCallCount()).To(Equal(1))

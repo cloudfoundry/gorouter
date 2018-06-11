@@ -84,10 +84,11 @@ type EndpointIterator interface {
 }
 
 type endpointElem struct {
-	endpoint *Endpoint
-	index    int
-	updated  time.Time
-	failedAt *time.Time
+	endpoint           *Endpoint
+	index              int
+	updated            time.Time
+	failedAt           *time.Time
+	maxConnsPerBackend int64
 }
 
 type Pool struct {
@@ -99,9 +100,9 @@ type Pool struct {
 	contextPath     string
 	routeServiceUrl string
 
-	retryAfterFailure time.Duration
-	nextIdx           int
-	overloaded        bool
+	retryAfterFailure  time.Duration
+	nextIdx            int
+	maxConnsPerBackend int64
 
 	random *rand.Rand
 }
@@ -144,15 +145,23 @@ func (e *Endpoint) IsTLS() bool {
 	return e.useTls
 }
 
-func NewPool(retryAfterFailure time.Duration, host, contextPath string) *Pool {
+type PoolOpts struct {
+	RetryAfterFailure  time.Duration
+	Host               string
+	ContextPath        string
+	MaxConnsPerBackend int64
+}
+
+func NewPool(opts *PoolOpts) *Pool {
 	return &Pool{
-		endpoints:         make([]*endpointElem, 0, 1),
-		index:             make(map[string]*endpointElem),
-		retryAfterFailure: retryAfterFailure,
-		nextIdx:           -1,
-		host:              host,
-		contextPath:       contextPath,
-		random:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		endpoints:          make([]*endpointElem, 0, 1),
+		index:              make(map[string]*endpointElem),
+		retryAfterFailure:  opts.RetryAfterFailure,
+		nextIdx:            -1,
+		maxConnsPerBackend: opts.MaxConnsPerBackend,
+		host:               opts.Host,
+		contextPath:        opts.ContextPath,
+		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -166,6 +175,10 @@ func (p *Pool) Host() string {
 
 func (p *Pool) ContextPath() string {
 	return p.contextPath
+}
+
+func (p *Pool) MaxConnsPerBackend() int64 {
+	return p.maxConnsPerBackend
 }
 
 // Returns true if endpoint was added or updated, false otherwise
@@ -200,8 +213,9 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 	} else {
 		result = ADDED
 		e = &endpointElem{
-			endpoint: endpoint,
-			index:    len(p.endpoints),
+			endpoint:           endpoint,
+			index:              len(p.endpoints),
+			maxConnsPerBackend: p.maxConnsPerBackend,
 		}
 
 		p.endpoints = append(p.endpoints, e)
@@ -225,17 +239,6 @@ func (p *Pool) RouteServiceUrl() string {
 	} else {
 		return ""
 	}
-}
-
-func (p *Pool) FilteredPool(maxConnsPerBackend int64) *Pool {
-	filteredPool := NewPool(p.retryAfterFailure, p.Host(), p.ContextPath())
-	p.Each(func(endpoint *Endpoint) {
-		if endpoint.Stats.NumberConnections.Count() < maxConnsPerBackend {
-			filteredPool.Put(endpoint)
-		}
-	})
-
-	return filteredPool
 }
 
 func (p *Pool) PruneEndpoints() []*Endpoint {
@@ -311,16 +314,10 @@ func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 	}
 }
 
-func (p *Pool) findById(id string) *Endpoint {
-	var endpoint *Endpoint
+func (p *Pool) findById(id string) *endpointElem {
 	p.lock.Lock()
-	e := p.index[id]
-	if e != nil {
-		endpoint = e.endpoint
-	}
-	p.lock.Unlock()
-
-	return endpoint
+	defer p.lock.Unlock()
+	return p.index[id]
 }
 
 func (p *Pool) IsEmpty() bool {
@@ -329,6 +326,28 @@ func (p *Pool) IsEmpty() bool {
 	p.lock.Unlock()
 
 	return l == 0
+}
+
+func (p *Pool) IsOverloaded() bool {
+	if p.IsEmpty() {
+		return true
+	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.maxConnsPerBackend == 0 {
+		return false
+	}
+
+	if p.maxConnsPerBackend > 0 {
+		for _, e := range p.endpoints {
+			if e.endpoint.Stats.NumberConnections.value < p.maxConnsPerBackend {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (p *Pool) MarkUpdated(t time.Time) {
@@ -382,6 +401,14 @@ func (p *Pool) MarshalJSON() ([]byte, error) {
 func (e *endpointElem) failed() {
 	t := time.Now()
 	e.failedAt = &t
+}
+
+func (e *endpointElem) isOverloaded() bool {
+	if e.maxConnsPerBackend == 0 {
+		return false
+	}
+
+	return e.endpoint.Stats.NumberConnections.value >= e.maxConnsPerBackend
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {

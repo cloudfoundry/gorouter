@@ -132,7 +132,7 @@ func NewProxy(
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
-	n.Use(handlers.NewLookup(registry, reporter, cfg.Backends.MaxConns, logger))
+	n.Use(handlers.NewLookup(registry, reporter, logger))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),

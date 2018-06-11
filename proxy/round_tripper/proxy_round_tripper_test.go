@@ -78,7 +78,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 		)
 
 		BeforeEach(func() {
-			routePool = route.NewPool(1*time.Second, "myapp.com", "")
+			routePool = route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  1 * time.Second,
+				Host:               "myapp.com",
+				ContextPath:        "",
+				MaxConnsPerBackend: 0,
+			})
 			resp = httptest.NewRecorder()
 			proxyWriter := utils.NewProxyResponseWriter(resp)
 			reqBody = new(testBody)

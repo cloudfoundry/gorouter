@@ -14,7 +14,12 @@ var _ = Describe("RoundRobin", func() {
 	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = route.NewPool(2*time.Minute, "", "")
+		pool = route.NewPool(&route.PoolOpts{
+			RetryAfterFailure:  2 * time.Minute,
+			Host:               "",
+			ContextPath:        "",
+			MaxConnsPerBackend: 0,
+		})
 	})
 
 	Describe("Next", func() {
@@ -132,6 +137,87 @@ var _ = Describe("RoundRobin", func() {
 			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
 
+		Context("when some endpoints are overloaded", func() {
+			var (
+				epOne, epTwo *route.Endpoint
+			)
+
+			BeforeEach(func() {
+				pool = route.NewPool(&route.PoolOpts{
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 2,
+				})
+
+				epOne = route.NewEndpoint(&route.EndpointOpts{Host: "5.5.5.5", Port: 5555, PrivateInstanceId: "private-label-1"})
+				pool.Put(epOne)
+				epTwo = route.NewEndpoint(&route.EndpointOpts{Host: "2.2.2.2", Port: 2222, PrivateInstanceId: "private-label-2"})
+				pool.Put(epTwo)
+			})
+
+			Context("when there is no initial endpoint", func() {
+				It("returns an unencumbered endpoint", func() {
+					epTwo.Stats.NumberConnections.Increment()
+					epTwo.Stats.NumberConnections.Increment()
+					iter := route.NewRoundRobin(pool, "")
+
+					foundEndpoint := iter.Next()
+					Expect(foundEndpoint).To(Equal(epOne))
+
+					sameEndpoint := iter.Next()
+					Expect(foundEndpoint).To(Equal(sameEndpoint))
+				})
+
+				Context("when all endpoints are overloaded", func() {
+					It("returns nil", func() {
+						epOne.Stats.NumberConnections.Increment()
+						epOne.Stats.NumberConnections.Increment()
+						epTwo.Stats.NumberConnections.Increment()
+						epTwo.Stats.NumberConnections.Increment()
+						iter := route.NewRoundRobin(pool, "")
+
+						Consistently(func() *route.Endpoint {
+							return iter.Next()
+						}).Should(BeNil())
+					})
+				})
+			})
+
+			Context("when there is an initial endpoint", func() {
+				var iter route.EndpointIterator
+				BeforeEach(func() {
+					iter = route.NewRoundRobin(pool, "private-label-1")
+				})
+
+				Context("when the initial endpoint is overloaded", func() {
+					BeforeEach(func() {
+						epOne.Stats.NumberConnections.Increment()
+						epOne.Stats.NumberConnections.Increment()
+					})
+
+					Context("when there is an unencumbered endpoint", func() {
+						It("returns the unencumbered endpoint", func() {
+							Expect(iter.Next()).To(Equal(epTwo))
+							Expect(iter.Next()).To(Equal(epTwo))
+						})
+					})
+
+					Context("when there isn't an unencumbered endpoint", func() {
+						BeforeEach(func() {
+							epTwo.Stats.NumberConnections.Increment()
+							epTwo.Stats.NumberConnections.Increment()
+						})
+
+						It("returns nil", func() {
+							Consistently(func() *route.Endpoint {
+								return iter.Next()
+							}).Should(BeNil())
+						})
+					})
+				})
+			})
+		})
 	})
 
 	Describe("Failed", func() {
@@ -175,7 +261,12 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("resets failed endpoints after exceeding failure duration", func() {
-			pool = route.NewPool(50*time.Millisecond, "", "")
+			pool = route.NewPool(&route.PoolOpts{
+				RetryAfterFailure:  50 * time.Millisecond,
+				Host:               "",
+				ContextPath:        "",
+				MaxConnsPerBackend: 0,
+			})
 
 			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
 			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
