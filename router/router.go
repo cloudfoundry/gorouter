@@ -1,9 +1,7 @@
 package router
 
 import (
-	"io/ioutil"
 	"os"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -171,11 +169,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	}
 
 	atomic.StoreInt32(r.HeartbeatOK, 1)
-	// create pid file
-	err = r.writePidFile(r.config.PidFile)
-	if err != nil {
-		return err
-	}
 
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
@@ -184,17 +177,6 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	r.OnErrOrSignal(signals, r.errChan)
 
-	return nil
-}
-
-func (r *Router) writePidFile(pidFile string) error {
-	if pidFile != "" {
-		pid := strconv.Itoa(os.Getpid())
-		err := ioutil.WriteFile(pidFile, []byte(pid), 0660)
-		if err != nil {
-			return fmt.Errorf("cannot create pid file:  %v", err)
-		}
-	}
 	return nil
 }
 

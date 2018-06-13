@@ -70,6 +70,7 @@ var _ = Describe("Router", func() {
 		natsPort            uint16
 		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
 		routeServicesServer *sharedfakes.RouteServicesServer
+		err                 error
 	)
 
 	BeforeEach(func() {
@@ -98,11 +99,6 @@ var _ = Describe("Router", func() {
 	})
 
 	JustBeforeEach(func() {
-		// set pid file
-		f, err := ioutil.TempFile("", "gorouter-test-pidfile-")
-		Expect(err).ToNot(HaveOccurred())
-		config.PidFile = f.Name()
-
 		router, err = initializeRouter(config, registry, varz, mbusClient, logger, routeServicesServer)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -125,20 +121,7 @@ var _ = Describe("Router", func() {
 
 		if router != nil {
 			router.Stop()
-
-			if config.PidFile != "" {
-				// remove pid file
-				err := os.Remove(config.PidFile)
-				Expect(err).ToNot(HaveOccurred())
-			}
 		}
-	})
-
-	It("creates a pidfile on startup", func() {
-		Eventually(func() bool {
-			_, err := os.Stat(config.PidFile)
-			return err == nil
-		}).Should(BeTrue())
 	})
 
 	Describe("Route Services Server", func() {
