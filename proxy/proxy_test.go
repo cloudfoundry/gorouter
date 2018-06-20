@@ -252,14 +252,14 @@ var _ = Describe("Proxy", func() {
 
 		It("handles double slashes in an absolute-form request target correctly", func() {
 			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
-				conn.CheckLine("GET http://test.io//something.io HTTP/1.1")
+				conn.CheckLine("GET http://test.io//something.io?q=something HTTP/1.1")
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
 			conn.WriteLines([]string{
-				"GET http://test.io//something.io HTTP/1.1",
+				"GET http://test.io//something.io?q=something HTTP/1.1",
 				"Host: test.io",
 			})
 
