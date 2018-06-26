@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -31,6 +30,7 @@ var _ = Describe("Route Services", func() {
 		metadataHeader       string
 		cryptoKey            = "ABCDEFGHIJKLMNOP"
 		forwardedUrl         string
+		rsCertChain          test_util.CertChain
 	)
 
 	JustBeforeEach(func() {
@@ -82,7 +82,14 @@ var _ = Describe("Route Services", func() {
 		ln, err := net.Listen("tcp", "127.0.0.1:0")
 		Expect(err).NotTo(HaveOccurred())
 
-		routeServiceListener = newTlsListener(ln)
+		rsCertNames := test_util.CertNames{
+			CommonName: "route-service",
+			SANs: test_util.SubjectAltNames{
+				IP: "127.0.0.1",
+			},
+		}
+		rsCertChain = test_util.CreateSignedCertWithRootCA(rsCertNames)
+		routeServiceListener = tls.NewListener(ln, rsCertChain.AsTLSConfig())
 		routeServiceURL = "https://" + routeServiceListener.Addr().String()
 	})
 
@@ -323,34 +330,36 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	It("returns a 526 when the SSL cert of the route service is signed by an unknown authority", func() {
-		ln := test_util.RegisterHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
-			defer GinkgoRecover()
-			Fail("Should not get here")
-		}, test_util.RegisterConfig{RouteServiceUrl: routeServiceURL})
-		defer func() {
-			Expect(ln.Close()).ToNot(HaveErrored())
-		}()
+	Context("when the SSL cert of the route service is signed by an unknown authority", func() {
+		// the caCertPool is empty
+		BeforeEach(func() {
+			caCertPool = x509.NewCertPool()
+		})
 
-		conn := dialProxy(proxyServer)
+		It("returns a 526", func() {
+			ln := test_util.RegisterHandler(r, "my_host.com", func(conn *test_util.HttpConn) {
+				defer GinkgoRecover()
+				Fail("Should not get here")
+			}, test_util.RegisterConfig{RouteServiceUrl: routeServiceURL})
+			defer func() {
+				Expect(ln.Close()).ToNot(HaveErrored())
+			}()
 
-		req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
-		conn.WriteRequest(req)
+			conn := dialProxy(proxyServer)
 
-		res, _ := readResponse(conn)
+			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
+			conn.WriteRequest(req)
 
-		Expect(res.StatusCode).To(Equal(526))
+			res, _ := readResponse(conn)
+
+			Expect(res.StatusCode).To(Equal(526))
+		})
 	})
 
 	Context("with a valid certificate", func() {
 		BeforeEach(func() {
-			caCertsPath := filepath.Join("..", "test", "assets", "certs", "uaa-ca.pem")
-			certBytes, err := ioutil.ReadFile(caCertsPath)
-			Expect(err).NotTo(HaveOccurred())
-
 			caCertPool = x509.NewCertPool()
-			ok := caCertPool.AppendCertsFromPEM(certBytes)
-			Expect(ok).To(BeTrue())
+			caCertPool.AddCert(rsCertChain.CACert)
 		})
 
 		It("returns a 200 when we route to a route service", func() {
@@ -433,7 +442,7 @@ var _ = Describe("Route Services", func() {
 				rsTLSCert, err = tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
 				Expect(err).NotTo(HaveOccurred())
 
-				caCertPool, err = x509.SystemCertPool()
+				caCertPool = x509.NewCertPool()
 				Expect(err).NotTo(HaveOccurred())
 				caCertPool.AddCert(certChain.CACert)
 			})

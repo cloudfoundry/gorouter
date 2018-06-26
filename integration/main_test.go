@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -83,9 +82,6 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
 		tempCfg.SuspendPruningIfNatsUnavailable = suspendPruning
-		caCertsPath := filepath.Join(testAssets, "certs", "uaa-ca.pem")
-		caCertsPath, err := filepath.Abs(caCertsPath)
-		Expect(err).ToNot(HaveOccurred())
 		tempCfg.LoadBalancerHealthyThreshold = 0
 		tempCfg.OAuth = config.OAuthConfig{
 			TokenEndpoint: "127.0.0.1",
@@ -106,9 +102,6 @@ var _ = Describe("Router Integration", func() {
 		configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
 		tempCfg.SuspendPruningIfNatsUnavailable = suspendPruning
-		caCertsPath := filepath.Join(testAssets, "certs", "uaa-ca.pem")
-		caCertsPath, err := filepath.Abs(caCertsPath)
-		Expect(err).ToNot(HaveOccurred())
 		tempCfg.LoadBalancerHealthyThreshold = 0
 		tempCfg.OAuth = config.OAuthConfig{
 			TokenEndpoint: "127.0.0.1",
@@ -1376,45 +1369,4 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 	default:
 		return false, errors.New("Didn't get an OK response")
 	}
-}
-
-func setupTlsServer() *ghttp.Server {
-	oauthServer := ghttp.NewUnstartedServer()
-
-	caCertsPath := path.Join(testAssets, "certs")
-	caCertsPath, err := filepath.Abs(caCertsPath)
-	Expect(err).ToNot(HaveOccurred())
-
-	public := filepath.Join(caCertsPath, "server.pem")
-	private := filepath.Join(caCertsPath, "server.key")
-	cert, err := tls.LoadX509KeyPair(public, private)
-	Expect(err).ToNot(HaveOccurred())
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
-	}
-	oauthServer.HTTPTestServer.TLS = tlsConfig
-	oauthServer.AllowUnhandledRequests = true
-	oauthServer.UnhandledRequestStatusCode = http.StatusOK
-
-	publicKey := "-----BEGIN PUBLIC KEY-----\\n" +
-		"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDHFr+KICms+tuT1OXJwhCUmR2d\\n" +
-		"KVy7psa8xzElSyzqx7oJyfJ1JZyOzToj9T5SfTIq396agbHJWVfYphNahvZ/7uMX\\n" +
-		"qHxf+ZH9BL1gk9Y6kCnbM5R60gfwjyW1/dQPjOzn9N394zd2FJoFHwdq9Qs0wBug\\n" +
-		"spULZVNRxq7veq/fzwIDAQAB\\n" +
-		"-----END PUBLIC KEY-----"
-
-	data := fmt.Sprintf("{\"alg\":\"rsa\", \"value\":\"%s\"}", publicKey)
-	oauthServer.RouteToHandler("GET", "/token_key",
-		ghttp.CombineHandlers(
-			ghttp.VerifyRequest("GET", "/token_key"),
-			ghttp.RespondWith(http.StatusOK, data)),
-	)
-	oauthServer.RouteToHandler("POST", "/oauth/token",
-		func(w http.ResponseWriter, req *http.Request) {
-			jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
-			w.Write(jsonBytes)
-		})
-	return oauthServer
 }

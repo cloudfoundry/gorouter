@@ -1876,18 +1876,6 @@ func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
 	return test_util.NewHttpConn(conn)
 }
 
-func newTlsListener(listener net.Listener) net.Listener {
-	cert, err := tls.LoadX509KeyPair("../test/assets/certs/server.pem", "../test/assets/certs/server.key")
-	Expect(err).ToNot(HaveOccurred())
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA},
-	}
-
-	return tls.NewListener(listener, tlsConfig)
-}
-
 func parseResponseTimeFromLog(log string) float64 {
 	r, err := regexp.Compile("response_time:(\\d+.\\d+)")
 	Expect(err).ToNot(HaveOccurred())

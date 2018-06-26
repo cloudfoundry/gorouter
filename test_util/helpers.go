@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"strconv"
@@ -224,6 +225,15 @@ func (cc *CertChain) AsTLSConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
+}
+
+func (cc *CertChain) WriteCACertToDir(dir string) string {
+	file, err := ioutil.TempFile(dir, "certs")
+	Expect(err).ToNot(HaveOccurred())
+	err = ioutil.WriteFile(file.Name(), cc.CACertPEM, 0644)
+	Expect(err).ToNot(HaveOccurred())
+
+	return file.Name()
 }
 
 type SubjectAltNames struct {
