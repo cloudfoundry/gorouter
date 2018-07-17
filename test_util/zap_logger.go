@@ -1,6 +1,8 @@
 package test_util
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/logger"
@@ -61,4 +63,9 @@ func (s *TestZapSink) Lines() []string {
 // Buffer returns the gbytes buffer that was used as the sink
 func (z *TestZapLogger) Buffer() *gbytes.Buffer {
 	return z.TestZapSink.Buffer
+}
+
+func (z *TestZapLogger) Lines(level zap.Level) []string {
+	r, _ := regexp.Compile(fmt.Sprintf(".*\"log_level\":%d.*}\n", levelNumber(level)))
+	return r.FindAllString(string(z.TestZapSink.Buffer.Contents()), -1)
 }

@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"github.com/uber-go/zap"
 )
 
 type nullVarz struct{}
@@ -249,6 +250,18 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
 					}
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+				})
+
+				It("logs the attempt number", func() {
+					res, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+
+					errorLogs := logger.Lines(zap.ErrorLevel)
+					Expect(errorLogs).To(HaveLen(2))
+					for i := 0; i < 2; i++ {
+						Expect(errorLogs[i]).To(ContainSubstring(fmt.Sprintf("\"attempt\":%d", i+1)))
+					}
 				})
 
 				It("does not call the error handler", func() {
