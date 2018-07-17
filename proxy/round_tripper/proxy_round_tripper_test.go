@@ -246,8 +246,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 					ep2 := iter.Next()
 					Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
 
+					errorLogs := logger.Lines(zap.ErrorLevel)
+					Expect(errorLogs).To(HaveLen(2))
 					for i := 0; i < 2; i++ {
-						Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
+						Expect(errorLogs[i]).To(ContainSubstring("backend-endpoint-failed"))
 					}
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 				})
