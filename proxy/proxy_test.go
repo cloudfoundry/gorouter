@@ -1864,8 +1864,8 @@ var _ = Describe("Proxy", func() {
 // that clutter stdout/stderr when running unit tests
 func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
 	log.SetOutput(ioutil.Discard)
+	defer log.SetOutput(os.Stderr)
 	res, body := conn.ReadResponse()
-	log.SetOutput(os.Stderr)
 	return res, body
 }
 
