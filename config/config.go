@@ -238,7 +238,6 @@ var defaultConfig = Config{
 	DisableKeepAlives:   true,
 	MaxIdleConns:        100,
 	MaxIdleConnsPerHost: 2,
-	Backends:            BackendConfig{MaxConns: 500},
 }
 
 func DefaultConfig() (*Config, error) {
