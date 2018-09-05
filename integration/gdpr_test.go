@@ -144,7 +144,7 @@ var _ = Describe("GDPR", func() {
 		It("omits RemoteAddr from stdout", func() {
 			testState.cfg.Status.Pass = "pass"
 			testState.cfg.Status.User = "user"
-			testState.cfg.Status.Port = 6705
+			testState.cfg.Status.Port = 6706
 			testState.cfg.Logging.DisableLogSourceIP = true
 			testState.StartGorouter()
 
