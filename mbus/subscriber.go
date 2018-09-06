@@ -41,8 +41,8 @@ type RegistryMessage struct {
 	EndpointUpdatedAtNs     int64             `json:"endpoint_updated_at_ns"`
 }
 
-func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error) {
-	port, useTls, err := rm.port(acceptTLS)
+func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
+	port, useTLS, err := rm.port()
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (rm *RegistryMessage) makeEndpoint(acceptTLS bool) (*route.Endpoint, error)
 		RouteServiceUrl:         rm.RouteServiceURL,
 		ModificationTag:         models.ModificationTag{},
 		IsolationSegment:        rm.IsolationSegment,
-		UseTLS:                  useTls,
+		UseTLS:                  useTLS,
 		UpdatedAt:               updatedAt,
 	}), nil
 }
@@ -74,10 +74,8 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 }
 
 // Prefer TLS Port instead of HTTP Port in Registrty Message
-func (rm *RegistryMessage) port(acceptTLS bool) (uint16, bool, error) {
-	if !acceptTLS && rm.Port == 0 {
-		return 0, false, errors.New("Invalid registry message: backend tls is not enabled")
-	} else if acceptTLS && rm.TLSPort != 0 {
+func (rm *RegistryMessage) port() (uint16, bool, error) {
+	if rm.TLSPort != 0 {
 		return rm.TLSPort, true, nil
 	}
 	return rm.Port, false, nil
@@ -91,8 +89,7 @@ type Subscriber struct {
 	reconnected      <-chan Signal
 	natsPendingLimit int
 
-	params    startMessageParams
-	acceptTLS bool
+	params startMessageParams
 
 	logger logger.Logger
 }
@@ -119,14 +116,11 @@ func NewSubscriber(
 	return &Subscriber{
 		mbusClient:    mbusClient,
 		routeRegistry: routeRegistry,
-
 		params: startMessageParams{
 			id: fmt.Sprintf("%d-%s", c.Index, guid),
 			minimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
 			pruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
 		},
-		acceptTLS: c.Backends.EnableTLS,
-
 		reconnected:      reconnected,
 		natsPendingLimit: c.NatsClientMessageBufferSize,
 		logger:           l,
@@ -232,7 +226,7 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint(s.acceptTLS)
+	endpoint, err := msg.makeEndpoint()
 	if err != nil {
 		s.logger.Error("Unable to register route",
 			zap.Error(err),
@@ -247,7 +241,7 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 }
 
 func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint(s.acceptTLS)
+	endpoint, err := msg.makeEndpoint()
 	if err != nil {
 		s.logger.Error("Unable to unregister route",
 			zap.Error(err),

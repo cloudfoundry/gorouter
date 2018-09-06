@@ -19,7 +19,6 @@ import (
 	"github.com/nats-io/go-nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
 )
 
@@ -325,50 +324,46 @@ var _ = Describe("Subscriber", func() {
 		})
 	})
 
-	Context("when TLS is enabled for backends", func() {
+	Context("when the message contains a tls port for route", func() {
 		BeforeEach(func() {
-			cfg.Backends.EnableTLS = true
 			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
-		Context("when the message contains a tls port for route", func() {
-			It("endpoint is constructed with tls port instead of http", func() {
-				msg := mbus.RegistryMessage{
-					Host:                 "host",
-					App:                  "app",
-					TLSPort:              1999,
-					ServerCertDomainSAN:  "san",
-					PrivateInstanceID:    "id",
-					PrivateInstanceIndex: "index",
-					Port:                 1111,
-					StaleThresholdInSeconds: 120,
-					Uris: []route.Uri{"test.example.com"},
-					Tags: map[string]string{"key": "value"},
-				}
+		It("endpoint is constructed with tls port instead of http", func() {
+			msg := mbus.RegistryMessage{
+				Host:                    "host",
+				App:                     "app",
+				TLSPort:                 1999,
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				StaleThresholdInSeconds: 120,
+				Uris: []route.Uri{"test.example.com"},
+				Tags: map[string]string{"key": "value"},
+			}
 
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
 
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
 
-				Eventually(registry.RegisterCallCount).Should(Equal(1))
-				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
-					Host:                    "host",
-					AppId:                   "app",
-					Port:                    1999,
-					UseTLS:                  true,
-					ServerCertDomainSAN:     "san",
-					PrivateInstanceId:       "id",
-					PrivateInstanceIndex:    "index",
-					StaleThresholdInSeconds: 120,
-					Tags: map[string]string{"key": "value"},
-				})
-
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host:                    "host",
+				AppId:                   "app",
+				Port:                    1999,
+				UseTLS:                  true,
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceId:       "id",
+				PrivateInstanceIndex:    "index",
+				StaleThresholdInSeconds: 120,
+				Tags: map[string]string{"key": "value"},
 			})
+
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
 		})
 	})
 
@@ -400,131 +395,53 @@ var _ = Describe("Subscriber", func() {
 		Expect(originalEndpoint).To(Equal(expectedEndpoint))
 	})
 
-	Context("when TLS is disabled for backends", func() {
+	Context("when the message contains just a regular port", func() {
 		BeforeEach(func() {
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
-		Context("when the message contains a tls port and no port", func() {
-			It("endpoint is not constructed and an error message is logged and unregister fails", func() {
-				msg := mbus.RegistryMessage{
-					Host:                    "host",
-					App:                     "app",
-					TLSPort:                 1999,
-					ServerCertDomainSAN:     "san",
-					PrivateInstanceID:       "id",
-					PrivateInstanceIndex:    "index",
-					StaleThresholdInSeconds: 120,
-					Uris: []route.Uri{"test.example.com"},
-					Tags: map[string]string{"key": "value"},
-				}
 
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
+		It("endpoint is constructed with the regular port and useTls set to false, unregister succeeds", func() {
+			msg := mbus.RegistryMessage{
+				Host:                 "host",
+				App:                  "app",
+				ServerCertDomainSAN:  "san",
+				PrivateInstanceID:    "id",
+				PrivateInstanceIndex: "index",
+				Port:                 1111,
+				StaleThresholdInSeconds: 120,
+				Uris: []route.Uri{"test.example.com"},
+				Tags: map[string]string{"key": "value"},
+			}
 
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
 
-				Consistently(registry.RegisterCallCount).Should(BeZero())
-				Expect(l).To(gbytes.Say("Unable to register route"))
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
 
-				err = natsClient.Publish("router.unregister", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Consistently(registry.UnregisterCallCount).Should(BeZero())
-				Expect(l).To(gbytes.Say("Unable to unregister route"))
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host:                    "host",
+				AppId:                   "app",
+				Port:                    1111,
+				UseTLS:                  false,
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceId:       "id",
+				PrivateInstanceIndex:    "index",
+				StaleThresholdInSeconds: 120,
+				Tags: map[string]string{"key": "value"},
 			})
-		})
 
-		Context("when the message contains a regular port and a tls port", func() {
-			It("endpoint is constructed with the regular port and useTls set to false and unregister succeeds with regular port", func() {
-				msg := mbus.RegistryMessage{
-					Host:                 "host",
-					App:                  "app",
-					TLSPort:              1999,
-					ServerCertDomainSAN:  "san",
-					PrivateInstanceID:    "id",
-					PrivateInstanceIndex: "index",
-					Port:                 1111,
-					StaleThresholdInSeconds: 120,
-					Uris: []route.Uri{"test.example.com"},
-					Tags: map[string]string{"key": "value"},
-				}
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
 
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
+			err = natsClient.Publish("router.unregister", data)
+			Expect(err).ToNot(HaveOccurred())
 
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(registry.RegisterCallCount).Should(Equal(1))
-				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
-					Host:                    "host",
-					AppId:                   "app",
-					Port:                    1111,
-					UseTLS:                  false,
-					ServerCertDomainSAN:     "san",
-					PrivateInstanceId:       "id",
-					PrivateInstanceIndex:    "index",
-					StaleThresholdInSeconds: 120,
-					Tags: map[string]string{"key": "value"},
-				})
-
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
-
-				err = natsClient.Publish("router.unregister", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(registry.UnregisterCallCount).Should(Equal(1))
-				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
-			})
-		})
-
-		Context("when the message contains just a regular port", func() {
-			It("endpoint is constructed with the regular port and useTls set to false, unregister succeeds", func() {
-				msg := mbus.RegistryMessage{
-					Host:                 "host",
-					App:                  "app",
-					ServerCertDomainSAN:  "san",
-					PrivateInstanceID:    "id",
-					PrivateInstanceIndex: "index",
-					Port:                 1111,
-					StaleThresholdInSeconds: 120,
-					Uris: []route.Uri{"test.example.com"},
-					Tags: map[string]string{"key": "value"},
-				}
-
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
-
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(registry.RegisterCallCount).Should(Equal(1))
-				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
-					Host:                    "host",
-					AppId:                   "app",
-					Port:                    1111,
-					UseTLS:                  false,
-					ServerCertDomainSAN:     "san",
-					PrivateInstanceId:       "id",
-					PrivateInstanceIndex:    "index",
-					StaleThresholdInSeconds: 120,
-					Tags: map[string]string{"key": "value"},
-				})
-
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
-
-				err = natsClient.Publish("router.unregister", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(registry.UnregisterCallCount).Should(Equal(1))
-				_, originalEndpoint = registry.UnregisterArgsForCall(0)
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
-			})
+			Eventually(registry.UnregisterCallCount).Should(Equal(1))
+			_, originalEndpoint = registry.UnregisterArgsForCall(0)
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
 		})
 	})
 

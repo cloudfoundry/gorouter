@@ -237,7 +237,6 @@ var _ = Describe("Router Integration", func() {
 			backendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
 			// set Gorouter to use client certs
-			cfg.Backends.EnableTLS = true
 			cfg.Backends.TLSPem = config.TLSPem{
 				CertChain:  string(clientCertChain.CertPEM),
 				PrivateKey: string(clientCertChain.PrivKeyPEM),

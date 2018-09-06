@@ -21,7 +21,7 @@ func BenchmarkCreateRegistryMessage(b *testing.B) {
 			b.Fatalf("Unable to create registry message: %s", err.Error())
 		}
 
-		endpoint, err := msg.makeEndpoint(false)
+		endpoint, err := msg.makeEndpoint()
 		if endpoint.ApplicationId != "12345" {
 			b.Fatal("Endpoint not successfully created")
 		}

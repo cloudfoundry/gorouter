@@ -437,10 +437,6 @@ enable_proxy: true
 			Expect(config.MaxIdleConns).To(Equal(100))
 		})
 
-		It("defaults enable tls to false", func() {
-			Expect(config.Backends.EnableTLS).To(BeFalse())
-		})
-
 		It("defaults MaxConns to 0", func() {
 			var b = []byte("")
 			err := config.Initialize(b)

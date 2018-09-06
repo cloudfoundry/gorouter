@@ -75,7 +75,6 @@ type OAuthConfig struct {
 
 type BackendConfig struct {
 	ClientAuthCertificate tls.Certificate
-	EnableTLS             bool             `yaml:"enable_tls"`
 	MaxConns              int64            `yaml:"max_conns"`
 	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }

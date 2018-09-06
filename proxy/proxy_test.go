@@ -844,7 +844,6 @@ var _ = Describe("Proxy", func() {
 		Context("when a TLS handshake occurs", func() {
 			var nl net.Listener
 			JustBeforeEach(func() {
-				conf.Backends.EnableTLS = true
 				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "instance-id"})
 				backendCert, err := tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
 				Expect(err).NotTo(HaveOccurred())
