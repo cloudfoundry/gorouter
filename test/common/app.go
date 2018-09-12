@@ -102,13 +102,13 @@ func (a *TestApp) Port() uint16 {
 func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
 	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
-		Host:    "127.0.0.1",
-		TlsPort: a.port,
-		Port:    a.port,
-		Uris:    a.urls,
-		Tags:    a.tags,
-		Dea:     "dea",
-		App:     "0",
+		Host:                    "127.0.0.1",
+		TlsPort:                 a.port,
+		Port:                    a.port,
+		Uris:                    a.urls,
+		Tags:                    a.tags,
+		Dea:                     "dea",
+		App:                     "0",
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:     a.routeService,
@@ -122,12 +122,12 @@ func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
 func (a *TestApp) Register() {
 	uuid, _ := uuid.GenerateUUID()
 	rm := registerMessage{
-		Host: "127.0.0.1",
-		Port: a.port,
-		Uris: a.urls,
-		Tags: a.tags,
-		Dea:  "dea",
-		App:  "0",
+		Host:                    "127.0.0.1",
+		Port:                    a.port,
+		Uris:                    a.urls,
+		Tags:                    a.tags,
+		Dea:                     "dea",
+		App:                     "0",
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:   a.routeService,

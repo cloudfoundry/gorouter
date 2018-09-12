@@ -610,8 +610,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		e2 := route.NewEndpoint(&route.EndpointOpts{
-			Host: "5.6.7.8",
-			Port: 5678,
+			Host:                    "5.6.7.8",
+			Port:                    5678,
 			StaleThresholdInSeconds: -1,
 			ServerCertDomainSAN:     "pvt_test_san",
 			PrivateInstanceId:       "pvt_test_instance_id",
@@ -637,7 +637,7 @@ var _ = Describe("Pool", func() {
 				Port:                    5678,
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
-				Tags: sample_tags,
+				Tags:                    sample_tags,
 			})
 		})
 		It("marshals json ", func() {
@@ -657,7 +657,7 @@ var _ = Describe("Pool", func() {
 				Port:                    5678,
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
-				Tags: sample_tags,
+				Tags:                    sample_tags,
 			})
 
 		})

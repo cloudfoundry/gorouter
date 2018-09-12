@@ -113,9 +113,9 @@ func (s *testState) newRequest(url string) *http.Request {
 func (s *testState) register(backend *httptest.Server, routeURI string) {
 	_, backendPort := hostnameAndPort(backend.Listener.Addr().String())
 	rm := mbus.RegistryMessage{
-		Host: "127.0.0.1",
-		Port: uint16(backendPort),
-		Uris: []route.Uri{route.Uri(routeURI)},
+		Host:                    "127.0.0.1",
+		Port:                    uint16(backendPort),
+		Uris:                    []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
 		RouteServiceURL:         "",
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
@@ -127,9 +127,9 @@ func (s *testState) registerWithExternalRouteService(appBackend, routeServiceSer
 	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
 	_, appBackendPort := hostnameAndPort(appBackend.Listener.Addr().String())
 	rm := mbus.RegistryMessage{
-		Host: "127.0.0.1",
-		Port: uint16(appBackendPort),
-		Uris: []route.Uri{route.Uri(routeURI)},
+		Host:                    "127.0.0.1",
+		Port:                    uint16(appBackendPort),
+		Uris:                    []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
 		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, serverPort),
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),

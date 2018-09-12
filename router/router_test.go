@@ -792,9 +792,8 @@ var _ = Describe("Router", func() {
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 				defer resp.Body.Close()
 
-				body, err := ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(body).To(HaveLen(0))
+				_, err = ioutil.ReadAll(resp.Body)
+				Expect(err).To(HaveOccurred())
 			})
 		})
 

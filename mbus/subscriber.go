@@ -52,13 +52,13 @@ func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
 	}
 
 	return route.NewEndpoint(&route.EndpointOpts{
-		AppId:                rm.App,
-		Host:                 rm.Host,
-		Port:                 port,
-		ServerCertDomainSAN:  rm.ServerCertDomainSAN,
-		PrivateInstanceId:    rm.PrivateInstanceID,
-		PrivateInstanceIndex: rm.PrivateInstanceIndex,
-		Tags:                 rm.Tags,
+		AppId:                   rm.App,
+		Host:                    rm.Host,
+		Port:                    port,
+		ServerCertDomainSAN:     rm.ServerCertDomainSAN,
+		PrivateInstanceId:       rm.PrivateInstanceID,
+		PrivateInstanceIndex:    rm.PrivateInstanceIndex,
+		Tags:                    rm.Tags,
 		StaleThresholdInSeconds: rm.StaleThresholdInSeconds,
 		RouteServiceUrl:         rm.RouteServiceURL,
 		ModificationTag:         models.ModificationTag{},
@@ -117,7 +117,7 @@ func NewSubscriber(
 		mbusClient:    mbusClient,
 		routeRegistry: routeRegistry,
 		params: startMessageParams{
-			id: fmt.Sprintf("%d-%s", c.Index, guid),
+			id:                               fmt.Sprintf("%d-%s", c.Index, guid),
 			minimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
 			pruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
 		},
@@ -261,8 +261,8 @@ func (s *Subscriber) startMessage() ([]byte, error) {
 	}
 
 	d := common.RouterStart{
-		Id:    s.params.id,
-		Hosts: []string{host},
+		Id:                               s.params.id,
+		Hosts:                            []string{host},
 		MinimumRegisterIntervalInSeconds: s.params.minimumRegisterIntervalInSeconds,
 		PruneThresholdInSeconds:          s.params.pruneThresholdInSeconds,
 	}

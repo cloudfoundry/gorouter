@@ -48,8 +48,8 @@ var _ = Describe("AccessLogRecord", func() {
 				r.Register(
 					route.Uri(fmt.Sprintf("bench.%s.%s", test_util.LocalhostDNS, str)),
 					route.NewEndpoint(&route.EndpointOpts{
-						Host: "localhost",
-						Port: uint16(i),
+						Host:                    "localhost",
+						Port:                    uint16(i),
 						StaleThresholdInSeconds: -1,
 						UseTLS:                  false,
 					}),

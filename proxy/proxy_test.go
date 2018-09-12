@@ -917,10 +917,10 @@ var _ = Describe("Proxy", func() {
 				Expect(body).To(Equal("ABCD"))
 
 				rsp := test_util.NewResponse(200)
-				out := &bytes.Buffer{}
-				out.WriteString("DEFG")
-				rsp.Body = ioutil.NopCloser(out)
+				rsp.Body = ioutil.NopCloser(strings.NewReader("DEFG"))
 				conn.WriteResponse(rsp)
+
+				conn.Close()
 			}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
 			defer ln.Close()
 
@@ -928,7 +928,7 @@ var _ = Describe("Proxy", func() {
 
 			body := &bytes.Buffer{}
 			body.WriteString("ABCD")
-			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
+			req := test_util.NewRequest("POST", "test", "/", body)
 			conn.WriteRequest(req)
 
 			resp, _ := conn.ReadResponse()

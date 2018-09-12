@@ -339,8 +339,8 @@ var _ = Describe("Subscriber", func() {
 				PrivateInstanceID:       "id",
 				PrivateInstanceIndex:    "index",
 				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test.example.com"},
-				Tags: map[string]string{"key": "value"},
+				Uris:                    []route.Uri{"test.example.com"},
+				Tags:                    map[string]string{"key": "value"},
 			}
 
 			data, err := json.Marshal(msg)
@@ -360,7 +360,7 @@ var _ = Describe("Subscriber", func() {
 				PrivateInstanceId:       "id",
 				PrivateInstanceIndex:    "index",
 				StaleThresholdInSeconds: 120,
-				Tags: map[string]string{"key": "value"},
+				Tags:                    map[string]string{"key": "value"},
 			})
 
 			Expect(originalEndpoint).To(Equal(expectedEndpoint))
@@ -403,15 +403,15 @@ var _ = Describe("Subscriber", func() {
 
 		It("endpoint is constructed with the regular port and useTls set to false, unregister succeeds", func() {
 			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				ServerCertDomainSAN:  "san",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
+				Host:                    "host",
+				App:                     "app",
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				Port:                    1111,
 				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test.example.com"},
-				Tags: map[string]string{"key": "value"},
+				Uris:                    []route.Uri{"test.example.com"},
+				Tags:                    map[string]string{"key": "value"},
 			}
 
 			data, err := json.Marshal(msg)
@@ -431,7 +431,7 @@ var _ = Describe("Subscriber", func() {
 				PrivateInstanceId:       "id",
 				PrivateInstanceIndex:    "index",
 				StaleThresholdInSeconds: 120,
-				Tags: map[string]string{"key": "value"},
+				Tags:                    map[string]string{"key": "value"},
 			})
 
 			Expect(originalEndpoint).To(Equal(expectedEndpoint))
@@ -453,16 +453,16 @@ var _ = Describe("Subscriber", func() {
 		})
 		It("does not update the registry", func() {
 			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				RouteServiceURL:      "url",
-				ServerCertDomainSAN:  "san",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
+				Host:                    "host",
+				App:                     "app",
+				RouteServiceURL:         "url",
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				Port:                    1111,
 				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test.example.com", "test2.example.com"},
-				Tags: map[string]string{"key": "value"},
+				Uris:                    []route.Uri{"test.example.com", "test2.example.com"},
+				Tags:                    map[string]string{"key": "value"},
 			}
 
 			data, err := json.Marshal(msg)
@@ -485,31 +485,31 @@ var _ = Describe("Subscriber", func() {
 		It("does not race against registrations", func() {
 			racingURI := route.Uri("test3.example.com")
 			racingMsg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				RouteServiceURL:      "https://url.example.com",
-				ServerCertDomainSAN:  "san",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
+				Host:                    "host",
+				App:                     "app",
+				RouteServiceURL:         "https://url.example.com",
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				Port:                    1111,
 				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{racingURI},
-				Tags: map[string]string{"key": "value"},
+				Uris:                    []route.Uri{racingURI},
+				Tags:                    map[string]string{"key": "value"},
 			}
 
 			racingData, err := json.Marshal(racingMsg)
 			Expect(err).NotTo(HaveOccurred())
 
 			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app1",
-				ServerCertDomainSAN:  "san",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1112,
+				Host:                    "host",
+				App:                     "app1",
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				Port:                    1112,
 				StaleThresholdInSeconds: 120,
-				Uris: []route.Uri{"test.example.com", "test2.example.com"},
-				Tags: map[string]string{"key": "value"},
+				Uris:                    []route.Uri{"test.example.com", "test2.example.com"},
+				Tags:                    map[string]string{"key": "value"},
 			}
 
 			data, err := json.Marshal(msg)
@@ -545,17 +545,17 @@ var _ = Describe("Subscriber", func() {
 
 		It("unregisters the route", func() {
 			msg := mbus.RegistryMessage{
-				Host:                 "host",
-				App:                  "app",
-				RouteServiceURL:      "https://url.example.com",
-				ServerCertDomainSAN:  "san",
-				PrivateInstanceID:    "id",
-				PrivateInstanceIndex: "index",
-				Port:                 1111,
+				Host:                    "host",
+				App:                     "app",
+				RouteServiceURL:         "https://url.example.com",
+				ServerCertDomainSAN:     "san",
+				PrivateInstanceID:       "id",
+				PrivateInstanceIndex:    "index",
+				Port:                    1111,
 				StaleThresholdInSeconds: 120,
-				Uris:             []route.Uri{"test.example.com", "test2.example.com"},
-				Tags:             map[string]string{"key": "value"},
-				IsolationSegment: "abc-iso-seg",
+				Uris:                    []route.Uri{"test.example.com", "test2.example.com"},
+				Tags:                    map[string]string{"key": "value"},
+				IsolationSegment:        "abc-iso-seg",
 			}
 
 			data, err := json.Marshal(msg)

@@ -199,6 +199,7 @@ var _ = Describe("Route Services", func() {
 						Body:       ioutil.NopCloser(out),
 					}
 					conn.WriteResponse(res)
+					conn.Close()
 				}, test_util.RegisterConfig{RouteServiceUrl: routeServiceURL})
 				defer func() {
 					Expect(ln.Close()).ToNot(HaveErrored())
@@ -228,6 +229,7 @@ var _ = Describe("Route Services", func() {
 							Body:       ioutil.NopCloser(out),
 						}
 						conn.WriteResponse(res)
+						conn.Close()
 					}, test_util.RegisterConfig{RouteServiceUrl: routeServiceURL})
 					defer func() {
 						Expect(ln.Close()).ToNot(HaveErrored())
@@ -261,6 +263,7 @@ var _ = Describe("Route Services", func() {
 							Body:       ioutil.NopCloser(out),
 						}
 						conn.WriteResponse(res)
+						conn.Close()
 					})
 					defer func() {
 						Expect(ln.Close()).ToNot(HaveErrored())
