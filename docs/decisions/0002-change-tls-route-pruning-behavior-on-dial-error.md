@@ -4,13 +4,15 @@ Date: 2018-09-12
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
-We had received a bug noting that when route-integrity is
-turned on we do not prune routes that receive a `Dial` error.
-Looking through the code we have special logic in place making
+This is related to story [#158847588](https://www.pivotaltracker.com/story/show/158847588)
+
+In the story above, when route-integrity is turned on
+(soon the default) we do not prune routes that receive a `Dial` error.
+The code has special logic in place making
 it so that there are only two types of errors that result in a
 prune:
 
@@ -40,3 +42,8 @@ is re-emitted).
 Logging will be introduced into the route pool for the first time
 giving operators a view into whether a prune or fail has actually
 occurred and what error caused it.
+
+An app under load today will be marked as failed and removed from
+the pool for a certain amount of time. The request is retried with
+a new backend until max retries are reached. This behavior should
+appear the same to the end user after the change is implemented.
