@@ -38,6 +38,7 @@ var _ = Describe("Endpoint", func() {
 		})
 	})
 })
+
 var _ = Describe("Pool", func() {
 	var pool *route.Pool
 
@@ -66,6 +67,7 @@ var _ = Describe("Pool", func() {
 			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeTrue())
 		})
+
 		It("returns false if the hosts are the same but paths are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
@@ -81,6 +83,7 @@ var _ = Describe("Pool", func() {
 			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
 		})
+
 		It("returns false if the paths are the same but hosts are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
@@ -96,6 +99,7 @@ var _ = Describe("Pool", func() {
 			})
 			Expect(route.PoolsMatch(p1, p2)).To(BeFalse())
 		})
+
 		It("returns false if the both hosts and paths on the pools are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
@@ -640,6 +644,7 @@ var _ = Describe("Pool", func() {
 				Tags:                    sample_tags,
 			})
 		})
+
 		It("marshals json ", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
@@ -661,6 +666,7 @@ var _ = Describe("Pool", func() {
 			})
 
 		})
+
 		It("marshals json ", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
