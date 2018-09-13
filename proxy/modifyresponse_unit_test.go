@@ -7,7 +7,9 @@ import (
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"
+	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -35,7 +37,7 @@ var _ = Describe("modifyResponse", func() {
 		reqInfo, err = handlers.ContextRequestInfo(modifiedReq)
 		Expect(err).ToNot(HaveOccurred())
 		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
-		reqInfo.RoutePool = route.NewPool(&route.PoolOpts{
+		reqInfo.RoutePool = route.NewPool(new(logger_fakes.FakeLogger), &route.PoolOpts{
 			RetryAfterFailure:  0,
 			Host:               "foo.com",
 			ContextPath:        "context-path",

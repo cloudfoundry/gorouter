@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
@@ -92,6 +93,7 @@ type endpointElem struct {
 }
 
 type Pool struct {
+	logger    logger.Logger
 	lock      sync.Mutex
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
@@ -146,14 +148,16 @@ func (e *Endpoint) IsTLS() bool {
 }
 
 type PoolOpts struct {
+	Logger             logger.Logger
 	RetryAfterFailure  time.Duration
 	Host               string
 	ContextPath        string
 	MaxConnsPerBackend int64
 }
 
-func NewPool(opts *PoolOpts) *Pool {
+func NewPool(logger logger.Logger, opts *PoolOpts) *Pool {
 	return &Pool{
+		logger:             logger,
 		endpoints:          make([]*endpointElem, 0, 1),
 		index:              make(map[string]*endpointElem),
 		retryAfterFailure:  opts.RetryAfterFailure,
@@ -366,7 +370,15 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 		return
 	}
 
+	logger := p.logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
+		logger.Error("prune-failed-endpoint")
+		p.removeEndpoint(e)
+		return
+	}
+
+	if e.endpoint.useTls && fails.UnavailableClassifiers.Classify(err) {
+		logger.Error("prune-unavailable-endpoint")
 		p.removeEndpoint(e)
 		return
 	}
