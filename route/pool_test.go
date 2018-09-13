@@ -1,6 +1,7 @@
 package route_test
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"net"
 
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Endpoint", func() {
@@ -40,10 +43,14 @@ var _ = Describe("Endpoint", func() {
 })
 
 var _ = Describe("Pool", func() {
-	var pool *route.Pool
+	var (
+		pool   *route.Pool
+		logger *test_util.TestZapLogger
+	)
 
 	BeforeEach(func() {
-		pool = route.NewPool(&route.PoolOpts{
+		logger = test_util.NewTestZapLogger("test")
+		pool = route.NewPool(logger, &route.PoolOpts{
 			RetryAfterFailure:  2 * time.Minute,
 			Host:               "",
 			ContextPath:        "",
@@ -53,13 +60,13 @@ var _ = Describe("Pool", func() {
 
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
-			p1 := route.NewPool(&route.PoolOpts{
+			p1 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
-			p2 := route.NewPool(&route.PoolOpts{
+			p2 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
@@ -69,13 +76,13 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("returns false if the hosts are the same but paths are different", func() {
-			p1 := route.NewPool(&route.PoolOpts{
+			p1 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
-			p2 := route.NewPool(&route.PoolOpts{
+			p2 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/other",
@@ -85,13 +92,13 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("returns false if the paths are the same but hosts are different", func() {
-			p1 := route.NewPool(&route.PoolOpts{
+			p1 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
-			p2 := route.NewPool(&route.PoolOpts{
+			p2 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/path",
@@ -101,13 +108,13 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("returns false if the both hosts and paths on the pools are different", func() {
-			p1 := route.NewPool(&route.PoolOpts{
+			p1 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
-			p2 := route.NewPool(&route.PoolOpts{
+			p2 := route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/other",
@@ -247,17 +254,18 @@ var _ = Describe("Pool", func() {
 			pool.EndpointFailed(endpoint, x509.HostnameError{})
 
 			Expect(pool.IsEmpty()).To(BeTrue())
+			Expect(logger.Buffer()).To(gbytes.Say(`prune-failed-endpoint`))
 		})
 
-		It("does not prune tls routes on connection errors", func() {
+		It("prunes tls routes on connection errors", func() {
 			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
 			pool.Put(endpoint)
 
 			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+			pool.EndpointFailed(endpoint, &net.OpError{Op: "dial", Err: errors.New("didn't work")})
 
-			pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
-
-			Expect(pool.IsEmpty()).To(BeFalse())
+			Expect(pool.IsEmpty()).To(BeTrue())
+			Expect(logger.Buffer()).To(gbytes.Say(`prune-unavailable-endpoint`))
 		})
 
 		It("does not prune non-tls routes that have already expired", func() {
@@ -340,7 +348,7 @@ var _ = Describe("Pool", func() {
 	Context("IsOverloaded", func() {
 		Context("when MaxConnsPerBackend is not set (unlimited)", func() {
 			BeforeEach(func() {
-				pool = route.NewPool(&route.PoolOpts{
+				pool = route.NewPool(logger, &route.PoolOpts{
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -370,7 +378,7 @@ var _ = Describe("Pool", func() {
 		})
 
 		BeforeEach(func() {
-			pool = route.NewPool(&route.PoolOpts{
+			pool = route.NewPool(logger, &route.PoolOpts{
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "",
 				ContextPath:        "",

@@ -77,12 +77,14 @@ var _ = Describe("Route Service Handler", func() {
 
 		reqChan = make(chan *http.Request, 1)
 
-		routePool = route.NewPool(&route.PoolOpts{
-			RetryAfterFailure:  1 * time.Second,
-			Host:               "my_host.com",
-			ContextPath:        "/resource+9-9_9",
-			MaxConnsPerBackend: 0,
-		})
+		routePool = route.NewPool(
+			new(logger_fakes.FakeLogger),
+			&route.PoolOpts{
+				RetryAfterFailure:  1 * time.Second,
+				Host:               "my_host.com",
+				ContextPath:        "/resource+9-9_9",
+				MaxConnsPerBackend: 0,
+			})
 
 		fakeLogger = new(logger_fakes.FakeLogger)
 		reg = &fakeRegistry.FakeRegistry{}
@@ -217,7 +219,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when the route service has a route in the route registry", func() {
 				BeforeEach(func() {
-					rsPool := route.NewPool(&route.PoolOpts{
+					rsPool := route.NewPool(new(logger_fakes.FakeLogger), &route.PoolOpts{
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "route-service.com",
 						ContextPath:        "/",
@@ -360,7 +362,7 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
 
-					rsPool := route.NewPool(&route.PoolOpts{
+					rsPool := route.NewPool(new(logger_fakes.FakeLogger), &route.PoolOpts{
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "my_host.com",
 						ContextPath:        "/original_path",

@@ -19,6 +19,10 @@ var PrunableClassifiers = ClassifierGroup{
 	AttemptedTLSWithNonTLSBackend,
 }
 
+var UnavailableClassifiers = ClassifierGroup{
+	Dial,
+}
+
 // Classify returns true on errors that are retryable
 func (cg ClassifierGroup) Classify(err error) bool {
 	for _, classifier := range cg {

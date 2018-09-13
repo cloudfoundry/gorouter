@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,12 +15,14 @@ var _ = Describe("RoundRobin", func() {
 	var pool *route.Pool
 
 	BeforeEach(func() {
-		pool = route.NewPool(&route.PoolOpts{
-			RetryAfterFailure:  2 * time.Minute,
-			Host:               "",
-			ContextPath:        "",
-			MaxConnsPerBackend: 0,
-		})
+		pool = route.NewPool(
+			new(logger_fakes.FakeLogger),
+			&route.PoolOpts{
+				RetryAfterFailure:  2 * time.Minute,
+				Host:               "",
+				ContextPath:        "",
+				MaxConnsPerBackend: 0,
+			})
 	})
 
 	Describe("Next", func() {
@@ -143,12 +146,14 @@ var _ = Describe("RoundRobin", func() {
 			)
 
 			BeforeEach(func() {
-				pool = route.NewPool(&route.PoolOpts{
-					RetryAfterFailure:  2 * time.Minute,
-					Host:               "",
-					ContextPath:        "",
-					MaxConnsPerBackend: 2,
-				})
+				pool = route.NewPool(
+					new(logger_fakes.FakeLogger),
+					&route.PoolOpts{
+						RetryAfterFailure:  2 * time.Minute,
+						Host:               "",
+						ContextPath:        "",
+						MaxConnsPerBackend: 2,
+					})
 
 				epOne = route.NewEndpoint(&route.EndpointOpts{Host: "5.5.5.5", Port: 5555, PrivateInstanceId: "private-label-1"})
 				pool.Put(epOne)
@@ -261,12 +266,14 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("resets failed endpoints after exceeding failure duration", func() {
-			pool = route.NewPool(&route.PoolOpts{
-				RetryAfterFailure:  50 * time.Millisecond,
-				Host:               "",
-				ContextPath:        "",
-				MaxConnsPerBackend: 0,
-			})
+			pool = route.NewPool(
+				new(logger_fakes.FakeLogger),
+				&route.PoolOpts{
+					RetryAfterFailure:  50 * time.Millisecond,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 0,
+				})
 
 			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
 			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
