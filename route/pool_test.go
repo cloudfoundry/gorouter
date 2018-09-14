@@ -62,12 +62,14 @@ var _ = Describe("Pool", func() {
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
 			p1 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
@@ -78,12 +80,14 @@ var _ = Describe("Pool", func() {
 
 		It("returns false if the hosts are the same but paths are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/other",
@@ -94,12 +98,14 @@ var _ = Describe("Pool", func() {
 
 		It("returns false if the paths are the same but hosts are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/path",
@@ -110,12 +116,14 @@ var _ = Describe("Pool", func() {
 
 		It("returns false if the both hosts and paths on the pools are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/other",
@@ -374,6 +382,7 @@ var _ = Describe("Pool", func() {
 		Context("when MaxConnsPerBackend is not set (unlimited)", func() {
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -404,6 +413,7 @@ var _ = Describe("Pool", func() {
 
 		BeforeEach(func() {
 			pool = route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "",
 				ContextPath:        "",
@@ -647,8 +657,8 @@ var _ = Describe("Pool", func() {
 		})
 
 		e2 := route.NewEndpoint(&route.EndpointOpts{
-			Host:                    "5.6.7.8",
-			Port:                    5678,
+			Host: "5.6.7.8",
+			Port: 5678,
 			StaleThresholdInSeconds: -1,
 			ServerCertDomainSAN:     "pvt_test_san",
 			PrivateInstanceId:       "pvt_test_instance_id",
@@ -674,7 +684,7 @@ var _ = Describe("Pool", func() {
 				Port:                    5678,
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
-				Tags:                    sample_tags,
+				Tags: sample_tags,
 			})
 		})
 
@@ -695,7 +705,7 @@ var _ = Describe("Pool", func() {
 				Port:                    5678,
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
-				Tags:                    sample_tags,
+				Tags: sample_tags,
 			})
 
 		})

@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
-	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
@@ -80,8 +80,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 		)
 
 		BeforeEach(func() {
+			logger = test_util.NewTestZapLogger("test")
 			routePool = route.NewPool(&route.PoolOpts{
-				Logger:             new(loggerfakes.FakeLogger),
+				Logger:             logger,
 				RetryAfterFailure:  1 * time.Second,
 				Host:               "myapp.com",
 				ContextPath:        "",
@@ -106,7 +107,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			reqInfo.RoutePool = routePool
 			reqInfo.ProxyResponseWriter = proxyWriter
 
-			logger = test_util.NewTestZapLogger("test")
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
 
 			endpoint = route.NewEndpoint(&route.EndpointOpts{
@@ -249,10 +249,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
 
 					errorLogs := logger.Lines(zap.ErrorLevel)
-					Expect(errorLogs).To(HaveLen(2))
-					for i := 0; i < 2; i++ {
-						Expect(errorLogs[i]).To(ContainSubstring("backend-endpoint-failed"))
+					Expect(len(errorLogs)).To(BeNumerically(">=", 2))
+					count := 0
+					for i := 0; i < len(errorLogs); i++ {
+						if strings.Contains(errorLogs[i], "backend-endpoint-failed") {
+							count++
+						}
 					}
+					Expect(count).To(Equal(2))
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 				})
 
@@ -262,10 +266,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 
 					errorLogs := logger.Lines(zap.ErrorLevel)
-					Expect(errorLogs).To(HaveLen(2))
-					for i := 0; i < 2; i++ {
-						Expect(errorLogs[i]).To(ContainSubstring(fmt.Sprintf("\"attempt\":%d", i+1)))
+					Expect(len(errorLogs)).To(BeNumerically(">=", 3))
+					count := 0
+					for i := 0; i < len(errorLogs); i++ {
+						if strings.Contains(errorLogs[i], fmt.Sprintf("\"attempt\":%d", count+1)) {
+							count++
+						}
 					}
+					Expect(count).To(Equal(2))
 				})
 
 				It("does not call the error handler", func() {

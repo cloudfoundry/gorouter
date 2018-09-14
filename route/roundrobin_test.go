@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -16,7 +16,7 @@ var _ = Describe("RoundRobin", func() {
 
 	BeforeEach(func() {
 		pool = route.NewPool(&route.PoolOpts{
-			Logger:             new(fakes.FakeLogger),
+			Logger:             test_util.NewTestZapLogger("test"),
 			RetryAfterFailure:  2 * time.Minute,
 			Host:               "",
 			ContextPath:        "",
@@ -146,7 +146,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             new(fakes.FakeLogger),
+					Logger:             test_util.NewTestZapLogger("test"),
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -265,7 +265,7 @@ var _ = Describe("RoundRobin", func() {
 
 		It("resets failed endpoints after exceeding failure duration", func() {
 			pool = route.NewPool(&route.PoolOpts{
-				Logger:             new(fakes.FakeLogger),
+				Logger:             test_util.NewTestZapLogger("test"),
 				RetryAfterFailure:  50 * time.Millisecond,
 				Host:               "",
 				ContextPath:        "",
