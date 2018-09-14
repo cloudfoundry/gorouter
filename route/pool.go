@@ -12,6 +12,7 @@ import (
 	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/routing-api/models"
 )
@@ -105,6 +106,7 @@ type Pool struct {
 	maxConnsPerBackend int64
 
 	random *rand.Rand
+	logger logger.Logger
 }
 
 type EndpointOpts struct {
@@ -150,6 +152,7 @@ type PoolOpts struct {
 	Host               string
 	ContextPath        string
 	MaxConnsPerBackend int64
+	Logger             logger.Logger
 }
 
 func NewPool(opts *PoolOpts) *Pool {
@@ -162,6 +165,7 @@ func NewPool(opts *PoolOpts) *Pool {
 		host:               opts.Host,
 		contextPath:        opts.ContextPath,
 		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
+		logger:             opts.Logger,
 	}
 }
 
@@ -366,12 +370,16 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 		return
 	}
 
+	logger := p.logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
+		logger.Error("prune-failed-endpoint")
 		p.removeEndpoint(e)
+
 		return
 	}
 
 	if fails.FailableClassifiers.Classify(err) {
+		logger.Error("endpoint-marked-as-ineligible")
 		e.failed()
 		return
 	}

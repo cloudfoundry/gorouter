@@ -48,9 +48,13 @@ var _ = Describe("ClassifierGroup", func() {
 		It("matches hostname mismatch", func() {
 			pc := fails.PrunableClassifiers
 
+			Expect(pc.Classify(&net.OpError{Op: "dial"})).To(BeTrue())
+			Expect(pc.Classify(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})).To(BeFalse())
+			Expect(pc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})).To(BeTrue())
+			Expect(pc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})).To(BeTrue())
 			Expect(pc.Classify(tls.RecordHeaderError{})).To(BeTrue())
 			Expect(pc.Classify(x509.HostnameError{})).To(BeTrue())
-			Expect(pc.Classify(&net.OpError{Op: "Dial"})).To(BeFalse())
+			Expect(pc.Classify(x509.UnknownAuthorityError{})).To(BeTrue())
 			Expect(pc.Classify(errors.New("i'm a potato"))).To(BeFalse())
 		})
 	})

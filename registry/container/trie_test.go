@@ -1,6 +1,7 @@
 package container_test
 
 import (
+	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 
 	"code.cloudfoundry.org/gorouter/registry/container"
@@ -18,6 +19,7 @@ var _ = Describe("Trie", func() {
 	BeforeEach(func() {
 		r = container.NewTrie()
 		p = route.NewPool(&route.PoolOpts{
+			Logger:             new(fakes.FakeLogger),
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -25,6 +27,7 @@ var _ = Describe("Trie", func() {
 		})
 
 		p1 = route.NewPool(&route.PoolOpts{
+			Logger:             new(fakes.FakeLogger),
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -32,6 +35,7 @@ var _ = Describe("Trie", func() {
 		})
 
 		p2 = route.NewPool(&route.PoolOpts{
+			Logger:             new(fakes.FakeLogger),
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -124,8 +128,19 @@ var _ = Describe("Trie", func() {
 		})
 
 		It("adds a child node", func() {
-			rootPool := route.NewPool(&route.PoolOpts{RetryAfterFailure: 0, Host: "", ContextPath: ""})
-			childPool := route.NewPool(&route.PoolOpts{RetryAfterFailure: 0, Host: "", ContextPath: ""})
+			rootPool := route.NewPool(
+				&route.PoolOpts{
+					Logger:            new(fakes.FakeLogger),
+					RetryAfterFailure: 0,
+					Host:              "",
+					ContextPath:       "",
+				})
+			childPool := route.NewPool(&route.PoolOpts{
+				Logger:            new(fakes.FakeLogger),
+				RetryAfterFailure: 0,
+				Host:              "",
+				ContextPath:       "",
+			})
 
 			_ = r.Insert("example", rootPool)
 
@@ -258,8 +273,18 @@ var _ = Describe("Trie", func() {
 
 			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
-			p3 := route.NewPool(&route.PoolOpts{RetryAfterFailure: 42, Host: "", ContextPath: ""})
-			p4 := route.NewPool(&route.PoolOpts{RetryAfterFailure: 42, Host: "", ContextPath: ""})
+			p3 := route.NewPool(&route.PoolOpts{
+				Logger:            new(fakes.FakeLogger),
+				RetryAfterFailure: 42,
+				Host:              "",
+				ContextPath:       "",
+			})
+			p4 := route.NewPool(&route.PoolOpts{
+				Logger:            new(fakes.FakeLogger),
+				RetryAfterFailure: 42,
+				Host:              "",
+				ContextPath:       "",
+			})
 			p1.Put(e1)
 			p2.Put(e2)
 			r.Insert("/foo", p1)

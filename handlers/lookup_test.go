@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
@@ -21,7 +21,7 @@ var _ = Describe("Lookup", func() {
 	var (
 		handler        *negroni.Negroni
 		nextHandler    http.HandlerFunc
-		logger         *logger_fakes.FakeLogger
+		logger         *loggerfakes.FakeLogger
 		reg            *fakeRegistry.FakeRegistry
 		rep            *fakes.FakeCombinedReporter
 		resp           *httptest.ResponseRecorder
@@ -40,7 +40,7 @@ var _ = Describe("Lookup", func() {
 		nextCalled = false
 		nextRequest = &http.Request{}
 		maxConnections = 2
-		logger = new(logger_fakes.FakeLogger)
+		logger = new(loggerfakes.FakeLogger)
 		rep = &fakes.FakeCombinedReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
@@ -79,6 +79,7 @@ var _ = Describe("Lookup", func() {
 
 		BeforeEach(func() {
 			pool = route.NewPool(&route.PoolOpts{
+				Logger:             logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "example.com",
 				ContextPath:        "/",
@@ -110,6 +111,7 @@ var _ = Describe("Lookup", func() {
 		Context("when conn limit is set to unlimited", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -142,6 +144,7 @@ var _ = Describe("Lookup", func() {
 		Context("when conn limit is reached for an endpoint", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -169,6 +172,7 @@ var _ = Describe("Lookup", func() {
 			var testEndpoint *route.Endpoint
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -200,6 +204,7 @@ var _ = Describe("Lookup", func() {
 		Context("when a specific instance is requested", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -227,6 +232,7 @@ var _ = Describe("Lookup", func() {
 		Context("when an invalid instance header is requested", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -254,6 +260,7 @@ var _ = Describe("Lookup", func() {
 		Context("when given an incomplete app instance header", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -280,6 +287,7 @@ var _ = Describe("Lookup", func() {
 		Context("when only the app id is given", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",
@@ -310,6 +318,7 @@ var _ = Describe("Lookup", func() {
 				handler.UseHandler(nextHandler)
 
 				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "example.com",
 					ContextPath:        "/",

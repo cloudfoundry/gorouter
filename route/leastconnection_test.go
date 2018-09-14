@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -15,6 +16,7 @@ var _ = Describe("LeastConnection", func() {
 	BeforeEach(func() {
 		pool = route.NewPool(
 			&route.PoolOpts{
+				Logger:             new(fakes.FakeLogger),
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "",
 				ContextPath:        "",
@@ -134,6 +136,7 @@ var _ = Describe("LeastConnection", func() {
 
 				BeforeEach(func() {
 					pool = route.NewPool(&route.PoolOpts{
+						Logger:             new(fakes.FakeLogger),
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "",
 						ContextPath:        "",

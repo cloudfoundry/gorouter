@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -17,6 +18,7 @@ func loadBalance(lb route.EndpointIterator) {
 func loadBalanceFor(strategy string, b *testing.B) {
 
 	pool := route.NewPool(&route.PoolOpts{
+		Logger:             new(fakes.FakeLogger),
 		RetryAfterFailure:  2 * time.Minute,
 		Host:               "",
 		ContextPath:        "",

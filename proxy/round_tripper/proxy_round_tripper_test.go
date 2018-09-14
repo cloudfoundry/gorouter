@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
+	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
@@ -80,6 +81,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 		BeforeEach(func() {
 			routePool = route.NewPool(&route.PoolOpts{
+				Logger:             new(loggerfakes.FakeLogger),
 				RetryAfterFailure:  1 * time.Second,
 				Host:               "myapp.com",
 				ContextPath:        "",

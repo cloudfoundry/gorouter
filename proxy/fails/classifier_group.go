@@ -3,20 +3,24 @@ package fails
 type ClassifierGroup []Classifier
 
 var RetriableClassifiers = ClassifierGroup{
-	AttemptedTLSWithNonTLSBackend,
 	Dial,
 	ConnectionResetOnRead,
+	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
 	RemoteFailedCertCheck,
 	RemoteHandshakeFailure,
-	HostnameMismatch,
 	UntrustedCert,
 }
 
 var FailableClassifiers = RetriableClassifiers
 
 var PrunableClassifiers = ClassifierGroup{
-	HostnameMismatch,
+	Dial,
 	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
+	RemoteFailedCertCheck,
+	RemoteHandshakeFailure,
+	UntrustedCert,
 }
 
 // Classify returns true on errors that are retryable

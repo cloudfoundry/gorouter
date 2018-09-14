@@ -95,6 +95,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	if pool == nil {
 		host, contextPath := splitHostAndContextPath(uri)
 		pool = route.NewPool(&route.PoolOpts{
+			Logger:             r.logger,
 			RetryAfterFailure:  r.dropletStaleThreshold / 4,
 			Host:               host,
 			ContextPath:        contextPath,
@@ -204,6 +205,7 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
 			surgicalPool = route.NewPool(&route.PoolOpts{
+				Logger:             r.logger,
 				RetryAfterFailure:  0,
 				Host:               p.Host(),
 				ContextPath:        p.ContextPath(),

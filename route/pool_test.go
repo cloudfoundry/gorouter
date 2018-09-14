@@ -1,6 +1,7 @@
 package route_test
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"net"
 
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Endpoint", func() {
@@ -40,10 +43,15 @@ var _ = Describe("Endpoint", func() {
 })
 
 var _ = Describe("Pool", func() {
-	var pool *route.Pool
+	var (
+		pool   *route.Pool
+		logger *test_util.TestZapLogger
+	)
 
 	BeforeEach(func() {
+		logger = test_util.NewTestZapLogger("test")
 		pool = route.NewPool(&route.PoolOpts{
+			Logger:             logger,
 			RetryAfterFailure:  2 * time.Minute,
 			Host:               "",
 			ContextPath:        "",
@@ -238,37 +246,62 @@ var _ = Describe("Pool", func() {
 	})
 
 	Context("EndpointFailed", func() {
-		It("prunes tls routes on hostname mismatch errors", func() {
-			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
-			pool.Put(endpoint)
+		Context("non-tls endpoints", func() {
+			It("does not prune", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: false})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+				pool.EndpointFailed(endpoint, x509.HostnameError{})
 
-			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
-
-			pool.EndpointFailed(endpoint, x509.HostnameError{})
-
-			Expect(pool.IsEmpty()).To(BeTrue())
+				Expect(pool.IsEmpty()).To(BeFalse())
+			})
 		})
+		Context("tls endpoints", func() {
+			It("prunes on hostname mismatch errors", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+				pool.EndpointFailed(endpoint, x509.HostnameError{})
 
-		It("does not prune tls routes on connection errors", func() {
-			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
-			pool.Put(endpoint)
+				Expect(pool.IsEmpty()).To(BeTrue())
+			})
 
-			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+			It("prunes on attempting non-TLS backend errors", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+				pool.EndpointFailed(endpoint, tls.RecordHeaderError{})
 
-			pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
+				Expect(pool.IsEmpty()).To(BeTrue())
+			})
 
-			Expect(pool.IsEmpty()).To(BeFalse())
-		})
+			It("prunes on TCP dial error", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true, StaleThresholdInSeconds: 1})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now())
+				pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
 
-		It("does not prune non-tls routes that have already expired", func() {
-			endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: false})
-			pool.Put(endpoint)
+				Expect(pool.IsEmpty()).To(BeTrue())
+			})
 
-			pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+			It("logs the endpoint that is pruned", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true, StaleThresholdInSeconds: 1})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now())
+				pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
 
-			pool.EndpointFailed(endpoint, x509.HostnameError{})
+				Expect(logger.Buffer()).To(gbytes.Say(`prune-failed-endpoint`))
+			})
 
-			Expect(pool.IsEmpty()).To(BeFalse())
+			It("does not prune connection reset errors", func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true, StaleThresholdInSeconds: 1})
+				pool.Put(endpoint)
+				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+				connectionResetError := &net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")}
+				pool.EndpointFailed(endpoint, connectionResetError)
+
+				Expect(pool.IsEmpty()).To(BeFalse())
+			})
 		})
 	})
 
