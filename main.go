@@ -282,16 +282,16 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 }
 
 func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
-	clock := clock.NewClock()
+	cl := clock.NewClock()
 
-	uaaClient := newUaaClient(logger, clock, c)
+	uaaClient := newUaaClient(logger, cl, c)
 
 	_, err := uaaClient.FetchToken(true)
 	if err != nil {
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
 
-	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingAPIClient, 1, clock)
+	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingAPIClient, 1, cl)
 	return routeFetcher
 }
 
