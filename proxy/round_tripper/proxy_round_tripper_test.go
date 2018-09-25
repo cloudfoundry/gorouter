@@ -290,7 +290,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("when backend is unavailable due to non-retryable error", func() {
 				BeforeEach(func() {
-					transport.RoundTripReturns(nil, &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})
+					badResponse := &http.Response{
+						Header: make(map[string][]string),
+					}
+					badResponse.Header.Add(handlers.VcapRequestIdHeader, "some-request-id")
+					transport.RoundTripReturns(badResponse, &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})
 					retryableClassifier.ClassifyReturns(false)
 				})
 
@@ -346,7 +350,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					ep2 := iter.Next()
 					Expect(ep1).To(Equal(ep2))
 
-					Expect(logger.Buffer()).To(gbytes.Say(`backend-endpoint-failed`))
+					logOutput := logger.Buffer()
+					Expect(logOutput).To(gbytes.Say(`backend-endpoint-failed`))
+					Expect(logOutput).To(gbytes.Say(`vcap_request_id`))
 				})
 			})
 

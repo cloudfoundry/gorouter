@@ -144,7 +144,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 
 			if err != nil {
 				iter.EndpointFailed(err)
-				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1))
+				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)))
 
 				if rt.retryableClassifier.Classify(err) {
 					logger.Debug("retryable-error", zap.Object("error", err))
