@@ -123,7 +123,6 @@ type Config struct {
 	Tracing                  Tracing           `yaml:"tracing,omitempty"`
 	TraceKey                 string            `yaml:"trace_key,omitempty"`
 	AccessLog                AccessLog         `yaml:"access_log,omitempty"`
-	EnableAccessLogStreaming bool              `yaml:"enable_access_log_streaming,omitempty"`
 	DebugAddr                string            `yaml:"debug_addr,omitempty"`
 	EnablePROXY              bool              `yaml:"enable_proxy,omitempty"`
 	EnableSSL                bool              `yaml:"enable_ssl,omitempty"`
