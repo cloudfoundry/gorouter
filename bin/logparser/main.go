@@ -10,9 +10,15 @@ import (
 func main() {
 	logLine := os.Args[1:]
 
-	msg := convertToMessage(logLine[0])
+	parsedLine := Parse(logLine[0])
+	fmt.Print(parsedLine)
+}
+
+func Parse(logLine string) string {
+	msg := convertToMessage(logLine)
 	out, _ := json.MarshalIndent(msg, "", " ")
-	fmt.Print(string(out))
+
+	return string(out)
 }
 
 type message struct {
