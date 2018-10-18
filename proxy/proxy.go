@@ -129,6 +129,9 @@ func NewProxy(
 	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
+	if cfg.StrictTransportSecurityHeader != "" {
+		n.Use(handlers.NewInjectHeaderHandler("Strict-Transport-Security", cfg.StrictTransportSecurityHeader))
+	}
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
