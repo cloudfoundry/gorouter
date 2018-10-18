@@ -612,6 +612,63 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
+	Describe("HSTS", func() {
+		mockedHandler := func(addHeader bool) net.Listener {
+			return test_util.RegisterHandler(r, "hsts-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				if addHeader {
+					resp.Header.Set("Strict-Transport-Security", "foobar")
+				}
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+		}
+
+		processAndGetHeader := func() string {
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "hsts-test", "/", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			return resp.Header.Get("Strict-Transport-Security")
+		}
+
+		It("does not add Strict-Transport-Security if not configured", func() {
+			ln := mockedHandler(false)
+			defer ln.Close()
+
+			header := processAndGetHeader()
+			Expect(header).To(BeEmpty())
+		})
+
+		Context("when strict_transport_security_header is set", func() {
+			BeforeEach(func() {
+				conf.StrictTransportSecurityHeader = "max-age=1234"
+			})
+
+			It("adds Strict-Transport-Security if it doesn't already exist in the response", func() {
+				ln := mockedHandler(false)
+				defer ln.Close()
+
+				header := processAndGetHeader()
+				Expect(header).To(Equal("max-age=1234"))
+			})
+
+			It("does not add Strict-Transport-Security if it already exists in the response", func() {
+				ln := mockedHandler(true)
+				defer ln.Close()
+
+				header := processAndGetHeader()
+				Expect(header).To(Equal("foobar"))
+			})
+		})
+	})
+
 	Describe("Backend Connection Handling", func() {
 		Context("when max conn per backend is set to > 0 ", func() {
 			BeforeEach(func() {

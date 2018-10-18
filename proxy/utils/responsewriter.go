@@ -12,6 +12,7 @@ type ProxyResponseWriter interface {
 	Hijack() (net.Conn, *bufio.ReadWriter, error)
 	Write(b []byte) (int, error)
 	WriteHeader(s int)
+	InjectHeader(header string, value string)
 	Done()
 	Flush()
 	Status() int
@@ -25,14 +26,17 @@ type proxyResponseWriter struct {
 	status int
 	size   int
 
+	headersToInject http.Header
+
 	flusher http.Flusher
 	done    bool
 }
 
 func NewProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
 	proxyWriter := &proxyResponseWriter{
-		w:       w,
-		flusher: w.(http.Flusher),
+		w:               w,
+		flusher:         w.(http.Flusher),
+		headersToInject: http.Header{},
 	}
 
 	return proxyWriter
@@ -80,11 +84,21 @@ func (p *proxyResponseWriter) WriteHeader(s int) {
 		p.w.Header()["Content-Type"] = nil
 	}
 
+	for h, v := range p.headersToInject {
+		if _, ok := p.w.Header()[h]; !ok {
+			p.w.Header()[h] = v
+		}
+	}
+
 	p.w.WriteHeader(s)
 
 	if p.status == 0 {
 		p.status = s
 	}
+}
+
+func (p *proxyResponseWriter) InjectHeader(header string, value string) {
+	p.headersToInject[header] = append(p.headersToInject[header], value)
 }
 
 func (p *proxyResponseWriter) Done() {

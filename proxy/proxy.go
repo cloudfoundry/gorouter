@@ -145,6 +145,9 @@ func NewProxy(
 		SanitizeForwardedProto:   p.sanitizeForwardedProto,
 		Logger:                   logger,
 	})
+	if cfg.StrictTransportSecurityHeader != "" {
+		n.Use(handlers.NewInjectHeaderHandler("Strict-Transport-Security", cfg.StrictTransportSecurityHeader))
+	}
 	n.Use(routeServiceHandler)
 	n.Use(p)
 	n.UseHandler(rproxy)

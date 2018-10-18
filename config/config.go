@@ -139,6 +139,8 @@ type Config struct {
 	IsolationSegments        []string          `yaml:"isolation_segments,omitempty"`
 	RoutingTableShardingMode string            `yaml:"routing_table_sharding_mode,omitempty"`
 
+	StrictTransportSecurityHeader string `yaml:"strict_transport_security_header,omitempty"`
+
 	CipherString                      string             `yaml:"cipher_suites,omitempty"`
 	CipherSuites                      []uint16           `yaml:"-"`
 	MinTLSVersionString               string             `yaml:"min_tls_version,omitempty"`
