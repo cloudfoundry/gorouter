@@ -3,6 +3,12 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"runtime"
+	"syscall"
+	"time"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
@@ -12,6 +18,7 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
@@ -28,19 +35,10 @@ import (
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/go-nats"
-	"github.com/uber-go/zap"
-
-	"flag"
-	"fmt"
-	"os"
-	"runtime"
-	"syscall"
-	"time"
-
-	"code.cloudfoundry.org/gorouter/metrics"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
+	"github.com/uber-go/zap"
 )
 
 var (
@@ -163,7 +161,7 @@ func main() {
 	}
 	healthCheck = 0
 	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper(), rss.ArrivedViaARouteServicesServer)
-	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
+	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
@@ -181,7 +179,7 @@ func main() {
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "natsMonitor", Runner: natsMonitor})
-	members = append(members, grouper.Member{Name: "router", Runner: router})
+	members = append(members, grouper.Member{Name: "router", Runner: goRouter})
 
 	group := grouper.NewOrdered(os.Interrupt, members)
 

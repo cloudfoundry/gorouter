@@ -470,13 +470,13 @@ var _ = Describe("Router", func() {
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
 				skipSanitize := func(*http.Request) bool { return false }
-				proxy := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
+				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &healthCheck, rt, skipSanitize)
 
 				errChan = make(chan error, 2)
 				var err error
 				rss := &sharedfakes.RouteServicesServer{}
-				rtr, err = router.NewRouter(logger, config, proxy, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
+				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
 				runRouter(rtr)
 			})

@@ -2,12 +2,6 @@ package common
 
 import (
 	"crypto/tls"
-
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/route"
-	"github.com/nats-io/go-nats"
-	. "github.com/onsi/gomega"
-
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/nats-io/go-nats"
+	. "github.com/onsi/gomega"
 )
 
 type TestApp struct {
@@ -100,7 +98,7 @@ func (a *TestApp) Port() uint16 {
 }
 
 func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
-	uuid, _ := uuid.GenerateUUID()
+	id, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host:                    "127.0.0.1",
 		TlsPort:                 a.port,
@@ -113,14 +111,14 @@ func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
 
 		RouteServiceUrl:     a.routeService,
 		ServerCertDomainSAN: serverCertDomainSAN,
-		PrivateInstanceId:   uuid,
+		PrivateInstanceId:   id,
 	}
 
 	b, _ := json.Marshal(rm)
 	a.mbusClient.Publish("router.register", b)
 }
 func (a *TestApp) Register() {
-	uuid, _ := uuid.GenerateUUID()
+	id, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host:                    "127.0.0.1",
 		Port:                    a.port,
@@ -131,7 +129,7 @@ func (a *TestApp) Register() {
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:   a.routeService,
-		PrivateInstanceId: uuid,
+		PrivateInstanceId: id,
 	}
 
 	b, _ := json.Marshal(rm)

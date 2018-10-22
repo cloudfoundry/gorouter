@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock/fakeclock"
-
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	testRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
@@ -20,11 +19,10 @@ import (
 	"code.cloudfoundry.org/uaa-go-client/schema"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/tedsuo/ifrit"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
 )
 
 var sender *metrics_fakes.FakeMetricSender
@@ -345,10 +343,9 @@ var _ = Describe("RouteFetcher", func() {
 			Context("and the event source successfully subscribes", func() {
 				It("responds to events", func() {
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(Equal(1))
-					route := models.NewRoute("z.a.k", 63, "42.42.42.42", "Tomato", "route-service-url", 1)
 					eventChannel <- routing_api.Event{
 						Action: "Delete",
-						Route:  route,
+						Route:  models.NewRoute("z.a.k", 63, "42.42.42.42", "Tomato", "route-service-url", 1),
 					}
 					Eventually(registry.UnregisterCallCount).Should(BeNumerically(">=", 1))
 				})
