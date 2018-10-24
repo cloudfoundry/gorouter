@@ -19,12 +19,13 @@ import (
 )
 
 var _ = Describe("TLS to backends", func() {
+	const serverCertDomainSAN = "example.com"
+
 	var (
-		testState           *testState
-		serverCertDomainSAN string
-		backendCertChain    test_util.CertChain
-		clientCertChain     test_util.CertChain
-		backendTLSConfig    *tls.Config
+		testState        *testState
+		backendCertChain test_util.CertChain
+		clientCertChain  test_util.CertChain
+		backendTLSConfig *tls.Config
 	)
 
 	BeforeEach(func() {
@@ -32,7 +33,6 @@ var _ = Describe("TLS to backends", func() {
 		testState.cfg.SkipSSLValidation = false
 		testState.cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
-		serverCertDomainSAN = "example.com"
 		backendCertChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: serverCertDomainSAN})
 		testState.cfg.CACerts = string(backendCertChain.CACertPEM)
 
