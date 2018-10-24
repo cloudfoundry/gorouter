@@ -60,7 +60,7 @@ var _ = Describe("TLS to backends", func() {
 		}
 	})
 
-	FContext("websockets and TLS interaction", func() {
+	Context("websockets and TLS interaction", func() {
 		assertWebsocketSuccess := func(wsApp *common.TestApp) {
 			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 

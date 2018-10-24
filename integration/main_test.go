@@ -509,11 +509,11 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 			sendRegistration := func(port int, url string) error {
 				rm := mbus.RegistryMessage{
-					Host: "127.0.0.1",
-					Port: uint16(port),
-					Uris: []route.Uri{route.Uri(url)},
-					Tags: nil,
-					App:  "0",
+					Host:                    "127.0.0.1",
+					Port:                    uint16(port),
+					Uris:                    []route.Uri{route.Uri(url)},
+					Tags:                    nil,
+					App:                     "0",
 					StaleThresholdInSeconds: 1,
 					EndpointUpdatedAtNs:     time.Now().Add(-10 * time.Second).UnixNano(),
 					// simulate 10 seconds of latency on NATS message
