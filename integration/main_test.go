@@ -148,8 +148,7 @@ var _ = Describe("Router Integration", func() {
 	}
 
 	stopGorouter := func(gorouterSession *Session) {
-		err := gorouterSession.Command.Process.Signal(syscall.SIGTERM)
-		Expect(err).ToNot(HaveOccurred())
+		gorouterSession.Command.Process.Signal(syscall.SIGTERM)
 		Eventually(gorouterSession, 5).Should(Exit(0))
 	}
 
