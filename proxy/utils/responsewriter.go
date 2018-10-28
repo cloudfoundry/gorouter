@@ -18,6 +18,7 @@ type ProxyResponseWriter interface {
 	SetStatus(status int)
 	Size() int
 	CloseNotify() <-chan bool
+	AddHeaderRewriter(HeaderRewriter)
 }
 
 type proxyResponseWriter struct {
@@ -27,6 +28,8 @@ type proxyResponseWriter struct {
 
 	flusher http.Flusher
 	done    bool
+
+	headerRewriters []HeaderRewriter
 }
 
 func NewProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
@@ -80,6 +83,10 @@ func (p *proxyResponseWriter) WriteHeader(s int) {
 		p.w.Header()["Content-Type"] = nil
 	}
 
+	for _, headerRewriter := range p.headerRewriters {
+		headerRewriter.RewriteHeader(p.w.Header())
+	}
+
 	p.w.WriteHeader(s)
 
 	if p.status == 0 {
@@ -109,4 +116,8 @@ func (p *proxyResponseWriter) SetStatus(status int) {
 
 func (p *proxyResponseWriter) Size() int {
 	return p.size
+}
+
+func (p *proxyResponseWriter) AddHeaderRewriter(r HeaderRewriter) {
+	p.headerRewriters = append(p.headerRewriters, r)
 }

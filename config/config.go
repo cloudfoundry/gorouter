@@ -112,6 +112,15 @@ var defaultLoggingConfig = LoggingConfig{
 	MetronAddress: "localhost:3457",
 }
 
+type HeaderNameValue struct {
+	Name  string `yaml: "name"`
+	Value string `yaml: "value,omitempty"`
+}
+
+type HTTPRewrite struct {
+	InjectResponseHeaders []HeaderNameValue `inject_response_headers,omitempty`
+}
+
 type Config struct {
 	Status                   StatusConfig      `yaml:"status,omitempty"`
 	Nats                     []NatsConfig      `yaml:"nats,omitempty"`
@@ -188,6 +197,8 @@ type Config struct {
 	DisableKeepAlives   bool `yaml:"disable_keep_alives,omitempty"`
 	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
 	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
+
+	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 }
 
 var defaultConfig = Config{

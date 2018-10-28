@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"reflect"
 	"strings"
 	"time"
 
@@ -129,6 +130,10 @@ func NewProxy(
 	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
 	n.Use(handlers.NewReporter(reporter, logger))
+	if !reflect.DeepEqual(cfg.HTTPRewrite, config.HTTPRewrite{}) {
+		logger.Debug("http-rewrite", zap.Object("config", cfg.HTTPRewrite))
+		n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite))
+	}
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.heartbeatOK, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))

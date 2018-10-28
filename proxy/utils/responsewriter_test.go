@@ -63,6 +63,16 @@ func (f *fakeHijackerResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, erro
 	return nil, nil, errors.New("Not Implemented")
 }
 
+type fakeHeaderRewriter struct {
+	rewriteHeaderCalled bool
+	rewriteHeaderHeader http.Header
+}
+
+func (f *fakeHeaderRewriter) RewriteHeader(h http.Header) {
+	f.rewriteHeaderCalled = true
+	f.rewriteHeaderHeader = h
+}
+
 var _ = Describe("ProxyWriter", func() {
 	var (
 		closeNotifier chan bool
@@ -184,5 +194,20 @@ var _ = Describe("ProxyWriter", func() {
 		proxy.Write([]byte("foo"))
 		proxy.Write([]byte("foo"))
 		Expect(proxy.Size()).To(BeNumerically("==", 6))
+	})
+
+	It("WriteHeader calls the registered HeaderRewriter with the proxied Header", func() {
+		r1 := &fakeHeaderRewriter{}
+		r2 := &fakeHeaderRewriter{}
+		proxy.AddHeaderRewriter(r1)
+		proxy.AddHeaderRewriter(r2)
+
+		fake.Header().Add("foo", "bar")
+
+		proxy.WriteHeader(http.StatusOK)
+		Expect(r1.rewriteHeaderCalled).To(BeTrue())
+		Expect(r1.rewriteHeaderHeader).To(HaveKey("Foo"))
+		Expect(r2.rewriteHeaderCalled).To(BeTrue())
+		Expect(r2.rewriteHeaderHeader).To(HaveKey("Foo"))
 	})
 })

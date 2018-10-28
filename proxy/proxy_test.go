@@ -31,6 +31,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Proxy", func() {
@@ -609,6 +610,82 @@ var _ = Describe("Proxy", func() {
 			conn.WriteRequest(req)
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	})
+
+	FDescribe("HTTP Rewrite", func() {
+		mockedHandler := func(host string, headers []string) net.Listener {
+			return test_util.RegisterHandler(r, host, func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				for _, h := range headers {
+					resp.Header.Set(strings.Split(h, ":")[0], strings.Split(h, ":")[1])
+				}
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+		}
+
+		process := func(host string) *http.Response {
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", host, "/", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			return resp
+		}
+
+		It("does not add a rewrite handler if not configured", func() {
+			ln := mockedHandler("hsts-test", []string{})
+			defer ln.Close()
+
+			process("hsts-test")
+			Expect(testLogger).NotTo(gbytes.Say("http-rewrite"))
+		})
+
+		Context("when inject response header is set", func() {
+			BeforeEach(func() {
+				conf.HTTPRewrite = config.HTTPRewrite{
+					InjectResponseHeaders: []config.HeaderNameValue{
+						{Name: "X-Foo", Value: "bar"},
+					},
+				}
+			})
+
+			It("adds a rewrite handler if configured", func() {
+				ln := mockedHandler("hsts-test", []string{})
+				defer ln.Close()
+
+				process("hsts-test")
+				Expect(testLogger).To(gbytes.Say("http-rewrite"))
+			})
+
+			It("adds the header if it doesn't already exist in the response", func() {
+				ln := mockedHandler("hsts-test", []string{})
+				defer ln.Close()
+
+				header := process("hsts-test").Header
+				Expect(header.Get("X-Foo")).To(Equal("bar"))
+			})
+
+			It("does not add the header if it already exists in the response", func() {
+				ln := mockedHandler("hsts-test", []string{"X-Foo: foo"})
+				defer ln.Close()
+
+				header := process("hsts-test").Header
+				Expect(header.Get("X-Foo")).To(Equal("foo"))
+			})
+
+			It("adds the header for unknown routes", func() {
+				ln := mockedHandler("hsts-test", []string{})
+				defer ln.Close()
+
+				header := process("other-host").Header
+				Expect(header.Get("X-Foo")).To(Equal("bar"))
+			})
 		})
 	})
 
