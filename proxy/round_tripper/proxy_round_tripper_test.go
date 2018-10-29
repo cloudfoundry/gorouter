@@ -65,7 +65,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			combinedReporter       *fakes.FakeCombinedReporter
 			roundTripperFactory    *FakeRoundTripperFactory
 			routeServicesTransport *sharedfakes.RoundTripper
-			retryableClassifier    *errorClassifierFakes.Classifier
+			retriableClassifier    *errorClassifierFakes.Classifier
 			errorHandler           *roundtripperfakes.ErrorHandler
 			timeout                time.Duration
 
@@ -125,14 +125,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 			errorHandler = &roundtripperfakes.ErrorHandler{}
 
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
-			retryableClassifier = &errorClassifierFakes.Classifier{}
-			retryableClassifier.ClassifyReturns(false)
+			retriableClassifier = &errorClassifierFakes.Classifier{}
+			retriableClassifier.ClassifyReturns(false)
 			routeServicesTransport = &sharedfakes.RoundTripper{}
 		})
 
 		JustBeforeEach(func() {
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
-				roundTripperFactory, retryableClassifier,
+				roundTripperFactory, retriableClassifier,
 				logger, "",
 				combinedReporter, false,
 				errorHandler, routeServicesTransport,
@@ -203,14 +203,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 						}
 					}
 
-					retryableClassifier.ClassifyReturns(true)
+					retriableClassifier.ClassifyReturns(true)
 				})
 
 				It("retries until success", func() {
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(transport.RoundTripCallCount()).To(Equal(3))
-					Expect(retryableClassifier.ClassifyCallCount()).To(Equal(2))
+					Expect(retriableClassifier.ClassifyCallCount()).To(Equal(2))
 
 					Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 					Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
@@ -288,14 +288,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 
-			Context("when backend is unavailable due to non-retryable error", func() {
+			Context("when backend is unavailable due to non-retriable error", func() {
 				BeforeEach(func() {
 					badResponse := &http.Response{
 						Header: make(map[string][]string),
 					}
 					badResponse.Header.Add(handlers.VcapRequestIdHeader, "some-request-id")
 					transport.RoundTripReturns(badResponse, &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})
-					retryableClassifier.ClassifyReturns(false)
+					retriableClassifier.ClassifyReturns(false)
 				})
 
 				It("does not retry", func() {
@@ -463,14 +463,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 							recordedRequests[r.URL.Host] = r.URL.Scheme
 							return nil, errors.New("potato")
 						}
-						retryableClassifier.ClassifyReturns(true)
+						retriableClassifier.ClassifyReturns(true)
 					})
 
 					It("uses the correct url scheme (protocol) for each backend", func() {
 						_, err := proxyRoundTripper.RoundTrip(req)
 						Expect(err).To(HaveOccurred())
 						Expect(transport.RoundTripCallCount()).To(Equal(3))
-						Expect(retryableClassifier.ClassifyCallCount()).To(Equal(3))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(3))
 
 						Expect(recordedRequests).To(Equal(map[string]string{
 							"1.1.1.1:9090":  "http",
@@ -638,7 +638,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						transport.RoundTripReturns(
 							nil, dialError,
 						)
-						retryableClassifier.ClassifyReturns(true)
+						retriableClassifier.ClassifyReturns(true)
 					})
 
 					It("calls the error handler", func() {
@@ -659,10 +659,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 						}
 					})
 
-					Context("when route service is unavailable due to non-retryable error", func() {
+					Context("when route service is unavailable due to non-retriable error", func() {
 						BeforeEach(func() {
 							transport.RoundTripReturns(nil, errors.New("banana"))
-							retryableClassifier.ClassifyReturns(false)
+							retriableClassifier.ClassifyReturns(false)
 						})
 
 						It("does not retry and returns status bad gateway", func() {

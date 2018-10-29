@@ -11,7 +11,7 @@ var ErrorTypes = ClassifierGroup{
 	UntrustedCert,
 }
 
-//Classify returns true on errors that are in the classifier group
+// Classify returns true on errors that are in the classifier group
 func (cg ClassifierGroup) Classify(err error) bool {
 	for _, classifier := range cg {
 		if classifier.Classify(err) {

@@ -122,7 +122,7 @@ var _ = Describe("Backend TLS", func() {
 				resp := registerAppAndTest()
 				Expect(resp.StatusCode).To(Equal(496))
 			})
-			Context("when the route is expired and the backend fails with a retryable error", func() {
+			Context("when the route is expired and the backend fails with a retriable error", func() {
 				BeforeEach(func() {
 					registerConfig.StaleThreshold = -1
 				})

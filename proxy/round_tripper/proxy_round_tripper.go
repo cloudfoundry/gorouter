@@ -59,7 +59,7 @@ type errorHandler interface {
 
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
-	retryableClassifier fails.Classifier,
+	retriableClassifier fails.Classifier,
 	logger logger.Logger,
 	defaultLoadBalance string,
 	combinedReporter metrics.ProxyReporter,
@@ -74,7 +74,7 @@ func NewProxyRoundTripper(
 		combinedReporter:       combinedReporter,
 		secureCookies:          secureCookies,
 		roundTripperFactory:    roundTripperFactory,
-		retryableClassifier:    retryableClassifier,
+		retriableClassifier:    retriableClassifier,
 		errorHandler:           errorHandler,
 		routeServicesTransport: routeServicesTransport,
 		endpointTimeout:        endpointTimeout,
@@ -87,7 +87,7 @@ type roundTripper struct {
 	combinedReporter       metrics.ProxyReporter
 	secureCookies          bool
 	roundTripperFactory    RoundTripperFactory
-	retryableClassifier    fails.Classifier
+	retriableClassifier    fails.Classifier
 	errorHandler           errorHandler
 	routeServicesTransport http.RoundTripper
 	endpointTimeout        time.Duration
@@ -146,8 +146,8 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 				iter.EndpointFailed(err)
 				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)))
 
-				if rt.retryableClassifier.Classify(err) {
-					logger.Debug("retryable-error", zap.Object("error", err))
+				if rt.retriableClassifier.Classify(err) {
+					logger.Debug("retriable-error", zap.Object("error", err))
 					continue
 				}
 			}
@@ -181,7 +181,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			if err != nil {
 				logger.Error("route-service-connection-failed", zap.Error(err))
 
-				if rt.retryableClassifier.Classify(err) {
+				if rt.retriableClassifier.Classify(err) {
 					continue
 				}
 			}
