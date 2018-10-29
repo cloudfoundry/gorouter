@@ -102,7 +102,7 @@ func NewProxy(
 	}
 
 	prt := round_tripper.NewProxyRoundTripper(
-		roundTripperFactory, fails.RetriableClassifiers, p.logger,
+		roundTripperFactory, fails.ErrorTypes, p.logger,
 		p.defaultLoadBalance, p.reporter, p.secureCookies,
 		&round_tripper.ErrorHandler{
 			MetricReporter: p.reporter,

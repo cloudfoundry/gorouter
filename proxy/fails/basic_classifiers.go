@@ -26,11 +26,6 @@ var ContextCancelled = ClassifierFunc(func(err error) bool {
 	return err == context.Canceled
 })
 
-var ConnectionResetOnRead = ClassifierFunc(func(err error) bool {
-	ne, ok := err.(*net.OpError)
-	return ok && ne.Op == "read" && ne.Err.Error() == "read: connection reset by peer"
-})
-
 var RemoteFailedCertCheck = ClassifierFunc(func(err error) bool {
 	ne, ok := err.(*net.OpError)
 	return ok && ne.Op == "remote error" && ne.Err.Error() == "tls: bad certificate"

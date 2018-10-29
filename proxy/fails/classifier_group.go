@@ -2,19 +2,7 @@ package fails
 
 type ClassifierGroup []Classifier
 
-var RetriableClassifiers = ClassifierGroup{
-	Dial,
-	ConnectionResetOnRead,
-	AttemptedTLSWithNonTLSBackend,
-	HostnameMismatch,
-	RemoteFailedCertCheck,
-	RemoteHandshakeFailure,
-	UntrustedCert,
-}
-
-var FailableClassifiers = RetriableClassifiers
-
-var PrunableClassifiers = ClassifierGroup{
+var ErrorTypes = ClassifierGroup{
 	Dial,
 	AttemptedTLSWithNonTLSBackend,
 	HostnameMismatch,
@@ -23,7 +11,7 @@ var PrunableClassifiers = ClassifierGroup{
 	UntrustedCert,
 }
 
-// Classify returns true on errors that are retryable
+//Classify returns true on errors that are in the classifier group
 func (cg ClassifierGroup) Classify(err error) bool {
 	for _, classifier := range cg {
 		if classifier.Classify(err) {

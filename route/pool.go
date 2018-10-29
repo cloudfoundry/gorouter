@@ -371,17 +371,16 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 	}
 
 	logger := p.logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
-	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
-		logger.Error("prune-failed-endpoint")
-		p.removeEndpoint(e)
+	if fails.ErrorTypes.Classify(err) {
+		if e.endpoint.useTls {
+			logger.Error("prune-failed-endpoint")
+			p.removeEndpoint(e)
 
-		return
-	}
+			return
+		}
 
-	if fails.FailableClassifiers.Classify(err) {
 		logger.Error("endpoint-marked-as-ineligible")
 		e.failed()
-		return
 	}
 
 	return

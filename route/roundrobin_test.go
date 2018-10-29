@@ -282,7 +282,7 @@ var _ = Describe("RoundRobin", func() {
 			n2 := iter.Next()
 			Expect(n1).ToNot(Equal(n2))
 
-			iter.EndpointFailed(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})
+			iter.EndpointFailed(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})
 
 			n1 = iter.Next()
 			n2 = iter.Next()
