@@ -34,7 +34,6 @@ var _ = Describe("ClassifierGroup", func() {
 			rc := fails.RetriableClassifiers
 
 			Expect(rc.Classify(&net.OpError{Op: "dial"})).To(BeTrue())
-			Expect(rc.Classify(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})).To(BeTrue())
 			Expect(rc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})).To(BeTrue())
 			Expect(rc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})).To(BeTrue())
 			Expect(rc.Classify(tls.RecordHeaderError{})).To(BeTrue())
@@ -58,5 +57,4 @@ var _ = Describe("ClassifierGroup", func() {
 			Expect(pc.Classify(errors.New("i'm a potato"))).To(BeFalse())
 		})
 	})
-
 })

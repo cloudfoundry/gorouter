@@ -255,15 +255,29 @@ var _ = Describe("Pool", func() {
 
 	Context("EndpointFailed", func() {
 		Context("non-tls endpoints", func() {
-			It("does not prune", func() {
-				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: false})
-				pool.Put(endpoint)
-				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
-				pool.EndpointFailed(endpoint, x509.HostnameError{})
+			var failedEndpoint, fineEndpoint *route.Endpoint
 
-				Expect(pool.IsEmpty()).To(BeFalse())
+			BeforeEach(func() {
+				failedEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.1.1.1", Port: 8443, UseTLS: false})
+				fineEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "2.2.2.2", Port: 8080, UseTLS: false})
+				pool.Put(failedEndpoint)
+				pool.Put(fineEndpoint)
+				pool.MarkUpdated(time.Now().Add(-2 * time.Second))
+			})
+
+			Context("when a read connection is reset", func() {
+				It("marks the endpoint as failed", func() {
+					connectionResetError := &net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")}
+					pool.EndpointFailed(failedEndpoint, connectionResetError)
+					i := pool.Endpoints("", "")
+					epOne := i.Next()
+					epTwo := i.Next()
+					Expect(epOne).To(Equal(epTwo))
+					Expect(epOne).To(Equal(fineEndpoint))
+				})
 			})
 		})
+
 		Context("tls endpoints", func() {
 			It("prunes on hostname mismatch errors", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, UseTLS: true})
