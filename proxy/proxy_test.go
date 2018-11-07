@@ -613,7 +613,7 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
-	FDescribe("HTTP Rewrite", func() {
+	Describe("HTTP Rewrite", func() {
 		mockedHandler := func(host string, headers []string) net.Listener {
 			return test_util.RegisterHandler(r, host, func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)

@@ -16,7 +16,7 @@ var _ = Describe("InjectHeaderRewriter", func() {
 		headerToInject.Add("foo", "bar1")
 		headerToInject.Add("foo", "bar2")
 
-		rewriter := utils.InjectHeaderRewriter{headerToInject}
+		rewriter := utils.InjectHeaderRewriter{Header: headerToInject}
 
 		rewriter.RewriteHeader(header)
 
@@ -32,7 +32,7 @@ var _ = Describe("InjectHeaderRewriter", func() {
 		headerToInject.Add("foo", "bar1")
 		headerToInject.Add("foo", "bar2")
 
-		rewriter := utils.InjectHeaderRewriter{headerToInject}
+		rewriter := utils.InjectHeaderRewriter{Header: headerToInject}
 
 		rewriter.RewriteHeader(header)
 

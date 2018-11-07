@@ -113,12 +113,12 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type HeaderNameValue struct {
-	Name  string `yaml: "name"`
-	Value string `yaml: "value,omitempty"`
+	Name  string `yaml:"name"`
+	Value string `yaml:"value,omitempty"`
 }
 
 type HTTPRewrite struct {
-	InjectResponseHeaders []HeaderNameValue `inject_response_headers,omitempty`
+	InjectResponseHeaders []HeaderNameValue `yaml:"inject_response_headers,omitempty"`
 }
 
 type Config struct {
