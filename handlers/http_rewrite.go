@@ -10,7 +10,7 @@ import (
 )
 
 type httpRewriteHandler struct {
-	responseHeaderRewriter utils.HeaderRewriter
+	responseHeaderRewriters []utils.HeaderRewriter
 }
 
 func headerNameValuesToHTTPHeader(headerNameValues []config.HeaderNameValue) http.Header {
@@ -25,13 +25,21 @@ func NewHTTPRewriteHandler(cfg config.HTTPRewrite) negroni.Handler {
 	addHeadersIfNotPresent := headerNameValuesToHTTPHeader(
 		cfg.Responses.AddHeadersIfNotPresent,
 	)
+	removeHeaders := headerNameValuesToHTTPHeader(
+		cfg.Responses.RemoveHeaders,
+	)
 	return &httpRewriteHandler{
-		responseHeaderRewriter: &utils.AddHeaderIfNotPresentRewriter{Header: addHeadersIfNotPresent},
+		responseHeaderRewriters: []utils.HeaderRewriter{
+			&utils.RemoveHeaderRewriter{Header: removeHeaders},
+			&utils.AddHeaderIfNotPresentRewriter{Header: addHeadersIfNotPresent},
+		},
 	}
 }
 
 func (p *httpRewriteHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	proxyWriter := rw.(utils.ProxyResponseWriter)
-	proxyWriter.AddHeaderRewriter(p.responseHeaderRewriter)
+	for _, rewriter := range p.responseHeaderRewriters {
+		proxyWriter.AddHeaderRewriter(rewriter)
+	}
 	next(rw, r)
 }

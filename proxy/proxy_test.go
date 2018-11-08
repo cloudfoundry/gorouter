@@ -689,6 +689,44 @@ var _ = Describe("Proxy", func() {
 				Expect(header.Get("X-Foo")).To(Equal("bar"))
 			})
 		})
+
+		Context("when remove response header is set", func() {
+			BeforeEach(func() {
+				conf.HTTPRewrite = config.HTTPRewrite{
+					Responses: config.HTTPRewriteResponses{
+						RemoveHeaders: []config.HeaderNameValue{
+							{Name: "X-Vcap-Request-Id"},
+							{Name: "X-Foo"},
+						},
+					},
+				}
+			})
+
+			It("adds a rewrite handler if configured", func() {
+				ln := mockedHandler("hsts-test", []string{})
+				defer ln.Close()
+
+				process("hsts-test")
+				Expect(testLogger).To(gbytes.Say("http-rewrite"))
+			})
+
+			It("can remove headers set by gorouter like X-Vcap-Request-Id", func() {
+				ln := mockedHandler("hsts-test", []string{})
+				defer ln.Close()
+
+				header := process("hsts-test").Header
+				Expect(header.Get(handlers.VcapRequestIdHeader)).To(BeEmpty())
+			})
+
+			It("removes the headers that match and only those", func() {
+				ln := mockedHandler("hsts-test", []string{"X-Foo: foo", "X-Bar: bar"})
+				defer ln.Close()
+
+				header := process("hsts-test").Header
+				Expect(header).ToNot(HaveKey("foo"))
+				Expect(header.Get("X-Bar")).To(Equal("bar"))
+			})
+		})
 	})
 
 	Describe("Backend Connection Handling", func() {

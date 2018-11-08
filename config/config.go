@@ -123,6 +123,7 @@ type HTTPRewrite struct {
 
 type HTTPRewriteResponses struct {
 	AddHeadersIfNotPresent []HeaderNameValue `yaml:"add_headers_if_not_present,omitempty"`
+	RemoveHeaders          []HeaderNameValue `yaml:"remove_headers,omitempty"`
 }
 
 type Config struct {

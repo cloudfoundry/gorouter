@@ -20,3 +20,14 @@ func (i *AddHeaderIfNotPresentRewriter) RewriteHeader(header http.Header) {
 		}
 	}
 }
+
+// RemoveHeaderRewriter: Removes any value associated to a header
+type RemoveHeaderRewriter struct {
+	Header http.Header
+}
+
+func (i *RemoveHeaderRewriter) RewriteHeader(header http.Header) {
+	for h, _ := range i.Header {
+		header.Del(h)
+	}
+}

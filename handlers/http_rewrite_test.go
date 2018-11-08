@@ -80,4 +80,49 @@ var _ = Describe("HTTPRewrite Handler", func() {
 			Expect(res.Header()["X-Bar"]).To(ConsistOf("bar1", "bar2"))
 		})
 	})
+
+	Describe("with Responses.RemoveHeaders", func() {
+		It("does not remove headers that have same name", func() {
+			cfg := config.HTTPRewrite{
+				Responses: config.HTTPRewriteResponses{
+					RemoveHeaders: []config.HeaderNameValue{
+						{Name: "X-Bar"},
+					},
+				},
+			}
+			res := process(cfg)
+			Expect(res.Header()).To(HaveKey("X-Foo"))
+			Expect(res.Header()["X-Foo"]).To(ConsistOf("foo"))
+		})
+
+		It("removes headers that have same name", func() {
+			cfg := config.HTTPRewrite{
+				Responses: config.HTTPRewriteResponses{
+					RemoveHeaders: []config.HeaderNameValue{
+						{Name: "X-Foo"},
+					},
+				},
+			}
+			res := process(cfg)
+			Expect(res.Header()).ToNot(HaveKey("X-Foo"))
+		})
+	})
+
+	Describe("with Responses.RemoveHeaders and Responses.InjectHeadersIfNotPresent", func() {
+		It("removes and adds the header", func() {
+			cfg := config.HTTPRewrite{
+				Responses: config.HTTPRewriteResponses{
+					RemoveHeaders: []config.HeaderNameValue{
+						{Name: "X-Foo"},
+					},
+					AddHeadersIfNotPresent: []config.HeaderNameValue{
+						{Name: "X-Foo", Value: "bar"},
+					},
+				},
+			}
+			res := process(cfg)
+			Expect(res.Header()).To(HaveKey("X-Foo"))
+			Expect(res.Header()["X-Foo"]).To(ConsistOf("bar"))
+		})
+	})
 })
