@@ -8,7 +8,9 @@ type HeaderRewriter interface {
 	RewriteHeader(http.Header)
 }
 
-// AddHeaderIfNotPresentRewriter: Adds headers only if they are not present in the current http.Header
+// AddHeaderIfNotPresentRewriter: Adds headers only if they are not present
+// in the current http.Header.
+// The http.Header must be built using the method Add() to canonalize the keys
 type AddHeaderIfNotPresentRewriter struct {
 	Header http.Header
 }
@@ -22,6 +24,7 @@ func (i *AddHeaderIfNotPresentRewriter) RewriteHeader(header http.Header) {
 }
 
 // RemoveHeaderRewriter: Removes any value associated to a header
+// The http.Header must be built using the method Add() to canonalize the keys
 type RemoveHeaderRewriter struct {
 	Header http.Header
 }

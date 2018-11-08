@@ -79,6 +79,21 @@ var _ = Describe("HTTPRewrite Handler", func() {
 			Expect(res.Header()["X-Foo"]).To(ConsistOf("foo"))
 			Expect(res.Header()["X-Bar"]).To(ConsistOf("bar1", "bar2"))
 		})
+
+		It("canonicalizes the header names to be case-insentive", func() {
+			cfg := config.HTTPRewrite{
+				Responses: config.HTTPRewriteResponses{
+					AddHeadersIfNotPresent: []config.HeaderNameValue{
+						{Name: "x-FoO", Value: "bar"},
+						{Name: "x-BaR", Value: "bar1"},
+						{Name: "X-bAr", Value: "bar2"},
+					},
+				},
+			}
+			res := process(cfg)
+			Expect(res.Header()["X-Foo"]).To(ConsistOf("foo"))
+			Expect(res.Header()["X-Bar"]).To(ConsistOf("bar1", "bar2"))
+		})
 	})
 
 	Describe("with Responses.RemoveHeaders", func() {
@@ -100,6 +115,18 @@ var _ = Describe("HTTPRewrite Handler", func() {
 				Responses: config.HTTPRewriteResponses{
 					RemoveHeaders: []config.HeaderNameValue{
 						{Name: "X-Foo"},
+					},
+				},
+			}
+			res := process(cfg)
+			Expect(res.Header()).ToNot(HaveKey("X-Foo"))
+		})
+
+		It("canonicalizes the header names to be case-insentive", func() {
+			cfg := config.HTTPRewrite{
+				Responses: config.HTTPRewriteResponses{
+					RemoveHeaders: []config.HeaderNameValue{
+						{Name: "x-FoO"},
 					},
 				},
 			}
