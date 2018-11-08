@@ -646,11 +646,13 @@ var _ = Describe("Proxy", func() {
 			Expect(testLogger).NotTo(gbytes.Say("http-rewrite"))
 		})
 
-		Context("when inject response header is set", func() {
+		Context("when add response header is set", func() {
 			BeforeEach(func() {
 				conf.HTTPRewrite = config.HTTPRewrite{
-					InjectResponseHeaders: []config.HeaderNameValue{
-						{Name: "X-Foo", Value: "bar"},
+					Responses: config.HTTPRewriteResponses{
+						AddHeadersIfNotPresent: []config.HeaderNameValue{
+							{Name: "X-Foo", Value: "bar"},
+						},
 					},
 				}
 			})

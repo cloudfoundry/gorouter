@@ -40,21 +40,25 @@ var _ = Describe("HTTPRewrite Handler", func() {
 		Expect(res.Body.Bytes()).To(Equal([]byte("I'm a little teapot, short and stout.")))
 	})
 
-	Describe("with AddResponseHeaders", func() {
+	Describe("with Responses.InjectHeadersIfNotPresent", func() {
 		It("does not change the header if already present in response", func() {
 			cfg := config.HTTPRewrite{
-				InjectResponseHeaders: []config.HeaderNameValue{
-					{Name: "X-Foo", Value: "bar"},
+				Responses: config.HTTPRewriteResponses{
+					AddHeadersIfNotPresent: []config.HeaderNameValue{
+						{Name: "X-Foo", Value: "bar"},
+					},
 				},
 			}
 			res := process(cfg)
 			Expect(res.Header()["X-Foo"]).To(ConsistOf("foo"))
 		})
 
-		It("injects a header if it is not present and keeps existing ones", func() {
+		It("adds a header if it is not present and keeps existing ones", func() {
 			cfg := config.HTTPRewrite{
-				InjectResponseHeaders: []config.HeaderNameValue{
-					{Name: "X-Bar", Value: "bar"},
+				Responses: config.HTTPRewriteResponses{
+					AddHeadersIfNotPresent: []config.HeaderNameValue{
+						{Name: "X-Bar", Value: "bar"},
+					},
 				},
 			}
 			res := process(cfg)
@@ -62,11 +66,13 @@ var _ = Describe("HTTPRewrite Handler", func() {
 			Expect(res.Header()["X-Bar"]).To(ConsistOf("bar"))
 		})
 
-		It("injects multiple values for same header", func() {
+		It("adds multiple values for same header", func() {
 			cfg := config.HTTPRewrite{
-				InjectResponseHeaders: []config.HeaderNameValue{
-					{Name: "X-Bar", Value: "bar1"},
-					{Name: "X-Bar", Value: "bar2"},
+				Responses: config.HTTPRewriteResponses{
+					AddHeadersIfNotPresent: []config.HeaderNameValue{
+						{Name: "X-Bar", Value: "bar1"},
+						{Name: "X-Bar", Value: "bar2"},
+					},
 				},
 			}
 			res := process(cfg)

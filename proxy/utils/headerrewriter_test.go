@@ -8,15 +8,15 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("InjectHeaderRewriter", func() {
-	It("injects headers if missing in the original Header", func() {
+var _ = Describe("AddHeaderIfNotPresentRewriter", func() {
+	It("adds headers if missing in the original Header", func() {
 		header := http.Header{}
 
-		headerToInject := http.Header{}
-		headerToInject.Add("foo", "bar1")
-		headerToInject.Add("foo", "bar2")
+		headerToAdd := http.Header{}
+		headerToAdd.Add("foo", "bar1")
+		headerToAdd.Add("foo", "bar2")
 
-		rewriter := utils.InjectHeaderRewriter{Header: headerToInject}
+		rewriter := utils.AddHeaderIfNotPresentRewriter{Header: headerToAdd}
 
 		rewriter.RewriteHeader(header)
 
@@ -24,15 +24,15 @@ var _ = Describe("InjectHeaderRewriter", func() {
 		Expect(header["Foo"]).To(ConsistOf("bar1", "bar2"))
 	})
 
-	It("does not inject headers if present in the original Header", func() {
+	It("does not add headers if present in the original Header", func() {
 		header := http.Header{}
 		header.Add("foo", "original")
 
-		headerToInject := http.Header{}
-		headerToInject.Add("foo", "bar1")
-		headerToInject.Add("foo", "bar2")
+		headerToAdd := http.Header{}
+		headerToAdd.Add("foo", "bar1")
+		headerToAdd.Add("foo", "bar2")
 
-		rewriter := utils.InjectHeaderRewriter{Header: headerToInject}
+		rewriter := utils.AddHeaderIfNotPresentRewriter{Header: headerToAdd}
 
 		rewriter.RewriteHeader(header)
 

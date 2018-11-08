@@ -118,7 +118,11 @@ type HeaderNameValue struct {
 }
 
 type HTTPRewrite struct {
-	InjectResponseHeaders []HeaderNameValue `yaml:"inject_response_headers,omitempty"`
+	Responses HTTPRewriteResponses `yaml:"responses,omitempty"`
+}
+
+type HTTPRewriteResponses struct {
+	AddHeadersIfNotPresent []HeaderNameValue `yaml:"add_headers_if_not_present,omitempty"`
 }
 
 type Config struct {
