@@ -58,7 +58,6 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 
 func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request) {
 	l.reporter.CaptureBadRequest()
-	l.logger.Info("unknown-route")
 
 	rw.Header().Set("X-Cf-RouterError", "unknown_route")
 
