@@ -32,16 +32,16 @@ func (r *LeastConnection) Next() *Endpoint {
 	}
 
 	if e != nil {
-		e.endpoint.Lock()
-		defer e.endpoint.Unlock()
+		e.endpoint.RLock()
+		defer e.endpoint.RUnlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}
 
 	e = r.next()
 	if e != nil {
-		e.endpoint.Lock()
-		defer e.endpoint.Unlock()
+		e.endpoint.RLock()
+		defer e.endpoint.RUnlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}

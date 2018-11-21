@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,11 +52,6 @@ func NewStats() *Stats {
 	}
 }
 
-type ProxyRoundTripper interface {
-	http.RoundTripper
-	CancelRequest(*http.Request)
-}
-
 type Endpoint struct {
 	sync.RWMutex
 	ApplicationId        string
@@ -72,7 +66,6 @@ type Endpoint struct {
 	Stats                *Stats
 	IsolationSegment     string
 	useTls               bool
-	RoundTripper         ProxyRoundTripper
 	UpdatedAt            time.Time
 }
 
@@ -208,10 +201,6 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 			if oldEndpoint.PrivateInstanceId != endpoint.PrivateInstanceId {
 				delete(p.index, oldEndpoint.PrivateInstanceId)
 				p.index[endpoint.PrivateInstanceId] = e
-			}
-
-			if oldEndpoint.ServerCertDomainSAN == endpoint.ServerCertDomainSAN {
-				endpoint.RoundTripper = oldEndpoint.RoundTripper
 			}
 		}
 	} else {

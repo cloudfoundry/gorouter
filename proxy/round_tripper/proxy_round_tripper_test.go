@@ -543,16 +543,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			Context("transport re-use", func() {
-				It("re-uses transports for the same endpoint", func() {
-					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(1))
-
-					_, err = proxyRoundTripper.RoundTrip(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(1))
-				})
-
 				It("does not re-use transports between endpoints", func() {
 					endpoint = route.NewEndpoint(&route.EndpointOpts{
 						Host: "1.1.1.1", Port: 9091, UseTLS: true, PrivateInstanceId: "instanceId-2",
@@ -570,7 +560,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(2))
+					Expect(roundTripperFactory.Calls).To(Equal(3))
+
+					_, err = proxyRoundTripper.RoundTrip(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(roundTripperFactory.Calls).To(Equal(4))
 				})
 			})
 
@@ -903,15 +897,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 				})
-			})
-		})
-
-		Context("CancelRequest", func() {
-			It("can cancel requests", func() {
-				reqInfo.RouteEndpoint = endpoint
-				proxyRoundTripper.CancelRequest(req)
-				Expect(transport.CancelRequestCallCount()).To(Equal(1))
-				Expect(transport.CancelRequestArgsForCall(0)).To(Equal(req))
 			})
 		})
 	})
