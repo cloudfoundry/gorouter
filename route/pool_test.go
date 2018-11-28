@@ -2,6 +2,7 @@ package route_test
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"crypto/tls"
@@ -195,6 +196,36 @@ var _ = Describe("Pool", func() {
 					Expect(pool.Endpoints("", "").Next().ModificationTag).To(Equal(modTag2))
 				})
 			})
+		})
+
+		Context("RoundTrippers", func() {
+			var (
+				roundTripper *http.Transport
+			)
+			BeforeEach(func() {
+				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+				pool.Put(endpoint)
+				roundTripper = &http.Transport{TLSClientConfig: &tls.Config{ServerName: "server-cert-domain-san-1"}}
+				pool.Each(func(e *route.Endpoint) {
+					e.RoundTripper = roundTripper
+				})
+			})
+			It("preserves roundTrippers on duplicate endpoints", func() {
+				sameEndpointRegisteredTwice := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+				pool.Put(sameEndpointRegisteredTwice)
+				pool.Each(func(e *route.Endpoint) {
+					Expect(e.RoundTripper).To(Equal(roundTripper))
+				})
+			})
+
+			It("clears roundTrippers if the server cert domain SAN changes", func() {
+				endpointWithSameAddressButDifferentId := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ServerCertDomainSAN: "some-new-san"})
+				pool.Put(endpointWithSameAddressButDifferentId)
+				pool.Each(func(e *route.Endpoint) {
+					Expect(e.RoundTripper).To(BeNil())
+				})
+			})
+
 		})
 	})
 

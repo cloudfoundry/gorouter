@@ -34,10 +34,22 @@ const (
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
 type ProxyRoundTripper interface {
 	http.RoundTripper
+	CancelRequest(*http.Request)
 }
 
 type RoundTripperFactory interface {
 	New(expectedServerName string) ProxyRoundTripper
+}
+
+func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
+	e.Lock()
+	if e.RoundTripper == nil {
+
+		e.RoundTripper = roundTripperFactory.New(e.ServerCertDomainSAN)
+	}
+	e.Unlock()
+
+	return e.RoundTripper
 }
 
 //go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler
@@ -156,8 +168,8 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			request.URL = new(url.URL)
 			*request.URL = *reqInfo.RouteServiceURL
 
-			tr := rt.roundTripperFactory.New(endpoint.ServerCertDomainSAN)
-
+			var tr http.RoundTripper
+			tr = GetRoundTripper(endpoint, rt.roundTripperFactory)
 			if reqInfo.IsInternalRouteService {
 				// note: this *looks* like it breaks TLS to internal route service backends,
 				// but in fact it is right!  this hairpins back on the gorouter, and the subsequent
@@ -208,6 +220,16 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	return res, nil
 }
 
+func (rt *roundTripper) CancelRequest(request *http.Request) {
+	endpoint, err := handlers.GetEndpoint(request.Context())
+	if err != nil {
+		return
+	}
+
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
+	tr.CancelRequest(request)
+}
+
 func (rt *roundTripper) backendRoundTrip(
 	request *http.Request,
 	endpoint *route.Endpoint,
@@ -222,7 +244,7 @@ func (rt *roundTripper) backendRoundTrip(
 	iter.PreRequest(endpoint)
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
-	tr := rt.roundTripperFactory.New(endpoint.ServerCertDomainSAN)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
 	res, err := rt.timedRoundTrip(tr, request)
 
 	// decrement connection stats
