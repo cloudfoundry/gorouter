@@ -12,7 +12,9 @@ import (
 func writeStatus(rw http.ResponseWriter, code int, message string, logger logger.Logger) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
-	logger.Info("status", zap.String("body", body))
+	if code != 404 {
+		logger.Info("status", zap.String("body", body))
+	}
 
 	http.Error(rw, body, code)
 	if code > 299 {
