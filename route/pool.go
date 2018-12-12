@@ -59,7 +59,6 @@ type ProxyRoundTripper interface {
 }
 
 type Endpoint struct {
-	sync.RWMutex
 	ApplicationId        string
 	addr                 string
 	Tags                 map[string]string
@@ -74,6 +73,7 @@ type Endpoint struct {
 	useTls               bool
 	RoundTripper         ProxyRoundTripper
 	UpdatedAt            time.Time
+	RoundTripperInit     sync.Once
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -85,6 +85,7 @@ type EndpointIterator interface {
 }
 
 type endpointElem struct {
+	sync.Mutex
 	endpoint           *Endpoint
 	index              int
 	updated            time.Time
@@ -195,8 +196,8 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 	if found {
 		result = UPDATED
 		if e.endpoint != endpoint {
-			e.endpoint.Lock()
-			defer e.endpoint.Unlock()
+			e.Lock()
+			defer e.Unlock()
 
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
 				return UNMODIFIED

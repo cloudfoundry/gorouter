@@ -3,6 +3,7 @@ package route_test
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -137,6 +138,41 @@ var _ = Describe("RoundRobin", func() {
 
 			iter = route.NewRoundRobin(pool, "bar")
 			Expect(foundEndpoint).To(Equal(endpointBar))
+		})
+
+		It("is safe for concurrent use", func() {
+			var wg sync.WaitGroup
+
+			// these numbers need to be high in order to drive out the race condition
+			const numReaders = 100
+			const numEndpoints = 100
+			const numGoroutines = 5
+
+			iterateLoop := func(pool *route.Pool) {
+				defer GinkgoRecover()
+				for j := 0; j < numReaders; j++ {
+					iter := route.NewRoundRobin(pool, "")
+					Expect(iter.Next()).NotTo(BeNil())
+				}
+				wg.Done()
+			}
+
+			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+			pool.Put(e1)
+
+			for i := 0; i < numGoroutines; i++ {
+				wg.Add(1)
+				go func() {
+					iterateLoop(pool)
+				}()
+			}
+
+			for i := 0; i < numEndpoints; i++ {
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+				pool.Put(e1)
+			}
+
+			wg.Wait()
 		})
 
 		Context("when some endpoints are overloaded", func() {

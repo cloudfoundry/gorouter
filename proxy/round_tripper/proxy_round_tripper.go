@@ -42,12 +42,9 @@ type RoundTripperFactory interface {
 }
 
 func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
-	e.Lock()
-	if e.RoundTripper == nil {
-
+	e.RoundTripperInit.Do(func() {
 		e.RoundTripper = roundTripperFactory.New(e.ServerCertDomainSAN)
-	}
-	e.Unlock()
+	})
 
 	return e.RoundTripper
 }
