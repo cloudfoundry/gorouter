@@ -346,7 +346,7 @@ func (p *Pool) IsOverloaded() bool {
 
 	if p.maxConnsPerBackend > 0 {
 		for _, e := range p.endpoints {
-			if e.endpoint.Stats.NumberConnections.value < p.maxConnsPerBackend {
+			if e.endpoint.Stats.NumberConnections.Count() < p.maxConnsPerBackend {
 				return false
 			}
 		}
@@ -417,7 +417,7 @@ func (e *endpointElem) isOverloaded() bool {
 		return false
 	}
 
-	return e.endpoint.Stats.NumberConnections.value >= e.maxConnsPerBackend
+	return e.endpoint.Stats.NumberConnections.Count() >= e.maxConnsPerBackend
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
