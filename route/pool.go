@@ -85,7 +85,7 @@ type EndpointIterator interface {
 }
 
 type endpointElem struct {
-	sync.Mutex
+	sync.RWMutex
 	endpoint           *Endpoint
 	index              int
 	updated            time.Time

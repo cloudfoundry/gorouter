@@ -30,16 +30,16 @@ func (r *RoundRobin) Next() *Endpoint {
 	}
 
 	if e != nil {
-		e.Lock()
-		defer e.Unlock()
+		e.RLock()
+		defer e.RUnlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}
 
 	e = r.next()
 	if e != nil {
-		e.Lock()
-		defer e.Unlock()
+		e.RLock()
+		defer e.RUnlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}
