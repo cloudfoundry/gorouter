@@ -94,7 +94,7 @@ type endpointElem struct {
 }
 
 type Pool struct {
-	lock      sync.Mutex
+	sync.Mutex
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
 
@@ -188,8 +188,8 @@ func (p *Pool) MaxConnsPerBackend() int64 {
 
 // Returns true if endpoint was added or updated, false otherwise
 func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
 	var result PoolPutResult
 	e, found := p.index[endpoint.CanonicalAddr()]
@@ -235,8 +235,8 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 }
 
 func (p *Pool) RouteServiceUrl() string {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
 	if len(p.endpoints) > 0 {
 		endpt := p.endpoints[0]
@@ -247,7 +247,7 @@ func (p *Pool) RouteServiceUrl() string {
 }
 
 func (p *Pool) PruneEndpoints() []*Endpoint {
-	p.lock.Lock()
+	p.Lock()
 
 	last := len(p.endpoints)
 	now := time.Now()
@@ -273,7 +273,7 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 		}
 	}
 
-	p.lock.Unlock()
+	p.Unlock()
 	return prunedEndpoints
 }
 
@@ -281,8 +281,8 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 func (p *Pool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 	l := len(p.endpoints)
 	if l > 0 {
 		e = p.index[endpoint.CanonicalAddr()]
@@ -320,15 +320,15 @@ func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 }
 
 func (p *Pool) findById(id string) *endpointElem {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 	return p.index[id]
 }
 
 func (p *Pool) IsEmpty() bool {
-	p.lock.Lock()
+	p.Lock()
 	l := len(p.endpoints)
-	p.lock.Unlock()
+	p.Unlock()
 
 	return l == 0
 }
@@ -338,8 +338,8 @@ func (p *Pool) IsOverloaded() bool {
 		return true
 	}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 	if p.maxConnsPerBackend == 0 {
 		return false
 	}
@@ -356,16 +356,16 @@ func (p *Pool) IsOverloaded() bool {
 }
 
 func (p *Pool) MarkUpdated(t time.Time) {
-	p.lock.Lock()
+	p.Lock()
 	for _, e := range p.endpoints {
 		e.updated = t
 	}
-	p.lock.Unlock()
+	p.Unlock()
 }
 
 func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.Lock()
+	defer p.Unlock()
 	e := p.index[endpoint.CanonicalAddr()]
 	if e == nil {
 		return
@@ -389,20 +389,20 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 }
 
 func (p *Pool) Each(f func(endpoint *Endpoint)) {
-	p.lock.Lock()
+	p.Lock()
 	for _, e := range p.endpoints {
 		f(e.endpoint)
 	}
-	p.lock.Unlock()
+	p.Unlock()
 }
 
 func (p *Pool) MarshalJSON() ([]byte, error) {
-	p.lock.Lock()
+	p.Lock()
 	endpoints := make([]*Endpoint, 0, len(p.endpoints))
 	for _, e := range p.endpoints {
 		endpoints = append(endpoints, e.endpoint)
 	}
-	p.lock.Unlock()
+	p.Unlock()
 
 	return json.Marshal(endpoints)
 }

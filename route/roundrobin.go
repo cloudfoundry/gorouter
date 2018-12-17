@@ -51,8 +51,8 @@ func (r *RoundRobin) Next() *Endpoint {
 var max int
 
 func (r *RoundRobin) next() *endpointElem {
-	r.pool.lock.Lock()
-	defer r.pool.lock.Unlock()
+	r.pool.Lock()
+	defer r.pool.Unlock()
 
 	last := len(r.pool.endpoints)
 	if last == 0 {
