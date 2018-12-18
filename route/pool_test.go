@@ -207,14 +207,14 @@ var _ = Describe("Pool", func() {
 				pool.Put(endpoint)
 				roundTripper = &http.Transport{TLSClientConfig: &tls.Config{ServerName: "server-cert-domain-san-1"}}
 				pool.Each(func(e *route.Endpoint) {
-					e.RoundTripper = roundTripper
+					e.SetRoundTripper(roundTripper)
 				})
 			})
 			It("preserves roundTrippers on duplicate endpoints", func() {
 				sameEndpointRegisteredTwice := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 				pool.Put(sameEndpointRegisteredTwice)
 				pool.Each(func(e *route.Endpoint) {
-					Expect(e.RoundTripper).To(Equal(roundTripper))
+					Expect(e.RoundTripper()).To(Equal(roundTripper))
 				})
 			})
 
@@ -222,7 +222,7 @@ var _ = Describe("Pool", func() {
 				endpointWithSameAddressButDifferentId := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ServerCertDomainSAN: "some-new-san"})
 				pool.Put(endpointWithSameAddressButDifferentId)
 				pool.Each(func(e *route.Endpoint) {
-					Expect(e.RoundTripper).To(BeNil())
+					Expect(e.RoundTripper()).To(BeNil())
 				})
 			})
 
