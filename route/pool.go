@@ -71,9 +71,24 @@ type Endpoint struct {
 	Stats                *Stats
 	IsolationSegment     string
 	useTls               bool
-	RoundTripper         ProxyRoundTripper
+	roundTripper         ProxyRoundTripper
+	roundTripperMutex    sync.RWMutex
 	UpdatedAt            time.Time
 	RoundTripperInit     sync.Once
+}
+
+func (e *Endpoint) RoundTripper() ProxyRoundTripper {
+	e.roundTripperMutex.RLock()
+	defer e.roundTripperMutex.RUnlock()
+
+	return e.roundTripper
+}
+
+func (e *Endpoint) SetRoundTripper(tripper ProxyRoundTripper) {
+	e.roundTripperMutex.Lock()
+	defer e.roundTripperMutex.Unlock()
+
+	e.roundTripper = tripper
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -212,7 +227,7 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 			}
 
 			if oldEndpoint.ServerCertDomainSAN == endpoint.ServerCertDomainSAN {
-				endpoint.RoundTripper = oldEndpoint.RoundTripper
+				endpoint.SetRoundTripper(oldEndpoint.RoundTripper())
 			}
 		}
 	} else {
