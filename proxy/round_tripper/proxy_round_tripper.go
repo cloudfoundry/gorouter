@@ -42,11 +42,14 @@ type RoundTripperFactory interface {
 }
 
 func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
-	e.RoundTripperInit.Do(func() {
-		e.SetRoundTripper(roundTripperFactory.New(e.ServerCertDomainSAN))
-	})
+	e.Lock()
+	if e.RoundTripper == nil {
 
-	return e.RoundTripper()
+		e.RoundTripper = roundTripperFactory.New(e.ServerCertDomainSAN)
+	}
+	e.Unlock()
+
+	return e.RoundTripper
 }
 
 //go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler

@@ -59,6 +59,7 @@ type ProxyRoundTripper interface {
 }
 
 type Endpoint struct {
+	sync.RWMutex
 	ApplicationId        string
 	addr                 string
 	Tags                 map[string]string
@@ -71,24 +72,8 @@ type Endpoint struct {
 	Stats                *Stats
 	IsolationSegment     string
 	useTls               bool
-	roundTripper         ProxyRoundTripper
-	roundTripperMutex    sync.RWMutex
+	RoundTripper         ProxyRoundTripper
 	UpdatedAt            time.Time
-	RoundTripperInit     sync.Once
-}
-
-func (e *Endpoint) RoundTripper() ProxyRoundTripper {
-	e.roundTripperMutex.RLock()
-	defer e.roundTripperMutex.RUnlock()
-
-	return e.roundTripper
-}
-
-func (e *Endpoint) SetRoundTripper(tripper ProxyRoundTripper) {
-	e.roundTripperMutex.Lock()
-	defer e.roundTripperMutex.Unlock()
-
-	e.roundTripper = tripper
 }
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
@@ -100,7 +85,6 @@ type EndpointIterator interface {
 }
 
 type endpointElem struct {
-	sync.RWMutex
 	endpoint           *Endpoint
 	index              int
 	updated            time.Time
@@ -109,7 +93,7 @@ type endpointElem struct {
 }
 
 type Pool struct {
-	sync.Mutex
+	lock      sync.Mutex
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
 
@@ -203,16 +187,16 @@ func (p *Pool) MaxConnsPerBackend() int64 {
 
 // Returns true if endpoint was added or updated, false otherwise
 func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	var result PoolPutResult
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
 		result = UPDATED
 		if e.endpoint != endpoint {
-			e.Lock()
-			defer e.Unlock()
+			e.endpoint.Lock()
+			defer e.endpoint.Unlock()
 
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
 				return UNMODIFIED
@@ -227,7 +211,7 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 			}
 
 			if oldEndpoint.ServerCertDomainSAN == endpoint.ServerCertDomainSAN {
-				endpoint.SetRoundTripper(oldEndpoint.RoundTripper())
+				endpoint.RoundTripper = oldEndpoint.RoundTripper
 			}
 		}
 	} else {
@@ -250,8 +234,8 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 }
 
 func (p *Pool) RouteServiceUrl() string {
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	if len(p.endpoints) > 0 {
 		endpt := p.endpoints[0]
@@ -262,7 +246,7 @@ func (p *Pool) RouteServiceUrl() string {
 }
 
 func (p *Pool) PruneEndpoints() []*Endpoint {
-	p.Lock()
+	p.lock.Lock()
 
 	last := len(p.endpoints)
 	now := time.Now()
@@ -288,7 +272,7 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 		}
 	}
 
-	p.Unlock()
+	p.lock.Unlock()
 	return prunedEndpoints
 }
 
@@ -296,8 +280,8 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 func (p *Pool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	l := len(p.endpoints)
 	if l > 0 {
 		e = p.index[endpoint.CanonicalAddr()]
@@ -335,15 +319,15 @@ func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 }
 
 func (p *Pool) findById(id string) *endpointElem {
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	return p.index[id]
 }
 
 func (p *Pool) IsEmpty() bool {
-	p.Lock()
+	p.lock.Lock()
 	l := len(p.endpoints)
-	p.Unlock()
+	p.lock.Unlock()
 
 	return l == 0
 }
@@ -353,15 +337,15 @@ func (p *Pool) IsOverloaded() bool {
 		return true
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	if p.maxConnsPerBackend == 0 {
 		return false
 	}
 
 	if p.maxConnsPerBackend > 0 {
 		for _, e := range p.endpoints {
-			if e.endpoint.Stats.NumberConnections.Count() < p.maxConnsPerBackend {
+			if e.endpoint.Stats.NumberConnections.value < p.maxConnsPerBackend {
 				return false
 			}
 		}
@@ -371,16 +355,16 @@ func (p *Pool) IsOverloaded() bool {
 }
 
 func (p *Pool) MarkUpdated(t time.Time) {
-	p.Lock()
+	p.lock.Lock()
 	for _, e := range p.endpoints {
 		e.updated = t
 	}
-	p.Unlock()
+	p.lock.Unlock()
 }
 
 func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	e := p.index[endpoint.CanonicalAddr()]
 	if e == nil {
 		return
@@ -404,20 +388,20 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 }
 
 func (p *Pool) Each(f func(endpoint *Endpoint)) {
-	p.Lock()
+	p.lock.Lock()
 	for _, e := range p.endpoints {
 		f(e.endpoint)
 	}
-	p.Unlock()
+	p.lock.Unlock()
 }
 
 func (p *Pool) MarshalJSON() ([]byte, error) {
-	p.Lock()
+	p.lock.Lock()
 	endpoints := make([]*Endpoint, 0, len(p.endpoints))
 	for _, e := range p.endpoints {
 		endpoints = append(endpoints, e.endpoint)
 	}
-	p.Unlock()
+	p.lock.Unlock()
 
 	return json.Marshal(endpoints)
 }
@@ -432,7 +416,7 @@ func (e *endpointElem) isOverloaded() bool {
 		return false
 	}
 
-	return e.endpoint.Stats.NumberConnections.Count() >= e.maxConnsPerBackend
+	return e.endpoint.Stats.NumberConnections.value >= e.maxConnsPerBackend
 }
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {

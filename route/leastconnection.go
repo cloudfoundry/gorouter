@@ -32,16 +32,16 @@ func (r *LeastConnection) Next() *Endpoint {
 	}
 
 	if e != nil {
-		e.RLock()
-		defer e.RUnlock()
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}
 
 	e = r.next()
 	if e != nil {
-		e.RLock()
-		defer e.RUnlock()
+		e.endpoint.Lock()
+		defer e.endpoint.Unlock()
 		r.lastEndpoint = e.endpoint
 		return e.endpoint
 	}
@@ -59,8 +59,8 @@ func (r *LeastConnection) PostRequest(e *Endpoint) {
 }
 
 func (r *LeastConnection) next() *endpointElem {
-	r.pool.Lock()
-	defer r.pool.Unlock()
+	r.pool.lock.Lock()
+	defer r.pool.lock.Unlock()
 
 	var selected *endpointElem
 
