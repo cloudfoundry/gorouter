@@ -2,6 +2,7 @@ package integration
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,6 +35,9 @@ type testState struct {
 	trustedExternalServiceHostname string
 	trustedExternalServiceTLS      *tls.Config
 
+	trustedBackendServerCertSAN string
+	trustedBackendTLSConfig     *tls.Config
+
 	trustedClientTLSConfig *tls.Config
 
 	// these get set when gorouter is started
@@ -46,6 +50,8 @@ type testState struct {
 func NewTestState() *testState {
 	// TODO: don't hide so much behind these test_util methods
 	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
+	cfg.SkipSSLValidation = false
+	cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 	// TODO: why these magic numbers?
 	cfg.PruneStaleDropletsInterval = 2 * time.Second
@@ -67,10 +73,27 @@ func NewTestState() *testState {
 	Expect(err).ToNot(HaveOccurred())
 	cfg.CACerts = string(routeServiceCert)
 
-	clientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	clientTLSCert, err := tls.X509KeyPair(clientCertChain.CertPEM, clientCertChain.PrivKeyPEM)
-	Expect(err).NotTo(HaveOccurred())
-	cfg.CACerts = cfg.CACerts + string(clientCertChain.CACertPEM)
+	browserToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	cfg.CACerts = cfg.CACerts + string(browserToGoRouterClientCertChain.CACertPEM)
+
+	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
+	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN})
+	cfg.CACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
+
+	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
+	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
+	trustedBackendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+
+	// set Gorouter to use client certs
+	cfg.Backends.TLSPem = config.TLSPem{
+		CertChain:  string(gorouterToBackendsClientCertChain.CertPEM),
+		PrivateKey: string(gorouterToBackendsClientCertChain.PrivKeyPEM),
+	}
+
+	// make backend trust the CA that signed the gorouter's client cert
+	certPool := x509.NewCertPool()
+	certPool.AddCert(gorouterToBackendsClientCertChain.CACert)
+	trustedBackendTLSConfig.ClientCAs = certPool
 
 	uaaCACertsPath, err := filepath.Abs(filepath.Join("test", "assets", "certs", "uaa-ca.pem"))
 	Expect(err).ToNot(HaveOccurred())
@@ -93,9 +116,9 @@ func NewTestState() *testState {
 		trustedExternalServiceTLS: &tls.Config{
 			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
-		trustedClientTLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{clientTLSCert},
-		},
+		trustedClientTLSConfig:      browserToGoRouterClientCertChain.AsTLSConfig(),
+		trustedBackendTLSConfig:     trustedBackendTLSConfig,
+		trustedBackendServerCertSAN: trustedBackendServerCertSAN,
 	}
 }
 
