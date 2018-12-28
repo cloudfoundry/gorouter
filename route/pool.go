@@ -91,6 +91,15 @@ func (e *Endpoint) SetRoundTripper(tripper ProxyRoundTripper) {
 	e.roundTripper = tripper
 }
 
+func (e *Endpoint) SetRoundTripperIfNil(roundTripperCtor func() ProxyRoundTripper) {
+	e.roundTripperMutex.Lock()
+	defer e.roundTripperMutex.Unlock()
+
+	if e.roundTripper == nil {
+		e.roundTripper = roundTripperCtor()
+	}
+}
+
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
 	Next() *Endpoint

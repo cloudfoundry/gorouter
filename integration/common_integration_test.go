@@ -67,6 +67,8 @@ func NewTestState() *testState {
 
 	cfg.SuspendPruningIfNatsUnavailable = true
 
+	cfg.DisableKeepAlives = false
+
 	externalRouteServiceHostname := "external-route-service.localhost.routing.cf-app.com"
 	routeServiceKey, routeServiceCert := test_util.CreateKeyPair(externalRouteServiceHostname)
 	routeServiceTLSCert, err := tls.X509KeyPair(routeServiceCert, routeServiceKey)
@@ -134,14 +136,26 @@ func (s *testState) newRequest(url string) *http.Request {
 }
 
 func (s *testState) register(backend *httptest.Server, routeURI string) {
+	s.registerAsTLS(backend, routeURI, "")
+}
+
+func (s *testState) registerAsTLS(backend *httptest.Server, routeURI string, serverCertDomainSAN string) {
 	_, backendPort := hostnameAndPort(backend.Listener.Addr().String())
+	var openPort, tlsPort uint16
+	if serverCertDomainSAN != "" {
+		tlsPort = uint16(backendPort)
+	} else {
+		openPort = uint16(backendPort)
+	}
 	rm := mbus.RegistryMessage{
 		Host:                    "127.0.0.1",
-		Port:                    uint16(backendPort),
+		Port:                    openPort,
+		TLSPort:                 tlsPort,
 		Uris:                    []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
 		RouteServiceURL:         "",
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
+		ServerCertDomainSAN:     serverCertDomainSAN,
 	}
 	s.registerAndWait(rm)
 }
@@ -222,4 +236,13 @@ func (s *testState) StopAndCleanup() {
 	if s.gorouterSession != nil && s.gorouterSession.ExitCode() == -1 {
 		Eventually(s.gorouterSession.Terminate(), 5).Should(Exit(0))
 	}
+}
+
+func assertRequestSucceeds(client *http.Client, req *http.Request) {
+	resp, err := client.Do(req)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(resp.StatusCode).To(Equal(200))
+	_, err = ioutil.ReadAll(resp.Body)
+	Expect(err).NotTo(HaveOccurred())
+	resp.Body.Close()
 }
