@@ -85,10 +85,26 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		return
 	}
 
-	t := time.Now()
+	endpointAdded := r.register(uri, endpoint)
 
+	r.reporter.CaptureRegistryMessage(endpoint)
+
+	if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
+		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
+	}
+
+	if endpointAdded >= route.UPDATED {
+		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
+	} else {
+		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
+	}
+}
+
+func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
 	r.Lock()
 	defer r.Unlock()
+
+	t := time.Now()
 
 	routekey := uri.RouteKey()
 
@@ -114,19 +130,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	r.timeOfLastUpdate = t
 
-	go func() {
-		r.reporter.CaptureRegistryMessage(endpoint)
-
-		if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
-			r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
-		}
-
-		if endpointAdded >= route.UPDATED {
-			r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
-		} else {
-			r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
-		}
-	}()
+	return endpointAdded
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
@@ -134,6 +138,12 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		return
 	}
 
+	r.unregister(uri, endpoint)
+
+	r.reporter.CaptureUnregistryMessage(endpoint)
+}
+
+func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -152,13 +162,20 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 			r.byURI.Delete(uri)
 		}
 	}
-
-	go r.reporter.CaptureUnregistryMessage(endpoint)
 }
 
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	started := time.Now()
 
+	pool := r.lookup(uri)
+
+	endLookup := time.Now()
+	r.reporter.CaptureLookupTime(endLookup.Sub(started))
+
+	return pool
+}
+
+func (r *RouteRegistry) lookup(uri route.Uri) *route.Pool {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -169,10 +186,6 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 		uri, err = uri.NextWildcard()
 		pool = r.byURI.MatchUri(uri)
 	}
-
-	endLookup := time.Now()
-	go r.reporter.CaptureLookupTime(endLookup.Sub(started))
-
 	return pool
 }
 
