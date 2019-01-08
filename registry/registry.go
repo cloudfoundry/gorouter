@@ -88,6 +88,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	t := time.Now()
 
 	r.Lock()
+	defer r.Unlock()
 
 	routekey := uri.RouteKey()
 
@@ -112,19 +113,20 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	endpointAdded := pool.Put(endpoint)
 
 	r.timeOfLastUpdate = t
-	r.Unlock()
 
-	r.reporter.CaptureRegistryMessage(endpoint)
+	go func() {
+		r.reporter.CaptureRegistryMessage(endpoint)
 
-	if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
-		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
-	}
+		if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
+			r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
+		}
 
-	if endpointAdded >= route.UPDATED {
-		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
-	} else {
-		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
-	}
+		if endpointAdded >= route.UPDATED {
+			r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
+		} else {
+			r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
+		}
+	}()
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
@@ -133,6 +135,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	}
 
 	r.Lock()
+	defer r.Unlock()
 
 	uri = uri.RouteKey()
 
@@ -150,14 +153,14 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		}
 	}
 
-	r.Unlock()
-	r.reporter.CaptureUnregistryMessage(endpoint)
+	go r.reporter.CaptureUnregistryMessage(endpoint)
 }
 
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	started := time.Now()
 
 	r.RLock()
+	defer r.RUnlock()
 
 	uri = uri.RouteKey()
 	var err error
@@ -167,9 +170,8 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 		pool = r.byURI.MatchUri(uri)
 	}
 
-	r.RUnlock()
 	endLookup := time.Now()
-	r.reporter.CaptureLookupTime(endLookup.Sub(started))
+	go r.reporter.CaptureLookupTime(endLookup.Sub(started))
 
 	return pool
 }
@@ -221,8 +223,8 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 func (r *RouteRegistry) StartPruningCycle() {
 	if r.pruneStaleDropletsInterval > 0 {
 		r.Lock()
+		defer r.Unlock()
 		r.ticker = time.NewTicker(r.pruneStaleDropletsInterval)
-		r.Unlock()
 
 		go func() {
 			for {
@@ -241,34 +243,31 @@ func (r *RouteRegistry) StartPruningCycle() {
 
 func (r *RouteRegistry) StopPruningCycle() {
 	r.Lock()
+	defer r.Unlock()
 	if r.ticker != nil {
 		r.ticker.Stop()
 	}
-	r.Unlock()
 }
 
 func (registry *RouteRegistry) NumUris() int {
 	registry.RLock()
-	uriCount := registry.byURI.PoolCount()
-	registry.RUnlock()
+	defer registry.RUnlock()
 
-	return uriCount
+	return registry.byURI.PoolCount()
 }
 
 func (r *RouteRegistry) TimeOfLastUpdate() time.Time {
 	r.RLock()
-	t := r.timeOfLastUpdate
-	r.RUnlock()
+	defer r.RUnlock()
 
-	return t
+	return r.timeOfLastUpdate
 }
 
 func (r *RouteRegistry) NumEndpoints() int {
 	r.RLock()
-	count := r.byURI.EndpointCount()
-	r.RUnlock()
+	defer r.RUnlock()
 
-	return count
+	return r.byURI.EndpointCount()
 }
 
 func (r *RouteRegistry) MarshalJSON() ([]byte, error) {
@@ -321,8 +320,8 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 
 func (r *RouteRegistry) SuspendPruning(f func() bool) {
 	r.Lock()
+	defer r.Unlock()
 	r.suspendPruning = f
-	r.Unlock()
 }
 
 // bulk update to mark pool / endpoints as updated
