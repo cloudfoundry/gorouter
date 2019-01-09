@@ -28,16 +28,19 @@ import (
 
 var _ = Describe("Proxy Unit tests", func() {
 	var (
-		proxyObj         http.Handler
-		fakeAccessLogger *fakelogger.FakeAccessLogger
-		logger           logger.Logger
-		resp             utils.ProxyResponseWriter
-		combinedReporter metrics.ProxyReporter
+		proxyObj           http.Handler
+		fakeAccessLogger   *fakelogger.FakeAccessLogger
+		logger             logger.Logger
+		resp               utils.ProxyResponseWriter
+		combinedReporter   metrics.ProxyReporter
+		routeServiceConfig *routeservice.RouteServiceConfig
+		rt                 *sharedfakes.RoundTripper
+		tlsConfig          *tls.Config
 	)
 
 	Describe("ServeHTTP", func() {
 		BeforeEach(func() {
-			tlsConfig := &tls.Config{
+			tlsConfig = &tls.Config{
 				CipherSuites:       conf.CipherSuites,
 				InsecureSkipVerify: conf.SkipSSLValidation,
 			}
@@ -47,7 +50,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			logger = test_util.NewTestZapLogger("test")
 			r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
 
-			routeServiceConfig := routeservice.NewRouteServiceConfig(
+			routeServiceConfig = routeservice.NewRouteServiceConfig(
 				logger,
 				conf.RouteServiceEnabled,
 				conf.RouteServiceTimeout,
@@ -61,7 +64,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			proxyReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 			combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyReporter}
 
-			rt := &sharedfakes.RoundTripper{}
+			rt = &sharedfakes.RoundTripper{}
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
@@ -113,6 +116,25 @@ var _ = Describe("Proxy Unit tests", func() {
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
 				Expect(fakeAccessLogger.LogArgsForCall(0).FinishedAt).NotTo(Equal(time.Time{}))
+			})
+		})
+
+		Context("when the route registry is nil, causing the proxy to panic", func() {
+			var healthCheck int32
+			BeforeEach(func() {
+				healthCheck = 1
+				proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, nil, combinedReporter, routeServiceConfig, tlsConfig, &healthCheck, rt, skipSanitization)
+			})
+
+			It("fails the healthcheck", func() {
+				req := test_util.NewRequest("GET", "some-app", "/", nil)
+
+				proxyObj.ServeHTTP(resp, req)
+				Expect(healthCheck).To(Equal(int32(0)))
+
+				req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
+				proxyObj.ServeHTTP(resp, req)
+				Expect(resp.Status()).To(Equal(http.StatusServiceUnavailable))
 			})
 		})
 	})
