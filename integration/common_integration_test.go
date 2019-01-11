@@ -2,6 +2,7 @@ package integration
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,6 +36,9 @@ type testState struct {
 	trustedExternalServiceHostname string
 	trustedExternalServiceTLS      *tls.Config
 
+	trustedBackendServerCertSAN string
+	trustedBackendTLSConfig     *tls.Config
+
 	trustedClientTLSConfig *tls.Config
 
 	// these get set when gorouter is started
@@ -47,6 +51,8 @@ type testState struct {
 func NewTestState() *testState {
 	// TODO: don't hide so much behind these test_util methods
 	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
+	cfg.SkipSSLValidation = false
+	cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 	// TODO: why these magic numbers?
 	cfg.PruneStaleDropletsInterval = 2 * time.Second
@@ -62,16 +68,35 @@ func NewTestState() *testState {
 
 	cfg.SuspendPruningIfNatsUnavailable = true
 
+	cfg.DisableKeepAlives = false
+
 	externalRouteServiceHostname := "external-route-service.localhost.routing.cf-app.com"
 	routeServiceKey, routeServiceCert := test_util.CreateKeyPair(externalRouteServiceHostname)
 	routeServiceTLSCert, err := tls.X509KeyPair(routeServiceCert, routeServiceKey)
 	Expect(err).ToNot(HaveOccurred())
 	cfg.CACerts = string(routeServiceCert)
 
-	clientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	clientTLSCert, err := tls.X509KeyPair(clientCertChain.CertPEM, clientCertChain.PrivKeyPEM)
-	Expect(err).NotTo(HaveOccurred())
-	cfg.CACerts = cfg.CACerts + string(clientCertChain.CACertPEM)
+	browserToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	cfg.CACerts = cfg.CACerts + string(browserToGoRouterClientCertChain.CACertPEM)
+
+	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
+	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN})
+	cfg.CACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
+
+	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter"})
+	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
+	trustedBackendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+
+	// set Gorouter to use client certs
+	cfg.Backends.TLSPem = config.TLSPem{
+		CertChain:  string(gorouterToBackendsClientCertChain.CertPEM),
+		PrivateKey: string(gorouterToBackendsClientCertChain.PrivKeyPEM),
+	}
+
+	// make backend trust the CA that signed the gorouter's client cert
+	certPool := x509.NewCertPool()
+	certPool.AddCert(gorouterToBackendsClientCertChain.CACert)
+	trustedBackendTLSConfig.ClientCAs = certPool
 
 	uaaCACertsPath, err := filepath.Abs(filepath.Join("test", "assets", "certs", "uaa-ca.pem"))
 	Expect(err).ToNot(HaveOccurred())
@@ -94,9 +119,9 @@ func NewTestState() *testState {
 		trustedExternalServiceTLS: &tls.Config{
 			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
-		trustedClientTLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{clientTLSCert},
-		},
+		trustedClientTLSConfig:      browserToGoRouterClientCertChain.AsTLSConfig(),
+		trustedBackendTLSConfig:     trustedBackendTLSConfig,
+		trustedBackendServerCertSAN: trustedBackendServerCertSAN,
 	}
 }
 
@@ -112,14 +137,26 @@ func (s *testState) newRequest(url string) *http.Request {
 }
 
 func (s *testState) register(backend *httptest.Server, routeURI string) {
+	s.registerAsTLS(backend, routeURI, "")
+}
+
+func (s *testState) registerAsTLS(backend *httptest.Server, routeURI string, serverCertDomainSAN string) {
 	_, backendPort := hostnameAndPort(backend.Listener.Addr().String())
+	var openPort, tlsPort uint16
+	if serverCertDomainSAN != "" {
+		tlsPort = uint16(backendPort)
+	} else {
+		openPort = uint16(backendPort)
+	}
 	rm := mbus.RegistryMessage{
-		Host: "127.0.0.1",
-		Port: uint16(backendPort),
-		Uris: []route.Uri{route.Uri(routeURI)},
+		Host:                    "127.0.0.1",
+		Port:                    openPort,
+		TLSPort:                 tlsPort,
+		Uris:                    []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
 		RouteServiceURL:         "",
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
+		ServerCertDomainSAN:     serverCertDomainSAN,
 	}
 	s.registerAndWait(rm)
 }
@@ -198,4 +235,13 @@ func (s *testState) StopAndCleanup() {
 	if s.gorouterSession != nil && s.gorouterSession.ExitCode() == -1 {
 		Eventually(s.gorouterSession.Terminate(), 5).Should(Exit(0))
 	}
+}
+
+func assertRequestSucceeds(client *http.Client, req *http.Request) {
+	resp, err := client.Do(req)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(resp.StatusCode).To(Equal(200))
+	_, err = ioutil.ReadAll(resp.Body)
+	Expect(err).NotTo(HaveOccurred())
+	resp.Body.Close()
 }

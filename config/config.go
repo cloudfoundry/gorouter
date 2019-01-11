@@ -199,7 +199,7 @@ type Config struct {
 	PidFile     string `yaml:"pid_file,omitempty"`
 	LoadBalance string `yaml:"balancing_algorithm,omitempty"`
 
-	DisableKeepAlives   bool `yaml:"disable_keep_alives,omitempty"`
+	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
 	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
 	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
 

@@ -43,7 +43,7 @@ type RoundTripperFactory interface {
 
 func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
 	e.RoundTripperInit.Do(func() {
-		e.SetRoundTripper(roundTripperFactory.New(e.ServerCertDomainSAN))
+		e.SetRoundTripperIfNil(func() route.ProxyRoundTripper { return roundTripperFactory.New(e.ServerCertDomainSAN) })
 	})
 
 	return e.RoundTripper()
