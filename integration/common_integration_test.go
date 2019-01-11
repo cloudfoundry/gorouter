@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
 )
 
@@ -164,9 +165,9 @@ func (s *testState) registerWithExternalRouteService(appBackend, routeServiceSer
 	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
 	_, appBackendPort := hostnameAndPort(appBackend.Listener.Addr().String())
 	rm := mbus.RegistryMessage{
-		Host:                    "127.0.0.1",
-		Port:                    uint16(appBackendPort),
-		Uris:                    []route.Uri{route.Uri(routeURI)},
+		Host: "127.0.0.1",
+		Port: uint16(appBackendPort),
+		Uris: []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
 		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, serverPort),
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
@@ -211,16 +212,14 @@ func (s *testState) StartGorouter() {
 	s.gorouterSession, err = Start(cmd, GinkgoWriter, GinkgoWriter)
 	Expect(err).ToNot(HaveOccurred())
 
-	Eventually(func() string {
+	Eventually(func() *Session {
 		if s.gorouterSession.ExitCode() >= 0 {
 			Fail("gorouter quit early!")
 		}
-		return string(s.gorouterSession.Out.Contents())
-	}, 20*time.Second).Should(SatisfyAll(
-		ContainSubstring(`starting`),
-		MatchRegexp(`Successfully-connected-to-nats.*localhost:\d+`),
-		ContainSubstring(`gorouter.started`),
-	))
+		return s.gorouterSession
+	}, 20*time.Second).Should(Say("starting"))
+	Eventually(s.gorouterSession, 5*time.Second).Should(Say(`Successfully-connected-to-nats.*localhost:\d+`))
+	Eventually(s.gorouterSession, 5*time.Second).Should(Say(`gorouter.started`))
 
 	s.mbusClient, err = newMessageBus(s.cfg)
 	Expect(err).ToNot(HaveOccurred())

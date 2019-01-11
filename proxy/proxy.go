@@ -124,6 +124,7 @@ func NewProxy(
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, cfg.ExtraHeadersToLog, logger)
 	n := negroni.New()
+	n.Use(handlers.NewPanicCheck(p.heartbeatOK, logger))
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
