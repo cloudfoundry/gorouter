@@ -136,8 +136,9 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 				doRequest()
 
 				By("checking that the same connection is *still* being re-used on the backend")
-				assertConnectionIsReused(testApp.GetConnStates(),
-					"new", "active", "idle", "active", "idle", "active", "idle")
+				// We don't need to assert on the last "idle" since we know the connection is being reused by not seeing a "new"
+				assertConnectionIsReused(testApp.GetConnStates()[:6],
+					"new", "active", "idle", "active", "idle", "active")
 			})
 		})
 	})
