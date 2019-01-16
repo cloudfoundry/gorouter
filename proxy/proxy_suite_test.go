@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync/atomic"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -47,7 +48,7 @@ var (
 	cryptoPrev              secure.Crypto
 	caCertPool              *x509.CertPool
 	recommendHttps          bool
-	heartbeatOK             int32
+	heartbeatOK             *int32
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
 	skipSanitization        func(req *http.Request) bool
@@ -59,6 +60,8 @@ func TestProxy(t *testing.T) {
 }
 
 var _ = BeforeEach(func() {
+	heartbeatOK = new(int32)
+	atomic.StoreInt32(heartbeatOK, 1)
 	testLogger = test_util.NewTestZapLogger("test")
 	var err error
 
@@ -101,7 +104,6 @@ var _ = JustBeforeEach(func() {
 		RootCAs:            caCertPool,
 		Certificates:       []tls.Certificate{conf.Backends.ClientAuthCertificate},
 	}
-	heartbeatOK = 1
 
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		testLogger,
@@ -124,7 +126,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, &heartbeatOK, fakeRouteServicesClient, skipSanitization)
+	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, heartbeatOK, fakeRouteServicesClient, skipSanitization)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)
