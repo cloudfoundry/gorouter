@@ -91,18 +91,10 @@ var _ = Describe("TLS to backends", func() {
 			req.Header.Set("Connection", "upgrade")
 			x.WriteRequest(req)
 
-			responseChan := make(chan *http.Response)
-			go func() {
-				defer GinkgoRecover()
-				var resp *http.Response
-				resp, err = http.ReadResponse(x.Reader, &http.Request{})
-				Expect(err).NotTo(HaveOccurred())
-				defer resp.Body.Close()
-				responseChan <- resp
-			}()
+			resp, err := http.ReadResponse(x.Reader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
+			resp.Body.Close()
 
-			var resp *http.Response
-			Eventually(responseChan, "9s").Should(Receive(&resp))
 			Expect(resp.StatusCode).To(Equal(404))
 
 			// client-side conn should have been closed
@@ -122,14 +114,8 @@ var _ = Describe("TLS to backends", func() {
 		runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, nil)
 		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
 		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
-		heartbeatInterval := 200 * time.Millisecond
-		runningTicker := time.NewTicker(heartbeatInterval)
-		go func() {
-			for {
-				<-runningTicker.C
-				runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
-			}
-		}()
+		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
+
 		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
