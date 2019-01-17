@@ -11,9 +11,6 @@ import (
 
 const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
-// 64-bit random hexadecimal string
-const b3_id_regex = `^[[:xdigit:]]{16}$`
-
 var _ = Describe("Headers", func() {
 	Describe("SetTraceHeaders", func() {
 		var respWriter http.ResponseWriter
