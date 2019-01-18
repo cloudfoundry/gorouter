@@ -64,6 +64,10 @@ var _ = Describe("Lookup", func() {
 			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
 		})
 
+		It("Sets Cache-Control to public,max-age=2", func() {
+			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+		})
+
 		It("returns a 404 NotFound and does not call next", func() {
 			Expect(nextCalled).To(BeFalse())
 			Expect(resp.Code).To(Equal(http.StatusNotFound))
