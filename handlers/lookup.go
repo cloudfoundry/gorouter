@@ -60,6 +60,7 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	l.reporter.CaptureBadRequest()
 
 	rw.Header().Set("X-Cf-RouterError", "unknown_route")
+	rw.Header().Set("Cache-Control", "public,max-age=2")
 
 	writeStatus(
 		rw,
