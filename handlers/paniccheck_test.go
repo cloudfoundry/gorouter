@@ -91,4 +91,27 @@ var _ = Describe("Paniccheck", func() {
 			Expect(testLogger).NotTo(gbytes.Say("panic-check"))
 		})
 	})
+
+	Context("when the panic is due to an abort", func() {
+		BeforeEach(func() {
+			n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
+				// This panic occurs when a client goes away in the middle of a request
+				// this is a panic we expect to see in normal operation and is safe to ignore
+				panic(http.ErrAbortHandler)
+			})
+		})
+		It("the healthcheck is set to 1", func() {
+			_, err := http.Get(fmt.Sprintf("http://%s", server.Addr()))
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(heartbeatOK).To(Equal(int32(1)))
+		})
+
+		It("does not log anything", func() {
+			_, err := http.Get(fmt.Sprintf("http://%s", server.Addr()))
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(testLogger).NotTo(gbytes.Say("panic-check"))
+		})
+	})
 })
