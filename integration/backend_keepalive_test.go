@@ -125,7 +125,7 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 				doRequest()
 
 				By("checking that only one backend connection is used for both requests")
-				assertConnectionIsReused(testApp.GetConnStates(), "new", "active", "idle", "active", "idle")
+				assertConnectionIsReused(testApp.GetConnStates()[:4], "new", "active", "idle", "active")
 
 				By("re-registering the route")
 				testState.registerAsTLS(testApp.Server, testAppRoute, testState.trustedBackendServerCertSAN)
