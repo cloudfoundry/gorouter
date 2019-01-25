@@ -70,13 +70,11 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 
 			By("checking that the connection is not re-used")
 			connStates = testApp.GetConnStates()
-			Expect(connStates).To(HaveLen(6))
 			Expect(connStates[0].State).To(Equal("new"))
 			Expect(connStates[1].State).To(Equal("active"))
 			Expect(connStates[2].State).To(Equal("closed"))
 			Expect(connStates[3].State).To(Equal("new"))
 			Expect(connStates[4].State).To(Equal("active"))
-			Expect(connStates[5].State).To(Equal("closed"))
 
 			By("checking that different connections are used for each request")
 			Expect(connStates[0].ConnPtr).NotTo(Equal(connStates[3].ConnPtr))
@@ -109,8 +107,8 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 				doRequest()
 
 				By("checking that the same connection is *still* being re-used on the backend")
-				assertConnectionIsReused(testApp.GetConnStates(),
-					"new", "active", "idle", "active", "idle", "active", "idle")
+				assertConnectionIsReused(testApp.GetConnStates()[:6],
+					"new", "active", "idle", "active", "idle", "active")
 			})
 		})
 
