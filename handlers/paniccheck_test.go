@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -46,7 +47,7 @@ var _ = Describe("Paniccheck", func() {
 	Context("when something panics", func() {
 		BeforeEach(func() {
 			n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
-				panic("we expect this panic")
+				panic(errors.New("we expect this panic"))
 			})
 		})
 		It("the healthcheck is set to 0", func() {
@@ -66,7 +67,7 @@ var _ = Describe("Paniccheck", func() {
 			_, err := http.Get(fmt.Sprintf("http://%s", server.Addr()))
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(testLogger).To(gbytes.Say("panic-check"))
+			Expect(testLogger).To(gbytes.Say("we expect this panic"))
 		})
 	})
 

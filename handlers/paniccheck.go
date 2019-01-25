@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"sync/atomic"
 
@@ -24,13 +25,17 @@ func NewPanicCheck(healthcheck *int32, logger logger.Logger) negroni.Handler {
 
 func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	defer func() {
-		if err := recover(); err != nil {
-			switch err {
+		if rec := recover(); rec != nil {
+			switch rec {
 			case http.ErrAbortHandler:
 				// The ErrAbortHandler panic occurs when a client goes away in the middle of a request
 				// this is a panic we expect to see in normal operation and is safe to ignore
 			default:
-				p.logger.Error("panic-check", zap.Object("panic", err))
+				err, ok := rec.(error)
+				if !ok {
+					err = fmt.Errorf("%v", rec)
+				}
+				p.logger.Error("panic-check", zap.Error(err))
 				atomic.StoreInt32(p.heartbeatOK, 0)
 				rw.WriteHeader(http.StatusServiceUnavailable)
 				r.Close = true
