@@ -650,14 +650,13 @@ var _ = Describe("Router Integration", func() {
 			tempCfg.NatsClientPingInterval = 100 * time.Millisecond
 			writeConfig(tempCfg, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
-
 			natsRunner.Stop()
 			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
 			Eventually(gorouterSession).Should(Say("nats-connection-still-disconnected"))
 			natsRunner.Start()
 			Eventually(gorouterSession, 2*time.Second).Should(Say("nats-connection-reconnected"))
 			Consistently(gorouterSession, 500*time.Millisecond).ShouldNot(Say("nats-connection-still-disconnected"))
-			Consistently(gorouterSession.ExitCode, 2*time.Second).ShouldNot(Equal(1))
+			Consistently(gorouterSession.ExitCode, 2*time.Second).Should(Equal(-1))
 		})
 	})
 
