@@ -25,4 +25,4 @@ go install -v github.com/onsi/ginkgo/ginkgo
 echo -e "\n Formatting packages..."
 
 go fmt ./...
-ginkgo -keepGoing -trace -progress -r -failOnPending -randomizeAllSpecs -race "$@"
+ginkgo -keepGoing -trace -progress -r -failOnPending -randomizeAllSpecs -p -race "$@"
