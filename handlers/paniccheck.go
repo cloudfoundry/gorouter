@@ -29,7 +29,9 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 			switch rec {
 			case http.ErrAbortHandler:
 				// The ErrAbortHandler panic occurs when a client goes away in the middle of a request
-				// this is a panic we expect to see in normal operation and is safe to ignore
+				// this is a panic we expect to see in normal operation and is safe to allow the panic
+				// http.Server will handle it appropriately
+				panic(http.ErrAbortHandler)
 			default:
 				err, ok := rec.(error)
 				if !ok {
