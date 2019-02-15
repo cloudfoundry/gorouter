@@ -306,6 +306,32 @@ var _ = Describe("Route Service Handler", func() {
 				})
 			})
 
+			Context("when a request has a valid route service signature and metadata header and URL contains special chars", func() {
+				BeforeEach(func() {
+					reqArgs, err := config.Request("", "https://my_host.com/resource+9-9_9?query=%23%25")
+					Expect(err).ToNot(HaveOccurred())
+					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
+					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
+				})
+
+				It("strips headers and sends the request to the backend instance", func() {
+					handler.ServeHTTP(resp, req)
+
+					Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+					var passedReq *http.Request
+					Eventually(reqChan).Should(Receive(&passedReq))
+
+					Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
+					Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
+					reqInfo, err := handlers.ContextRequestInfo(passedReq)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(reqInfo.RouteServiceURL).To(BeNil())
+					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				})
+			})
+
 			Context("when a request has a route service signature but no metadata header", func() {
 				BeforeEach(func() {
 					reqArgs, err := config.Request("", forwardedUrl)
