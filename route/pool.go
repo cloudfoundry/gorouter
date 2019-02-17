@@ -210,7 +210,7 @@ func (p *Pool) MaxConnsPerBackend() int64 {
 	return p.maxConnsPerBackend
 }
 
-// Returns true if endpoint was added or updated, false otherwise
+// Put returns true if endpoint was added or updated, false otherwise
 func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 	p.Lock()
 	defer p.Unlock()
@@ -301,7 +301,7 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 	return prunedEndpoints
 }
 
-// Returns true if the endpoint was removed from the Pool, false otherwise.
+// Remove returns true if the endpoint was removed from the Pool, false otherwise.
 func (p *Pool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 

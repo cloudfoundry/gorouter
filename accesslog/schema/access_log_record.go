@@ -36,7 +36,7 @@ func (b *recordBuffer) WriteIntValue(v int) {
 	b.writeSpace()
 }
 
-// WriteDashOrStringValue writes an int or a "-" to the buffer if the int is
+// WriteDashOrIntValue writes an int or a "-" to the buffer if the int is
 // equal to 0
 func (b *recordBuffer) WriteDashOrIntValue(v int) {
 	if v == 0 {
@@ -47,7 +47,7 @@ func (b *recordBuffer) WriteDashOrIntValue(v int) {
 	}
 }
 
-// WriteDashOrStringValue writes a float or a "-" to the buffer if the float is
+// WriteDashOrFloatValue writes a float or a "-" to the buffer if the float is
 // 0 or lower
 func (b *recordBuffer) WriteDashOrFloatValue(v float64) {
 	if v >= 0 {

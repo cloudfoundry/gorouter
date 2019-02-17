@@ -14,7 +14,7 @@ type proxyHealthcheck struct {
 	logger      logger.Logger
 }
 
-// NewHealthcheck creates a handler that responds to healthcheck requests.
+// NewProxyHealthcheck: creates a handler that responds to healthcheck requests.
 // If userAgent is set to a non-empty string, it will use that user agent to
 // differentiate between healthcheck requests and non-healthcheck requests.
 // Otherwise, it will treat all requests as healthcheck requests.
