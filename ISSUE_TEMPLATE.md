@@ -3,6 +3,7 @@ Thanks for submitting an issue to `gorouter`. We are always trying to improve! T
 ## Issue
 
 [provide quick introduction so this issue can be triaged]
+
 [tell us about how this impacts your users or production or dev environments, to help us prioritize]
 
 ## Context
