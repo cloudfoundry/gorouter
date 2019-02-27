@@ -246,8 +246,7 @@ func (r *RouteRegistry) StartPruningCycle() {
 					r.logger.Info("start-pruning-routes")
 					r.pruneStaleDroplets()
 					r.logger.Info("finished-pruning-routes")
-					msSinceLastUpdate := uint64(time.Since(r.TimeOfLastUpdate()) / time.Millisecond)
-					r.reporter.CaptureRouteStats(r.NumUris(), msSinceLastUpdate)
+					r.reporter.CaptureRouteStats(r.NumUris(), r.MSSinceLastUpdate())
 				}
 			}
 		}()
@@ -267,6 +266,14 @@ func (registry *RouteRegistry) NumUris() int {
 	defer registry.RUnlock()
 
 	return registry.byURI.PoolCount()
+}
+
+func (r *RouteRegistry) MSSinceLastUpdate() int64 {
+	timeOfLastUpdate := r.TimeOfLastUpdate()
+	if (timeOfLastUpdate == time.Time{}) {
+		return -1
+	}
+	return int64(time.Since(timeOfLastUpdate) / time.Millisecond)
 }
 
 func (r *RouteRegistry) TimeOfLastUpdate() time.Time {

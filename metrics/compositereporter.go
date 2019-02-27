@@ -39,7 +39,7 @@ type ComponentTagged interface {
 
 //go:generate counterfeiter -o fakes/fake_registry_reporter.go . RouteRegistryReporter
 type RouteRegistryReporter interface {
-	CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64)
+	CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64)
 	CaptureRoutesPruned(prunedRoutes uint64)
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged)

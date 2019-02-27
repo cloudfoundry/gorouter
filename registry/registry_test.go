@@ -1201,6 +1201,19 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(t.Before(start)).To(BeFalse())
 			Expect(t.After(end)).To(BeFalse())
 		})
+
+		Context("MSSinceLastUpdate", func() {
+			It("returns a value numerically greater than 0", func() {
+				r.Register("bar", barEndpoint)
+				Eventually(func() int64 { return r.MSSinceLastUpdate() }).Should(BeNumerically(">", 0))
+			})
+
+			Context("when no routes have been registered", func() {
+				It("returns a value numerically greater than 0", func() {
+					Expect(r.MSSinceLastUpdate()).To(Equal(int64(-1)))
+				})
+			})
+		})
 	})
 
 	It("marshals", func() {

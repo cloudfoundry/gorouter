@@ -10,48 +10,35 @@ import (
 )
 
 type FakeVarzReporter struct {
-	CaptureBadRequestStub            func()
-	captureBadRequestMutex           sync.RWMutex
-	captureBadRequestArgsForCall     []struct{}
-	CaptureBadGatewayStub            func()
-	captureBadGatewayMutex           sync.RWMutex
-	captureBadGatewayArgsForCall     []struct{}
-	CaptureRoutingRequestStub        func(b *route.Endpoint)
+	CaptureBadGatewayStub        func()
+	captureBadGatewayMutex       sync.RWMutex
+	captureBadGatewayArgsForCall []struct {
+	}
+	CaptureBadRequestStub        func()
+	captureBadRequestMutex       sync.RWMutex
+	captureBadRequestArgsForCall []struct {
+	}
+	CaptureRoutingRequestStub        func(*route.Endpoint)
 	captureRoutingRequestMutex       sync.RWMutex
 	captureRoutingRequestArgsForCall []struct {
-		b *route.Endpoint
+		arg1 *route.Endpoint
 	}
-	CaptureRoutingResponseLatencyStub        func(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
+	CaptureRoutingResponseLatencyStub        func(*route.Endpoint, int, time.Time, time.Duration)
 	captureRoutingResponseLatencyMutex       sync.RWMutex
 	captureRoutingResponseLatencyArgsForCall []struct {
-		b          *route.Endpoint
-		statusCode int
-		t          time.Time
-		d          time.Duration
+		arg1 *route.Endpoint
+		arg2 int
+		arg3 time.Time
+		arg4 time.Duration
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeVarzReporter) CaptureBadRequest() {
-	fake.captureBadRequestMutex.Lock()
-	fake.captureBadRequestArgsForCall = append(fake.captureBadRequestArgsForCall, struct{}{})
-	fake.recordInvocation("CaptureBadRequest", []interface{}{})
-	fake.captureBadRequestMutex.Unlock()
-	if fake.CaptureBadRequestStub != nil {
-		fake.CaptureBadRequestStub()
-	}
-}
-
-func (fake *FakeVarzReporter) CaptureBadRequestCallCount() int {
-	fake.captureBadRequestMutex.RLock()
-	defer fake.captureBadRequestMutex.RUnlock()
-	return len(fake.captureBadRequestArgsForCall)
-}
-
 func (fake *FakeVarzReporter) CaptureBadGateway() {
 	fake.captureBadGatewayMutex.Lock()
-	fake.captureBadGatewayArgsForCall = append(fake.captureBadGatewayArgsForCall, struct{}{})
+	fake.captureBadGatewayArgsForCall = append(fake.captureBadGatewayArgsForCall, struct {
+	}{})
 	fake.recordInvocation("CaptureBadGateway", []interface{}{})
 	fake.captureBadGatewayMutex.Unlock()
 	if fake.CaptureBadGatewayStub != nil {
@@ -65,15 +52,44 @@ func (fake *FakeVarzReporter) CaptureBadGatewayCallCount() int {
 	return len(fake.captureBadGatewayArgsForCall)
 }
 
-func (fake *FakeVarzReporter) CaptureRoutingRequest(b *route.Endpoint) {
+func (fake *FakeVarzReporter) CaptureBadGatewayCalls(stub func()) {
+	fake.captureBadGatewayMutex.Lock()
+	defer fake.captureBadGatewayMutex.Unlock()
+	fake.CaptureBadGatewayStub = stub
+}
+
+func (fake *FakeVarzReporter) CaptureBadRequest() {
+	fake.captureBadRequestMutex.Lock()
+	fake.captureBadRequestArgsForCall = append(fake.captureBadRequestArgsForCall, struct {
+	}{})
+	fake.recordInvocation("CaptureBadRequest", []interface{}{})
+	fake.captureBadRequestMutex.Unlock()
+	if fake.CaptureBadRequestStub != nil {
+		fake.CaptureBadRequestStub()
+	}
+}
+
+func (fake *FakeVarzReporter) CaptureBadRequestCallCount() int {
+	fake.captureBadRequestMutex.RLock()
+	defer fake.captureBadRequestMutex.RUnlock()
+	return len(fake.captureBadRequestArgsForCall)
+}
+
+func (fake *FakeVarzReporter) CaptureBadRequestCalls(stub func()) {
+	fake.captureBadRequestMutex.Lock()
+	defer fake.captureBadRequestMutex.Unlock()
+	fake.CaptureBadRequestStub = stub
+}
+
+func (fake *FakeVarzReporter) CaptureRoutingRequest(arg1 *route.Endpoint) {
 	fake.captureRoutingRequestMutex.Lock()
 	fake.captureRoutingRequestArgsForCall = append(fake.captureRoutingRequestArgsForCall, struct {
-		b *route.Endpoint
-	}{b})
-	fake.recordInvocation("CaptureRoutingRequest", []interface{}{b})
+		arg1 *route.Endpoint
+	}{arg1})
+	fake.recordInvocation("CaptureRoutingRequest", []interface{}{arg1})
 	fake.captureRoutingRequestMutex.Unlock()
 	if fake.CaptureRoutingRequestStub != nil {
-		fake.CaptureRoutingRequestStub(b)
+		fake.CaptureRoutingRequestStub(arg1)
 	}
 }
 
@@ -83,24 +99,31 @@ func (fake *FakeVarzReporter) CaptureRoutingRequestCallCount() int {
 	return len(fake.captureRoutingRequestArgsForCall)
 }
 
+func (fake *FakeVarzReporter) CaptureRoutingRequestCalls(stub func(*route.Endpoint)) {
+	fake.captureRoutingRequestMutex.Lock()
+	defer fake.captureRoutingRequestMutex.Unlock()
+	fake.CaptureRoutingRequestStub = stub
+}
+
 func (fake *FakeVarzReporter) CaptureRoutingRequestArgsForCall(i int) *route.Endpoint {
 	fake.captureRoutingRequestMutex.RLock()
 	defer fake.captureRoutingRequestMutex.RUnlock()
-	return fake.captureRoutingRequestArgsForCall[i].b
+	argsForCall := fake.captureRoutingRequestArgsForCall[i]
+	return argsForCall.arg1
 }
 
-func (fake *FakeVarzReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
+func (fake *FakeVarzReporter) CaptureRoutingResponseLatency(arg1 *route.Endpoint, arg2 int, arg3 time.Time, arg4 time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.Lock()
 	fake.captureRoutingResponseLatencyArgsForCall = append(fake.captureRoutingResponseLatencyArgsForCall, struct {
-		b          *route.Endpoint
-		statusCode int
-		t          time.Time
-		d          time.Duration
-	}{b, statusCode, t, d})
-	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{b, statusCode, t, d})
+		arg1 *route.Endpoint
+		arg2 int
+		arg3 time.Time
+		arg4 time.Duration
+	}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{arg1, arg2, arg3, arg4})
 	fake.captureRoutingResponseLatencyMutex.Unlock()
 	if fake.CaptureRoutingResponseLatencyStub != nil {
-		fake.CaptureRoutingResponseLatencyStub(b, statusCode, t, d)
+		fake.CaptureRoutingResponseLatencyStub(arg1, arg2, arg3, arg4)
 	}
 }
 
@@ -110,19 +133,26 @@ func (fake *FakeVarzReporter) CaptureRoutingResponseLatencyCallCount() int {
 	return len(fake.captureRoutingResponseLatencyArgsForCall)
 }
 
+func (fake *FakeVarzReporter) CaptureRoutingResponseLatencyCalls(stub func(*route.Endpoint, int, time.Time, time.Duration)) {
+	fake.captureRoutingResponseLatencyMutex.Lock()
+	defer fake.captureRoutingResponseLatencyMutex.Unlock()
+	fake.CaptureRoutingResponseLatencyStub = stub
+}
+
 func (fake *FakeVarzReporter) CaptureRoutingResponseLatencyArgsForCall(i int) (*route.Endpoint, int, time.Time, time.Duration) {
 	fake.captureRoutingResponseLatencyMutex.RLock()
 	defer fake.captureRoutingResponseLatencyMutex.RUnlock()
-	return fake.captureRoutingResponseLatencyArgsForCall[i].b, fake.captureRoutingResponseLatencyArgsForCall[i].statusCode, fake.captureRoutingResponseLatencyArgsForCall[i].t, fake.captureRoutingResponseLatencyArgsForCall[i].d
+	argsForCall := fake.captureRoutingResponseLatencyArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeVarzReporter) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.captureBadRequestMutex.RLock()
-	defer fake.captureBadRequestMutex.RUnlock()
 	fake.captureBadGatewayMutex.RLock()
 	defer fake.captureBadGatewayMutex.RUnlock()
+	fake.captureBadRequestMutex.RLock()
+	defer fake.captureBadRequestMutex.RUnlock()
 	fake.captureRoutingRequestMutex.RLock()
 	defer fake.captureRoutingRequestMutex.RUnlock()
 	fake.captureRoutingResponseLatencyMutex.RLock()

@@ -94,7 +94,7 @@ func (m *MetricsReporter) CaptureRouteRegistrationLatency(t time.Duration) {
 	}
 }
 
-func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate uint64) {
+func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
 	m.Sender.SendValue("total_routes", float64(totalRoutes), "")
 	m.Sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
 }
