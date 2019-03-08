@@ -314,21 +314,10 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
 				})
 
-				It("strips headers and sends the request to the backend instance", func() {
+				It("should get response from backend instance without errors", func() {
 					handler.ServeHTTP(resp, req)
 
 					Expect(resp.Code).To(Equal(http.StatusTeapot))
-
-					var passedReq *http.Request
-					Eventually(reqChan).Should(Receive(&passedReq))
-
-					Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).To(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).To(BeEmpty())
-					Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(BeEmpty())
-					reqInfo, err := handlers.ContextRequestInfo(passedReq)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(reqInfo.RouteServiceURL).To(BeNil())
-					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
 			})
 
