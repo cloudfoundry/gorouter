@@ -306,6 +306,21 @@ var _ = Describe("Route Service Handler", func() {
 				})
 			})
 
+			Context("when a request has a valid route service signature and metadata header and URL contains special chars", func() {
+				BeforeEach(func() {
+					reqArgs, err := config.Request("", "https://my_host.com/resource+9-9_9?query=%23%25")
+					Expect(err).ToNot(HaveOccurred())
+					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
+					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
+				})
+
+				It("should get response from backend instance without errors", func() {
+					handler.ServeHTTP(resp, req)
+
+					Expect(resp.Code).To(Equal(http.StatusTeapot))
+				})
+			})
+
 			Context("when a request has a route service signature but no metadata header", func() {
 				BeforeEach(func() {
 					reqArgs, err := config.Request("", forwardedUrl)

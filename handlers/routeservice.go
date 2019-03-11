@@ -180,7 +180,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 }
 
 func (r *RouteService) validateRouteServicePool(validatedSig *routeservice.Signature, reqInfo *RequestInfo) error {
-	forwardedURL, err := url.Parse(validatedSig.ForwardedUrl)
+	forwardedURL, err := url.ParseRequestURI(validatedSig.ForwardedUrl)
 	if err != nil {
 		return err
 	}
