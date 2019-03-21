@@ -132,8 +132,8 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 		rsu := routeServiceArgs.ParsedUrl
 		uri := route.Uri(hostWithoutPort(rsu.Host) + rsu.EscapedPath())
-		if r.registry.Lookup(uri) != nil {
-			reqInfo.IsInternalRouteService = true
+		if r.config.RouteServiceHairpinning() && r.registry.Lookup(uri) != nil {
+			reqInfo.ShouldRouteToInternalRouteService = true
 		}
 	}
 

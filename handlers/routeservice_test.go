@@ -96,7 +96,7 @@ var _ = Describe("Route Service Handler", func() {
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
 		config = routeservice.NewRouteServiceConfig(
-			logger, true, 60*time.Second, crypto, nil, true,
+			logger, true, true, 60*time.Second, crypto, nil, true,
 		)
 
 		nextCalled = false
@@ -116,7 +116,7 @@ var _ = Describe("Route Service Handler", func() {
 
 	Context("with route services disabled", func() {
 		BeforeEach(func() {
-			config = routeservice.NewRouteServiceConfig(logger, false, 0, nil, nil, false)
+			config = routeservice.NewRouteServiceConfig(logger, false, false, 0, nil, nil, false)
 		})
 
 		Context("for normal routes", func() {
@@ -212,7 +212,7 @@ var _ = Describe("Route Service Handler", func() {
 
 				Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
 				Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
-				Expect(reqInfo.IsInternalRouteService).To(BeFalse())
+				Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
 
@@ -246,15 +246,47 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
 					Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
-					Expect(reqInfo.IsInternalRouteService).To(BeTrue())
+					Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeTrue())
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				})
+
+				Context("when the hairpin feature flag is disabled", func() {
+					BeforeEach(func() {
+						hairpinning := false
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
 				})
 			})
 
 			Context("when recommendHttps is set to false", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, 60*time.Second, crypto, nil, false,
+						logger, true, false, 60*time.Second, crypto, nil, false,
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
@@ -275,7 +307,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
 					Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
-					Expect(reqInfo.IsInternalRouteService).To(BeFalse())
+					Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
 			})
@@ -439,7 +471,7 @@ var _ = Describe("Route Service Handler", func() {
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, 60*time.Second, crypto, cryptoPrev, true,
+						logger, true, false, 60*time.Second, crypto, cryptoPrev, true,
 					)
 				})
 

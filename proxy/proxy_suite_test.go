@@ -108,6 +108,7 @@ var _ = JustBeforeEach(func() {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		testLogger,
 		conf.RouteServiceEnabled,
+		conf.RouteServicesHairpinning,
 		conf.RouteServiceTimeout,
 		crypto,
 		cryptoPrev,

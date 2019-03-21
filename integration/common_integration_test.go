@@ -52,6 +52,7 @@ func NewTestState() *testState {
 	// TODO: don't hide so much behind these test_util methods
 	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
 	cfg.SkipSSLValidation = false
+	cfg.RouteServicesHairpinning = false
 	cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 
 	// TODO: why these magic numbers?
@@ -74,10 +75,10 @@ func NewTestState() *testState {
 	routeServiceKey, routeServiceCert := test_util.CreateKeyPair(externalRouteServiceHostname)
 	routeServiceTLSCert, err := tls.X509KeyPair(routeServiceCert, routeServiceKey)
 	Expect(err).ToNot(HaveOccurred())
-	cfg.CACerts = string(routeServiceCert)
 
 	browserToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
 	cfg.CACerts = cfg.CACerts + string(browserToGoRouterClientCertChain.CACertPEM)
+	cfg.CACerts = cfg.CACerts + string(routeServiceCert)
 
 	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN})
@@ -162,24 +163,34 @@ func (s *testState) registerAsTLS(backend *httptest.Server, routeURI string, ser
 }
 
 func (s *testState) registerWithExternalRouteService(appBackend, routeServiceServer *httptest.Server, routeServiceHostname string, routeURI string) {
-	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
+	_, routeServicePort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
 	_, appBackendPort := hostnameAndPort(appBackend.Listener.Addr().String())
 	rm := mbus.RegistryMessage{
 		Host:                    "127.0.0.1",
 		Port:                    uint16(appBackendPort),
 		Uris:                    []route.Uri{route.Uri(routeURI)},
 		StaleThresholdInSeconds: 1,
-		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, serverPort),
+		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, routeServicePort),
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 	}
 	s.registerAndWait(rm)
 }
 
-func (s *testState) registerWithInternalRouteService(appBackend, routeServiceServer *httptest.Server, routeURI string) {
+func (s *testState) registerWithInternalRouteService(appBackend, routeServiceServer *httptest.Server, routeURI string, gorouterPort uint16) {
 	_, serverPort := hostnameAndPort(routeServiceServer.Listener.Addr().String())
-	internalRouteServiceHostname := fmt.Sprintf("some-internal-route-service-%d.some.domain", serverPort)
-	s.register(routeServiceServer, internalRouteServiceHostname)                                               // the route service is just an app registered normally
-	s.registerWithExternalRouteService(appBackend, routeServiceServer, internalRouteServiceHostname, routeURI) // register
+	internalRouteServiceHostname := fmt.Sprintf("internal-route-service-%d.localhost.routing.cf-app.com", serverPort)
+	s.register(routeServiceServer, internalRouteServiceHostname) // the route service is just an app registered normally
+
+	_, appBackendPort := hostnameAndPort(appBackend.Listener.Addr().String())
+	rm := mbus.RegistryMessage{
+		Host:                    "127.0.0.1",
+		Port:                    uint16(appBackendPort),
+		Uris:                    []route.Uri{route.Uri(routeURI)},
+		StaleThresholdInSeconds: 1,
+		RouteServiceURL:         fmt.Sprintf("https://%s:%d", internalRouteServiceHostname, gorouterPort),
+		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
+	}
+	s.registerAndWait(rm)
 }
 
 func (s *testState) registerAndWait(rm mbus.RegistryMessage) {

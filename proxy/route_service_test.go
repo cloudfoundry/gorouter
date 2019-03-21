@@ -70,6 +70,7 @@ var _ = Describe("Route Services", func() {
 		config := routeservice.NewRouteServiceConfig(
 			testLogger,
 			conf.RouteServiceEnabled,
+			conf.RouteServicesHairpinning,
 			1*time.Hour,
 			crypto,
 			nil,
@@ -386,7 +387,10 @@ var _ = Describe("Route Services", func() {
 		})
 	})
 
-	Context("when the route service is a CF app", func() {
+	Context("when the route service is a CF app and hairpinning is enabled", func() {
+		BeforeEach(func() {
+			conf.RouteServicesHairpinning = true
+		})
 		Context("when registration message does not contain tls_port", func() {
 			It("successfully looks up the route service and sends the request", func() {
 				routeServiceHandler := func(conn *test_util.HttpConn) {

@@ -142,6 +142,7 @@ func main() {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger.Session("proxy"),
 		c.RouteServiceEnabled,
+		c.RouteServicesHairpinning,
 		c.RouteServiceTimeout,
 		crypto,
 		cryptoPrev,

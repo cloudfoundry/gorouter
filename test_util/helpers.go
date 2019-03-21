@@ -127,30 +127,30 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 
 	c.EnableSSL = true
 
-	potatoCertchain := CreateSignedCertWithRootCA(CertNames{SANs: SubjectAltNames{DNS: "potato.com", IP: c.Ip}})
-	potato2Certchain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato2.com"})
+	rootCertChain := CreateSignedCertWithRootCA(CertNames{SANs: SubjectAltNames{DNS: "*.localhost.routing.cf-app.com", IP: c.Ip}})
+	secondaryCertChain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato2.com"})
 
 	clientTrustedCertPool := x509.NewCertPool()
-	clientTrustedCertPool.AppendCertsFromPEM(potatoCertchain.CACertPEM)
-	clientTrustedCertPool.AppendCertsFromPEM(potato2Certchain.CACertPEM)
+	clientTrustedCertPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
+	clientTrustedCertPool.AppendCertsFromPEM(secondaryCertChain.CACertPEM)
 
 	c.TLSPEM = []config.TLSPem{
-		config.TLSPem{
-			CertChain:  string(potatoCertchain.CertPEM),
-			PrivateKey: string(potatoCertchain.PrivKeyPEM),
+		{
+			CertChain:  string(rootCertChain.CertPEM),
+			PrivateKey: string(rootCertChain.PrivKeyPEM),
 		},
-		config.TLSPem{
-			CertChain:  string(potato2Certchain.CertPEM),
-			PrivateKey: string(potato2Certchain.PrivKeyPEM),
+		{
+			CertChain:  string(secondaryCertChain.CertPEM),
+			PrivateKey: string(secondaryCertChain.PrivKeyPEM),
 		},
 	}
+	c.CACerts = string(rootCertChain.CACertPEM)
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 	c.ClientCertificateValidationString = "none"
 
 	return c, &tls.Config{
-		RootCAs:    clientTrustedCertPool,
-		ServerName: "potato.com",
+		RootCAs: clientTrustedCertPool,
 	}
 }
 

@@ -165,16 +165,13 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			request.URL = new(url.URL)
 			*request.URL = *reqInfo.RouteServiceURL
 
-			var tr http.RoundTripper
-			tr = GetRoundTripper(endpoint, rt.roundTripperFactory)
-			if reqInfo.IsInternalRouteService {
-				// note: this *looks* like it breaks TLS to internal route service backends,
-				// but in fact it is right!  this hairpins back on the gorouter, and the subsequent
-				// request from the gorouter will go to a backend using TLS (if tls_port is set on that endpoint)
-				tr = rt.routeServicesTransport
+			var roundTripper http.RoundTripper
+			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory)
+			if reqInfo.ShouldRouteToInternalRouteService {
+				roundTripper = rt.routeServicesTransport
 			}
 
-			res, err = rt.timedRoundTrip(tr, request)
+			res, err = rt.timedRoundTrip(roundTripper, request)
 			if err != nil {
 				logger.Error("route-service-connection-failed", zap.Error(err))
 

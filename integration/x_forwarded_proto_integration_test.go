@@ -1,14 +1,13 @@
 package integration
 
 import (
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"fmt"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-
-	"code.cloudfoundry.org/gorouter/routeservice"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("modifications of X-Forwarded-Proto header", func() {
@@ -193,23 +192,29 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 	for gc, tcs := range rsTestCases {
 		goroutercfg := gc
 		rsInternalTestCases := tcs
-		It(fmt.Sprintf("gorouter config: %+v sets the headers correctly", goroutercfg), func() {
-			testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
-			testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
-			testState.StartGorouter()
 
-			doRequest := func(testCase rsTestCase, hostname string) {
-				req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
-				req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
-				resp, err := testState.client.Do(req)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(200))
-				resp.Body.Close()
-			}
+		for i, testCase := range rsInternalTestCases {
+			It(fmt.Sprintf("gorouter config: %+v sets the headers correctly\nclientRequestScheme: %s\nclientRequestHeader: %s\nexpectBackendHeader: %s\nrsRequestScheme: %s\nexpectedRsHeader: %s\n",
+				goroutercfg,
+				testCase.clientRequestScheme,
+				testCase.clientRequestHeader,
+				testCase.expectBackendHeader,
+				testCase.rsRequestScheme,
+				testCase.expectedRsHeader), func() {
 
-			for i, testCase := range rsInternalTestCases {
-				By(fmt.Sprintf("case %d: %+v", i, testCase))
-				hostname := fmt.Sprintf("basic-app-%d.some.domain", i)
+				hostname := "basic-app.some.domain"
+				testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
+				testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
+				testState.StartGorouter()
+
+				doRequest := func(testCase rsTestCase, hostname string) {
+					req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
+					req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
+					resp, err := testState.client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(200))
+					resp.Body.Close()
+				}
 
 				appReceivedHeaders := make(chan http.Header, 1)
 				testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -270,8 +275,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				}))
 				defer internalRouteService.Close()
 				hostname = fmt.Sprintf("basic-app-%d-via-internal-route-service.some.domain", i)
-				testState.registerWithInternalRouteService(testApp, internalRouteService, hostname)
-
+				testState.registerWithInternalRouteService(testApp, internalRouteService, hostname, testState.cfg.SSLPort)
 				doRequest(testCase, hostname)
 
 				expectedBackendHeader = <-appReceivedHeaders
@@ -279,7 +283,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 
 				expectedInternalRsHeader := <-internalRsHeaders
 				Expect(expectedInternalRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
-			}
-		})
+			})
+		}
 	}
 })

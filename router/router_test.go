@@ -1851,7 +1851,7 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
-	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.EndpointTimeout, nil, nil, false)
+	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.RouteServicesHairpinning, config.EndpointTimeout, nil, nil, false)
 
 	rt := &sharedfakes.RoundTripper{}
 	skipSanitize := func(*http.Request) bool { return false }

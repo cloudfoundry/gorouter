@@ -260,7 +260,7 @@ var _ = Describe("Router Integration", func() {
 			dialTls := func(version uint16) error {
 				clientTLSConfig.MaxVersion = version
 				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", cfg.SSLPort))
+				_, err := client.Get(fmt.Sprintf("https://local.localhost.routing.cf-app.com:%d", cfg.SSLPort))
 				return err
 			}
 
@@ -842,7 +842,7 @@ var _ = Describe("Router Integration", func() {
 				routeSvcApp.AddHandler("/rs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(477)
 				}))
-				routeServiceURL = fmt.Sprintf("https://some-route-service.%s/rs", test_util.LocalhostDNS)
+				routeServiceURL = fmt.Sprintf("https://some-route-service.%s:%d/rs", test_util.LocalhostDNS, cfg.SSLPort)
 			})
 
 			It("successfully connects to the route service", func() {

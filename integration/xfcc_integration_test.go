@@ -1,17 +1,16 @@
 package integration
 
 import (
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
@@ -95,7 +94,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 		gorouterCfg := gc
 		clientCfgs := ccs
 
-		for i, cc := range clientCfgs {
+		for _, cc := range clientCfgs {
 			clientCfg := cc
 
 			It(fmt.Sprintf(
@@ -125,8 +124,9 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					Expect(resp.StatusCode).To(Equal(200))
 					resp.Body.Close()
 				}
-				appHostname := fmt.Sprintf("basic-app-%d-via-internal-route-service.some.domain", i)
+				appHostname := "app-with-route-service.some.domain"
 				appReceivedHeaders := make(chan http.Header, 1)
+
 				testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					appReceivedHeaders <- r.Header
 					w.WriteHeader(200)
@@ -134,7 +134,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 				defer testApp.Close()
 
 				routeServiceReceivedHeaders := make(chan http.Header, 1)
-				routeService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				routeService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					routeServiceReceivedHeaders <- r.Header
 					w.WriteHeader(200)
 
@@ -153,9 +153,12 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					Expect(err).NotTo(HaveOccurred())
 					defer resp.Body.Close()
 				}))
+
+				routeService.TLS = testState.trustedExternalServiceTLS
+				routeService.StartTLS()
 				defer routeService.Close()
 
-				testState.registerWithInternalRouteService(testApp, routeService, appHostname)
+				testState.registerWithExternalRouteService(testApp, routeService, testState.trustedExternalServiceHostname, appHostname)
 
 				if clientCfg.clientCert {
 					testState.client.Transport.(*http.Transport).TLSClientConfig.Certificates = testState.trustedClientTLSConfig.Certificates

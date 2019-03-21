@@ -184,6 +184,7 @@ type Config struct {
 	RouteServiceSecret         string           `yaml:"route_services_secret,omitempty"`
 	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only,omitempty"`
 	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https,omitempty"`
+	RouteServicesHairpinning   bool             `yaml:"route_services_hairpinning"`
 	// These fields are populated by the `Process` function.
 	Ip                          string        `yaml:"-"`
 	RouteServiceEnabled         bool          `yaml:"-"`

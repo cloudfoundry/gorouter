@@ -53,6 +53,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			routeServiceConfig = routeservice.NewRouteServiceConfig(
 				logger,
 				conf.RouteServiceEnabled,
+				conf.RouteServicesHairpinning,
 				conf.RouteServiceTimeout,
 				crypto,
 				cryptoPrev,

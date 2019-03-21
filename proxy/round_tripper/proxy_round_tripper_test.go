@@ -617,7 +617,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				Context("when the route service is an internal route service", func() {
 					BeforeEach(func() {
-						reqInfo.IsInternalRouteService = true
+						reqInfo.ShouldRouteToInternalRouteService = true
 						transport.RoundTripStub = nil
 						transport.RoundTripReturns(nil, nil)
 					})

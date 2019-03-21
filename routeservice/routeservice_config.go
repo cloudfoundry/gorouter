@@ -21,12 +21,13 @@ const (
 var ErrExpired = errors.New("route service request expired")
 
 type RouteServiceConfig struct {
-	routeServiceEnabled bool
-	routeServiceTimeout time.Duration
-	crypto              secure.Crypto
-	cryptoPrev          secure.Crypto
-	logger              logger.Logger
-	recommendHttps      bool
+	routeServiceEnabled     bool
+	routeServiceHairpinning bool
+	routeServiceTimeout     time.Duration
+	crypto                  secure.Crypto
+	cryptoPrev              secure.Crypto
+	logger                  logger.Logger
+	recommendHttps          bool
 }
 
 type RouteServiceRequest struct {
@@ -41,18 +42,20 @@ type RouteServiceRequest struct {
 func NewRouteServiceConfig(
 	logger logger.Logger,
 	enabled bool,
+	hairpinning bool,
 	timeout time.Duration,
 	crypto secure.Crypto,
 	cryptoPrev secure.Crypto,
 	recommendHttps bool,
 ) *RouteServiceConfig {
 	return &RouteServiceConfig{
-		routeServiceEnabled: enabled,
-		routeServiceTimeout: timeout,
-		crypto:              crypto,
-		cryptoPrev:          cryptoPrev,
-		logger:              logger,
-		recommendHttps:      recommendHttps,
+		routeServiceEnabled:     enabled,
+		routeServiceTimeout:     timeout,
+		routeServiceHairpinning: hairpinning,
+		crypto:                  crypto,
+		cryptoPrev:              cryptoPrev,
+		logger:                  logger,
+		recommendHttps:          recommendHttps,
 	}
 }
 
@@ -62,6 +65,10 @@ func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
 
 func (rs *RouteServiceConfig) RouteServiceRecommendHttps() bool {
 	return rs.recommendHttps
+}
+
+func (rs *RouteServiceConfig) RouteServiceHairpinning() bool {
+	return rs.routeServiceHairpinning
 }
 
 func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceRequest, error) {
