@@ -33,7 +33,7 @@ connection has closed. Golang's HTTP package is no exception.
 
 Basic client that subscribes and then prints what it receives:
 ```go
-conn, err := net.Dial("tcp", "192.0.2.1:8080")
+conn, err := net.Dial("tcp", "127.0.0.1:8080")
 if err != nil {
   // handle dial error
 }
@@ -87,7 +87,7 @@ func handleConnection(conn net.Conn) {
   if readErr != nil {
     // handle connection read err / connection close
   }
-  if n == 8 && string(tmpBuf[:8]) == "subscribe" {
+  if n == 9 && string(tmpBuf[:9]) == "subscribe" {
     for i := 0; i < 5; i++ {
       _, writeErr := conn.Write("hello")
       if writeErr != nil {
