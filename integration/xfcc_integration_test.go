@@ -1,16 +1,17 @@
 package integration
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/routeservice"
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
@@ -146,7 +147,9 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					var resp *http.Response
 					var err error
 					if clientCfg.routeServiceRequestScheme == "https" {
-						resp, err = testState.client.Do(newRequest)
+						testState.routeServiceClient.Transport.(*http.Transport).TLSClientConfig.Certificates =
+							testState.trustedRouteServiceClientTLSConfig.Certificates
+						resp, err = testState.routeServiceClient.Do(newRequest)
 					} else {
 						resp, err = http.DefaultClient.Do(newRequest)
 					}

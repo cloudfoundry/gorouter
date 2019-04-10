@@ -33,13 +33,15 @@ type testState struct {
 	// these get set by the constructor
 	cfg                            *config.Config
 	client                         *http.Client
+	routeServiceClient             *http.Client
 	trustedExternalServiceHostname string
 	trustedExternalServiceTLS      *tls.Config
 
 	trustedBackendServerCertSAN string
 	trustedBackendTLSConfig     *tls.Config
 
-	trustedClientTLSConfig *tls.Config
+	trustedClientTLSConfig             *tls.Config
+	trustedRouteServiceClientTLSConfig *tls.Config
 
 	// these get set when gorouter is started
 	tmpdir          string
@@ -79,6 +81,8 @@ func NewTestState() *testState {
 	browserToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
 	cfg.CACerts = cfg.CACerts + string(browserToGoRouterClientCertChain.CACertPEM)
 	cfg.CACerts = cfg.CACerts + string(routeServiceCert)
+	routeServiceToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	cfg.CACerts = cfg.CACerts + string(routeServiceToGoRouterClientCertChain.CACertPEM)
 
 	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN})
@@ -116,13 +120,19 @@ func NewTestState() *testState {
 				TLSClientConfig: clientTLSConfig,
 			},
 		},
+		routeServiceClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: clientTLSConfig,
+			},
+		},
 		trustedExternalServiceHostname: externalRouteServiceHostname,
 		trustedExternalServiceTLS: &tls.Config{
 			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
-		trustedClientTLSConfig:      browserToGoRouterClientCertChain.AsTLSConfig(),
-		trustedBackendTLSConfig:     trustedBackendTLSConfig,
-		trustedBackendServerCertSAN: trustedBackendServerCertSAN,
+		trustedClientTLSConfig:             browserToGoRouterClientCertChain.AsTLSConfig(),
+		trustedRouteServiceClientTLSConfig: routeServiceToGoRouterClientCertChain.AsTLSConfig(),
+		trustedBackendTLSConfig:            trustedBackendTLSConfig,
+		trustedBackendServerCertSAN:        trustedBackendServerCertSAN,
 	}
 }
 
