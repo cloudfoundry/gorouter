@@ -28,7 +28,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/tedsuo/ifrit"
@@ -105,9 +105,9 @@ var _ = Describe("Router", func() {
 	}
 
 	runRouter := func(r *router.Router) (chan os.Signal, chan struct{}) {
-		signals := make(chan os.Signal)
-		readyChan := make(chan struct{})
-		closeChannel := make(chan struct{})
+		signals := make(chan os.Signal, 1)
+		readyChan := make(chan struct{}, 1)
+		closeChannel := make(chan struct{}, 1)
 		go func() {
 			r.Run(signals, readyChan)
 			close(closeChannel)
