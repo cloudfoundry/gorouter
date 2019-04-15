@@ -135,7 +135,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 				defer testApp.Close()
 
 				routeServiceReceivedHeaders := make(chan http.Header, 1)
-				routeService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				routeService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					routeServiceReceivedHeaders <- r.Header
 					w.WriteHeader(200)
 
@@ -156,12 +156,9 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					Expect(err).NotTo(HaveOccurred())
 					defer resp.Body.Close()
 				}))
-
-				routeService.TLS = testState.trustedExternalServiceTLS
-				routeService.StartTLS()
 				defer routeService.Close()
 
-				testState.registerWithExternalRouteService(testApp, routeService, testState.trustedExternalServiceHostname, appHostname)
+				testState.registerWithInternalRouteService(testApp, routeService, appHostname, testState.cfg.SSLPort)
 
 				if clientCfg.clientCert {
 					testState.client.Transport.(*http.Transport).TLSClientConfig.Certificates = testState.trustedClientTLSConfig.Certificates

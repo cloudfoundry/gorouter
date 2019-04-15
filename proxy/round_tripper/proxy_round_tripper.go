@@ -38,15 +38,17 @@ type ProxyRoundTripper interface {
 }
 
 type RoundTripperFactory interface {
-	New(expectedServerName string) ProxyRoundTripper
+	New(expectedServerName string, isRouteService bool) ProxyRoundTripper
 }
 
-func GetRoundTripper(e *route.Endpoint, roundTripperFactory RoundTripperFactory) ProxyRoundTripper {
-	e.RoundTripperInit.Do(func() {
-		e.SetRoundTripperIfNil(func() route.ProxyRoundTripper { return roundTripperFactory.New(e.ServerCertDomainSAN) })
+func GetRoundTripper(endpoint *route.Endpoint, roundTripperFactory RoundTripperFactory, isRouteService bool) ProxyRoundTripper {
+	endpoint.RoundTripperInit.Do(func() {
+		endpoint.SetRoundTripperIfNil(func() route.ProxyRoundTripper {
+			return roundTripperFactory.New(endpoint.ServerCertDomainSAN, isRouteService)
+		})
 	})
 
-	return e.RoundTripper()
+	return endpoint.RoundTripper()
 }
 
 //go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler
@@ -166,7 +168,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 			*request.URL = *reqInfo.RouteServiceURL
 
 			var roundTripper http.RoundTripper
-			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory)
+			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory, true)
 			if reqInfo.ShouldRouteToInternalRouteService {
 				roundTripper = rt.routeServicesTransport
 			}
@@ -220,7 +222,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 		return
 	}
 
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
 	tr.CancelRequest(request)
 }
 
@@ -238,7 +240,7 @@ func (rt *roundTripper) backendRoundTrip(
 	iter.PreRequest(endpoint)
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
 	res, err := rt.timedRoundTrip(tr, request)
 
 	// decrement connection stats

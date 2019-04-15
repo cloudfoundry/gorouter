@@ -140,6 +140,17 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 }
 
+func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
+	forwardedURLRaw := req.Header.Get(routeservice.HeaderKeyForwardedURL)
+	signature := req.Header.Get(routeservice.HeaderKeySignature)
+
+	if forwardedURLRaw == "" || signature == "" {
+		return false
+	}
+	_, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+	return err == nil
+}
+
 func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {

@@ -28,19 +28,27 @@ func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
 }
 
 type FactoryImpl struct {
-	Template *http.Transport
+	BackendTemplate      *http.Transport
+	RouteServiceTemplate *http.Transport
 }
 
-func (t *FactoryImpl) New(expectedServerName string) ProxyRoundTripper {
-	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, t.Template.TLSClientConfig)
+func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyRoundTripper {
+	var template *http.Transport
+	if isRouteService {
+		template = t.RouteServiceTemplate
+	} else {
+		template = t.BackendTemplate
+	}
+
+	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig)
 
 	newTransport := &http.Transport{
-		Dial:                t.Template.Dial,
-		DisableKeepAlives:   t.Template.DisableKeepAlives,
-		MaxIdleConns:        t.Template.MaxIdleConns,
-		IdleConnTimeout:     t.Template.IdleConnTimeout,
-		MaxIdleConnsPerHost: t.Template.MaxIdleConnsPerHost,
-		DisableCompression:  t.Template.DisableCompression,
+		Dial:                template.Dial,
+		DisableKeepAlives:   template.DisableKeepAlives,
+		MaxIdleConns:        template.MaxIdleConns,
+		IdleConnTimeout:     template.IdleConnTimeout,
+		MaxIdleConnsPerHost: template.MaxIdleConnsPerHost,
+		DisableCompression:  template.DisableCompression,
 		TLSClientConfig:     customTLSConfig,
 	}
 	return NewDropsondeRoundTripper(newTransport)

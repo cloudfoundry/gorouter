@@ -43,12 +43,12 @@ func (t *testBody) Close() error {
 }
 
 type FakeRoundTripperFactory struct {
-	ReturnValue round_tripper.ProxyRoundTripper
-	Calls       int
+	ReturnValue                round_tripper.ProxyRoundTripper
+	RequestedRoundTripperTypes []bool
 }
 
-func (f *FakeRoundTripperFactory) New(expectedServerName string) round_tripper.ProxyRoundTripper {
-	f.Calls++
+func (f *FakeRoundTripperFactory) New(expectedServerName string, isRouteService bool) round_tripper.ProxyRoundTripper {
+	f.RequestedRoundTripperTypes = append(f.RequestedRoundTripperTypes, isRouteService)
 	return f.ReturnValue
 }
 
@@ -546,11 +546,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("re-uses transports for the same endpoint", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(1))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(1))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
 				})
 
 				It("does not re-use transports between endpoints", func() {
@@ -562,15 +562,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(1))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(2))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false, false}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.Calls).To(Equal(2))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false, false}))
 				})
 			})
 

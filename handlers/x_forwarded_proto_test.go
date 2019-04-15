@@ -2,7 +2,6 @@ package handlers_test
 
 import (
 	"crypto/tls"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 
@@ -11,7 +10,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/uber-go/zap"
 )
 
 var _ = Describe("X-Forwarded-Proto", func() {
@@ -43,7 +41,7 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		var handler *handlers.XForwardedProto
 		BeforeEach(func() {
 			handler = &handlers.XForwardedProto{
-				SkipSanitization:         func(req *http.Request) (bool, error) { return true, nil },
+				SkipSanitization:         func(req *http.Request) bool { return true },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   false,
 				Logger:                   logger,
@@ -70,7 +68,7 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		var handler *handlers.XForwardedProto
 		BeforeEach(func() {
 			handler = &handlers.XForwardedProto{
-				SkipSanitization:         func(req *http.Request) (bool, error) { return false, nil },
+				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: true,
 				SanitizeForwardedProto:   false,
 				Logger:                   logger,
@@ -93,7 +91,7 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		var handler *handlers.XForwardedProto
 		BeforeEach(func() {
 			handler = &handlers.XForwardedProto{
-				SkipSanitization:         func(req *http.Request) (bool, error) { return false, nil },
+				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   true,
 				Logger:                   logger,
@@ -123,7 +121,7 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		var handler *handlers.XForwardedProto
 		BeforeEach(func() {
 			handler = &handlers.XForwardedProto{
-				SkipSanitization:         func(req *http.Request) (bool, error) { return false, nil },
+				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   false,
 				Logger:                   logger,
@@ -144,26 +142,6 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		It("sets X-Forwarded-Proto to http if client is not providing one and connecting over http", func() {
 			Expect(processAndGetUpdatedHeader(handler)).To(Equal("http"))
 			Expect(nextCalled).To(BeTrue())
-		})
-	})
-
-	Context("When SkipSanitization returns an error", func() {
-		var handler *handlers.XForwardedProto
-		BeforeEach(func() {
-			handler = &handlers.XForwardedProto{
-				SkipSanitization:         func(req *http.Request) (bool, error) { return false, errors.New("bad stuff") },
-				ForceForwardedProtoHttps: false,
-				SanitizeForwardedProto:   false,
-				Logger:                   logger,
-			}
-		})
-		It("returns with an HTTP bad request", func() {
-			processAndGetUpdatedHeader(handler)
-			Expect(nextCalled).To(BeFalse())
-			Expect(res.Code).To(Equal(http.StatusBadRequest))
-			message, zapFields := logger.ErrorArgsForCall(0)
-			Expect(message).To(Equal("signature-validation-failed"))
-			Expect(zapFields).To(ContainElement(zap.Error(errors.New("bad stuff"))))
 		})
 	})
 })

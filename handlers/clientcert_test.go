@@ -32,12 +32,11 @@ var _ = Describe("Clientcert", func() {
 		forceDeleteHeader      = func(req *http.Request) (bool, error) { return true, nil }
 		dontForceDeleteHeader  = func(req *http.Request) (bool, error) { return false, nil }
 		errorForceDeleteHeader = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
-		skipSanitization       = func(req *http.Request) (bool, error) { return true, nil }
-		dontSkipSanitization   = func(req *http.Request) (bool, error) { return false, nil }
-		errorSkipSanitization  = func(req *http.Request) (bool, error) { return false, errors.New("skipSanitization error") }
+		skipSanitization       = func(req *http.Request) bool { return true }
+		dontSkipSanitization   = func(req *http.Request) bool { return false }
 	)
 
-	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) (bool, error), errorCase string) {
+	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {
 		logger := new(logger_fakes.FakeLogger)
 		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger)
 
@@ -69,10 +68,9 @@ var _ = Describe("Clientcert", func() {
 		Expect(nextHandlerWasCalled).To(BeFalse())
 	},
 		Entry("forceDelete returns an error", errorForceDeleteHeader, skipSanitization, "forceDeleteError"),
-		Entry("skipSanitization returns an error", forceDeleteHeader, errorSkipSanitization, "sanitizeError"),
 	)
 
-	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) (bool, error), forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
+	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
 		logger := new(logger_fakes.FakeLogger)
 		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger)
 

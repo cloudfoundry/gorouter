@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -70,22 +69,10 @@ func NewRouteServicesServer() (*RouteServicesServer, error) {
 	}, nil
 }
 
-func (rs *RouteServicesServer) ArrivedViaARouteServicesServer(req *http.Request) bool {
-	if reqRS, ok := req.Context().Value(arrivedViaRSS).(*RouteServicesServer); ok {
-		return reqRS == rs
-	}
-	return false
-}
-
-type key int
-
-const arrivedViaRSS key = 0
-
 func (rs *RouteServicesServer) Serve(handler http.Handler, errChan chan error) error {
 	localServer := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			reqWithData := r.WithContext(context.WithValue(r.Context(), arrivedViaRSS, rs))
-			handler.ServeHTTP(w, reqWithData)
+			handler.ServeHTTP(w, r)
 		}),
 	}
 	tlsConfig := &tls.Config{

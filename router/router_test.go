@@ -1854,9 +1854,8 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.RouteServicesHairpinning, config.EndpointTimeout, nil, nil, false)
 
 	rt := &sharedfakes.RoundTripper{}
-	skipSanitize := func(*http.Request) bool { return false }
 	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, nil, rt, skipSanitize)
+		routeServiceConfig, &tls.Config{}, &tls.Config{}, nil, rt)
 
 	var healthCheck int32
 	healthCheck = 0

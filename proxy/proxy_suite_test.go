@@ -127,7 +127,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, heartbeatOK, fakeRouteServicesClient, skipSanitization)
+	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, heartbeatOK, fakeRouteServicesClient)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)

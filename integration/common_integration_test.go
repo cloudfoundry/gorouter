@@ -97,6 +97,10 @@ func NewTestState() *testState {
 		CertChain:  string(gorouterToBackendsClientCertChain.CertPEM),
 		PrivateKey: string(gorouterToBackendsClientCertChain.PrivKeyPEM),
 	}
+	cfg.RouteServiceConfig.TLSPem = config.TLSPem{
+		CertChain:  string(browserToGoRouterClientCertChain.CertPEM),
+		PrivateKey: string(browserToGoRouterClientCertChain.PrivKeyPEM),
+	}
 
 	// make backend trust the CA that signed the gorouter's client cert
 	certPool := x509.NewCertPool()

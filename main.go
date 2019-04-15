@@ -27,14 +27,14 @@ import (
 	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/routing-api"
+	routing_api "code.cloudfoundry.org/routing-api"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
@@ -156,12 +156,19 @@ func main() {
 		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
 	}
 
+	routeServiceTLSConfig := &tls.Config{
+		CipherSuites:       c.CipherSuites,
+		InsecureSkipVerify: c.SkipSSLValidation,
+		RootCAs:            c.CAPool,
+		Certificates:       []tls.Certificate{c.RouteServiceConfig.ClientAuthCertificate},
+	}
+
 	rss, err := router.NewRouteServicesServer()
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
 	healthCheck = 0
-	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, &healthCheck, rss.GetRoundTripper(), rss.ArrivedViaARouteServicesServer)
+	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, &healthCheck, rss.GetRoundTripper())
 	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))

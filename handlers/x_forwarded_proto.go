@@ -4,11 +4,10 @@ import (
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 )
 
 type XForwardedProto struct {
-	SkipSanitization         func(req *http.Request) (bool, error)
+	SkipSanitization         func(req *http.Request) bool
 	ForceForwardedProtoHttps bool
 	SanitizeForwardedProto   bool
 	Logger                   logger.Logger
@@ -17,17 +16,7 @@ type XForwardedProto struct {
 func (h *XForwardedProto) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	newReq := new(http.Request)
 	*newReq = *r
-	skip, err := h.SkipSanitization(r)
-	if err != nil {
-		h.Logger.Error("signature-validation-failed", zap.Error(err))
-		writeStatus(
-			rw,
-			http.StatusBadRequest,
-			"Failed to validate Route Service Signature for x-forwarded-proto",
-			h.Logger,
-		)
-		return
-	}
+	skip := h.SkipSanitization(r)
 	if !skip {
 		if h.ForceForwardedProtoHttps {
 			newReq.Header.Set("X-Forwarded-Proto", "https")

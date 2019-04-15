@@ -50,7 +50,7 @@ type proxy struct {
 	endpointTimeout          time.Duration
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
-	skipSanitization         func(req *http.Request) bool
+	routeServiceTLSConfig    *tls.Config
 	disableXFFLogging        bool
 	disableSourceIPLogging   bool
 }
@@ -62,10 +62,10 @@ func NewProxy(
 	registry registry.Registry,
 	reporter metrics.ProxyReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
-	tlsConfig *tls.Config,
+	backendTLSConfig *tls.Config,
+	routeServiceTLSConfig *tls.Config,
 	heartbeatOK *int32,
 	routeServicesTransport http.RoundTripper,
-	skipSanitization func(req *http.Request) bool,
 ) http.Handler {
 
 	p := &proxy{
@@ -84,21 +84,30 @@ func NewProxy(
 		endpointDialTimeout:      cfg.EndpointDialTimeout,
 		endpointTimeout:          cfg.EndpointTimeout,
 		bufferPool:               NewBufferPool(),
-		backendTLSConfig:         tlsConfig,
-		skipSanitization:         skipSanitization,
+		backendTLSConfig:         backendTLSConfig,
+		routeServiceTLSConfig:    routeServiceTLSConfig,
 		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging:   cfg.Logging.DisableLogSourceIP,
 	}
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
-		Template: &http.Transport{
+		BackendTemplate: &http.Transport{
 			Dial:                (&net.Dialer{Timeout: cfg.EndpointDialTimeout}).Dial,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
 			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
 			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
 			DisableCompression:  true,
-			TLSClientConfig:     tlsConfig,
+			TLSClientConfig:     backendTLSConfig,
+		},
+		RouteServiceTemplate: &http.Transport{
+			Dial:                (&net.Dialer{Timeout: cfg.EndpointDialTimeout}).Dial,
+			DisableKeepAlives:   cfg.DisableKeepAlives,
+			MaxIdleConns:        cfg.MaxIdleConns,
+			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
+			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
+			DisableCompression:  true,
+			TLSClientConfig:     routeServiceTLSConfig,
 		},
 	}
 
@@ -140,13 +149,13 @@ func NewProxy(
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger))
 	n.Use(handlers.NewClientCert(
-		SkipSanitize(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
+		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
 		cfg.ForwardedClientCert,
 		logger,
 	))
 	n.Use(&handlers.XForwardedProto{
-		SkipSanitization:         SkipSanitizeXFP(p.skipSanitization, routeServiceHandler.(*handlers.RouteService)),
+		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),
 		ForceForwardedProtoHttps: p.forceForwardedProtoHttps,
 		SanitizeForwardedProto:   p.sanitizeForwardedProto,
 		Logger:                   logger,
@@ -160,25 +169,18 @@ func NewProxy(
 
 type RouteServiceValidator interface {
 	ArrivedViaRouteService(req *http.Request) (bool, error)
+	IsRouteServiceTraffic(req *http.Request) bool
 }
 
-func SkipSanitizeXFP(arrivedViaRouteServicesServer func(*http.Request) bool, routeServiceValidator RouteServiceValidator) func(*http.Request) (bool, error) {
-	return func(req *http.Request) (bool, error) {
-		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
-		if err != nil {
-			return false, err
-		}
-		return valid || arrivedViaRouteServicesServer(req), nil
+func SkipSanitizeXFP(routeServiceValidator RouteServiceValidator) func(*http.Request) bool {
+	return func(req *http.Request) bool {
+		return routeServiceValidator.IsRouteServiceTraffic(req)
 	}
 }
 
-func SkipSanitize(arrivedViaRouteServicesServer func(*http.Request) bool, routeServiceValidator RouteServiceValidator) func(*http.Request) (bool, error) {
-	return func(req *http.Request) (bool, error) {
-		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
-		if err != nil {
-			return false, err
-		}
-		return arrivedViaRouteServicesServer(req) || (valid && req.TLS != nil), nil
+func SkipSanitize(routeServiceValidator RouteServiceValidator) func(*http.Request) bool {
+	return func(req *http.Request) bool {
+		return routeServiceValidator.IsRouteServiceTraffic(req) && (req.TLS != nil)
 	}
 }
 
@@ -215,7 +217,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	stickyEndpointId := getStickySession(request)
-	iter := &wrappedIterator{
+	endpointIterator := &wrappedIterator{
 		nested: reqInfo.RoutePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
 
 		afterNext: func(endpoint *route.Endpoint) {
@@ -227,12 +229,12 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	}
 
 	if handlers.IsTcpUpgrade(request) {
-		handler.HandleTcpRequest(iter)
+		handler.HandleTcpRequest(endpointIterator)
 		return
 	}
 
 	if handlers.IsWebSocketUpgrade(request) {
-		handler.HandleWebSocketRequest(iter)
+		handler.HandleWebSocketRequest(endpointIterator)
 		return
 	}
 

@@ -79,6 +79,11 @@ type BackendConfig struct {
 	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }
 
+type RouteServiceConfig struct {
+	ClientAuthCertificate tls.Certificate
+	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
+}
+
 type LoggingConfig struct {
 	Syslog                 string `yaml:"syslog"`
 	SyslogAddr             string
@@ -193,6 +198,8 @@ type Config struct {
 	Backends                    BackendConfig `yaml:"backends,omitempty"`
 	ExtraHeadersToLog           []string      `yaml:"extra_headers_to_log,omitempty"`
 
+	RouteServiceConfig RouteServiceConfig `yaml:"route_services,omitempty"`
+
 	TokenFetcherMaxRetries                    uint32        `yaml:"token_fetcher_max_retries,omitempty"`
 	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval,omitempty"`
 	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time,omitempty"`
@@ -293,6 +300,15 @@ func (c *Config) Process() error {
 			return fmt.Errorf(errMsg)
 		}
 		c.Backends.ClientAuthCertificate = certificate
+	}
+
+	if c.RouteServiceConfig.CertChain != "" && c.RouteServiceConfig.PrivateKey != "" {
+		certificate, err := tls.X509KeyPair([]byte(c.RouteServiceConfig.CertChain), []byte(c.RouteServiceConfig.PrivateKey))
+		if err != nil {
+			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			return fmt.Errorf(errMsg)
+		}
+		c.RouteServiceConfig.ClientAuthCertificate = certificate
 	}
 
 	if c.EnableSSL {
