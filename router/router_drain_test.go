@@ -108,12 +108,16 @@ var _ = Describe("Router", func() {
 		signals := make(chan os.Signal, 1)
 		readyChan := make(chan struct{}, 1)
 		closeChannel := make(chan struct{}, 1)
+		errChannel := make(chan error, 1)
 		go func() {
-			r.Run(signals, readyChan)
-			close(closeChannel)
+			defer close(closeChannel)
+			defer close(errChannel)
+			errChannel <- r.Run(signals, readyChan)
 		}()
 		select {
 		case <-readyChan:
+		case err := <-errChannel:
+			Expect(err).ToNot(HaveOccurred())
 		}
 		return signals, closeChannel
 	}
