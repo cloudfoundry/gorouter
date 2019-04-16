@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"sync/atomic"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -48,7 +48,7 @@ var (
 	cryptoPrev              secure.Crypto
 	caCertPool              *x509.CertPool
 	recommendHttps          bool
-	heartbeatOK             *int32
+	heartbeatOK             *threading.SharedBoolean
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
 	skipSanitization        func(req *http.Request) bool
@@ -60,8 +60,8 @@ func TestProxy(t *testing.T) {
 }
 
 var _ = BeforeEach(func() {
-	heartbeatOK = new(int32)
-	atomic.StoreInt32(heartbeatOK, 1)
+	heartbeatOK = &threading.SharedBoolean{}
+	heartbeatOK.Set(true)
 	testLogger = test_util.NewTestZapLogger("test")
 	var err error
 

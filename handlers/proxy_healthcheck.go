@@ -1,16 +1,15 @@
 package handlers
 
 import (
-	"net/http"
-	"sync/atomic"
-
+	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni"
+	"net/http"
 )
 
 type proxyHealthcheck struct {
 	userAgent   string
-	heartbeatOK *int32
+	heartbeatOK *threading.SharedBoolean
 	logger      logger.Logger
 }
 
@@ -18,7 +17,7 @@ type proxyHealthcheck struct {
 // If userAgent is set to a non-empty string, it will use that user agent to
 // differentiate between healthcheck requests and non-healthcheck requests.
 // Otherwise, it will treat all requests as healthcheck requests.
-func NewProxyHealthcheck(userAgent string, heartbeatOK *int32, logger logger.Logger) negroni.Handler {
+func NewProxyHealthcheck(userAgent string, heartbeatOK *threading.SharedBoolean, logger logger.Logger) negroni.Handler {
 	return &proxyHealthcheck{
 		userAgent:   userAgent,
 		heartbeatOK: heartbeatOK,
@@ -36,7 +35,7 @@ func (h *proxyHealthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	rw.Header().Set("Cache-Control", "private, max-age=0")
 	rw.Header().Set("Expires", "0")
 
-	draining := atomic.LoadInt32(h.heartbeatOK) == 0
+	draining := !h.heartbeatOK.Get()
 	if draining {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		r.Close = true

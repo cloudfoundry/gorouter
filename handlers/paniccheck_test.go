@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"code.cloudfoundry.org/gorouter/common/threading"
+
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -17,7 +19,7 @@ import (
 
 var _ = Describe("Paniccheck", func() {
 	var (
-		heartbeatOK  int32
+		heartbeatOK  *threading.SharedBoolean
 		testLogger   logger.Logger
 		panicHandler negroni.Handler
 		request      *http.Request
@@ -25,13 +27,14 @@ var _ = Describe("Paniccheck", func() {
 	)
 
 	BeforeEach(func() {
-		heartbeatOK = 1
+		heartbeatOK = &threading.SharedBoolean{}
+		heartbeatOK.Set(true)
 
 		testLogger = test_util.NewTestZapLogger("test")
 		request = httptest.NewRequest("GET", "http://example.com/foo", nil)
 		recorder = httptest.NewRecorder()
 
-		panicHandler = handlers.NewPanicCheck(&heartbeatOK, testLogger)
+		panicHandler = handlers.NewPanicCheck(heartbeatOK, testLogger)
 	})
 
 	Context("when something panics", func() {
@@ -39,10 +42,9 @@ var _ = Describe("Paniccheck", func() {
 			panic(errors.New("we expect this panic"))
 		}
 
-		It("the healthcheck is set to 0", func() {
+		It("the healthcheck is set to false", func() {
 			panicHandler.ServeHTTP(recorder, request, expectedPanic)
-
-			Expect(heartbeatOK).To(Equal(int32(0)))
+			Expect(heartbeatOK.Get()).To(BeFalse())
 		})
 
 		It("responds with a 503 Service Unavailable", func() {
@@ -60,9 +62,9 @@ var _ = Describe("Paniccheck", func() {
 	Context("when there is no panic", func() {
 		var noop = func(http.ResponseWriter, *http.Request) {}
 
-		It("leaves the healthcheck set to 1", func() {
+		It("leaves the healthcheck set to true", func() {
 			panicHandler.ServeHTTP(recorder, request, noop)
-			Expect(heartbeatOK).To(Equal(int32(1)))
+			Expect(heartbeatOK.Get()).To(BeTrue())
 		})
 
 		It("responds with a 200", func() {
@@ -85,12 +87,12 @@ var _ = Describe("Paniccheck", func() {
 			panic(http.ErrAbortHandler)
 		}
 
-		It("the healthcheck is set to 1", func() {
+		It("the healthcheck is set to true", func() {
 			Expect(func() {
 				panicHandler.ServeHTTP(recorder, request, errAbort)
 			}).To(Panic())
 
-			Expect(heartbeatOK).To(Equal(int32(1)))
+			Expect(heartbeatOK.Get()).To(BeTrue())
 		})
 
 		It("does not log anything", func() {

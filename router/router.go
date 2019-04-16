@@ -1,11 +1,6 @@
 package router
 
 import (
-	"os"
-	"sync"
-	"sync/atomic"
-	"syscall"
-
 	"bytes"
 	"compress/zlib"
 	"crypto/tls"
@@ -15,19 +10,24 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"sync"
+	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/gorouter/handlers"
 
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
-	"github.com/armon/go-proxyproto"
-	"github.com/nats-io/go-nats"
+	proxyproto "github.com/armon/go-proxyproto"
+	nats "github.com/nats-io/go-nats"
 	"github.com/uber-go/zap"
 )
 
@@ -45,7 +45,6 @@ type rss interface {
 	Serve(handler http.Handler, errChan chan error) error
 	Stop()
 }
-
 type Router struct {
 	config     *config.Config
 	handler    http.Handler
@@ -66,15 +65,14 @@ type Router struct {
 	stopping            bool
 	stopLock            sync.Mutex
 	uptimeMonitor       *monitor.Uptime
-	HeartbeatOK         *int32
+	heartBeatOK         *threading.SharedBoolean
 	logger              logger.Logger
 	errChan             chan error
 	routeServicesServer rss
 }
 
 func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
-
+	v varz.Varz, heartbeatOK *threading.SharedBoolean, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
 	var host string
 	if cfg.Status.Port != 0 {
 		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
@@ -122,7 +120,7 @@ func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, m
 		activeConns:         make(map[net.Conn]struct{}),
 		logger:              logger,
 		errChan:             routerErrChan,
-		HeartbeatOK:         heartbeatOK,
+		heartBeatOK:         heartbeatOK,
 		stopping:            false,
 		routeServicesServer: routeServicesServer,
 	}
@@ -168,7 +166,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
-	atomic.StoreInt32(r.HeartbeatOK, 1)
+	r.heartBeatOK.Set(true)
 
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
@@ -313,7 +311,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 }
 
 func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
-	atomic.StoreInt32(r.HeartbeatOK, 0)
+	r.heartBeatOK.Set(false)
 
 	<-time.After(drainWait)
 

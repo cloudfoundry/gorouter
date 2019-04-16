@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"code.cloudfoundry.org/gorouter/common/threading"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,7 @@ var _ = Describe("Proxy Healthcheck", func() {
 		logger      logger.Logger
 		resp        *httptest.ResponseRecorder
 		req         *http.Request
-		heartbeatOK int32
+		heartbeatOK *threading.SharedBoolean
 		nextHandler http.HandlerFunc
 		nextCalled  bool
 	)
@@ -27,9 +28,10 @@ var _ = Describe("Proxy Healthcheck", func() {
 		logger = test_util.NewTestZapLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
-		heartbeatOK = 1
+		heartbeatOK = &threading.SharedBoolean{}
+		heartbeatOK.Set(true)
 
-		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", &heartbeatOK, logger)
+		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", heartbeatOK, logger)
 		nextHandler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})
@@ -67,7 +69,7 @@ var _ = Describe("Proxy Healthcheck", func() {
 
 		Context("when draining is in progress", func() {
 			BeforeEach(func() {
-				heartbeatOK = 0
+				heartbeatOK.Set(false)
 			})
 
 			It("closes the request", func() {

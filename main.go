@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/threading"
+
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	"code.cloudfoundry.org/gorouter/accesslog"
@@ -43,7 +45,7 @@ import (
 
 var (
 	configFile  string
-	healthCheck int32
+	healthCheck *threading.SharedBoolean
 )
 
 func main() {
@@ -167,9 +169,10 @@ func main() {
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
-	healthCheck = 0
-	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, &healthCheck, rss.GetRoundTripper())
-	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil, rss)
+	healthCheck = &threading.SharedBoolean{}
+	healthCheck.Set(false)
+	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, healthCheck, rss.GetRoundTripper())
+	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, healthCheck, logCounter, nil, rss)
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}

@@ -7,9 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sync/atomic"
 	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/threading"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -48,7 +49,7 @@ var _ = Describe("Router", func() {
 		rtr              *router.Router
 		subscriber       ifrit.Process
 		natsPort         uint16
-		healthCheck      int32
+		healthCheck      *threading.SharedBoolean
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
@@ -114,11 +115,13 @@ var _ = Describe("Router", func() {
 			defer close(errChannel)
 			errChannel <- r.Run(signals, readyChan)
 		}()
+
 		select {
 		case <-readyChan:
 		case err := <-errChannel:
 			Expect(err).ToNot(HaveOccurred())
 		}
+
 		return signals, closeChannel
 	}
 
@@ -216,7 +219,8 @@ var _ = Describe("Router", func() {
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		logcounter := schema.NewLogCounter()
-		atomic.StoreInt32(&healthCheck, 0)
+		healthCheck = &threading.SharedBoolean{}
+		healthCheck.Set(false)
 
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
@@ -227,17 +231,18 @@ var _ = Describe("Router", func() {
 
 		rt := &sharedfakes.RoundTripper{}
 		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, &healthCheck, rt)
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthCheck, rt)
 
 		errChan := make(chan error, 2)
 		var err error
 		rss := &sharedfakes.RouteServicesServer{}
-		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
+		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, errChan, rss)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
 		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber")))
 		<-subscriber.Ready()
+
 	})
 
 	AfterEach(func() {
@@ -329,7 +334,7 @@ var _ = Describe("Router", func() {
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
-
+				//TODO: wtf is this doing here? sleep?
 				time.Sleep(1 * time.Second)
 			})
 			app.RegisterAndListen()
@@ -468,17 +473,16 @@ var _ = Describe("Router", func() {
 
 			BeforeEach(func() {
 				logcounter := schema.NewLogCounter()
-				var healthCheck int32
-				healthCheck = 0
+				healthCheck := &threading.SharedBoolean{}
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
 				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, &healthCheck, rt)
+					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthCheck, rt)
 
 				errChan = make(chan error, 2)
 				var err error
 				rss := &sharedfakes.RouteServicesServer{}
-				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, errChan, rss)
+				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
 				runRouter(rtr)
 			})
@@ -509,6 +513,7 @@ var _ = Describe("Router", func() {
 		Context("when a SIGTERM signal is sent", func() {
 			It("it drains and stops the router", func() {
 				signals, closeChannel := runRouter(rtr)
+				//time.Sleep(time.Second)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGTERM)
 			})
 		})

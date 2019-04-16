@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"code.cloudfoundry.org/gorouter/common/threading"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -39,8 +41,9 @@ var _ = Describe("AccessLogRecord", func() {
 
 		rss, err := router.NewRouteServicesServer()
 		Expect(err).ToNot(HaveOccurred())
+		var heartbeatOK *threading.SharedBoolean
 		proxy.NewProxy(logger, accesslog, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
-			&tls.Config{}, &tls.Config{}, nil, rss.GetRoundTripper())
+			&tls.Config{}, &tls.Config{}, heartbeatOK, rss.GetRoundTripper())
 
 		b.Time("RegisterTime", func() {
 			for i := 0; i < 1000; i++ {

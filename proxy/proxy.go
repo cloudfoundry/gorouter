@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/threading"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -40,7 +42,7 @@ type proxy struct {
 	reporter                 metrics.ProxyReporter
 	accessLogger             accesslog.AccessLogger
 	secureCookies            bool
-	heartbeatOK              *int32
+	heartbeatOK              *threading.SharedBoolean
 	routeServiceConfig       *routeservice.RouteServiceConfig
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
@@ -64,7 +66,7 @@ func NewProxy(
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	backendTLSConfig *tls.Config,
 	routeServiceTLSConfig *tls.Config,
-	heartbeatOK *int32,
+	heartbeatOK *threading.SharedBoolean,
 	routeServicesTransport http.RoundTripper,
 ) http.Handler {
 
@@ -75,7 +77,7 @@ func NewProxy(
 		logger:                   logger,
 		reporter:                 reporter,
 		secureCookies:            cfg.SecureCookies,
-		heartbeatOK:              heartbeatOK, // 1->true, 0->false
+		heartbeatOK:              heartbeatOK,
 		routeServiceConfig:       routeServiceConfig,
 		healthCheckUserAgent:     cfg.HealthCheckUserAgent,
 		forceForwardedProtoHttps: cfg.ForceForwardedProtoHttps,

@@ -1249,8 +1249,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds with failure to load balancer check if heartbeatOK is false", func() {
-			atomic.StoreInt32(heartbeatOK, 0)
-
+			heartbeatOK.Set(false)
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "", "/", nil)

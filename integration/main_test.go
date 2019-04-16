@@ -28,8 +28,8 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/localip"
 
-	"github.com/nats-io/go-nats"
-	"gopkg.in/yaml.v2"
+	nats "github.com/nats-io/go-nats"
+	yaml "gopkg.in/yaml.v2"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

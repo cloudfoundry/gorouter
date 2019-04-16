@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -22,35 +23,33 @@ import (
 	"syscall"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/threading"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
+	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	. "code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
+	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
-
-	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
-
-	"encoding/base64"
-
-	"code.cloudfoundry.org/gorouter/logger"
-	testcommon "code.cloudfoundry.org/gorouter/test/common"
 )
 
 var _ = Describe("Router", func() {
@@ -1855,12 +1854,11 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 
 	rt := &sharedfakes.RoundTripper{}
 	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, &tls.Config{}, nil, rt)
+		routeServiceConfig, &tls.Config{}, &tls.Config{}, &threading.SharedBoolean{}, rt)
 
-	var healthCheck int32
-	healthCheck = 0
+	healthCheck := &threading.SharedBoolean{}
 	logcounter := schema.NewLogCounter()
-	return NewRouter(logger, config, p, mbusClient, registry, varz, &healthCheck, logcounter, nil, routeServicesServer)
+	return NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, nil, routeServicesServer)
 }
 
 func readVarz(v vvarz.Varz) map[string]interface{} {
