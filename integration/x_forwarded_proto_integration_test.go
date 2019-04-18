@@ -249,10 +249,13 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				testState.registerWithExternalRouteService(testApp, externalRouteService, testState.trustedExternalServiceHostname, hostname)
 
 				doRequest(testCase, hostname)
-				expectedBackendHeader := <-appReceivedHeaders
+
+				var expectedBackendHeader http.Header
+				Expect(appReceivedHeaders).To(Receive(&expectedBackendHeader))
 				Expect(expectedBackendHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendHeader}))
 
-				expectedRsHeader := <-externalRsHeaders
+				var expectedRsHeader http.Header
+				Expect(externalRsHeaders).To(Receive(&expectedRsHeader))
 				Expect(expectedRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
 
 				By("registering internal route service")
