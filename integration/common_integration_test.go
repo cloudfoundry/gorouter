@@ -168,7 +168,7 @@ func (s *testState) registerAsTLS(backend *httptest.Server, routeURI string, ser
 		Port:                    openPort,
 		TLSPort:                 tlsPort,
 		Uris:                    []route.Uri{route.Uri(routeURI)},
-		StaleThresholdInSeconds: 1,
+		StaleThresholdInSeconds: 10,
 		RouteServiceURL:         "",
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 		ServerCertDomainSAN:     serverCertDomainSAN,
@@ -183,7 +183,7 @@ func (s *testState) registerWithExternalRouteService(appBackend, routeServiceSer
 		Host:                    "127.0.0.1",
 		Port:                    uint16(appBackendPort),
 		Uris:                    []route.Uri{route.Uri(routeURI)},
-		StaleThresholdInSeconds: 1,
+		StaleThresholdInSeconds: 10,
 		RouteServiceURL:         fmt.Sprintf("https://%s:%d", routeServiceHostname, routeServicePort),
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 	}
@@ -200,7 +200,7 @@ func (s *testState) registerWithInternalRouteService(appBackend, routeServiceSer
 		Host:                    "127.0.0.1",
 		Port:                    uint16(appBackendPort),
 		Uris:                    []route.Uri{route.Uri(routeURI)},
-		StaleThresholdInSeconds: 1,
+		StaleThresholdInSeconds: 10,
 		RouteServiceURL:         fmt.Sprintf("https://%s:%d", internalRouteServiceHostname, gorouterPort),
 		PrivateInstanceID:       fmt.Sprintf("%x", rand.Int31()),
 	}
