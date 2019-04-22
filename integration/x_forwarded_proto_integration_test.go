@@ -1,13 +1,14 @@
 package integration
 
 import (
-	"code.cloudfoundry.org/gorouter/routeservice"
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+
+	"code.cloudfoundry.org/gorouter/routeservice"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("modifications of X-Forwarded-Proto header", func() {
@@ -251,11 +252,11 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				doRequest(testCase, hostname)
 
 				var expectedBackendHeader http.Header
-				Expect(appReceivedHeaders).To(Receive(&expectedBackendHeader))
+				Eventually(appReceivedHeaders, "3s").Should(Receive(&expectedBackendHeader))
 				Expect(expectedBackendHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendHeader}))
 
 				var expectedRsHeader http.Header
-				Expect(externalRsHeaders).To(Receive(&expectedRsHeader))
+				Eventually(externalRsHeaders, "3s").Should(Receive(&expectedRsHeader))
 				Expect(expectedRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
 
 				By("registering internal route service")
