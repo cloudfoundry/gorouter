@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	"github.com/onsi/ginkgo"
 
 	. "github.com/onsi/gomega"
@@ -26,6 +26,7 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, dela
 		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
 
 		conn, _, err := w.(http.Hijacker).Hijack()
+		Expect(err).ToNot(HaveOccurred())
 		x := test_util.NewHttpConn(conn)
 
 		resp := test_util.NewResponse(http.StatusSwitchingProtocols)
@@ -35,7 +36,6 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, dela
 		time.Sleep(delay)
 
 		x.WriteResponse(resp)
-		Expect(err).ToNot(HaveOccurred())
 
 		x.CheckLine("hello from client")
 		x.WriteLine("hello from server")
