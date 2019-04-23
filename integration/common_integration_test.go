@@ -244,7 +244,7 @@ func (s *testState) StartGorouter() {
 		return s.gorouterSession
 	}, 20*time.Second).Should(Say("starting"))
 	Eventually(s.gorouterSession, 5*time.Second).Should(Say(`Successfully-connected-to-nats.*localhost:\d+`))
-	Eventually(s.gorouterSession, 5*time.Second).Should(Say(`gorouter.started`))
+	Eventually(s.gorouterSession, 15*time.Second).Should(Say(`gorouter.started`))
 
 	s.mbusClient, err = newMessageBus(s.cfg)
 	Expect(err).ToNot(HaveOccurred())
