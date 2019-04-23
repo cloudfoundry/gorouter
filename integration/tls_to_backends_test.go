@@ -37,6 +37,7 @@ var _ = Describe("TLS to backends", func() {
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s", "500ms").Should(BeTrue())
 
+			wsApp.WaitUntilReady()
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, testState.cfg.Port))
 			Expect(err).NotTo(HaveOccurred())
@@ -81,6 +82,8 @@ var _ = Describe("TLS to backends", func() {
 			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, localIP, testState.cfg.Status.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
+
+			wsApp.WaitUntilReady()
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, testState.cfg.Port))
 			Expect(err).NotTo(HaveOccurred())

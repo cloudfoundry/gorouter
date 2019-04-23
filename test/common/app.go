@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	. "github.com/onsi/gomega"
 )
 
@@ -95,6 +96,18 @@ func (a *TestApp) RegisterRepeatedly(duration time.Duration) {
 
 func (a *TestApp) Port() uint16 {
 	return a.port
+}
+
+func (a *TestApp) WaitUntilReady() {
+	Eventually(func() error {
+		url := fmt.Sprintf("127.0.0.1:%d", a.Port())
+		_, err := net.Dial("tcp", url)
+
+		return err
+	},
+		"5s",
+		"300ms",
+	).Should(Not(HaveOccurred()))
 }
 
 func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
