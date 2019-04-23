@@ -35,7 +35,8 @@ var _ = Describe("TLS to backends", func() {
 		assertWebsocketSuccess := func(wsApp *common.TestApp) {
 			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
-			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
+			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s", "500ms").Should(BeTrue())
+
 
 			conn, err := net.Dial("tcp", fmt.Sprintf("ws-app.%s:%d", test_util.LocalhostDNS, testState.cfg.Port))
 			Expect(err).NotTo(HaveOccurred())
