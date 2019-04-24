@@ -17,8 +17,11 @@ trap printStatus EXIT
 # install gnatsd
 go get -v github.com/nats-io/gnatsd
 
+# install shadow tool
+go get -u golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+
 go vet ./...
-go tool vet --shadow .
+go vet -vettool="$(command -v shadow)"
 
 # install ginkgo
 go install -v github.com/onsi/ginkgo/ginkgo
