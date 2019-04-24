@@ -284,7 +284,8 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	uaaClient := newUaaClient(logger, clock, c)
 
 	if !c.RoutingApi.AuthDisabled {
-		token, err := uaaClient.FetchToken(true)
+		forceUpdate := true
+		token, err := uaaClient.FetchToken(forceUpdate)
 		if err != nil {
 			return nil, fmt.Errorf("unable-to-fetch-token: %s", err.Error())
 		}
@@ -306,7 +307,8 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 
 	uaaClient := newUaaClient(logger, cl, c)
 
-	_, err := uaaClient.FetchToken(true)
+	forceUpdate := true
+	_, err := uaaClient.FetchToken(forceUpdate)
 	if err != nil {
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
