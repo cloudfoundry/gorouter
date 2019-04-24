@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	testhelpers "test-helpers"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
@@ -27,6 +28,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/localip"
+	"code.cloudfoundry.org/tlsconfig"
 
 	nats "github.com/nats-io/go-nats"
 	yaml "gopkg.in/yaml.v2"
@@ -999,7 +1001,21 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		JustBeforeEach(func() {
+			// server
+			serverCAPath, _, _, serverCert := testhelpers.GenerateCaAndMutualTlsCerts()
+			// client
+			clientCAPath, clientCertPath, clientKeyPath, _ := testhelpers.GenerateCaAndMutualTlsCerts()
+
+			tlsConfig, err := tlsconfig.Build(
+				tlsconfig.WithInternalServiceDefaults(),
+				tlsconfig.WithIdentity(serverCert),
+			).Server(
+				tlsconfig.WithClientAuthenticationFromFile(clientCAPath),
+			)
+			Expect(err).ToNot(HaveOccurred())
+
 			routingApiServer = ghttp.NewUnstartedServer()
+			routingApiServer.HTTPTestServer.TLS = tlsConfig
 			routingApiServer.RouteToHandler(
 				"GET", "/routing/v1/router_groups", ghttp.CombineHandlers(
 					verifyAuthHeader,
@@ -1033,10 +1049,20 @@ var _ = Describe("Router Integration", func() {
 					)
 				},
 			)
-			routingApiServer.Start()
+			routingApiServer.HTTPTestServer.StartTLS()
 
 			cfg.RoutingApi.Uri, cfg.RoutingApi.Port = uriAndPort(routingApiServer.URL())
+			caCerts, err := ioutil.ReadFile(serverCAPath)
+			Expect(err).NotTo(HaveOccurred())
+			cfg.RoutingApi.CACerts = string(caCerts)
 
+			clientCert, err := ioutil.ReadFile(clientCertPath)
+			Expect(err).NotTo(HaveOccurred())
+			cfg.RoutingApi.CertChain = string(clientCert)
+
+			clientKey, err := ioutil.ReadFile(clientKeyPath)
+			Expect(err).NotTo(HaveOccurred())
+			cfg.RoutingApi.PrivateKey = string(clientKey)
 		})
 		AfterEach(func() {
 			routingApiServer.Close()

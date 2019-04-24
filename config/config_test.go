@@ -246,35 +246,88 @@ routing_table_sharding_mode: "segments"
 			Expect(config.RoutingTableShardingMode).To(Equal("segments"))
 		})
 
-		It("sets the Routing Api config", func() {
-			var b = []byte(`
-routing_api:
-  uri: http://bob.url/token
-  port: 1234
-`)
+		Describe("routing API configuration", func() {
+			Context("when the routing API configuration is set", func() {
+				var (
+					cfg       *Config
+					certChain test_util.CertChain
+				)
 
-			err := config.Initialize(b)
-			Expect(err).ToNot(HaveOccurred())
+				BeforeEach(func() {
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					cfg = &Config{
+						RoutingApi: RoutingApiConfig{
+							Uri:          "http://bob.url/token",
+							Port:         1234,
+							AuthDisabled: true,
+							TLSPem: TLSPem{
+								CertChain:  string(certChain.CertPEM),
+								PrivateKey: string(certChain.PrivKeyPEM),
+							},
+							CACerts: string(certChain.CACertPEM),
+						},
+					}
+				})
 
-			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
-			Expect(config.RoutingApi.Port).To(Equal(1234))
-			Expect(config.RoutingApi.AuthDisabled).To(BeFalse())
-		})
+				Context("when the config is valid", func() {
+					BeforeEach(func() {
+						b, err := yaml.Marshal(cfg)
+						Expect(err).ToNot(HaveOccurred())
 
-		It("sets the Routing Api config with optional values", func() {
-			var b = []byte(`
-routing_api:
-  uri: http://bob.url/token
-  port: 1234
-  auth_disabled: true
-`)
+						err = config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
 
-			err := config.Initialize(b)
-			Expect(err).ToNot(HaveOccurred())
+						err = config.Process()
+						Expect(err).ToNot(HaveOccurred())
+					})
 
-			Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
-			Expect(config.RoutingApi.Port).To(Equal(1234))
-			Expect(config.RoutingApi.AuthDisabled).To(BeTrue())
+					It("pulls out the values into Go objects that we can use", func() {
+						Expect(config.RoutingApi.Uri).To(Equal("http://bob.url/token"))
+						Expect(config.RoutingApi.Port).To(Equal(1234))
+						Expect(config.RoutingApi.AuthDisabled).To(BeTrue())
+
+						Expect(config.RoutingApi.CAPool.Subjects()).To(ContainElement(certChain.CACert.RawSubject))
+						Expect(config.RoutingApi.ClientAuthCertificate).To(Equal(certChain.AsTLSConfig().Certificates[0]))
+					})
+
+					It("reports that the routing API is enabled", func() {
+						Expect(config.RoutingApiEnabled()).To(BeTrue())
+					})
+				})
+
+				Context("when the routing api config is invalid", func() {
+					processConfig := func(malformedConfig *Config) error {
+						b, err := yaml.Marshal(malformedConfig)
+						Expect(err).ToNot(HaveOccurred())
+
+						err = config.Initialize(b)
+						Expect(err).ToNot(HaveOccurred())
+
+						return config.Process()
+					}
+
+					It("returns an error if the certificate is malformed", func() {
+						cfg.RoutingApi.CertChain = "ya ya ya ya"
+						Expect(processConfig(cfg)).ToNot(Succeed())
+					})
+
+					It("returns an error if the private key is malformed", func() {
+						cfg.RoutingApi.PrivateKey = "ya ya ya ya"
+						Expect(processConfig(cfg)).ToNot(Succeed())
+					})
+
+					It("returns an error if the ca is malformed", func() {
+						cfg.RoutingApi.CACerts = "ya ya ya ya"
+						Expect(processConfig(cfg)).ToNot(Succeed())
+					})
+				})
+			})
+
+			Context("when the routing API configuration is not set", func() {
+				It("reports that the routing API is disabled", func() {
+					Expect(config.RoutingApiEnabled()).To(BeFalse())
+				})
+			})
 		})
 
 		It("sets the OAuth config", func() {
@@ -673,31 +726,6 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					It("does NOT enabled route services", func() {
 						Expect(config.RouteServiceEnabled).To(BeFalse())
 					})
-				})
-			})
-		})
-
-		Describe("RoutingApiEnabled", func() {
-			var b = []byte(`
-routing_api:
-  uri: http://jimisdabest.com
-  port: 8080
-`)
-			Context("when the routing api is properly configured", func() {
-				It("reports the routing api as enabled", func() {
-					err := config.Initialize(b)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(config.Process()).To(Succeed())
-					Expect(config.RoutingApiEnabled()).To(BeTrue())
-				})
-			})
-
-			Context("when the routing api is not properly configured", func() {
-				It("reports the routing api as disabled", func() {
-					err := config.Initialize([]byte{})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(config.Process()).To(Succeed())
-					Expect(config.RoutingApiEnabled()).To(BeFalse())
 				})
 			})
 		})

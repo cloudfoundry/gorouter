@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/tlsconfig"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
@@ -264,7 +265,18 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 
 func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {
 	routingAPIURI := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
-	client := routing_api.NewClient(routingAPIURI, false)
+
+	tlsConfig, err := tlsconfig.Build(
+		tlsconfig.WithInternalServiceDefaults(),
+		tlsconfig.WithIdentity(c.RoutingApi.ClientAuthCertificate),
+	).Client(
+		tlsconfig.WithAuthority(c.RoutingApi.CAPool),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := routing_api.NewClientWithTLSConfig(routingAPIURI, tlsConfig)
 
 	logger.Debug("fetching-token")
 	clock := clock.NewClock()
@@ -282,8 +294,7 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 		client.SetToken(token.AccessToken)
 	}
 	// Test connectivity
-	_, err := client.Routes()
-	if err != nil {
+	if _, err := client.Routes(); err != nil {
 		return nil, err
 	}
 

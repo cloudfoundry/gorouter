@@ -52,9 +52,13 @@ type NatsConfig struct {
 }
 
 type RoutingApiConfig struct {
-	Uri          string `yaml:"uri"`
-	Port         int    `yaml:"port"`
-	AuthDisabled bool   `yaml:"auth_disabled"`
+	Uri                   string         `yaml:"uri"`
+	Port                  int            `yaml:"port"`
+	AuthDisabled          bool           `yaml:"auth_disabled"`
+	CACerts               string         `yaml:"ca_certs"`
+	CAPool                *x509.CertPool `yaml:"-"`
+	ClientAuthCertificate tls.Certificate
+	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }
 
 var defaultNatsConfig = NatsConfig{
@@ -309,6 +313,22 @@ func (c *Config) Process() error {
 			return fmt.Errorf(errMsg)
 		}
 		c.RouteServiceConfig.ClientAuthCertificate = certificate
+	}
+
+	if c.RoutingApiEnabled() {
+		certificate, err := tls.X509KeyPair([]byte(c.RoutingApi.CertChain), []byte(c.RoutingApi.PrivateKey))
+		if err != nil {
+			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			return fmt.Errorf(errMsg)
+		}
+		c.RoutingApi.ClientAuthCertificate = certificate
+
+		certPool := x509.NewCertPool()
+
+		if ok := certPool.AppendCertsFromPEM([]byte(c.RoutingApi.CACerts)); !ok {
+			return fmt.Errorf("Error while adding CACerts to gorouter's routing-api cert pool: \n%s\n", c.RoutingApi.CACerts)
+		}
+		c.RoutingApi.CAPool = certPool
 	}
 
 	if c.EnableSSL {
