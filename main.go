@@ -50,6 +50,15 @@ var (
 )
 
 func main() {
+	fmt.Println("")
+	fmt.Println("   _____       _____             _            ")
+	fmt.Println("  / ____|     |  __ \\           | |           ")
+	fmt.Println(" | |  __  ___ | |__) |___  _   _| |_ ___ _ __ ")
+	fmt.Println(" | | |_ |/ _ \\|  _  // _ \\| | | | __/ _ \\ '__|")
+	fmt.Println(" | |__| | (_) | | \\ \\ (_) | |_| | ||  __/ |   ")
+	fmt.Println("  \\_____|\\___/|_|  \\_\\___/ \\__,_|\\__\\___|_|   ")
+	fmt.Println("                                              ")
+	fmt.Println("                                              ")
 	flag.StringVar(&configFile, "c", "", "Configuration File")
 	flag.Parse()
 
