@@ -62,28 +62,27 @@ func main() {
 	flag.StringVar(&configFile, "c", "", "Configuration File")
 	flag.Parse()
 
+	prefix := "gorouter.stdout"
+	tmpLogger, _ := createLogger(prefix, "INFO")
+
 	c, err := config.DefaultConfig()
 	if err != nil {
-		fmt.Println("Error loading config:", err)
-		os.Exit(1)
+		tmpLogger.Fatal("Error loading config:", zap.Error(err))
 	}
 
 	if configFile != "" {
 		c, err = config.InitConfigFromFile(configFile)
 		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
+			tmpLogger.Fatal("Error loading config:", zap.Error(err))
 		}
 	}
 
 	logCounter := schema.NewLogCounter()
 
-	prefix := "gorouter.stdout"
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
 	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level)
-
 	logger.Info("starting")
 
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
