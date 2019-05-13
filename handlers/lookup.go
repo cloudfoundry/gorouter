@@ -18,6 +18,8 @@ import (
 const (
 	CfInstanceIdHeader = "X-CF-InstanceID"
 	CfAppInstance      = "X-CF-APP-INSTANCE"
+
+	cacheMaxAgeSeconds = 2
 )
 
 type lookupHandler struct {
@@ -60,7 +62,10 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	l.reporter.CaptureBadRequest()
 
 	rw.Header().Set("X-Cf-RouterError", "unknown_route")
-	rw.Header().Set("Cache-Control", "public,max-age=2")
+	rw.Header().Set(
+		"Cache-Control",
+		fmt.Sprintf("public,max-age=%d", cacheMaxAgeSeconds),
+	)
 
 	writeStatus(
 		rw,
