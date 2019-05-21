@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	testhelpers "test-helpers"
 	"time"
 
+	tls_helpers "code.cloudfoundry.org/cf-routing-test-helpers/tls"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -1002,9 +1002,9 @@ var _ = Describe("Router Integration", func() {
 
 		JustBeforeEach(func() {
 			// server
-			serverCAPath, _, _, serverCert := testhelpers.GenerateCaAndMutualTlsCerts()
+			serverCAPath, _, _, serverCert := tls_helpers.GenerateCaAndMutualTlsCerts()
 			// client
-			clientCAPath, clientCertPath, clientKeyPath, _ := testhelpers.GenerateCaAndMutualTlsCerts()
+			clientCAPath, clientCertPath, clientKeyPath, _ := tls_helpers.GenerateCaAndMutualTlsCerts()
 
 			tlsConfig, err := tlsconfig.Build(
 				tlsconfig.WithInternalServiceDefaults(),
