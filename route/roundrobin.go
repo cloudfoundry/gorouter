@@ -5,13 +5,13 @@ import (
 )
 
 type RoundRobin struct {
-	pool *Pool
+	pool *EndpointPool
 
 	initialEndpoint string
 	lastEndpoint    *Endpoint
 }
 
-func NewRoundRobin(p *Pool, initial string) EndpointIterator {
+func NewRoundRobin(p *EndpointPool, initial string) EndpointIterator {
 	return &RoundRobin{
 		pool:            p,
 		initialEndpoint: initial,

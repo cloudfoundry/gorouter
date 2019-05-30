@@ -89,7 +89,7 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 	)
 }
 
-func (l *lookupHandler) lookup(r *http.Request) *route.Pool {
+func (l *lookupHandler) lookup(r *http.Request) *route.EndpointPool {
 	requestPath := r.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)

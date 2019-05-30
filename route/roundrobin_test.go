@@ -13,7 +13,7 @@ import (
 )
 
 var _ = Describe("RoundRobin", func() {
-	var pool *route.Pool
+	var pool *route.EndpointPool
 
 	BeforeEach(func() {
 		pool = route.NewPool(&route.PoolOpts{
@@ -148,7 +148,7 @@ var _ = Describe("RoundRobin", func() {
 			const numEndpoints = 100
 			const numGoroutines = 5
 
-			iterateLoop := func(pool *route.Pool) {
+			iterateLoop := func(pool *route.EndpointPool) {
 				defer GinkgoRecover()
 				for j := 0; j < numReaders; j++ {
 					iter := route.NewRoundRobin(pool, "")

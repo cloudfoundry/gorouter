@@ -28,14 +28,14 @@ var _ = Describe("Route Service Handler", func() {
 		handler *negroni.Negroni
 
 		reg      *fakeRegistry.FakeRegistry
-		routeMap map[string]*route.Pool
+		routeMap map[string]*route.EndpointPool
 
 		resp *httptest.ResponseRecorder
 		req  *http.Request
 
 		config       *routeservice.RouteServiceConfig
 		crypto       *secure.AesGCM
-		routePool    *route.Pool
+		routePool    *route.EndpointPool
 		forwardedUrl string
 
 		logger *loggerfakes.FakeLogger
@@ -87,8 +87,8 @@ var _ = Describe("Route Service Handler", func() {
 
 		logger = new(loggerfakes.FakeLogger)
 		reg = &fakeRegistry.FakeRegistry{}
-		routeMap = make(map[string]*route.Pool)
-		reg.LookupStub = func(uri route.Uri) *route.Pool {
+		routeMap = make(map[string]*route.EndpointPool)
+		reg.LookupStub = func(uri route.Uri) *route.EndpointPool {
 			return routeMap[uri.String()]
 		}
 		routeMap["my_host.com/resource%209-9_9"] = routePool

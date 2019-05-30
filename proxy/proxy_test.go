@@ -1318,7 +1318,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		Context("when the endpoint is nil", func() {
-			removeAllEndpoints := func(pool *route.Pool) {
+			removeAllEndpoints := func(pool *route.EndpointPool) {
 				endpoints := make([]*route.Endpoint, 0)
 				pool.Each(func(e *route.Endpoint) {
 					endpoints = append(endpoints, e)
@@ -1940,7 +1940,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		Context("when the endpoint is nil", func() {
-			removeAllEndpoints := func(pool *route.Pool) {
+			removeAllEndpoints := func(pool *route.EndpointPool) {
 				endpoints := make([]*route.Endpoint, 0)
 				pool.Each(func(e *route.Endpoint) {
 					endpoints = append(endpoints, e)

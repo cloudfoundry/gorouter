@@ -79,7 +79,7 @@ var _ = Describe("Lookup", func() {
 	})
 
 	Context("when there is a pool that matches the request, but it has no endpoints", func() {
-		var pool *route.Pool
+		var pool *route.EndpointPool
 
 		BeforeEach(func() {
 			pool = route.NewPool(&route.PoolOpts{

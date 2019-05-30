@@ -42,9 +42,9 @@ var _ = Describe("Endpoint", func() {
 	})
 })
 
-var _ = Describe("Pool", func() {
+var _ = Describe("EndpointPool", func() {
 	var (
-		pool   *route.Pool
+		pool   *route.EndpointPool
 		logger *test_util.TestZapLogger
 	)
 

@@ -21,7 +21,7 @@ const requestInfoCtxKey key = "RequestInfo"
 // informaton between handlers
 type RequestInfo struct {
 	StartedAt, StoppedAt              time.Time
-	RoutePool                         *route.Pool
+	RoutePool                         *route.EndpointPool
 	RouteEndpoint                     *route.Endpoint
 	ProxyResponseWriter               utils.ProxyResponseWriter
 	RouteServiceURL                   *url.URL

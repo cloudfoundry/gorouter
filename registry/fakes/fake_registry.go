@@ -21,18 +21,18 @@ type FakeRegistry struct {
 		uri      route.Uri
 		endpoint *route.Endpoint
 	}
-	LookupStub        func(uri route.Uri) *route.Pool
+	LookupStub        func(uri route.Uri) *route.EndpointPool
 	lookupMutex       sync.RWMutex
 	lookupArgsForCall []struct {
 		uri route.Uri
 	}
 	lookupReturns struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}
 	lookupReturnsOnCall map[int]struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}
-	LookupWithInstanceStub        func(uri route.Uri, appID, appIndex string) *route.Pool
+	LookupWithInstanceStub        func(uri route.Uri, appID, appIndex string) *route.EndpointPool
 	lookupWithInstanceMutex       sync.RWMutex
 	lookupWithInstanceArgsForCall []struct {
 		uri      route.Uri
@@ -40,10 +40,10 @@ type FakeRegistry struct {
 		appIndex string
 	}
 	lookupWithInstanceReturns struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}
 	lookupWithInstanceReturnsOnCall map[int]struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}
 	StartPruningCycleStub        func()
 	startPruningCycleMutex       sync.RWMutex
@@ -134,7 +134,7 @@ func (fake *FakeRegistry) UnregisterArgsForCall(i int) (route.Uri, *route.Endpoi
 	return fake.unregisterArgsForCall[i].uri, fake.unregisterArgsForCall[i].endpoint
 }
 
-func (fake *FakeRegistry) Lookup(uri route.Uri) *route.Pool {
+func (fake *FakeRegistry) Lookup(uri route.Uri) *route.EndpointPool {
 	fake.lookupMutex.Lock()
 	ret, specificReturn := fake.lookupReturnsOnCall[len(fake.lookupArgsForCall)]
 	fake.lookupArgsForCall = append(fake.lookupArgsForCall, struct {
@@ -163,26 +163,26 @@ func (fake *FakeRegistry) LookupArgsForCall(i int) route.Uri {
 	return fake.lookupArgsForCall[i].uri
 }
 
-func (fake *FakeRegistry) LookupReturns(result1 *route.Pool) {
+func (fake *FakeRegistry) LookupReturns(result1 *route.EndpointPool) {
 	fake.LookupStub = nil
 	fake.lookupReturns = struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}{result1}
 }
 
-func (fake *FakeRegistry) LookupReturnsOnCall(i int, result1 *route.Pool) {
+func (fake *FakeRegistry) LookupReturnsOnCall(i int, result1 *route.EndpointPool) {
 	fake.LookupStub = nil
 	if fake.lookupReturnsOnCall == nil {
 		fake.lookupReturnsOnCall = make(map[int]struct {
-			result1 *route.Pool
+			result1 *route.EndpointPool
 		})
 	}
 	fake.lookupReturnsOnCall[i] = struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}{result1}
 }
 
-func (fake *FakeRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.Pool {
+func (fake *FakeRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.EndpointPool {
 	fake.lookupWithInstanceMutex.Lock()
 	ret, specificReturn := fake.lookupWithInstanceReturnsOnCall[len(fake.lookupWithInstanceArgsForCall)]
 	fake.lookupWithInstanceArgsForCall = append(fake.lookupWithInstanceArgsForCall, struct {
@@ -213,22 +213,22 @@ func (fake *FakeRegistry) LookupWithInstanceArgsForCall(i int) (route.Uri, strin
 	return fake.lookupWithInstanceArgsForCall[i].uri, fake.lookupWithInstanceArgsForCall[i].appID, fake.lookupWithInstanceArgsForCall[i].appIndex
 }
 
-func (fake *FakeRegistry) LookupWithInstanceReturns(result1 *route.Pool) {
+func (fake *FakeRegistry) LookupWithInstanceReturns(result1 *route.EndpointPool) {
 	fake.LookupWithInstanceStub = nil
 	fake.lookupWithInstanceReturns = struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}{result1}
 }
 
-func (fake *FakeRegistry) LookupWithInstanceReturnsOnCall(i int, result1 *route.Pool) {
+func (fake *FakeRegistry) LookupWithInstanceReturnsOnCall(i int, result1 *route.EndpointPool) {
 	fake.LookupWithInstanceStub = nil
 	if fake.lookupWithInstanceReturnsOnCall == nil {
 		fake.lookupWithInstanceReturnsOnCall = make(map[int]struct {
-			result1 *route.Pool
+			result1 *route.EndpointPool
 		})
 	}
 	fake.lookupWithInstanceReturnsOnCall[i] = struct {
-		result1 *route.Pool
+		result1 *route.EndpointPool
 	}{result1}
 }
 

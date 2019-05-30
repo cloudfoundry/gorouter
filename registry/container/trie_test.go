@@ -13,7 +13,7 @@ var _ = Describe("Trie", func() {
 
 	var (
 		r         *container.Trie
-		p, p1, p2 *route.Pool
+		p, p1, p2 *route.EndpointPool
 	)
 
 	BeforeEach(func() {
@@ -374,7 +374,7 @@ var _ = Describe("Trie", func() {
 			p2.Put(e2)
 			r.Insert("/foo", p1)
 			r.Insert("/foo/bar/baz", p2)
-			expectedMap := map[route.Uri]*route.Pool{
+			expectedMap := map[route.Uri]*route.EndpointPool{
 				"foo":         p1,
 				"foo/bar/baz": p2,
 			}
@@ -401,7 +401,7 @@ var _ = Describe("Trie", func() {
 		r.Insert("/foo", p1)
 		r.Insert("/foo/bar/baz", p2)
 
-		pools := make([]*route.Pool, 0)
+		pools := make([]*route.EndpointPool, 0)
 		r.EachNodeWithPool(func(node *container.Trie) {
 			pools = append(pools, node.Pool)
 		})

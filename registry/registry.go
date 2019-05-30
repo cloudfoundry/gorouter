@@ -19,8 +19,8 @@ import (
 type Registry interface {
 	Register(uri route.Uri, endpoint *route.Endpoint)
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
-	Lookup(uri route.Uri) *route.Pool
-	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.Pool
+	Lookup(uri route.Uri) *route.EndpointPool
+	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.EndpointPool
 }
 
 type PruneStatus int
@@ -159,7 +159,7 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 	}
 }
 
-func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
+func (r *RouteRegistry) Lookup(uri route.Uri) *route.EndpointPool {
 	started := time.Now()
 
 	pool := r.lookup(uri)
@@ -170,7 +170,7 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	return pool
 }
 
-func (r *RouteRegistry) lookup(uri route.Uri) *route.Pool {
+func (r *RouteRegistry) lookup(uri route.Uri) *route.EndpointPool {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -202,7 +202,7 @@ func (r *RouteRegistry) endpointInRouterShard(endpoint *route.Endpoint) bool {
 	return false
 }
 
-func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.Pool {
+func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.EndpointPool {
 	uri = uri.RouteKey()
 	p := r.Lookup(uri)
 
@@ -210,7 +210,7 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 		return nil
 	}
 
-	var surgicalPool *route.Pool
+	var surgicalPool *route.EndpointPool
 
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {

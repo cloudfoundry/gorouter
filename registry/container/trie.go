@@ -9,13 +9,13 @@ import (
 // package name inspired by golang package that includes heap, list and ring.
 type Trie struct {
 	Segment    string
-	Pool       *route.Pool
+	Pool       *route.EndpointPool
 	ChildNodes map[string]*Trie
 	Parent     *Trie
 }
 
-// Find returns a *route.Pool that matches exactly the URI parameter, nil if no match was found.
-func (r *Trie) Find(uri route.Uri) *route.Pool {
+// Find returns a *route.EndpointPool that matches exactly the URI parameter, nil if no match was found.
+func (r *Trie) Find(uri route.Uri) *route.EndpointPool {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 
@@ -45,10 +45,10 @@ func (r *Trie) Find(uri route.Uri) *route.Pool {
 }
 
 // MatchUri returns the longest route that matches the URI parameter, nil if nothing matches.
-func (r *Trie) MatchUri(uri route.Uri) *route.Pool {
+func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
-	var lastPool *route.Pool
+	var lastPool *route.EndpointPool
 
 	for {
 		pathParts := parts(key)
@@ -83,7 +83,7 @@ func (r *Trie) MatchUri(uri route.Uri) *route.Pool {
 	return nil
 }
 
-func (r *Trie) Insert(uri route.Uri, value *route.Pool) *Trie {
+func (r *Trie) Insert(uri route.Uri, value *route.EndpointPool) *Trie {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 
@@ -230,7 +230,7 @@ func NewTrie() *Trie {
 	return &Trie{ChildNodes: make(map[string]*Trie), Segment: ""}
 }
 
-// Snip removes an empty Pool from a node and trims empty leaf nodes from the Trie
+// Snip removes an empty EndpointPool from a node and trims empty leaf nodes from the Trie
 func (r *Trie) Snip() {
 	if r.Pool != nil && r.Pool.IsEmpty() {
 		r.Pool = nil
@@ -249,11 +249,11 @@ func (r *Trie) ToPath() string {
 	return r.Parent.ToPath() + "/" + r.Segment
 }
 
-func (r *Trie) ToMap() map[route.Uri]*route.Pool {
-	return r.toMap(r.Segment, make(map[route.Uri]*route.Pool))
+func (r *Trie) ToMap() map[route.Uri]*route.EndpointPool {
+	return r.toMap(r.Segment, make(map[route.Uri]*route.EndpointPool))
 }
 
-func (r *Trie) toMap(segment string, m map[route.Uri]*route.Pool) map[route.Uri]*route.Pool {
+func (r *Trie) toMap(segment string, m map[route.Uri]*route.EndpointPool) map[route.Uri]*route.EndpointPool {
 	if r.Pool != nil {
 		m[route.Uri(segment)] = r.Pool
 	}

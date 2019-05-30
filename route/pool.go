@@ -117,7 +117,7 @@ type endpointElem struct {
 	maxConnsPerBackend int64
 }
 
-type Pool struct {
+type EndpointPool struct {
 	sync.Mutex
 	endpoints []*endpointElem
 	index     map[string]*endpointElem
@@ -180,8 +180,8 @@ type PoolOpts struct {
 	Logger             logger.Logger
 }
 
-func NewPool(opts *PoolOpts) *Pool {
-	return &Pool{
+func NewPool(opts *PoolOpts) *EndpointPool {
+	return &EndpointPool{
 		endpoints:          make([]*endpointElem, 0, 1),
 		index:              make(map[string]*endpointElem),
 		retryAfterFailure:  opts.RetryAfterFailure,
@@ -194,24 +194,24 @@ func NewPool(opts *PoolOpts) *Pool {
 	}
 }
 
-func PoolsMatch(p1, p2 *Pool) bool {
+func PoolsMatch(p1, p2 *EndpointPool) bool {
 	return p1.Host() == p2.Host() && p1.ContextPath() == p2.ContextPath()
 }
 
-func (p *Pool) Host() string {
+func (p *EndpointPool) Host() string {
 	return p.host
 }
 
-func (p *Pool) ContextPath() string {
+func (p *EndpointPool) ContextPath() string {
 	return p.contextPath
 }
 
-func (p *Pool) MaxConnsPerBackend() int64 {
+func (p *EndpointPool) MaxConnsPerBackend() int64 {
 	return p.maxConnsPerBackend
 }
 
 // Returns true if endpoint was added or updated, false otherwise
-func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
+func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 	p.Lock()
 	defer p.Unlock()
 
@@ -258,7 +258,7 @@ func (p *Pool) Put(endpoint *Endpoint) PoolPutResult {
 	return result
 }
 
-func (p *Pool) RouteServiceUrl() string {
+func (p *EndpointPool) RouteServiceUrl() string {
 	p.Lock()
 	defer p.Unlock()
 
@@ -270,7 +270,7 @@ func (p *Pool) RouteServiceUrl() string {
 	}
 }
 
-func (p *Pool) PruneEndpoints() []*Endpoint {
+func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 	p.Lock()
 
 	last := len(p.endpoints)
@@ -301,8 +301,8 @@ func (p *Pool) PruneEndpoints() []*Endpoint {
 	return prunedEndpoints
 }
 
-// Returns true if the endpoint was removed from the Pool, false otherwise.
-func (p *Pool) Remove(endpoint *Endpoint) bool {
+// Returns true if the endpoint was removed from the EndpointPool, false otherwise.
+func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
 	var e *endpointElem
 
 	p.Lock()
@@ -319,7 +319,7 @@ func (p *Pool) Remove(endpoint *Endpoint) bool {
 	return false
 }
 
-func (p *Pool) removeEndpoint(e *endpointElem) {
+func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	i := e.index
 	es := p.endpoints
 	last := len(es)
@@ -334,7 +334,7 @@ func (p *Pool) removeEndpoint(e *endpointElem) {
 	delete(p.index, e.endpoint.PrivateInstanceId)
 }
 
-func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
+func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 	switch defaultLoadBalance {
 	case config.LOAD_BALANCE_LC:
 		return NewLeastConnection(p, initial)
@@ -343,13 +343,13 @@ func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 	}
 }
 
-func (p *Pool) findById(id string) *endpointElem {
+func (p *EndpointPool) findById(id string) *endpointElem {
 	p.Lock()
 	defer p.Unlock()
 	return p.index[id]
 }
 
-func (p *Pool) IsEmpty() bool {
+func (p *EndpointPool) IsEmpty() bool {
 	p.Lock()
 	l := len(p.endpoints)
 	p.Unlock()
@@ -357,7 +357,7 @@ func (p *Pool) IsEmpty() bool {
 	return l == 0
 }
 
-func (p *Pool) IsOverloaded() bool {
+func (p *EndpointPool) IsOverloaded() bool {
 	if p.IsEmpty() {
 		return true
 	}
@@ -379,7 +379,7 @@ func (p *Pool) IsOverloaded() bool {
 	return true
 }
 
-func (p *Pool) MarkUpdated(t time.Time) {
+func (p *EndpointPool) MarkUpdated(t time.Time) {
 	p.Lock()
 	for _, e := range p.endpoints {
 		e.updated = t
@@ -387,7 +387,7 @@ func (p *Pool) MarkUpdated(t time.Time) {
 	p.Unlock()
 }
 
-func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
+func (p *EndpointPool) EndpointFailed(endpoint *Endpoint, err error) {
 	p.Lock()
 	defer p.Unlock()
 	e := p.index[endpoint.CanonicalAddr()]
@@ -412,7 +412,7 @@ func (p *Pool) EndpointFailed(endpoint *Endpoint, err error) {
 	return
 }
 
-func (p *Pool) Each(f func(endpoint *Endpoint)) {
+func (p *EndpointPool) Each(f func(endpoint *Endpoint)) {
 	p.Lock()
 	for _, e := range p.endpoints {
 		f(e.endpoint)
@@ -420,7 +420,7 @@ func (p *Pool) Each(f func(endpoint *Endpoint)) {
 	p.Unlock()
 }
 
-func (p *Pool) MarshalJSON() ([]byte, error) {
+func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	p.Lock()
 	endpoints := make([]*Endpoint, 0, len(p.endpoints))
 	for _, e := range p.endpoints {

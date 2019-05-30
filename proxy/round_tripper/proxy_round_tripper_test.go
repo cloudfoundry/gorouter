@@ -56,7 +56,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
 			proxyRoundTripper      round_tripper.ProxyRoundTripper
-			routePool              *route.Pool
+			routePool              *route.EndpointPool
 			transport              *roundtripperfakes.FakeProxyRoundTripper
 			logger                 *test_util.TestZapLogger
 			req                    *http.Request

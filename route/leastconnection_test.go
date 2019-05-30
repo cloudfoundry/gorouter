@@ -11,7 +11,7 @@ import (
 )
 
 var _ = Describe("LeastConnection", func() {
-	var pool *route.Pool
+	var pool *route.EndpointPool
 
 	BeforeEach(func() {
 		pool = route.NewPool(

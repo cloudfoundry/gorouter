@@ -8,12 +8,12 @@ import (
 var randomize = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type LeastConnection struct {
-	pool            *Pool
+	pool            *EndpointPool
 	initialEndpoint string
 	lastEndpoint    *Endpoint
 }
 
-func NewLeastConnection(p *Pool, initial string) EndpointIterator {
+func NewLeastConnection(p *EndpointPool, initial string) EndpointIterator {
 	return &LeastConnection{
 		pool:            p,
 		initialEndpoint: initial,
