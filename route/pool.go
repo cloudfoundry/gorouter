@@ -129,6 +129,7 @@ type EndpointPool struct {
 	retryAfterFailure  time.Duration
 	nextIdx            int
 	maxConnsPerBackend int64
+	pruneTlsEndpoints  bool
 
 	random *rand.Rand
 	logger logger.Logger
@@ -178,6 +179,7 @@ type PoolOpts struct {
 	ContextPath        string
 	MaxConnsPerBackend int64
 	Logger             logger.Logger
+	PruneTlsEndpoints  bool
 }
 
 func NewPool(opts *PoolOpts) *EndpointPool {
@@ -191,6 +193,7 @@ func NewPool(opts *PoolOpts) *EndpointPool {
 		contextPath:        opts.ContextPath,
 		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
 		logger:             opts.Logger,
+		pruneTlsEndpoints:  opts.PruneTlsEndpoints,
 	}
 }
 
@@ -281,9 +284,9 @@ func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 	for i := 0; i < last; {
 		e := p.endpoints[i]
 
-		if e.endpoint.useTls {
+		if e.endpoint.useTls && !p.pruneTlsEndpoints {
 			i++
-			continue
+			continue // skip pruning
 		}
 
 		staleTime := now.Add(-e.endpoint.StaleThreshold)

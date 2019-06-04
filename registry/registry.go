@@ -44,6 +44,7 @@ type RouteRegistry struct {
 
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
+	pruneStaleTlsRoutes        bool
 
 	reporter metrics.RouteRegistryReporter
 
@@ -63,6 +64,7 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 
 	r.pruneStaleDropletsInterval = c.PruneStaleDropletsInterval
 	r.dropletStaleThreshold = c.DropletStaleThreshold
+	r.pruneStaleTlsRoutes = c.PruneStaleTlsRoutes
 	r.suspendPruning = func() bool { return false }
 
 	r.reporter = reporter
@@ -112,6 +114,7 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 			Host:               host,
 			ContextPath:        contextPath,
 			MaxConnsPerBackend: r.maxConnsPerBackend,
+			PruneTlsEndpoints:  r.pruneStaleTlsRoutes,
 		})
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
@@ -214,6 +217,11 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
+			/**
+			 * Omitting `PruneTlsEndpoints` since pruning happens in the
+			 * parent EndpointPool. In the case the parent is pruned,
+			 * this funciton would not be called.
+			 */
 			surgicalPool = route.NewPool(&route.PoolOpts{
 				Logger:             r.logger,
 				RetryAfterFailure:  0,

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/localip"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const (
@@ -174,6 +174,7 @@ type Config struct {
 	SuspendPruningIfNatsUnavailable bool          `yaml:"suspend_pruning_if_nats_unavailable,omitempty"`
 	PruneStaleDropletsInterval      time.Duration `yaml:"prune_stale_droplets_interval,omitempty"`
 	DropletStaleThreshold           time.Duration `yaml:"droplet_stale_threshold,omitempty"`
+	PruneStaleTlsRoutes             bool          `yaml:"prune_stale_tls_routes,omitempty"`
 	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval,omitempty"`
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval,omitempty"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout,omitempty"`
