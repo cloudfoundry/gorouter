@@ -905,6 +905,69 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 		})
+		
+
+		Context("when sticky session vcap cookie provided by backend", func() {
+				var (
+						sessionCookie *http.Cookie
+						vcapCookie    *http.Cookie
+						endpoint1     *route.Endpoint
+						endpoint2     *route.Endpoint
+				)
+
+				BeforeEach(func() {
+						sessionCookie = &http.Cookie{
+								Name: round_tripper.StickyCookieKey,
+						}
+
+						vcapCookie = &http.Cookie{
+								Name: round_tripper.VcapCookieId,
+						}
+
+						transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+								resp := &http.Response{StatusCode: http.StatusTeapot, Header: make(map[string][]string)}
+
+								vcapCookie.Value = "id-5"
+								resp.Header.Add(round_tripper.CookieHeader, vcapCookie.String())
+
+								if len(req.Cookies()) > 0 {
+										//Only attach the JSESSIONID on to the response
+										resp.Header.Add(round_tripper.CookieHeader, req.Cookies()[0].String())
+										return resp, nil
+								}
+
+								sessionCookie.Value, _ = uuid.GenerateUUID()
+								resp.Header.Add(round_tripper.CookieHeader, sessionCookie.String())
+								return resp, nil
+						}
+
+						endpoint1 = route.NewEndpoint(&route.EndpointOpts{
+								Host: "1.1.1.1", Port: 9091, PrivateInstanceId: "id-1",
+						})
+						endpoint2 = route.NewEndpoint(&route.EndpointOpts{
+								Host: "1.1.1.1", Port: 9092, PrivateInstanceId: "id-2",
+						})
+
+						added := routePool.Put(endpoint1)
+						Expect(added).To(Equal(route.ADDED))
+						added = routePool.Put(endpoint2)
+						Expect(added).To(Equal(route.ADDED))
+						removed := routePool.Remove(endpoint)
+						Expect(removed).To(BeTrue())
+				})
+
+				It("will pass on backend provided vcap cookie header with the privateInstanceId", func() {
+						resp, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).ToNot(HaveOccurred())
+
+						cookies := resp.Cookies()
+						Expect(cookies).To(HaveLen(2))
+						Expect(cookies[1].Raw).To(Equal(sessionCookie.String()))
+						Expect(cookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+						Expect(cookies[0].Value).To(Equal("id-5"))
+				})
+		})
+
 
 		Context("CancelRequest", func() {
 			It("can cancel requests", func() {
