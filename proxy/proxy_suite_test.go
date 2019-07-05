@@ -24,11 +24,9 @@ import (
 
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"github.com/cloudfoundry/custom-cats-reporters/honeycomb/client"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	fakelogsender "github.com/cloudfoundry/dropsonde/log_sender/fake"
-	"github.com/honeycombio/libhoney-go"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -58,23 +56,7 @@ var (
 
 func TestProxy(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecWithReporter(t, "Proxy Suite")
-}
-
-func RunSpecWithReporter(t *testing.T, desc string) {
-	reporters := []Reporter{}
-	honeycombReporter := NewHoneycombReporter()
-	reporters = append(reporters, honeycombReporter)
-	RunSpecsWithDefaultAndCustomReporters(t, desc, reporters)
-}
-
-func NewHoneycombReporter() Reporter {
-	honeyCombClient := client.New(libhoney.Config{
-		WriteKey: os.Getenv("HONEYCOMB_KEY"),
-		Dataset:  "gorouter",
-	})
-
-	return test_util.NewFailureReporter(honeyCombClient)
+	test_util.RunSpecWithHoneyCombReporter(t, "Proxy Suite")
 }
 
 var _ = BeforeEach(func() {
