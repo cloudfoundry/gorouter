@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -22,7 +23,7 @@ const keyPath = "fixtures/key"
 
 func TestRssCli(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "RSS Cli Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "RSS Cli Suite")
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {

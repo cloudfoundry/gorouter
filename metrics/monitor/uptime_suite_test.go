@@ -1,6 +1,7 @@
 package monitor_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metrics"
@@ -12,7 +13,7 @@ import (
 
 func TestMonitor(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Monitor Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Monitor Suite")
 }
 
 var (

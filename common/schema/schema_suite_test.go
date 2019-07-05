@@ -1,6 +1,7 @@
 package schema_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -9,5 +10,5 @@ import (
 
 func TestSchema(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Schema Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Schema Suite")
 }

@@ -67,7 +67,7 @@ var _ = SynchronizedAfterSuite(func() {
 
 func TestIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Integration Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Integration Suite")
 }
 
 func setupTLSServer() *ghttp.Server {

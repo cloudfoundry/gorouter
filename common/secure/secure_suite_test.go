@@ -1,6 +1,7 @@
 package secure_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -9,5 +10,5 @@ import (
 
 func TestCrypto(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Crypto Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Crypto Suite")
 }

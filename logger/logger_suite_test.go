@@ -1,6 +1,7 @@
 package logger_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -9,5 +10,5 @@ import (
 
 func TestLogger(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Logger Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Logger Suite")
 }

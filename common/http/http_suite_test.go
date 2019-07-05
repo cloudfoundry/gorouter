@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -9,5 +10,5 @@ import (
 
 func TestHttp(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Http Suite")
+	test_util.RunSpecWithHoneyCombReporter(t, "Http Suite")
 }
