@@ -24,12 +24,11 @@ import (
 
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"github.com/cloudfoundry/custom-cats-reporters/honeycomb"
 	"github.com/cloudfoundry/custom-cats-reporters/honeycomb/client"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	fakelogsender "github.com/cloudfoundry/dropsonde/log_sender/fake"
-	libhoney "github.com/honeycombio/libhoney-go"
+	"github.com/honeycombio/libhoney-go"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -75,7 +74,7 @@ func NewHoneycombReporter() Reporter {
 		Dataset:  "gorouter",
 	})
 
-	return honeycomb.New(honeyCombClient)
+	return test_util.NewFailureReporter(honeyCombClient)
 }
 
 var _ = BeforeEach(func() {
