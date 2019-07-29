@@ -7,6 +7,7 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
@@ -49,7 +50,17 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 	startStopEvent := factories.NewHttpStartStop(r, prw.Status(), int64(prw.Size()), events.PeerType_Server, requestID)
 	startStopEvent.StartTimestamp = proto.Int64(startTime.UnixNano())
 
-	err = hh.emitter.Emit(startStopEvent)
+	envelope, err := emitter.Wrap(startStopEvent, hh.emitter.Origin())
+	if err != nil {
+		hh.logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
+	}
+
+	endpoint, _ := GetEndpoint(r.Context())
+	if endpoint != nil {
+		envelope.Tags = endpoint.Tags
+	}
+
+	err = hh.emitter.EmitEnvelope(envelope)
 	if err != nil {
 		hh.logger.Info("failed-to-emit-startstop-event", zap.Error(err))
 	}
