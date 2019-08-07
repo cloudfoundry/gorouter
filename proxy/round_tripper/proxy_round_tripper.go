@@ -306,13 +306,13 @@ func setupStickySession(
 			break
 		}
 	}
-	
+
 	for _, v := range response.Cookies() {
 		if v.Name == VcapCookieId {
 			sticky = false
 			break
 		}
-	}	
+	}
 
 	if sticky {
 		// right now secure attribute would as equal to the JSESSION ID cookie (if present),
