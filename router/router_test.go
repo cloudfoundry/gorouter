@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/gorouter/config"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -546,33 +547,39 @@ var _ = Describe("Router", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 
-	It("handles a /routes request", func() {
-		var client http.Client
-		var req *http.Request
-		var resp *http.Response
-		var err error
+	Describe("/routes endpoint", func() {
+		var registerData []byte
 
-		err = mbusClient.Publish("router.register",
-			[]byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id",
-		"private_instance_index": "2"}`))
-		Expect(err).ToNot(HaveOccurred())
-		time.Sleep(250 * time.Millisecond)
+		BeforeEach(func() {
+			registerData = []byte(`{"dea":"dea1","app":"app1","uris":["test.com"],"host":"1.2.3.4","port":1234,"tags":{},"private_instance_id":"private_instance_id",
+		"private_instance_index": "2"}`)
+		})
 
-		host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+		JustBeforeEach(func() {
+			err := mbusClient.Publish("router.register", registerData)
+			Expect(err).ToNot(HaveOccurred())
+			time.Sleep(250 * time.Millisecond)
+		})
 
-		req, err = http.NewRequest("GET", host, nil)
-		Expect(err).ToNot(HaveOccurred())
-		req.SetBasicAuth("user", "pass")
+		Context("when a route is registered", func() {
+			It("contains the registered route", func() {
+				Expect(routeExists(config, "test.com")).To(BeTrue())
+			})
+		})
 
-		resp, err = client.Do(req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp).ToNot(BeNil())
-		Expect(resp.StatusCode).To(Equal(200))
+		Context("when a route is unregistered", func() {
+			JustBeforeEach(func() {
+				Expect(routeExists(config, "test.com")).To(BeTrue())
 
-		body, err := ioutil.ReadAll(resp.Body)
-		defer resp.Body.Close()
-		Expect(err).ToNot(HaveOccurred())
-		Expect(string(body)).To(MatchRegexp(".*1\\.2\\.3\\.4:1234.*\n"))
+				err := mbusClient.Publish("router.unregister", registerData)
+				Expect(err).ToNot(HaveOccurred())
+				time.Sleep(250 * time.Millisecond)
+			})
+
+			It("removes the unregistered route", func() {
+				Expect(routeExists(config, "test.com")).To(BeFalse())
+			})
+		})
 	})
 
 	Context("when proxy proto is enabled", func() {
@@ -2029,4 +2036,32 @@ func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
 	}
 
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+}
+
+func routeExists(config *config.Config, routeName string) (bool, error) {
+	host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+	req, err := http.NewRequest("GET", host, nil)
+	Expect(err).ToNot(HaveOccurred())
+	req.SetBasicAuth("user", "pass")
+
+	var client http.Client
+	resp, err := client.Do(req)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp).ToNot(BeNil())
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		bytes, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		Expect(err).ToNot(HaveOccurred())
+		routes := make(map[string]interface{})
+		err = json.Unmarshal(bytes, &routes)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, found := routes[routeName]
+		return found, nil
+
+	default:
+		return false, errors.New("Didn't get an OK response")
+	}
 }

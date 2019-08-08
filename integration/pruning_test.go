@@ -1,14 +1,12 @@
 package integration
 
 import (
-	"fmt"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Pruning stale routes", func() {
@@ -49,23 +47,8 @@ var _ = Describe("Pruning stale routes", func() {
 			tlsApp.TlsRegister(testState.trustedBackendServerCertSAN)
 			tlsApp.TlsListen(testState.trustedBackendTLSConfig)
 
-			routesURI := fmt.Sprintf(
-				"http://%s:%s@%s:%d/routes",
-				testState.cfg.Status.User,
-				testState.cfg.Status.Pass,
-				"localhost",
-				testState.cfg.Status.Port,
-			)
-
-			Eventually(
-				func() bool { return appRegistered(routesURI, tlsApp) },
-				"2s",
-			).Should(BeTrue())
-
 			tlsApp.VerifyAppStatus(200)
-
 			time.Sleep(expectPruneAfter)
-
 			tlsApp.VerifyAppStatus(404)
 		})
 	})
@@ -94,24 +77,6 @@ var _ = Describe("Pruning stale routes", func() {
 			)
 			plainTextApp.Register()
 			plainTextApp.Listen()
-
-			routesURI := fmt.Sprintf(
-				"http://%s:%s@%s:%d/routes",
-				testState.cfg.Status.User,
-				testState.cfg.Status.Pass,
-				"localhost",
-				testState.cfg.Status.Port,
-			)
-
-			Eventually(
-				func() bool { return appRegistered(routesURI, tlsApp) },
-				"2s",
-			).Should(BeTrue())
-
-			Eventually(
-				func() bool { return appRegistered(routesURI, plainTextApp) },
-				"2s",
-			).Should(BeTrue())
 
 			tlsApp.VerifyAppStatus(200)
 			plainTextApp.VerifyAppStatus(200)
