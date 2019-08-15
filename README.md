@@ -90,7 +90,7 @@ When deployed with Cloud Foundry, registration of routes for apps pushed to CF o
 
 ### Registering Routes via NATS
 
-When the gorouter starts, it sends a `router.start` message to NATS. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a seperate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
+When the gorouter starts, it sends a `router.start` message to NATS. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a separate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
 
 The format of the `router.start` message is as follows:
 
@@ -189,7 +189,7 @@ If `router.backends.enable_tls` has been set to true, `tls_port` will be used as
 
 Note that if `router.backends.enable_tls` is true and `host` and `tls_port` happens to match a registered `host` and `port` pair, this `host` and `port` pair will be unregistered. The reverse is also true.
 
-**Note:** In order to use `nats-pub` to register a route, you must install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's easiest on a VM that has ruby as a package, such as the API VM. Find the ruby installed in /var/vcap/packages, export your PATH variable to include the bin directory, and then run `gem install nats`. Find the nats login info from your gorouter config, and use it to connect to the nats cluster.  
+**Note:** In order to use `nats-pub` to register a route, you must install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's easiest on a VM that has ruby as a package, such as the API VM. Find the ruby installed in /var/vcap/packages, export your PATH variable to include the bin directory, and then run `gem install nats`. Find the nats login info from your gorouter config and use it to connect to the nats cluster.  
 
 ## Healthchecking from a Load Balancer
 
@@ -316,7 +316,7 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The default load balancing algorithm that GoRouter will use is a simple **round-robin** strategy. GoRouter will retry a request if the chosen backend does not accept the TCP connection.
 
 ### Round-Robin
-Default load balancing algorithm that gorouter will use or may be explicity set in **gorouter.yml**
+Default load balancing algorithm that gorouter will use or may be explicitly set in **gorouter.yml**
 ```yaml
 default_balancing_algorithm: round-robin
 ```
@@ -345,7 +345,7 @@ properties:
     force_forwarded_proto_https: true
 ```
 
-### Enabling apps to detect the requestor's IP address uing PROXY Protocol
+### Enabling apps to detect the requestor's IP address using PROXY Protocol
 
 If you terminate TLS in front of Gorouter, your component should also send the `X-Forwarded-Proto` HTTP header in order for  `X-Forwarded-For` header to applications can detect the requestor's IP address.
 
@@ -392,7 +392,7 @@ Sample log message in gorouter.
 - `source`: The function within Gorouter that initiated the log message
 - `data`: Additional information that varies based on the message
 
-Access logs provide information for the following fields when recieving a request:
+Access logs provide information for the following fields when receiving a request:
 
 `<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> <Backend Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
 * Status Code, Response Time, Application ID, Application Index, and Extra Headers are all optional fields
@@ -402,7 +402,7 @@ Access logs are also redirected to syslog.
 
 ## Headers
 
-If an user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture.
+If a user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture.
 
 ## Supported Cipher Suites
 
