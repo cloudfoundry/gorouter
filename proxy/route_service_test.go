@@ -354,7 +354,7 @@ var _ = Describe("Route Services", func() {
 			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 			conn.WriteRequest(req)
 
-			res, _ := readResponse(conn)
+			res := readResponseNoErrorCheck(conn)
 
 			Expect(res.StatusCode).To(Equal(526))
 		})
@@ -380,7 +380,7 @@ var _ = Describe("Route Services", func() {
 			req := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", nil)
 			conn.WriteRequest(req)
 
-			res, _ := readResponse(conn)
+			res, _ := conn.ReadResponse()
 
 			okCodes := []int{http.StatusOK, http.StatusFound}
 			Expect(okCodes).Should(ContainElement(res.StatusCode))
@@ -436,7 +436,7 @@ var _ = Describe("Route Services", func() {
 				conn := dialProxy(proxyServer)
 				conn.WriteRequest(test_util.NewRequest("GET", "my_app.com", "", nil))
 
-				res, _ := readResponse(conn)
+				res, _ := conn.ReadResponse()
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
 		})
@@ -505,7 +505,7 @@ var _ = Describe("Route Services", func() {
 				req := test_util.NewRequest("GET", "my_app.com", "", nil)
 				conn.WriteRequest(req)
 
-				res, _ := readResponse(conn)
+				res, _ := conn.ReadResponse()
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
 			})
 		})

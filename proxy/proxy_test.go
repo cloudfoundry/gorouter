@@ -797,7 +797,8 @@ var _ = Describe("Proxy", func() {
 			started := time.Now()
 			conn.WriteRequest(req)
 
-			resp, _ := readResponse(conn)
+			resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(2*time.Second)))
@@ -810,7 +811,7 @@ var _ = Describe("Proxy", func() {
 
 				timesToTick := 5
 				// sleep to force a dial timeout
-				time.Sleep(1 * time.Second)
+				time.Sleep(1100 * time.Millisecond)
 
 				conn.WriteLines([]string{
 					"HTTP/1.1 200 OK",
@@ -839,12 +840,13 @@ var _ = Describe("Proxy", func() {
 			started := time.Now()
 			conn.WriteRequest(req)
 
-			resp, _ := readResponse(conn)
+			resp, err := http.ReadResponse(conn.Reader, nil)
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 			Expect(time.Since(started)).To(BeNumerically("<", time.Duration(2*time.Second)))
 
-			var err error
+			// var err error
 			Eventually(serverResult, "2s").Should(Receive(&err))
 			Expect(err).NotTo(BeNil())
 		})
@@ -1134,7 +1136,6 @@ var _ = Describe("Proxy", func() {
 
 		Context("when the request has X-CF-APP-INSTANCE", func() {
 			It("lookups the route to that specific app index and id", func() {
-				done := make(chan struct{})
 				ln := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
 				}, test_util.RegisterConfig{AppId: "app-1-id"})
@@ -1152,7 +1153,6 @@ var _ = Describe("Proxy", func() {
 
 					conn.Close()
 
-					done <- struct{}{}
 				}, test_util.RegisterConfig{AppId: "app-2-id"})
 				defer ln2.Close()
 
@@ -1164,7 +1164,6 @@ var _ = Describe("Proxy", func() {
 				Consistently(func() string {
 					conn.WriteRequest(req)
 
-					Eventually(done).Should(Receive())
 					_, b := conn.ReadResponse()
 					return b
 				}).Should(Equal("Hellow World: App2"))
@@ -1622,7 +1621,7 @@ var _ = Describe("Proxy", func() {
 				req.Header.Add("Connection", "Upgrade")
 
 				conn.WriteRequest(req)
-
+				conn.ReadResponse()
 			}
 			// 1st client connected
 			connectClient()
@@ -1904,23 +1903,23 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("emits HTTP startstop events", func() {
-			done := make(chan struct{})
 			var vcapHeader string
 			ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
 				req, _ := conn.ReadRequest()
 				vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
-				done <- struct{}{}
 				resp := test_util.NewResponse(http.StatusOK)
 				conn.WriteResponse(resp)
 				conn.Close()
 			}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
 			defer ln.Close()
-
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "app", "/", nil)
-
 			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
 			findStartStopEvent := func() *events.HttpStartStop {
 				for _, ev := range fakeEmitter.GetEvents() {
 					startStopEvent, ok := ev.(*events.HttpStartStop)
@@ -1930,8 +1929,6 @@ var _ = Describe("Proxy", func() {
 				}
 				return nil
 			}
-
-			Eventually(done).Should(Receive())
 
 			Eventually(findStartStopEvent).ShouldNot(BeNil())
 			u2, err := uuid.ParseHex(vcapHeader)
@@ -1977,11 +1974,12 @@ var _ = Describe("Proxy", func() {
 
 // HACK: this is used to silence any http warnings in logs
 // that clutter stdout/stderr when running unit tests
-func readResponse(conn *test_util.HttpConn) (*http.Response, string) {
+func readResponseNoErrorCheck(conn *test_util.HttpConn) *http.Response {
 	log.SetOutput(ioutil.Discard)
-	res, body := conn.ReadResponse()
+	resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+	Expect(err).ToNot(HaveOccurred())
 	log.SetOutput(os.Stderr)
-	return res, body
+	return resp
 }
 
 func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
