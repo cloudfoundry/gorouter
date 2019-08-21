@@ -458,3 +458,26 @@ func (h *HangingReadCloser) Read(p []byte) (n int, err error) {
 }
 
 func (h *HangingReadCloser) Close() error { return nil }
+
+type SlowReadCloser struct {
+	mu            sync.Mutex
+	readCalls     int
+	SleepDuration time.Duration
+}
+
+func (h *SlowReadCloser) Read(p []byte) (n int, err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.readCalls++
+
+	if h.readCalls < 2 {
+		p[0] = '!'
+		return 1, nil
+	}
+
+	time.Sleep(h.SleepDuration)
+	return 0, errors.New("slow read closer request has timed out")
+}
+
+func (h *SlowReadCloser) Close() error { return nil }

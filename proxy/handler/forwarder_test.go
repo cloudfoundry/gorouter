@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
@@ -82,13 +83,35 @@ var _ = Describe("Forwarder", func() {
 		})
 	})
 
-	Context("when the backend hangs on reading the header", func() {
+	Context("when the backend hangs indefinitely on reading the header", func() {
 		BeforeEach(func() {
 			backendConn = NewMockConn(&test_util.HangingReadCloser{})
 		})
 
 		It("times out after some time and logs the timeout", func() {
 			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+			Expect(logger.Buffer()).To(gbytes.Say(`timeout waiting for http response from backend`))
+		})
+	})
+
+	Context("when the backend responds after BackendReadTimeout", func() {
+		var (
+			sleepDuration time.Duration
+		)
+
+		BeforeEach(func() {
+			forwarder.BackendReadTimeout = 10 * time.Millisecond
+			sleepDuration = 100 * time.Millisecond
+			backendConn = NewMockConn(&test_util.SlowReadCloser{SleepDuration: sleepDuration})
+		})
+
+		It("does not leak goroutines", func() {
+			beforeGoroutineCount := runtime.NumGoroutine()
+			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+
+			time.Sleep(2 * sleepDuration)
+
+			Expect(runtime.NumGoroutine()).To(Equal(beforeGoroutineCount))
 			Expect(logger.Buffer()).To(gbytes.Say(`timeout waiting for http response from backend`))
 		})
 	})

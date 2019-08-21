@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -37,9 +38,17 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 	teedReader := io.TeeReader(backendConn, headerBytes)
 	var resp *http.Response
 	var err error
+
+	ctx, cancel := context.WithTimeout(context.Background(), f.BackendReadTimeout)
+	defer cancel()
+
 	go func() {
 		resp, err = http.ReadResponse(bufio.NewReader(teedReader), nil)
-		headerWasRead <- struct{}{}
+
+		select {
+		case headerWasRead <- struct{}{}:
+		case <-ctx.Done():
+		}
 	}()
 
 	select {
@@ -47,7 +56,7 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 		if err != nil {
 			return 0
 		}
-	case <-time.After(f.BackendReadTimeout):
+	case <-ctx.Done():
 		f.Logger.Error("websocket-forwardio", zap.Error(errors.New("timeout waiting for http response from backend")))
 		return 0
 	}
