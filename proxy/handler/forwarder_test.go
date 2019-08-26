@@ -81,6 +81,11 @@ var _ = Describe("Forwarder", func() {
 		It("immediately returns code 0, without waiting for either connection to close", func() {
 			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
 		})
+
+		It("doesn't websocket forwared a non-timeout error", func() {
+			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+			Expect(logger.Buffer().Contents()).To(HaveLen(0))
+		})
 	})
 
 	Context("when the backend hangs indefinitely on reading the header", func() {
@@ -109,10 +114,9 @@ var _ = Describe("Forwarder", func() {
 			beforeGoroutineCount := runtime.NumGoroutine()
 			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
 
-			time.Sleep(2 * sleepDuration)
-
-			Expect(runtime.NumGoroutine()).To(Equal(beforeGoroutineCount))
-			Expect(logger.Buffer()).To(gbytes.Say(`timeout waiting for http response from backend`))
+			Eventually(func() int {
+				return runtime.NumGoroutine()
+			}).Should(BeNumerically("<=", beforeGoroutineCount))
 		})
 	})
 })

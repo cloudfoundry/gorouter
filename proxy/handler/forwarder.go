@@ -3,13 +3,12 @@ package handler
 import (
 	"bufio"
 	"bytes"
-	"context"
-	"errors"
 	"io"
 	"net/http"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/uber-go/zap"
 )
 
@@ -33,31 +32,15 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 		done <- true
 	}
 
-	headerWasRead := make(chan struct{})
 	headerBytes := &bytes.Buffer{}
 	teedReader := io.TeeReader(backendConn, headerBytes)
-	var resp *http.Response
-	var err error
 
-	ctx, cancel := context.WithTimeout(context.Background(), f.BackendReadTimeout)
-	defer cancel()
-
-	go func() {
-		resp, err = http.ReadResponse(bufio.NewReader(teedReader), nil)
-
-		select {
-		case headerWasRead <- struct{}{}:
-		case <-ctx.Done():
+	resp, err := utils.ReadResponseWithTimeout(bufio.NewReader(teedReader), nil, f.BackendReadTimeout)
+	if err != nil {
+		switch err.(type) {
+		case utils.TimeoutError:
+			f.Logger.Error("websocket-forwardio", zap.Error(err))
 		}
-	}()
-
-	select {
-	case <-headerWasRead:
-		if err != nil {
-			return 0
-		}
-	case <-ctx.Done():
-		f.Logger.Error("websocket-forwardio", zap.Error(errors.New("timeout waiting for http response from backend")))
 		return 0
 	}
 
