@@ -38,7 +38,8 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 				if !ok {
 					err = fmt.Errorf("%v", rec)
 				}
-				p.logger.Error("panic-check", zap.Error(err))
+				p.logger.Error("panic-check", zap.Nest("error", zap.Error(err), zap.Stack()))
+
 				p.heartbeatOK.Set(false)
 				rw.WriteHeader(http.StatusServiceUnavailable)
 				r.Close = true
