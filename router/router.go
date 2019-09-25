@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/gorouter/handlers"
 
 	"code.cloudfoundry.org/gorouter/common"
@@ -26,8 +25,8 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
-	proxyproto "github.com/armon/go-proxyproto"
-	nats "github.com/nats-io/go-nats"
+	"github.com/armon/go-proxyproto"
+	"github.com/nats-io/go-nats"
 	"github.com/uber-go/zap"
 )
 
@@ -65,14 +64,14 @@ type Router struct {
 	stopping            bool
 	stopLock            sync.Mutex
 	uptimeMonitor       *monitor.Uptime
-	heartBeatOK         *threading.SharedBoolean
+	health              *health.Health
 	logger              logger.Logger
 	errChan             chan error
 	routeServicesServer rss
 }
 
 func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, heartbeatOK *threading.SharedBoolean, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
+	v varz.Varz, h *health.Health, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
 	var host string
 	if cfg.Status.Port != 0 {
 		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
@@ -90,12 +89,12 @@ func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, m
 	}
 
 	healthz := &health.Healthz{}
-	health := handlers.NewHealthcheck(heartbeatOK, logger)
+	healthCheck := handlers.NewHealthcheck(h, logger)
 	component := &common.VcapComponent{
 		Config:  cfg,
 		Varz:    varz,
 		Healthz: healthz,
-		Health:  health,
+		Health:  healthCheck,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},
@@ -120,7 +119,7 @@ func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, m
 		activeConns:         make(map[net.Conn]struct{}),
 		logger:              logger,
 		errChan:             routerErrChan,
-		heartBeatOK:         heartbeatOK,
+		health:              h,
 		stopping:            false,
 		routeServicesServer: routeServicesServer,
 	}
@@ -166,7 +165,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
-	r.heartBeatOK.Set(true)
+	r.health.SetHealth(health.Healthy)
 
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
@@ -311,7 +310,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 }
 
 func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
-	r.heartBeatOK.Set(false)
+	r.health.SetHealth(health.Degraded)
 
 	<-time.After(drainWait)
 

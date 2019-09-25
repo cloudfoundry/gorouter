@@ -1,7 +1,7 @@
 package handlers_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,21 +15,21 @@ import (
 
 var _ = Describe("Healthcheck", func() {
 	var (
-		handler     http.Handler
-		logger      logger.Logger
-		resp        *httptest.ResponseRecorder
-		req         *http.Request
-		heartbeatOK *threading.SharedBoolean
+		handler      http.Handler
+		logger       logger.Logger
+		resp         *httptest.ResponseRecorder
+		req          *http.Request
+		healthStatus *health.Health
 	)
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
-		heartbeatOK = &threading.SharedBoolean{}
-		heartbeatOK.Set(true)
+		healthStatus = &health.Health{}
+		healthStatus.SetHealth(health.Healthy)
 
-		handler = handlers.NewHealthcheck(heartbeatOK, logger)
+		handler = handlers.NewHealthcheck(healthStatus, logger)
 	})
 
 	It("closes the request", func() {
@@ -53,7 +53,7 @@ var _ = Describe("Healthcheck", func() {
 
 	Context("when draining is in progress", func() {
 		BeforeEach(func() {
-			heartbeatOK.Set(false)
+			healthStatus.SetHealth(health.Degraded)
 		})
 
 		It("responds with a 503 Service Unavailable", func() {

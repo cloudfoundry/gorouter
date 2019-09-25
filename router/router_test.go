@@ -3,6 +3,7 @@ package router_test
 import (
 	"bufio"
 	"bytes"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -23,7 +24,6 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/gorouter/config"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
@@ -44,7 +44,7 @@ import (
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -1861,11 +1861,11 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 
 	rt := &sharedfakes.RoundTripper{}
 	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, &tls.Config{}, &threading.SharedBoolean{}, rt)
+		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, rt)
 
-	healthCheck := &threading.SharedBoolean{}
+	h := &health.Health{}
 	logcounter := schema.NewLogCounter()
-	return NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, nil, routeServicesServer)
+	return NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, nil, routeServicesServer)
 }
 
 func readVarz(v vvarz.Varz) map[string]interface{} {

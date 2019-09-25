@@ -2,6 +2,7 @@ package proxy_test
 
 import (
 	"bytes"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -1247,8 +1248,8 @@ var _ = Describe("Proxy", func() {
 			Expect(body).To(Equal("ok\n"))
 		})
 
-		It("responds with failure to load balancer check if heartbeatOK is false", func() {
-			heartbeatOK.Set(false)
+		It("responds with failure to load balancer check if healthStatus is unhealthy", func() {
+			healthStatus.SetHealth(health.Degraded)
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "", "/", nil)

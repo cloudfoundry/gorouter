@@ -1,10 +1,9 @@
 package handlers
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"fmt"
 	"net/http"
-
-	"code.cloudfoundry.org/gorouter/common/threading"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
@@ -12,15 +11,15 @@ import (
 )
 
 type panicCheck struct {
-	heartbeatOK *threading.SharedBoolean
-	logger      logger.Logger
+	health *health.Health
+	logger logger.Logger
 }
 
 // NewPanicCheck creates a handler responsible for checking for panics and setting the Healthcheck to fail.
-func NewPanicCheck(healthcheck *threading.SharedBoolean, logger logger.Logger) negroni.Handler {
+func NewPanicCheck(health *health.Health, logger logger.Logger) negroni.Handler {
 	return &panicCheck{
-		heartbeatOK: healthcheck,
-		logger:      logger,
+		health: health,
+		logger: logger,
 	}
 }
 
@@ -40,7 +39,8 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 				}
 				p.logger.Error("panic-check", zap.Nest("error", zap.Error(err), zap.Stack()))
 
-				p.heartbeatOK.Set(false)
+				p.health.SetHealth(health.Degraded)
+
 				rw.WriteHeader(http.StatusServiceUnavailable)
 				r.Close = true
 			}

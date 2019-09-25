@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -9,8 +10,6 @@ import (
 	"os"
 	"syscall"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/common/threading"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -29,7 +28,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/tedsuo/ifrit"
@@ -49,7 +48,7 @@ var _ = Describe("Router", func() {
 		rtr              *router.Router
 		subscriber       ifrit.Process
 		natsPort         uint16
-		healthCheck      *threading.SharedBoolean
+		healthStatus     *health.Health
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
@@ -219,8 +218,7 @@ var _ = Describe("Router", func() {
 		mbusClient = natsRunner.MessageBus
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		logcounter := schema.NewLogCounter()
-		healthCheck = &threading.SharedBoolean{}
-		healthCheck.Set(false)
+		healthStatus = &health.Health{}
 
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
@@ -231,12 +229,12 @@ var _ = Describe("Router", func() {
 
 		rt := &sharedfakes.RoundTripper{}
 		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthCheck, rt)
+			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthStatus, rt)
 
 		errChan := make(chan error, 2)
 		var err error
 		rss := &sharedfakes.RouteServicesServer{}
-		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, errChan, rss)
+		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthStatus, logcounter, errChan, rss)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
@@ -473,16 +471,16 @@ var _ = Describe("Router", func() {
 
 			BeforeEach(func() {
 				logcounter := schema.NewLogCounter()
-				healthCheck := &threading.SharedBoolean{}
+				h := &health.Health{}
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
 				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthCheck, rt)
+					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)
 
 				errChan = make(chan error, 2)
 				var err error
 				rss := &sharedfakes.RouteServicesServer{}
-				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthCheck, logcounter, errChan, rss)
+				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
 				runRouter(rtr)
 			})

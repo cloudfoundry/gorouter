@@ -1,27 +1,27 @@
 package handlers
 
 import (
-	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni"
 	"net/http"
 )
 
 type proxyHealthcheck struct {
-	userAgent   string
-	heartbeatOK *threading.SharedBoolean
-	logger      logger.Logger
+	userAgent string
+	health    *health.Health
+	logger    logger.Logger
 }
 
 // NewHealthcheck creates a handler that responds to healthcheck requests.
 // If userAgent is set to a non-empty string, it will use that user agent to
 // differentiate between healthcheck requests and non-healthcheck requests.
 // Otherwise, it will treat all requests as healthcheck requests.
-func NewProxyHealthcheck(userAgent string, heartbeatOK *threading.SharedBoolean, logger logger.Logger) negroni.Handler {
+func NewProxyHealthcheck(userAgent string, health *health.Health, logger logger.Logger) negroni.Handler {
 	return &proxyHealthcheck{
-		userAgent:   userAgent,
-		heartbeatOK: heartbeatOK,
-		logger:      logger,
+		userAgent: userAgent,
+		health:    health,
+		logger:    logger,
 	}
 }
 
@@ -35,8 +35,7 @@ func (h *proxyHealthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	rw.Header().Set("Cache-Control", "private, max-age=0")
 	rw.Header().Set("Expires", "0")
 
-	draining := !h.heartbeatOK.Get()
-	if draining {
+	if h.health.Health() != health.Healthy {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		r.Close = true
 		return

@@ -1,11 +1,10 @@
 package integration
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"fmt"
 	"strconv"
-
-	"code.cloudfoundry.org/gorouter/common/threading"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/config"
@@ -41,9 +40,9 @@ var _ = Describe("AccessLogRecord", func() {
 
 		rss, err := router.NewRouteServicesServer()
 		Expect(err).ToNot(HaveOccurred())
-		var heartbeatOK *threading.SharedBoolean
+		var h *health.Health
 		proxy.NewProxy(logger, accesslog, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
-			&tls.Config{}, &tls.Config{}, heartbeatOK, rss.GetRoundTripper())
+			&tls.Config{}, &tls.Config{}, h, rss.GetRoundTripper())
 
 		b.Time("RegisterTime", func() {
 			for i := 0; i < 1000; i++ {

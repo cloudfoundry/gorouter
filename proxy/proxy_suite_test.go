@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
@@ -11,7 +12,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -48,7 +48,7 @@ var (
 	cryptoPrev              secure.Crypto
 	caCertPool              *x509.CertPool
 	recommendHttps          bool
-	heartbeatOK             *threading.SharedBoolean
+	healthStatus            *health.Health
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
 	skipSanitization        func(req *http.Request) bool
@@ -60,8 +60,8 @@ func TestProxy(t *testing.T) {
 }
 
 var _ = BeforeEach(func() {
-	heartbeatOK = &threading.SharedBoolean{}
-	heartbeatOK.Set(true)
+	healthStatus = &health.Health{}
+	healthStatus.SetHealth(health.Healthy)
 	testLogger = test_util.NewTestZapLogger("test")
 	var err error
 
@@ -127,7 +127,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, heartbeatOK, fakeRouteServicesClient)
+	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)

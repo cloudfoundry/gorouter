@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -9,8 +10,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/common/threading"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -42,7 +41,7 @@ type proxy struct {
 	reporter                 metrics.ProxyReporter
 	accessLogger             accesslog.AccessLogger
 	secureCookies            bool
-	heartbeatOK              *threading.SharedBoolean
+	health                   *health.Health
 	routeServiceConfig       *routeservice.RouteServiceConfig
 	healthCheckUserAgent     string
 	forceForwardedProtoHttps bool
@@ -66,7 +65,7 @@ func NewProxy(
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	backendTLSConfig *tls.Config,
 	routeServiceTLSConfig *tls.Config,
-	heartbeatOK *threading.SharedBoolean,
+	health *health.Health,
 	routeServicesTransport http.RoundTripper,
 ) http.Handler {
 
@@ -77,7 +76,7 @@ func NewProxy(
 		logger:                   logger,
 		reporter:                 reporter,
 		secureCookies:            cfg.SecureCookies,
-		heartbeatOK:              heartbeatOK,
+		health:                   health,
 		routeServiceConfig:       routeServiceConfig,
 		healthCheckUserAgent:     cfg.HealthCheckUserAgent,
 		forceForwardedProtoHttps: cfg.ForceForwardedProtoHttps,
@@ -135,7 +134,7 @@ func NewProxy(
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, cfg.ExtraHeadersToLog, logger)
 	n := negroni.New()
-	n.Use(handlers.NewPanicCheck(p.heartbeatOK, logger))
+	n.Use(handlers.NewPanicCheck(p.health, logger))
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
@@ -146,7 +145,7 @@ func NewProxy(
 		logger.Debug("http-rewrite", zap.Object("config", cfg.HTTPRewrite))
 		n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite))
 	}
-	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.heartbeatOK, logger))
+	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger))

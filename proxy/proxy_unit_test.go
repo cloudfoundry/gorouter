@@ -2,13 +2,12 @@ package proxy_test
 
 import (
 	"bytes"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/common/threading"
 
 	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -72,7 +71,7 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			skipSanitization = func(req *http.Request) bool { return false }
 			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
-				routeServiceConfig, tlsConfig, tlsConfig, &threading.SharedBoolean{}, rt)
+				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
 
@@ -123,18 +122,18 @@ var _ = Describe("Proxy Unit tests", func() {
 		})
 
 		Context("when the route registry is nil, causing the proxy to panic", func() {
-			var healthCheck *threading.SharedBoolean
+			var h *health.Health
 			BeforeEach(func() {
-				healthCheck = &threading.SharedBoolean{}
-				healthCheck.Set(true)
-				proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, nil, combinedReporter, routeServiceConfig, tlsConfig, tlsConfig, healthCheck, rt)
+				h = &health.Health{}
+				h.SetHealth(health.Healthy)
+				proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, nil, combinedReporter, routeServiceConfig, tlsConfig, tlsConfig, h, rt)
 			})
 
 			It("fails the healthcheck", func() {
 				req := test_util.NewRequest("GET", "some-app", "/", nil)
 
 				proxyObj.ServeHTTP(resp, req)
-				Expect(healthCheck.Get()).To(BeFalse())
+				Expect(h.Health()).To(Equal(health.Degraded))
 
 				req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
 				proxyObj.ServeHTTP(resp, req)

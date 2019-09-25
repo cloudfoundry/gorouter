@@ -1,6 +1,7 @@
 package main
 
 import (
+	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -10,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/threading"
 	"code.cloudfoundry.org/tlsconfig"
 
 	"code.cloudfoundry.org/clock"
@@ -37,7 +37,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
@@ -46,7 +46,7 @@ import (
 
 var (
 	configFile  string
-	healthCheck *threading.SharedBoolean
+	healthCheck *health.Health
 )
 
 func main() {
@@ -169,8 +169,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
-	healthCheck = &threading.SharedBoolean{}
-	healthCheck.Set(false)
+	healthCheck = &health.Health{}
 	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, healthCheck, rss.GetRoundTripper())
 	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, healthCheck, logCounter, nil, rss)
 	if err != nil {

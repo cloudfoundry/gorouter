@@ -1,7 +1,7 @@
 package handlers_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/threading"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -16,22 +16,22 @@ import (
 
 var _ = Describe("Proxy Healthcheck", func() {
 	var (
-		handler     negroni.Handler
-		logger      logger.Logger
-		resp        *httptest.ResponseRecorder
-		req         *http.Request
-		heartbeatOK *threading.SharedBoolean
-		nextHandler http.HandlerFunc
-		nextCalled  bool
+		handler      negroni.Handler
+		logger       logger.Logger
+		resp         *httptest.ResponseRecorder
+		req          *http.Request
+		healthStatus *health.Health
+		nextHandler  http.HandlerFunc
+		nextCalled   bool
 	)
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
-		heartbeatOK = &threading.SharedBoolean{}
-		heartbeatOK.Set(true)
+		healthStatus = &health.Health{}
+		healthStatus.SetHealth(health.Healthy)
 
-		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", heartbeatOK, logger)
+		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", healthStatus, logger)
 		nextHandler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})
@@ -69,7 +69,7 @@ var _ = Describe("Proxy Healthcheck", func() {
 
 		Context("when draining is in progress", func() {
 			BeforeEach(func() {
-				heartbeatOK.Set(false)
+				healthStatus.SetHealth(health.Degraded)
 			})
 
 			It("closes the request", func() {
