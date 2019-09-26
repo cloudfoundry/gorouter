@@ -135,63 +135,15 @@ var _ = Describe("Router", func() {
 		return resp.StatusCode
 	}
 
-	testRouterDrain := func(config *cfg.Config, mbusClient *nats.Conn, registry *rregistry.RouteRegistry, initiateDrain func()) {
-		app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
-		blocker := make(chan bool)
-		resultCh := make(chan bool, 2)
-		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-			blocker <- true
+	testUnhealthy := func(h *health.Health, interrupt func()) {
+		Expect(h.Health()).To(Equal(health.Healthy))
 
-			_, err := ioutil.ReadAll(r.Body)
-			defer r.Body.Close()
-			Expect(err).ToNot(HaveOccurred())
+		go interrupt()
 
-			<-blocker
+		Eventually(func() health.Status {
+			return h.Health()
+		}).Should(Equal(health.Degraded))
 
-			w.WriteHeader(http.StatusNoContent)
-		})
-
-		app.RegisterAndListen()
-
-		Eventually(func() bool {
-			return appRegistered(registry, app)
-		}).Should(BeTrue())
-
-		drainTimeout := 100 * time.Millisecond
-
-		go func() {
-			defer GinkgoRecover()
-			req, err := http.NewRequest("GET", app.Endpoint(), nil)
-			Expect(err).ToNot(HaveOccurred())
-
-			client := http.Client{}
-			resp, err := client.Do(req)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp).ToNot(BeNil())
-			defer resp.Body.Close()
-			_, err = ioutil.ReadAll(resp.Body)
-			Expect(err).ToNot(HaveOccurred())
-			resultCh <- false
-		}()
-
-		<-blocker
-
-		go initiateDrain()
-
-		Consistently(resultCh, drainTimeout/10).ShouldNot(Receive())
-
-		blocker <- false
-
-		var result bool
-		Eventually(resultCh).Should(Receive(&result))
-		Expect(result).To(BeFalse())
-
-		req, err := http.NewRequest("GET", app.Endpoint(), nil)
-		Expect(err).ToNot(HaveOccurred())
-
-		client := http.Client{}
-		_, err = client.Do(req)
-		Expect(err).To(HaveOccurred())
 	}
 
 	BeforeEach(func() {
@@ -219,6 +171,7 @@ var _ = Describe("Router", func() {
 		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
 		logcounter := schema.NewLogCounter()
 		healthStatus = &health.Health{}
+		healthStatus.SetHealth(health.Healthy)
 
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
@@ -372,7 +325,6 @@ var _ = Describe("Router", func() {
 				blocker := make(chan bool)
 				drainDone := make(chan struct{})
 				clientDone := make(chan struct{})
-				serviceUnavailable := make(chan bool)
 
 				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 					blocker <- true
@@ -417,33 +369,15 @@ var _ = Describe("Router", func() {
 					close(clientDone)
 				}()
 
-				// check for ok health
-				Consistently(func() int {
-					return healthCheckWithEndpointReceives()
-				}, 100*time.Millisecond).Should(Equal(http.StatusOK))
-
 				// wait for app to receive request
 				<-blocker
-
-				// check drain makes gorouter returns service unavailable
-				go func() {
-					defer GinkgoRecover()
-					Eventually(func() int {
-						result := healthCheckWithEndpointReceives()
-						if result == http.StatusServiceUnavailable {
-							serviceUnavailable <- true
-						}
-						return result
-					}, 100*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
-				}()
 
 				// check that we can still connect within drainWait time
 				go func() {
 					defer GinkgoRecover()
-					<-serviceUnavailable
 					Consistently(func() int {
 						return healthCheckWithEndpointReceives()
-					}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+					}, 500*time.Millisecond).ShouldNot(Equal(http.StatusBadGateway))
 				}()
 
 				// trigger drain
@@ -468,10 +402,13 @@ var _ = Describe("Router", func() {
 	Context("OnErrOrSignal", func() {
 		Context("when an error is received in the error channel", func() {
 			var errChan chan error
+			var h *health.Health
+			var rtr2 *router.Router
 
 			BeforeEach(func() {
 				logcounter := schema.NewLogCounter()
-				h := &health.Health{}
+				h = &health.Health{}
+				h.SetHealth(health.Healthy)
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
 				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
@@ -480,14 +417,14 @@ var _ = Describe("Router", func() {
 				errChan = make(chan error, 2)
 				var err error
 				rss := &sharedfakes.RouteServicesServer{}
-				rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, errChan, rss)
+				rtr2, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
-				runRouter(rtr)
+				runRouter(rtr2)
 			})
 
-			It("it drains existing connections and stops the router", func() {
-				testRouterDrain(config, mbusClient, registry, func() {
-					errChan <- errors.New("Initiate drain error")
+			It("degrades router health", func() {
+				testUnhealthy(h, func() {
+					errChan <- errors.New("initiate unhealthy error")
 				})
 			})
 		})
@@ -501,8 +438,8 @@ var _ = Describe("Router", func() {
 				signals, _ = runRouter(rtr)
 			})
 
-			It("it drains and stops the router", func() {
-				testRouterDrain(config, mbusClient, registry, func() {
+			It("degrades router health", func() {
+				testUnhealthy(healthStatus, func() {
 					signals <- syscall.SIGUSR1
 				})
 			})
@@ -511,7 +448,6 @@ var _ = Describe("Router", func() {
 		Context("when a SIGTERM signal is sent", func() {
 			It("it drains and stops the router", func() {
 				signals, closeChannel := runRouter(rtr)
-				//time.Sleep(time.Second)
 				testAndVerifyRouterStopsNoDrain(signals, closeChannel, syscall.SIGTERM)
 			})
 		})
@@ -532,8 +468,8 @@ var _ = Describe("Router", func() {
 				signals, _ = runRouter(rtr)
 			})
 
-			It("it drains and stops the router", func() {
-				testRouterDrain(config, mbusClient, registry, func() {
+			It("degrades router health", func() {
+				testUnhealthy(healthStatus, func() {
 					signals <- syscall.SIGUSR1
 					signals <- syscall.SIGUSR1
 					signals <- syscall.SIGTERM

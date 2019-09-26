@@ -45,8 +45,8 @@ import (
 )
 
 var (
-	configFile  string
-	healthCheck *health.Health
+	configFile string
+	h          *health.Health
 )
 
 func main() {
@@ -169,9 +169,13 @@ func main() {
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
-	healthCheck = &health.Health{}
-	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, healthCheck, rss.GetRoundTripper())
-	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, healthCheck, logCounter, nil, rss)
+
+	h = &health.Health{}
+	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, h, rss.GetRoundTripper())
+	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, h, logCounter, nil, rss)
+
+	h.OnDegrade = goRouter.DrainAndStop
+
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
@@ -199,6 +203,9 @@ func main() {
 		time.Sleep(c.RouteLatencyMetricMuzzleDuration) // this way we avoid reporting metrics for pre-existing routes
 		metricsReporter.UnmuzzleRouteRegistrationLatency()
 	}()
+
+	<-monitor.Ready()
+	h.SetHealth(health.Healthy)
 
 	err = <-monitor.Wait()
 	if err != nil {

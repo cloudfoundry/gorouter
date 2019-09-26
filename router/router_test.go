@@ -219,15 +219,11 @@ var _ = Describe("Router", func() {
 			Consistently(func() int {
 				return healthCheckWithEndpointReceives()
 			}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
-			Eventually(func() int {
-				return healthCheckWithEndpointReceives()
-			}).Should(Equal(http.StatusOK))
 			signals <- syscall.SIGUSR1
 		})
 
 		It("should log waiting delay value", func() {
 			Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
-			verify_health(fmt.Sprintf("localhost:%d", statusPort))
 		})
 	})
 
@@ -1864,8 +1860,13 @@ func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, var
 		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, rt)
 
 	h := &health.Health{}
+
 	logcounter := schema.NewLogCounter()
-	return NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, nil, routeServicesServer)
+	router, e := NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, nil, routeServicesServer)
+
+	h.OnDegrade = router.DrainAndStop
+
+	return router, e
 }
 
 func readVarz(v vvarz.Varz) map[string]interface{} {
