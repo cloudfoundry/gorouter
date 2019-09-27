@@ -1,8 +1,6 @@
 package health
 
-import (
-	"sync"
-)
+import "sync/atomic"
 
 type Status uint64
 
@@ -12,35 +10,16 @@ const (
 	Degraded
 )
 
-type onDegradeCallback func()
-
 type Health struct {
-	mu     sync.RWMutex // to lock health r/w
-	health Status
-
-	OnDegrade onDegradeCallback
+	health uint64
 }
 
 func (h *Health) Health() Status {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.health
+	return Status(atomic.LoadUint64(&h.health))
 }
 
 func (h *Health) SetHealth(s Status) {
-	h.mu.Lock()
-
-	if h.health == Degraded {
-		h.mu.Unlock()
-		return
-	}
-
-	h.health = s
-	h.mu.Unlock()
-
-	if h.OnDegrade != nil && s == Degraded {
-		h.OnDegrade()
-	}
+	atomic.StoreUint64(&h.health, uint64(s))
 }
 
 func (h *Health) String() string {

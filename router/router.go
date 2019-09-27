@@ -165,6 +165,8 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		return err
 	}
 
+	r.health.SetHealth(health.Healthy)
+
 	r.logger.Info("gorouter.started")
 	go r.uptimeMonitor.Start()
 
@@ -180,7 +182,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 	case err := <-errChan:
 		if err != nil {
 			r.logger.Error("Error occurred", zap.Error(err))
-			r.health.SetHealth(health.Degraded)
+			r.DrainAndStop()
 		}
 	case sig := <-signals:
 		go func() {
@@ -192,7 +194,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 			}
 		}()
 		if sig == syscall.SIGUSR1 {
-			r.health.SetHealth(health.Degraded)
+			r.DrainAndStop()
 		} else {
 			r.Stop()
 		}
@@ -308,6 +310,8 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 }
 
 func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
+	r.health.SetHealth(health.Degraded)
+
 	<-time.After(drainWait)
 
 	r.stopListening()
