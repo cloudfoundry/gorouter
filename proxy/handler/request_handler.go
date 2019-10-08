@@ -12,6 +12,7 @@ import (
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -104,7 +105,8 @@ func (h *RequestHandler) Logger() logger.Logger {
 func (h *RequestHandler) HandleBadGateway(err error, request *http.Request) {
 	h.reporter.CaptureBadGateway()
 
-	h.response.Header().Set("X-Cf-RouterError", "endpoint_failure")
+	handlers.AddRouterErrorHeader(h.response, "endpoint_failure")
+
 	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
 	h.response.Done()
 }

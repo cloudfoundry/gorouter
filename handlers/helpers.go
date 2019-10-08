@@ -5,9 +5,25 @@ import (
 	"net/http"
 	"strings"
 
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 )
+
+const (
+	cacheMaxAgeSeconds = 2
+)
+
+func AddRouterErrorHeader(rw http.ResponseWriter, val string) {
+	rw.Header().Set(router_http.CfRouterError, val)
+}
+
+func addInvalidResponseCacheControlHeader(rw http.ResponseWriter) {
+	rw.Header().Set(
+		"Cache-Control",
+		fmt.Sprintf("public,max-age=%d", cacheMaxAgeSeconds),
+	)
+}
 
 func writeStatus(rw http.ResponseWriter, code int, message string, logger logger.Logger) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)

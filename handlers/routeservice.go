@@ -50,7 +50,8 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	if !r.config.RouteServiceEnabled() {
 		r.logger.Info("route-service-unsupported")
 
-		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+		AddRouterErrorHeader(rw, "route_service_unsupported")
+
 		writeStatus(
 			rw,
 			http.StatusBadGateway,
@@ -62,7 +63,8 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	if IsTcpUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
-		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+		AddRouterErrorHeader(rw, "route_service_unsupported")
+
 		writeStatus(
 			rw,
 			http.StatusServiceUnavailable,
@@ -74,7 +76,8 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	if IsWebSocketUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
-		rw.Header().Set("X-Cf-RouterError", "route_service_unsupported")
+		AddRouterErrorHeader(rw, "route_service_unsupported")
+
 		writeStatus(
 			rw,
 			http.StatusServiceUnavailable,

@@ -18,8 +18,6 @@ import (
 const (
 	CfInstanceIdHeader = "X-CF-InstanceID"
 	CfAppInstance      = "X-CF-APP-INSTANCE"
-
-	cacheMaxAgeSeconds = 2
 )
 
 type lookupHandler struct {
@@ -61,11 +59,8 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request) {
 	l.reporter.CaptureBadRequest()
 
-	rw.Header().Set("X-Cf-RouterError", "unknown_route")
-	rw.Header().Set(
-		"Cache-Control",
-		fmt.Sprintf("public,max-age=%d", cacheMaxAgeSeconds),
-	)
+	AddRouterErrorHeader(rw, "unknown_route")
+	addInvalidResponseCacheControlHeader(rw)
 
 	writeStatus(
 		rw,
@@ -79,7 +74,7 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 	l.reporter.CaptureBackendExhaustedConns()
 	l.logger.Info("connection-limit-reached")
 
-	rw.Header().Set("X-Cf-RouterError", "Connection Limit Reached")
+	AddRouterErrorHeader(rw, "Connection Limit Reached")
 
 	writeStatus(
 		rw,
