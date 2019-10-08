@@ -92,23 +92,26 @@ var _ = Describe("Lookup", func() {
 			reg.LookupReturns(pool)
 		})
 
-		It("sends a bad request metric", func() {
-			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+		It("does not send a bad request metric", func() {
+			Expect(rep.CaptureBadRequestCallCount()).To(Equal(0))
 		})
 
-		It("sets X-Cf-RouterError to unknown_route", func() {
-			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+		It("sets X-Cf-RouterError to no_endpoints", func() {
+			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("no_endpoints"))
 		})
 
-		It("returns a 404 NotFound and does not call next", func() {
+		It("returns a 503 ServiceUnavailable and does not call next", func() {
 			Expect(nextCalled).To(BeFalse())
-			Expect(resp.Code).To(Equal(http.StatusNotFound))
+			Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
 		})
 
 		It("has a meaningful response", func() {
-			Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') does not exist"))
+			Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') has no available endpoints"))
 		})
 
+		It("Sets Cache-Control to public,max-age=2", func() {
+			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+		})
 	})
 
 	Context("when there is a pool that matches the request, and it has endpoints", func() {
