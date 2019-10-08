@@ -60,7 +60,7 @@ var _ = Describe("HandleError", func() {
 		responseWriter = utils.NewProxyResponseWriter(responseRecorder)
 	})
 
-	It("Sets a header to describe the endpoint_failure", func() {
+	It("sets a header to describe the endpoint_failure", func() {
 		errorHandler.HandleError(responseWriter, errors.New("potato"))
 		Expect(responseWriter.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
 	})
@@ -129,11 +129,11 @@ var _ = Describe("HandleError", func() {
 				errorHandler.HandleError(responseWriter, err)
 			})
 
-			It("Has a 503 Status Code", func() {
+			It("has a 503 Status Code", func() {
 				Expect(responseWriter.Status()).To(Equal(503))
 			})
 
-			It("Emits a backend_invalid_id metric", func() {
+			It("emits a backend_invalid_id metric", func() {
 				Expect(metricReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
 			})
 		})
@@ -144,11 +144,11 @@ var _ = Describe("HandleError", func() {
 				errorHandler.HandleError(responseWriter, err)
 			})
 
-			It("Has a 526 Status Code", func() {
+			It("has a 526 Status Code", func() {
 				Expect(responseWriter.Status()).To(Equal(526))
 			})
 
-			It("Emits a backend_invalid_tls_cert metric", func() {
+			It("emits a backend_invalid_tls_cert metric", func() {
 				Expect(metricReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
 			})
 		})
@@ -159,11 +159,11 @@ var _ = Describe("HandleError", func() {
 				errorHandler.HandleError(responseWriter, err)
 			})
 
-			It("Has a 525 Status Code", func() {
+			It("has a 525 Status Code", func() {
 				Expect(responseWriter.Status()).To(Equal(525))
 			})
 
-			It("Emits a backend_tls_handshake_failed metric", func() {
+			It("emits a backend_tls_handshake_failed metric", func() {
 				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
 			})
 		})
@@ -174,11 +174,11 @@ var _ = Describe("HandleError", func() {
 				errorHandler.HandleError(responseWriter, err)
 			})
 
-			It("Has a 525 Status Code", func() {
+			It("has a 525 Status Code", func() {
 				Expect(responseWriter.Status()).To(Equal(525))
 			})
 
-			It("Emits a backend_tls_handshake_failed metric", func() {
+			It("emits a backend_tls_handshake_failed metric", func() {
 				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
 			})
 		})
@@ -189,7 +189,7 @@ var _ = Describe("HandleError", func() {
 				errorHandler.HandleError(responseWriter, err)
 			})
 
-			It("Has a 499 Status Code", func() {
+			It("has a 499 Status Code", func() {
 				Expect(responseWriter.Status()).To(Equal(499))
 			})
 		})

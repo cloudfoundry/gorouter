@@ -57,7 +57,7 @@ var _ = Describe("AccessLogRecord", func() {
 	})
 
 	Describe("LogMessage", func() {
-		It("Makes a record with all values", func() {
+		It("makes a record with all values", func() {
 			r := BufferReader(bytes.NewBufferString(record.LogMessage()))
 			Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
 			Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
@@ -100,7 +100,7 @@ var _ = Describe("AccessLogRecord", func() {
 				}
 			})
 
-			It("Makes a record with all values", func() {
+			It("makes a record with all values", func() {
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
 				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
 				Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
@@ -169,7 +169,7 @@ var _ = Describe("AccessLogRecord", func() {
 		})
 
 		Context("when extra headers is an empty slice", func() {
-			It("Makes a record with all values", func() {
+			It("makes a record with all values", func() {
 				record := schema.AccessLogRecord{
 					Request: &http.Request{
 						Host:   "FakeRequestHost",

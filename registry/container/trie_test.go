@@ -200,7 +200,7 @@ var _ = Describe("Trie", func() {
 			Expect(pool).NotTo(BeNil())
 		})
 
-		It("Returns the number of pools after deleting one", func() {
+		It("returns the number of pools after deleting one", func() {
 			r.Insert("/foo/bar/baz", p1)
 			r.Insert("/foo/bar", p2)
 
@@ -253,7 +253,7 @@ var _ = Describe("Trie", func() {
 		})
 	})
 
-	It("Returns the number of pools", func() {
+	It("returns the number of pools", func() {
 		Expect(r.PoolCount()).To(Equal(0))
 
 		r.Insert("/foo/bar/baz", p1)
@@ -367,7 +367,7 @@ var _ = Describe("Trie", func() {
 	})
 
 	Describe(".ToMap", func() {
-		It("Can be represented by a map", func() {
+		It("can be represented by a map", func() {
 			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
 			p1.Put(e1)
@@ -384,7 +384,7 @@ var _ = Describe("Trie", func() {
 	})
 
 	Describe(".ToPath", func() {
-		It("Returns full URI", func() {
+		It("returns full URI", func() {
 			e1 := route.NewEndpoint(&route.EndpointOpts{})
 			p1.Put(e1)
 			node1 := r.Insert("foo.com", p1)
