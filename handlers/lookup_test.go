@@ -60,11 +60,11 @@ var _ = Describe("Lookup", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
 		})
 
-		It("Sets X-Cf-RouterError to unknown_route", func() {
+		It("sets X-Cf-RouterError to unknown_route", func() {
 			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
 		})
 
-		It("Sets Cache-Control to public,max-age=2", func() {
+		It("sets Cache-Control to public,max-age=2", func() {
 			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
 		})
 
@@ -96,7 +96,7 @@ var _ = Describe("Lookup", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
 		})
 
-		It("Sets X-Cf-RouterError to unknown_route", func() {
+		It("sets X-Cf-RouterError to unknown_route", func() {
 			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
 		})
 

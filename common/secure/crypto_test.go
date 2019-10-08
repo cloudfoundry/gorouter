@@ -140,7 +140,7 @@ var _ = Describe("Crypto", func() {
 	})
 
 	Describe("RandomBytes", func() {
-		It("Generates a random byte array with the specified length", func() {
+		It("generates a random byte array with the specified length", func() {
 			randBytes, err := secure.RandomBytes(123)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(randBytes).To(HaveLen(123))

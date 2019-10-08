@@ -119,7 +119,7 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
-		It("Does not append ? to the request", func() {
+		It("does not append ? to the request", func() {
 			ln := test_util.RegisterHandler(r, "test/?", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /? HTTP/1.1")
 
@@ -1026,7 +1026,7 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Describe("Access Logging", func() {
-		It("Logs a request", func() {
+		It("logs a request", func() {
 			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
 				req, body := conn.ReadRequest()
 				Expect(req.Method).To(Equal("POST"))
@@ -1075,7 +1075,7 @@ var _ = Describe("Proxy", func() {
 			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
-		It("Logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
+		It("logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
 			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
 				conn.ReadRequest()
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -1111,7 +1111,7 @@ var _ = Describe("Proxy", func() {
 			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
-		It("Logs a request when it exits early", func() {
+		It("logs a request when it exits early", func() {
 			conn := dialProxy(proxyServer)
 
 			body := &bytes.Buffer{}
@@ -1542,7 +1542,7 @@ var _ = Describe("Proxy", func() {
 			conn.Close()
 		})
 
-		It("Logs the response time and status code 101 in the access logs", func() {
+		It("logs the response time and status code 101 in the access logs", func() {
 			done := make(chan bool)
 			ln := test_util.RegisterHandler(r, "ws", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)

@@ -186,7 +186,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					transport.RoundTripReturns(resp.Result(), nil)
 				})
 
-				It("Sends X-cf headers", func() {
+				It("sends X-cf headers", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))

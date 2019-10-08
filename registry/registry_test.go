@@ -433,7 +433,7 @@ var _ = Describe("RouteRegistry", func() {
 			})
 		})
 
-		It("Handles unknown URIs", func() {
+		It("handles unknown URIs", func() {
 			r.Unregister("bar", barEndpoint)
 			Expect(r.NumUris()).To(Equal(0))
 			Expect(r.NumEndpoints()).To(Equal(0))
