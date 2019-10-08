@@ -37,8 +37,13 @@ func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger log
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	pool := l.lookup(r)
-	if pool == nil || pool.IsEmpty() {
+	if pool == nil {
 		l.handleMissingRoute(rw, r)
+		return
+	}
+
+	if pool.IsEmpty() {
+		l.handleUnavailableRoute(rw, r)
 		return
 	}
 
@@ -66,6 +71,18 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		rw,
 		http.StatusNotFound,
 		fmt.Sprintf("Requested route ('%s') does not exist.", r.Host),
+		l.logger,
+	)
+}
+
+func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.Request) {
+	AddRouterErrorHeader(rw, "no_endpoints")
+	addInvalidResponseCacheControlHeader(rw)
+
+	writeStatus(
+		rw,
+		http.StatusServiceUnavailable,
+		fmt.Sprintf("Requested route ('%s') has no available endpoints.", r.Host),
 		l.logger,
 	)
 }
