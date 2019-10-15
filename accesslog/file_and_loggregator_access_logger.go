@@ -79,12 +79,13 @@ func CreateRunningAccessLogger(logger logger.Logger, ls logsender, config *confi
 
 	accessLogger := &FileAndLoggregatorAccessLogger{
 		dropsondeSourceInstance: dropsondeSourceInstance,
-		channel:                 make(chan schema.AccessLogRecord, 1024),
-		stopCh:                  make(chan struct{}),
-		disableXFFLogging:       config.Logging.DisableLogForwardedFor,
-		disableSourceIPLogging:  config.Logging.DisableLogSourceIP,
-		logger:                  logger,
-		ls:                      ls,
+
+		channel:                make(chan schema.AccessLogRecord, 1024),
+		stopCh:                 make(chan struct{}),
+		disableXFFLogging:      config.Logging.DisableLogForwardedFor,
+		disableSourceIPLogging: config.Logging.DisableLogSourceIP,
+		logger:                 logger,
+		ls:                     ls,
 	}
 	configureWriters(accessLogger, writers)
 
