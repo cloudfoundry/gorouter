@@ -46,7 +46,23 @@ var _ = Describe("DropsondeLogSender", func() {
 			Expect(logMessage.Message).To(Equal([]byte("someMessage")))
 		})
 
-		Describe("when app id is empty", func() {
+		It("emits an envelope with tags", func() {
+			tags := map[string]string{
+				"foo": "bar",
+				"baz": "fuz",
+			}
+			logSender.SendAppLog("someID", "someMessage", tags)
+
+			Expect(logger.ErrorCallCount()).To(Equal(0))
+			Expect(eventEmitter.EmitEnvelopeCallCount()).To(Equal(1))
+			envelope := eventEmitter.EmitEnvelopeArgsForCall(0)
+			Expect(envelope.Tags).To(Equal(map[string]string{
+				"foo": "bar",
+				"baz": "fuz",
+			}))
+		})
+
+		Context("when app id is empty", func() {
 			It("does not emit an envelope", func() {
 				logSender.SendAppLog("", "someMessage", nil)
 

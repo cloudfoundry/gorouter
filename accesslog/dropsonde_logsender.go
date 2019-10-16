@@ -42,6 +42,8 @@ func (l *DropsondeLogSender) SendAppLog(appID, message string, tags map[string]s
 		return
 	}
 
+	envelope.Tags = tags
+
 	if err = l.eventEmitter.EmitEnvelope(envelope); err != nil {
 		l.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
 	}
