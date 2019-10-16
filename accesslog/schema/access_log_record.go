@@ -11,6 +11,11 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 )
 
+//go:generate counterfeiter -o fakes/access_log_record.go . LogSender
+type LogSender interface {
+	SendAppLog(appID, message string, tags map[string]string)
+}
+
 // recordBuffer defines additional helper methods to write to the record buffer
 type recordBuffer struct {
 	bytes.Buffer
@@ -182,6 +187,10 @@ func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 	return int64(bytesWritten), err
 }
 
+func (r *AccessLogRecord) SendLog(ls LogSender) {
+	ls.SendAppLog(r.ApplicationID(), r.LogMessage(), r.tags())
+}
+
 // ApplicationID returns the application ID that corresponds with the access log
 func (r *AccessLogRecord) ApplicationID() string {
 	if r.RouteEndpoint == nil {
@@ -198,6 +207,14 @@ func (r *AccessLogRecord) LogMessage() string {
 	}
 
 	return string(r.getRecord())
+}
+
+func (r *AccessLogRecord) tags() map[string]string {
+	if r.RouteEndpoint == nil {
+		return nil
+	}
+
+	return r.RouteEndpoint.Tags
 }
 
 func (r *AccessLogRecord) addExtraHeaders(b *recordBuffer) {
