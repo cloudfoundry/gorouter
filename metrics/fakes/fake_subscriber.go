@@ -8,21 +8,11 @@ import (
 )
 
 type FakeSubscriber struct {
-	PendingStub        func() (int, error)
-	pendingMutex       sync.RWMutex
-	pendingArgsForCall []struct{}
-	pendingReturns     struct {
-		result1 int
-		result2 error
-	}
-	pendingReturnsOnCall map[int]struct {
-		result1 int
-		result2 error
-	}
 	DroppedStub        func() (int, error)
 	droppedMutex       sync.RWMutex
-	droppedArgsForCall []struct{}
-	droppedReturns     struct {
+	droppedArgsForCall []struct {
+	}
+	droppedReturns struct {
 		result1 int
 		result2 error
 	}
@@ -30,57 +20,27 @@ type FakeSubscriber struct {
 		result1 int
 		result2 error
 	}
+	PendingStub        func() (int, error)
+	pendingMutex       sync.RWMutex
+	pendingArgsForCall []struct {
+	}
+	pendingReturns struct {
+		result1 int
+		result2 error
+	}
+	pendingReturnsOnCall map[int]struct {
+		result1 int
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
-}
-
-func (fake *FakeSubscriber) Pending() (int, error) {
-	fake.pendingMutex.Lock()
-	ret, specificReturn := fake.pendingReturnsOnCall[len(fake.pendingArgsForCall)]
-	fake.pendingArgsForCall = append(fake.pendingArgsForCall, struct{}{})
-	fake.recordInvocation("Pending", []interface{}{})
-	fake.pendingMutex.Unlock()
-	if fake.PendingStub != nil {
-		return fake.PendingStub()
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fake.pendingReturns.result1, fake.pendingReturns.result2
-}
-
-func (fake *FakeSubscriber) PendingCallCount() int {
-	fake.pendingMutex.RLock()
-	defer fake.pendingMutex.RUnlock()
-	return len(fake.pendingArgsForCall)
-}
-
-func (fake *FakeSubscriber) PendingReturns(result1 int, result2 error) {
-	fake.PendingStub = nil
-	fake.pendingReturns = struct {
-		result1 int
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeSubscriber) PendingReturnsOnCall(i int, result1 int, result2 error) {
-	fake.PendingStub = nil
-	if fake.pendingReturnsOnCall == nil {
-		fake.pendingReturnsOnCall = make(map[int]struct {
-			result1 int
-			result2 error
-		})
-	}
-	fake.pendingReturnsOnCall[i] = struct {
-		result1 int
-		result2 error
-	}{result1, result2}
 }
 
 func (fake *FakeSubscriber) Dropped() (int, error) {
 	fake.droppedMutex.Lock()
 	ret, specificReturn := fake.droppedReturnsOnCall[len(fake.droppedArgsForCall)]
-	fake.droppedArgsForCall = append(fake.droppedArgsForCall, struct{}{})
+	fake.droppedArgsForCall = append(fake.droppedArgsForCall, struct {
+	}{})
 	fake.recordInvocation("Dropped", []interface{}{})
 	fake.droppedMutex.Unlock()
 	if fake.DroppedStub != nil {
@@ -89,7 +49,8 @@ func (fake *FakeSubscriber) Dropped() (int, error) {
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	return fake.droppedReturns.result1, fake.droppedReturns.result2
+	fakeReturns := fake.droppedReturns
+	return fakeReturns.result1, fakeReturns.result2
 }
 
 func (fake *FakeSubscriber) DroppedCallCount() int {
@@ -98,7 +59,15 @@ func (fake *FakeSubscriber) DroppedCallCount() int {
 	return len(fake.droppedArgsForCall)
 }
 
+func (fake *FakeSubscriber) DroppedCalls(stub func() (int, error)) {
+	fake.droppedMutex.Lock()
+	defer fake.droppedMutex.Unlock()
+	fake.DroppedStub = stub
+}
+
 func (fake *FakeSubscriber) DroppedReturns(result1 int, result2 error) {
+	fake.droppedMutex.Lock()
+	defer fake.droppedMutex.Unlock()
 	fake.DroppedStub = nil
 	fake.droppedReturns = struct {
 		result1 int
@@ -107,6 +76,8 @@ func (fake *FakeSubscriber) DroppedReturns(result1 int, result2 error) {
 }
 
 func (fake *FakeSubscriber) DroppedReturnsOnCall(i int, result1 int, result2 error) {
+	fake.droppedMutex.Lock()
+	defer fake.droppedMutex.Unlock()
 	fake.DroppedStub = nil
 	if fake.droppedReturnsOnCall == nil {
 		fake.droppedReturnsOnCall = make(map[int]struct {
@@ -120,13 +91,68 @@ func (fake *FakeSubscriber) DroppedReturnsOnCall(i int, result1 int, result2 err
 	}{result1, result2}
 }
 
+func (fake *FakeSubscriber) Pending() (int, error) {
+	fake.pendingMutex.Lock()
+	ret, specificReturn := fake.pendingReturnsOnCall[len(fake.pendingArgsForCall)]
+	fake.pendingArgsForCall = append(fake.pendingArgsForCall, struct {
+	}{})
+	fake.recordInvocation("Pending", []interface{}{})
+	fake.pendingMutex.Unlock()
+	if fake.PendingStub != nil {
+		return fake.PendingStub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	fakeReturns := fake.pendingReturns
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeSubscriber) PendingCallCount() int {
+	fake.pendingMutex.RLock()
+	defer fake.pendingMutex.RUnlock()
+	return len(fake.pendingArgsForCall)
+}
+
+func (fake *FakeSubscriber) PendingCalls(stub func() (int, error)) {
+	fake.pendingMutex.Lock()
+	defer fake.pendingMutex.Unlock()
+	fake.PendingStub = stub
+}
+
+func (fake *FakeSubscriber) PendingReturns(result1 int, result2 error) {
+	fake.pendingMutex.Lock()
+	defer fake.pendingMutex.Unlock()
+	fake.PendingStub = nil
+	fake.pendingReturns = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeSubscriber) PendingReturnsOnCall(i int, result1 int, result2 error) {
+	fake.pendingMutex.Lock()
+	defer fake.pendingMutex.Unlock()
+	fake.PendingStub = nil
+	if fake.pendingReturnsOnCall == nil {
+		fake.pendingReturnsOnCall = make(map[int]struct {
+			result1 int
+			result2 error
+		})
+	}
+	fake.pendingReturnsOnCall[i] = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeSubscriber) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.pendingMutex.RLock()
-	defer fake.pendingMutex.RUnlock()
 	fake.droppedMutex.RLock()
 	defer fake.droppedMutex.RUnlock()
+	fake.pendingMutex.RLock()
+	defer fake.pendingMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

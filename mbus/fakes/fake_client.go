@@ -9,11 +9,23 @@ import (
 )
 
 type FakeClient struct {
-	SubscribeStub        func(subj string, cb nats.MsgHandler) (*nats.Subscription, error)
+	PublishStub        func(string, []byte) error
+	publishMutex       sync.RWMutex
+	publishArgsForCall []struct {
+		arg1 string
+		arg2 []byte
+	}
+	publishReturns struct {
+		result1 error
+	}
+	publishReturnsOnCall map[int]struct {
+		result1 error
+	}
+	SubscribeStub        func(string, nats.MsgHandler) (*nats.Subscription, error)
 	subscribeMutex       sync.RWMutex
 	subscribeArgsForCall []struct {
-		subj string
-		cb   nats.MsgHandler
+		arg1 string
+		arg2 nats.MsgHandler
 	}
 	subscribeReturns struct {
 		result1 *nats.Subscription
@@ -23,38 +35,93 @@ type FakeClient struct {
 		result1 *nats.Subscription
 		result2 error
 	}
-	PublishStub        func(subj string, data []byte) error
-	publishMutex       sync.RWMutex
-	publishArgsForCall []struct {
-		subj string
-		data []byte
-	}
-	publishReturns struct {
-		result1 error
-	}
-	publishReturnsOnCall map[int]struct {
-		result1 error
-	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeClient) Subscribe(subj string, cb nats.MsgHandler) (*nats.Subscription, error) {
+func (fake *FakeClient) Publish(arg1 string, arg2 []byte) error {
+	var arg2Copy []byte
+	if arg2 != nil {
+		arg2Copy = make([]byte, len(arg2))
+		copy(arg2Copy, arg2)
+	}
+	fake.publishMutex.Lock()
+	ret, specificReturn := fake.publishReturnsOnCall[len(fake.publishArgsForCall)]
+	fake.publishArgsForCall = append(fake.publishArgsForCall, struct {
+		arg1 string
+		arg2 []byte
+	}{arg1, arg2Copy})
+	fake.recordInvocation("Publish", []interface{}{arg1, arg2Copy})
+	fake.publishMutex.Unlock()
+	if fake.PublishStub != nil {
+		return fake.PublishStub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.publishReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) PublishCallCount() int {
+	fake.publishMutex.RLock()
+	defer fake.publishMutex.RUnlock()
+	return len(fake.publishArgsForCall)
+}
+
+func (fake *FakeClient) PublishCalls(stub func(string, []byte) error) {
+	fake.publishMutex.Lock()
+	defer fake.publishMutex.Unlock()
+	fake.PublishStub = stub
+}
+
+func (fake *FakeClient) PublishArgsForCall(i int) (string, []byte) {
+	fake.publishMutex.RLock()
+	defer fake.publishMutex.RUnlock()
+	argsForCall := fake.publishArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeClient) PublishReturns(result1 error) {
+	fake.publishMutex.Lock()
+	defer fake.publishMutex.Unlock()
+	fake.PublishStub = nil
+	fake.publishReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) PublishReturnsOnCall(i int, result1 error) {
+	fake.publishMutex.Lock()
+	defer fake.publishMutex.Unlock()
+	fake.PublishStub = nil
+	if fake.publishReturnsOnCall == nil {
+		fake.publishReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.publishReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) Subscribe(arg1 string, arg2 nats.MsgHandler) (*nats.Subscription, error) {
 	fake.subscribeMutex.Lock()
 	ret, specificReturn := fake.subscribeReturnsOnCall[len(fake.subscribeArgsForCall)]
 	fake.subscribeArgsForCall = append(fake.subscribeArgsForCall, struct {
-		subj string
-		cb   nats.MsgHandler
-	}{subj, cb})
-	fake.recordInvocation("Subscribe", []interface{}{subj, cb})
+		arg1 string
+		arg2 nats.MsgHandler
+	}{arg1, arg2})
+	fake.recordInvocation("Subscribe", []interface{}{arg1, arg2})
 	fake.subscribeMutex.Unlock()
 	if fake.SubscribeStub != nil {
-		return fake.SubscribeStub(subj, cb)
+		return fake.SubscribeStub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	return fake.subscribeReturns.result1, fake.subscribeReturns.result2
+	fakeReturns := fake.subscribeReturns
+	return fakeReturns.result1, fakeReturns.result2
 }
 
 func (fake *FakeClient) SubscribeCallCount() int {
@@ -63,13 +130,22 @@ func (fake *FakeClient) SubscribeCallCount() int {
 	return len(fake.subscribeArgsForCall)
 }
 
+func (fake *FakeClient) SubscribeCalls(stub func(string, nats.MsgHandler) (*nats.Subscription, error)) {
+	fake.subscribeMutex.Lock()
+	defer fake.subscribeMutex.Unlock()
+	fake.SubscribeStub = stub
+}
+
 func (fake *FakeClient) SubscribeArgsForCall(i int) (string, nats.MsgHandler) {
 	fake.subscribeMutex.RLock()
 	defer fake.subscribeMutex.RUnlock()
-	return fake.subscribeArgsForCall[i].subj, fake.subscribeArgsForCall[i].cb
+	argsForCall := fake.subscribeArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeClient) SubscribeReturns(result1 *nats.Subscription, result2 error) {
+	fake.subscribeMutex.Lock()
+	defer fake.subscribeMutex.Unlock()
 	fake.SubscribeStub = nil
 	fake.subscribeReturns = struct {
 		result1 *nats.Subscription
@@ -78,6 +154,8 @@ func (fake *FakeClient) SubscribeReturns(result1 *nats.Subscription, result2 err
 }
 
 func (fake *FakeClient) SubscribeReturnsOnCall(i int, result1 *nats.Subscription, result2 error) {
+	fake.subscribeMutex.Lock()
+	defer fake.subscribeMutex.Unlock()
 	fake.SubscribeStub = nil
 	if fake.subscribeReturnsOnCall == nil {
 		fake.subscribeReturnsOnCall = make(map[int]struct {
@@ -91,67 +169,13 @@ func (fake *FakeClient) SubscribeReturnsOnCall(i int, result1 *nats.Subscription
 	}{result1, result2}
 }
 
-func (fake *FakeClient) Publish(subj string, data []byte) error {
-	var dataCopy []byte
-	if data != nil {
-		dataCopy = make([]byte, len(data))
-		copy(dataCopy, data)
-	}
-	fake.publishMutex.Lock()
-	ret, specificReturn := fake.publishReturnsOnCall[len(fake.publishArgsForCall)]
-	fake.publishArgsForCall = append(fake.publishArgsForCall, struct {
-		subj string
-		data []byte
-	}{subj, dataCopy})
-	fake.recordInvocation("Publish", []interface{}{subj, dataCopy})
-	fake.publishMutex.Unlock()
-	if fake.PublishStub != nil {
-		return fake.PublishStub(subj, data)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fake.publishReturns.result1
-}
-
-func (fake *FakeClient) PublishCallCount() int {
-	fake.publishMutex.RLock()
-	defer fake.publishMutex.RUnlock()
-	return len(fake.publishArgsForCall)
-}
-
-func (fake *FakeClient) PublishArgsForCall(i int) (string, []byte) {
-	fake.publishMutex.RLock()
-	defer fake.publishMutex.RUnlock()
-	return fake.publishArgsForCall[i].subj, fake.publishArgsForCall[i].data
-}
-
-func (fake *FakeClient) PublishReturns(result1 error) {
-	fake.PublishStub = nil
-	fake.publishReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeClient) PublishReturnsOnCall(i int, result1 error) {
-	fake.PublishStub = nil
-	if fake.publishReturnsOnCall == nil {
-		fake.publishReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.publishReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
 func (fake *FakeClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.subscribeMutex.RLock()
-	defer fake.subscribeMutex.RUnlock()
 	fake.publishMutex.RLock()
 	defer fake.publishMutex.RUnlock()
+	fake.subscribeMutex.RLock()
+	defer fake.subscribeMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
