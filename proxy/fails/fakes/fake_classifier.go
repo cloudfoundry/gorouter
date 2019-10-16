@@ -8,10 +8,10 @@ import (
 )
 
 type Classifier struct {
-	ClassifyStub        func(err error) bool
+	ClassifyStub        func(error) bool
 	classifyMutex       sync.RWMutex
 	classifyArgsForCall []struct {
-		err error
+		arg1 error
 	}
 	classifyReturns struct {
 		result1 bool
@@ -23,21 +23,22 @@ type Classifier struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *Classifier) Classify(err error) bool {
+func (fake *Classifier) Classify(arg1 error) bool {
 	fake.classifyMutex.Lock()
 	ret, specificReturn := fake.classifyReturnsOnCall[len(fake.classifyArgsForCall)]
 	fake.classifyArgsForCall = append(fake.classifyArgsForCall, struct {
-		err error
-	}{err})
-	fake.recordInvocation("Classify", []interface{}{err})
+		arg1 error
+	}{arg1})
+	fake.recordInvocation("Classify", []interface{}{arg1})
 	fake.classifyMutex.Unlock()
 	if fake.ClassifyStub != nil {
-		return fake.ClassifyStub(err)
+		return fake.ClassifyStub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	return fake.classifyReturns.result1
+	fakeReturns := fake.classifyReturns
+	return fakeReturns.result1
 }
 
 func (fake *Classifier) ClassifyCallCount() int {
@@ -46,13 +47,22 @@ func (fake *Classifier) ClassifyCallCount() int {
 	return len(fake.classifyArgsForCall)
 }
 
+func (fake *Classifier) ClassifyCalls(stub func(error) bool) {
+	fake.classifyMutex.Lock()
+	defer fake.classifyMutex.Unlock()
+	fake.ClassifyStub = stub
+}
+
 func (fake *Classifier) ClassifyArgsForCall(i int) error {
 	fake.classifyMutex.RLock()
 	defer fake.classifyMutex.RUnlock()
-	return fake.classifyArgsForCall[i].err
+	argsForCall := fake.classifyArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *Classifier) ClassifyReturns(result1 bool) {
+	fake.classifyMutex.Lock()
+	defer fake.classifyMutex.Unlock()
 	fake.ClassifyStub = nil
 	fake.classifyReturns = struct {
 		result1 bool
@@ -60,6 +70,8 @@ func (fake *Classifier) ClassifyReturns(result1 bool) {
 }
 
 func (fake *Classifier) ClassifyReturnsOnCall(i int, result1 bool) {
+	fake.classifyMutex.Lock()
+	defer fake.classifyMutex.Unlock()
 	fake.ClassifyStub = nil
 	if fake.classifyReturnsOnCall == nil {
 		fake.classifyReturnsOnCall = make(map[int]struct {

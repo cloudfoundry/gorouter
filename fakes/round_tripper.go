@@ -38,7 +38,8 @@ func (fake *RoundTripper) RoundTrip(arg1 *http.Request) (*http.Response, error) 
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	return fake.roundTripReturns.result1, fake.roundTripReturns.result2
+	fakeReturns := fake.roundTripReturns
+	return fakeReturns.result1, fakeReturns.result2
 }
 
 func (fake *RoundTripper) RoundTripCallCount() int {
@@ -47,13 +48,22 @@ func (fake *RoundTripper) RoundTripCallCount() int {
 	return len(fake.roundTripArgsForCall)
 }
 
+func (fake *RoundTripper) RoundTripCalls(stub func(*http.Request) (*http.Response, error)) {
+	fake.roundTripMutex.Lock()
+	defer fake.roundTripMutex.Unlock()
+	fake.RoundTripStub = stub
+}
+
 func (fake *RoundTripper) RoundTripArgsForCall(i int) *http.Request {
 	fake.roundTripMutex.RLock()
 	defer fake.roundTripMutex.RUnlock()
-	return fake.roundTripArgsForCall[i].arg1
+	argsForCall := fake.roundTripArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *RoundTripper) RoundTripReturns(result1 *http.Response, result2 error) {
+	fake.roundTripMutex.Lock()
+	defer fake.roundTripMutex.Unlock()
 	fake.RoundTripStub = nil
 	fake.roundTripReturns = struct {
 		result1 *http.Response
@@ -62,6 +72,8 @@ func (fake *RoundTripper) RoundTripReturns(result1 *http.Response, result2 error
 }
 
 func (fake *RoundTripper) RoundTripReturnsOnCall(i int, result1 *http.Response, result2 error) {
+	fake.roundTripMutex.Lock()
+	defer fake.roundTripMutex.Unlock()
 	fake.RoundTripStub = nil
 	if fake.roundTripReturnsOnCall == nil {
 		fake.roundTripReturnsOnCall = make(map[int]struct {

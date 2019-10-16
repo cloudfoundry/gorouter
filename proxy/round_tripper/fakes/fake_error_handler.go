@@ -37,10 +37,17 @@ func (fake *ErrorHandler) HandleErrorCallCount() int {
 	return len(fake.handleErrorArgsForCall)
 }
 
+func (fake *ErrorHandler) HandleErrorCalls(stub func(utils.ProxyResponseWriter, error)) {
+	fake.handleErrorMutex.Lock()
+	defer fake.handleErrorMutex.Unlock()
+	fake.HandleErrorStub = stub
+}
+
 func (fake *ErrorHandler) HandleErrorArgsForCall(i int) (utils.ProxyResponseWriter, error) {
 	fake.handleErrorMutex.RLock()
 	defer fake.handleErrorMutex.RUnlock()
-	return fake.handleErrorArgsForCall[i].arg1, fake.handleErrorArgsForCall[i].arg2
+	argsForCall := fake.handleErrorArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *ErrorHandler) Invocations() map[string][][]interface{} {
