@@ -1,7 +1,6 @@
 package main
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -10,6 +9,8 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/tlsconfig"
 
@@ -34,7 +35,6 @@ import (
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/log_sender"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/go-nats"
@@ -125,7 +125,7 @@ func main() {
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
 		logger.Session("access-log"),
-		log_sender.NewLogSender(dropsonde.AutowiredEmitter()),
+		accesslog.NewLogSender(c, dropsonde.AutowiredEmitter(), logger),
 		c,
 	)
 	if err != nil {
@@ -378,3 +378,4 @@ func createLogger(component string, level string) (goRouterLogger.Logger, lager.
 	lggr := goRouterLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
 	return lggr, minLagerLogLevel
 }
+

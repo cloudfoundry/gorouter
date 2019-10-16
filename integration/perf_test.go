@@ -1,10 +1,11 @@
 package integration
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"fmt"
 	"strconv"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/config"
@@ -20,8 +21,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	schemaFakes "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 )
 
 var _ = Describe("AccessLogRecord", func() {
@@ -29,7 +30,7 @@ var _ = Describe("AccessLogRecord", func() {
 		sender := new(fakes.MetricSender)
 		batcher := new(fakes.MetricBatcher)
 		metricsReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
-		ls := fake.NewFakeLogSender()
+		ls := &schemaFakes.FakeLogSender{}
 		logger := test_util.NewTestZapLogger("test")
 		c, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())

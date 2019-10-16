@@ -9,24 +9,58 @@ import (
 )
 
 type FakeAccessLogger struct {
-	RunStub         func()
-	runMutex        sync.RWMutex
-	runArgsForCall  []struct{}
+	LogStub        func(schema.AccessLogRecord)
+	logMutex       sync.RWMutex
+	logArgsForCall []struct {
+		arg1 schema.AccessLogRecord
+	}
+	RunStub        func()
+	runMutex       sync.RWMutex
+	runArgsForCall []struct {
+	}
 	StopStub        func()
 	stopMutex       sync.RWMutex
-	stopArgsForCall []struct{}
-	LogStub         func(record schema.AccessLogRecord)
-	logMutex        sync.RWMutex
-	logArgsForCall  []struct {
-		record schema.AccessLogRecord
+	stopArgsForCall []struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
+func (fake *FakeAccessLogger) Log(arg1 schema.AccessLogRecord) {
+	fake.logMutex.Lock()
+	fake.logArgsForCall = append(fake.logArgsForCall, struct {
+		arg1 schema.AccessLogRecord
+	}{arg1})
+	fake.recordInvocation("Log", []interface{}{arg1})
+	fake.logMutex.Unlock()
+	if fake.LogStub != nil {
+		fake.LogStub(arg1)
+	}
+}
+
+func (fake *FakeAccessLogger) LogCallCount() int {
+	fake.logMutex.RLock()
+	defer fake.logMutex.RUnlock()
+	return len(fake.logArgsForCall)
+}
+
+func (fake *FakeAccessLogger) LogCalls(stub func(schema.AccessLogRecord)) {
+	fake.logMutex.Lock()
+	defer fake.logMutex.Unlock()
+	fake.LogStub = stub
+}
+
+func (fake *FakeAccessLogger) LogArgsForCall(i int) schema.AccessLogRecord {
+	fake.logMutex.RLock()
+	defer fake.logMutex.RUnlock()
+	argsForCall := fake.logArgsForCall[i]
+	return argsForCall.arg1
+}
+
 func (fake *FakeAccessLogger) Run() {
 	fake.runMutex.Lock()
-	fake.runArgsForCall = append(fake.runArgsForCall, struct{}{})
+	fake.runArgsForCall = append(fake.runArgsForCall, struct {
+	}{})
 	fake.recordInvocation("Run", []interface{}{})
 	fake.runMutex.Unlock()
 	if fake.RunStub != nil {
@@ -40,9 +74,16 @@ func (fake *FakeAccessLogger) RunCallCount() int {
 	return len(fake.runArgsForCall)
 }
 
+func (fake *FakeAccessLogger) RunCalls(stub func()) {
+	fake.runMutex.Lock()
+	defer fake.runMutex.Unlock()
+	fake.RunStub = stub
+}
+
 func (fake *FakeAccessLogger) Stop() {
 	fake.stopMutex.Lock()
-	fake.stopArgsForCall = append(fake.stopArgsForCall, struct{}{})
+	fake.stopArgsForCall = append(fake.stopArgsForCall, struct {
+	}{})
 	fake.recordInvocation("Stop", []interface{}{})
 	fake.stopMutex.Unlock()
 	if fake.StopStub != nil {
@@ -56,39 +97,21 @@ func (fake *FakeAccessLogger) StopCallCount() int {
 	return len(fake.stopArgsForCall)
 }
 
-func (fake *FakeAccessLogger) Log(record schema.AccessLogRecord) {
-	fake.logMutex.Lock()
-	fake.logArgsForCall = append(fake.logArgsForCall, struct {
-		record schema.AccessLogRecord
-	}{record})
-	fake.recordInvocation("Log", []interface{}{record})
-	fake.logMutex.Unlock()
-	if fake.LogStub != nil {
-		fake.LogStub(record)
-	}
-}
-
-func (fake *FakeAccessLogger) LogCallCount() int {
-	fake.logMutex.RLock()
-	defer fake.logMutex.RUnlock()
-	return len(fake.logArgsForCall)
-}
-
-func (fake *FakeAccessLogger) LogArgsForCall(i int) schema.AccessLogRecord {
-	fake.logMutex.RLock()
-	defer fake.logMutex.RUnlock()
-	return fake.logArgsForCall[i].record
+func (fake *FakeAccessLogger) StopCalls(stub func()) {
+	fake.stopMutex.Lock()
+	defer fake.stopMutex.Unlock()
+	fake.StopStub = stub
 }
 
 func (fake *FakeAccessLogger) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.logMutex.RLock()
+	defer fake.logMutex.RUnlock()
 	fake.runMutex.RLock()
 	defer fake.runMutex.RUnlock()
 	fake.stopMutex.RLock()
 	defer fake.stopMutex.RUnlock()
-	fake.logMutex.RLock()
-	defer fake.logMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

@@ -9,17 +9,6 @@ import (
 )
 
 type FakeLogger struct {
-	WithStub        func(...zap.Field) logger.Logger
-	withMutex       sync.RWMutex
-	withArgsForCall []struct {
-		arg1 []zap.Field
-	}
-	withReturns struct {
-		result1 logger.Logger
-	}
-	withReturnsOnCall map[int]struct {
-		result1 logger.Logger
-	}
 	CheckStub        func(zap.Level, string) *zap.CheckedMessage
 	checkMutex       sync.RWMutex
 	checkArgsForCall []struct {
@@ -32,28 +21,15 @@ type FakeLogger struct {
 	checkReturnsOnCall map[int]struct {
 		result1 *zap.CheckedMessage
 	}
-	LogStub        func(zap.Level, string, ...zap.Field)
-	logMutex       sync.RWMutex
-	logArgsForCall []struct {
-		arg1 zap.Level
-		arg2 string
-		arg3 []zap.Field
+	DPanicStub        func(string, ...zap.Field)
+	dPanicMutex       sync.RWMutex
+	dPanicArgsForCall []struct {
+		arg1 string
+		arg2 []zap.Field
 	}
 	DebugStub        func(string, ...zap.Field)
 	debugMutex       sync.RWMutex
 	debugArgsForCall []struct {
-		arg1 string
-		arg2 []zap.Field
-	}
-	InfoStub        func(string, ...zap.Field)
-	infoMutex       sync.RWMutex
-	infoArgsForCall []struct {
-		arg1 string
-		arg2 []zap.Field
-	}
-	WarnStub        func(string, ...zap.Field)
-	warnMutex       sync.RWMutex
-	warnArgsForCall []struct {
 		arg1 string
 		arg2 []zap.Field
 	}
@@ -63,21 +39,28 @@ type FakeLogger struct {
 		arg1 string
 		arg2 []zap.Field
 	}
-	DPanicStub        func(string, ...zap.Field)
-	dPanicMutex       sync.RWMutex
-	dPanicArgsForCall []struct {
+	FatalStub        func(string, ...zap.Field)
+	fatalMutex       sync.RWMutex
+	fatalArgsForCall []struct {
 		arg1 string
 		arg2 []zap.Field
+	}
+	InfoStub        func(string, ...zap.Field)
+	infoMutex       sync.RWMutex
+	infoArgsForCall []struct {
+		arg1 string
+		arg2 []zap.Field
+	}
+	LogStub        func(zap.Level, string, ...zap.Field)
+	logMutex       sync.RWMutex
+	logArgsForCall []struct {
+		arg1 zap.Level
+		arg2 string
+		arg3 []zap.Field
 	}
 	PanicStub        func(string, ...zap.Field)
 	panicMutex       sync.RWMutex
 	panicArgsForCall []struct {
-		arg1 string
-		arg2 []zap.Field
-	}
-	FatalStub        func(string, ...zap.Field)
-	fatalMutex       sync.RWMutex
-	fatalArgsForCall []struct {
 		arg1 string
 		arg2 []zap.Field
 	}
@@ -94,63 +77,33 @@ type FakeLogger struct {
 	}
 	SessionNameStub        func() string
 	sessionNameMutex       sync.RWMutex
-	sessionNameArgsForCall []struct{}
-	sessionNameReturns     struct {
+	sessionNameArgsForCall []struct {
+	}
+	sessionNameReturns struct {
 		result1 string
 	}
 	sessionNameReturnsOnCall map[int]struct {
 		result1 string
 	}
+	WarnStub        func(string, ...zap.Field)
+	warnMutex       sync.RWMutex
+	warnArgsForCall []struct {
+		arg1 string
+		arg2 []zap.Field
+	}
+	WithStub        func(...zap.Field) logger.Logger
+	withMutex       sync.RWMutex
+	withArgsForCall []struct {
+		arg1 []zap.Field
+	}
+	withReturns struct {
+		result1 logger.Logger
+	}
+	withReturnsOnCall map[int]struct {
+		result1 logger.Logger
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
-}
-
-func (fake *FakeLogger) With(arg1 ...zap.Field) logger.Logger {
-	fake.withMutex.Lock()
-	ret, specificReturn := fake.withReturnsOnCall[len(fake.withArgsForCall)]
-	fake.withArgsForCall = append(fake.withArgsForCall, struct {
-		arg1 []zap.Field
-	}{arg1})
-	fake.recordInvocation("With", []interface{}{arg1})
-	fake.withMutex.Unlock()
-	if fake.WithStub != nil {
-		return fake.WithStub(arg1...)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fake.withReturns.result1
-}
-
-func (fake *FakeLogger) WithCallCount() int {
-	fake.withMutex.RLock()
-	defer fake.withMutex.RUnlock()
-	return len(fake.withArgsForCall)
-}
-
-func (fake *FakeLogger) WithArgsForCall(i int) []zap.Field {
-	fake.withMutex.RLock()
-	defer fake.withMutex.RUnlock()
-	return fake.withArgsForCall[i].arg1
-}
-
-func (fake *FakeLogger) WithReturns(result1 logger.Logger) {
-	fake.WithStub = nil
-	fake.withReturns = struct {
-		result1 logger.Logger
-	}{result1}
-}
-
-func (fake *FakeLogger) WithReturnsOnCall(i int, result1 logger.Logger) {
-	fake.WithStub = nil
-	if fake.withReturnsOnCall == nil {
-		fake.withReturnsOnCall = make(map[int]struct {
-			result1 logger.Logger
-		})
-	}
-	fake.withReturnsOnCall[i] = struct {
-		result1 logger.Logger
-	}{result1}
 }
 
 func (fake *FakeLogger) Check(arg1 zap.Level, arg2 string) *zap.CheckedMessage {
@@ -168,7 +121,8 @@ func (fake *FakeLogger) Check(arg1 zap.Level, arg2 string) *zap.CheckedMessage {
 	if specificReturn {
 		return ret.result1
 	}
-	return fake.checkReturns.result1
+	fakeReturns := fake.checkReturns
+	return fakeReturns.result1
 }
 
 func (fake *FakeLogger) CheckCallCount() int {
@@ -177,13 +131,22 @@ func (fake *FakeLogger) CheckCallCount() int {
 	return len(fake.checkArgsForCall)
 }
 
+func (fake *FakeLogger) CheckCalls(stub func(zap.Level, string) *zap.CheckedMessage) {
+	fake.checkMutex.Lock()
+	defer fake.checkMutex.Unlock()
+	fake.CheckStub = stub
+}
+
 func (fake *FakeLogger) CheckArgsForCall(i int) (zap.Level, string) {
 	fake.checkMutex.RLock()
 	defer fake.checkMutex.RUnlock()
-	return fake.checkArgsForCall[i].arg1, fake.checkArgsForCall[i].arg2
+	argsForCall := fake.checkArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeLogger) CheckReturns(result1 *zap.CheckedMessage) {
+	fake.checkMutex.Lock()
+	defer fake.checkMutex.Unlock()
 	fake.CheckStub = nil
 	fake.checkReturns = struct {
 		result1 *zap.CheckedMessage
@@ -191,6 +154,8 @@ func (fake *FakeLogger) CheckReturns(result1 *zap.CheckedMessage) {
 }
 
 func (fake *FakeLogger) CheckReturnsOnCall(i int, result1 *zap.CheckedMessage) {
+	fake.checkMutex.Lock()
+	defer fake.checkMutex.Unlock()
 	fake.CheckStub = nil
 	if fake.checkReturnsOnCall == nil {
 		fake.checkReturnsOnCall = make(map[int]struct {
@@ -200,6 +165,166 @@ func (fake *FakeLogger) CheckReturnsOnCall(i int, result1 *zap.CheckedMessage) {
 	fake.checkReturnsOnCall[i] = struct {
 		result1 *zap.CheckedMessage
 	}{result1}
+}
+
+func (fake *FakeLogger) DPanic(arg1 string, arg2 ...zap.Field) {
+	fake.dPanicMutex.Lock()
+	fake.dPanicArgsForCall = append(fake.dPanicArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("DPanic", []interface{}{arg1, arg2})
+	fake.dPanicMutex.Unlock()
+	if fake.DPanicStub != nil {
+		fake.DPanicStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) DPanicCallCount() int {
+	fake.dPanicMutex.RLock()
+	defer fake.dPanicMutex.RUnlock()
+	return len(fake.dPanicArgsForCall)
+}
+
+func (fake *FakeLogger) DPanicCalls(stub func(string, ...zap.Field)) {
+	fake.dPanicMutex.Lock()
+	defer fake.dPanicMutex.Unlock()
+	fake.DPanicStub = stub
+}
+
+func (fake *FakeLogger) DPanicArgsForCall(i int) (string, []zap.Field) {
+	fake.dPanicMutex.RLock()
+	defer fake.dPanicMutex.RUnlock()
+	argsForCall := fake.dPanicArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeLogger) Debug(arg1 string, arg2 ...zap.Field) {
+	fake.debugMutex.Lock()
+	fake.debugArgsForCall = append(fake.debugArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("Debug", []interface{}{arg1, arg2})
+	fake.debugMutex.Unlock()
+	if fake.DebugStub != nil {
+		fake.DebugStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) DebugCallCount() int {
+	fake.debugMutex.RLock()
+	defer fake.debugMutex.RUnlock()
+	return len(fake.debugArgsForCall)
+}
+
+func (fake *FakeLogger) DebugCalls(stub func(string, ...zap.Field)) {
+	fake.debugMutex.Lock()
+	defer fake.debugMutex.Unlock()
+	fake.DebugStub = stub
+}
+
+func (fake *FakeLogger) DebugArgsForCall(i int) (string, []zap.Field) {
+	fake.debugMutex.RLock()
+	defer fake.debugMutex.RUnlock()
+	argsForCall := fake.debugArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeLogger) Error(arg1 string, arg2 ...zap.Field) {
+	fake.errorMutex.Lock()
+	fake.errorArgsForCall = append(fake.errorArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("Error", []interface{}{arg1, arg2})
+	fake.errorMutex.Unlock()
+	if fake.ErrorStub != nil {
+		fake.ErrorStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) ErrorCallCount() int {
+	fake.errorMutex.RLock()
+	defer fake.errorMutex.RUnlock()
+	return len(fake.errorArgsForCall)
+}
+
+func (fake *FakeLogger) ErrorCalls(stub func(string, ...zap.Field)) {
+	fake.errorMutex.Lock()
+	defer fake.errorMutex.Unlock()
+	fake.ErrorStub = stub
+}
+
+func (fake *FakeLogger) ErrorArgsForCall(i int) (string, []zap.Field) {
+	fake.errorMutex.RLock()
+	defer fake.errorMutex.RUnlock()
+	argsForCall := fake.errorArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeLogger) Fatal(arg1 string, arg2 ...zap.Field) {
+	fake.fatalMutex.Lock()
+	fake.fatalArgsForCall = append(fake.fatalArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("Fatal", []interface{}{arg1, arg2})
+	fake.fatalMutex.Unlock()
+	if fake.FatalStub != nil {
+		fake.FatalStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) FatalCallCount() int {
+	fake.fatalMutex.RLock()
+	defer fake.fatalMutex.RUnlock()
+	return len(fake.fatalArgsForCall)
+}
+
+func (fake *FakeLogger) FatalCalls(stub func(string, ...zap.Field)) {
+	fake.fatalMutex.Lock()
+	defer fake.fatalMutex.Unlock()
+	fake.FatalStub = stub
+}
+
+func (fake *FakeLogger) FatalArgsForCall(i int) (string, []zap.Field) {
+	fake.fatalMutex.RLock()
+	defer fake.fatalMutex.RUnlock()
+	argsForCall := fake.fatalArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeLogger) Info(arg1 string, arg2 ...zap.Field) {
+	fake.infoMutex.Lock()
+	fake.infoArgsForCall = append(fake.infoArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("Info", []interface{}{arg1, arg2})
+	fake.infoMutex.Unlock()
+	if fake.InfoStub != nil {
+		fake.InfoStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) InfoCallCount() int {
+	fake.infoMutex.RLock()
+	defer fake.infoMutex.RUnlock()
+	return len(fake.infoArgsForCall)
+}
+
+func (fake *FakeLogger) InfoCalls(stub func(string, ...zap.Field)) {
+	fake.infoMutex.Lock()
+	defer fake.infoMutex.Unlock()
+	fake.InfoStub = stub
+}
+
+func (fake *FakeLogger) InfoArgsForCall(i int) (string, []zap.Field) {
+	fake.infoMutex.RLock()
+	defer fake.infoMutex.RUnlock()
+	argsForCall := fake.infoArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeLogger) Log(arg1 zap.Level, arg2 string, arg3 ...zap.Field) {
@@ -222,135 +347,17 @@ func (fake *FakeLogger) LogCallCount() int {
 	return len(fake.logArgsForCall)
 }
 
+func (fake *FakeLogger) LogCalls(stub func(zap.Level, string, ...zap.Field)) {
+	fake.logMutex.Lock()
+	defer fake.logMutex.Unlock()
+	fake.LogStub = stub
+}
+
 func (fake *FakeLogger) LogArgsForCall(i int) (zap.Level, string, []zap.Field) {
 	fake.logMutex.RLock()
 	defer fake.logMutex.RUnlock()
-	return fake.logArgsForCall[i].arg1, fake.logArgsForCall[i].arg2, fake.logArgsForCall[i].arg3
-}
-
-func (fake *FakeLogger) Debug(arg1 string, arg2 ...zap.Field) {
-	fake.debugMutex.Lock()
-	fake.debugArgsForCall = append(fake.debugArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("Debug", []interface{}{arg1, arg2})
-	fake.debugMutex.Unlock()
-	if fake.DebugStub != nil {
-		fake.DebugStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) DebugCallCount() int {
-	fake.debugMutex.RLock()
-	defer fake.debugMutex.RUnlock()
-	return len(fake.debugArgsForCall)
-}
-
-func (fake *FakeLogger) DebugArgsForCall(i int) (string, []zap.Field) {
-	fake.debugMutex.RLock()
-	defer fake.debugMutex.RUnlock()
-	return fake.debugArgsForCall[i].arg1, fake.debugArgsForCall[i].arg2
-}
-
-func (fake *FakeLogger) Info(arg1 string, arg2 ...zap.Field) {
-	fake.infoMutex.Lock()
-	fake.infoArgsForCall = append(fake.infoArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("Info", []interface{}{arg1, arg2})
-	fake.infoMutex.Unlock()
-	if fake.InfoStub != nil {
-		fake.InfoStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) InfoCallCount() int {
-	fake.infoMutex.RLock()
-	defer fake.infoMutex.RUnlock()
-	return len(fake.infoArgsForCall)
-}
-
-func (fake *FakeLogger) InfoArgsForCall(i int) (string, []zap.Field) {
-	fake.infoMutex.RLock()
-	defer fake.infoMutex.RUnlock()
-	return fake.infoArgsForCall[i].arg1, fake.infoArgsForCall[i].arg2
-}
-
-func (fake *FakeLogger) Warn(arg1 string, arg2 ...zap.Field) {
-	fake.warnMutex.Lock()
-	fake.warnArgsForCall = append(fake.warnArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("Warn", []interface{}{arg1, arg2})
-	fake.warnMutex.Unlock()
-	if fake.WarnStub != nil {
-		fake.WarnStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) WarnCallCount() int {
-	fake.warnMutex.RLock()
-	defer fake.warnMutex.RUnlock()
-	return len(fake.warnArgsForCall)
-}
-
-func (fake *FakeLogger) WarnArgsForCall(i int) (string, []zap.Field) {
-	fake.warnMutex.RLock()
-	defer fake.warnMutex.RUnlock()
-	return fake.warnArgsForCall[i].arg1, fake.warnArgsForCall[i].arg2
-}
-
-func (fake *FakeLogger) Error(arg1 string, arg2 ...zap.Field) {
-	fake.errorMutex.Lock()
-	fake.errorArgsForCall = append(fake.errorArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("Error", []interface{}{arg1, arg2})
-	fake.errorMutex.Unlock()
-	if fake.ErrorStub != nil {
-		fake.ErrorStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) ErrorCallCount() int {
-	fake.errorMutex.RLock()
-	defer fake.errorMutex.RUnlock()
-	return len(fake.errorArgsForCall)
-}
-
-func (fake *FakeLogger) ErrorArgsForCall(i int) (string, []zap.Field) {
-	fake.errorMutex.RLock()
-	defer fake.errorMutex.RUnlock()
-	return fake.errorArgsForCall[i].arg1, fake.errorArgsForCall[i].arg2
-}
-
-func (fake *FakeLogger) DPanic(arg1 string, arg2 ...zap.Field) {
-	fake.dPanicMutex.Lock()
-	fake.dPanicArgsForCall = append(fake.dPanicArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("DPanic", []interface{}{arg1, arg2})
-	fake.dPanicMutex.Unlock()
-	if fake.DPanicStub != nil {
-		fake.DPanicStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) DPanicCallCount() int {
-	fake.dPanicMutex.RLock()
-	defer fake.dPanicMutex.RUnlock()
-	return len(fake.dPanicArgsForCall)
-}
-
-func (fake *FakeLogger) DPanicArgsForCall(i int) (string, []zap.Field) {
-	fake.dPanicMutex.RLock()
-	defer fake.dPanicMutex.RUnlock()
-	return fake.dPanicArgsForCall[i].arg1, fake.dPanicArgsForCall[i].arg2
+	argsForCall := fake.logArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeLogger) Panic(arg1 string, arg2 ...zap.Field) {
@@ -372,35 +379,17 @@ func (fake *FakeLogger) PanicCallCount() int {
 	return len(fake.panicArgsForCall)
 }
 
+func (fake *FakeLogger) PanicCalls(stub func(string, ...zap.Field)) {
+	fake.panicMutex.Lock()
+	defer fake.panicMutex.Unlock()
+	fake.PanicStub = stub
+}
+
 func (fake *FakeLogger) PanicArgsForCall(i int) (string, []zap.Field) {
 	fake.panicMutex.RLock()
 	defer fake.panicMutex.RUnlock()
-	return fake.panicArgsForCall[i].arg1, fake.panicArgsForCall[i].arg2
-}
-
-func (fake *FakeLogger) Fatal(arg1 string, arg2 ...zap.Field) {
-	fake.fatalMutex.Lock()
-	fake.fatalArgsForCall = append(fake.fatalArgsForCall, struct {
-		arg1 string
-		arg2 []zap.Field
-	}{arg1, arg2})
-	fake.recordInvocation("Fatal", []interface{}{arg1, arg2})
-	fake.fatalMutex.Unlock()
-	if fake.FatalStub != nil {
-		fake.FatalStub(arg1, arg2...)
-	}
-}
-
-func (fake *FakeLogger) FatalCallCount() int {
-	fake.fatalMutex.RLock()
-	defer fake.fatalMutex.RUnlock()
-	return len(fake.fatalArgsForCall)
-}
-
-func (fake *FakeLogger) FatalArgsForCall(i int) (string, []zap.Field) {
-	fake.fatalMutex.RLock()
-	defer fake.fatalMutex.RUnlock()
-	return fake.fatalArgsForCall[i].arg1, fake.fatalArgsForCall[i].arg2
+	argsForCall := fake.panicArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeLogger) Session(arg1 string) logger.Logger {
@@ -417,7 +406,8 @@ func (fake *FakeLogger) Session(arg1 string) logger.Logger {
 	if specificReturn {
 		return ret.result1
 	}
-	return fake.sessionReturns.result1
+	fakeReturns := fake.sessionReturns
+	return fakeReturns.result1
 }
 
 func (fake *FakeLogger) SessionCallCount() int {
@@ -426,13 +416,22 @@ func (fake *FakeLogger) SessionCallCount() int {
 	return len(fake.sessionArgsForCall)
 }
 
+func (fake *FakeLogger) SessionCalls(stub func(string) logger.Logger) {
+	fake.sessionMutex.Lock()
+	defer fake.sessionMutex.Unlock()
+	fake.SessionStub = stub
+}
+
 func (fake *FakeLogger) SessionArgsForCall(i int) string {
 	fake.sessionMutex.RLock()
 	defer fake.sessionMutex.RUnlock()
-	return fake.sessionArgsForCall[i].arg1
+	argsForCall := fake.sessionArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeLogger) SessionReturns(result1 logger.Logger) {
+	fake.sessionMutex.Lock()
+	defer fake.sessionMutex.Unlock()
 	fake.SessionStub = nil
 	fake.sessionReturns = struct {
 		result1 logger.Logger
@@ -440,6 +439,8 @@ func (fake *FakeLogger) SessionReturns(result1 logger.Logger) {
 }
 
 func (fake *FakeLogger) SessionReturnsOnCall(i int, result1 logger.Logger) {
+	fake.sessionMutex.Lock()
+	defer fake.sessionMutex.Unlock()
 	fake.SessionStub = nil
 	if fake.sessionReturnsOnCall == nil {
 		fake.sessionReturnsOnCall = make(map[int]struct {
@@ -454,7 +455,8 @@ func (fake *FakeLogger) SessionReturnsOnCall(i int, result1 logger.Logger) {
 func (fake *FakeLogger) SessionName() string {
 	fake.sessionNameMutex.Lock()
 	ret, specificReturn := fake.sessionNameReturnsOnCall[len(fake.sessionNameArgsForCall)]
-	fake.sessionNameArgsForCall = append(fake.sessionNameArgsForCall, struct{}{})
+	fake.sessionNameArgsForCall = append(fake.sessionNameArgsForCall, struct {
+	}{})
 	fake.recordInvocation("SessionName", []interface{}{})
 	fake.sessionNameMutex.Unlock()
 	if fake.SessionNameStub != nil {
@@ -463,7 +465,8 @@ func (fake *FakeLogger) SessionName() string {
 	if specificReturn {
 		return ret.result1
 	}
-	return fake.sessionNameReturns.result1
+	fakeReturns := fake.sessionNameReturns
+	return fakeReturns.result1
 }
 
 func (fake *FakeLogger) SessionNameCallCount() int {
@@ -472,7 +475,15 @@ func (fake *FakeLogger) SessionNameCallCount() int {
 	return len(fake.sessionNameArgsForCall)
 }
 
+func (fake *FakeLogger) SessionNameCalls(stub func() string) {
+	fake.sessionNameMutex.Lock()
+	defer fake.sessionNameMutex.Unlock()
+	fake.SessionNameStub = stub
+}
+
 func (fake *FakeLogger) SessionNameReturns(result1 string) {
+	fake.sessionNameMutex.Lock()
+	defer fake.sessionNameMutex.Unlock()
 	fake.SessionNameStub = nil
 	fake.sessionNameReturns = struct {
 		result1 string
@@ -480,6 +491,8 @@ func (fake *FakeLogger) SessionNameReturns(result1 string) {
 }
 
 func (fake *FakeLogger) SessionNameReturnsOnCall(i int, result1 string) {
+	fake.sessionNameMutex.Lock()
+	defer fake.sessionNameMutex.Unlock()
 	fake.SessionNameStub = nil
 	if fake.sessionNameReturnsOnCall == nil {
 		fake.sessionNameReturnsOnCall = make(map[int]struct {
@@ -491,33 +504,125 @@ func (fake *FakeLogger) SessionNameReturnsOnCall(i int, result1 string) {
 	}{result1}
 }
 
+func (fake *FakeLogger) Warn(arg1 string, arg2 ...zap.Field) {
+	fake.warnMutex.Lock()
+	fake.warnArgsForCall = append(fake.warnArgsForCall, struct {
+		arg1 string
+		arg2 []zap.Field
+	}{arg1, arg2})
+	fake.recordInvocation("Warn", []interface{}{arg1, arg2})
+	fake.warnMutex.Unlock()
+	if fake.WarnStub != nil {
+		fake.WarnStub(arg1, arg2...)
+	}
+}
+
+func (fake *FakeLogger) WarnCallCount() int {
+	fake.warnMutex.RLock()
+	defer fake.warnMutex.RUnlock()
+	return len(fake.warnArgsForCall)
+}
+
+func (fake *FakeLogger) WarnCalls(stub func(string, ...zap.Field)) {
+	fake.warnMutex.Lock()
+	defer fake.warnMutex.Unlock()
+	fake.WarnStub = stub
+}
+
+func (fake *FakeLogger) WarnArgsForCall(i int) (string, []zap.Field) {
+	fake.warnMutex.RLock()
+	defer fake.warnMutex.RUnlock()
+	argsForCall := fake.warnArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeLogger) With(arg1 ...zap.Field) logger.Logger {
+	fake.withMutex.Lock()
+	ret, specificReturn := fake.withReturnsOnCall[len(fake.withArgsForCall)]
+	fake.withArgsForCall = append(fake.withArgsForCall, struct {
+		arg1 []zap.Field
+	}{arg1})
+	fake.recordInvocation("With", []interface{}{arg1})
+	fake.withMutex.Unlock()
+	if fake.WithStub != nil {
+		return fake.WithStub(arg1...)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.withReturns
+	return fakeReturns.result1
+}
+
+func (fake *FakeLogger) WithCallCount() int {
+	fake.withMutex.RLock()
+	defer fake.withMutex.RUnlock()
+	return len(fake.withArgsForCall)
+}
+
+func (fake *FakeLogger) WithCalls(stub func(...zap.Field) logger.Logger) {
+	fake.withMutex.Lock()
+	defer fake.withMutex.Unlock()
+	fake.WithStub = stub
+}
+
+func (fake *FakeLogger) WithArgsForCall(i int) []zap.Field {
+	fake.withMutex.RLock()
+	defer fake.withMutex.RUnlock()
+	argsForCall := fake.withArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeLogger) WithReturns(result1 logger.Logger) {
+	fake.withMutex.Lock()
+	defer fake.withMutex.Unlock()
+	fake.WithStub = nil
+	fake.withReturns = struct {
+		result1 logger.Logger
+	}{result1}
+}
+
+func (fake *FakeLogger) WithReturnsOnCall(i int, result1 logger.Logger) {
+	fake.withMutex.Lock()
+	defer fake.withMutex.Unlock()
+	fake.WithStub = nil
+	if fake.withReturnsOnCall == nil {
+		fake.withReturnsOnCall = make(map[int]struct {
+			result1 logger.Logger
+		})
+	}
+	fake.withReturnsOnCall[i] = struct {
+		result1 logger.Logger
+	}{result1}
+}
+
 func (fake *FakeLogger) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.withMutex.RLock()
-	defer fake.withMutex.RUnlock()
 	fake.checkMutex.RLock()
 	defer fake.checkMutex.RUnlock()
-	fake.logMutex.RLock()
-	defer fake.logMutex.RUnlock()
-	fake.debugMutex.RLock()
-	defer fake.debugMutex.RUnlock()
-	fake.infoMutex.RLock()
-	defer fake.infoMutex.RUnlock()
-	fake.warnMutex.RLock()
-	defer fake.warnMutex.RUnlock()
-	fake.errorMutex.RLock()
-	defer fake.errorMutex.RUnlock()
 	fake.dPanicMutex.RLock()
 	defer fake.dPanicMutex.RUnlock()
-	fake.panicMutex.RLock()
-	defer fake.panicMutex.RUnlock()
+	fake.debugMutex.RLock()
+	defer fake.debugMutex.RUnlock()
+	fake.errorMutex.RLock()
+	defer fake.errorMutex.RUnlock()
 	fake.fatalMutex.RLock()
 	defer fake.fatalMutex.RUnlock()
+	fake.infoMutex.RLock()
+	defer fake.infoMutex.RUnlock()
+	fake.logMutex.RLock()
+	defer fake.logMutex.RUnlock()
+	fake.panicMutex.RLock()
+	defer fake.panicMutex.RUnlock()
 	fake.sessionMutex.RLock()
 	defer fake.sessionMutex.RUnlock()
 	fake.sessionNameMutex.RLock()
 	defer fake.sessionNameMutex.RUnlock()
+	fake.warnMutex.RLock()
+	defer fake.warnMutex.RUnlock()
+	fake.withMutex.RLock()
+	defer fake.withMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
