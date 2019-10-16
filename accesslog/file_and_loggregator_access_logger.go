@@ -5,8 +5,6 @@ import (
 	"log/syslog"
 	"regexp"
 
-	"strconv"
-
 	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
@@ -23,10 +21,6 @@ type AccessLogger interface {
 	Log(record schema.AccessLogRecord)
 }
 
-type logsender interface {
-	SendAppLog(appID, message, sourceType, sourceInstance string) error
-}
-
 type NullAccessLogger struct {
 }
 
@@ -35,18 +29,17 @@ func (x *NullAccessLogger) Stop()                      {}
 func (x *NullAccessLogger) Log(schema.AccessLogRecord) {}
 
 type FileAndLoggregatorAccessLogger struct {
-	dropsondeSourceInstance string
-	channel                 chan schema.AccessLogRecord
-	stopCh                  chan struct{}
-	writer                  io.Writer
-	writerCount             int
-	disableXFFLogging       bool
-	disableSourceIPLogging  bool
-	logger                  logger.Logger
-	ls                      logsender
+	channel                chan schema.AccessLogRecord
+	stopCh                 chan struct{}
+	writer                 io.Writer
+	writerCount            int
+	disableXFFLogging      bool
+	disableSourceIPLogging bool
+	logger                 logger.Logger
+	logsender              schema.LogSender
 }
 
-func CreateRunningAccessLogger(logger logger.Logger, ls logsender, config *config.Config) (AccessLogger, error) {
+func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender, config *config.Config) (AccessLogger, error) {
 	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
@@ -72,20 +65,13 @@ func CreateRunningAccessLogger(logger logger.Logger, ls logsender, config *confi
 		writers = append(writers, syslogWriter)
 	}
 
-	var dropsondeSourceInstance string
-	if config.Logging.LoggregatorEnabled {
-		dropsondeSourceInstance = strconv.FormatUint(uint64(config.Index), 10)
-	}
-
 	accessLogger := &FileAndLoggregatorAccessLogger{
-		dropsondeSourceInstance: dropsondeSourceInstance,
-
 		channel:                make(chan schema.AccessLogRecord, 1024),
 		stopCh:                 make(chan struct{}),
 		disableXFFLogging:      config.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging: config.Logging.DisableLogSourceIP,
 		logger:                 logger,
-		ls:                     ls,
+		logsender:              logsender,
 	}
 	configureWriters(accessLogger, writers)
 
@@ -103,12 +89,7 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 					x.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
 				}
 			}
-			if x.dropsondeSourceInstance != "" && record.ApplicationID() != "" {
-				err := x.ls.SendAppLog(record.ApplicationID(), record.LogMessage(), "RTR", x.dropsondeSourceInstance)
-				if err != nil {
-					x.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
-				}
-			}
+			record.SendLog(x.logsender)
 		case <-x.stopCh:
 			return
 		}
@@ -120,10 +101,6 @@ func (x *FileAndLoggregatorAccessLogger) FileWriter() io.Writer {
 }
 func (x *FileAndLoggregatorAccessLogger) WriterCount() int {
 	return x.writerCount
-}
-
-func (x *FileAndLoggregatorAccessLogger) DropsondeSourceInstance() string {
-	return x.dropsondeSourceInstance
 }
 
 func (x *FileAndLoggregatorAccessLogger) Stop() {

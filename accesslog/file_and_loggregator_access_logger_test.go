@@ -11,11 +11,11 @@ import (
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	schemaFakes "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -26,52 +26,34 @@ var _ = Describe("AccessLog", func() {
 		var (
 			logger logger.Logger
 			cfg    *config.Config
-			ls     *fake.FakeLogSender
+			ls     *schemaFakes.FakeLogSender
 		)
 
-		Context("with a dropsonde source instance", func() {
+		Context("log sender", func() {
 			BeforeEach(func() {
 				logger = test_util.NewTestZapLogger("test")
-				ls = fake.NewFakeLogSender()
+				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
 				cfg, err = config.DefaultConfig()
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			It("logs to dropsonde", func() {
+			It("logs", func() {
 				cfg.Logging.LoggregatorEnabled = true
 				cfg.Index = 42
 
 				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
-				accessLogger.Log(*CreateAccessLogRecord())
+				record := *CreateAccessLogRecord()
+				accessLogger.Log(record)
 
-				Eventually(ls.GetLogs).Should(HaveLen(1))
-				Expect(ls.GetLogs()[0].AppId).To(Equal("my_awesome_id"))
-				Expect(ls.GetLogs()[0].Message).To(MatchRegexp("^.*foo.bar.*\n"))
-				Expect(ls.GetLogs()[0].SourceType).To(Equal("RTR"))
-				Expect(ls.GetLogs()[0].SourceInstance).To(Equal("42"))
-				Expect(ls.GetLogs()[0].MessageType).To(Equal("OUT"))
-
-				accessLogger.Stop()
-			})
-
-			It("a record with no app id is not logged to dropsonde", func() {
-				cfg.Logging.LoggregatorEnabled = true
-				cfg.Index = 42
-
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
-				Expect(err).ToNot(HaveOccurred())
-
-				routeEndpoint := route.NewEndpoint(&route.EndpointOpts{Host: "127.0.0.1", Port: 4567})
-
-				accessLogRecord := CreateAccessLogRecord()
-				accessLogRecord.RouteEndpoint = routeEndpoint
-				accessLogger.Log(*accessLogRecord)
-
-				Consistently(ls.GetLogs).Should(HaveLen(0))
+				Eventually(ls.SendAppLogCallCount).Should(Equal(1))
+				appID, message, tags := ls.SendAppLogArgsForCall(0)
+				Expect(appID).To(Equal("my_awesome_id"))
+				Expect(message).To(MatchRegexp("^.*foo.bar.*\n"))
+				Expect(tags).To(BeNil())
 
 				accessLogger.Stop()
 			})
@@ -85,7 +67,7 @@ var _ = Describe("AccessLog", func() {
 
 			BeforeEach(func() {
 				logger = test_util.NewTestZapLogger("test")
-				ls = fake.NewFakeLogSender()
+				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
 				cfg, err = config.DefaultConfig()
@@ -126,7 +108,7 @@ var _ = Describe("AccessLog", func() {
 		Context("when created with access log file", func() {
 			BeforeEach(func() {
 				logger = test_util.NewTestZapLogger("test")
-				ls = fake.NewFakeLogSender()
+				ls = &schemaFakes.FakeLogSender{}
 				var err error
 				cfg, err = config.DefaultConfig()
 				Expect(err).ToNot(HaveOccurred())
@@ -160,7 +142,7 @@ var _ = Describe("AccessLog", func() {
 
 			BeforeEach(func() {
 				logger = test_util.NewTestZapLogger("test")
-				ls = fake.NewFakeLogSender()
+				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
 				cfg, err = config.DefaultConfig()
@@ -208,7 +190,7 @@ var _ = Describe("AccessLog", func() {
 
 			BeforeEach(func() {
 				logger = test_util.NewTestZapLogger("test")
-				ls = fake.NewFakeLogSender()
+				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
 				cfg, err = config.DefaultConfig()
@@ -267,12 +249,12 @@ var _ = Describe("AccessLog", func() {
 		var (
 			baseLogger logger.Logger
 			cfg        *config.Config
-			ls         *fake.FakeLogSender
+			ls         *schemaFakes.FakeLogSender
 		)
 
 		BeforeEach(func() {
 			baseLogger = test_util.NewTestZapLogger("test")
-			ls = fake.NewFakeLogSender()
+			ls = &schemaFakes.FakeLogSender{}
 
 			var err error
 			cfg, err = config.DefaultConfig()
@@ -290,7 +272,6 @@ var _ = Describe("AccessLog", func() {
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).To(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(0))
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).To(Equal("0"))
 		})
 
 		It("creates an access log if an access log is specified", func() {
@@ -298,7 +279,6 @@ var _ = Describe("AccessLog", func() {
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).To(BeEmpty())
 		})
 
 		It("creates an AccessLogger if both access log and loggregator is enabled", func() {
@@ -308,7 +288,6 @@ var _ = Describe("AccessLog", func() {
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).ToNot(BeEmpty())
 		})
 
 		It("should have two writers configured if access log file and enable_streaming are enabled", func() {
@@ -319,7 +298,6 @@ var _ = Describe("AccessLog", func() {
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(2))
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).ToNot(BeEmpty())
 		})
 
 		It("should have one writer configured if access log file set but enable_streaming is disabled", func() {
@@ -330,7 +308,6 @@ var _ = Describe("AccessLog", func() {
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).ToNot(BeEmpty())
 		})
 
 		It("should have one writer configured if access log file not set but enable_streaming is enabled", func() {
@@ -341,7 +318,6 @@ var _ = Describe("AccessLog", func() {
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).DropsondeSourceInstance()).ToNot(BeEmpty())
 		})
 
 		It("reports an error if the access log location is invalid", func() {

@@ -1,7 +1,6 @@
 package proxy_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
@@ -9,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -22,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
-	fakelogsender "github.com/cloudfoundry/dropsonde/log_sender/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -41,7 +42,6 @@ var (
 	conf                    *config.Config
 	proxyServer             net.Listener
 	al                      accesslog.AccessLogger
-	accessLogFile           *test_util.FakeFile
 	ls                      *fakelogsender.FakeLogSender
 	crypto                  secure.Crypto
 	testLogger              logger.Logger
@@ -88,7 +88,7 @@ var _ = JustBeforeEach(func() {
 	f, err = ioutil.TempFile("", "fakeFile")
 	Expect(err).NotTo(HaveOccurred())
 	conf.AccessLog.File = f.Name()
-	ls = fakelogsender.NewFakeLogSender()
+	ls = &fakelogsender.FakeLogSender{}
 	al, err = accesslog.CreateRunningAccessLogger(testLogger, ls, conf)
 	Expect(err).NotTo(HaveOccurred())
 	go al.Run()
