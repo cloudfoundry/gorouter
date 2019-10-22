@@ -30,6 +30,8 @@ import (
 	"github.com/uber-go/zap"
 )
 
+const StickyCookieKey = "JSESSIONID"
+
 type nullVarz struct{}
 
 type testBody struct {
@@ -137,6 +139,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 				combinedReporter, false,
 				errorHandler, routeServicesTransport,
 				timeout,
+				map[string]struct{}{
+					"JSESSIONID": struct{}{},
+				},
 			)
 		})
 
@@ -699,7 +704,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				BeforeEach(func() {
 					sessionCookie = &http.Cookie{
-						Name: round_tripper.StickyCookieKey,
+						Name: StickyCookieKey,
 					}
 
 					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
@@ -916,7 +921,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			BeforeEach(func() {
 				sessionCookie = &http.Cookie{
-					Name: round_tripper.StickyCookieKey,
+					Name: StickyCookieKey,
 				}
 
 				vcapCookie = &http.Cookie{

@@ -3,7 +3,6 @@ package router_test
 import (
 	"bufio"
 	"bytes"
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -23,6 +22,8 @@ import (
 	"os"
 	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/config"
 
@@ -56,6 +57,7 @@ import (
 var _ = Describe("Router", func() {
 
 	const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
+	const StickyCookieKey = "JSESSIONID"
 
 	var (
 		natsRunner *test_util.NATSRunner
@@ -85,6 +87,10 @@ var _ = Describe("Router", func() {
 		config.SSLCertificates = []tls.Certificate{cert}
 		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
 		config.ClientCertificateValidation = tls.NoClientCert
+		config.StickySessionCookieNames = map[string]struct{}{
+			StickyCookieKey: struct{}{},
+			"SESSION":       struct{}{},
+		}
 
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
@@ -284,7 +290,7 @@ var _ = Describe("Router", func() {
 	It("Sticky sessions allow multiple consecutive requests to reach the same instance of an app", func() {
 		apps := make([]*testcommon.TestApp, 10)
 		for i := range apps {
-			apps[i] = test.NewStickyApp([]route.Uri{"sticky." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+			apps[i] = test.NewStickyApp([]route.Uri{"sticky." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, StickyCookieKey)
 			apps[i].RegisterAndListen()
 		}
 
@@ -293,8 +299,45 @@ var _ = Describe("Router", func() {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
 		}
-		sessionCookie, vcapCookie, port1 := getSessionAndAppPort("sticky."+test_util.LocalhostDNS, config.Port)
-		port2 := getAppPortWithSticky("sticky."+test_util.LocalhostDNS, config.Port, sessionCookie, vcapCookie)
+		resp, port1 := getSessionAndAppPort("sticky."+test_util.LocalhostDNS, config.Port)
+		port2 := getAppPortWithSticky("sticky."+test_util.LocalhostDNS, config.Port, resp.Cookies())
+
+		var vcapCookie *http.Cookie
+		for _, cookie := range resp.Cookies() {
+			if cookie.Name == proxy.VcapCookieId {
+				vcapCookie = cookie
+			}
+		}
+
+		Expect(port1).To(Equal(port2))
+		Expect(vcapCookie.Path).To(Equal("/"))
+
+		for _, app := range apps {
+			app.Unregister()
+		}
+	})
+
+	It("Sticky sessions can be configured to use other cookie names", func() {
+		apps := make([]*testcommon.TestApp, 10)
+		for i := range apps {
+			apps[i] = test.NewStickyApp([]route.Uri{"sticky." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "SESSION")
+			apps[i].RegisterAndListen()
+		}
+
+		for _, app := range apps {
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+		}
+		resp, port1 := getSessionAndAppPort("sticky."+test_util.LocalhostDNS, config.Port)
+		port2 := getAppPortWithSticky("sticky."+test_util.LocalhostDNS, config.Port, resp.Cookies())
+
+		var vcapCookie *http.Cookie
+		for _, cookie := range resp.Cookies() {
+			if cookie.Name == proxy.VcapCookieId {
+				vcapCookie = cookie
+			}
+		}
 
 		Expect(port1).To(Equal(port2))
 		Expect(vcapCookie.Path).To(Equal("/"))
@@ -1966,7 +2009,7 @@ func sendRequests(url string, rPort uint16, times int) {
 	}
 }
 
-func getSessionAndAppPort(url string, rPort uint16) (*http.Cookie, *http.Cookie, string) {
+func getSessionAndAppPort(url string, rPort uint16) (*http.Response, string) {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -1984,19 +2027,10 @@ func getSessionAndAppPort(url string, rPort uint16) (*http.Cookie, *http.Cookie,
 	port, err = ioutil.ReadAll(resp.Body)
 	Expect(err).ToNot(HaveOccurred())
 
-	var sessionCookie, vcapCookie *http.Cookie
-	for _, cookie := range resp.Cookies() {
-		if cookie.Name == proxy.StickyCookieKey {
-			sessionCookie = cookie
-		} else if cookie.Name == proxy.VcapCookieId {
-			vcapCookie = cookie
-		}
-	}
-
-	return sessionCookie, vcapCookie, string(port)
+	return resp, string(port)
 }
 
-func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *http.Cookie) string {
+func getAppPortWithSticky(url string, rPort uint16, respCookies []*http.Cookie) string {
 	var client http.Client
 	var req *http.Request
 	var resp *http.Response
@@ -2008,8 +2042,9 @@ func getAppPortWithSticky(url string, rPort uint16, sessionCookie, vcapCookie *h
 	req, err = http.NewRequest("GET", uri, nil)
 	Expect(err).ToNot(HaveOccurred())
 
-	req.AddCookie(sessionCookie)
-	req.AddCookie(vcapCookie)
+	for _, cookie := range respCookies {
+		req.AddCookie(cookie)
+	}
 
 	resp, err = client.Do(req)
 	Expect(err).ToNot(HaveOccurred())

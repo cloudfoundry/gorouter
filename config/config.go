@@ -30,6 +30,35 @@ var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
 var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
 
+type StringSet map[string]struct{}
+
+func (ss *StringSet) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var arr []string
+
+	err := unmarshal(&arr)
+	if err != nil {
+		return err
+	}
+
+	*ss = make(map[string]struct{})
+
+	for _, elem := range arr {
+		(*ss)[elem] = struct{}{}
+	}
+
+	return nil
+}
+
+func (ss StringSet) MarshalYAML() (interface{}, error) {
+	arr := make([]string, 0, len(ss))
+
+	for k := range ss {
+		arr = append(arr, k)
+	}
+
+	return arr, nil
+}
+
 type StatusConfig struct {
 	Host string `yaml:"host"`
 	Port uint16 `yaml:"port"`
@@ -184,10 +213,11 @@ type Config struct {
 
 	RouteLatencyMetricMuzzleDuration time.Duration `yaml:"route_latency_metric_muzzle_duration,omitempty"`
 
-	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
-	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies        bool          `yaml:"secure_cookies,omitempty"`
-	HealthCheckUserAgent string        `yaml:"healthcheck_user_agent,omitempty"`
+	DrainWait                time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout             time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies            bool          `yaml:"secure_cookies,omitempty"`
+	StickySessionCookieNames StringSet     `yaml:"sticky_session_cookie_names"`
+	HealthCheckUserAgent     string        `yaml:"healthcheck_user_agent,omitempty"`
 
 	OAuth                      OAuthConfig      `yaml:"oauth,omitempty"`
 	RoutingApi                 RoutingApiConfig `yaml:"routing_api,omitempty"`
@@ -265,6 +295,8 @@ var defaultConfig = Config{
 	DisableKeepAlives:   true,
 	MaxIdleConns:        100,
 	MaxIdleConnsPerHost: 2,
+
+	StickySessionCookieNames: StringSet{"JSESSIONID": struct{}{}},
 }
 
 func DefaultConfig() (*Config, error) {

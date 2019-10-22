@@ -30,8 +30,7 @@ import (
 )
 
 const (
-	VcapCookieId    = "__VCAP_ID__"
-	StickyCookieKey = "JSESSIONID"
+	VcapCookieId = "__VCAP_ID__"
 )
 
 type proxy struct {
@@ -54,6 +53,7 @@ type proxy struct {
 	routeServiceTLSConfig    *tls.Config
 	disableXFFLogging        bool
 	disableSourceIPLogging   bool
+	stickySessionCookieNames config.StringSet
 }
 
 func NewProxy(
@@ -89,6 +89,7 @@ func NewProxy(
 		routeServiceTLSConfig:    routeServiceTLSConfig,
 		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging:   cfg.Logging.DisableLogSourceIP,
+		stickySessionCookieNames: cfg.StickySessionCookieNames,
 	}
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
@@ -121,6 +122,7 @@ func NewProxy(
 		},
 		routeServicesTransport,
 		p.endpointTimeout,
+		p.stickySessionCookieNames,
 	)
 
 	rproxy := &httputil.ReverseProxy{
@@ -217,7 +219,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
 
-	stickyEndpointId := getStickySession(request)
+	stickyEndpointId := getStickySession(request, p.stickySessionCookieNames)
 	endpointIterator := &wrappedIterator{
 		nested: reqInfo.RoutePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
 
@@ -287,11 +289,13 @@ func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
 	i.nested.PostRequest(e)
 }
 
-func getStickySession(request *http.Request) string {
+func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
 	// Try choosing a backend using sticky session
-	if _, err := request.Cookie(StickyCookieKey); err == nil {
-		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			return sticky.Value
+	for stickyCookieName, _ := range stickySessionCookieNames {
+		if _, err := request.Cookie(stickyCookieName); err == nil {
+			if sticky, err := request.Cookie(VcapCookieId); err == nil {
+				return sticky.Value
+			}
 		}
 	}
 	return ""

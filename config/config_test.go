@@ -616,6 +616,23 @@ extra_headers_to_log:
 			Expect(config.ExtraHeadersToLog).To(ContainElement("x-b3-trace-id"))
 		})
 
+		Describe("StickySessionCookieNames", func() {
+			It("converts the provided list to a set of StickySessionCookieNames", func() {
+				var b = []byte(`
+sticky_session_cookie_names:
+  - someName
+  - anotherName
+`)
+
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(config.Process()).To(Succeed())
+
+				Expect(config.StickySessionCookieNames).To(HaveKey("someName"))
+				Expect(config.StickySessionCookieNames).To(HaveKey("anotherName"))
+			})
+		})
+
 		Context("When secure cookies is set to false", func() {
 			It("set DropletStaleThreshold equal to StartResponseDelayInterval", func() {
 				var b = []byte(`

@@ -11,6 +11,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const StickyCookieKey = "JSESSIONID"
+
 var _ = Describe("Session Affinity", func() {
 	var done chan bool
 	var jSessionIdCookie *http.Cookie
@@ -41,7 +43,7 @@ var _ = Describe("Session Affinity", func() {
 		conf.SecureCookies = false
 
 		jSessionIdCookie = &http.Cookie{
-			Name:    proxy.StickyCookieKey,
+			Name:    StickyCookieKey,
 			Value:   "xxx",
 			MaxAge:  1,
 			Expires: time.Now(),
@@ -177,7 +179,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+				jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 				Expect(jsessionId).ToNot(BeNil())
 
 				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
@@ -205,7 +207,7 @@ var _ = Describe("Session Affinity", func() {
 					Eventually(done).Should(Receive())
 
 					resp, _ := x.ReadResponse()
-					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
 					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
@@ -232,7 +234,7 @@ var _ = Describe("Session Affinity", func() {
 					Eventually(done).Should(Receive())
 
 					resp, _ := x.ReadResponse()
-					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
 					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
@@ -264,7 +266,7 @@ var _ = Describe("Session Affinity", func() {
 			req.AddCookie(cookie)
 
 			jSessionIdCookie = &http.Cookie{
-				Name:  proxy.StickyCookieKey,
+				Name:  StickyCookieKey,
 				Value: "xxx",
 			}
 			req.AddCookie(jSessionIdCookie)
@@ -282,7 +284,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				Expect(getCookie(proxy.StickyCookieKey, resp.Cookies())).To(BeNil())
+				Expect(getCookie(StickyCookieKey, resp.Cookies())).To(BeNil())
 				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
 			})
 
@@ -320,7 +322,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+				jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 				Expect(jsessionId).ToNot(BeNil())
 
 				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
@@ -347,7 +349,7 @@ var _ = Describe("Session Affinity", func() {
 					Eventually(done).Should(Receive())
 
 					resp, _ := x.ReadResponse()
-					jsessionId := getCookie(proxy.StickyCookieKey, resp.Cookies())
+					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 					Expect(jsessionId.MaxAge).To(Equal(-1))
 

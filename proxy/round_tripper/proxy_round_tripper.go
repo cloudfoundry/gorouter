@@ -10,6 +10,7 @@ import (
 
 	"github.com/uber-go/zap"
 
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -21,7 +22,6 @@ import (
 
 const (
 	VcapCookieId              = "__VCAP_ID__"
-	StickyCookieKey           = "JSESSIONID"
 	CookieHeader              = "Set-Cookie"
 	BadGatewayMessage         = "502 Bad Gateway: Registered endpoint failed to handle the request."
 	HostnameErrorMessage      = "503 Service Unavailable"
@@ -66,30 +66,33 @@ func NewProxyRoundTripper(
 	errorHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
 	endpointTimeout time.Duration,
+	stickySessionCookieNames config.StringSet,
 ) ProxyRoundTripper {
 	return &roundTripper{
-		logger:                 logger,
-		defaultLoadBalance:     defaultLoadBalance,
-		combinedReporter:       combinedReporter,
-		secureCookies:          secureCookies,
-		roundTripperFactory:    roundTripperFactory,
-		retriableClassifier:    retriableClassifier,
-		errorHandler:           errorHandler,
-		routeServicesTransport: routeServicesTransport,
-		endpointTimeout:        endpointTimeout,
+		logger:                   logger,
+		defaultLoadBalance:       defaultLoadBalance,
+		combinedReporter:         combinedReporter,
+		secureCookies:            secureCookies,
+		roundTripperFactory:      roundTripperFactory,
+		retriableClassifier:      retriableClassifier,
+		errorHandler:             errorHandler,
+		routeServicesTransport:   routeServicesTransport,
+		endpointTimeout:          endpointTimeout,
+		stickySessionCookieNames: stickySessionCookieNames,
 	}
 }
 
 type roundTripper struct {
-	logger                 logger.Logger
-	defaultLoadBalance     string
-	combinedReporter       metrics.ProxyReporter
-	secureCookies          bool
-	roundTripperFactory    RoundTripperFactory
-	retriableClassifier    fails.Classifier
-	errorHandler           errorHandler
-	routeServicesTransport http.RoundTripper
-	endpointTimeout        time.Duration
+	logger                   logger.Logger
+	defaultLoadBalance       string
+	combinedReporter         metrics.ProxyReporter
+	secureCookies            bool
+	roundTripperFactory      RoundTripperFactory
+	retriableClassifier      fails.Classifier
+	errorHandler             errorHandler
+	routeServicesTransport   http.RoundTripper
+	endpointTimeout          time.Duration
+	stickySessionCookieNames config.StringSet
 }
 
 func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -117,7 +120,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	stickyEndpointID := getStickySession(request)
+	stickyEndpointID := getStickySession(request, rt.stickySessionCookieNames)
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	logger := rt.logger
@@ -209,7 +212,7 @@ func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error)
 	if res != nil && endpoint.PrivateInstanceId != "" {
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.secureCookies,
-			reqInfo.RoutePool.ContextPath(),
+			reqInfo.RoutePool.ContextPath(), rt.stickySessionCookieNames,
 		)
 	}
 
@@ -289,6 +292,7 @@ func setupStickySession(
 	originalEndpointId string,
 	secureCookies bool,
 	path string,
+	stickySessionCookieNames config.StringSet,
 ) {
 	secure := false
 	maxAge := 0
@@ -297,7 +301,7 @@ func setupStickySession(
 	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
 
 	for _, v := range response.Cookies() {
-		if v.Name == StickyCookieKey {
+		if _, ok := stickySessionCookieNames[v.Name]; ok {
 			sticky = true
 			if v.MaxAge < 0 {
 				maxAge = v.MaxAge
@@ -336,11 +340,13 @@ func setupStickySession(
 	}
 }
 
-func getStickySession(request *http.Request) string {
+func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
 	// Try choosing a backend using sticky session
-	if _, err := request.Cookie(StickyCookieKey); err == nil {
-		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			return sticky.Value
+	for stickyCookieName, _ := range stickySessionCookieNames {
+		if _, err := request.Cookie(stickyCookieName); err == nil {
+			if sticky, err := request.Cookie(VcapCookieId); err == nil {
+				return sticky.Value
+			}
 		}
 	}
 	return ""
