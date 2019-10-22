@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -10,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -114,15 +115,16 @@ func NewProxy(
 	}
 
 	prt := round_tripper.NewProxyRoundTripper(
-		roundTripperFactory, fails.RetriableClassifiers, p.logger,
-		p.defaultLoadBalance, p.reporter, p.secureCookies,
+		roundTripperFactory,
+		fails.RetriableClassifiers,
+		logger,
+		reporter,
 		&round_tripper.ErrorHandler{
-			MetricReporter: p.reporter,
+			MetricReporter: reporter,
 			ErrorSpecs:     round_tripper.DefaultErrorSpecs,
 		},
 		routeServicesTransport,
-		p.endpointTimeout,
-		p.stickySessionCookieNames,
+		cfg,
 	)
 
 	rproxy := &httputil.ReverseProxy{

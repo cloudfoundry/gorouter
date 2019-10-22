@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -69,7 +70,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			routeServicesTransport *sharedfakes.RoundTripper
 			retriableClassifier    *errorClassifierFakes.Classifier
 			errorHandler           *roundtripperfakes.ErrorHandler
-			timeout                time.Duration
+			cfg                    *config.Config
 
 			reqInfo *handlers.RequestInfo
 
@@ -95,8 +96,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 			reqBody = new(testBody)
 			req = test_util.NewRequest("GET", "myapp.com", "/", reqBody)
 			req.URL.Scheme = "http"
-
-			timeout = 0 * time.Millisecond
 
 			handlers.NewRequestInfo().ServeHTTP(nil, req, func(_ http.ResponseWriter, transformedReq *http.Request) {
 				req = transformedReq
@@ -130,18 +129,21 @@ var _ = Describe("ProxyRoundTripper", func() {
 			retriableClassifier = &errorClassifierFakes.Classifier{}
 			retriableClassifier.ClassifyReturns(false)
 			routeServicesTransport = &sharedfakes.RoundTripper{}
+
+			cfg, err = config.DefaultConfig()
+			Expect(err).ToNot(HaveOccurred())
+			cfg.EndpointTimeout = 0 * time.Millisecond
 		})
 
 		JustBeforeEach(func() {
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
-				roundTripperFactory, retriableClassifier,
-				logger, "",
-				combinedReporter, false,
-				errorHandler, routeServicesTransport,
-				timeout,
-				map[string]struct{}{
-					"JSESSIONID": struct{}{},
-				},
+				roundTripperFactory,
+				retriableClassifier,
+				logger,
+				combinedReporter,
+				errorHandler,
+				routeServicesTransport,
+				cfg,
 			)
 		})
 
@@ -809,7 +811,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			Context("when endpoint timeout is not 0", func() {
 				var reqCh chan *http.Request
 				BeforeEach(func() {
-					timeout = 10 * time.Millisecond
+					cfg.EndpointTimeout = 10 * time.Millisecond
 					reqCh = make(chan *http.Request, 1)
 
 					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {

@@ -58,27 +58,25 @@ type errorHandler interface {
 
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
-	retriableClassifier fails.Classifier,
+	retriableClassifiers fails.Classifier,
 	logger logger.Logger,
-	defaultLoadBalance string,
 	combinedReporter metrics.ProxyReporter,
-	secureCookies bool,
-	errorHandler errorHandler,
+	errHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
-	endpointTimeout time.Duration,
-	stickySessionCookieNames config.StringSet,
+	cfg *config.Config,
 ) ProxyRoundTripper {
+
 	return &roundTripper{
 		logger:                   logger,
-		defaultLoadBalance:       defaultLoadBalance,
+		defaultLoadBalance:       cfg.LoadBalance,
 		combinedReporter:         combinedReporter,
-		secureCookies:            secureCookies,
+		secureCookies:            cfg.SecureCookies,
 		roundTripperFactory:      roundTripperFactory,
-		retriableClassifier:      retriableClassifier,
-		errorHandler:             errorHandler,
+		retriableClassifier:      retriableClassifiers,
+		errorHandler:             errHandler,
 		routeServicesTransport:   routeServicesTransport,
-		endpointTimeout:          endpointTimeout,
-		stickySessionCookieNames: stickySessionCookieNames,
+		endpointTimeout:          cfg.EndpointTimeout,
+		stickySessionCookieNames: cfg.StickySessionCookieNames,
 	}
 }
 
