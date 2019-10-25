@@ -55,6 +55,61 @@ var _ = Describe("Lookup", func() {
 		handler.ServeHTTP(resp, req)
 	})
 
+	Context("when the host is identical to the remote IP address", func() {
+		BeforeEach(func() {
+			req.Host = "1.2.3.4"
+			req.RemoteAddr = "1.2.3.4:60001"
+		})
+
+		It("sends a bad request metric", func() {
+			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+		})
+
+		It("sets X-Cf-RouterError to empty_host", func() {
+			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("empty_host"))
+		})
+
+		It("sets Cache-Control to public,max-age=2", func() {
+			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+		})
+
+		It("returns a 400 BadRequest and does not call next", func() {
+			Expect(nextCalled).To(BeFalse())
+			Expect(resp.Code).To(Equal(http.StatusBadRequest))
+		})
+
+		It("has a meaningful response", func() {
+			Expect(resp.Body.String()).To(ContainSubstring("Request had empty Host header"))
+		})
+	})
+
+	Context("when the host is not set", func() {
+		BeforeEach(func() {
+			req.Host = ""
+		})
+
+		It("sends a bad request metric", func() {
+			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+		})
+
+		It("sets X-Cf-RouterError to empty_host", func() {
+			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("empty_host"))
+		})
+
+		It("sets Cache-Control to public,max-age=2", func() {
+			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+		})
+
+		It("returns a 400 BadRequest and does not call next", func() {
+			Expect(nextCalled).To(BeFalse())
+			Expect(resp.Code).To(Equal(http.StatusBadRequest))
+		})
+
+		It("has a meaningful response", func() {
+			Expect(resp.Body.String()).To(ContainSubstring("Request had empty Host header"))
+		})
+	})
+
 	Context("when there is no pool that matches the request", func() {
 		It("sends a bad request metric", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
