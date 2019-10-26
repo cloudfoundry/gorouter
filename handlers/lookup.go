@@ -36,6 +36,26 @@ func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger log
 }
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	// gorouter requires the Host header to know to which backend to proxy to.
+	//
+	// The Host header is optional in HTTP/1.0,
+	// so we must explicitly check that the Host is set.
+	//
+	// Also, when some load balancers which are used to load balance gorouters
+	// (e.g. AWS Classic ELB)
+	// receive HTTP/1.0 requests without a host headers,
+	// they optimistically add their IP address to the host header.
+	//
+	// Therefore to not expose the internal IP address of the load balancer,
+	// we must check that the Host is not also the source of the request.
+	//
+	// It is not vali for the Host header to be an IP address,
+	// because Gorouter should not have an IP address as a route.
+	if r.Host == "" || hostWithoutPort(r.Host) == hostWithoutPort(r.RemoteAddr) {
+		l.handleMissingHost(rw, r)
+		return
+	}
+
 	pool := l.lookup(r)
 	if pool == nil {
 		l.handleMissingRoute(rw, r)
@@ -59,6 +79,20 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	}
 	requestInfo.RoutePool = pool
 	next(rw, r)
+}
+
+func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request) {
+	l.reporter.CaptureBadRequest()
+
+	AddRouterErrorHeader(rw, "empty_host")
+	addInvalidResponseCacheControlHeader(rw)
+
+	writeStatus(
+		rw,
+		http.StatusBadRequest,
+		"Request had empty Host header",
+		l.logger,
+	)
 }
 
 func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request) {
