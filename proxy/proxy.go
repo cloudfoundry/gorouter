@@ -93,9 +93,14 @@ func NewProxy(
 		stickySessionCookieNames: cfg.StickySessionCookieNames,
 	}
 
+	dialer := &net.Dialer{
+		Timeout:   cfg.EndpointDialTimeout,
+		KeepAlive: cfg.EndpointKeepAliveProbeInterval,
+	}
+
 	roundTripperFactory := &round_tripper.FactoryImpl{
 		BackendTemplate: &http.Transport{
-			Dial:                (&net.Dialer{Timeout: cfg.EndpointDialTimeout}).Dial,
+			Dial:                dialer.Dial,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
 			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
@@ -104,7 +109,7 @@ func NewProxy(
 			TLSClientConfig:     backendTLSConfig,
 		},
 		RouteServiceTemplate: &http.Transport{
-			Dial:                (&net.Dialer{Timeout: cfg.EndpointDialTimeout}).Dial,
+			Dial:                dialer.Dial,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
 			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
