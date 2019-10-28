@@ -100,6 +100,22 @@ endpoint_timeout: 10s
 			Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 		})
 
+		It("defaults keep alive probe interval to 1 second", func() {
+			Expect(config.FrontendIdleTimeout).To(Equal(900 * time.Second))
+			Expect(config.EndpointKeepAliveProbeInterval).To(Equal(1 * time.Second))
+		})
+
+		It("sets keep alive probe interval", func() {
+			var b = []byte(`
+endpoint_keep_alive_probe_interval: 500ms
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.EndpointKeepAliveProbeInterval).To(Equal(500 * time.Millisecond))
+		})
+
 		It("sets nats config", func() {
 			var b = []byte(`
 nats:
