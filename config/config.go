@@ -208,7 +208,7 @@ type Config struct {
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval,omitempty"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout,omitempty"`
 	EndpointDialTimeout             time.Duration `yaml:"-"`
-	EndpointKeepAliveProbeInterval  time.Duration `yaml:"-"`
+	EndpointKeepAliveProbeInterval  time.Duration `yaml:"endpoint_keep_alive_probe_interval,omitempty"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout,omitempty"`
 	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout,omitempty"`
 
