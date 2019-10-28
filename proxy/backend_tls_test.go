@@ -262,6 +262,8 @@ var _ = Describe("Backend TLS", func() {
 	Context("when no cipher suites are shared between gorouter and backend", func() {
 		BeforeEach(func() {
 			conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}
+			// cannot configure CipherSuites for TLS 1.3 so we configure the backend to use 1.2
+			registerConfig.TLSConfig.MaxVersion = tls.VersionTLS12
 		})
 		It("returns a HTTP 525 SSL Handshake error", func() {
 			resp := registerAppAndTest()

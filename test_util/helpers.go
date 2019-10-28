@@ -273,7 +273,7 @@ func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootCert, err := x509.ParseCertificate(rootCADER)
 	Expect(err).NotTo(HaveOccurred())
 
-	ownKey, err := rsa.GenerateKey(rand.Reader, 512)
+	ownKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	Expect(err).NotTo(HaveOccurred())
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)
@@ -320,7 +320,7 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 		IsCA:                  true,
 	}
 
-	privKey, err := rsa.GenerateKey(rand.Reader, 512)
+	privKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	Expect(err).ToNot(HaveOccurred())
 	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
 	Expect(err).ToNot(HaveOccurred())
@@ -351,7 +351,7 @@ func CreateSignedCertDER(cname string, parentCert x509.Certificate, parentKey *r
 		IsCA:                  false,
 	}
 
-	privKey, err := rsa.GenerateKey(rand.Reader, 512)
+	privKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	Expect(err).ToNot(HaveOccurred())
 	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &parentCert, &privKey.PublicKey, parentKey)
 	Expect(err).ToNot(HaveOccurred())

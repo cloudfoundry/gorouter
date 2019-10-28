@@ -1329,6 +1329,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("fails when the client uses an unsupported cipher suite", func() {
+			tlsClientConfig.MaxVersion = tls.VersionTLS12 // Can not configure cipher suites for TLS1.3
 			tlsClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA}
 
 			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)

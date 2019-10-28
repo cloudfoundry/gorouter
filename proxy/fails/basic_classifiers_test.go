@@ -163,6 +163,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 
 			Context("when another TLS error occurs", func() {
 				BeforeEach(func() {
+					tlsServer.TLS.MaxVersion = tls.VersionTLS12 // Can not configure cipher suites for TLS1.3
 					tlsServer.TLS.CipherSuites = []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}
 				})
 				It("does not match other tls errors", func() {
@@ -179,6 +180,7 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 	Describe("RemoteHandshakeFailure", func() {
 		Context("when the cipher suites aren't compatible", func() {
 			BeforeEach(func() {
+				tlsServer.TLS.MaxVersion = tls.VersionTLS12 // Can not configure cipher suites for TLS1.3
 				tlsServer.TLS.CipherSuites = []uint16{tls.TLS_RSA_WITH_RC4_128_SHA}
 			})
 
