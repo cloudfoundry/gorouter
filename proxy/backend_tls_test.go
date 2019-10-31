@@ -99,6 +99,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend requires a client certificate", func() {
 		BeforeEach(func() {
 			registerConfig.TLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+			registerConfig.TLSConfig.MaxVersion = tls.VersionTLS12
 		})
 
 		It("makes an mTLS connection with the backend", func() {
