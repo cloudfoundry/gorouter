@@ -135,16 +135,34 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 	Describe("RemoteFailedTLSCertCheck", func() {
 		Context("when the server expects client certs", func() {
 			Context("when but the client doesn't provide client certs", func() {
-				BeforeEach(func() {
-					testTransport.TLSClientConfig.Certificates = []tls.Certificate{}
+				Context("when using TLS 1.2", func() {
+					BeforeEach(func() {
+						testTransport.TLSClientConfig.Certificates = []tls.Certificate{}
+						testTransport.TLSClientConfig.MaxVersion = tls.VersionTLS12
+					})
+
+					It("matches the error", func() {
+						req, _ := http.NewRequest("GET", tlsServer.URL, nil)
+
+						_, err := testTransport.RoundTrip(req)
+						Expect(err).To(HaveOccurred())
+						Expect(fails.RemoteFailedCertCheck(err)).To(BeTrue())
+					})
 				})
 
-				It("matches the error", func() {
-					req, _ := http.NewRequest("GET", tlsServer.URL, nil)
+				Context("when using TLS 1.3", func() {
+					BeforeEach(func() {
+						testTransport.TLSClientConfig.Certificates = []tls.Certificate{}
+						testTransport.TLSClientConfig.MaxVersion = tls.VersionTLS13
+					})
 
-					_, err := testTransport.RoundTrip(req)
-					Expect(err).To(HaveOccurred())
-					Expect(fails.RemoteFailedCertCheck(err)).To(BeTrue())
+					It("matches the error", func() {
+						req, _ := http.NewRequest("GET", tlsServer.URL, nil)
+
+						_, err := testTransport.RoundTrip(req)
+						Expect(err).To(HaveOccurred())
+						Expect(fails.RemoteFailedCertCheck(err)).To(BeTrue())
+					})
 				})
 			})
 
