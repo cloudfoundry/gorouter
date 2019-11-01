@@ -137,6 +137,16 @@ var _ = Describe("Crypto", func() {
 				Expect(decryptedText).ToNot(Equal(plainText))
 			})
 		})
+
+		Context("when the nonce is an invalid length", func() {
+			It("does not panic and returns an error", func() {
+				otherNonce := []byte("0123")
+				decryptedText, err := aesGcm.Decrypt(cipherText, otherNonce)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("incorrect nonce length"))
+				Expect(decryptedText).ToNot(Equal(plainText))
+			})
+		})
 	})
 
 	Describe("RandomBytes", func() {
