@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"fmt"
 	"net/http"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"

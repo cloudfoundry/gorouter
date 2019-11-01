@@ -378,4 +378,3 @@ func createLogger(component string, level string) (goRouterLogger.Logger, lager.
 	lggr := goRouterLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
 	return lggr, minLagerLogLevel
 }
-
