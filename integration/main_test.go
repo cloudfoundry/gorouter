@@ -812,6 +812,8 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		verifyAppRunning := func(runningApp *common.TestApp) {
+			runningApp.WaitUntilReady()
+
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
 			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 		}
