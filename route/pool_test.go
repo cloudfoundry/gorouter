@@ -485,44 +485,20 @@ var _ = Describe("EndpointPool", func() {
 		})
 	})
 
-	Describe("PruneEndpoints", func() {
-		const defaultThreshold = 1 * time.Minute
+	Context("PruneEndpoints", func() {
+		defaultThreshold := 1 * time.Minute
 
 		Context("when the pool contains tls endpoints", func() {
-			Context("when configured to prune tls endpoints", func() {
-				BeforeEach(func() {
-					pool = route.NewPool(&route.PoolOpts{
-						Logger:            logger,
-						PruneTlsEndpoints: true,
-					})
-					e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: true, StaleThresholdInSeconds: 60})
-					pool.Put(e1)
-				})
-				It("*does* prune the tls endpoints", func() {
-					pool.MarkUpdated(time.Now().Add(-2 * defaultThreshold))
-					Expect(pool.IsEmpty()).To(BeFalse())
-					prunedEndpoints := pool.PruneEndpoints()
-					Expect(pool.IsEmpty()).To(BeTrue())
-					Expect(len(prunedEndpoints)).To(Equal(1))
-				})
+			BeforeEach(func() {
+				e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: true, StaleThresholdInSeconds: 60})
+				pool.Put(e1)
 			})
-
-			Context("when configured not to prune tls endpoints", func() {
-				BeforeEach(func() {
-					pool = route.NewPool(&route.PoolOpts{
-						Logger:            logger,
-						PruneTlsEndpoints: false,
-					})
-					e1 := route.NewEndpoint(&route.EndpointOpts{UseTLS: true, StaleThresholdInSeconds: 60})
-					pool.Put(e1)
-				})
-				It("does not prune the tls endpoints", func() {
-					pool.MarkUpdated(time.Now().Add(-2 * defaultThreshold))
-					Expect(pool.IsEmpty()).To(Equal(false))
-					prunedEndpoints := pool.PruneEndpoints()
-					Expect(pool.IsEmpty()).To(Equal(false))
-					Expect(len(prunedEndpoints)).To(Equal(0))
-				})
+			It("does not prune the tls endpoints", func() {
+				pool.MarkUpdated(time.Now().Add(-2 * defaultThreshold))
+				Expect(pool.IsEmpty()).To(Equal(false))
+				prunedEndpoints := pool.PruneEndpoints()
+				Expect(pool.IsEmpty()).To(Equal(false))
+				Expect(len(prunedEndpoints)).To(Equal(0))
 			})
 		})
 
