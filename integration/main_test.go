@@ -834,6 +834,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		Context("when the route service is hosted on the platform (internal, has a route as an app)", func() {
+			const TEST_STATUS_CODE = 477
 			var routeSvcApp *common.TestApp
 
 			BeforeEach(func() {
@@ -842,7 +843,7 @@ var _ = Describe("Router Integration", func() {
 
 				routeSvcApp = common.NewTestApp([]route.Uri{"some-route-service." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 				routeSvcApp.AddHandler("/rs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(477)
+					w.WriteHeader(TEST_STATUS_CODE)
 				}))
 				routeServiceURL = fmt.Sprintf("https://some-route-service.%s:%d/rs", test_util.LocalhostDNS, cfg.SSLPort)
 			})
@@ -857,7 +858,7 @@ var _ = Describe("Router Integration", func() {
 				req.Host = "demo." + test_util.LocalhostDNS
 				res, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(res.StatusCode).To(Equal(477))
+				Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
 			})
 
 			Context("when the client connects with HTTPS", func() {
@@ -871,7 +872,7 @@ var _ = Describe("Router Integration", func() {
 					req.Host = "demo." + test_util.LocalhostDNS
 					res, err := client.Do(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(res.StatusCode).To(Equal(477))
+					Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
 				})
 
 				Context("when the gorouter has http disabled", func() {
@@ -889,7 +890,7 @@ var _ = Describe("Router Integration", func() {
 						req.Host = "demo." + test_util.LocalhostDNS
 						res, err := client.Do(req)
 						Expect(err).ToNot(HaveOccurred())
-						Expect(res.StatusCode).To(Equal(477))
+						Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
 					})
 				})
 			})
