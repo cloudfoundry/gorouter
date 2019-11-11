@@ -79,6 +79,7 @@ var _ = Describe("GDPR", func() {
 			wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			wsApp.Register()
 			wsApp.Listen()
+			wsApp.WaitUntilReady()
 
 			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
@@ -89,7 +90,7 @@ var _ = Describe("GDPR", func() {
 
 			x := test_util.NewHttpConn(conn)
 
-			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
+			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "", nil)
 			req.Header.Add("X-FORWARDED-FOR", "192.168.0.1")
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
@@ -151,6 +152,7 @@ var _ = Describe("GDPR", func() {
 			wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			wsApp.Register()
 			wsApp.Listen()
+			wsApp.WaitUntilReady()
 
 			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
 
@@ -161,7 +163,7 @@ var _ = Describe("GDPR", func() {
 
 			x := test_util.NewHttpConn(conn)
 
-			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "/chat", nil)
+			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "", nil)
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
 			x.WriteRequest(req)
