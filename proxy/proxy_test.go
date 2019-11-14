@@ -2,7 +2,6 @@ package proxy_test
 
 import (
 	"bytes"
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -20,6 +19,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -1710,154 +1711,6 @@ var _ = Describe("Proxy", func() {
 
 				Expect(fakeReporter.CaptureWebSocketUpdateCallCount()).To(Equal(0))
 				Expect(fakeReporter.CaptureWebSocketFailureCallCount()).To(Equal(1))
-				conn.Close()
-			})
-		})
-	})
-
-	Describe("TCP Upgrade Connections", func() {
-		It("upgrades a Tcp request", func() {
-			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-				conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
-				conn.CheckLine("hello from client")
-				conn.WriteLine("hello from server")
-				conn.Close()
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
-			req.Header.Set("Upgrade", "tcp")
-
-			req.Header.Set("Connection", "Upgrade")
-
-			conn.WriteRequest(req)
-
-			conn.CheckLine("HTTP/1.1 101 Switching Protocols")
-			conn.CheckLine("")
-			conn.CheckLine("hello")
-			conn.WriteLine("hello from client")
-			conn.CheckLine("hello from server")
-
-			conn.Close()
-		})
-
-		It("logs the response time and status code 101 in the access logs", func() {
-			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-				conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
-				conn.CheckLine("hello from client")
-				conn.WriteLine("hello from server")
-				conn.Close()
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
-			req.Header.Set("Upgrade", "tcp")
-
-			req.Header.Set("Connection", "Upgrade")
-
-			conn.WriteRequest(req)
-
-			conn.CheckLine("HTTP/1.1 101 Switching Protocols")
-			conn.CheckLine("")
-			conn.CheckLine("hello")
-			conn.WriteLine("hello from client")
-			conn.CheckLine("hello from server")
-
-			Eventually(func() (int64, error) {
-				fi, err := f.Stat()
-				if err != nil {
-					return 0, err
-				}
-				return fi.Size(), nil
-			}).ShouldNot(BeZero())
-
-			b, err := ioutil.ReadFile(f.Name())
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(string(b)).To(ContainSubstring(`response_time:`))
-			Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 101"))
-			responseTime := parseResponseTimeFromLog(string(b))
-			Expect(responseTime).To(BeNumerically(">", 0))
-
-			conn.Close()
-		})
-
-		It("does not emit a latency metric", func() {
-			var wg sync.WaitGroup
-			first := true
-			ln := test_util.RegisterHandler(r, "tcp-handler", func(conn *test_util.HttpConn) {
-				defer wg.Done()
-				defer conn.Close()
-				if first {
-					conn.WriteLine("HTTP/1.1 101 Switching Protocols\r\n\r\nhello")
-					first = false
-				}
-				for {
-					_, err := conn.Write([]byte("Hello"))
-					if err != nil {
-						return
-					}
-				}
-			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
-			req.Header.Set("Upgrade", "tcp")
-
-			req.Header.Set("Connection", "Upgrade")
-
-			wg.Add(1)
-			conn.WriteRequest(req)
-			buf := make([]byte, 5)
-			_, err := conn.Read(buf)
-			Expect(err).ToNot(HaveOccurred())
-			conn.Close()
-			wg.Wait()
-
-			Consistently(fakeReporter.CaptureRoutingResponseLatencyCallCount, 1).Should(Equal(0))
-		})
-
-		Context("when the connection to the backend fails", func() {
-			It("logs a 502 BadGateway", func() {
-				test_util.RegisterAddr(r, "tcp-handler", "192.0.2.1:1234", test_util.RegisterConfig{
-					InstanceIndex: "2",
-					AppId:         "abc",
-				})
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "tcp-handler", "/chat", nil)
-				req.Header.Set("Upgrade", "tcp")
-				req.Header.Set("Connection", "Upgrade")
-
-				conn.WriteRequest(req)
-
-				res, err := http.ReadResponse(conn.Reader, &http.Request{})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-
-				Eventually(func() (int64, error) {
-					fi, fErr := f.Stat()
-					if fErr != nil {
-						return 0, fErr
-					}
-					return fi.Size(), nil
-				}).ShouldNot(BeZero())
-
-				b, err := ioutil.ReadFile(f.Name())
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(string(b)).To(ContainSubstring(`response_time:`))
-				Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 502"))
-				responseTime := parseResponseTimeFromLog(string(b))
-				Expect(responseTime).To(BeNumerically(">", 0))
-
 				conn.Close()
 			})
 		})

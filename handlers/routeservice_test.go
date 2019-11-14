@@ -568,25 +568,6 @@ var _ = Describe("Route Service Handler", func() {
 			})
 		})
 
-		Context("when a TCP request an app bound to a route service", func() {
-			BeforeEach(func() {
-				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodrouteservice.com"})
-
-				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
-				req.Header.Set("connection", "upgrade")
-				req.Header.Set("upgrade", "tcp")
-
-			})
-			It("returns a 503", func() {
-				handler.ServeHTTP(resp, req)
-
-				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
-				Expect(resp.Body.String()).To(ContainSubstring("TCP requests are not supported for routes bound to Route Services."))
-
-				Expect(nextCalled).To(BeFalse())
-			})
-		})
 		Context("when a websocket request an app bound to a route service", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodrouteservice.com"})

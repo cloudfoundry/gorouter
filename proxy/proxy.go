@@ -238,11 +238,6 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		},
 	}
 
-	if handlers.IsTcpUpgrade(request) {
-		handler.HandleTcpRequest(endpointIterator)
-		return
-	}
-
 	if handlers.IsWebSocketUpgrade(request) {
 		handler.HandleWebSocketRequest(endpointIterator)
 		return

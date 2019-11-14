@@ -55,10 +55,6 @@ func IsWebSocketUpgrade(request *http.Request) bool {
 	return strings.ToLower(upgradeHeader(request)) == "websocket"
 }
 
-func IsTcpUpgrade(request *http.Request) bool {
-	return upgradeHeader(request) == "tcp"
-}
-
 func upgradeHeader(request *http.Request) string {
 	// handle multiple Connection field-values, either in a comma-separated string or multiple field-headers
 	for _, v := range request.Header[http.CanonicalHeaderKey("Connection")] {

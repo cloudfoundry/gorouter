@@ -60,19 +60,6 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		)
 		return
 	}
-	if IsTcpUpgrade(req) {
-		r.logger.Info("route-service-unsupported")
-
-		AddRouterErrorHeader(rw, "route_service_unsupported")
-
-		writeStatus(
-			rw,
-			http.StatusServiceUnavailable,
-			"TCP requests are not supported for routes bound to Route Services.",
-			r.logger,
-		)
-		return
-	}
 	if IsWebSocketUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
 
