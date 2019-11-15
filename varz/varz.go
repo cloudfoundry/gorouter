@@ -130,11 +130,6 @@ func (x *HttpMetric) CaptureResponse(statusCode int, duration time.Duration) {
 
 type TaggedHttpMetric map[string]*HttpMetric
 
-func NewTaggedHttpMetric() TaggedHttpMetric {
-	x := make(TaggedHttpMetric)
-	return x
-}
-
 func (x TaggedHttpMetric) httpMetric(t string) *HttpMetric {
 	y := x[t]
 	if y == nil {

@@ -33,8 +33,6 @@ import (
 
 const StickyCookieKey = "JSESSIONID"
 
-type nullVarz struct{}
-
 type testBody struct {
 	bytes.Buffer
 	closeCount int

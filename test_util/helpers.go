@@ -327,37 +327,6 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	return privKey, certDER
 }
 
-func CreateSignedCertDER(cname string, parentCert x509.Certificate, parentKey *rsa.PrivateKey) (*rsa.PrivateKey, []byte) {
-	// generate a random serial number (a real cert authority would have some logic behind this)
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	Expect(err).ToNot(HaveOccurred())
-
-	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if cname != "" {
-		subject.CommonName = cname
-	}
-
-	tmpl := x509.Certificate{
-		SerialNumber:          serialNumber,
-		Subject:               subject,
-		SignatureAlgorithm:    x509.SHA256WithRSA,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
-		BasicConstraintsValid: true,
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-		IsCA:                  false,
-	}
-
-	privKey, err := rsa.GenerateKey(rand.Reader, 1024)
-	Expect(err).ToNot(HaveOccurred())
-	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &parentCert, &privKey.PublicKey, parentKey)
-	Expect(err).ToNot(HaveOccurred())
-	return privKey, certDER
-}
-
 func CreateKeyPairFromDER(certDER []byte, privKey *rsa.PrivateKey) (keyPEM, certPEM []byte) {
 	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
 	certPEM = pem.EncodeToMemory(&b)
@@ -427,13 +396,6 @@ func CreateECKeyPair(cname string) (keyPEM, certPEM []byte) {
 
 func CreateCert(cname string) tls.Certificate {
 	privKeyPEM, certPEM := CreateKeyPair(cname)
-	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
-	Expect(err).ToNot(HaveOccurred())
-	return tlsCert
-}
-
-func CreateECCert(cname string) tls.Certificate {
-	privKeyPEM, certPEM := CreateECKeyPair(cname)
 	tlsCert, err := tls.X509KeyPair(certPEM, privKeyPEM)
 	Expect(err).ToNot(HaveOccurred())
 	return tlsCert

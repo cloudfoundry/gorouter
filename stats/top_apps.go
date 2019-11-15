@@ -79,16 +79,6 @@ func (x *byFirstMarkTimeHeap) SetIndex(i, j int) {
 	y.ti = j
 }
 
-type byFirstMarkTimeHeapSnapshot struct{ byFirstMarkTimeHeap }
-
-func (x *byFirstMarkTimeHeapSnapshot) Init() {
-	x.Heap.HeapType = x
-}
-
-func (x *byFirstMarkTimeHeapSnapshot) SetIndex(i, j int) {
-	// No-op
-}
-
 type byRequestsHeap struct{ container.Heap }
 
 func (x *byRequestsHeap) Init() {

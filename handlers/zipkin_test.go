@@ -19,7 +19,6 @@ const (
 	b3TraceID      = "7f46165474d11ee5836777d85df2cdab"
 	b3SpanID       = "54ebcb82b14862d9"
 	b3ParentSpanID = "e56b75d6af463476"
-	b3Sampled      = "true"
 	b3Single       = "1g56165474d11ee5836777d85df2cdab-32ebcb82b14862d9-1-ab6b75d6af463476"
 )
 

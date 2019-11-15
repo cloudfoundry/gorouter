@@ -48,8 +48,6 @@ func (r *RoundRobin) Next() *Endpoint {
 	return nil
 }
 
-var max int
-
 func (r *RoundRobin) next() *endpointElem {
 	r.pool.Lock()
 	defer r.pool.Unlock()

@@ -1749,35 +1749,6 @@ var _ = Describe("Router", func() {
 	})
 })
 
-func createSelfSignedCert(cname string) (*tls.Certificate, error) {
-	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-	serverCertTmpl, err := certTemplate(cname)
-	if err != nil {
-		return nil, err
-	}
-	serverCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
-	serverCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-	serverCertTmpl.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
-
-	_, serverCertPEM, err := createCert(serverCertTmpl, serverCertTmpl, &serverKey.PublicKey, serverKey)
-	if err != nil {
-		return nil, err
-	}
-	// provide the private key and the cert
-	serverKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(serverKey),
-	})
-	serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	return &serverCert, nil
-}
-
 func createClientCert(clientCertTmpl *x509.Certificate, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
 	// generate a key pair for the client
 	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -1934,49 +1905,6 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	}
 
 	return x
-}
-
-func verify_health(host string) {
-	var req *http.Request
-	path := "/health"
-
-	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
-	bytes := verify_success(req)
-	Expect(string(bytes)).To(ContainSubstring("ok"))
-}
-
-func verify_health_z(host string) {
-	var req *http.Request
-	path := "/healthz"
-
-	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
-	bytes := verify_success(req)
-	Expect(string(bytes)).To(Equal("ok"))
-}
-
-func verify_var_z(host, user, pass string) {
-	var client http.Client
-	var req *http.Request
-	var resp *http.Response
-	var err error
-	path := "/varz"
-
-	// Request without username:password should be rejected
-	req, _ = http.NewRequest("GET", "http://"+host+path, nil)
-	resp, err = client.Do(req)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(resp).ToNot(BeNil())
-	Expect(resp.StatusCode).To(Equal(401))
-
-	// varz Basic auth
-	req.SetBasicAuth(user, pass)
-	bytes := verify_success(req)
-	varz := make(map[string]interface{})
-	json.Unmarshal(bytes, &varz)
-
-	Expect(varz["num_cores"]).ToNot(Equal(0))
-	Expect(varz["type"]).To(Equal("Router"))
-	Expect(varz["uuid"]).ToNot(Equal(""))
 }
 
 func verify_success(req *http.Request) []byte {

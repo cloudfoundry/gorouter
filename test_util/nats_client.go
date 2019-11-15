@@ -24,10 +24,6 @@ func NewNats(port uint16) *Nats {
 	}
 }
 
-func NewNatsOnRandomPort() *Nats {
-	return NewNats(NextAvailPort())
-}
-
 func (n *Nats) Port() uint16 {
 	return n.port
 }

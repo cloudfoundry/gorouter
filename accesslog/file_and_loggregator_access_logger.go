@@ -3,7 +3,6 @@ package accesslog
 import (
 	"io"
 	"log/syslog"
-	"regexp"
 
 	"github.com/uber-go/zap"
 
@@ -112,9 +111,6 @@ func (x *FileAndLoggregatorAccessLogger) Log(r schema.AccessLogRecord) {
 	r.DisableSourceIPLogging = x.disableSourceIPLogging
 	x.channel <- r
 }
-
-var ipAddressRegex, _ = regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(:[0-9]{1,5}){1}$`)
-var hostnameRegex, _ = regexp.Compile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])(:[0-9]{1,5}){1}$`)
 
 func configureWriters(a *FileAndLoggregatorAccessLogger, ws []io.Writer) {
 	var multiws []io.Writer

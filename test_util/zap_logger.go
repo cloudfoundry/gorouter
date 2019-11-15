@@ -11,12 +11,6 @@ import (
 	"github.com/uber-go/zap"
 )
 
-func numberLevelFormatter() zap.LevelFormatter {
-	return zap.LevelFormatter(func(level zap.Level) zap.Field {
-		return zap.Int("log_level", levelNumber(level))
-	})
-}
-
 // We add 1 to zap's default values to match our level definitions
 // https://github.com/uber-go/zap/blob/47f41350ff078ea1415b63c117bf1475b7bbe72c/level.go#L36
 func levelNumber(level zap.Level) int {

@@ -1207,11 +1207,6 @@ func appRegistered(routesUri string, app *common.TestApp) bool {
 	return err == nil && routeFound
 }
 
-func appUnregistered(routesUri string, app *common.TestApp) bool {
-	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
-	return err == nil && !routeFound
-}
-
 func routeExists(routesEndpoint, routeName string) (bool, error) {
 	resp, err := http.Get(routesEndpoint)
 	if err != nil {

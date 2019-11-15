@@ -13,8 +13,6 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
-var natsCommand *exec.Cmd
-
 type NATSRunner struct {
 	port        int
 	natsSession *gexec.Session

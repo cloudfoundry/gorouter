@@ -44,16 +44,6 @@ func (x *byTimeMinHeap) SetIndex(i, j int) {
 	y.ti = j
 }
 
-type byTimeMinHeapSnapshot struct{ byTimeMinHeap }
-
-func (x *byTimeMinHeapSnapshot) Init() {
-	x.Heap.HeapType = x
-}
-
-func (x *byTimeMinHeapSnapshot) SetIndex(i, j int) {
-	// No-op
-}
-
 type byTimeMaxHeap struct{ container.Heap }
 
 func (x *byTimeMaxHeap) Init() {

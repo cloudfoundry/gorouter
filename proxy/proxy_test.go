@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
@@ -1853,11 +1852,4 @@ func parseResponseTimeFromLog(log string) float64 {
 	Expect(err).ToNot(HaveOccurred())
 
 	return f
-}
-
-func responseContains(resp *http.Response, match string) bool {
-	dump, err := httputil.DumpResponse(resp, true)
-	Expect(err).ToNot(HaveOccurred())
-	str := strings.ToLower(string(dump))
-	return strings.Contains(str, strings.ToLower(match))
 }

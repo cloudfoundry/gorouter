@@ -4,12 +4,10 @@ import (
 	"net/http"
 
 	commonhttp "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/common/http/fakes"
+	httpfakes "code.cloudfoundry.org/gorouter/common/http/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
 
 var _ = Describe("Headers", func() {
 	Describe("SetTraceHeaders", func() {

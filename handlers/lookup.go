@@ -15,10 +15,7 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const (
-	CfInstanceIdHeader = "X-CF-InstanceID"
-	CfAppInstance      = "X-CF-APP-INSTANCE"
-)
+const CfAppInstance = "X-CF-APP-INSTANCE"
 
 type lookupHandler struct {
 	registry registry.Registry
