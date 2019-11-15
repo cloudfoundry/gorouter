@@ -1907,10 +1907,6 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 	return x
 }
 
-func verify_success(req *http.Request) []byte {
-	return sendAndReceive(req, http.StatusOK)
-}
-
 func sendAndReceive(req *http.Request, statusCode int) []byte {
 	var client http.Client
 	resp, err := client.Do(req)

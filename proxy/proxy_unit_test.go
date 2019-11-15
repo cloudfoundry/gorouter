@@ -2,12 +2,13 @@ package proxy_test
 
 import (
 	"bytes"
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -242,14 +243,6 @@ var errorViaRouteService = &hasBeenToRouteServiceValidatorFake{
 			Error: errors.New("Bad route service validator"),
 		},
 	},
-}
-
-var notArrivedViaRouteServicesServer = func(*http.Request) bool {
-	return false
-}
-
-var arrivedViaRouteServicesServer = func(*http.Request) bool {
-	return true
 }
 
 type hasBeenToRouteServiceValidatorFake struct {
