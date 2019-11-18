@@ -141,14 +141,21 @@ func NewProxy(
 	}
 
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
-	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, cfg.ExtraHeadersToLog, logger)
+
+	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
+
+	headersToLog := utils.CollectHeadersToLog(
+		cfg.ExtraHeadersToLog,
+		zipkinHandler.HeadersToLog(),
+	)
+
 	n := negroni.New()
 	n.Use(handlers.NewPanicCheck(p.health, logger))
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
 	n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
-	n.Use(handlers.NewAccessLog(accessLogger, zipkinHandler.HeadersToLog(), logger))
+	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	if !reflect.DeepEqual(cfg.HTTPRewrite, config.HTTPRewrite{}) {
 		logger.Debug("http-rewrite", zap.Object("config", cfg.HTTPRewrite))
