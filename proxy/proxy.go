@@ -143,10 +143,12 @@ func NewProxy(
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
 
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
+	w3cHandler := handlers.NewW3C(cfg.Tracing.EnableW3C, cfg.Tracing.W3CTenantID, logger)
 
 	headersToLog := utils.CollectHeadersToLog(
 		cfg.ExtraHeadersToLog,
 		zipkinHandler.HeadersToLog(),
+		w3cHandler.HeadersToLog(),
 	)
 
 	n := negroni.New()
@@ -163,6 +165,7 @@ func NewProxy(
 	}
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)
+	n.Use(w3cHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
 	n.Use(handlers.NewLookup(registry, reporter, logger))
 	n.Use(handlers.NewClientCert(
