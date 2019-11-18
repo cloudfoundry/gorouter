@@ -484,6 +484,40 @@ enable_proxy: true
 			Expect(config.Tracing.EnableZipkin).To(BeFalse())
 		})
 
+		It("sets Tracing.EnableW3C", func() {
+			var b = []byte("tracing:\n  enable_w3c: true")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Tracing.EnableW3C).To(BeTrue())
+
+		})
+
+		It("defaults Tracing.W3C", func() {
+			var b = []byte(``)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Tracing.EnableW3C).To(BeFalse())
+		})
+
+		It("sets Tracing.W3CTenantID", func() {
+			var b = []byte("tracing:\n  w3c_tenant_id: cf")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Tracing.W3CTenantID).To(Equal("cf"))
+
+		})
+
+		It("defaults Tracing.W3CTenantID", func() {
+			var b = []byte(``)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Tracing.W3CTenantID).To(BeEmpty())
+		})
+
 		It("sets the proxy forwarded proto header", func() {
 			var b = []byte("force_forwarded_proto_https: true")
 			config.Initialize(b)
