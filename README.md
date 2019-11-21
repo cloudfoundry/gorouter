@@ -2,7 +2,7 @@
 
 # GoRouter This repository contains the source code for the Cloud
 Foundry L7 HTTP router.  GoRouter is deployed by default with Cloud
-Foundry ([cf-release](https://github.com/cloudfoundry/cf-release))
+Foundry ([cf-deployment](https://github.com/cloudfoundry/cf-deployment))
 which includes
 [routing-release](https://github.com/cloudfoundry/routing-release) as
 submodule.
@@ -95,7 +95,7 @@ See [Routing Release 0.144.0 Release Notes]
 
 Gorouters routing table is updated dynamically via the NATS message
 bus.  NATS can be deployed via BOSH with
-([cf-release](https://github.com/cloudfoundry/cf-release)) or
+([cf-deployment](https://github.com/cloudfoundry/cf-deployment)) or
 standalone using
 [nats-release](https://github.com/cloudfoundry/nats-release).
 
@@ -368,7 +368,7 @@ $ curl "http://someuser:somepass@10.0.32.15:8080/routes"
 
 Because of the nature of the data present in `/varz` and `/routes`,
 they require http basic authentication credentials. These credentials
-can be found the BOSH manifest for cf-release under the `router` job:
+can be found the BOSH manifest for cf-deployment under the `router` job:
 
 ```
 properties:
@@ -486,7 +486,7 @@ headers, you can use the PROXY protocol to send Gorouter the
 requestor's IP address.
 
 If your TLS-terminating component supports the PROXY protocol, enable
-the PROXY protocol on Gorouter using the following cf-release manifest
+the PROXY protocol on Gorouter using the following cf-deployment manifest
 property:
 
 ```
