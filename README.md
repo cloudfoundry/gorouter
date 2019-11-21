@@ -1,9 +1,16 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
+[![Go Report Card]
+(https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)]
+(https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
 
-# GoRouter
-This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry/routing-release) as submodule.
+# GoRouter This repository contains the source code for the Cloud
+Foundry L7 HTTP router.  GoRouter is deployed by default with Cloud
+Foundry ([cf-release](https://github.com/cloudfoundry/cf-release))
+which includes
+[routing-release](https://github.com/cloudfoundry/routing-release) as
+submodule.
 
-**Note**: This repository should be imported as `code.cloudfoundry.org/gorouter`.
+**Note**: This repository should be imported as
+  `code.cloudfoundry.org/gorouter`.
 
 ## Development
 
@@ -11,14 +18,18 @@ The following instructions may help you get started with gorouter.
 
 ### Prerequisites
 
-- Go should be installed and in the PATH
-- GOPATH should be set as described in http://golang.org/doc/code.html
-- [gnatsd](https://github.com/nats-io/gnatsd) installed and in the PATH
-- Install [direnv](http://direnv.net/)
+- Go should be installed and in the PATH GOPATH should be set as
+- described in http://golang.org/doc/code.html
+- [gnatsd](https://github.com/nats-io/gnatsd) installed and in the
+- PATH Install [direnv](http://direnv.net/)
 
 ### Setup
 
-GoRouter dependencies are managed with [routing-release](https://github.com/cloudfoundry/routing-release#). Do not clone the gorouter repo directly; instead, follow instructions at https://github.com/cloudfoundry/routing-release#get-the-code (summarized below).
+GoRouter dependencies are managed with
+[routing-release](https://github.com/cloudfoundry/routing-release#).
+Do not clone the gorouter repo directly; instead, follow instructions
+at https://github.com/cloudfoundry/routing-release#get-the-code
+(summarized below).
 
 ```bash
 git clone https://github.com/cloudfoundry/routing-release
@@ -26,17 +37,18 @@ cd routing-release
 ./scripts/update
 cd src/code.cloudfoundry.org/gorouter
 ```
- *Note: direnv will automatically set your GOPATH when you cd into the routing-release directory. You will need to run `direnv allow` the first time.*
+ *Note: direnv will automatically set your GOPATH when you cd into the
+ routing-release directory. You will need to run `direnv allow` the
+ first time.*
 
 ### Running Tests
 
 We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
 
-Running `bin/test` will:
-- Checks for Go
-- Checks that GOPATH is set
-- Installs gnatsd and ginkgo (or use the one already downloaded into the GOPATH)
-- Runs all the tests with ginkgo (in random order, without benchmarks)
+Running `bin/test` will: - Checks for Go - Checks that GOPATH is set -
+Installs gnatsd and ginkgo (or use the one already downloaded into the
+GOPATH) - Runs all the tests with ginkgo (in random order, without
+benchmarks)
 
 Any flags passed into `bin/test` will be passed into ginkgo.
 
@@ -78,19 +90,45 @@ gorouter
 
 ## Performance
 
-See [Routing Release 0.144.0 Release Notes](https://github.com/cloudfoundry/routing-release/releases/tag/0.144.0)
+See [Routing Release 0.144.0 Release Notes]
+(https://github.com/cloudfoundry/routing-release/releases/tag/0.144.0)
 
 ## Dynamic Routing Table
 
-Gorouters routing table is updated dynamically via the NATS message bus. NATS can be deployed via BOSH with ([cf-release](https://github.com/cloudfoundry/cf-release)) or standalone using [nats-release](https://github.com/cloudfoundry/nats-release).
+Gorouters routing table is updated dynamically via the NATS message
+bus.  NATS can be deployed via BOSH with
+([cf-release](https://github.com/cloudfoundry/cf-release)) or
+standalone using
+[nats-release](https://github.com/cloudfoundry/nats-release).
 
-To add or remove a record from the routing table, a NATS client must send register or unregister messages. Records in the routing table have a maximum TTL of 120 seconds, so clients must heartbeat registration messages periodically; we recommend every 20s. [Route Registrar](https://github.com/cloudfoundry/route-registrar) is a BOSH job that comes with [Routing Release](https://github.com/cloudfoundry/routing-release) that automates this process.
+To add or remove a record from the routing table, a NATS client must
+send register or unregister messages. Records in the routing table
+have a maximum TTL of 120 seconds, so clients must heartbeat
+registration messages periodically; we recommend every 20s.  [Route
+Registrar](https://github.com/cloudfoundry/route-registrar) is a BOSH
+job that comes with [Routing
+Release](https://github.com/cloudfoundry/routing-release) that
+automates this process.
 
-When deployed with Cloud Foundry, registration of routes for apps pushed to CF occurs automatically without user involvement. For details, see [Routes and Domains](https://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html).
+When deployed with Cloud Foundry, registration of routes for apps
+pushed to CF occurs automatically without user involvement. For
+details, see [Routes and Domains]
+(https://docs.cloudfoundry.org/devguide/deploy-apps/routes-domains.html).
 
 ### Registering Routes via NATS
 
-When the gorouter starts, it sends a `router.start` message to NATS. This message contains an interval that other components should then send `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that clients should send `router.register` messages on this interval. This `minimumRegisterIntervalInSeconds` value is configured through the `start_response_delay_interval` configuration property. GoRouter will prune routes that it considers to be stale based upon a separate "staleness" value, `droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if routes have become stale on an interval defined by `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these values are represented in seconds and will always be integers.
+When the gorouter starts, it sends a `router.start` message to NATS.
+This message contains an interval that other components should then
+send `router.register` on, `minimumRegisterIntervalInSeconds`. It is
+recommended that clients should send `router.register` messages on
+this interval.  This `minimumRegisterIntervalInSeconds` value is
+configured through the `start_response_delay_interval` configuration
+property. GoRouter will prune routes that it considers to be stale
+based upon a separate "staleness" value, `droplet_stale_threshold`,
+which defaults to 120 seconds. GoRouter will check if routes have
+become stale on an interval defined by
+`prune_stale_droplets_interval`, which defaults to 30 seconds. All of
+these values are represented in seconds and will always be integers.
 
 The format of the `router.start` message is as follows:
 
@@ -103,9 +141,14 @@ The format of the `router.start` message is as follows:
 }
 ```
 
-After a `router.start` message is received by a client, the client should send `router.register` messages. This ensures that the new router can update its routing table and synchronize with existing routers.
+After a `router.start` message is received by a client, the client
+should send `router.register` messages. This ensures that the new
+router can update its routing table and synchronize with existing
+routers.
 
-If a component comes online after the router, it must make a NATS request called `router.greet` in order to determine the interval. The response to this message will be the same format as `router.start`.
+If a component comes online after the router, it must make a NATS
+request called `router.greet` in order to determine the interval. The
+response to this message will be the same format as `router.start`.
 
 The format of the `router.register` message is as follows:
 
@@ -130,26 +173,66 @@ The format of the `router.register` message is as follows:
 }
 ```
 
-`stale_threshold_in_seconds` is the custom staleness threshold for the route being registered. If this value is not sent, it will default to the router's default staleness threshold.
+`stale_threshold_in_seconds` is the custom staleness threshold for the
+route being registered. If this value is not sent, it will default to
+the router's default staleness threshold.
 
-`app` is a unique identifier for an application that the endpoint is registered for. This value will be included in router access logs with the label `app_id`, as well as being sent with requests to the endpoint in an HTTP header `X-CF-ApplicationId`.
+`app` is a unique identifier for an application that the endpoint is
+registered for. This value will be included in router access logs with
+the label `app_id`, as well as being sent with requests to the
+endpoint in an HTTP header `X-CF-ApplicationId`.
 
-`private_instance_id` is a unique identifier for an instance associated with the app identified by the `app` field. Gorouter includes an HTTP header `X-CF-InstanceId` set to this value with requests to the registered endpoint.
+`private_instance_id` is a unique identifier for an instance
+associated with the app identified by the `app` field. Gorouter
+includes an HTTP header `X-CF-InstanceId` set to this value with
+requests to the registered endpoint.
 
-`isolation_segment` determines which routers will register route. Only Gorouters configured with the matching isolation segment will register the route. If a value is not provided, the route will be registered only by Gorouters set to the `all` or `shared-and-segments` router table sharding modes. Refer to the job properties for [Gorouter](https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec) for more information.
+`isolation_segment` determines which routers will register route. Only
+Gorouters configured with the matching isolation segment will register
+the route.  If a value is not provided, the route will be registered
+only by Gorouters set to the `all` or `shared-and-segments` router
+table sharding modes.  Refer to the job properties for [Gorouter]
+(https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec)
+for more information.
 
-`tls_port` is the port that Gorouter will use to attempt TLS connections with the registered backends. Supported only when `router.backend.enable_tls: true` is configured in the manifest. `router.ca_certs` may be optionally configured with a CA, for backends certificates signed by custom CAs. For mutual authentication with backends, `router.backends.tls_pem` may be optionally provided. When `router.backend.enable_tls: true`, Gorouter will prefer `tls_port` over `port` if present in the NATS message. Otherwise, `port` will be preferred, and messages with only `tls_port` will be rejected and an error message logged.
+`tls_port` is the port that Gorouter will use to attempt TLS
+connections with the registered backends. Supported only when
+`router.backend.enable_tls: true` is configured in the
+manifest. `router.ca_certs` may be optionally configured with a CA,
+for backends certificates signed by custom CAs. For mutual
+authentication with backends, `router.backends.tls_pem` may be
+optionally provided. When `router.backend.enable_tls: true`, Gorouter
+will prefer `tls_port` over `port` if present in the NATS
+message. Otherwise, `port` will be preferred, and messages with only
+`tls_port` will be rejected and an error message logged.
 
-`server_cert_domain_san` (required when `tls_port` is present) Indicates a string that Gorouter will look for in a Subject Alternative Name (SAN) of the TLS certificate hosted by the backend to validate instance identity. When the value of `server_cert_domain_san` does not match a SAN in the server certificate, Gorouter will prune the backend and retry another backend for the route if one exists, or return a 503 if it cannot validate the identity of any backend in three tries.
+`server_cert_domain_san` (required when `tls_port` is present)
+Indicates a string that Gorouter will look for in a Subject
+Alternative Name (SAN) of the TLS certificate hosted by the backend to
+validate instance identity. When the value of `server_cert_domain_san`
+does not match a SAN in the server certificate, Gorouter will prune
+the backend and retry another backend for the route if one exists, or
+return a 503 if it cannot validate the identity of any backend in
+three tries.
 
-Additionally, if the `host` and `tls_port` pair matches an already registered `host` and `port` pair, the previously registered route will be overwritten and Gorouter will now attempt TLS connections with the `host` and `tls_port` pair. The same is also true if the `host` and `port` pair matches an already registered `host` and `tls_port` pair, except Gorouter will no longer attempt TLS connections with the backend.
+Additionally, if the `host` and `tls_port` pair matches an already
+registered `host` and `port` pair, the previously registered route
+will be overwritten and Gorouter will now attempt TLS connections with
+the `host` and `tls_port` pair. The same is also true if the `host`
+and `port` pair matches an already registered `host` and `tls_port`
+pair, except Gorouter will no longer attempt TLS connections with the
+backend.
 
-Such a message can be sent to both the `router.register` subject to register
-URIs, and to the `router.unregister` subject to unregister URIs, respectively.
+Such a message can be sent to both the `router.register` subject to
+register URIs, and to the `router.unregister` subject to unregister
+URIs, respectively.
 
 ### Deleting a Route
 
-Routes can be deleted with the `router.unregister` nats message. The format of the `router.unregister` message the same as the `router.register` message, but most information is ignored. Any route that matches the `host`, `port` and `uris` fields will be deleted.
+Routes can be deleted with the `router.unregister` nats message. The
+format of the `router.unregister` message the same as the
+`router.register` message, but most information is ignored. Any route
+that matches the `host`, `port` and `uris` fields will be deleted.
 
 ### Example
 
@@ -185,21 +268,35 @@ $ curl my_first_url.localhost.routing.cf-app.com:8081
 404 Not Found: Requested route ('my_first_url.localhost.routing.cf-app.com') does not exist.
 ```
 
-If `router.backends.enable_tls` has been set to true, `tls_port` will be used as the definitive port when unregistering a route if present, otherwise `port` will be used. If `router.backends.enable_tls` is set to false, `port` will be preferred and any requests with only `tls_port` will be rejected and an error logged to the gorouter logs.
+If `router.backends.enable_tls` has been set to true, `tls_port` will
+be used as the definitive port when unregistering a route if present,
+otherwise `port` will be used. If `router.backends.enable_tls` is set
+to false, `port` will be preferred and any requests with only
+`tls_port` will be rejected and an error logged to the gorouter logs.
 
-Note that if `router.backends.enable_tls` is true and `host` and `tls_port` happens to match a registered `host` and `port` pair, this `host` and `port` pair will be unregistered. The reverse is also true.
+Note that if `router.backends.enable_tls` is true and `host` and
+`tls_port` happens to match a registered `host` and `port` pair, this
+`host` and `port` pair will be unregistered. The reverse is also true.
 
-**Note:** In order to use `nats-pub` to register a route, you must install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's easiest on a VM that has ruby as a package, such as the API VM. Find the ruby installed in /var/vcap/packages, export your PATH variable to include the bin directory, and then run `gem install nats`. Find the nats login info from your gorouter config and use it to connect to the nats cluster.  
+**Note:** In order to use `nats-pub` to register a route, you must
+  install the [gem](https://github.com/nats-io/ruby-nats) on a Cloud
+  Foundry VM. It's easiest on a VM that has ruby as a package, such as
+  the API VM. Find the ruby installed in /var/vcap/packages, export
+  your PATH variable to include the bin directory, and then run `gem
+  install nats`. Find the nats login info from your gorouter config
+  and use it to connect to the nats cluster.
 
 ## Healthchecking from a Load Balancer
 
-To scale GoRouter horizontally for high-availability or throughput capacity, you
-must deploy it behind a highly-available load balancer (F5, AWS ELB, etc).
+To scale GoRouter horizontally for high-availability or throughput
+capacity, you must deploy it behind a highly-available load balancer
+(F5, AWS ELB, etc).
 
-GoRouter has a health endpoint `/health` on port 8080 that returns a 200 OK which indicates
-the GoRouter instance is healthy; any other response indicates unhealthy.
-This port can be configured via the `router.status.port` property in the BOSH
-deployment manifest or via the `status.port` property under
+GoRouter has a health endpoint `/health` on port 8080 that returns a
+200 OK which indicates the GoRouter instance is healthy; any other
+response indicates unhealthy.  This port can be configured via the
+`router.status.port` property in the BOSH deployment manifest or via
+the `status.port` property under
 `/var/vcap/jobs/gorouter/config/gorouter.yml`
 
 
@@ -223,13 +320,13 @@ ok
 * Connection #0 to host 10.0.32.15 left intact
 ```
 
-**DEPRECATED:**
-Your load balancer can be configured to send an HTTP healthcheck on
-port 80 with the `User-Agent` HTTP header set to `HTTP-Monitor/1.1`. A 200
-response indicates the GoRouter instance is healthy; any other response
-indicates unhealthy. GoRouter can be configured to accept alternate values for
-the User Agent header using the `healthcheck_user_agent` configuration
-property; as an example, AWS ELBS send `User-Agent: ELB-HealthChecker/1.0`.
+**DEPRECATED:** Your load balancer can be configured to send an HTTP
+healthcheck on port 80 with the `User-Agent` HTTP header set to
+`HTTP-Monitor/1.1`. A 200 response indicates the GoRouter instance is
+healthy; any other response indicates unhealthy. GoRouter can be
+configured to accept alternate values for the User Agent header using
+the `healthcheck_user_agent` configuration property; as an example,
+AWS ELBS send `User-Agent: ELB-HealthChecker/1.0`.
 
 ```
 $ curl -v -A "HTTP-Monitor/1.1" "http://10.0.32.15"
@@ -254,22 +351,26 @@ ok
 * Connection #0 to host 10.0.32.15 left intact
 ```
 
-**DEPRECATED:**
-The `/healthz` endpoint provides a similar response, but it always returns a 200
-response regardless of whether or not the GoRouter instance is healthy.
+**DEPRECATED:** The `/healthz` endpoint provides a similar response,
+but it always returns a 200 response regardless of whether or not the
+GoRouter instance is healthy.
 
 ## Instrumentation
 
 ### The Routing Table
 
-The `/routes` endpoint returns the entire routing table as JSON. This endpoint requires basic authentication and is served on port 8080. Each route has an associated array of host:port entries.
+The `/routes` endpoint returns the entire routing table as JSON. This
+endpoint requires basic authentication and is served on port
+8080. Each route has an associated array of host:port entries.
 
 ```
 $ curl "http://someuser:somepass@10.0.32.15:8080/routes"
 {"api.catwoman.cf-app.com":[{"address":"10.244.0.138:9022","ttl":0,"tags":{"component":"CloudController"}}],"dora-dora.catwoman.cf-app.com":[{"address":"10.244.16.4:60035","ttl":0,"tags":{"component":"route-emitter"}},{"address":"10.244.16.4:60060","ttl":0,"tags":{"component":"route-emitter"}}]}
 ```
 
-Because of the nature of the data present in `/varz` and `/routes`, they require http basic authentication credentials. These credentials can be found the BOSH manifest for cf-release under the `router` job:
+Because of the nature of the data present in `/varz` and `/routes`,
+they require http basic authentication credentials. These credentials
+can be found the BOSH manifest for cf-release under the `router` job:
 
 ```
 properties:
@@ -280,9 +381,12 @@ properties:
       user: paronymy61-polaric
 ```
 
-If `router.status.user` is not set in the manifest, the default is `router-status` as can be seen from [the job spec](https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec).
+If `router.status.user` is not set in the manifest, the default is
+`router-status` as can be seen from [the job
+spec](https://github.com/cloudfoundry/routing-release/blob/develop/jobs/gorouter/spec).
 
-Or on the Gorouter VM under `/var/vcap/jobs/gorouter/config/gorouter.yml`:
+Or on the Gorouter VM under
+`/var/vcap/jobs/gorouter/config/gorouter.yml`:
 
 ```
 status:
@@ -293,7 +397,8 @@ status:
 
 ### Metrics
 
-The `/varz` endpoint provides status and metrics. This endpoint requires basic authentication.
+The `/varz` endpoint provides status and metrics. This endpoint
+requires basic authentication.
 
 ```
 $ curl "http://someuser:somepass@10.0.32.15:8080/varz"
@@ -302,7 +407,10 @@ $ curl "http://someuser:somepass@10.0.32.15:8080/varz"
 
 ### Profiling the Server
 
-The GoRouter runs the [debugserver](https://github.com/cloudfoundry/debugserver), which is a wrapper around the go pprof tool. In order to generate this profile, do the following:
+The GoRouter runs the
+[debugserver](https://github.com/cloudfoundry/debugserver), which is a
+wrapper around the go pprof tool. In order to generate this profile,
+do the following:
 
 ```bash
 # Establish a SSH tunnel to your server (not necessary if you can connect directly)
@@ -313,31 +421,53 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 
 ## Load Balancing
 
-The GoRouter is, in simple terms, a reverse proxy that load balances between many backend instances. The default load balancing algorithm that GoRouter will use is a simple **round-robin** strategy. GoRouter will retry a request if the chosen backend does not accept the TCP connection.
+The GoRouter is, in simple terms, a reverse proxy that load balances
+between many backend instances. The default load balancing algorithm
+that GoRouter will use is a simple **round-robin** strategy. GoRouter
+will retry a request if the chosen backend does not accept the TCP
+connection.
 
 ### Round-Robin
-Default load balancing algorithm that gorouter will use or may be explicitly set in **gorouter.yml**
-```yaml
-default_balancing_algorithm: round-robin
-```
+Default load balancing algorithm that gorouter will
+use or may be explicitly set in **gorouter.yml** ```yaml
+default_balancing_algorithm: round-robin ```
 
 ### Least-Connection
-The GoRouter also supports least connection based routing and this can be enabled in **gorouter.yml**
+The GoRouter also supports least connection based routing and this can
+be enabled in **gorouter.yml**
 ```yaml
 default_balancing_algorithm: least-connection
 ```
-Least connection based load balancing will select the endpoint with the least number of connections. If multiple endpoints match with the same number of least connections, it will select a random one within those least connections.
+Least connection based load balancing will select the endpoint with
+the least number of connections. If multiple endpoints match with the
+same number of least connections, it will select a random one within
+those least connections.
 
-_NOTE: GoRouter currently only supports changing the load balancing strategy at the gorouter level and does not yet support a finer-grained level such as route-level. Therefore changing the load balancing algorithm from the default (round-robin) should be proceeded with caution._
+_NOTE: GoRouter currently only supports changing the load balancing
+strategy at the gorouter level and does not yet support a
+finer-grained level such as route-level. Therefore changing the load
+balancing algorithm from the default (round-robin) should be proceeded
+with caution._
 
 
+## When terminating TLS in front of Gorouter with a component that
+   does not support sending HTTP headers
 
-## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
+### Enabling apps and CF to detect that request was encrypted using
+    X-Forwarded-Proto
+If you terminate TLS in front of Gorouter, your component should send
+the `X-Forwarded-Proto` HTTP header in order for applications and
+Cloud Foundry system components to correctly detect when the original
+request was encrypted. As an example, UAA will reject requests that do
+not include `X-Forwarded-Proto: https`.
 
-### Enabling apps and CF to detect that request was encrypted using X-Forwarded-Proto
-If you terminate TLS in front of Gorouter, your component should send the `X-Forwarded-Proto` HTTP header in order for applications and Cloud Foundry system components to correctly detect when the original request was encrypted. As an example, UAA will reject requests that do not include `X-Forwarded-Proto: https`.
-
-If your TLS-terminating component does not support sending HTTP headers, we recommend also terminating TLS at Gorouter. In this scenario you should only disable TLS at Gorouter if your TLS-terminating component rejects unencrypted requests **and** your private network is completely trusted. In this case, use the following property to inform applications and CF system components that requests are secure.
+If your TLS-terminating component does not support sending HTTP
+headers, we recommend also terminating TLS at Gorouter. In this
+scenario you should only disable TLS at Gorouter if your
+TLS-terminating component rejects unencrypted requests **and** your
+private network is completely trusted. In this case, use the following
+property to inform applications and CF system components that requests
+are secure.
 
 ```
 properties:
@@ -345,13 +475,21 @@ properties:
     force_forwarded_proto_https: true
 ```
 
-### Enabling apps to detect the requestor's IP address using PROXY Protocol
+### Enabling apps to detect the requestor's IP address using PROXY
+    Protocol
 
-If you terminate TLS in front of Gorouter, your component should also send the `X-Forwarded-Proto` HTTP header in order for  `X-Forwarded-For` header to applications can detect the requestor's IP address.
+If you terminate TLS in front of Gorouter, your component should also
+send the `X-Forwarded-Proto` HTTP header in order for
+`X-Forwarded-For` header to applications can detect the requestor's IP
+address.
 
-If your TLS-terminating component does not support sending HTTP headers, you can use the PROXY protocol to send Gorouter the requestor's IP address.
+If your TLS-terminating component does not support sending HTTP
+headers, you can use the PROXY protocol to send Gorouter the
+requestor's IP address.
 
-If your TLS-terminating component supports the PROXY protocol, enable the PROXY protocol on Gorouter using the following cf-release manifest property:
+If your TLS-terminating component supports the PROXY protocol, enable
+the PROXY protocol on Gorouter using the following cf-release manifest
+property:
 
 ```
 properties:
@@ -365,21 +503,33 @@ You can test this feature manually:
 echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.1\r\nHost: [APP URL]\r\n" | nc [GOROUTER IP] [GOROUTER PORT]
 ```
 
-You should see in the access logs on the GoRouter that the `X-Forwarded-For` header is `1.2.3.4`. You can read more about the PROXY Protocol [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
+You should see in the access logs on the GoRouter that the
+`X-Forwarded-For` header is `1.2.3.4`. You can read more about the
+PROXY Protocol
+[here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
 
 ## HTTP/2 Support
 
-The GoRouter does not currently support proxying HTTP/2 connections, even over TLS. Connections made using HTTP/1.1, either by TLS or cleartext, will be proxied to backends over cleartext.
+The GoRouter does not currently support proxying HTTP/2 connections,
+even over TLS. Connections made using HTTP/1.1, either by TLS or
+cleartext, will be proxied to backends over cleartext.
 
 ## Logs
 
-The router's logging is specified in its YAML configuration file. It supports the following log levels:
+The router's logging is specified in its YAML configuration file. It
+supports the following log levels:
 
-* `fatal` - A fatal error has occurred that makes gorouter unable to handle any requests.
-Examples: the router can't bind to its TCP port, a CF component has published invalid data to the router.
-* `error` - An unexpected error has occurred. Examples: the router failed to fetch token from UAA service.
-* `info`  - An expected event has occurred. Examples: the router started or exited, the router has begun to prune routes for stale droplets.
-* `debug` - A lower-level event has occurred. Examples: route registration, route unregistration.
+* `fatal` - A fatal error has occurred that makes gorouter unable to
+handle any requests.  Examples: the router can't bind to its TCP port,
+a CF component has published invalid data to the router.
+* `error` - An unexpected error has occurred.
+Examples: the router failed to fetch
+token from UAA service.
+* `info` - An expected event has
+occurred. Examples: the router started or exited, the router has begun
+to prune routes for stale droplets.
+* `debug` - A lower-level event
+has occurred. Examples: route registration, route unregistration.
 
 Sample log message in gorouter.
 
@@ -392,22 +542,41 @@ Sample log message in gorouter.
 - `source`: The function within Gorouter that initiated the log message
 - `data`: Additional information that varies based on the message
 
-Access logs provide information for the following fields when receiving a request:
+Access logs provide information for the following fields when
+receiving a request:
 
-`<Request Host> - [<Start Date>] "<Request Method> <Request URL> <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent> "<Referer>" "<User-Agent>" <Remote Address> <Backend Address> x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>" vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
-* Status Code, Response Time, Application ID, Application Index, and Extra Headers are all optional fields
-* The absence of Status Code, Response Time, Application ID, or Application Index will result in a "-" in the corresponding field
+`<Request Host> - [<Start Date>] "<Request Method> <Request URL>
+<Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent>
+"<Referer>" "<User-Agent>" <Remote Address> <Backend Address>
+x_forwarded_for:"<X-Forwarded-For>"
+x_forwarded_proto:"<X-Forwarded-Proto>"
+vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time>
+app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
+* Status Code, Response Time, Application ID, Application Index, and
+Extra Headers are all optional fields * The absence of Status Code,
+Response Time, Application ID, or Application Index will result in a
+"-" in the corresponding field
 
 Access logs are also redirected to syslog.
 
 ## Headers
 
-If a user wants to send requests to a specific app instance, the header `X-CF-APP-INSTANCE` can be added to indicate the specific instance to be targeted. The format of the header value should be `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be found or the format is wrong, a 404 status code is returned. Usage of this header is only available for users on the Diego architecture.
+If a user wants to send requests to a specific app instance, the
+header `X-CF-APP-INSTANCE` can be added to indicate the specific
+instance to be targeted. The format of the header value should be
+`X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be
+found or the format is wrong, a 404 status code is returned. Usage of
+this header is only available for users on the Diego architecture.
 
 ## Supported Cipher Suites
 
-The Gorouter supports both RFC and OpenSSL formatted values. Refer to [golang 1.9](https://github.com/golang/go/blob/release-branch.go1.9/src/crypto/tls/cipher_suites.go#L369-L390) for the list of supported cipher suites for Gorouter. Refer to [this documentation](https://testssl.sh/openssl-rfc.mapping.html) for a list of OpenSSL RFC mappings.
-Example configurations enabling the TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 cipher suite for Gorouter:
+The Gorouter supports both RFC and OpenSSL formatted values. Refer to
+[golang
+1.9](https://github.com/golang/go/blob/release-branch.go1.9/src/crypto/tls/cipher_suites.go#L369-L390)
+for the list of supported cipher suites for Gorouter. Refer to [this
+documentation](https://testssl.sh/openssl-rfc.mapping.html) for a list
+of OpenSSL RFC mappings.  Example configurations enabling the
+TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 cipher suite for Gorouter:
 
 ```
 ...
@@ -428,14 +597,18 @@ cipher_suite: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
 
 ## Docs
 
-There is a separate [docs](docs) folder which contains more advanced topics.
+There is a separate [docs](docs) folder which contains more advanced
+topics.
 
 ## Troubleshooting
 
-Refer [doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slow_requests.html) to learn more troubleshooting slow requests.
+Refer
+[doc](https://docs.pivotal.io/pivotalcf/1-9/adminguide/troubleshooting_slow_requests.html)
+to learn more troubleshooting slow requests.
 
 ## Contributing
 
-Please read the [contributors' guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
-Please read our [Development Guide for Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md)
-
+Please read the [contributors'
+guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
+Please read our [Development Guide for
+Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md)
