@@ -28,6 +28,7 @@ type TestApp struct {
 	mux          *http.ServeMux
 	stopped      bool
 	routeService string
+	GUID         string
 }
 
 func NewTestApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string, routeService string) *TestApp {
@@ -41,6 +42,7 @@ func NewTestApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[
 	app.mbusClient = mbusClient
 	app.tags = tags
 	app.routeService = routeService
+	app.GUID, _ = uuid.GenerateUUID()
 
 	app.mux = http.NewServeMux()
 
@@ -98,6 +100,10 @@ func (a *TestApp) Port() uint16 {
 	return a.port
 }
 
+func (a *TestApp) AppGUID() string {
+	return a.GUID
+}
+
 func (a *TestApp) WaitUntilReady() {
 	Eventually(func() error {
 		url := fmt.Sprintf("127.0.0.1:%d", a.Port())
@@ -119,7 +125,8 @@ func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
 		Uris:                    a.urls,
 		Tags:                    a.tags,
 		Dea:                     "dea",
-		App:                     "0",
+		App:                     a.GUID,
+		PrivateInstanceIndex:    "0",
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:     a.routeService,
@@ -138,7 +145,8 @@ func (a *TestApp) Register() {
 		Uris:                    a.urls,
 		Tags:                    a.tags,
 		Dea:                     "dea",
-		App:                     "0",
+		App:                     a.GUID,
+		PrivateInstanceIndex:    "0",
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:   a.routeService,
@@ -237,7 +245,8 @@ type registerMessage struct {
 	App                     string            `json:"app"`
 	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
 
-	RouteServiceUrl     string `json:"route_service_url"`
-	ServerCertDomainSAN string `json:"server_cert_domain_san"`
-	PrivateInstanceId   string `json:"private_instance_id"`
+	RouteServiceUrl      string `json:"route_service_url"`
+	ServerCertDomainSAN  string `json:"server_cert_domain_san"`
+	PrivateInstanceId    string `json:"private_instance_id"`
+	PrivateInstanceIndex string `json:"private_instance_index"`
 }

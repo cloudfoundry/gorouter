@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -30,6 +31,8 @@ var _ = Describe("Lookup", func() {
 		nextRequest    *http.Request
 		maxConnections int64
 	)
+
+	const fakeAppGUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		nextCalled = true
@@ -111,25 +114,54 @@ var _ = Describe("Lookup", func() {
 	})
 
 	Context("when there is no pool that matches the request", func() {
-		It("sends a bad request metric", func() {
-			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+		Context("when the route does not exist", func() {
+			It("sends a bad request metric", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
+
+			It("sets X-Cf-RouterError to unknown_route", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
+
+			It("sets Cache-Control to contain no-cache, no-store", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+			})
+
+			It("returns a 404 NotFound and does not call next", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusNotFound))
+			})
+
+			It("has a meaningful response", func() {
+				Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') does not exist"))
+			})
 		})
 
-		It("sets X-Cf-RouterError to unknown_route", func() {
-			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-		})
+		Context("when an instance header is given", func() {
+			BeforeEach(func() {
+				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1")
+			})
 
-		It("sets Cache-Control to public,max-age=2", func() {
-			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
-		})
+			It("sends a bad request metric", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
 
-		It("returns a 404 NotFound and does not call next", func() {
-			Expect(nextCalled).To(BeFalse())
-			Expect(resp.Code).To(Equal(http.StatusNotFound))
-		})
+			It("sets X-Cf-RouterError to unknown_route", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
 
-		It("has a meaningful response", func() {
-			Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') does not exist"))
+			It("sets Cache-Control to contain no-cache, no-store", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+			})
+
+			It("returns a 404 NotFound and does not call next", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusNotFound))
+			})
+
+			It("has a meaningful response", func() {
+				Expect(resp.Body.String()).To(ContainSubstring("Requested instance ('1') with guid ('%s') does not exist for route ('example.com')", fakeAppGUID))
+			})
 		})
 	})
 
@@ -276,7 +308,7 @@ var _ = Describe("Lookup", func() {
 				pool.Put(exampleEndpoint)
 				reg.LookupReturns(pool)
 
-				req.Header.Add("X-CF-App-Instance", "app-guid:instance-id")
+				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1")
 
 				reg.LookupWithInstanceReturns(pool)
 			})
@@ -286,8 +318,8 @@ var _ = Describe("Lookup", func() {
 				uri, appGuid, appIndex := reg.LookupWithInstanceArgsForCall(0)
 
 				Expect(uri.String()).To(Equal("example.com"))
-				Expect(appGuid).To(Equal("app-guid"))
-				Expect(appIndex).To(Equal("instance-id"))
+				Expect(appGuid).To(Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
+				Expect(appIndex).To(Equal("1"))
 			})
 		})
 
@@ -304,7 +336,7 @@ var _ = Describe("Lookup", func() {
 				pool.Put(exampleEndpoint)
 				reg.LookupReturns(pool)
 
-				req.Header.Add("X-CF-App-Instance", "app-guid:instance-id:invalid-part")
+				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1:invalid-part")
 
 				reg.LookupWithInstanceReturns(pool)
 			})
@@ -313,9 +345,27 @@ var _ = Describe("Lookup", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
 			})
 
-			It("responds with 404", func() {
+			It("responds with 400", func() {
 				Expect(nextCalled).To(BeFalse())
-				Expect(resp.Code).To(Equal(http.StatusNotFound))
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
+			})
+
+			It("responds with an error in the body", func() {
+				body, err := ioutil.ReadAll(resp.Body)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(body)).To(Equal("400 Bad Request: Invalid X-CF-App-Instance Header\n"))
+			})
+
+			It("reports the bad request", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
+
+			It("responds with a X-CF-RouterError header", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("invalid_cf_app_instance_header"))
+			})
+
+			It("adds a no-cache header to the response", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
 			})
 		})
 
@@ -332,17 +382,18 @@ var _ = Describe("Lookup", func() {
 				pool.Put(exampleEndpoint)
 				reg.LookupReturns(pool)
 
-				appInstanceHeader := "app-id:"
+				appInstanceHeader := fakeAppGUID + ":"
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
 				reg.LookupWithInstanceReturns(pool)
 			})
+
 			It("does not lookup the instance", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
 			})
 
-			It("responds with 404", func() {
+			It("responds with 400", func() {
 				Expect(nextCalled).To(BeFalse())
-				Expect(resp.Code).To(Equal(http.StatusNotFound))
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
 			})
 		})
 
@@ -359,7 +410,7 @@ var _ = Describe("Lookup", func() {
 				pool.Put(exampleEndpoint)
 				reg.LookupReturns(pool)
 
-				appInstanceHeader := "app-id"
+				appInstanceHeader := fakeAppGUID
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
 				reg.LookupWithInstanceReturns(pool)
 			})
@@ -367,9 +418,9 @@ var _ = Describe("Lookup", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
 			})
 
-			It("responds with 404", func() {
+			It("responds with 400", func() {
 				Expect(nextCalled).To(BeFalse())
-				Expect(resp.Code).To(Equal(http.StatusNotFound))
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
 			})
 		})
 

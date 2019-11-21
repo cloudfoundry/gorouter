@@ -1136,13 +1136,24 @@ var _ = Describe("Proxy", func() {
 		})
 
 		Context("when the request has X-CF-APP-INSTANCE", func() {
-			It("lookups the route to that specific app index and id", func() {
-				ln := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
+			var (
+				conn  *test_util.HttpConn
+				uuid1 *uuid.UUID
+				uuid2 *uuid.UUID
+				ln net.Listener
+				ln2 net.Listener
+			)
+
+			JustBeforeEach(func() {
+				uuid1, _ = uuid.NewV4()
+				uuid2, _ = uuid.NewV4()
+
+				ln = test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
-				}, test_util.RegisterConfig{AppId: "app-1-id"})
+				}, test_util.RegisterConfig{AppId: uuid1.String()})
 				defer ln.Close()
 
-				ln2 := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
+				ln2 = test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -1154,13 +1165,15 @@ var _ = Describe("Proxy", func() {
 
 					conn.Close()
 
-				}, test_util.RegisterConfig{AppId: "app-2-id"})
+				}, test_util.RegisterConfig{AppId: uuid2.String(), InstanceIndex: "0"})
+				conn = dialProxy(proxyServer)
+			})
+
+			It("lookups the route to that specific app index and id", func() {
 				defer ln2.Close()
-
-				conn := dialProxy(proxyServer)
-
-				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/chat", nil)
-				req.Header.Set(router_http.CfAppInstance, "app-2-id:2")
+				defer ln.Close()
+				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/", nil)
+				req.Header.Set(router_http.CfAppInstance, uuid2.String()+":0")
 
 				Consistently(func() string {
 					conn.WriteRequest(req)
@@ -1171,15 +1184,8 @@ var _ = Describe("Proxy", func() {
 			})
 
 			It("returns a 404 if it cannot find the specified instance", func() {
-				ln := test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
-					Fail("App should not have received request")
-				}, test_util.RegisterConfig{AppId: "app-1-id"})
-				defer ln.Close()
-
-				conn := dialProxy(proxyServer)
-
 				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/", nil)
-				req.Header.Set("X-CF-APP-INSTANCE", "app-1-id:1")
+				req.Header.Set("X-CF-APP-INSTANCE", uuid1.String()+":1")
 				conn.WriteRequest(req)
 
 				resp, _ := conn.ReadResponse()

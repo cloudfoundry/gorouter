@@ -1170,7 +1170,165 @@ var _ = Describe("Router Integration", func() {
 			})
 		})
 	})
+
+	Describe("caching", func() {
+		var (
+			goRouterClient    *http.Client
+			mbusClient        *nats.Conn
+			privateInstanceId string
+			done              chan bool
+			appRoute          string
+		)
+
+		BeforeEach(func() {
+			var clientTLSConfig *tls.Config
+			cfg, clientTLSConfig = createSSLConfig(natsPort)
+			writeConfig(cfg, cfgFile)
+			var err error
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			startGorouterSession(cfgFile)
+			goRouterClient = &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+
+			appRoute = "test." + test_util.LocalhostDNS
+			runningApp1 := test.NewGreetApp([]route.Uri{route.Uri(appRoute)}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+			privateInstanceId = runningApp1.AppGUID()
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done = make(chan bool, 1)
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+		})
+
+		It("does not cache a 400", func() {
+			defer func() { done <- true }()
+			req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", appRoute, cfg.SSLPort), nil)
+			Expect(err).ToNot(HaveOccurred())
+			req.Header.Add("X-CF-APP-INSTANCE", "$^%*&%:!@#(*&$")
+			resp, err := goRouterClient.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+			Expect(resp.Header.Get("Cache-Control")).To(Equal("no-cache, no-store"))
+		})
+
+		It("does not cache a 404", func() {
+			defer func() { done <- true }()
+			req, err := http.NewRequest("GET", fmt.Sprintf("https://does-not-exist.%s:%d", test_util.LocalhostDNS, cfg.SSLPort), nil)
+			Expect(err).ToNot(HaveOccurred())
+			resp, err := goRouterClient.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+			Expect(resp.Header.Get("Cache-Control")).To(Equal("no-cache, no-store"))
+		})
+
+		Context("when the route exists, but the guid in the header does not", func() {
+			It("does not cache a 404", func() {
+				defer func() { done <- true }()
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", appRoute, cfg.SSLPort), nil)
+				req.Header.Add("X-CF-APP-INSTANCE", privateInstanceId+":1")
+				Expect(err).ToNot(HaveOccurred())
+				resp, err := goRouterClient.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.Header.Get("Cache-Control")).To(Equal("no-cache, no-store"))
+			})
+		})
+	})
+
+	Context("when instance id header is specified", func() {
+		var (
+			clientTLSConfig   *tls.Config
+			mbusClient        *nats.Conn
+			privateInstanceId string
+			done              chan bool
+		)
+
+		BeforeEach(func() {
+			cfg, clientTLSConfig = createSSLConfig(natsPort)
+			writeConfig(cfg, cfgFile)
+			var err error
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			startGorouterSession(cfgFile)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+			privateInstanceId = runningApp1.AppGUID()
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done = make(chan bool, 1)
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+		})
+
+		Context("when it is syntactically invalid", func() {
+			It("returns a 400 Bad Request", func() {
+				defer func() { done <- true }()
+				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort), nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.Header.Add("X-CF-APP-INSTANCE", "$^%*&%:!@#(*&$")
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+			})
+		})
+
+		Context("when the instance doesn't exist", func() {
+			It("returns a 404 Not Found", func() {
+				defer func() { done <- true }()
+				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort), nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.Header.Add("X-CF-APP-INSTANCE", privateInstanceId+":1")
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+			})
+		})
+
+		Context("when the instance does exist and is valid", func() {
+			It("returns a ", func() {
+				defer func() { done <- true }()
+				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort), nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.Header.Add("X-CF-APP-INSTANCE", privateInstanceId+":0")
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+		})
+	})
 })
+
+func getGoRouterClient() *http.Client {
+	return &http.Client{}
+}
 
 func uriAndPort(url string) (string, int) {
 	parts := strings.Split(url, ":")

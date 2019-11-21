@@ -25,6 +25,13 @@ func addInvalidResponseCacheControlHeader(rw http.ResponseWriter) {
 	)
 }
 
+func addNoCacheControlHeader(rw http.ResponseWriter) {
+	rw.Header().Set(
+		"Cache-Control",
+		"no-cache, no-store",
+	)
+}
+
 func writeStatus(rw http.ResponseWriter, code int, message string, logger logger.Logger) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 

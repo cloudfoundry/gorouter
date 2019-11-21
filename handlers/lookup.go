@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 
 	"fmt"
@@ -16,6 +17,14 @@ import (
 )
 
 const CfAppInstance = "X-CF-APP-INSTANCE"
+
+type InvalidInstanceHeaderError struct {
+	headerValue string
+}
+
+func (err InvalidInstanceHeaderError) Error() string {
+	return fmt.Sprintf("invalid-app-instance-header: %s", err.headerValue)
+}
 
 type lookupHandler struct {
 	registry registry.Registry
@@ -53,7 +62,12 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		return
 	}
 
-	pool := l.lookup(r)
+	pool, err := l.lookup(r)
+	if _, ok := err.(InvalidInstanceHeaderError); ok {
+		l.handleInvalidInstanceHeader(rw, r)
+		return
+	}
+
 	if pool == nil {
 		l.handleMissingRoute(rw, r)
 		return
@@ -78,6 +92,20 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	next(rw, r)
 }
 
+func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request) {
+	l.reporter.CaptureBadRequest()
+
+	AddRouterErrorHeader(rw, "invalid_cf_app_instance_header")
+	addNoCacheControlHeader(rw)
+
+	writeStatus(
+		rw,
+		http.StatusBadRequest,
+		"Invalid X-CF-App-Instance Header",
+		l.logger,
+	)
+}
+
 func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request) {
 	l.reporter.CaptureBadRequest()
 
@@ -96,12 +124,18 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "unknown_route")
-	addInvalidResponseCacheControlHeader(rw)
+	addNoCacheControlHeader(rw)
+
+	errorMsg := fmt.Sprintf("Requested route ('%s') does not exist.", r.Host)
+	if appInstanceHeader := r.Header.Get(router_http.CfAppInstance); appInstanceHeader != "" {
+		guid, idx, _ := validateAndSplitInstanceHeader(appInstanceHeader)
+		errorMsg = fmt.Sprintf("Requested instance ('%s') with guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
+	}
 
 	writeStatus(
 		rw,
 		http.StatusNotFound,
-		fmt.Sprintf("Requested route ('%s') does not exist.", r.Host),
+		errorMsg,
 		l.logger,
 	)
 }
@@ -132,35 +166,34 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 	)
 }
 
-func (l *lookupHandler) lookup(r *http.Request) *route.EndpointPool {
+func (l *lookupHandler) lookup(r *http.Request) (*route.EndpointPool, error) {
 	requestPath := r.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {
-		appID, appIndex, err := validateCfAppInstance(appInstanceHeader)
+		appID, appIndex, err := validateAndSplitInstanceHeader(appInstanceHeader)
 
 		if err != nil {
 			l.logger.Error("invalid-app-instance-header", zap.Error(err))
-			return nil
+			return nil, InvalidInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 
-		return l.registry.LookupWithInstance(uri, appID, appIndex)
+		return l.registry.LookupWithInstance(uri, appID, appIndex), nil
 	}
 
-	return l.registry.Lookup(uri)
+	return l.registry.Lookup(uri), nil
 }
 
-func validateCfAppInstance(appInstanceHeader string) (string, string, error) {
+func validateAndSplitInstanceHeader(appInstanceHeader string) (string, string, error) {
+	// Regex to match format of `APP_GUID:INSTANCE_ID`
+	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
+	if !r.MatchString(appInstanceHeader) {
+		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
+	}
+
 	appDetails := strings.Split(appInstanceHeader, ":")
-	if len(appDetails) != 2 {
-		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
-	}
-
-	if appDetails[0] == "" || appDetails[1] == "" {
-		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
-	}
-
 	return appDetails[0], appDetails[1], nil
+
 }
