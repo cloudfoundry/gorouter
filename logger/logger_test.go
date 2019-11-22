@@ -31,11 +31,11 @@ var _ = Describe("Logger", func() {
 	})
 
 	var TestCommonLogFeatures = func(sourceString string) {
-		It("outputs a properly-formatted message", func() {
+		It("outputs a properly-formatted message with human readable timestamp", func() {
 			Expect(testSink.Lines()).To(HaveLen(1))
 
 			Expect(testSink.Lines()[0]).To(MatchRegexp(
-				"{\"log_level\":[0-9]*,\"timestamp\":.*,\"message\":\"%s\",\"source\":\"%s\".*}",
+				`{"log_level":[0-9]*,"timestamp":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z","message":"%s","source":"%s".*}`,
 				action,
 				sourceString,
 			))
