@@ -3,8 +3,13 @@ package integration
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -18,16 +23,23 @@ import (
 var _ = Describe("TLS to backends", func() {
 	var (
 		testState *testState
+		accessLog string
 	)
 
 	BeforeEach(func() {
+		var err error
+		accessLog, err = ioutil.TempDir("", "accesslog")
+		Expect(err).NotTo(HaveOccurred())
+
 		testState = NewTestState()
+		testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
 		testState.StartGorouter()
 	})
 
 	AfterEach(func() {
 		if testState != nil {
 			testState.StopAndCleanup()
+			os.RemoveAll(accessLog)
 		}
 	})
 
@@ -124,4 +136,41 @@ var _ = Describe("TLS to backends", func() {
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)
 	})
+
+	It("logs an access log with valid timestamps", func() {
+		// registering a route setup
+		runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, nil)
+		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
+		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
+		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
+		runningApp1.VerifyAppStatus(200)
+
+
+		// test access log
+		Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
+
+		Eventually(func() ([]byte, error) {
+			return ioutil.ReadFile(testState.cfg.AccessLog.File)
+		}).Should(ContainSubstring(`response_time`))
+
+		f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
+		Expect(err).NotTo(HaveOccurred())
+		fmt.Printf("contents %s", f)
+
+		responseTime := parseTimestampsFromAccessLog("response_time", f)
+		gorouterTime := parseTimestampsFromAccessLog("gorouter_time", f)
+		appTime := parseTimestampsFromAccessLog("app_time", f)
+
+		Expect(responseTime).To(BeNumerically(">", 0))
+		Expect(gorouterTime).To(BeNumerically(">", 0))
+		Expect(appTime).To(BeNumerically(">", 0))
+	})
 })
+
+func parseTimestampsFromAccessLog(keyName string, bytesToParse []byte) (float64){
+	exp := regexp.MustCompile(keyName + `:(\d+\.?\d*)`)
+	value, err := strconv.ParseFloat(string(exp.FindSubmatch(bytesToParse)[1]), 64)
+	Expect(err).NotTo(HaveOccurred())
+	return value
+}

@@ -102,13 +102,13 @@ var _ = Describe("AccessLog", func() {
 
 		alr := accessLogger.LogArgsForCall(0)
 
-		Expect(alr.StartedAt).ToNot(BeZero())
+		Expect(alr.RoundtripStartedAt).ToNot(BeZero())
 		Expect(alr.Request.Header).To(Equal(req.Header))
 		Expect(alr.Request.Method).To(Equal(req.Method))
 		Expect(alr.Request.URL).To(Equal(req.URL))
 		Expect(alr.Request.RemoteAddr).To(Equal(req.RemoteAddr))
 		Expect(alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
-		Expect(alr.FinishedAt).ToNot(BeZero())
+		Expect(alr.RoundtripFinishedAt).ToNot(BeZero())
 		Expect(alr.RequestBytesReceived).To(Equal(13))
 		Expect(alr.BodyBytesSent).To(Equal(37))
 		Expect(alr.StatusCode).To(Equal(http.StatusTeapot))

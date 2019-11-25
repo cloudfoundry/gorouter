@@ -56,7 +56,7 @@ func (b *recordBuffer) WriteDashOrIntValue(v int) {
 // 0 or lower
 func (b *recordBuffer) WriteDashOrFloatValue(v float64) {
 	if v >= 0 {
-		_, _ = b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		_, _ = b.WriteString(strconv.FormatFloat(v, 'f', 6, 64))
 	} else {
 		_, _ = b.WriteString(`"-"`)
 	}
@@ -87,9 +87,11 @@ type AccessLogRecord struct {
 	HeadersOverride        http.Header
 	StatusCode             int
 	RouteEndpoint          *route.Endpoint
-	StartedAt              time.Time
+	RoundtripStartedAt     time.Time
 	FirstByteAt            time.Time
-	FinishedAt             time.Time
+	RoundtripFinishedAt    time.Time
+	AppRequestStartedAt    time.Time
+	AppRequestFinishedAt   time.Time
 	BodyBytesSent          int
 	RequestBytesReceived   int
 	ExtraHeadersToLog      []string
@@ -99,11 +101,24 @@ type AccessLogRecord struct {
 }
 
 func (r *AccessLogRecord) formatStartedAt() string {
-	return r.StartedAt.Format("2006-01-02T15:04:05.000-0700")
+	return r.RoundtripStartedAt.Format("2006-01-02T15:04:05.000000000Z")
 }
 
-func (r *AccessLogRecord) responseTime() float64 {
-	return float64(r.FinishedAt.UnixNano()-r.StartedAt.UnixNano()) / float64(time.Second)
+func (r *AccessLogRecord) roundtripTime() float64 {
+	return float64(r.RoundtripFinishedAt.UnixNano()-r.RoundtripStartedAt.UnixNano()) / float64(time.Second)
+}
+
+func (r *AccessLogRecord) gorouterTime() float64 {
+	rt := r.roundtripTime()
+	at := r.appTime()
+	if rt >= 0 && at >= 0 {
+		return r.roundtripTime() - r.appTime()
+	}
+	return -1
+}
+
+func (r *AccessLogRecord) appTime() float64 {
+	return float64(r.AppRequestFinishedAt.UnixNano()-r.AppRequestStartedAt.UnixNano()) / float64(time.Second)
 }
 
 // getRecord memoizes makeRecord()
@@ -165,7 +180,13 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteDashOrStringValue(headers.Get("X-Vcap-Request-Id"))
 
 	b.WriteString(`response_time:`)
-	b.WriteDashOrFloatValue(r.responseTime())
+	b.WriteDashOrFloatValue(r.roundtripTime())
+
+	b.WriteString(`gorouter_time:`)
+	b.WriteDashOrFloatValue(r.gorouterTime())
+
+	b.WriteString(`app_time:`)
+	b.WriteDashOrFloatValue(r.appTime())
 
 	b.WriteString(`app_id:`)
 	b.WriteDashOrStringValue(appID)

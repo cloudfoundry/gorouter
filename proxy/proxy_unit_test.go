@@ -98,7 +98,7 @@ var _ = Describe("Proxy Unit tests", func() {
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
-				Expect(fakeAccessLogger.LogArgsForCall(0).FinishedAt).NotTo(Equal(time.Time{}))
+				Expect(fakeAccessLogger.LogArgsForCall(0).RoundtripFinishedAt).NotTo(Equal(time.Time{}))
 			})
 
 			It("logs response time for TCP connections", func() {
@@ -108,7 +108,8 @@ var _ = Describe("Proxy Unit tests", func() {
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
-				Expect(fakeAccessLogger.LogArgsForCall(0).FinishedAt).NotTo(Equal(time.Time{}))
+				Expect(fakeAccessLogger.LogArgsForCall(0).RoundtripFinishedAt).NotTo(Equal(time.Time{}))
+
 			})
 
 			It("logs response time for Web Socket connections", func() {
@@ -118,7 +119,7 @@ var _ = Describe("Proxy Unit tests", func() {
 
 				proxyObj.ServeHTTP(resp, req)
 				Expect(fakeAccessLogger.LogCallCount()).To(Equal(1))
-				Expect(fakeAccessLogger.LogArgsForCall(0).FinishedAt).NotTo(Equal(time.Time{}))
+				Expect(fakeAccessLogger.LogArgsForCall(0).RoundtripFinishedAt).NotTo(Equal(time.Time{}))
 			})
 		})
 

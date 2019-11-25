@@ -383,9 +383,9 @@ func CreateAccessLogRecord() *schema.AccessLogRecord {
 		Request:       req,
 		StatusCode:    res.StatusCode,
 		RouteEndpoint: b,
-		StartedAt:     time.Unix(10, 100000000),
+		RoundtripStartedAt:     time.Unix(10, 100000000),
 		FirstByteAt:   time.Unix(10, 200000000),
-		FinishedAt:    time.Unix(10, 300000000),
+		RoundtripFinishedAt:    time.Unix(10, 300000000),
 		BodyBytesSent: 42,
 	}
 

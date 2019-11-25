@@ -243,7 +243,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
+	reqInfo.AppRequestStartedAt = time.Now()
 	next(responseWriter, request)
+	reqInfo.AppRequestFinishedAt = time.Now()
 }
 
 func (p *proxy) setupProxyRequest(target *http.Request) {

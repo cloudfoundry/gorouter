@@ -39,8 +39,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 
 	alr := &schema.AccessLogRecord{
-		Request:           r,
-		StartedAt:         time.Now(),
+		Request: r,
 		ExtraHeadersToLog: a.extraHeadersToLog,
 	}
 
@@ -54,11 +53,14 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		a.logger.Fatal("request-info-err", zap.Error(err))
 		return
 	}
+	alr.RoundtripStartedAt = reqInfo.StartedAt
+	alr.RoundtripFinishedAt = time.Now()
+	alr.AppRequestStartedAt = reqInfo.AppRequestStartedAt
+	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
 	alr.HeadersOverride = reqInfo.BackendReqHeaders
 	alr.RouteEndpoint = reqInfo.RouteEndpoint
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
-	alr.FinishedAt = time.Now()
 	alr.StatusCode = proxyWriter.Status()
 	a.accessLogger.Log(*alr)
 }

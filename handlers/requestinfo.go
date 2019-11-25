@@ -20,12 +20,13 @@ const requestInfoCtxKey key = "RequestInfo"
 // RequestInfo stores all metadata about the request and is used to pass
 // informaton between handlers
 type RequestInfo struct {
-	StartedAt, StoppedAt              time.Time
-	RoutePool                         *route.EndpointPool
-	RouteEndpoint                     *route.Endpoint
-	ProxyResponseWriter               utils.ProxyResponseWriter
-	RouteServiceURL                   *url.URL
-	ShouldRouteToInternalRouteService bool
+	StartedAt, StoppedAt                      time.Time
+	AppRequestStartedAt, AppRequestFinishedAt time.Time
+	RoutePool                                 *route.EndpointPool
+	RouteEndpoint                             *route.Endpoint
+	ProxyResponseWriter                       utils.ProxyResponseWriter
+	RouteServiceURL                           *url.URL
+	ShouldRouteToInternalRouteService         bool
 
 	BackendReqHeaders http.Header
 }

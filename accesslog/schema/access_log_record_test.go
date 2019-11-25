@@ -50,8 +50,10 @@ var _ = Describe("AccessLogRecord", func() {
 			BodyBytesSent:        23,
 			StatusCode:           200,
 			RouteEndpoint:        endpoint,
-			StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+			RoundtripStartedAt:   time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			RoundtripFinishedAt:  time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+			AppRequestStartedAt:  time.Date(2000, time.January, 1, 0, 0, 5, 0, time.UTC),
+			AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 			RequestBytesReceived: 30,
 		}
 	})
@@ -59,12 +61,12 @@ var _ = Describe("AccessLogRecord", func() {
 	Describe("LogMessage", func() {
 		It("makes a record with all values", func() {
 			r := BufferReader(bytes.NewBufferString(record.LogMessage()))
-			Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+			Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 			Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 			Eventually(r).Should(Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
 			Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
 			Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
-			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_time:50.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"\n`))
 		})
 
@@ -102,12 +104,12 @@ var _ = Describe("AccessLogRecord", func() {
 
 			It("makes a record with all values", func() {
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
-				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 				Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 				Eventually(r).Should(Say(`200 30 23 "FooReferer" "FooUserAgent" "FakeRemoteAddr" `))
 				Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FooProxy1, FooProxy2" `))
 				Eventually(r).Should(Say(`x_forwarded_proto:"FooOriginalRequestProto" `))
-				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_time:50.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3"\n`))
 			})
 		})
@@ -121,18 +123,19 @@ var _ = Describe("AccessLogRecord", func() {
 				}
 				record.BodyBytesSent = 0
 				record.StatusCode = 0
-				record.FinishedAt = time.Time{}
+				record.RoundtripFinishedAt = time.Time{}
+				record.AppRequestFinishedAt = time.Time{}
 				record.RequestBytesReceived = 0
 			})
 
 			It("makes a record", func() {
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
-				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 				Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 				Eventually(r).Should(Say(`"-" 0 0 "-" "-" "FakeRemoteAddr" `))
 				Eventually(r).Should(Say(`"-" x_forwarded_for:"-" `))
 				Eventually(r).Should(Say(`x_forwarded_proto:"-" `))
-				Eventually(r).Should(Say(`vcap_request_id:"-" response_time:"-" app_id:"FakeApplicationId" `))
+				Eventually(r).Should(Say(`vcap_request_id:"-" response_time:"-" gorouter_time:"-" app_time:"-" app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"-"\n`))
 			})
 		})
@@ -157,12 +160,12 @@ var _ = Describe("AccessLogRecord", func() {
 
 			It("appends extra headers", func() {
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
-				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 				Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 				Eventually(r).Should(Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
 				Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
 				Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
-				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_time:50.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3" cache_control:"no-cache" accept_encoding:"gzip, deflate" `))
 				Eventually(r).Should(Say(`if_match:"737060cd8c284d8af7ad3082f209582d" doesnt_exist:"-"\n`))
 			})
@@ -190,19 +193,21 @@ var _ = Describe("AccessLogRecord", func() {
 					BodyBytesSent:        23,
 					StatusCode:           200,
 					RouteEndpoint:        endpoint,
-					StartedAt:            time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-					FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+					RoundtripStartedAt:   time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+					RoundtripFinishedAt:  time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+					AppRequestStartedAt:  time.Date(2000, time.January, 1, 0, 0, 5, 0, time.UTC),
+					AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 					RequestBytesReceived: 30,
 					ExtraHeadersToLog:    []string{},
 				}
 
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
-				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+				Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 				Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 				Eventually(r).Should(Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
 				Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
 				Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
-				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_time:50.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3"\n`))
 			})
 		})
@@ -215,12 +220,12 @@ var _ = Describe("AccessLogRecord", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			r := BufferReader(b)
-			Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4}\]`))
+			Eventually(r).Should(Say(`FakeRequestHost\s-\s\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z\]`))
 			Eventually(r).Should(Say(`"FakeRequestMethod http://example.com/request FakeRequestProto" `))
 			Eventually(r).Should(Say(`200 30 23 "FakeReferer" "FakeUserAgent" "FakeRemoteAddr" `))
 			Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
 			Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
-			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60 app_id:"FakeApplicationId" `))
+			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_time:50.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"\n`))
 		})
 	})
