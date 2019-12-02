@@ -26,16 +26,14 @@ const (
 type Zipkin struct {
 	zipkinEnabled bool
 	logger        logger.Logger
-	headersToLog  []string // Shared state with proxy for access logs
 }
 
 var _ negroni.Handler = new(Zipkin)
 
 // NewZipkin creates a new handler that sets Zipkin headers on requests
-func NewZipkin(enabled bool, headersToLog []string, logger logger.Logger) *Zipkin {
+func NewZipkin(enabled bool, logger logger.Logger) *Zipkin {
 	return &Zipkin{
 		zipkinEnabled: enabled,
-		headersToLog:  headersToLog,
 		logger:        logger,
 	}
 }
@@ -121,37 +119,17 @@ func BuildB3SingleHeader(traceID, spanID, sampling, flags, parentSpanID string) 
 	return traceID + "-" + spanID + "-" + samplingBit + "-" + parentSpanID
 }
 
-// HeadersToLog returns headers that should be logged in the access logs and
-// includes Zipkin headers in this set if necessary
+// HeadersToLog specifies the headers which should be logged if Zipkin headers
+// are enabled
 func (z *Zipkin) HeadersToLog() []string {
 	if !z.zipkinEnabled {
-		return z.headersToLog
-	}
-	headersToLog := z.headersToLog
-	if !contains(headersToLog, B3TraceIdHeader) {
-		headersToLog = append(headersToLog, B3TraceIdHeader)
+		return []string{}
 	}
 
-	if !contains(headersToLog, B3SpanIdHeader) {
-		headersToLog = append(headersToLog, B3SpanIdHeader)
+	return []string{
+		B3TraceIdHeader,
+		B3SpanIdHeader,
+		B3ParentSpanIdHeader,
+		B3Header,
 	}
-
-	if !contains(headersToLog, B3ParentSpanIdHeader) {
-		headersToLog = append(headersToLog, B3ParentSpanIdHeader)
-	}
-
-	if !contains(headersToLog, B3Header) {
-		headersToLog = append(headersToLog, B3Header)
-	}
-
-	return headersToLog
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }

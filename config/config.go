@@ -137,7 +137,9 @@ type AccessLog struct {
 }
 
 type Tracing struct {
-	EnableZipkin bool `yaml:"enable_zipkin"`
+	EnableZipkin bool   `yaml:"enable_zipkin"`
+	EnableW3C    bool   `yaml:"enable_w3c"`
+	W3CTenantID  string `yaml:"w3c_tenant_id"`
 }
 
 type TLSPem struct {

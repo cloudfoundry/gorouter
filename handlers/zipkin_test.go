@@ -24,12 +24,11 @@ const (
 
 var _ = Describe("Zipkin", func() {
 	var (
-		handler      *handlers.Zipkin
-		headersToLog []string
-		logger       logger.Logger
-		resp         http.ResponseWriter
-		req          *http.Request
-		nextCalled   bool
+		handler    *handlers.Zipkin
+		logger     logger.Logger
+		resp       http.ResponseWriter
+		req        *http.Request
+		nextCalled bool
 	)
 
 	nextHandler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -41,7 +40,6 @@ var _ = Describe("Zipkin", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		nextCalled = false
-		headersToLog = []string{"foo-header"}
 	})
 
 	AfterEach(func() {
@@ -49,7 +47,7 @@ var _ = Describe("Zipkin", func() {
 
 	Context("with Zipkin enabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(true, headersToLog, logger)
+			handler = handlers.NewZipkin(true, logger)
 		})
 
 		It("sets zipkin headers", func() {
@@ -60,16 +58,6 @@ var _ = Describe("Zipkin", func() {
 			Expect(req.Header.Get(handlers.B3Header)).ToNot(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
-		})
-
-		It("adds zipkin headers to access log record", func() {
-			newHeadersToLog := handler.HeadersToLog()
-
-			Expect(newHeadersToLog).To(ContainElement(handlers.B3SpanIdHeader))
-			Expect(newHeadersToLog).To(ContainElement(handlers.B3TraceIdHeader))
-			Expect(newHeadersToLog).To(ContainElement(handlers.B3ParentSpanIdHeader))
-			Expect(newHeadersToLog).To(ContainElement(handlers.B3Header))
-			Expect(newHeadersToLog).To(ContainElement("foo-header"))
 		})
 
 		Context("with B3TraceIdHeader, B3SpanIdHeader and B3ParentSpanIdHeader already set", func() {
@@ -165,20 +153,6 @@ var _ = Describe("Zipkin", func() {
 			})
 		})
 
-		Context("when X-B3-* headers are already set to be logged", func() {
-			BeforeEach(func() {
-				newSlice := []string{handlers.B3TraceIdHeader, handlers.B3SpanIdHeader, handlers.B3ParentSpanIdHeader}
-				headersToLog = newSlice
-			})
-			It("adds zipkin headers to access log record", func() {
-				newHeadersToLog := handler.HeadersToLog()
-
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3SpanIdHeader))
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3TraceIdHeader))
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3ParentSpanIdHeader))
-			})
-		})
-
 		Context("with B3Header already set", func() {
 			BeforeEach(func() {
 				req.Header.Set(handlers.B3Header, b3Single)
@@ -194,23 +168,11 @@ var _ = Describe("Zipkin", func() {
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
 		})
-
-		Context("when b3 headers are already set to be logged", func() {
-			BeforeEach(func() {
-				newSlice := []string{handlers.B3Header}
-				headersToLog = newSlice
-			})
-			It("adds zipkin headers to access log record", func() {
-				newHeadersToLog := handler.HeadersToLog()
-
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3Header))
-			})
-		})
 	})
 
 	Context("with Zipkin disabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(false, headersToLog, logger)
+			handler = handlers.NewZipkin(false, logger)
 		})
 
 		It("doesn't set any headers", func() {
@@ -221,27 +183,6 @@ var _ = Describe("Zipkin", func() {
 			Expect(req.Header.Get(handlers.B3Header)).To(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
-		})
-
-		It("does not add zipkin headers to access log record", func() {
-			newHeadersToLog := handler.HeadersToLog()
-			Expect(newHeadersToLog).NotTo(ContainElement(handlers.B3SpanIdHeader))
-			Expect(newHeadersToLog).NotTo(ContainElement(handlers.B3ParentSpanIdHeader))
-			Expect(newHeadersToLog).NotTo(ContainElement(handlers.B3TraceIdHeader))
-			Expect(newHeadersToLog).NotTo(ContainElement(handlers.B3Header))
-			Expect(newHeadersToLog).To(ContainElement("foo-header"))
-		})
-
-		Context("when X-B3-* headers are already set to be logged", func() {
-			It("adds zipkin headers to access log record", func() {
-				newSlice := []string{handlers.B3TraceIdHeader, handlers.B3SpanIdHeader, handlers.B3ParentSpanIdHeader, handlers.B3Header}
-				handler := handlers.NewZipkin(false, newSlice, logger)
-				newHeadersToLog := handler.HeadersToLog()
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3SpanIdHeader))
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3ParentSpanIdHeader))
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3TraceIdHeader))
-				Expect(newHeadersToLog).To(ContainElement(handlers.B3Header))
-			})
 		})
 	})
 })
