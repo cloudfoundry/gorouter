@@ -146,7 +146,6 @@ var _ = Describe("TLS to backends", func() {
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)
 
-
 		// test access log
 		Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
 
@@ -168,7 +167,7 @@ var _ = Describe("TLS to backends", func() {
 	})
 })
 
-func parseTimestampsFromAccessLog(keyName string, bytesToParse []byte) (float64){
+func parseTimestampsFromAccessLog(keyName string, bytesToParse []byte) float64 {
 	exp := regexp.MustCompile(keyName + `:(\d+\.?\d*)`)
 	value, err := strconv.ParseFloat(string(exp.FindSubmatch(bytesToParse)[1]), 64)
 	Expect(err).NotTo(HaveOccurred())

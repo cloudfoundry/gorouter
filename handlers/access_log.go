@@ -39,7 +39,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 
 	alr := &schema.AccessLogRecord{
-		Request: r,
+		Request:           r,
 		ExtraHeadersToLog: a.extraHeadersToLog,
 	}
 

@@ -1235,14 +1235,14 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		Context("when the route exists, but the guid in the header does not", func() {
-			It("does not cache a 404", func() {
+			It("does not cache a 400", func() {
 				defer func() { done <- true }()
 				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", appRoute, cfg.SSLPort), nil)
 				req.Header.Add("X-CF-APP-INSTANCE", privateInstanceId+":1")
 				Expect(err).ToNot(HaveOccurred())
 				resp, err := goRouterClient.Do(req)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 				Expect(resp.Header.Get("Cache-Control")).To(Equal("no-cache, no-store"))
 			})
 		})
@@ -1299,7 +1299,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		Context("when the instance doesn't exist", func() {
-			It("returns a 404 Not Found", func() {
+			It("returns a 400 Bad Request", func() {
 				defer func() { done <- true }()
 				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
 				req, err := http.NewRequest("GET", fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort), nil)
@@ -1307,7 +1307,7 @@ var _ = Describe("Router Integration", func() {
 				req.Header.Add("X-CF-APP-INSTANCE", privateInstanceId+":1")
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 			})
 		})
 

@@ -1140,8 +1140,8 @@ var _ = Describe("Proxy", func() {
 				conn  *test_util.HttpConn
 				uuid1 *uuid.UUID
 				uuid2 *uuid.UUID
-				ln net.Listener
-				ln2 net.Listener
+				ln    net.Listener
+				ln2   net.Listener
 			)
 
 			JustBeforeEach(func() {
@@ -1183,13 +1183,13 @@ var _ = Describe("Proxy", func() {
 				}).Should(Equal("Hellow World: App2"))
 			})
 
-			It("returns a 404 if it cannot find the specified instance", func() {
+			It("returns a 400 if it cannot find the specified instance", func() {
 				req := test_util.NewRequest("GET", "app."+test_util.LocalhostDNS, "/", nil)
 				req.Header.Set("X-CF-APP-INSTANCE", uuid1.String()+":1")
 				conn.WriteRequest(req)
 
 				resp, _ := conn.ReadResponse()
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 				Expect(resp.Header.Get("X-Cf-RouterError")).To(Equal("unknown_route"))
 			})
 		})
