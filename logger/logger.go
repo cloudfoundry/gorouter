@@ -1,6 +1,10 @@
 package logger
 
-import "github.com/uber-go/zap"
+import (
+	"time"
+
+	"github.com/uber-go/zap"
+)
 
 // Logger is the zap.Logger interface with additional Session methods.
 //go:generate counterfeiter -o fakes/fake_logger.go . Logger
@@ -26,12 +30,28 @@ type logger struct {
 	zap.Logger
 }
 
+func RFC3339Formatter(key string) zap.TimeFormatter {
+	return func(t time.Time) zap.Field {
+		return zap.String(key, t.Format("2006-01-02T15:04:05.000000000Z"))
+	}
+}
+
+func UnixEpochFormatter(key string) zap.TimeFormatter {
+	return zap.EpochFormatter(key)
+}
+
 // NewLogger returns a new zap logger that implements the Logger interface.
-func NewLogger(component string, options ...zap.Option) Logger {
+func NewLogger(component string, timestampFormat string, options ...zap.Option) Logger {
+	formatter := UnixEpochFormatter("timestamp")
+
+	if timestampFormat == "rfc3339" {
+		formatter = RFC3339Formatter("timestamp")
+	}
+
 	enc := zap.NewJSONEncoder(
 		zap.LevelString("log_level"),
 		zap.MessageKey("message"),
-		zap.EpochFormatter("timestamp"),
+		formatter,
 		numberLevelFormatter(),
 	)
 	origLogger := zap.New(enc, options...)

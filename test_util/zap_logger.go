@@ -35,6 +35,7 @@ func NewTestZapLogger(component string) *TestZapLogger {
 	}
 	testLogger := logger.NewLogger(
 		component,
+		"unix-epoch",
 		zap.DebugLevel,
 		zap.Output(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
 		zap.ErrorOutput(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),

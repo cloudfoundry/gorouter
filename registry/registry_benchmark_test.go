@@ -36,6 +36,7 @@ func setupLogger() logger.Logger {
 	}
 	l := logger.NewLogger(
 		"test",
+		"unix-epoch",
 		zap.InfoLevel,
 		zap.Output(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
 		zap.ErrorOutput(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),

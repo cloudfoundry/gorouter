@@ -25,42 +25,89 @@ var _ = Describe("Logger", func() {
 		testSink = &test_util.TestZapSink{Buffer: gbytes.NewBuffer()}
 		logger = NewLogger(
 			component,
+			"unix-epoch",
 			zap.DebugLevel,
 			zap.Output(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))),
 			zap.ErrorOutput(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))))
 	})
 
-	var TestCommonLogFeatures = func(sourceString string) {
-		It("outputs a properly-formatted message", func() {
-			Expect(testSink.Lines()).To(HaveLen(1))
-
-			Expect(testSink.Lines()[0]).To(MatchRegexp(
-				"{\"log_level\":[0-9]*,\"timestamp\":.*,\"message\":\"%s\",\"source\":\"%s\".*}",
-				action,
-				sourceString,
-			))
-		})
-	}
-
 	Describe("Session", func() {
-		BeforeEach(func() {
-			logger = logger.Session("my-subcomponent")
+		Context("when configured to use unix epoch formatting", func() {
+			Context("when session is originally called", func() {
+				BeforeEach(func() {
+					logger = logger.Session("my-subcomponent")
+					logger.Info(action)
+				})
+
+				It("outputs a properly-formatted message with human readable timestamp", func() {
+					Expect(testSink.Lines()).To(HaveLen(1))
+
+					Expect(testSink.Lines()[0]).To(MatchRegexp(
+						`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"my-component.my-subcomponent".*}`,
+						action,
+					))
+				})
+			})
+
+			Context("when session is called multiple times", func() {
+				BeforeEach(func() {
+					logger = logger.Session("my-sub-subcomponent")
+					logger.Info(action)
+				})
+
+				It("outputs a properly-formatted message with human readable timestamp", func() {
+					Expect(testSink.Lines()).To(HaveLen(1))
+
+					Expect(testSink.Lines()[0]).To(MatchRegexp(
+						`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"my-component.my-sub-subcomponent".*}`,
+						action,
+					))
+				})
+			})
 		})
 
-		Context("when session is originally called", func() {
+		Context("when configured to use RFC3339 formatting", func() {
 			BeforeEach(func() {
-				logger.Info(action)
-			})
-			TestCommonLogFeatures("my-component.my-subcomponent")
-		})
-
-		Context("when session is called multiple times", func() {
-			BeforeEach(func() {
-				logger = logger.Session("my-sub-subcomponent")
-				logger.Info(action)
+				testSink = &test_util.TestZapSink{Buffer: gbytes.NewBuffer()}
+				logger = NewLogger(
+					component,
+					"rfc3339",
+					zap.DebugLevel,
+					zap.Output(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))),
+					zap.ErrorOutput(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))))
 			})
 
-			TestCommonLogFeatures("my-component.my-subcomponent.my-sub-subcomponent")
+			Context("when session is originally called", func() {
+				BeforeEach(func() {
+					logger = logger.Session("my-subcomponent")
+					logger.Info(action)
+				})
+
+				It("outputs a properly-formatted message with human readable timestamp", func() {
+					Expect(testSink.Lines()).To(HaveLen(1))
+
+					Expect(testSink.Lines()[0]).To(MatchRegexp(
+						`{"log_level":[0-9]*,"timestamp":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z","message":"%s","source":"my-component.my-subcomponent".*}`,
+						action,
+					))
+				})
+			})
+
+			Context("when session is called multiple times", func() {
+				BeforeEach(func() {
+					logger = logger.Session("my-sub-subcomponent")
+					logger.Info(action)
+				})
+
+				It("outputs a properly-formatted message with human readable timestamp", func() {
+					Expect(testSink.Lines()).To(HaveLen(1))
+
+					Expect(testSink.Lines()[0]).To(MatchRegexp(
+						`{"log_level":[0-9]*,"timestamp":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z","message":"%s","source":"my-component.my-sub-subcomponent".*}`,
+						action,
+					))
+				})
+			})
 		})
 	})
 

@@ -121,14 +121,19 @@ type LoggingConfig struct {
 	Syslog                 string `yaml:"syslog"`
 	SyslogAddr             string
 	SyslogNetwork          string
-	Level                  string `yaml:"level"`
-	LoggregatorEnabled     bool   `yaml:"loggregator_enabled"`
-	MetronAddress          string `yaml:"metron_address"`
-	DisableLogForwardedFor bool   `yaml:"disable_log_forwarded_for"`
-	DisableLogSourceIP     bool   `yaml:"disable_log_source_ip"`
+	Level                  string       `yaml:"level"`
+	LoggregatorEnabled     bool         `yaml:"loggregator_enabled"`
+	MetronAddress          string       `yaml:"metron_address"`
+	DisableLogForwardedFor bool         `yaml:"disable_log_forwarded_for"`
+	DisableLogSourceIP     bool         `yaml:"disable_log_source_ip"`
+	Format                 FormatConfig `yaml:"format"`
 
 	// This field is populated by the `Process` function.
 	JobName string `yaml:"-"`
+}
+
+type FormatConfig struct {
+	Timestamp string `yaml:"timestamp"`
 }
 
 type AccessLog struct {
@@ -150,6 +155,7 @@ type TLSPem struct {
 var defaultLoggingConfig = LoggingConfig{
 	Level:         "debug",
 	MetronAddress: "localhost:3457",
+	Format:        FormatConfig{"unix-epoch"},
 }
 
 type HeaderNameValue struct {

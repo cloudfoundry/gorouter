@@ -54,7 +54,7 @@ func main() {
 	flag.Parse()
 
 	prefix := "gorouter.stdout"
-	tmpLogger, _ := createLogger(prefix, "INFO")
+	tmpLogger, _ := createLogger(prefix, "INFO", "unix-epoch")
 
 	c, err := config.DefaultConfig()
 	if err != nil {
@@ -73,7 +73,7 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level)
+	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.TimestampFormat)
 	logger.Info("starting")
 
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
@@ -357,7 +357,7 @@ func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Con
 	return uaaClient
 }
 
-func createLogger(component string, level string) (goRouterLogger.Logger, lager.LogLevel) {
+func createLogger(component string, level string, timestampFormat string) (goRouterLogger.Logger, lager.LogLevel) {
 	var logLevel zap.Level
 	logLevel.UnmarshalText([]byte(level))
 
@@ -375,6 +375,6 @@ func createLogger(component string, level string) (goRouterLogger.Logger, lager.
 		panic(fmt.Errorf("unknown log level: %s", level))
 	}
 
-	lggr := goRouterLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
+	lggr := goRouterLogger.NewLogger(component, timestampFormat, logLevel, zap.Output(os.Stdout))
 	return lggr, minLagerLogLevel
 }
