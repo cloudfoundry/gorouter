@@ -127,14 +127,17 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	addNoCacheControlHeader(rw)
 
 	errorMsg := fmt.Sprintf("Requested route ('%s') does not exist.", r.Host)
+	returnStatus := http.StatusNotFound
+
 	if appInstanceHeader := r.Header.Get(router_http.CfAppInstance); appInstanceHeader != "" {
-		guid, idx, _ := validateAndSplitInstanceHeader(appInstanceHeader)
+		guid, idx := splitInstanceHeader(appInstanceHeader)
 		errorMsg = fmt.Sprintf("Requested instance ('%s') with guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
+		returnStatus = http.StatusBadRequest
 	}
 
 	writeStatus(
 		rw,
-		http.StatusNotFound,
+		returnStatus,
 		errorMsg,
 		l.logger,
 	)
@@ -173,27 +176,29 @@ func (l *lookupHandler) lookup(r *http.Request) (*route.EndpointPool, error) {
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {
-		appID, appIndex, err := validateAndSplitInstanceHeader(appInstanceHeader)
-
+		err := validateInstanceHeader(appInstanceHeader)
 		if err != nil {
 			l.logger.Error("invalid-app-instance-header", zap.Error(err))
 			return nil, InvalidInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 
+		appID, appIndex := splitInstanceHeader(appInstanceHeader)
 		return l.registry.LookupWithInstance(uri, appID, appIndex), nil
 	}
 
 	return l.registry.Lookup(uri), nil
 }
 
-func validateAndSplitInstanceHeader(appInstanceHeader string) (string, string, error) {
+func validateInstanceHeader(appInstanceHeader string) error {
 	// Regex to match format of `APP_GUID:INSTANCE_ID`
 	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
 	if !r.MatchString(appInstanceHeader) {
-		return "", "", fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
+		return fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
 	}
+	return nil
+}
 
+func splitInstanceHeader(appInstanceHeader string) (string, string) {
 	appDetails := strings.Split(appInstanceHeader, ":")
-	return appDetails[0], appDetails[1], nil
-
+	return appDetails[0], appDetails[1]
 }
