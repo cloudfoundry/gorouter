@@ -73,7 +73,7 @@ func main() {
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.TimestampFormat)
+	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.Format.Timestamp)
 	logger.Info("starting")
 
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
