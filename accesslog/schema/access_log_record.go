@@ -185,9 +185,6 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteString(`gorouter_time:`)
 	b.WriteDashOrFloatValue(r.gorouterTime())
 
-	b.WriteString(`app_time:`)
-	b.WriteDashOrFloatValue(r.appTime())
-
 	b.WriteString(`app_id:`)
 	b.WriteDashOrStringValue(appID)
 

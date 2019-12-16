@@ -159,11 +159,9 @@ var _ = Describe("TLS to backends", func() {
 
 		responseTime := parseTimestampsFromAccessLog("response_time", f)
 		gorouterTime := parseTimestampsFromAccessLog("gorouter_time", f)
-		appTime := parseTimestampsFromAccessLog("app_time", f)
 
 		Expect(responseTime).To(BeNumerically(">", 0))
 		Expect(gorouterTime).To(BeNumerically(">", 0))
-		Expect(appTime).To(BeNumerically(">", 0))
 	})
 })
 
