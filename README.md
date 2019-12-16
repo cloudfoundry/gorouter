@@ -531,11 +531,11 @@ has occurred. Examples: route registration, route unregistration.
 
 Sample log message in gorouter.
 
-`[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
+`[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":"2019-11-21T22:16:18.750673404Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
 `
 
 - `log_level`: This represents logging level of the message
-- `timestamp`: Epoch time of the log
+- `timestamp`: Time of the log in either RFC 3339 (default) or epoch format
 - `message`: Content of the log line
 - `source`: The function within Gorouter that initiated the log message
 - `data`: Additional information that varies based on the message
