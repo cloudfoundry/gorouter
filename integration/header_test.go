@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 
 	"code.cloudfoundry.org/gorouter/config"
 	. "github.com/onsi/ginkgo"
@@ -119,5 +120,50 @@ var _ = Describe("Headers", func() {
 			resp.Body.Close()
 		})
 	})
-})
 
+	Context("Route Service Headers", func() {
+		const (
+			HeaderKeySignature    = "X-CF-Proxy-Signature"
+			HeaderKeyForwardedURL = "X-CF-Forwarded-Url"
+			HeaderKeyMetadata     = "X-CF-Proxy-Metadata"
+		)
+
+		BeforeEach(func() {
+
+			testState.StartGorouter()
+			testApp.Start()
+			testState.register(testApp.Server, testAppRoute)
+		})
+
+		It("strips the sensitive headers from the route service response", func() {
+			appHostname := "app-with-route-service.some.domain"
+
+			testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				Fail("The app should never be hit since the route service call will fail")
+			}))
+			defer testApp.Close()
+
+			routeService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set(HeaderKeySignature, "This value should NOT be leaked")
+				w.Header().Set(HeaderKeyForwardedURL, "Some URL that may be leaked")
+				w.Header().Set(HeaderKeyMetadata, "Some metadata that may be leaked")
+				w.WriteHeader(400)
+			}))
+			defer routeService.Close()
+
+			testState.registerWithInternalRouteService(
+				testApp,
+				routeService,
+				appHostname,
+				testState.cfg.SSLPort,
+			)
+
+			testState.client.Transport.(*http.Transport).TLSClientConfig.Certificates = testState.trustedClientTLSConfig.Certificates
+			req := testState.newRequest(fmt.Sprintf("https://%s", appHostname))
+			resp, err := testState.client.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(400))
+			Expect(resp.Header.Get(HeaderKeySignature)).To(BeEmpty())
+		})
+	})
+})

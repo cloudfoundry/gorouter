@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	headersToAlwaysRemove = []string{}
+	headersToAlwaysRemove = []string{"X-CF-Proxy-Signature"}
 )
 
 type proxy struct {
