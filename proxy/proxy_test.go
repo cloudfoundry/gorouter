@@ -658,14 +658,6 @@ var _ = Describe("Proxy", func() {
 				}
 			})
 
-			It("adds a rewrite handler if configured", func() {
-				ln := mockedHandler("hsts-test", []string{})
-				defer ln.Close()
-
-				process("hsts-test")
-				Expect(testLogger).To(gbytes.Say("http-rewrite"))
-			})
-
 			It("adds the header if it doesn't already exist in the response", func() {
 				ln := mockedHandler("hsts-test", []string{})
 				defer ln.Close()
@@ -701,14 +693,6 @@ var _ = Describe("Proxy", func() {
 						},
 					},
 				}
-			})
-
-			It("adds a rewrite handler if configured", func() {
-				ln := mockedHandler("hsts-test", []string{})
-				defer ln.Close()
-
-				process("hsts-test")
-				Expect(testLogger).To(gbytes.Say("http-rewrite"))
 			})
 
 			It("can remove headers set by gorouter like X-Vcap-Request-Id", func() {
