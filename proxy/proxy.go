@@ -34,6 +34,10 @@ const (
 	VcapCookieId = "__VCAP_ID__"
 )
 
+var (
+	headersToAlwaysRemove = []string{}
+)
+
 type proxy struct {
 	ip                       string
 	traceKey                 string
@@ -161,7 +165,7 @@ func NewProxy(
 	n.Use(handlers.NewReporter(reporter, logger))
 	if !reflect.DeepEqual(cfg.HTTPRewrite, config.HTTPRewrite{}) {
 		logger.Debug("http-rewrite", zap.Object("config", cfg.HTTPRewrite))
-		n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite))
+		n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
 	}
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)

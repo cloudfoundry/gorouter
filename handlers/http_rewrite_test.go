@@ -25,7 +25,7 @@ var _ = Describe("HTTPRewrite Handler", func() {
 		n := negroni.New()
 		n.Use(handlers.NewRequestInfo())
 		n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
-		n.Use(handlers.NewHTTPRewriteHandler(cfg))
+		n.Use(handlers.NewHTTPRewriteHandler(cfg, []string{}))
 		n.UseHandler(mockedService)
 
 		res := httptest.NewRecorder()
