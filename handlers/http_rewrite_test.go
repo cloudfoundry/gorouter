@@ -152,4 +152,30 @@ var _ = Describe("HTTPRewrite Handler", func() {
 			Expect(res.Header()["X-Foo"]).To(ConsistOf("bar"))
 		})
 	})
+
+	Describe("headersToAlwaysRemove", func() {
+		process := func(headersToAlwaysRemove []string) *httptest.ResponseRecorder {
+			mockedService := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header()["X-Foo"] = []string{"foo"}
+				w.WriteHeader(http.StatusTeapot)
+				w.Write([]byte("I'm a little teapot, short and stout."))
+			})
+
+			n := negroni.New()
+			n.Use(handlers.NewRequestInfo())
+			n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
+			n.Use(handlers.NewHTTPRewriteHandler(config.HTTPRewrite{}, headersToAlwaysRemove))
+			n.UseHandler(mockedService)
+
+			res := httptest.NewRecorder()
+			req, _ := http.NewRequest("GET", "/foo", nil)
+			n.ServeHTTP(res, req)
+			return res
+		}
+
+		It("removes the header", func() {
+			res := process([]string{"X-Foo"})
+			Expect(res.Header().Get("X-Foo")).To(BeEmpty())
+		})
+	})
 })

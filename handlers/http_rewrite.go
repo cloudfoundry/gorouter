@@ -21,12 +21,18 @@ func headerNameValuesToHTTPHeader(headerNameValues []config.HeaderNameValue) htt
 	return h
 }
 
-func NewHTTPRewriteHandler(cfg config.HTTPRewrite) negroni.Handler {
+func NewHTTPRewriteHandler(cfg config.HTTPRewrite, headersToAlwaysRemove []string) negroni.Handler {
 	addHeadersIfNotPresent := headerNameValuesToHTTPHeader(
 		cfg.Responses.AddHeadersIfNotPresent,
 	)
+	headers := cfg.Responses.RemoveHeaders
+
+	for _, header := range headersToAlwaysRemove {
+		headers = append(headers, config.HeaderNameValue{Name: header})
+	}
+
 	removeHeaders := headerNameValuesToHTTPHeader(
-		cfg.Responses.RemoveHeaders,
+		headers,
 	)
 	return &httpRewriteHandler{
 		responseHeaderRewriters: []utils.HeaderRewriter{
