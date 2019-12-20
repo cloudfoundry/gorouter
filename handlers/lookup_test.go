@@ -50,7 +50,7 @@ var _ = Describe("Lookup", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewLookup(reg, rep, logger))
+		handler.Use(handlers.NewLookup(reg, rep, logger, true))
 		handler.UseHandler(nextHandler)
 	})
 
@@ -167,37 +167,80 @@ var _ = Describe("Lookup", func() {
 
 	Context("when there is a pool that matches the request, but it has no endpoints", func() {
 		var pool *route.EndpointPool
+		Context("when empty pool response code 503 is set to true", func() {
+			BeforeEach(func() {
+				emptyPoolResponseCode503 := true
+				handler = negroni.New()
+				handler.Use(handlers.NewRequestInfo())
+				handler.Use(handlers.NewLookup(reg, rep, logger, emptyPoolResponseCode503))
+				handler.UseHandler(nextHandler)
 
-		BeforeEach(func() {
-			pool = route.NewPool(&route.PoolOpts{
-				Logger:             logger,
-				RetryAfterFailure:  2 * time.Minute,
-				Host:               "example.com",
-				ContextPath:        "/",
-				MaxConnsPerBackend: maxConnections,
+				pool = route.NewPool(&route.PoolOpts{
+					Logger:             logger,
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				reg.LookupReturns(pool)
 			})
-			reg.LookupReturns(pool)
+
+			It("does not send a bad request metric", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(0))
+			})
+
+			It("sets X-Cf-RouterError to no_endpoints", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("no_endpoints"))
+			})
+
+			It("returns a 503 ServiceUnavailable and does not call next", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
+			})
+
+			It("has a meaningful response", func() {
+				Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') has no available endpoints"))
+			})
+
+			It("Sets Cache-Control to public,max-age=2", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+			})
 		})
 
-		It("does not send a bad request metric", func() {
-			Expect(rep.CaptureBadRequestCallCount()).To(Equal(0))
-		})
+		Context("when empty pool response code 503 is set to false", func() {
+			BeforeEach(func() {
+				emptyPoolResponseCode503 := false
+				handler = negroni.New()
+				handler.Use(handlers.NewRequestInfo())
+				handler.Use(handlers.NewLookup(reg, rep, logger, emptyPoolResponseCode503))
+				handler.UseHandler(nextHandler)
 
-		It("sets X-Cf-RouterError to no_endpoints", func() {
-			Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("no_endpoints"))
-		})
+				pool = route.NewPool(&route.PoolOpts{
+					Logger:             logger,
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				reg.LookupReturns(pool)
+			})
 
-		It("returns a 503 ServiceUnavailable and does not call next", func() {
-			Expect(nextCalled).To(BeFalse())
-			Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
-		})
+			It("sends a bad request metric", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
 
-		It("has a meaningful response", func() {
-			Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') has no available endpoints"))
-		})
+			It("sets X-Cf-RouterError to unknown_route", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
 
-		It("Sets Cache-Control to public,max-age=2", func() {
-			Expect(resp.Header().Get("Cache-Control")).To(Equal("public,max-age=2"))
+			It("returns a 404 NotFound and does not call next", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusNotFound))
+			})
+
+			It("has a meaningful response", func() {
+				Expect(resp.Body.String()).To(ContainSubstring("Requested route ('example.com') does not exist"))
+			})
 		})
 	})
 
@@ -427,7 +470,7 @@ var _ = Describe("Lookup", func() {
 		Context("when request info is not set on the request context", func() {
 			BeforeEach(func() {
 				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, logger))
+				handler.Use(handlers.NewLookup(reg, rep, logger, true))
 				handler.UseHandler(nextHandler)
 
 				pool := route.NewPool(&route.PoolOpts{

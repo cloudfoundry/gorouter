@@ -167,7 +167,7 @@ func NewProxy(
 	n.Use(zipkinHandler)
 	n.Use(w3cHandler)
 	n.Use(handlers.NewProtocolCheck(logger))
-	n.Use(handlers.NewLookup(registry, reporter, logger))
+	n.Use(handlers.NewLookup(registry, reporter, logger, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),

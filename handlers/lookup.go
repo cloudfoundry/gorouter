@@ -27,17 +27,19 @@ func (err InvalidInstanceHeaderError) Error() string {
 }
 
 type lookupHandler struct {
-	registry registry.Registry
-	reporter metrics.ProxyReporter
-	logger   logger.Logger
+	registry                 registry.Registry
+	reporter                 metrics.ProxyReporter
+	logger                   logger.Logger
+	EmptyPoolResponseCode503 bool
 }
 
 // NewLookup creates a handler responsible for looking up a route.
-func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger logger.Logger) negroni.Handler {
+func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger logger.Logger, emptyPoolResponseCode503 bool) negroni.Handler {
 	return &lookupHandler{
-		registry: registry,
-		reporter: rep,
-		logger:   logger,
+		registry:                 registry,
+		reporter:                 rep,
+		logger:                   logger,
+		EmptyPoolResponseCode503: emptyPoolResponseCode503,
 	}
 }
 
@@ -74,8 +76,13 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	}
 
 	if pool.IsEmpty() {
-		l.handleUnavailableRoute(rw, r)
-		return
+		if l.EmptyPoolResponseCode503 {
+			l.handleUnavailableRoute(rw, r)
+			return
+		} else {
+			l.handleMissingRoute(rw, r)
+			return
+		}
 	}
 
 	if pool.IsOverloaded() {

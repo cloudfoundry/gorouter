@@ -255,6 +255,8 @@ type Config struct {
 	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
+
+	EmptyPoolResponseCode503 bool `yaml:"empty_pool_response_code_503,omitempty"`
 }
 
 var defaultConfig = Config{
