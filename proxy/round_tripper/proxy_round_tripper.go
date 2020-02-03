@@ -294,6 +294,7 @@ func setupStickySession(
 ) {
 	secure := false
 	maxAge := 0
+	sameSite := http.SameSite(0)
 
 	// did the endpoint change?
 	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
@@ -305,6 +306,7 @@ func setupStickySession(
 				maxAge = v.MaxAge
 			}
 			secure = v.Secure
+			sameSite = v.SameSite
 			break
 		}
 	}
@@ -330,6 +332,7 @@ func setupStickySession(
 			MaxAge:   maxAge,
 			HttpOnly: true,
 			Secure:   secure,
+			SameSite: sameSite,
 		}
 
 		if v := cookie.String(); v != "" {
