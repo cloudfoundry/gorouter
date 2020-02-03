@@ -150,7 +150,7 @@ var _ = Describe("Session Affinity", func() {
 	})
 
 	Context("first request", func() {
-		Context("when the response does not contain a JESSIONID cookie", func() {
+		Context("when the response does not contain a JSESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
 				ln := test_util.RegisterHandler(r, "app", responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
@@ -166,7 +166,7 @@ var _ = Describe("Session Affinity", func() {
 			})
 		})
 
-		Context("when the response contains a JESSIONID cookie", func() {
+		Context("when the response contains a JSESSIONID cookie", func() {
 
 			It("responds with a VCAP_ID cookie scoped to the session", func() {
 				ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
@@ -190,7 +190,7 @@ var _ = Describe("Session Affinity", func() {
 				Expect(cookie.Expires).To(BeZero())
 			})
 
-			Context("and JESSIONID cookie is set to Secure", func() {
+			Context("and JSESSIONID cookie is set to Secure", func() {
 
 				BeforeEach(func() {
 					jSessionIdCookie.Secure = true
@@ -245,6 +245,34 @@ var _ = Describe("Session Affinity", func() {
 					Expect(cookie.Expires).To(BeZero())
 				})
 			})
+
+			Context("and JSESSIONID cookie has SameSite attribute set", func() {
+
+				BeforeEach(func() {
+					jSessionIdCookie.SameSite = http.SameSiteStrictMode
+				})
+
+				It("responds with a VCAP_ID cookie that has the same SameSite attribute", func() {
+					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					defer ln.Close()
+
+					x := dialProxy(proxyServer)
+					req := test_util.NewRequest("GET", "app", "/", nil)
+					x.WriteRequest(req)
+
+					Eventually(done).Should(Receive())
+
+					resp, _ := x.ReadResponse()
+					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
+					Expect(jsessionId).ToNot(BeNil())
+
+					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					Expect(cookie).ToNot(BeNil())
+					Expect(cookie.Value).To(Equal("my-id"))
+					Expect(cookie.SameSite).To(Equal(http.SameSiteStrictMode))
+				})
+			})
+
 		})
 	})
 
@@ -272,7 +300,7 @@ var _ = Describe("Session Affinity", func() {
 			req.AddCookie(jSessionIdCookie)
 		})
 
-		Context("when the response does not contain a JESSIONID cookie", func() {
+		Context("when the response does not contain a JSESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
 				ln := test_util.RegisterHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
@@ -310,7 +338,7 @@ var _ = Describe("Session Affinity", func() {
 			})
 		})
 
-		Context("when the response contains a JESSIONID cookie", func() {
+		Context("when the response contains a JSESSIONID cookie", func() {
 			It("responds with a VCAP_ID cookie", func() {
 				ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "some-id"})
 				defer ln.Close()
