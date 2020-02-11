@@ -563,7 +563,7 @@ If a user wants to send requests to a specific app instance, the
 header `X-CF-APP-INSTANCE` can be added to indicate the specific
 instance to be targeted. The format of the header value should be
 `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be
-found or the format is wrong, a 404 status code is returned. Usage of
+found or the format is wrong, a 400 status code is returned. Usage of
 this header is only available for users on the Diego architecture.
 
 ## Supported Cipher Suites
