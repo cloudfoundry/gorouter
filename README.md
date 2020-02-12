@@ -548,12 +548,14 @@ receiving a request:
 "<Referer>" "<User-Agent>" <Remote Address> <Backend Address>
 x_forwarded_for:"<X-Forwarded-For>"
 x_forwarded_proto:"<X-Forwarded-Proto>"
-vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time>
+vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> gorouter_time:<GoRouter Time>
 app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
-* Status Code, Response Time, Application ID, Application Index, and
+* Status Code, Response Time, GoRouter Time, Application ID, Application Index, and
 Extra Headers are all optional fields * The absence of Status Code,
 Response Time, Application ID, or Application Index will result in a
 "-" in the corresponding field
+* `Response Time` is the total time it takes for the request to go through the GoRouter to the app and the response to travel back through the GoRouter. This includes the time traffic packet spends traversing the network to the app and back again to the GoRouter. It also includes the time the app spends forming a response.
+* `GoRouter Time` is the total time it takes for the request to go through the GoRouter initially plus the time it takes for the response to travel back through th GoRouter. This does not include the time traffic packet spends traversing the network to the app. This also does notinclude the time the app spends forming a response. 
 
 Access logs are also redirected to syslog.
 
