@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -138,6 +139,17 @@ func NewTestState() *testState {
 		trustedBackendTLSConfig:            trustedBackendTLSConfig,
 		trustedBackendServerCertSAN:        trustedBackendServerCertSAN,
 	}
+}
+
+func (s *testState) newPostRequest(url string, body io.Reader) *http.Request {
+	req, err := http.NewRequest("POST", url, body)
+	Expect(err).NotTo(HaveOccurred())
+	port := s.cfg.Port
+	if strings.HasPrefix(url, "https") {
+		port = s.cfg.SSLPort
+	}
+	req.URL.Host = fmt.Sprintf("127.0.0.1:%d", port)
+	return req
 }
 
 func (s *testState) newRequest(url string) *http.Request {

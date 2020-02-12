@@ -187,9 +187,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("sends X-cf headers", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(req.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))
-					Expect(req.Header.Get("X-CF-InstanceID")).To(Equal("instanceId"))
-					Expect(req.Header.Get("X-CF-InstanceIndex")).To(Equal("1"))
+					Expect(transport.RoundTripCallCount()).To(Equal(1))
+					outreq := transport.RoundTripArgsForCall(0)
+					Expect(outreq.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))
+					Expect(outreq.Header.Get("X-CF-InstanceID")).To(Equal("instanceId"))
+					Expect(outreq.Header.Get("X-CF-InstanceIndex")).To(Equal("1"))
 				})
 			})
 
@@ -372,8 +374,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(backendRes).To(BeNil())
 					Expect(err).To(Equal(handler.NoEndpointsAvailable))
 
-					Expect(reqBody.closeCount).To(Equal(1))
-
 					Expect(reqInfo.RouteEndpoint).To(BeNil())
 					Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
 				})
@@ -417,7 +417,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("returns the exact response received from the backend", func() {
 					resp, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(reqBody.closeCount).To(Equal(1))
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 				})
 
@@ -517,7 +516,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(transport.RoundTripCallCount()).To(Equal(1))
 					transformedReq := transport.RoundTripArgsForCall(0)
 					Expect(transformedReq.URL.Scheme).To(Equal("https"))
-					Expect(reqBody.closeCount).To(Equal(1))
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 				})
 
@@ -541,7 +539,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(transport.RoundTripCallCount()).To(Equal(1))
 						transformedReq := transport.RoundTripArgsForCall(0)
 						Expect(transformedReq.URL.Scheme).To(Equal("http"))
-						Expect(reqBody.closeCount).To(Equal(1))
 						Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 					})
 				})
@@ -596,7 +593,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("makes requests to the route service", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(reqBody.closeCount).To(Equal(1))
 				})
 
 				It("does not capture the routing request in metrics", func() {
@@ -674,8 +670,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 							_, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).To(MatchError(errors.New("banana")))
 							Expect(transport.RoundTripCallCount()).To(Equal(1))
-
-							Expect(reqBody.closeCount).To(Equal(1))
 						})
 
 						It("calls the error handler", func() {

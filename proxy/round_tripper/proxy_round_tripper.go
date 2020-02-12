@@ -93,17 +93,19 @@ type roundTripper struct {
 	stickySessionCookieNames config.StringSet
 }
 
-func (rt *roundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
 	var endpoint *route.Endpoint
 
+	request := originalRequest.Clone(originalRequest.Context())
+
 	if request.Body != nil {
-		closer := request.Body
+		// Temporarily disable closing of the body while in the RoundTrip function, since
+		// the underlying Transport will close the client request body.
+		// https://github.com/golang/go/blob/ab5d9f5831cd267e0d8e8954cfe9987b737aec9c/src/net/http/request.go#L179-L182
+
 		request.Body = ioutil.NopCloser(request.Body)
-		defer func() {
-			closer.Close()
-		}()
 	}
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
