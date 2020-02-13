@@ -1,6 +1,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
 
-# GoRouter This repository contains the source code for the Cloud
+# GoRouter
+This repository contains the source code for the Cloud
 Foundry L7 HTTP router.  GoRouter is deployed by default with Cloud
 Foundry ([cf-deployment](https://github.com/cloudfoundry/cf-deployment))
 which includes
