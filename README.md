@@ -569,8 +569,12 @@ If a user wants to send requests to a specific app instance, the
 header `X-CF-APP-INSTANCE` can be added to indicate the specific
 instance to be targeted. The format of the header value should be
 `X-Cf-App-Instance: APP_GUID:APP_INDEX`. If the instance cannot be
-found or the format is wrong, a 400 status code is returned. Usage of
-this header is only available for users on the Diego architecture.
+found or the format is wrong, a 400 status code is returned. In addition, Gorouter will return a `X-Cf-Routererror` header. 
+If the route does not exist, the value of this header will be `unknown_route`. 
+If the instance guid provided is incorrectly formatted, the value of the header will be `invalid_cf_app_instance_header`.
+If the route exists, the instance guid provided is correctly formatted, but the guid does not exist, 
+the request body will contain `400 Bad Request: Requested instance ('1') with guid ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') does not exist for route ('dora.superman.routing.cf-app.com')`.
+Usage of the `X-Cf-App-Instance` header is only available for users on the Diego architecture.
 
 ## Supported Cipher Suites
 
