@@ -151,6 +151,38 @@ var _ = Describe("Subscriber", func() {
 			}).Should(Equal(2))
 		})
 
+		It("returns the correct size after some publish and subscribe events", func() {
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+
+			block := make(<-chan struct{})
+			keepReading := true
+			registry.RegisterStub = func(uri route.Uri, endpoint *route.Endpoint) {
+				// Read only one message
+				if keepReading {
+					keepReading = false
+				} else {
+					// Prevent the completion of the read so that the count isn't changed
+					<-block
+				}
+			}
+
+			msg := mbus.RegistryMessage{Port: 8080, Uris: []route.Uri{"foo.example.com"}}
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() int {
+				msgs, err := sub.Pending()
+				Expect(err).ToNot(HaveOccurred())
+				return msgs
+			}).Should(Equal(1))
+		})
+
 		Context("when subscription is nil", func() {
 			It("returns an error", func() {
 				msgs, err := sub.Pending()
