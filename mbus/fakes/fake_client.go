@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"code.cloudfoundry.org/gorouter/mbus"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 )
 
 type FakeClient struct {

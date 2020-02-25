@@ -18,7 +18,7 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/localip"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
 )
 

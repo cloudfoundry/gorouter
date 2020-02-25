@@ -26,7 +26,7 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
 	"github.com/armon/go-proxyproto"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
 )
 

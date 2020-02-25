@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"

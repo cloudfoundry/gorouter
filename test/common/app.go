@@ -13,7 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 	. "github.com/onsi/gomega"
 )
 

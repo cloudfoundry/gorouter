@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 	"github.com/onsi/ginkgo"
 
 	. "github.com/onsi/gomega"

@@ -16,7 +16,7 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/tedsuo/ifrit"
@@ -125,13 +125,14 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	Describe("Pending", func() {
-		It("returns the subscription Pending value", func() {
+		It("returns the correct size after some publish events", func() {
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 
-			signal := make(chan struct{})
+			block := make(<-chan struct{})
 			registry.RegisterStub = func(uri route.Uri, endpoint *route.Endpoint) {
-				<-signal
+				// Prevent the completion of the read so that the count isn't changed
+				<-block
 			}
 
 			msg := mbus.RegistryMessage{Port: 8080, Uris: []route.Uri{"foo.example.com"}}
@@ -147,15 +148,7 @@ var _ = Describe("Subscriber", func() {
 				msgs, err := sub.Pending()
 				Expect(err).ToNot(HaveOccurred())
 				return msgs
-			}).Should(Equal(1))
-
-			signal <- struct{}{}
-
-			Eventually(func() int {
-				msgs, err := sub.Pending()
-				Expect(err).ToNot(HaveOccurred())
-				return msgs
-			}).Should(Equal(0))
+			}).Should(Equal(2))
 		})
 
 		Context("when subscription is nil", func() {

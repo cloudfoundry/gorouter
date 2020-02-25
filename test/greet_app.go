@@ -7,7 +7,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test/common"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 )
 
 func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string) *common.TestApp {

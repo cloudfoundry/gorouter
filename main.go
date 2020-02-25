@@ -37,7 +37,7 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"

@@ -30,7 +30,7 @@ import (
 	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/tlsconfig"
 
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 	yaml "gopkg.in/yaml.v2"
 
 	. "github.com/onsi/ginkgo"

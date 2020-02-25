@@ -8,7 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
 )
 
