@@ -40,7 +40,8 @@ var _ = Describe("Route services", func() {
 				testApp = httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(200)
-						_, _ = w.Write([]byte("I'm the app"))
+						_, err := w.Write([]byte("I'm the app"))
+						Expect(err).ToNot(HaveOccurred())
 					}))
 
 				routeService = httptest.NewServer(
@@ -68,7 +69,8 @@ var _ = Describe("Route services", func() {
 							Expect(body).To(Equal([]byte("I'm the app")))
 
 							w.WriteHeader(res.StatusCode)
-							_, _ = w.Write([]byte("I'm the route service"))
+							_, err = w.Write([]byte("I'm the route service"))
+							Expect(err).ToNot(HaveOccurred())
 						}))
 
 				testState.registerWithInternalRouteService(
