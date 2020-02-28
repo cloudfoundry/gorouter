@@ -88,10 +88,10 @@ var _ = Describe("Route Service Config", func() {
 			})
 
 			It("returns an error", func() {
-				encodedForwardedURL := "test.app.com"
+				rawForwardedURL := "test.app.com"
 				rsUrl := "https://example.com"
 
-				args, err := config.Request(rsUrl, encodedForwardedURL)
+				args, err := config.Request(rsUrl, rawForwardedURL)
 				Expect(err).To(HaveOccurred())
 
 				Expect(args.Metadata).To(BeEmpty())
