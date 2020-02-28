@@ -58,6 +58,10 @@ func SignatureFromHeaders(signatureHeader, metadataHeader string, crypto secure.
 	}
 
 	err = json.Unmarshal(metadataDecoded, &metadata)
+	if err != nil {
+		return signature, err
+	}
+
 	signatureDecoded, err := base64.URLEncoding.DecodeString(signatureHeader)
 	if err != nil {
 		return signature, err
