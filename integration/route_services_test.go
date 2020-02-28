@@ -85,7 +85,7 @@ var _ = Describe("Route services", func() {
 			testApp.Close()
 		})
 
-		FIt("URL-encrypts and decrypts properly", func() {
+		It("URL-encrypts and decrypts properly", func() {
 			req := testState.newRequest(
 				fmt.Sprintf("https://%s?%s", appHostname, "p=a%0Ab"),
 			)
