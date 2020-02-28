@@ -60,8 +60,8 @@ var _ = Describe("Route services", func() {
 							req.Header.Add("X-Cf-Proxy-Signature", sigHeader)
 
 							res, err := testState.routeServiceClient.Do(req)
-							defer res.Body.Close()
 							Expect(err).ToNot(HaveOccurred())
+							defer res.Body.Close()
 							Expect(res.StatusCode).To(Equal(http.StatusOK))
 
 							body, err := ioutil.ReadAll(res.Body)
