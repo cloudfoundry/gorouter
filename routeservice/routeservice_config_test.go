@@ -41,42 +41,32 @@ var _ = Describe("Route Service Config", func() {
 	})
 
 	Describe("Request", func() {
-		It("decodes an encoded URL", func() {
-			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
+		It("sets the signature to the forwarded URL exactly", func() {
+			rawForwardedURL := "this is my url%0A"
 			rsUrl := "https://example.com"
 
-			args, err := config.Request(rsUrl, encodedForwardedURL)
+			args, err := config.Request(rsUrl, rawForwardedURL)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(args.ForwardedURL).To(Equal(rawForwardedURL))
 
 			signature, err := routeservice.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(signature.ForwardedUrl).ToNot(BeEmpty())
+			Expect(signature.ForwardedUrl).To(Equal(rawForwardedURL))
 		})
 
 		It("sets the requested time", func() {
-			encodedForwardedURL := url.QueryEscape("test.app.com?query=sample")
+			rawForwardedUrl := "test.app.com?query=sample"
 			now := time.Now()
 			rsUrl := "https://example.com"
 
-			args, err := config.Request(rsUrl, encodedForwardedURL)
+			args, err := config.Request(rsUrl, rawForwardedUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			signature, err := routeservice.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(signature.RequestedTime).To(BeTemporally(">=", now))
-		})
-
-		It("returns an error if given an invalid encoded URL", func() {
-			encodedForwardedURL := "test.app.com?query=sample%"
-			rsUrl := "https://example.com"
-
-			args, err := config.Request(rsUrl, encodedForwardedURL)
-			Expect(err).To(HaveOccurred())
-
-			Expect(args.Metadata).To(BeEmpty())
-			Expect(args.Signature).To(BeEmpty())
 		})
 
 		Context("when encryption fails", func() {

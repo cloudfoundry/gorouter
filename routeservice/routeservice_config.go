@@ -122,14 +122,9 @@ func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUr
 }
 
 func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw string) (string, string, error) {
-	decodedURL, err := url.QueryUnescape(forwardedUrlRaw)
-	if err != nil {
-		rs.logger.Error("proxy-route-service-invalidForwardedURL", zap.Error(err))
-		return "", "", err
-	}
 	signature := &Signature{
 		RequestedTime: time.Now(),
-		ForwardedUrl:  decodedURL,
+		ForwardedUrl:  forwardedUrlRaw,
 	}
 
 	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signature)

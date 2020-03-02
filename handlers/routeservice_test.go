@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -65,8 +64,8 @@ var _ = Describe("Route Service Handler", func() {
 
 	BeforeEach(func() {
 		body := bytes.NewBufferString("What are you?")
-		testReq := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=123&query$2=345#page1..5", body)
-		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
+		testReq := test_util.NewRequest("GET", "my_host.com", "/resource+9-9_9?query=dog%0Acat&query$2=345#page1..5", body)
+		forwardedUrl = "https://my_host.com/resource+9-9_9?query=dog%0Acat&query$2=345#page1..5"
 		reqBuf := new(bytes.Buffer)
 		err := testReq.Write(reqBuf)
 		Expect(err).ToNot(HaveOccurred())
@@ -91,7 +90,7 @@ var _ = Describe("Route Service Handler", func() {
 		reg.LookupStub = func(uri route.Uri) *route.EndpointPool {
 			return routeMap[uri.String()]
 		}
-		routeMap["my_host.com/resource%209-9_9"] = routePool
+		routeMap["my_host.com/resource+9-9_9"] = routePool
 
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
@@ -375,12 +374,9 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request has an expired route service signature header", func() {
 				BeforeEach(func() {
-					decodedURL, err := url.QueryUnescape(forwardedUrl)
-					Expect(err).ToNot(HaveOccurred())
-
 					signature := &routeservice.Signature{
 						RequestedTime: time.Now().Add(-2 * time.Minute),
-						ForwardedUrl:  decodedURL,
+						ForwardedUrl:  forwardedUrl,
 					}
 
 					signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(crypto, signature)
@@ -434,12 +430,9 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request header key does not match the crypto key in the config", func() {
 				BeforeEach(func() {
-					decodedURL, err := url.QueryUnescape(forwardedUrl)
-					Expect(err).ToNot(HaveOccurred())
-
 					signature := &routeservice.Signature{
 						RequestedTime: time.Now(),
-						ForwardedUrl:  decodedURL,
+						ForwardedUrl:  forwardedUrl,
 					}
 
 					altCrypto, err := secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
@@ -477,12 +470,9 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request header key matches the previous crypto key in the config", func() {
 					BeforeEach(func() {
-						decodedURL, err := url.QueryUnescape(forwardedUrl)
-						Expect(err).ToNot(HaveOccurred())
-
 						signature := &routeservice.Signature{
 							RequestedTime: time.Now(),
-							ForwardedUrl:  decodedURL,
+							ForwardedUrl:  forwardedUrl,
 						}
 
 						signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(cryptoPrev, signature)
@@ -509,12 +499,9 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request has an expired route service signature header", func() {
 					BeforeEach(func() {
-						decodedURL, err := url.QueryUnescape(forwardedUrl)
-						Expect(err).ToNot(HaveOccurred())
-
 						signature := &routeservice.Signature{
 							RequestedTime: time.Now().Add(-2 * time.Minute),
-							ForwardedUrl:  decodedURL,
+							ForwardedUrl:  forwardedUrl,
 						}
 
 						signatureHeader, metadataHeader, err := routeservice.BuildSignatureAndMetadata(cryptoPrev, signature)
@@ -539,12 +526,9 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request header key does not match the previous crypto key in the config", func() {
 					BeforeEach(func() {
-						decodedURL, err := url.QueryUnescape(forwardedUrl)
-						Expect(err).ToNot(HaveOccurred())
-
 						signature := &routeservice.Signature{
 							RequestedTime: time.Now(),
-							ForwardedUrl:  decodedURL,
+							ForwardedUrl:  forwardedUrl,
 						}
 
 						altCrypto, err := secure.NewAesGCM([]byte("123456QRSTUVWXYZ"))

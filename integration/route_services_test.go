@@ -99,6 +99,19 @@ var _ = Describe("Route services", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
 			})
+
+			It("properly URL-encodes and decodes", func() {
+				req := testState.newRequest(
+					fmt.Sprintf("https://%s?%s", appHostname, "param=a%0Ab"),
+				)
+
+				res, err := testState.client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
+				body, err := ioutil.ReadAll(res.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(body).To(Equal([]byte("I'm the route service")))
+			})
 		})
 	})
 })
