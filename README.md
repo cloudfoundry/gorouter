@@ -573,7 +573,6 @@ found or the format is wrong, a 400 status code is returned. In addition, Gorout
 If the instance guid provided is incorrectly formatted, the value of the header will be `invalid_cf_app_instance_header`.
 If the instance guid provided is correctly formatted, but the guid does not exist, the value of this header will be `unknown_route`, and 
 the request body will contain `400 Bad Request: Requested instance ('1') with guid ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') does not exist for route ('dora.superman.routing.cf-app.com')`.
-Usage of the `X-Cf-App-Instance` header is only available for users on the Diego architecture.
 
 Usage of the `X-Cf-App-Instance` header is only available for users on the Diego architecture.
 
