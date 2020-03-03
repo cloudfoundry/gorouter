@@ -171,7 +171,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		err = r.validateRouteServicePool(validatedSig, reqInfo)
+		err = r.validateRouteServicePool(validatedSig, reqInfo.RoutePool)
 		if err != nil {
 			return false, err
 		}
@@ -180,7 +180,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 	return false, nil
 }
 
-func (r *RouteService) validateRouteServicePool(validatedSig *routeservice.Signature, reqInfo *RequestInfo) error {
+func (r *RouteService) validateRouteServicePool(validatedSig *routeservice.Signature, requestPool *route.EndpointPool) error {
 	forwardedURL, err := url.ParseRequestURI(validatedSig.ForwardedUrl)
 	if err != nil {
 		return err
@@ -190,9 +190,9 @@ func (r *RouteService) validateRouteServicePool(validatedSig *routeservice.Signa
 	if forwardedPool == nil {
 		return fmt.Errorf("original request URL %s does not exist in the routing table", uri.String())
 	}
-	reqPool := reqInfo.RoutePool
-	if !route.PoolsMatch(reqPool, forwardedPool) {
-		return fmt.Errorf("route service forwarded URL %s%s does not match the original request URL %s", reqPool.Host(), reqPool.ContextPath(), uri.String())
+
+	if !route.PoolsMatch(requestPool, forwardedPool) {
+		return fmt.Errorf("route service forwarded URL %s%s does not match the original request URL %s", requestPool.Host(), requestPool.ContextPath(), uri.String())
 	}
 	return nil
 }
