@@ -184,7 +184,8 @@ func main() {
 		rss.GetRoundTripper(),
 	)
 
-	errorChannel := nil
+	var errorChannel chan error
+	errorChannel = nil
 
 	goRouter, err := router.NewRouter(
 		logger.Session("router"),
