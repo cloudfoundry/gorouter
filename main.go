@@ -171,8 +171,31 @@ func main() {
 	}
 
 	h = &health.Health{}
-	proxy := proxy.NewProxy(logger, accessLogger, c, registry, compositeReporter, routeServiceConfig, backendTLSConfig, routeServiceTLSConfig, h, rss.GetRoundTripper())
-	goRouter, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, h, logCounter, nil, rss)
+	proxy := proxy.NewProxy(
+		logger,
+		accessLogger,
+		c,
+		registry,
+		compositeReporter,
+		routeServiceConfig,
+		backendTLSConfig,
+		routeServiceTLSConfig,
+		h,
+		rss.GetRoundTripper(),
+	)
+
+	goRouter, err := router.NewRouter(
+		logger.Session("router"),
+		c,
+		proxy,
+		natsClient,
+		registry,
+		varz,
+		h,
+		logCounter,
+		nil,
+		rss,
+	)
 
 	h.OnDegrade = goRouter.DrainAndStop
 

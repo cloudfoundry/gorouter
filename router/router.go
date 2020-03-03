@@ -70,8 +70,18 @@ type Router struct {
 	routeServicesServer rss
 }
 
-func NewRouter(logger logger.Logger, cfg *config.Config, handler http.Handler, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, h *health.Health, logCounter *schema.LogCounter, errChan chan error, routeServicesServer rss) (*Router, error) {
+func NewRouter(
+	logger logger.Logger,
+	cfg *config.Config,
+	handler http.Handler,
+	mbusClient *nats.Conn,
+	r *registry.RouteRegistry,
+	v varz.Varz,
+	h *health.Health,
+	logCounter *schema.LogCounter,
+	errChan chan error,
+	routeServicesServer rss,
+) (*Router, error) {
 	var host string
 	if cfg.Status.Port != 0 {
 		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
