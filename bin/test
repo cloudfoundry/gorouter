@@ -39,7 +39,6 @@ ginkgo \
   -randomizeAllSpecs \
   -p \
   -race \
-  -flakeAttempts 3 \
   -timeout 60s \
   "$@"
 
