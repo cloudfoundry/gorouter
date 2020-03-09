@@ -42,7 +42,7 @@ var _ = Describe("Route Service Signature", func() {
 		It("builds signature and metadata headers", func() {
 			signatureHeader, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signature)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(signatureHeader).ToNot(BeNil())
+			Expect(signatureHeader).ToNot(BeEmpty())
 			metadataDecoded, err := base64.URLEncoding.DecodeString(metadata)
 			Expect(err).ToNot(HaveOccurred())
 			metadataStruct := routeservice.Metadata{}
