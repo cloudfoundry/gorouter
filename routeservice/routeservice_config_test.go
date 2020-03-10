@@ -3,7 +3,6 @@ package routeservice_test
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -106,53 +105,54 @@ var _ = Describe("Route Service Config", func() {
 
 	Describe("ValidatedSignature", func() {
 		var (
-			signatureHeader string
-			metadataHeader  string
-			requestUrl      string
-			headers         *http.Header
-			signature       *routeservice.SignatureContents
+			requestFromRouteService routeservice.RequestReceivedFromRouteService
+			requestUrl              string
+			signatureContents       *routeservice.SignatureContents
 		)
 
 		BeforeEach(func() {
-			h := make(http.Header, 0)
-			headers = &h
 			var err error
 			requestUrl = "http://some-forwarded-url.com"
-			signature = &routeservice.SignatureContents{
+			signatureContents = &routeservice.SignatureContents{
 				RequestedTime: time.Now(),
 				ForwardedUrl:  requestUrl,
 			}
-			signatureHeader, metadataHeader, err = routeservice.BuildSignatureAndMetadata(crypto, signature)
+
+			signature, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 			Expect(err).ToNot(HaveOccurred())
 
-			headers.Set(routeservice.HeaderKeyForwardedURL, requestUrl)
-		})
-
-		JustBeforeEach(func() {
-			headers.Set(routeservice.HeaderKeySignature, signatureHeader)
-			headers.Set(routeservice.HeaderKeyMetadata, metadataHeader)
+			requestFromRouteService = routeservice.RequestReceivedFromRouteService{
+				AppUrl:    requestUrl,
+				Signature: signature,
+				Metadata:  metadata,
+			}
 		})
 
 		It("decrypts a valid signature and returns the decrypted signature", func() {
-			validatedSig, err := config.ValidatedSignature(headers, requestUrl)
+			validatedSig, err := config.ValidatedSignature(requestFromRouteService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(validatedSig.ForwardedUrl).To(Equal(signature.ForwardedUrl))
-			Expect(validatedSig.RequestedTime.Equal(signature.RequestedTime)).To(BeTrue())
+			Expect(validatedSig.ForwardedUrl).To(Equal(signatureContents.ForwardedUrl))
+			Expect(validatedSig.RequestedTime.Equal(signatureContents.RequestedTime)).To(BeTrue())
 		})
 
 		Context("when the timestamp is expired", func() {
 			BeforeEach(func() {
-				signature = &routeservice.SignatureContents{
+				signatureContents = &routeservice.SignatureContents{
 					RequestedTime: time.Now().Add(-10 * time.Hour),
 					ForwardedUrl:  requestUrl,
 				}
-				var err error
-				signatureHeader, metadataHeader, err = routeservice.BuildSignatureAndMetadata(crypto, signature)
+				signature, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 				Expect(err).ToNot(HaveOccurred())
+
+				requestFromRouteService = routeservice.RequestReceivedFromRouteService{
+					AppUrl:    requestUrl,
+					Signature: signature,
+					Metadata:  metadata,
+				}
 			})
 
 			It("returns an route service request expired error", func() {
-				_, err := config.ValidatedSignature(headers, requestUrl)
+				_, err := config.ValidatedSignature(requestFromRouteService)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(BeAssignableToTypeOf(routeservice.ErrExpired))
 				Expect(err.Error()).To(ContainSubstring("request expired"))
@@ -161,11 +161,15 @@ var _ = Describe("Route Service Config", func() {
 
 		Context("when the signature is invalid", func() {
 			BeforeEach(func() {
-				signatureHeader = "zKQt4bnxW30Kxky"
-				metadataHeader = "eyJpdiI6IjlBVn"
+				requestFromRouteService = routeservice.RequestReceivedFromRouteService{
+					AppUrl:    requestUrl,
+					Signature: "zKQt4bnxW30Kxky",
+					Metadata:  "eyJpdiI6IjlBVn",
+				}
 			})
+
 			It("returns an error", func() {
-				_, err := config.ValidatedSignature(headers, requestUrl)
+				_, err := config.ValidatedSignature(requestFromRouteService)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -180,7 +184,7 @@ var _ = Describe("Route Service Config", func() {
 
 			Context("when there is no previous key in the configuration", func() {
 				It("rejects the signature", func() {
-					_, err := config.ValidatedSignature(headers, requestUrl)
+					_, err := config.ValidatedSignature(requestFromRouteService)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})
@@ -195,23 +199,28 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("validates the signature", func() {
-					_, err := config.ValidatedSignature(headers, requestUrl)
+					_, err := config.ValidatedSignature(requestFromRouteService)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				Context("when a request has an expired Route service signature header", func() {
 					BeforeEach(func() {
-						signature = &routeservice.SignatureContents{
+						signatureContents = &routeservice.SignatureContents{
 							RequestedTime: time.Now().Add(-10 * time.Hour),
 							ForwardedUrl:  "some-forwarded-url",
 						}
-						var err error
-						signatureHeader, metadataHeader, err = routeservice.BuildSignatureAndMetadata(crypto, signature)
+						signature, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 						Expect(err).ToNot(HaveOccurred())
+
+						requestFromRouteService = routeservice.RequestReceivedFromRouteService{
+							AppUrl:    requestUrl,
+							Signature: signature,
+							Metadata:  metadata,
+						}
 					})
 
 					It("returns an route service request expired error", func() {
-						_, err := config.ValidatedSignature(headers, requestUrl)
+						_, err := config.ValidatedSignature(requestFromRouteService)
 						Expect(err).To(HaveOccurred())
 						Expect(err).To(BeAssignableToTypeOf(routeservice.ErrExpired))
 					})
@@ -227,7 +236,7 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("rejects the signature", func() {
-					_, err := config.ValidatedSignature(headers, requestUrl)
+					_, err := config.ValidatedSignature(requestFromRouteService)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})

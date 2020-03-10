@@ -137,7 +137,9 @@ func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
 	if forwardedURLRaw == "" || signature == "" {
 		return false
 	}
-	_, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+
+	request := newRequestReceivedFromRouteService(forwardedURLRaw, req.Header)
+	_, err := r.config.ValidatedSignature(request)
 	return err == nil
 }
 
@@ -167,7 +169,8 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 
 	if hasBeenToRouteService(routeServiceURL, rsSignature) {
 		// A request from a route service destined for a backend instances
-		validatedSig, err := r.config.ValidatedSignature(&req.Header, forwardedURLRaw)
+		request := newRequestReceivedFromRouteService(forwardedURLRaw, req.Header)
+		validatedSig, err := r.config.ValidatedSignature(request)
 		if err != nil {
 			return false, err
 		}
@@ -178,6 +181,14 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func newRequestReceivedFromRouteService(appUrl string, requestHeaders http.Header) routeservice.RequestReceivedFromRouteService {
+	return routeservice.RequestReceivedFromRouteService{
+		AppUrl:    appUrl,
+		Signature: requestHeaders.Get(routeservice.HeaderKeySignature),
+		Metadata:  requestHeaders.Get(routeservice.HeaderKeyMetadata),
+	}
 }
 
 func (r *RouteService) validateRouteServicePool(
