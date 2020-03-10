@@ -97,9 +97,9 @@ func (rs *RouteServiceConfig) CreateRequest(rsUrl, forwardedUrl string) (Request
 	return routeServiceArgs, nil
 }
 
-func (rs *RouteServiceConfig) ValidateRequest(response RequestReceivedFromRouteService) (*SignatureContents, error) {
+func (rs *RouteServiceConfig) ValidateRequest(request RequestReceivedFromRouteService) (*SignatureContents, error) {
 
-	signatureContents, err := SignatureContentsFromHeaders(response.Signature, response.Metadata, rs.crypto)
+	signatureContents, err := SignatureContentsFromHeaders(request.Signature, request.Metadata, rs.crypto)
 	if err != nil {
 		if rs.cryptoPrev == nil {
 			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
@@ -108,7 +108,7 @@ func (rs *RouteServiceConfig) ValidateRequest(response RequestReceivedFromRouteS
 
 		rs.logger.Debug("proxy-route-service-current-key", zap.String("message", "Decrypt-only secret used to validate route service signature header"))
 		// Decrypt the head again trying to use the old key.
-		signatureContents, err = SignatureContentsFromHeaders(response.Signature, response.Metadata, rs.cryptoPrev)
+		signatureContents, err = SignatureContentsFromHeaders(request.Signature, request.Metadata, rs.cryptoPrev)
 
 		if err != nil {
 			rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
