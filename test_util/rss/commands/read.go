@@ -24,17 +24,17 @@ func ReadSignature(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	signature, err := routeservice.SignatureFromHeaders(sigEncoded, metaEncoded, crypto)
+	signatureContents, err := routeservice.SignatureContentsFromHeaders(sigEncoded, metaEncoded, crypto)
 
 	if err != nil {
 		fmt.Printf("Failed to read signature: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	printSignature(signature)
+	printSignatureContents(signatureContents)
 }
 
-func printSignature(signature routeservice.Signature) {
-	signatureJson, _ := json.MarshalIndent(&signature, "", "  ")
+func printSignatureContents(signatureContents routeservice.SignatureContents) {
+	signatureJson, _ := json.MarshalIndent(&signatureContents, "", "  ")
 	fmt.Printf("Decoded Signature:\n%s\n\n", signatureJson)
 }

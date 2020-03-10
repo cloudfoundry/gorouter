@@ -15,8 +15,8 @@ import (
 
 var _ = Describe("Route Service Signature", func() {
 	var (
-		crypto    = new(fakes.FakeCrypto)
-		signature *routeservice.Signature
+		crypto            = new(fakes.FakeCrypto)
+		signatureContents *routeservice.SignatureContents
 	)
 
 	BeforeEach(func() {
@@ -35,12 +35,12 @@ var _ = Describe("Route Service Signature", func() {
 			return cipherText, nonce, nil
 		}
 
-		signature = &routeservice.Signature{RequestedTime: time.Now()}
+		signatureContents = &routeservice.SignatureContents{RequestedTime: time.Now()}
 	})
 
 	Describe("Build Signature and Metadata", func() {
 		It("builds signature and metadata headers", func() {
-			signatureHeader, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signature)
+			signatureHeader, metadata, err := routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(signatureHeader).ToNot(BeEmpty())
 			metadataDecoded, err := base64.URLEncoding.DecodeString(metadata)
@@ -57,13 +57,13 @@ var _ = Describe("Route Service Signature", func() {
 			})
 
 			It("returns an error", func() {
-				_, _, err := routeservice.BuildSignatureAndMetadata(crypto, signature)
+				_, _, err := routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
 
-	Describe("Parse signature from headers", func() {
+	Describe("Parse headers into signatureContent", func() {
 		var (
 			signatureHeader string
 			metadataHeader  string
@@ -71,14 +71,14 @@ var _ = Describe("Route Service Signature", func() {
 
 		BeforeEach(func() {
 			var err error
-			signatureHeader, metadataHeader, err = routeservice.BuildSignatureAndMetadata(crypto, signature)
+			signatureHeader, metadataHeader, err = routeservice.BuildSignatureAndMetadata(crypto, signatureContents)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("parses signature from signature and metadata headers", func() {
-			decryptedSignature, err := routeservice.SignatureFromHeaders(signatureHeader, metadataHeader, crypto)
+		It("parses signatureContents from signature and metadata headers", func() {
+			decryptedSignature, err := routeservice.SignatureContentsFromHeaders(signatureHeader, metadataHeader, crypto)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(signature.RequestedTime.Sub(decryptedSignature.RequestedTime)).To(Equal(time.Duration(0)))
+			Expect(signatureContents.RequestedTime.Sub(decryptedSignature.RequestedTime)).To(Equal(time.Duration(0)))
 		})
 	})
 

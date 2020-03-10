@@ -52,7 +52,7 @@ var _ = Describe("Route Services", func() {
 
 			crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 			Expect(err).ToNot(HaveOccurred())
-			_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
+			_, err = routeservice.SignatureContentsFromHeaders(sigHeader, metaHeader, crypto)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(r.Header.Get("X-CF-ApplicationID")).To(Equal(""))
@@ -404,7 +404,7 @@ var _ = Describe("Route Services", func() {
 
 					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())
-					_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
+					_, err = routeservice.SignatureContentsFromHeaders(sigHeader, metaHeader, crypto)
 					Expect(err).ToNot(HaveOccurred())
 
 					// X-CF-ApplicationID will only be set if the request was sent to internal cf app first time
@@ -466,7 +466,7 @@ var _ = Describe("Route Services", func() {
 
 					crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())
-					_, err = routeservice.SignatureFromHeaders(sigHeader, metaHeader, crypto)
+					_, err = routeservice.SignatureContentsFromHeaders(sigHeader, metaHeader, crypto)
 					Expect(err).ToNot(HaveOccurred())
 
 					// X-CF-ApplicationID will only be set if the request was sent to internal cf app first time

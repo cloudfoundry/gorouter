@@ -24,12 +24,12 @@ func GenerateSignature(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	signature, err := createSigFromArgs(c)
+	signatureContents, err := createSigFromArgs(c)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	sigEncoded, metaEncoded, err := routeservice.BuildSignatureAndMetadata(crypto, &signature)
+	sigEncoded, metaEncoded, err := routeservice.BuildSignatureAndMetadata(crypto, &signatureContents)
 	if err != nil {
 		fmt.Printf("Failed to create signature: %s", err.Error())
 		os.Exit(1)
@@ -39,8 +39,8 @@ func GenerateSignature(c *cli.Context) {
 	fmt.Printf("Encoded Metadata:\n%s\n\n", metaEncoded)
 }
 
-func createSigFromArgs(c *cli.Context) (routeservice.Signature, error) {
-	signature := routeservice.Signature{}
+func createSigFromArgs(c *cli.Context) (routeservice.SignatureContents, error) {
+	signatureContents := routeservice.SignatureContents{}
 	url := c.String("url")
 
 	var sigTime time.Time
@@ -51,7 +51,7 @@ func createSigFromArgs(c *cli.Context) (routeservice.Signature, error) {
 		unix, err := strconv.ParseInt(timeStr, 10, 64)
 		if err != nil {
 			fmt.Printf("Invalid time format: %s", timeStr)
-			return signature, err
+			return signatureContents, err
 		}
 
 		sigTime = time.Unix(unix, 0)
@@ -59,7 +59,7 @@ func createSigFromArgs(c *cli.Context) (routeservice.Signature, error) {
 		sigTime = time.Now()
 	}
 
-	return routeservice.Signature{
+	return routeservice.SignatureContents{
 		RequestedTime: sigTime,
 		ForwardedUrl:  url,
 	}, nil

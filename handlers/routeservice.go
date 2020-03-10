@@ -181,7 +181,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 }
 
 func (r *RouteService) validateRouteServicePool(
-	validatedSig *routeservice.Signature,
+	validatedSig *routeservice.SignatureContents,
 	requestPool *route.EndpointPool,
 ) error {
 

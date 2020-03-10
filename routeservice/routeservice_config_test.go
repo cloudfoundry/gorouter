@@ -49,10 +49,10 @@ var _ = Describe("Route Service Config", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(args.ForwardedURL).To(Equal(rawForwardedURL))
 
-			signature, err := routeservice.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
+			signatureContents, err := routeservice.SignatureContentsFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(signature.ForwardedUrl).To(Equal(rawForwardedURL))
+			Expect(signatureContents.ForwardedUrl).To(Equal(rawForwardedURL))
 		})
 
 		It("sets the requested time", func() {
@@ -63,10 +63,10 @@ var _ = Describe("Route Service Config", func() {
 			args, err := config.Request(rsUrl, rawForwardedUrl)
 			Expect(err).NotTo(HaveOccurred())
 
-			signature, err := routeservice.SignatureFromHeaders(args.Signature, args.Metadata, crypto)
+			signatureContents, err := routeservice.SignatureContentsFromHeaders(args.Signature, args.Metadata, crypto)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(signature.RequestedTime).To(BeTemporally(">=", now))
+			Expect(signatureContents.RequestedTime).To(BeTemporally(">=", now))
 		})
 
 		Context("when encryption fails", func() {
@@ -110,7 +110,7 @@ var _ = Describe("Route Service Config", func() {
 			metadataHeader  string
 			requestUrl      string
 			headers         *http.Header
-			signature       *routeservice.Signature
+			signature       *routeservice.SignatureContents
 		)
 
 		BeforeEach(func() {
@@ -118,7 +118,7 @@ var _ = Describe("Route Service Config", func() {
 			headers = &h
 			var err error
 			requestUrl = "http://some-forwarded-url.com"
-			signature = &routeservice.Signature{
+			signature = &routeservice.SignatureContents{
 				RequestedTime: time.Now(),
 				ForwardedUrl:  requestUrl,
 			}
@@ -142,7 +142,7 @@ var _ = Describe("Route Service Config", func() {
 
 		Context("when the timestamp is expired", func() {
 			BeforeEach(func() {
-				signature = &routeservice.Signature{
+				signature = &routeservice.SignatureContents{
 					RequestedTime: time.Now().Add(-10 * time.Hour),
 					ForwardedUrl:  requestUrl,
 				}
@@ -201,7 +201,7 @@ var _ = Describe("Route Service Config", func() {
 
 				Context("when a request has an expired Route service signature header", func() {
 					BeforeEach(func() {
-						signature = &routeservice.Signature{
+						signature = &routeservice.SignatureContents{
 							RequestedTime: time.Now().Add(-10 * time.Hour),
 							ForwardedUrl:  "some-forwarded-url",
 						}

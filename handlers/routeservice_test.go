@@ -374,7 +374,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request has an expired route service signature header", func() {
 				BeforeEach(func() {
-					signature := &routeservice.Signature{
+					signature := &routeservice.SignatureContents{
 						RequestedTime: time.Now().Add(-2 * time.Minute),
 						ForwardedUrl:  forwardedUrl,
 					}
@@ -430,7 +430,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request header key does not match the crypto key in the config", func() {
 				BeforeEach(func() {
-					signature := &routeservice.Signature{
+					signature := &routeservice.SignatureContents{
 						RequestedTime: time.Now(),
 						ForwardedUrl:  forwardedUrl,
 					}
@@ -470,7 +470,7 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request header key matches the previous crypto key in the config", func() {
 					BeforeEach(func() {
-						signature := &routeservice.Signature{
+						signature := &routeservice.SignatureContents{
 							RequestedTime: time.Now(),
 							ForwardedUrl:  forwardedUrl,
 						}
@@ -499,7 +499,7 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request has an expired route service signature header", func() {
 					BeforeEach(func() {
-						signature := &routeservice.Signature{
+						signature := &routeservice.SignatureContents{
 							RequestedTime: time.Now().Add(-2 * time.Minute),
 							ForwardedUrl:  forwardedUrl,
 						}
@@ -526,7 +526,7 @@ var _ = Describe("Route Service Handler", func() {
 
 				Context("when a request header key does not match the previous crypto key in the config", func() {
 					BeforeEach(func() {
-						signature := &routeservice.Signature{
+						signature := &routeservice.SignatureContents{
 							RequestedTime: time.Now(),
 							ForwardedUrl:  forwardedUrl,
 						}

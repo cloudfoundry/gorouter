@@ -92,11 +92,11 @@ func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceR
 	return routeServiceArgs, nil
 }
 
-func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUrl string) (*Signature, error) {
+func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUrl string) (*SignatureContents, error) {
 	metadataHeader := headers.Get(HeaderKeyMetadata)
 	signatureHeader := headers.Get(HeaderKeySignature)
 
-	signature, err := SignatureFromHeaders(signatureHeader, metadataHeader, rs.crypto)
+	signatureContents, err := SignatureContentsFromHeaders(signatureHeader, metadataHeader, rs.crypto)
 	if err != nil {
 		if rs.cryptoPrev == nil {
 			rs.logger.Error("proxy-route-service-current-key", zap.Error(err))
@@ -105,7 +105,7 @@ func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUr
 
 		rs.logger.Debug("proxy-route-service-current-key", zap.String("message", "Decrypt-only secret used to validate route service signature header"))
 		// Decrypt the head again trying to use the old key.
-		signature, err = SignatureFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
+		signatureContents, err = SignatureContentsFromHeaders(signatureHeader, metadataHeader, rs.cryptoPrev)
 
 		if err != nil {
 			rs.logger.Error("proxy-route-service-previous-key", zap.Error(err))
@@ -113,33 +113,33 @@ func (rs *RouteServiceConfig) ValidatedSignature(headers *http.Header, requestUr
 		}
 	}
 
-	err = rs.validateSignatureTimeout(signature)
+	err = rs.validateSignatureTimeout(signatureContents)
 	if err != nil {
 		return nil, err
 	}
 
-	return &signature, nil
+	return &signatureContents, nil
 }
 
 func (rs *RouteServiceConfig) generateSignatureAndMetadata(forwardedUrlRaw string) (string, string, error) {
-	signature := &Signature{
+	signatureContents := &SignatureContents{
 		RequestedTime: time.Now(),
 		ForwardedUrl:  forwardedUrlRaw,
 	}
 
-	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signature)
+	signatureHeader, metadataHeader, err := BuildSignatureAndMetadata(rs.crypto, signatureContents)
 	if err != nil {
 		return "", "", err
 	}
 	return signatureHeader, metadataHeader, nil
 }
 
-func (rs *RouteServiceConfig) validateSignatureTimeout(signature Signature) error {
-	if time.Since(signature.RequestedTime) > rs.routeServiceTimeout {
+func (rs *RouteServiceConfig) validateSignatureTimeout(signatureContents SignatureContents) error {
+	if time.Since(signatureContents.RequestedTime) > rs.routeServiceTimeout {
 		rs.logger.Error("proxy-route-service-timeout",
 			zap.Error(ErrExpired),
-			zap.String("forwarded-url", signature.ForwardedUrl),
-			zap.Time("request-time", signature.RequestedTime),
+			zap.String("forwarded-url", signatureContents.ForwardedUrl),
+			zap.Time("request-time", signatureContents.RequestedTime),
 		)
 		return ErrExpired
 	}

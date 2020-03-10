@@ -9,7 +9,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/secure"
 )
 
-type Signature struct {
+type SignatureContents struct {
 	ForwardedUrl  string    `json:"forwarded_url"`
 	RequestedTime time.Time `json:"requested_time"`
 }
@@ -18,13 +18,17 @@ type Metadata struct {
 	Nonce []byte `json:"nonce"`
 }
 
-func BuildSignatureAndMetadata(crypto secure.Crypto, signature *Signature) (string, string, error) {
-	signatureJson, err := json.Marshal(&signature)
+func BuildSignatureAndMetadata(
+	crypto secure.Crypto,
+	signatureContents *SignatureContents,
+) (string, string, error) {
+
+	signatureContentsJson, err := json.Marshal(&signatureContents)
 	if err != nil {
 		return "", "", err
 	}
 
-	signatureJsonEncrypted, nonce, err := crypto.Encrypt(signatureJson)
+	signatureJsonEncrypted, nonce, err := crypto.Encrypt(signatureContentsJson)
 	if err != nil {
 		return "", "", err
 	}
@@ -44,35 +48,35 @@ func BuildSignatureAndMetadata(crypto secure.Crypto, signature *Signature) (stri
 	return signatureHeader, metadataHeader, nil
 }
 
-func SignatureFromHeaders(signatureHeader, metadataHeader string, crypto secure.Crypto) (Signature, error) {
+func SignatureContentsFromHeaders(signatureHeader, metadataHeader string, crypto secure.Crypto) (SignatureContents, error) {
 	metadata := Metadata{}
-	signature := Signature{}
+	signatureContents := SignatureContents{}
 
 	if metadataHeader == "" {
-		return signature, errors.New("No metadata found")
+		return signatureContents, errors.New("No metadata found")
 	}
 
 	metadataDecoded, err := base64.URLEncoding.DecodeString(metadataHeader)
 	if err != nil {
-		return signature, err
+		return signatureContents, err
 	}
 
 	err = json.Unmarshal(metadataDecoded, &metadata)
 	if err != nil {
-		return signature, err
+		return signatureContents, err
 	}
 
 	signatureDecoded, err := base64.URLEncoding.DecodeString(signatureHeader)
 	if err != nil {
-		return signature, err
+		return signatureContents, err
 	}
 
 	signatureDecrypted, err := crypto.Decrypt(signatureDecoded, metadata.Nonce)
 	if err != nil {
-		return signature, err
+		return signatureContents, err
 	}
 
-	err = json.Unmarshal([]byte(signatureDecrypted), &signature)
+	err = json.Unmarshal([]byte(signatureDecrypted), &signatureContents)
 
-	return signature, err
+	return signatureContents, err
 }
