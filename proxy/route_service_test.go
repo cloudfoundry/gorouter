@@ -76,7 +76,7 @@ var _ = Describe("Route Services", func() {
 			nil,
 			recommendHttps,
 		)
-		reqArgs, err := config.Request("", forwardedUrl)
+		reqArgs, err := config.CreateRequest("", forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())
 		signatureHeader, metadataHeader = reqArgs.Signature, reqArgs.Metadata
 

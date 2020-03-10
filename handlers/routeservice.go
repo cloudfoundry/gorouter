@@ -102,7 +102,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		req.Header.Del(routeservice.HeaderKeyForwardedURL)
 	} else {
 		var err error
-		routeServiceArgs, err := r.config.Request(routeServiceURL, forwardedURLRaw)
+		routeServiceArgs, err := r.config.CreateRequest(routeServiceURL, forwardedURLRaw)
 		if err != nil {
 			r.logger.Error("route-service-failed", zap.Error(err))
 

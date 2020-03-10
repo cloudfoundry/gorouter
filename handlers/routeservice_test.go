@@ -313,7 +313,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request has a valid route service signature and metadata header", func() {
 				BeforeEach(func() {
-					reqArgs, err := config.Request("", forwardedUrl)
+					reqArgs, err := config.CreateRequest("", forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
@@ -339,7 +339,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request has a valid route service signature and metadata header and URL contains special chars", func() {
 				BeforeEach(func() {
-					reqArgs, err := config.Request("", "https://my_host.com/resource+9-9_9?query=%23%25")
+					reqArgs, err := config.CreateRequest("", "https://my_host.com/resource+9-9_9?query=%23%25")
 					Expect(err).ToNot(HaveOccurred())
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
@@ -354,7 +354,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when a request has a route service signature but no metadata header", func() {
 				BeforeEach(func() {
-					reqArgs, err := config.Request("", forwardedUrl)
+					reqArgs, err := config.CreateRequest("", forwardedUrl)
 					Expect(err).ToNot(HaveOccurred())
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 				})
@@ -400,7 +400,7 @@ var _ = Describe("Route Service Handler", func() {
 
 			Context("when the signature's forwarded_url does not match the request", func() {
 				BeforeEach(func() {
-					reqArgs, err := config.Request("", "https://my_host.com/original_path")
+					reqArgs, err := config.CreateRequest("", "https://my_host.com/original_path")
 					Expect(err).ToNot(HaveOccurred())
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)

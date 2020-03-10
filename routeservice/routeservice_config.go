@@ -76,7 +76,7 @@ func (rs *RouteServiceConfig) RouteServiceHairpinning() bool {
 	return rs.routeServiceHairpinning
 }
 
-func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RequestToSendToRouteService, error) {
+func (rs *RouteServiceConfig) CreateRequest(rsUrl, forwardedUrl string) (RequestToSendToRouteService, error) {
 	var routeServiceArgs RequestToSendToRouteService
 	sig, metadata, err := rs.generateSignatureAndMetadata(forwardedUrl)
 	if err != nil {

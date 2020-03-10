@@ -44,7 +44,7 @@ var _ = Describe("Route Service Config", func() {
 			rawForwardedURL := "this is my url%0A"
 			rsUrl := "https://example.com"
 
-			args, err := config.Request(rsUrl, rawForwardedURL)
+			args, err := config.CreateRequest(rsUrl, rawForwardedURL)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(args.ForwardedURL).To(Equal(rawForwardedURL))
 
@@ -59,7 +59,7 @@ var _ = Describe("Route Service Config", func() {
 			now := time.Now()
 			rsUrl := "https://example.com"
 
-			args, err := config.Request(rsUrl, rawForwardedUrl)
+			args, err := config.CreateRequest(rsUrl, rawForwardedUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			signatureContents, err := routeservice.SignatureContentsFromHeaders(args.Signature, args.Metadata, crypto)
@@ -80,7 +80,7 @@ var _ = Describe("Route Service Config", func() {
 				rawForwardedURL := "test.app.com"
 				rsUrl := "https://example.com"
 
-				args, err := config.Request(rsUrl, rawForwardedURL)
+				args, err := config.CreateRequest(rsUrl, rawForwardedURL)
 				Expect(err).To(HaveOccurred())
 
 				Expect(args.Metadata).To(BeEmpty())
@@ -91,7 +91,7 @@ var _ = Describe("Route Service Config", func() {
 		It("returns route service request information", func() {
 			rsUrl := "https://example.com"
 			forwardedUrl := "https://forwarded.example.com"
-			args, err := config.Request(rsUrl, forwardedUrl)
+			args, err := config.CreateRequest(rsUrl, forwardedUrl)
 			Expect(err).NotTo(HaveOccurred())
 
 			rsURL, err := url.Parse(rsUrl)
