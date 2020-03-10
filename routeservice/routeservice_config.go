@@ -29,7 +29,7 @@ type RouteServiceConfig struct {
 	recommendHttps          bool
 }
 
-type RouteServiceRequest struct {
+type RequestToSendToRouteService struct {
 	URLString      string
 	ParsedUrl      *url.URL
 	Signature      string
@@ -76,8 +76,8 @@ func (rs *RouteServiceConfig) RouteServiceHairpinning() bool {
 	return rs.routeServiceHairpinning
 }
 
-func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RouteServiceRequest, error) {
-	var routeServiceArgs RouteServiceRequest
+func (rs *RouteServiceConfig) Request(rsUrl, forwardedUrl string) (RequestToSendToRouteService, error) {
+	var routeServiceArgs RequestToSendToRouteService
 	sig, metadata, err := rs.generateSignatureAndMetadata(forwardedUrl)
 	if err != nil {
 		return routeServiceArgs, err
