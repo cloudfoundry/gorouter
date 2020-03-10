@@ -103,7 +103,7 @@ var _ = Describe("Route Service Config", func() {
 		})
 	})
 
-	Describe("ValidatedSignature", func() {
+	Describe("ValidateRequest", func() {
 		var (
 			requestFromRouteService routeservice.RequestReceivedFromRouteService
 			requestUrl              string
@@ -129,7 +129,7 @@ var _ = Describe("Route Service Config", func() {
 		})
 
 		It("decrypts a valid signature and returns the decrypted signature", func() {
-			validatedSig, err := config.ValidatedSignature(requestFromRouteService)
+			validatedSig, err := config.ValidateRequest(requestFromRouteService)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(validatedSig.ForwardedUrl).To(Equal(signatureContents.ForwardedUrl))
 			Expect(validatedSig.RequestedTime.Equal(signatureContents.RequestedTime)).To(BeTrue())
@@ -152,7 +152,7 @@ var _ = Describe("Route Service Config", func() {
 			})
 
 			It("returns an route service request expired error", func() {
-				_, err := config.ValidatedSignature(requestFromRouteService)
+				_, err := config.ValidateRequest(requestFromRouteService)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(BeAssignableToTypeOf(routeservice.ErrExpired))
 				Expect(err.Error()).To(ContainSubstring("request expired"))
@@ -169,7 +169,7 @@ var _ = Describe("Route Service Config", func() {
 			})
 
 			It("returns an error", func() {
-				_, err := config.ValidatedSignature(requestFromRouteService)
+				_, err := config.ValidateRequest(requestFromRouteService)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -184,7 +184,7 @@ var _ = Describe("Route Service Config", func() {
 
 			Context("when there is no previous key in the configuration", func() {
 				It("rejects the signature", func() {
-					_, err := config.ValidatedSignature(requestFromRouteService)
+					_, err := config.ValidateRequest(requestFromRouteService)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})
@@ -199,7 +199,7 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("validates the signature", func() {
-					_, err := config.ValidatedSignature(requestFromRouteService)
+					_, err := config.ValidateRequest(requestFromRouteService)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
@@ -220,7 +220,7 @@ var _ = Describe("Route Service Config", func() {
 					})
 
 					It("returns an route service request expired error", func() {
-						_, err := config.ValidatedSignature(requestFromRouteService)
+						_, err := config.ValidateRequest(requestFromRouteService)
 						Expect(err).To(HaveOccurred())
 						Expect(err).To(BeAssignableToTypeOf(routeservice.ErrExpired))
 					})
@@ -236,7 +236,7 @@ var _ = Describe("Route Service Config", func() {
 				})
 
 				It("rejects the signature", func() {
-					_, err := config.ValidatedSignature(requestFromRouteService)
+					_, err := config.ValidateRequest(requestFromRouteService)
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(ContainSubstring("authentication failed"))
 				})

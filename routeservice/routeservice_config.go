@@ -97,7 +97,7 @@ func (rs *RouteServiceConfig) CreateRequest(rsUrl, forwardedUrl string) (Request
 	return routeServiceArgs, nil
 }
 
-func (rs *RouteServiceConfig) ValidatedSignature(response RequestReceivedFromRouteService) (*SignatureContents, error) {
+func (rs *RouteServiceConfig) ValidateRequest(response RequestReceivedFromRouteService) (*SignatureContents, error) {
 
 	signatureContents, err := SignatureContentsFromHeaders(response.Signature, response.Metadata, rs.crypto)
 	if err != nil {

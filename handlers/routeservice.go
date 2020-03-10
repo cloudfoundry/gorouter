@@ -139,7 +139,7 @@ func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
 	}
 
 	request := newRequestReceivedFromRouteService(forwardedURLRaw, req.Header)
-	_, err := r.config.ValidatedSignature(request)
+	_, err := r.config.ValidateRequest(request)
 	return err == nil
 }
 
@@ -170,7 +170,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
 	if hasBeenToRouteService(routeServiceURL, rsSignature) {
 		// A request from a route service destined for a backend instances
 		request := newRequestReceivedFromRouteService(forwardedURLRaw, req.Header)
-		validatedSig, err := r.config.ValidatedSignature(request)
+		validatedSig, err := r.config.ValidateRequest(request)
 		if err != nil {
 			return false, err
 		}
