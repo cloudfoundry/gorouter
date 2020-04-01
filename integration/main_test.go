@@ -855,7 +855,7 @@ var _ = Describe("Router Integration", func() {
 			privateInstanceId string
 			done              chan bool
 			appRoute          string
-			waitGroup         sync.WaitGroup
+			goRoutine         sync.WaitGroup
 		)
 
 		BeforeEach(func() {
@@ -878,14 +878,14 @@ var _ = Describe("Router Integration", func() {
 			heartbeatInterval := 200 * time.Millisecond
 			runningTicker := time.NewTicker(heartbeatInterval)
 			done = make(chan bool, 1)
-			waitGroup.Add(1)
+			goRoutine.Add(1)
 			go func() {
+				defer goRoutine.Done()
 				for {
 					select {
 					case <-runningTicker.C:
 						runningApp1.Register()
 					case <-done:
-						waitGroup.Done()
 						return
 					}
 				}
@@ -894,7 +894,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		AfterEach(func() {
-			waitGroup.Wait()
+			goRoutine.Wait()
 		})
 
 		It("does not cache a 400", func() {
@@ -938,7 +938,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient        *nats.Conn
 			privateInstanceId string
 			done              chan bool
-			waitGroup         sync.WaitGroup
+			goRoutine         sync.WaitGroup
 		)
 
 		BeforeEach(func() {
@@ -957,14 +957,14 @@ var _ = Describe("Router Integration", func() {
 			heartbeatInterval := 200 * time.Millisecond
 			runningTicker := time.NewTicker(heartbeatInterval)
 			done = make(chan bool, 1)
-			waitGroup.Add(1)
+			goRoutine.Add(1)
 			go func() {
+				defer goRoutine.Done()
 				for {
 					select {
 					case <-runningTicker.C:
 						runningApp1.Register()
 					case <-done:
-						waitGroup.Done()
 						return
 					}
 				}
@@ -973,7 +973,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		AfterEach(func() {
-			waitGroup.Wait()
+			goRoutine.Wait()
 		})
 
 		Context("when it is syntactically invalid", func() {
