@@ -1,4 +1,4 @@
-Thanks for contributing to gorouter. To speed up the process of reviewing your pull request please provide us with:
+<!-- Thanks for contributing to 'gorouter'. To speed up the process of reviewing your pull request please provide us with: -->
 
 * A short explanation of the proposed change:
 
@@ -14,8 +14,10 @@ Thanks for contributing to gorouter. To speed up the process of reviewing your p
 
 * [ ] I have viewed signed and have submitted the Contributor License Agreement
 
-* [ ] I have made this pull request to the `master` branch
+* [ ] I have made this pull request to the `develop` branch
 
-* [ ] I have run all the unit tests using `bin/test`
+* [ ] I have run all the unit tests using `scripts/run-unit-tests-in-docker`
 
-* [ ] I have run CF Acceptance Tests on bosh lite
+* [ ] (Optional) I have run Routing Acceptance Tests and Routing Smoke Tests on bosh lite
+
+* [ ] (Optional) I have run CF Acceptance Tests on bosh lite

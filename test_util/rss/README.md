@@ -3,7 +3,7 @@ Command line tool for reading and writing route service signatures.
 
 ## Building
 
-```
+```bash
 cd ./test_util/rss
 go build
 ```
@@ -32,7 +32,6 @@ GLOBAL OPTIONS:
    --help, -h           show help
    --version, -v        print the version
 ```
-
 
 For example:
 
