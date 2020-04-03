@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -31,11 +32,14 @@ var _ = Describe("Route Services", func() {
 		cryptoKey            = "ABCDEFGHIJKLMNOP"
 		forwardedUrl         string
 		rsCertChain          test_util.CertChain
+		routeServiceServer   sync.WaitGroup
 	)
 
 	JustBeforeEach(func() {
 		server := &http.Server{Handler: http.HandlerFunc(routeServiceHandler)}
+		routeServiceServer.Add(1)
 		go func() {
+			defer routeServiceServer.Done()
 			_ = server.Serve(routeServiceListener)
 		}()
 	})
@@ -97,6 +101,7 @@ var _ = Describe("Route Services", func() {
 	AfterEach(func() {
 		err := routeServiceListener.Close()
 		Expect(err).ToNot(HaveOccurred())
+		routeServiceServer.Wait()
 	})
 
 	Context("with Route Services disabled", func() {
