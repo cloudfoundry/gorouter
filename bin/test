@@ -39,5 +39,5 @@ ginkgo \
   -randomizeAllSpecs \
   -p \
   -race \
-  -timeout 30m \
+  -timeout 20m \
   "$@"
