@@ -957,9 +957,13 @@ var _ = Describe("Router Integration", func() {
 			heartbeatInterval := 200 * time.Millisecond
 			runningTicker := time.NewTicker(heartbeatInterval)
 			done = make(chan bool, 1)
+			print("================= ADDING TO GOROUTING ======================\n")
 			goRoutine.Add(1)
 			go func() {
-				defer goRoutine.Done()
+				defer func() {
+					print("================= TELLING GOROUTING IT IS DONE ======================\n")
+					goRoutine.Done()
+				}()
 				for {
 					select {
 					case <-runningTicker.C:
@@ -973,7 +977,9 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		AfterEach(func() {
+			print("================= WAITING FOR GOROUTING TO EXIT ======================\n")
 			goRoutine.Wait()
+			print("================= GOROUTING EXITED, MOVING ON ======================\n")
 		})
 
 		Context("when it is syntactically invalid", func() {
