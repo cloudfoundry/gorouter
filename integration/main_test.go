@@ -263,11 +263,13 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
+			blocker2 := make(chan bool)
+
 			resultCh := make(chan error, 1)
 			timeoutApp := common.NewTestApp([]route.Uri{"timeout." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
-				<-blocker
+				<-blocker2
 			})
 			timeoutApp.Register()
 			timeoutApp.Listen()
@@ -282,7 +284,7 @@ var _ = Describe("Router Integration", func() {
 
 			<-blocker
 			defer func() {
-				blocker <- true
+				blocker2 <- true
 			}()
 
 			grouter := gorouterSession
@@ -301,10 +303,11 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			blocker := make(chan bool)
+			blocker2 := make(chan bool)
 			timeoutApp := common.NewTestApp([]route.Uri{"timeout." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil, "")
 			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
-				<-blocker
+				<-blocker2
 			})
 			timeoutApp.Register()
 			timeoutApp.Listen()
@@ -317,7 +320,7 @@ var _ = Describe("Router Integration", func() {
 
 			<-blocker
 			defer func() {
-				blocker <- true
+				blocker2 <- true
 			}()
 
 			grouter := gorouterSession
