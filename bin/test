@@ -14,8 +14,8 @@ trap printStatus EXIT
 
 . $(dirname $0)/gorequired
 
-# install gnatsd
-go get -v github.com/nats-io/gnatsd
+# install nats-server
+go get -v github.com/nats-io/nats-server
 
 # install shadow tool
 go get -u golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow

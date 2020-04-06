@@ -17,7 +17,7 @@ The following instructions may help you get started with gorouter.
 
 - Go should be installed and in the PATH GOPATH should be set as described in
   http://golang.org/doc/code.html
-- [gnatsd](https://github.com/nats-io/gnatsd) installed and in the
+- [nats-server](https://github.com/nats-io/nats-server) installed and in the
 - PATH Install [direnv](http://direnv.net/)
 
 ### Setup
@@ -45,7 +45,7 @@ We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
 Running `bin/test` will:
 - Checks for Go
 - Checks that GOPATH is set
-- Install gnatsd and ginkgo (or use the one already downloaded into the
+- Install nats-server and ginkgo (or use the one already downloaded into the
   GOPATH)
 - Run all the tests with ginkgo (in random order, without
   benchmarks)
@@ -81,8 +81,8 @@ go install
 
 ```bash
 # Start NATS server in daemon mode
-go get github.com/nats-io/gnatsd
-gnatsd &
+go get github.com/nats-io/nats-server
+nats-server &
 
 # Start gorouter
 gorouter

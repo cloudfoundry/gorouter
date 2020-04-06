@@ -31,19 +31,19 @@ func (runner *NATSRunner) Start() {
 		panic("starting an already started NATS runner!!!")
 	}
 
-	_, err := exec.LookPath("gnatsd")
+	_, err := exec.LookPath("nats-server")
 	if err != nil {
-		fmt.Println("You need gnatsd installed!")
+		fmt.Println("You need nats-server installed!")
 		os.Exit(1)
 	}
 
-	cmd := exec.Command("gnatsd", "-p", strconv.Itoa(runner.port))
+	cmd := exec.Command("nats-server", "-p", strconv.Itoa(runner.port))
 	sess, err := gexec.Start(
 		cmd,
-		gexec.NewPrefixedWriter("\x1b[32m[o]\x1b[34m[gnatsd]\x1b[0m ", ginkgo.GinkgoWriter),
-		gexec.NewPrefixedWriter("\x1b[91m[e]\x1b[34m[gnatsd]\x1b[0m ", ginkgo.GinkgoWriter),
+		gexec.NewPrefixedWriter("\x1b[32m[o]\x1b[34m[nats-server]\x1b[0m ", ginkgo.GinkgoWriter),
+		gexec.NewPrefixedWriter("\x1b[91m[e]\x1b[34m[nats-server]\x1b[0m ", ginkgo.GinkgoWriter),
 	)
-	Expect(err).NotTo(HaveOccurred(), "Make sure to have gnatsd on your path")
+	Expect(err).NotTo(HaveOccurred(), "Make sure to have nats-server on your path")
 
 	runner.natsSession = sess
 

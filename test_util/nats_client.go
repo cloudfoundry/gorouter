@@ -29,7 +29,7 @@ func (n *Nats) Port() uint16 {
 }
 
 func (n *Nats) Start() {
-	cmd := exec.Command("gnatsd", "-p", strconv.Itoa(int(n.port)), "--user", "nats", "--pass", "nats")
+	cmd := exec.Command("nats-server", "-p", strconv.Itoa(int(n.port)), "--user", "nats", "--pass", "nats")
 	err := cmd.Start()
 	Expect(err).ToNot(HaveOccurred())
 	n.cmd = cmd
