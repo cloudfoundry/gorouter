@@ -344,7 +344,15 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
 
-	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingAPIClient, 1, cl)
+	routeFetcher := route_fetcher.NewRouteFetcher(
+		logger,
+		uaaClient,
+		registry,
+		c,
+		routingAPIClient,
+		1,
+		cl,
+	)
 	return routeFetcher
 }
 
