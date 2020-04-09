@@ -59,7 +59,7 @@ var _ = Describe("RouteFetcher", func() {
 		Expect(err).ToNot(HaveOccurred())
 		cfg.PruneStaleDropletsInterval = 2 * time.Millisecond
 
-		retryInterval := 0
+		retryInterval := 0 * time.Second
 		uaaClient = &testUaaClient.FakeClient{}
 		registry = &testRegistry.FakeRegistry{}
 

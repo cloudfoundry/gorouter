@@ -350,7 +350,7 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		registry,
 		c,
 		routingAPIClient,
-		1,
+		1*time.Second,
 		cl,
 	)
 	return routeFetcher

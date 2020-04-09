@@ -19,10 +19,10 @@ import (
 )
 
 type RouteFetcher struct {
-	UaaClient                          uaa_client.Client
-	RouteRegistry                      registry.Registry
-	FetchRoutesInterval                time.Duration
-	SubscriptionRetryIntervalInSeconds int
+	UaaClient                 uaa_client.Client
+	RouteRegistry             registry.Registry
+	FetchRoutesInterval       time.Duration
+	SubscriptionRetryInterval time.Duration
 
 	logger          logger.Logger
 	endpoints       []models.Route
@@ -46,14 +46,14 @@ func NewRouteFetcher(
 	routeRegistry registry.Registry,
 	cfg *config.Config,
 	client routing_api.Client,
-	subscriptionRetryInterval int,
+	subscriptionRetryInterval time.Duration,
 	clock clock.Clock,
 ) *RouteFetcher {
 	return &RouteFetcher{
-		UaaClient:                          uaaClient,
-		RouteRegistry:                      routeRegistry,
-		FetchRoutesInterval:                cfg.PruneStaleDropletsInterval / 2,
-		SubscriptionRetryIntervalInSeconds: subscriptionRetryInterval,
+		UaaClient:                 uaaClient,
+		RouteRegistry:             routeRegistry,
+		FetchRoutesInterval:       cfg.PruneStaleDropletsInterval / 2,
+		SubscriptionRetryInterval: subscriptionRetryInterval,
 
 		client:       client,
 		logger:       logger,
@@ -118,7 +118,7 @@ func (r *RouteFetcher) startEventCycle() {
 				if atomic.LoadInt32(&r.stopEventSource) == 1 {
 					return
 				}
-				time.Sleep(time.Duration(r.SubscriptionRetryIntervalInSeconds) * time.Second)
+				time.Sleep(r.SubscriptionRetryInterval)
 			}
 		}
 	}()
