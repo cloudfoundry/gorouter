@@ -2,6 +2,7 @@ package route_fetcher
 
 import (
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,7 @@ type RouteFetcher struct {
 
 	logger          logger.Logger
 	endpoints       []models.Route
+	endpointsMutex  sync.Mutex
 	client          routing_api.Client
 	stopEventSource int32
 	eventSource     atomic.Value
@@ -226,12 +228,28 @@ func (r *RouteFetcher) fetchRoutesWithTokenRefresh() ([]models.Route, error) {
 	return routes, err
 }
 
+func (r *RouteFetcher) getEndpoints() []models.Route {
+	r.endpointsMutex.Lock()
+	defer r.endpointsMutex.Unlock()
+
+	result := make([]models.Route, len(r.endpoints))
+	copy(result, r.endpoints)
+
+	return result
+}
+
+func (r *RouteFetcher) setEndpoints(endpoints []models.Route) {
+	r.endpointsMutex.Lock()
+	defer r.endpointsMutex.Unlock()
+	r.endpoints = endpoints
+}
+
 func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 	r.deleteEndpoints(validRoutes)
 
-	r.endpoints = validRoutes
+	r.setEndpoints(validRoutes)
 
-	for _, aRoute := range r.endpoints {
+	for _, aRoute := range validRoutes {
 		r.RouteRegistry.Register(
 			route.Uri(aRoute.Route),
 			route.NewEndpoint(&route.EndpointOpts{
@@ -251,7 +269,7 @@ func (r *RouteFetcher) refreshEndpoints(validRoutes []models.Route) {
 func (r *RouteFetcher) deleteEndpoints(validRoutes []models.Route) {
 	var diff []models.Route
 
-	for _, curRoute := range r.endpoints {
+	for _, curRoute := range r.getEndpoints() {
 		routeFound := false
 
 		for _, validRoute := range validRoutes {
