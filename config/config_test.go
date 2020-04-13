@@ -929,6 +929,41 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 				})
 			})
 
+			Context("when valid value for max_tls_version is set", func() {
+				BeforeEach(func() {
+					configSnippet.MaxTLSVersionString = "TLSv1.3"
+				})
+				It("populates MaxTLSVersion", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process()).To(Succeed())
+					Expect(config.MaxTLSVersion).To(Equal(uint16(tls.VersionTLS13)))
+				})
+			})
+			Context("when invalid value for max_tls_version is set", func() {
+				BeforeEach(func() {
+					configSnippet.MaxTLSVersionString = "fake-tls"
+				})
+				It("returns a meaningful error", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process()).To(MatchError(`router.max_tls_version should be one of "TLSv1.2" or "TLSv1.3"`))
+				})
+			})
+			Context("when max_tls_version is not set", func() {
+				BeforeEach(func() {
+					configSnippet.MaxTLSVersionString = ""
+				})
+				It("sets the default to TLSv1.2", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process()).To(Succeed())
+					Expect(config.MaxTLSVersion).To(Equal(uint16(tls.VersionTLS12)))
+				})
+			})
 			Context("when a valid CACerts is provided", func() {
 				BeforeEach(func() {
 					configSnippet.CACerts = string(rootRSAPEM) + string(rootECDSAPEM)

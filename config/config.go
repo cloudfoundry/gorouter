@@ -202,7 +202,9 @@ type Config struct {
 	CipherString                      string             `yaml:"cipher_suites,omitempty"`
 	CipherSuites                      []uint16           `yaml:"-"`
 	MinTLSVersionString               string             `yaml:"min_tls_version,omitempty"`
+	MaxTLSVersionString               string             `yaml:"max_tls_version,omitempty"`
 	MinTLSVersion                     uint16             `yaml:"-"`
+	MaxTLSVersion                     uint16             `yaml:"-"`
 	ClientCertificateValidationString string             `yaml:"client_cert_validation,omitempty"`
 	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
 
@@ -271,6 +273,7 @@ var defaultConfig = Config{
 	SSLPort:       443,
 	DisableHTTP:   false,
 	MinTLSVersion: tls.VersionTLS12,
+	MaxTLSVersion: tls.VersionTLS12,
 
 	EndpointTimeout:                60 * time.Second,
 	EndpointDialTimeout:            5 * time.Second,
@@ -396,6 +399,15 @@ func (c *Config) Process() error {
 			c.MinTLSVersion = tls.VersionTLS12
 		default:
 			return fmt.Errorf(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
+		}
+
+		switch c.MaxTLSVersionString {
+		case "TLSv1.2", "":
+			c.MaxTLSVersion = tls.VersionTLS12
+		case "TLSv1.3":
+			c.MaxTLSVersion = tls.VersionTLS13
+		default:
+			return fmt.Errorf(`router.max_tls_version should be one of "TLSv1.2" or "TLSv1.3"`)
 		}
 
 		if len(c.TLSPEM) == 0 {

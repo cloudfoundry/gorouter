@@ -247,6 +247,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		Certificates: r.config.SSLCertificates,
 		CipherSuites: r.config.CipherSuites,
 		MinVersion:   r.config.MinTLSVersion,
+		MaxVersion:   r.config.MaxTLSVersion,
 		ClientCAs:    rootCAs,
 		ClientAuth:   r.config.ClientCertificateValidation,
 	}
