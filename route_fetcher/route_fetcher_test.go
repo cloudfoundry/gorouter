@@ -3,6 +3,7 @@ package route_fetcher_test
 import (
 	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/clock/fakeclock"
@@ -155,6 +156,22 @@ var _ = Describe("RouteFetcher", func() {
 						ModificationTag:         expectedRoute.ModificationTag,
 					})))
 			}
+		})
+
+		It("can be called in parallel", func() {
+			// test with -race to validate
+			client.RoutesReturns(response, nil)
+
+			var wg sync.WaitGroup
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func(wg *sync.WaitGroup) {
+					defer wg.Done()
+					err := fetcher.FetchRoutes()
+					Expect(err).ToNot(HaveOccurred())
+				}(&wg)
+			}
+			wg.Wait()
 		})
 
 		It("uses cache when fetching token from UAA", func() {
