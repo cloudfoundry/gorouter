@@ -9,6 +9,16 @@ GoRouter is deployed by default with Cloud Foundry
 > **Note**: This repository should be imported as
 > `code.cloudfoundry.org/gorouter`.
 
+## Reporting issues and requesting features
+
+Please report all issues and feature requests in [cloudfoundry/routing-release](https://github.com/cloudfoundry/routing-release).
+
+## Contributing
+
+Please read the [contributors'
+guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md) and our [Development Guide for
+Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md).
+
 ## Development
 
 The following instructions may help you get started with gorouter.
@@ -767,10 +777,3 @@ topics.
 Refer
 [doc](https://docs.pivotal.io/pivotalcf/adminguide/troubleshooting_slow_requests.html)
 to learn more troubleshooting slow requests.
-
-## Contributing
-
-Please read the [contributors'
-guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md)
-Please read our [Development Guide for
-Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md)
