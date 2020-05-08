@@ -25,10 +25,9 @@ The following instructions may help you get started with gorouter.
 
 ### Prerequisites
 
-- Go should be installed and in the PATH GOPATH should be set as described in
-  http://golang.org/doc/code.html
-- [nats-server](https://github.com/nats-io/nats-server) installed and in the
-- PATH Install [direnv](http://direnv.net/)
+- [Go](https://golang.org/doc/install) should be installed and in the PATH.
+- [nats-server](https://github.com/nats-io/nats-server) should be installed and in the PATH.
+- [direnv](http://direnv.net/) should be installed and in the PATH.
 
 ### Setup
 
