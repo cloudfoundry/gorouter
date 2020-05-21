@@ -1374,6 +1374,20 @@ endpoint_timeout: 10s
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(10 * time.Second))
 			})
+
+			It("lets drain_timeout be 60 if it wants", func() {
+				var b = []byte(`
+endpoint_timeout: 10s
+route_services_timeout: 11s
+drain_timeout: 60s
+`)
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Process()).To(Succeed())
+
+				Expect(config.DrainTimeout).To(Equal(60 * time.Second))
+			})
 		})
 
 		Describe("configuring client (mTLS) authentication to backends", func() {

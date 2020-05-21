@@ -156,6 +156,7 @@ var defaultLoggingConfig = LoggingConfig{
 	Level:         "debug",
 	MetronAddress: "localhost:3457",
 	Format:        FormatConfig{"unix-epoch"},
+	JobName:       "gorouter",
 }
 
 type HeaderNameValue struct {
@@ -315,16 +316,10 @@ var defaultConfig = Config{
 
 func DefaultConfig() (*Config, error) {
 	c := defaultConfig
-	err := c.Process()
-	if err != nil {
-		return nil, fmt.Errorf("invalid default config: %s", err)
-	}
-
 	return &c, nil
 }
 
 func (c *Config) Process() error {
-
 	if c.GoMaxProcs == -1 {
 		c.GoMaxProcs = runtime.NumCPU()
 	}
@@ -334,7 +329,7 @@ func (c *Config) Process() error {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
 	}
 
-	if c.DrainTimeout == 0 || c.DrainTimeout == defaultConfig.EndpointTimeout {
+	if c.DrainTimeout == 0 {
 		c.DrainTimeout = c.EndpointTimeout
 	}
 
