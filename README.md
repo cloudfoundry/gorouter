@@ -49,28 +49,11 @@ cd src/code.cloudfoundry.org/gorouter
 
 ### Running Tests
 
-We are using [Ginkgo](https://github.com/onsi/ginkgo), to run tests.
+Tests in this repo cannot be run on their own, only as part of Routing Release.
 
-Running `bin/test` will:
-- Checks for Go
-- Checks that GOPATH is set
-- Install nats-server and ginkgo (or use the one already downloaded into the
-  GOPATH)
-- Run all the tests with ginkgo (in random order, without
-  benchmarks)
-
-Any flags passed into `bin/test` will be passed into ginkgo.
-
-```bash
-# run all the tests
-bin/test
-
-# run only tests whose names match Registry
-bin/test -focus=Registry
-
-# run only the tests in the registry package
-bin/test registry
-```
+Follow the instructions for [running tests in
+docker](https://github.com/cloudfoundry/routing-release#in-a-docker-container)
+in the routing release readme.
 
 ### Building
 Building creates an executable in the gorouter/ dir:
