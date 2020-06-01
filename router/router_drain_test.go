@@ -1,7 +1,6 @@
 package router_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"os"
 	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -274,19 +275,21 @@ var _ = Describe("Router", func() {
 			Eventually(clientDone).Should(BeClosed())
 		})
 
-		It("times out if it takes too long", func() {
+		It("times out if it requests are not completed before timeout", func() {
 			app := common.NewTestApp([]route.Uri{"draintimeout." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
-			blocker := make(chan bool)
-			resultCh := make(chan error, 2)
+			appRequestReceived := make(chan struct{})
+			appRequestComplete := make(chan struct{})
+			drainResult := make(chan error, 2)
+
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				blocker <- true
+				appRequestReceived <- struct{}{}
 
 				_, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
-				//TODO: wtf is this doing here? sleep?
-				time.Sleep(1 * time.Second)
+
+				appRequestComplete <- struct{}{}
 			})
 			app.RegisterAndListen()
 
@@ -306,36 +309,37 @@ var _ = Describe("Router", func() {
 				defer resp.Body.Close()
 			}()
 
-			<-blocker
+			<-appRequestReceived
 
 			go func() {
 				defer GinkgoRecover()
 				err := rtr.Drain(0, 500*time.Millisecond)
-				resultCh <- err
+				drainResult <- err
 			}()
 
 			var result error
-			Eventually(resultCh).Should(Receive(&result))
+			Eventually(drainResult).Should(Receive(&result))
 			Expect(result).To(Equal(router.DrainTimeout))
+			<-appRequestComplete
 		})
 
 		Context("with http and https servers", func() {
 			It("it drains and stops the router", func() {
 				app := common.NewTestApp([]route.Uri{"drain." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
-				blocker := make(chan bool)
+				appRequestReceived := make(chan struct{})
+				appRequestComplete := make(chan struct{})
 				drainDone := make(chan struct{})
 				clientDone := make(chan struct{})
 
 				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-					blocker <- true
+					appRequestReceived <- struct{}{}
 
 					_, err := ioutil.ReadAll(r.Body)
 					defer r.Body.Close()
 					Expect(err).ToNot(HaveOccurred())
 
-					<-blocker
-
 					w.WriteHeader(http.StatusNoContent)
+					appRequestComplete <- struct{}{}
 				})
 
 				app.RegisterAndListen()
@@ -369,8 +373,7 @@ var _ = Describe("Router", func() {
 					close(clientDone)
 				}()
 
-				// wait for app to receive request
-				<-blocker
+				<-appRequestReceived
 
 				// check that we can still connect within drainWait time
 				go func() {
@@ -391,7 +394,7 @@ var _ = Describe("Router", func() {
 				Consistently(drainDone, drainTimeout/10).ShouldNot(BeClosed())
 
 				// drain in progress, continue with current request
-				blocker <- false
+				<-appRequestComplete
 
 				Eventually(drainDone, drainWait+drainTimeout*(9/10)).Should(BeClosed())
 				Eventually(clientDone).Should(BeClosed())
