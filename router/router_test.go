@@ -42,6 +42,7 @@ import (
 	. "code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
+	"code.cloudfoundry.org/gorouter/test/common"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
@@ -733,7 +734,7 @@ var _ = Describe("Router", func() {
 			assertServerResponse(client, req)
 
 			// use 3/4 of the idle timeout
-			time.Sleep(config.EndpointTimeout / 4 * 3)
+			time.Sleep((config.EndpointTimeout * 3) / 4)
 
 			//make second request without errors
 			resp, err := client.Do(req)
@@ -743,7 +744,7 @@ var _ = Describe("Router", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			// use another 3/4 of the idle timeout, exceeding the original timeout
-			time.Sleep(config.EndpointTimeout / 4 * 3)
+			time.Sleep((config.EndpointTimeout * 3) / 4)
 
 			// make third request without errors
 			// even though initial idle timeout was exceeded because
@@ -758,11 +759,11 @@ var _ = Describe("Router", func() {
 		It("removes the idle timeout during an active connection", func() {
 			// create an app that takes 3/4 of the deadline to respond
 			// during an active connection
-			app := test.NewSlowApp(
+			app := newSlowApp(
 				[]route.Uri{"keepalive." + test_util.LocalhostDNS},
 				config.Port,
 				mbusClient,
-				config.EndpointTimeout/4*3,
+				(config.EndpointTimeout*3)/4,
 			)
 			app.RegisterAndListen()
 			Eventually(func() bool {
@@ -783,7 +784,7 @@ var _ = Describe("Router", func() {
 			assertServerResponse(client, req)
 
 			// use 3/4 of the idle timeout
-			time.Sleep(config.EndpointTimeout / 4 * 3)
+			time.Sleep((config.EndpointTimeout * 3) / 4)
 
 			// because 3/4 of the idle timeout is now used
 			// making a request that will last 3/4 of the timeout
@@ -797,48 +798,106 @@ var _ = Describe("Router", func() {
 		})
 	})
 
-	Context("long requests", func() {
+	Describe("request timeout for long requests", func() {
+		var (
+			req    *http.Request
+			client http.Client
+		)
+
 		Context("http", func() {
 			JustBeforeEach(func() {
-				app := test.NewSlowApp(
+				app := newSlowApp(
 					[]route.Uri{"slow-app." + test_util.LocalhostDNS},
 					config.Port,
 					mbusClient,
-					1*time.Second,
+					config.EndpointTimeout*2,
 				)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
+
+				client = http.Client{}
 			})
 
-			It("terminates before receiving headers", func() {
-				uri := fmt.Sprintf("http://slow-app.%s:%d", test_util.LocalhostDNS, config.Port)
-				req, _ := http.NewRequest("GET", uri, nil)
-				client := http.Client{}
-				resp, err := client.Do(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(resp).ToNot(BeNil())
-				Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-				defer resp.Body.Close()
+			Context("when no body or header has been written", func() {
+				BeforeEach(func() {
+					uri := fmt.Sprintf("http://slow-app.%s:%d/", test_util.LocalhostDNS, config.Port)
+					req, _ = http.NewRequest("GET", uri, nil)
+				})
 
-				_, err = ioutil.ReadAll(resp.Body)
-				Expect(err).ToNot(HaveOccurred())
+				It("responds with a 502/BadGateway and an error message", func() {
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp).ToNot(BeNil())
+					Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+					defer resp.Body.Close()
+
+					b, err := ioutil.ReadAll(resp.Body)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(string(b)).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
+				})
 			})
 
-			It("terminates before receiving the body", func() {
-				uri := fmt.Sprintf("http://slow-app.%s:%d/hello", test_util.LocalhostDNS, config.Port)
-				req, _ := http.NewRequest("GET", uri, nil)
-				client := http.Client{}
-				resp, err := client.Do(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(resp).ToNot(BeNil())
-				Expect(resp.StatusCode).To(Equal(http.StatusOK))
-				defer resp.Body.Close()
+			Context("when body has been written, but not closed", func() {
+				BeforeEach(func() {
+					uri := fmt.Sprintf("http://slow-app.%s:%d/flushbody", test_util.LocalhostDNS, config.Port)
+					req, _ = http.NewRequest("GET", uri, nil)
+				})
 
-				_, err = ioutil.ReadAll(resp.Body)
-				Expect(err).To(HaveOccurred())
+				It("responds with a 200/Success and an unreadable body", func() {
+					// Characterization test
+					// This may not be the exact behavior we want, but it is how it currently behaves
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp).ToNot(BeNil())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					defer resp.Body.Close()
+
+					_, err = ioutil.ReadAll(resp.Body)
+					Expect(err).To(MatchError("unexpected EOF"))
+				})
+			})
+
+			Context("when header has been written, but no body", func() {
+				BeforeEach(func() {
+					uri := fmt.Sprintf("http://slow-app.%s:%d/flushheader", test_util.LocalhostDNS, config.Port)
+					req, _ = http.NewRequest("GET", uri, nil)
+				})
+
+				It("responds with the header and body which fails to be read", func() {
+					// Characterization test
+					// This may not be the exact behavior we want, but it is how it currently behaves
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp).ToNot(BeNil())
+					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+					defer resp.Body.Close()
+
+					_, err = ioutil.ReadAll(resp.Body)
+					Expect(err).To(MatchError("unexpected EOF"))
+				})
+			})
+
+			Context("when body and header have been written", func() {
+				BeforeEach(func() {
+					uri := fmt.Sprintf("http://slow-app.%s:%d/flushbodyandheader", test_util.LocalhostDNS, config.Port)
+					req, _ = http.NewRequest("GET", uri, nil)
+				})
+
+				It("responds with the header and body which fails to be read", func() {
+					// Characterization test
+					// This may not be the exact behavior we want, but it is how it currently behaves
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp).ToNot(BeNil())
+					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
+					defer resp.Body.Close()
+
+					_, err = ioutil.ReadAll(resp.Body)
+					Expect(err).To(MatchError("unexpected EOF"))
+				})
 			})
 		})
 
@@ -847,7 +906,7 @@ var _ = Describe("Router", func() {
 				[]route.Uri{"ws-app." + test_util.LocalhostDNS},
 				config.Port,
 				mbusClient,
-				1*time.Second,
+				config.EndpointTimeout*2,
 				"",
 			)
 			app.RegisterAndListen()
@@ -2025,4 +2084,33 @@ func routeExists(config *config.Config, routeName string) (bool, error) {
 	default:
 		return false, errors.New("Didn't get an OK response")
 	}
+}
+
+func newSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {
+	app := common.NewTestApp(urls, rPort, mbusClient, nil, "")
+
+	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(delay)
+	})
+
+	app.AddHandler("/flushheader", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+		w.(http.Flusher).Flush()
+		time.Sleep(delay)
+	})
+
+	app.AddHandler("/flushbody", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "hello, world")
+		w.(http.Flusher).Flush()
+		time.Sleep(delay)
+	})
+
+	app.AddHandler("/flushbodyandheader", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+		io.WriteString(w, "hello, world")
+		w.(http.Flusher).Flush()
+		time.Sleep(delay)
+	})
+
+	return app
 }
