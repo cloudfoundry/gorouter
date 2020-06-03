@@ -142,7 +142,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			} else {
 				request.URL.Scheme = "http"
 			}
-			res, err = rt.backendRoundTrip(request, endpoint, iter)
+			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
 			if err != nil {
 				iter.EndpointFailed(err)
@@ -176,7 +176,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				roundTripper = rt.routeServicesTransport
 			}
 
-			res, err = rt.timedRoundTrip(roundTripper, request)
+			res, err = rt.timedRoundTrip(roundTripper, request, logger)
 			if err != nil {
 				logger.Error("route-service-connection-failed", zap.Error(err))
 
@@ -233,6 +233,7 @@ func (rt *roundTripper) backendRoundTrip(
 	request *http.Request,
 	endpoint *route.Endpoint,
 	iter route.EndpointIterator,
+	logger logger.Logger,
 ) (*http.Response, error) {
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
@@ -244,14 +245,14 @@ func (rt *roundTripper) backendRoundTrip(
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
 	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
-	res, err := rt.timedRoundTrip(tr, request)
+	res, err := rt.timedRoundTrip(tr, request, logger)
 
 	// decrement connection stats
 	iter.PostRequest(endpoint)
 	return res, err
 }
 
-func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request) (*http.Response, error) {
+func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
 	if rt.endpointTimeout <= 0 {
 		return tr.RoundTrip(request)
 	}
@@ -264,6 +265,9 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	go func() {
 		select {
 		case <-reqCtx.Done():
+			if reqCtx.Err() == context.DeadlineExceeded {
+				logger.Error("backend-request-timeout", zap.Error(reqCtx.Err()), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)))
+			}
 			cancel()
 		}
 	}()
