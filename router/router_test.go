@@ -74,6 +74,8 @@ var _ = Describe("Router", func() {
 		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
 		routeServicesServer *sharedfakes.RouteServicesServer
 		err                 error
+		backendIdleTimeout  time.Duration
+		requestTimeout      time.Duration
 	)
 
 	BeforeEach(func() {
@@ -81,6 +83,8 @@ var _ = Describe("Router", func() {
 		statusPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
 		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
+		backendIdleTimeout = config.EndpointTimeout
+		requestTimeout = config.EndpointTimeout
 		config.EnableSSL = true
 		config.SSLPort = test_util.NextAvailPort()
 		config.DisableHTTP = false
@@ -106,7 +110,7 @@ var _ = Describe("Router", func() {
 	})
 
 	JustBeforeEach(func() {
-		router, err = initializeRouter(config, registry, varz, mbusClient, logger, routeServicesServer)
+		router, err = initializeRouter(config, backendIdleTimeout, requestTimeout, registry, varz, mbusClient, logger, routeServicesServer)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
@@ -153,7 +157,7 @@ var _ = Describe("Router", func() {
 				c := test_util.SpecConfig(statusPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
-				rtr, err := initializeRouter(c, registry, varz, mbusClient, logger, rss)
+				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
 				Expect(err).NotTo(HaveOccurred())
 
 				signals := make(chan os.Signal)
@@ -179,7 +183,7 @@ var _ = Describe("Router", func() {
 					return nil
 				}
 
-				rtr, err := initializeRouter(c, registry, varz, mbusClient, logger, rss)
+				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
 				Expect(err).NotTo(HaveOccurred())
 
 				signals := make(chan os.Signal)
@@ -206,7 +210,7 @@ var _ = Describe("Router", func() {
 			c.StartResponseDelayInterval = 1 * time.Second
 
 			// Create a second router to test the health check in parallel to startup
-			rtr, err = initializeRouter(c, registry, varz, mbusClient, logger, routeServicesServer)
+			rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
 
 			Expect(err).ToNot(HaveOccurred())
 			healthCheckWithEndpointReceives := func() int {
@@ -800,25 +804,30 @@ var _ = Describe("Router", func() {
 
 	Describe("request timeout for long requests", func() {
 		var (
-			req    *http.Request
-			client http.Client
+			req             *http.Request
+			client          http.Client
+			appResponseTime time.Duration
 		)
 
-		Context("http", func() {
+		Context("when app response time is longer than request timeout (and shorter than backend idle timeout)", func() {
+			BeforeEach(func() {
+				requestTimeout = 1 * time.Second
+				backendIdleTimeout = 3 * time.Second
+				appResponseTime = 2 * time.Second
+				client = http.Client{}
+			})
 			JustBeforeEach(func() {
 				app := newSlowApp(
 					[]route.Uri{"slow-app." + test_util.LocalhostDNS},
 					config.Port,
 					mbusClient,
-					config.EndpointTimeout*2,
+					appResponseTime,
 				)
 
 				app.RegisterAndListen()
 				Eventually(func() bool {
 					return appRegistered(registry, app)
 				}).Should(BeTrue())
-
-				client = http.Client{}
 			})
 
 			Context("when no body or header has been written", func() {
@@ -837,38 +846,18 @@ var _ = Describe("Router", func() {
 					b, err := ioutil.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(string(b)).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
+					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
+					Expect(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
 				})
 			})
 
-			Context("when body has been written, but not closed", func() {
+			Context("when something has been written, but the response has not completed", func() {
 				BeforeEach(func() {
-					uri := fmt.Sprintf("http://slow-app.%s:%d/flushbody", test_util.LocalhostDNS, config.Port)
+					uri := fmt.Sprintf("http://slow-app.%s:%d/partialresponse", test_util.LocalhostDNS, config.Port)
 					req, _ = http.NewRequest("GET", uri, nil)
 				})
 
-				It("responds with a 200/Success and an unreadable body", func() {
-					// Characterization test
-					// This may not be the exact behavior we want, but it is how it currently behaves
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
-					Expect(resp.StatusCode).To(Equal(http.StatusOK))
-					defer resp.Body.Close()
-
-					_, err = ioutil.ReadAll(resp.Body)
-					Expect(err).To(MatchError("unexpected EOF"))
-				})
-			})
-
-			Context("when header has been written, but no body", func() {
-				BeforeEach(func() {
-					uri := fmt.Sprintf("http://slow-app.%s:%d/flushheader", test_util.LocalhostDNS, config.Port)
-					req, _ = http.NewRequest("GET", uri, nil)
-				})
-
-				It("responds with the header and body which fails to be read", func() {
-					// Characterization test
-					// This may not be the exact behavior we want, but it is how it currently behaves
+				It("responds with an unreadable body", func() {
 					resp, err := client.Do(req)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(resp).ToNot(BeNil())
@@ -877,27 +866,43 @@ var _ = Describe("Router", func() {
 
 					_, err = ioutil.ReadAll(resp.Body)
 					Expect(err).To(MatchError("unexpected EOF"))
+					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
 				})
 			})
+		})
 
-			Context("when body and header have been written", func() {
-				BeforeEach(func() {
-					uri := fmt.Sprintf("http://slow-app.%s:%d/flushbodyandheader", test_util.LocalhostDNS, config.Port)
-					req, _ = http.NewRequest("GET", uri, nil)
-				})
+		Context("when app response time is shorter than request timeout (and longer than the backend idle timeout)", func() {
+			BeforeEach(func() {
+				requestTimeout = 3 * time.Second
+				backendIdleTimeout = 1 * time.Second
+				appResponseTime = 2 * time.Second
+				client = http.Client{}
+			})
+			JustBeforeEach(func() {
+				app := newSlowApp(
+					[]route.Uri{"slow-app." + test_util.LocalhostDNS},
+					config.Port,
+					mbusClient,
+					appResponseTime,
+				)
 
-				It("responds with the header and body which fails to be read", func() {
-					// Characterization test
-					// This may not be the exact behavior we want, but it is how it currently behaves
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
-					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
-					defer resp.Body.Close()
+				app.RegisterAndListen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+			})
 
-					_, err = ioutil.ReadAll(resp.Body)
-					Expect(err).To(MatchError("unexpected EOF"))
-				})
+			It("succeeds", func() {
+				uri := fmt.Sprintf("http://slow-app.%s:%d/", test_util.LocalhostDNS, config.Port)
+				req, _ = http.NewRequest("GET", uri, nil)
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				defer resp.Body.Close()
+
+				_, err = ioutil.ReadAll(resp.Body)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
@@ -1922,20 +1927,22 @@ func badCertTemplate(cname string) (*x509.Certificate, error) {
 	return &tmpl, nil
 }
 
-func initializeRouter(config *cfg.Config, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
+func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout time.Duration, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.RouteServicesHairpinning, config.EndpointTimeout, nil, nil, false)
 
-	rt := &sharedfakes.RoundTripper{}
-	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
-		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, rt)
+	proxyConfig := *config
+	proxyConfig.EndpointTimeout = requestTimeout
+	routeServicesTransport := &sharedfakes.RoundTripper{}
+	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, &proxyConfig, registry, combinedReporter,
+		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, routeServicesTransport)
 
 	h := &health.Health{}
-
 	logcounter := schema.NewLogCounter()
+	config.EndpointTimeout = backendIdleTimeout
 	router, e := NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, nil, routeServicesServer)
 
 	h.OnDegrade = router.DrainAndStop
@@ -2093,19 +2100,7 @@ func newSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay tim
 		time.Sleep(delay)
 	})
 
-	app.AddHandler("/flushheader", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTeapot)
-		w.(http.Flusher).Flush()
-		time.Sleep(delay)
-	})
-
-	app.AddHandler("/flushbody", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "hello, world")
-		w.(http.Flusher).Flush()
-		time.Sleep(delay)
-	})
-
-	app.AddHandler("/flushbodyandheader", func(w http.ResponseWriter, r *http.Request) {
+	app.AddHandler("/partialresponse", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 		io.WriteString(w, "hello, world")
 		w.(http.Flusher).Flush()
