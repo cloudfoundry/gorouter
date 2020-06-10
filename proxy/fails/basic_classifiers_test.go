@@ -3,6 +3,7 @@ package fails_test
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -223,6 +224,27 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 				_, err := testTransport.RoundTrip(req)
 				Expect(err).To(HaveOccurred())
 				Expect(fails.RemoteHandshakeFailure(err)).To(BeFalse())
+			})
+		})
+	})
+
+	Describe("ExpiredOrNotYetValidCertFailure", func() {
+		Context("when the cert is expired or not yet valid", func() {
+			var (
+				expiredClientCert *x509.Certificate
+			)
+
+			BeforeEach(func() {
+				expiredClientCertPool := test_util.CreateExpiredSignedCertWithRootCA(test_util.CertNames{CommonName: "client"})
+				block, _ := pem.Decode(expiredClientCertPool.CertPEM)
+				var err error
+				expiredClientCert, err = x509.ParseCertificate(block.Bytes)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("matches", func() {
+				_, err := expiredClientCert.Verify(x509.VerifyOptions{})
+				Expect(fails.ExpiredOrNotYetValidCertFailure(err)).To(BeTrue())
 			})
 		})
 	})

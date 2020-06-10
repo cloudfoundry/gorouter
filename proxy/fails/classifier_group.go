@@ -9,6 +9,7 @@ var RetriableClassifiers = ClassifierGroup{
 	RemoteFailedCertCheck,
 	RemoteHandshakeFailure,
 	UntrustedCert,
+	ExpiredOrNotYetValidCertFailure,
 }
 
 var FailableClassifiers = ClassifierGroup{

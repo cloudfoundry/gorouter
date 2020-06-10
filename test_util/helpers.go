@@ -246,6 +246,49 @@ type CertNames struct {
 	SANs       SubjectAltNames
 }
 
+func CreateExpiredSignedCertWithRootCA(cert CertNames) CertChain {
+	rootPrivateKey, rootCADER := CreateCertDER("theCA")
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	subject.CommonName = cert.CommonName
+
+	certTemplate := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.SHA256WithRSA,
+		NotBefore:             time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),
+		NotAfter:              time.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC),
+		BasicConstraintsValid: true,
+	}
+	if cert.SANs.IP != "" {
+		certTemplate.IPAddresses = []net.IP{net.ParseIP(cert.SANs.IP)}
+	}
+	if cert.SANs.DNS != "" {
+		certTemplate.DNSNames = []string{cert.SANs.DNS}
+	}
+	rootCert, err := x509.ParseCertificate(rootCADER)
+	Expect(err).NotTo(HaveOccurred())
+
+	ownKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	Expect(err).NotTo(HaveOccurred())
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)
+	Expect(err).NotTo(HaveOccurred())
+	ownKeyPEM, ownCertPEM := CreateKeyPairFromDER(certDER, ownKey)
+	rootKeyPEM, rootCertPEM := CreateKeyPairFromDER(rootCADER, rootPrivateKey)
+	return CertChain{
+		CertPEM:      ownCertPEM,
+		PrivKeyPEM:   ownKeyPEM,
+		CACertPEM:    rootCertPEM,
+		CAPrivKeyPEM: rootKeyPEM,
+		CACert:       rootCert,
+		CAPrivKey:    rootPrivateKey,
+	}
+}
 func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)

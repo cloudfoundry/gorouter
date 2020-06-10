@@ -39,6 +39,17 @@ var RemoteFailedCertCheck = ClassifierFunc(func(err error) bool {
 	return err != nil && err.Error() == "readLoopPeekFailLocked: remote error: tls: bad certificate"
 })
 
+var ExpiredOrNotYetValidCertFailure = ClassifierFunc(func(err error) bool {
+	switch x509err := err.(type) {
+	case x509.CertificateInvalidError:
+		return x509err.Reason == x509.Expired
+	case *x509.CertificateInvalidError:
+		return x509err.Reason == x509.Expired
+	default:
+		return false
+	}
+})
+
 var RemoteHandshakeFailure = ClassifierFunc(func(err error) bool {
 	ne, ok := err.(*net.OpError)
 	return ok && ne.Op == "remote error" && ne.Err.Error() == "tls: handshake failure"
