@@ -8,6 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
@@ -53,6 +54,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		a.logger.Fatal("request-info-err", zap.Error(err))
 		return
 	}
+
 	alr.RoundtripStartedAt = reqInfo.StartedAt
 	alr.RoundtripFinishedAt = time.Now()
 	alr.AppRequestStartedAt = reqInfo.AppRequestStartedAt
@@ -62,6 +64,8 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
 	alr.StatusCode = proxyWriter.Status()
+	alr.RouterError = proxyWriter.Header().Get(router_http.CfRouterError)
+
 	a.accessLogger.Log(*alr)
 }
 

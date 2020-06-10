@@ -97,6 +97,7 @@ type AccessLogRecord struct {
 	ExtraHeadersToLog      []string
 	DisableXFFLogging      bool
 	DisableSourceIPLogging bool
+	RouterError            string
 	record                 []byte
 }
 
@@ -188,9 +189,12 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteString(`app_id:`)
 	b.WriteDashOrStringValue(appID)
 
-	b.AppendSpaces(false)
 	b.WriteString(`app_index:`)
 	b.WriteDashOrStringValue(appIndex)
+
+	b.AppendSpaces(false)
+	b.WriteString(`x_cf_routererror:`)
+	b.WriteDashOrStringValue(r.RouterError)
 
 	r.addExtraHeaders(b)
 

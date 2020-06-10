@@ -114,6 +114,7 @@ var _ = Describe("AccessLog", func() {
 		Expect(alr.StatusCode).To(Equal(http.StatusTeapot))
 		Expect(alr.RouteEndpoint).To(Equal(testEndpoint))
 		Expect(alr.HeadersOverride).To(BeNil())
+		Expect(alr.RouterError).To(BeEmpty())
 	})
 
 	Context("when there are backend request headers on the context", func() {
@@ -154,4 +155,20 @@ var _ = Describe("AccessLog", func() {
 			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
 		})
 	})
+
+	Context("when there is an X-Cf-RouterError header on the response", func() {
+		BeforeEach(func() {
+			resp.Header().Add("X-Cf-RouterError", "endpoint-failed")
+		})
+
+		It("logs the header and value", func() {
+			handler.ServeHTTP(resp, req)
+			Expect(accessLogger.LogCallCount()).To(Equal(1))
+
+			alr := accessLogger.LogArgsForCall(0)
+
+			Expect(alr.RouterError).To(Equal("endpoint-failed"))
+		})
+	})
+
 })
