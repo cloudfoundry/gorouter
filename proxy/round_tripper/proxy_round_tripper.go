@@ -131,6 +131,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		if reqInfo.RouteServiceURL == nil {
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
 			if selectEndpointErr != nil {
+				logger.Error("select-endpoint-failed", zap.Error(selectEndpointErr))
 				break
 			}
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
