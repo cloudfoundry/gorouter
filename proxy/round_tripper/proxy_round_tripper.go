@@ -136,7 +136,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 			reqInfo.RouteEndpoint = endpoint
 
-			logger.Debug("backend", zap.Int("attempt", retry))
+			logger.Debug("backend", zap.Int("attempt", retry+1))
 			if endpoint.IsTLS() {
 				request.URL.Scheme = "https"
 			} else {
@@ -159,7 +159,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger.Debug(
 				"route-service",
 				zap.Object("route-service-url", reqInfo.RouteServiceURL),
-				zap.Int("attempt", retry),
+				zap.Int("attempt", retry+1),
 			)
 
 			endpoint = &route.Endpoint{
