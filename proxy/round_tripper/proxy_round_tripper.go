@@ -123,10 +123,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	stickyEndpointID := getStickySession(request, rt.stickySessionCookieNames)
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
-	logger := rt.logger
 	var selectEndpointErr error
 	for retry := 0; retry < handler.MaxRetries; retry++ {
-		logger = rt.logger
+		logger := rt.logger
 
 		if reqInfo.RouteServiceURL == nil {
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
