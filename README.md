@@ -737,14 +737,14 @@ architecture.
 
 The value of the `X-Cf-Routererror` header can be one of the following:
 
-| Value                          | Description                                                                                                                                                                                                     |
-|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| invalid_cf_app_instance_header | The provided value for the "X-Cf-App-Instance" header does not match the required format of `APP_GUID:INSTANCE_ID`.                                                                                             |
-| empty_host                     | The value for the "Host" header is empty, or the "Host" header is equivalent to the remote address. Some LB's optimistically set the "Host" header value with their IP address when there is no value present.. |
-| unknown_route                  | The desired route does not exist in the gorouter's route table.                                                                                                                                                 |
-| no_endpoints                   | There is an entry in the route table for the desired route, but there are no healthy endpoints available.                                                                                                       |
-| Connection Limit Reached       | The backends associated with the route have reached their max number of connections. The max connection number is set via the spec property `router.backends.max_conns`.                                        |
-| route_service_unsupported      | Route services are not enabled. This can be configured via the spec property `router.route_services_secret`. If the property is empty, route services are disabled.                                             |
+| Value                          | Description                                                                                                                                                                                                    |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| invalid_cf_app_instance_header | The provided value for the "X-Cf-App-Instance" header does not match the required format of `APP_GUID:INSTANCE_ID`.                                                                                            |
+| empty_host                     | The value for the "Host" header is empty, or the "Host" header is equivalent to the remote address. Some LB's optimistically set the "Host" header value with their IP address when there is no value present. |
+| unknown_route                  | The desired route does not exist in the gorouter's route table.                                                                                                                                                |
+| no_endpoints                   | There is an entry in the route table for the desired route, but there are no healthy endpoints available.                                                                                                      |
+| Connection Limit Reached       | The backends associated with the route have reached their max number of connections. The max connection number is set via the spec property `router.backends.max_conns`.                                       |
+| route_service_unsupported      | Route services are not enabled. This can be configured via the spec property `router.route_services_secret`. If the property is empty, route services are disabled.                                            |
 | endpoint_failure               | The registered endpoint for the desired route failed to handle the request.
 
 ## Supported Cipher Suites
