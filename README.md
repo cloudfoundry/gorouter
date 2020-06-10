@@ -689,12 +689,12 @@ request:
 x_forwarded_for:"<X-Forwarded-For>"
 x_forwarded_proto:"<X-Forwarded-Proto>"
 vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> gorouter_time:<GoRouter Time>
-app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
+app_id:<Application ID> app_index:<Application Index> x_cf_routererror:<X-Cf-RouterError> <Extra Headers>`
 
 * Status Code, Response Time, GoRouter Time, Application ID, Application Index,
-  and Extra Headers are all optional fields * The absence of Status Code,
-  Response Time, Application ID, or Application Index will result in a "-" in
-  the corresponding field
+  X-Cf-RouterError, and Extra Headers are all optional fields. The absence of
+  Status Code, Response Time, Application ID, Application Index, or
+  X-Cf-RouterError will result in a "-" in the corresponding field.
 
 * `Response Time` is the total time it takes for the request to go through the
   GoRouter to the app and for the response to travel back through the GoRouter.
@@ -707,6 +707,11 @@ app_id:<Application ID> app_index:<Application Index> <Extra Headers>`
   through the GoRouter. This does not include the time the request spends
   traversing the network to the app. This also does not include the time the app
   spends forming a response.
+
+* `X-CF-RouterError` is populated if the Gorouter encounters an error. This can
+  help distinguish if a non-2xx response code is due to an error in the Gorouter
+  or the backend. For more information on the possible Router Error causes go to
+  the [#router-errors](#router-errors) section.
 
 Access logs are also redirected to syslog.
 
@@ -727,6 +732,20 @@ contain `400 Bad Request: Requested instance ('1') with guid
 
 Usage of the `X-Cf-App-Instance` header is only available for users on the Diego
 architecture.
+
+### Router Errors
+
+The value of the `X-Cf-Routererror` header can be one of the following:
+
+| Value                          | Description                                                                                                                                                                                                     |
+|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| invalid_cf_app_instance_header | The provided value for the "X-Cf-App-Instance" header does not match the required format of `APP_GUID:INSTANCE_ID`.                                                                                             |
+| empty_host                     | The value for the "Host" header is empty, or the "Host" header is equivalent to the remote address. Some LB's optimistically set the "Host" header value with their IP address when there is no value present.. |
+| unknown_route                  | The desired route does not exist in the gorouter's route table.                                                                                                                                                 |
+| no_endpoints                   | There is an entry in the route table for the desired route, but there are no healthy endpoints available.                                                                                                       |
+| Connection Limit Reached       | The backends associated with the route have reached their max number of connections. The max connection number is set via the spec property `router.backends.max_conns`.                                        |
+| route_service_unsupported      | Route services are not enabled. This can be configured via the spec property `router.route_services_secret`. If the property is empty, route services are disabled.                                             |
+| endpoint_failure               | The registered endpoint for the desired route failed to handle the request.
 
 ## Supported Cipher Suites
 
