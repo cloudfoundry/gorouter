@@ -797,6 +797,60 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Expect(new_cookies[1].Value).To(Equal("id-5"))
 						})
 					})
+
+					Context("when the backend doesn't set the session cookie", func() {
+						Context("and previous session", func() {
+							var cookies []*http.Cookie
+							JustBeforeEach(func() {
+								resp, err := proxyRoundTripper.RoundTrip(req)
+								Expect(err).ToNot(HaveOccurred())
+
+								cookies = resp.Cookies()
+								Expect(cookies).To(HaveLen(2))
+								for _, cookie := range cookies {
+									req.AddCookie(cookie)
+								}
+								transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+									resp := &http.Response{StatusCode: http.StatusTeapot, Header: make(map[string][]string)}
+									return resp, nil
+								}
+							})
+
+							It("will select the previous backend and set the vcap cookie", func() {
+								resp, err := proxyRoundTripper.RoundTrip(req)
+								Expect(err).ToNot(HaveOccurred())
+
+								new_cookies := resp.Cookies()
+								Expect(new_cookies).To(HaveLen(1))
+								Expect(new_cookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+								Expect(new_cookies[0].Value).To(Equal(cookies[1].Value))
+							})
+							Context("when the previous endpoints cannot be reached", func() {
+								BeforeEach(func() {
+									removed := routePool.Remove(endpoint1)
+									Expect(removed).To(BeTrue())
+
+									removed = routePool.Remove(endpoint2)
+									Expect(removed).To(BeTrue())
+
+									new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
+									added := routePool.Put(new_endpoint)
+									Expect(added).To(Equal(route.ADDED))
+								})
+
+								It("will select a new backend and update the vcap cookie id", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									cookies := resp.Cookies()
+									Expect(cookies).To(HaveLen(1))
+									Expect(cookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(cookies[0].Value).To(Equal("id-5"))
+								})
+							})
+						})
+
+					})
 				})
 			})
 
