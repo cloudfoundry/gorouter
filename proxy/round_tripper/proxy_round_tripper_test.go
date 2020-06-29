@@ -385,6 +385,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).To(Equal(handler.NoEndpointsAvailable))
 				})
 
+				It("logs a message with `select-endpoint-failed`", func() {
+					proxyRoundTripper.RoundTrip(req)
+					logOutput := logger.Buffer()
+					Expect(logOutput).To(gbytes.Say(`select-endpoint-failed`))
+					Expect(logOutput).To(gbytes.Say(`myapp.com`))
+				})
+
 				It("does not capture any routing requests to the backend", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(Equal(handler.NoEndpointsAvailable))
