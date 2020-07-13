@@ -16,8 +16,8 @@ Please report all issues and feature requests in [cloudfoundry/routing-release](
 ## Contributing
 
 Please read the [contributors'
-guide](https://github.com/cloudfoundry/gorouter/blob/master/CONTRIBUTING.md) and our [Development Guide for
-Gorouter](https://github.com/cloudfoundry/gorouter/blob/master/docs/gorouter_development_guide.md).
+guide](https://github.com/cloudfoundry/gorouter/blob/main/CONTRIBUTING.md) and our [Development Guide for
+Gorouter](https://github.com/cloudfoundry/gorouter/blob/main/docs/gorouter_development_guide.md).
 
 ## Development
 
