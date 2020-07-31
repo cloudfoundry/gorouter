@@ -44,6 +44,23 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, dela
 	return app
 }
 
+func NewFailingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration, routeServiceUrl string) *common.TestApp {
+	app := common.NewTestApp(urls, rPort, mbusClient, nil, routeServiceUrl)
+	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+		defer ginkgo.GinkgoRecover()
+
+		Expect(r.Header.Get("Upgrade")).To(Equal("websocket"))
+		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
+
+		conn, _, err := w.(http.Hijacker).Hijack()
+		Expect(err).ToNot(HaveOccurred())
+		x := test_util.NewHttpConn(conn)
+		x.Close()
+	})
+
+	return app
+}
+
 func NewHangingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, routeServiceUrl string) *common.TestApp {
 	app := common.NewTestApp(urls, rPort, mbusClient, nil, routeServiceUrl)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {

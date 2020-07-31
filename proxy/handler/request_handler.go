@@ -145,6 +145,7 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 		h.reporter.CaptureWebSocketFailure()
 		return
 	}
+
 	h.response.SetStatus(backendStatusCode)
 	h.reporter.CaptureWebSocketUpdate()
 }
@@ -233,6 +234,8 @@ func (h *RequestHandler) serveTcp(
 	}
 	defer client.Close()
 
+	// Any status code has already been sent to the client,
+	// but this is the value that gets written to the access logs
 	backendStatusCode := h.forwarder.ForwardIO(client, backendConnection)
 	return backendStatusCode, nil
 }

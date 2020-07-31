@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"runtime"
@@ -78,13 +79,23 @@ var _ = Describe("Forwarder", func() {
 			backendConn = buildFakeBackend("banana", bytes.NewBufferString("bad data"))
 		})
 
-		It("immediately returns code 0, without waiting for either connection to close", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+		It("returns code 502 and logs the error", func() {
+			code := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(code).To(Equal(http.StatusBadGateway))
+			Expect(logger.Buffer()).To(gbytes.Say(`websocket-forwardio`))
+			Expect(clientConn.GetWrittenBytes()).To(HavePrefix("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
 		})
 
-		It("doesn't websocket forwared a non-timeout error", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
-			Expect(logger.Buffer().Contents()).To(HaveLen(0))
+		Context("when the bytes cannot be written to the client connection", func() {
+			BeforeEach(func() {
+				clientConn.WriteError("banana")
+			})
+			It("returns code 502 and logs the error", func() {
+				code := forwarder.ForwardIO(clientConn, backendConn)
+				Expect(code).To(Equal(http.StatusBadGateway))
+				Expect(logger.Buffer()).To(gbytes.Say(`websocket-forwardio`))
+				Expect(logger.Buffer()).To(gbytes.Say(`websocket-client-write.*banana`))
+			})
 		})
 	})
 
@@ -94,7 +105,7 @@ var _ = Describe("Forwarder", func() {
 		})
 
 		It("times out after some time and logs the timeout", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusBadGateway))
 			Expect(logger.Buffer()).To(gbytes.Say(`timeout waiting for http response from backend`))
 		})
 	})
@@ -112,7 +123,7 @@ var _ = Describe("Forwarder", func() {
 
 		It("does not leak goroutines", func() {
 			beforeGoroutineCount := runtime.NumGoroutine()
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(0))
+			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusBadGateway))
 
 			Eventually(func() int {
 				return runtime.NumGoroutine()
@@ -131,10 +142,18 @@ func NewMockConn(fakeBackend io.Reader) *MockReadWriter {
 type MockReadWriter struct {
 	io.Reader
 	sync.Mutex
-	buffer *bytes.Buffer
+	buffer     *bytes.Buffer
+	writeError error
+}
+
+func (m *MockReadWriter) WriteError(err string) {
+	m.writeError = errors.New(err)
 }
 
 func (m *MockReadWriter) Write(buffer []byte) (int, error) {
+	if m.writeError != nil {
+		return 0, m.writeError
+	}
 	time.Sleep(100 * time.Millisecond) // simulate some network delay
 	m.Lock()
 	defer m.Unlock()

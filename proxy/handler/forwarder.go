@@ -3,6 +3,8 @@ package handler
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -37,21 +39,33 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 
 	resp, err := utils.ReadResponseWithTimeout(bufio.NewReader(teedReader), nil, f.BackendReadTimeout)
 	if err != nil {
-		switch err.(type) {
-		case utils.TimeoutError:
-			f.Logger.Error("websocket-forwardio", zap.Error(err))
+		f.Logger.Error("websocket-forwardio", zap.Error(err))
+		// we have to write our own HTTP header since we didn't get one from the backend
+		_, writeErr := clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		if writeErr != nil {
+			f.Logger.Error("websocket-client-write", zap.Error(writeErr))
 		}
-		return 0
+		return http.StatusBadGateway
 	}
 
+	// as long as we got a valid response from the backend,
 	// we always write the header...
-	_, err = io.Copy(clientConn, headerBytes) // don't care about errors
+	_, err = io.Copy(clientConn, headerBytes)
 	if err != nil {
-		f.Logger.Error("websocket-copy", zap.Error(err))
-		return 0
+		f.Logger.Error("websocket-client-write", zap.Error(err))
+		// we got a status code from the backend,
+		//
+		// we don't know for sure that this got back to the client
+		// but there isn't much we can do about that at this point
+		//
+		// return it so we can log it in access logs
+		return resp.StatusCode
 	}
 
 	if !isValidWebsocketResponse(resp) {
+		errMsg := fmt.Sprintf("backend responded with non-101 status code: %d", resp.StatusCode)
+		err = errors.New(errMsg)
+		f.Logger.Error("websocket-backend", zap.Error(err))
 		return resp.StatusCode
 	}
 
@@ -59,6 +73,7 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 	go copy(clientConn, backendConn)
 	go copy(backendConn, clientConn)
 
+	// Note: this blocks until the entire websocket activity completes
 	<-done
 	return http.StatusSwitchingProtocols
 }
