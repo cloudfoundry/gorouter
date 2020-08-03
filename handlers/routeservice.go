@@ -16,17 +16,24 @@ import (
 )
 
 type RouteService struct {
-	config   *routeservice.RouteServiceConfig
-	registry registry.Registry
-	logger   logger.Logger
+	config      *routeservice.RouteServiceConfig
+	registry    registry.Registry
+	logger      logger.Logger
+	errorWriter ErrorWriter
 }
 
 // NewRouteService creates a handler responsible for handling route services
-func NewRouteService(config *routeservice.RouteServiceConfig, routeRegistry registry.Registry, logger logger.Logger) negroni.Handler {
+func NewRouteService(
+	config *routeservice.RouteServiceConfig,
+	routeRegistry registry.Registry,
+	logger logger.Logger,
+	errorWriter ErrorWriter,
+) negroni.Handler {
 	return &RouteService{
-		config:   config,
-		registry: routeRegistry,
-		logger:   logger,
+		config:      config,
+		registry:    routeRegistry,
+		logger:      logger,
+		errorWriter: errorWriter,
 	}
 }
 
@@ -52,7 +59,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 		AddRouterErrorHeader(rw, "route_service_unsupported")
 
-		writeStatus(
+		r.errorWriter.WriteError(
 			rw,
 			http.StatusBadGateway,
 			"Support for route services is disabled.",
@@ -65,7 +72,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 		AddRouterErrorHeader(rw, "route_service_unsupported")
 
-		writeStatus(
+		r.errorWriter.WriteError(
 			rw,
 			http.StatusServiceUnavailable,
 			"Websocket requests are not supported for routes bound to Route Services.",
@@ -86,7 +93,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	hasBeenToRouteService, err := r.ArrivedViaRouteService(req)
 	if err != nil {
 		r.logger.Error("signature-validation-failed", zap.Error(err))
-		writeStatus(
+		r.errorWriter.WriteError(
 			rw,
 			http.StatusBadRequest,
 			"Failed to validate Route Service Signature",
@@ -106,7 +113,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		if err != nil {
 			r.logger.Error("route-service-failed", zap.Error(err))
 
-			writeStatus(
+			r.errorWriter.WriteError(
 				rw,
 				http.StatusInternalServerError,
 				"Route service request failed.",

@@ -38,6 +38,7 @@ var _ = Describe("Route Service Handler", func() {
 		forwardedUrl string
 
 		logger *loggerfakes.FakeLogger
+		ew     = handlers.NewPlaintextErrorWriter()
 
 		reqChan chan *http.Request
 
@@ -109,7 +110,7 @@ var _ = Describe("Route Service Handler", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.UseFunc(testSetupHandler)
-		handler.Use(handlers.NewRouteService(config, reg, logger))
+		handler.Use(handlers.NewRouteService(config, reg, logger, ew))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -594,7 +595,7 @@ var _ = Describe("Route Service Handler", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewRouteService(config, reg, logger))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Fatal on the logger", func() {
@@ -609,7 +610,7 @@ var _ = Describe("Route Service Handler", func() {
 		BeforeEach(func() {
 			badHandler = negroni.New()
 			badHandler.Use(handlers.NewRequestInfo())
-			badHandler.Use(handlers.NewRouteService(config, reg, logger))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Fatal on the logger", func() {
