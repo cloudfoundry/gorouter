@@ -43,7 +43,7 @@ func (ew *plaintextErrorWriter) WriteError(
 	}
 
 	rw.WriteHeader(code)
-	rw.Write([]byte(body))
+	fmt.Fprintln(rw, body)
 }
 
 type htmlErrorWriter struct {
@@ -86,7 +86,7 @@ func (ew *htmlErrorWriter) WriteError(
 	var rendered bytes.Buffer
 	if err := ew.tpl.Execute(&rendered, nil); err != nil {
 		logger.Error("render-error-failed", zap.Error(err))
-		rw.Write([]byte(body))
+		fmt.Fprintln(rw, body)
 		return
 	}
 
