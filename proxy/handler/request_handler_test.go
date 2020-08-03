@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/handlers"
 	metric "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -22,6 +23,7 @@ var _ = Describe("RequestHandler", func() {
 	var (
 		rh     *handler.RequestHandler
 		logger *test_util.TestZapLogger
+		ew     = handlers.NewPlaintextErrorWriter()
 		req    *http.Request
 		pr     utils.ProxyResponseWriter
 	)
@@ -45,7 +47,7 @@ var _ = Describe("RequestHandler", func() {
 			}
 			rh = handler.NewRequestHandler(
 				req, pr,
-				&metric.FakeProxyReporter{}, logger,
+				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, &tls.Config{},
 				handler.DisableXFFLogging(true),
 			)
@@ -93,7 +95,7 @@ var _ = Describe("RequestHandler", func() {
 			}
 			rh = handler.NewRequestHandler(
 				req, pr,
-				&metric.FakeProxyReporter{}, logger,
+				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, &tls.Config{},
 				handler.DisableSourceIPLogging(true),
 			)
