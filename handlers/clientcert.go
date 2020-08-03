@@ -18,14 +18,22 @@ type clientCert struct {
 	forceDeleteHeader func(req *http.Request) (bool, error)
 	forwardingMode    string
 	logger            logger.Logger
+	errorWriter       ErrorWriter
 }
 
-func NewClientCert(skipSanitization func(req *http.Request) bool, forceDeleteHeader func(req *http.Request) (bool, error), forwardingMode string, logger logger.Logger) negroni.Handler {
+func NewClientCert(
+	skipSanitization func(req *http.Request) bool,
+	forceDeleteHeader func(req *http.Request) (bool, error),
+	forwardingMode string,
+	logger logger.Logger,
+	ew ErrorWriter,
+) negroni.Handler {
 	return &clientCert{
 		skipSanitization:  skipSanitization,
 		forceDeleteHeader: forceDeleteHeader,
 		forwardingMode:    forwardingMode,
 		logger:            logger,
+		errorWriter:       ew,
 	}
 }
 
@@ -48,7 +56,7 @@ func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 	delete, err := c.forceDeleteHeader(r)
 	if err != nil {
 		c.logger.Error("signature-validation-failed", zap.Error(err))
-		writeStatus(
+		c.errorWriter.WriteError(
 			rw,
 			http.StatusBadRequest,
 			"Failed to validate Route Service Signature for x-forwarded-client-cert",

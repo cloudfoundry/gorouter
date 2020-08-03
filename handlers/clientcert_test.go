@@ -34,11 +34,12 @@ var _ = Describe("Clientcert", func() {
 		errorForceDeleteHeader = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
 		skipSanitization       = func(req *http.Request) bool { return true }
 		dontSkipSanitization   = func(req *http.Request) bool { return false }
+		errorWriter            = handlers.NewPlaintextErrorWriter()
 	)
 
 	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {
 		logger := new(logger_fakes.FakeLogger)
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger)
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger, errorWriter)
 
 		nextHandlerWasCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
@@ -72,7 +73,7 @@ var _ = Describe("Clientcert", func() {
 
 	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
 		logger := new(logger_fakes.FakeLogger)
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger)
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger, errorWriter)
 
 		nextReq := &http.Request{}
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextReq = r })
