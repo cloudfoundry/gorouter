@@ -17,7 +17,9 @@ import (
 
 var _ = Describe("Protocolcheck", func() {
 	var (
-		logger     logger.Logger
+		logger logger.Logger
+		ew     = handlers.NewPlaintextErrorWriter()
+
 		nextCalled bool
 		server     *ghttp.Server
 		n          *negroni.Negroni
@@ -31,7 +33,7 @@ var _ = Describe("Protocolcheck", func() {
 		n.UseFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 			next(rw, req)
 		})
-		n.Use(handlers.NewProtocolCheck(logger))
+		n.Use(handlers.NewProtocolCheck(logger, ew))
 		n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})

@@ -13,14 +13,16 @@ import (
 )
 
 type protocolCheck struct {
-	logger logger.Logger
+	logger      logger.Logger
+	errorWriter ErrorWriter
 }
 
 // NewProtocolCheck creates a handler responsible for checking the protocol of
 // the request
-func NewProtocolCheck(logger logger.Logger) negroni.Handler {
+func NewProtocolCheck(logger logger.Logger, errorWriter ErrorWriter) negroni.Handler {
 	return &protocolCheck{
-		logger: logger,
+		logger:      logger,
+		errorWriter: errorWriter,
 	}
 }
 
@@ -29,7 +31,7 @@ func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)
 		if err != nil {
-			writeStatus(
+			p.errorWriter.WriteError(
 				rw,
 				http.StatusBadRequest,
 				"Unsupported protocol",
