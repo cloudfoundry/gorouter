@@ -30,15 +30,23 @@ type lookupHandler struct {
 	registry                 registry.Registry
 	reporter                 metrics.ProxyReporter
 	logger                   logger.Logger
+	errorWriter              ErrorWriter
 	EmptyPoolResponseCode503 bool
 }
 
 // NewLookup creates a handler responsible for looking up a route.
-func NewLookup(registry registry.Registry, rep metrics.ProxyReporter, logger logger.Logger, emptyPoolResponseCode503 bool) negroni.Handler {
+func NewLookup(
+	registry registry.Registry,
+	rep metrics.ProxyReporter,
+	logger logger.Logger,
+	ew ErrorWriter,
+	emptyPoolResponseCode503 bool,
+) negroni.Handler {
 	return &lookupHandler{
 		registry:                 registry,
 		reporter:                 rep,
 		logger:                   logger,
+		errorWriter:              ew,
 		EmptyPoolResponseCode503: emptyPoolResponseCode503,
 	}
 }
@@ -105,7 +113,7 @@ func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *h
 	AddRouterErrorHeader(rw, "invalid_cf_app_instance_header")
 	addNoCacheControlHeader(rw)
 
-	writeStatus(
+	l.errorWriter.WriteError(
 		rw,
 		http.StatusBadRequest,
 		"Invalid X-CF-App-Instance Header",
@@ -119,7 +127,7 @@ func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Reques
 	AddRouterErrorHeader(rw, "empty_host")
 	addInvalidResponseCacheControlHeader(rw)
 
-	writeStatus(
+	l.errorWriter.WriteError(
 		rw,
 		http.StatusBadRequest,
 		"Request had empty Host header",
@@ -142,7 +150,7 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		returnStatus = http.StatusBadRequest
 	}
 
-	writeStatus(
+	l.errorWriter.WriteError(
 		rw,
 		returnStatus,
 		errorMsg,
@@ -154,7 +162,7 @@ func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.R
 	AddRouterErrorHeader(rw, "no_endpoints")
 	addInvalidResponseCacheControlHeader(rw)
 
-	writeStatus(
+	l.errorWriter.WriteError(
 		rw,
 		http.StatusServiceUnavailable,
 		fmt.Sprintf("Requested route ('%s') has no available endpoints.", r.Host),
@@ -168,7 +176,7 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 
 	AddRouterErrorHeader(rw, "Connection Limit Reached")
 
-	writeStatus(
+	l.errorWriter.WriteError(
 		rw,
 		http.StatusServiceUnavailable,
 		fmt.Sprintf("Requested route ('%s') has reached the connection limit.", r.Host),

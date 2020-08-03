@@ -30,6 +30,7 @@ var _ = Describe("Lookup", func() {
 		nextCalled     bool
 		nextRequest    *http.Request
 		maxConnections int64
+		ew             = handlers.NewPlaintextErrorWriter()
 	)
 
 	const fakeAppGUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
@@ -50,7 +51,7 @@ var _ = Describe("Lookup", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewLookup(reg, rep, logger, true))
+		handler.Use(handlers.NewLookup(reg, rep, logger, ew, true))
 		handler.UseHandler(nextHandler)
 	})
 
@@ -172,7 +173,7 @@ var _ = Describe("Lookup", func() {
 				emptyPoolResponseCode503 := true
 				handler = negroni.New()
 				handler.Use(handlers.NewRequestInfo())
-				handler.Use(handlers.NewLookup(reg, rep, logger, emptyPoolResponseCode503))
+				handler.Use(handlers.NewLookup(reg, rep, logger, ew, emptyPoolResponseCode503))
 				handler.UseHandler(nextHandler)
 
 				pool = route.NewPool(&route.PoolOpts{
@@ -212,7 +213,7 @@ var _ = Describe("Lookup", func() {
 				emptyPoolResponseCode503 := false
 				handler = negroni.New()
 				handler.Use(handlers.NewRequestInfo())
-				handler.Use(handlers.NewLookup(reg, rep, logger, emptyPoolResponseCode503))
+				handler.Use(handlers.NewLookup(reg, rep, logger, ew, emptyPoolResponseCode503))
 				handler.UseHandler(nextHandler)
 
 				pool = route.NewPool(&route.PoolOpts{
@@ -470,7 +471,7 @@ var _ = Describe("Lookup", func() {
 		Context("when request info is not set on the request context", func() {
 			BeforeEach(func() {
 				handler = negroni.New()
-				handler.Use(handlers.NewLookup(reg, rep, logger, true))
+				handler.Use(handlers.NewLookup(reg, rep, logger, ew, true))
 				handler.UseHandler(nextHandler)
 
 				pool := route.NewPool(&route.PoolOpts{
