@@ -41,7 +41,7 @@ var _ = Describe("GDPR", func() {
 			testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
 
 			testState.cfg.Logging.DisableLogForwardedFor = true
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 
 			testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -74,7 +74,7 @@ var _ = Describe("GDPR", func() {
 			testState.cfg.Status.User = "user"
 			testState.cfg.Status.Port = 6705
 			testState.cfg.Logging.DisableLogForwardedFor = true
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 
 			wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			wsApp.Register()
@@ -118,7 +118,7 @@ var _ = Describe("GDPR", func() {
 			testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
 
 			testState.cfg.Logging.DisableLogSourceIP = true
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 
 			testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -147,7 +147,7 @@ var _ = Describe("GDPR", func() {
 			testState.cfg.Status.User = "user"
 			testState.cfg.Status.Port = 6706
 			testState.cfg.Logging.DisableLogSourceIP = true
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 
 			wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			wsApp.Register()

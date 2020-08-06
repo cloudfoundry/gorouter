@@ -49,7 +49,7 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 		BeforeEach(func() {
 			testState.cfg.DisableKeepAlives = true
 
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 			Expect(testApp.GetConnStates()).To(BeEmpty())
@@ -84,7 +84,7 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 	Context("when KeepAlives are enabled", func() {
 		BeforeEach(func() {
 			testState.cfg.DisableKeepAlives = false
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 		})
 
 		Context("when connecting to a non-TLS backend", func() {

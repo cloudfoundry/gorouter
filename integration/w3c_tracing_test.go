@@ -48,7 +48,7 @@ var _ = Describe("W3C tracing headers", func() {
 	})
 
 	JustBeforeEach(func() {
-		testState.StartGorouter()
+		testState.StartGorouterOrFail()
 
 		testApp = httptest.NewServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

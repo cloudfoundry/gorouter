@@ -25,7 +25,7 @@ var _ = Describe("Large upload", func() {
 
 	BeforeEach(func() {
 		testState = NewTestState()
-		testState.StartGorouter()
+		testState.StartGorouterOrFail()
 	})
 
 	AfterEach(func() {

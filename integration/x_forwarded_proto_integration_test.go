@@ -94,7 +94,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 		It(fmt.Sprintf("gorouter config %+v: sets the headers correctly", goroutercfg), func() {
 			testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
 			testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 
 			doRequest := func(testCase testCase, hostname string) {
 				req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
@@ -206,7 +206,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				hostname := "basic-app.some.domain"
 				testState.cfg.ForceForwardedProtoHttps = goroutercfg.forceForwardedProtoHTTPS
 				testState.cfg.SanitizeForwardedProto = goroutercfg.sanitizeForwardedProto
-				testState.StartGorouter()
+				testState.StartGorouterOrFail()
 
 				doRequest := func(testCase rsTestCase, hostname string) {
 					req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))

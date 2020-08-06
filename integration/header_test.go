@@ -46,7 +46,7 @@ var _ = Describe("Headers", func() {
 
 	Context("Sanity Test", func() {
 		BeforeEach(func() {
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 		})
@@ -72,7 +72,7 @@ var _ = Describe("Headers", func() {
 					},
 				}
 
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 		})
@@ -104,7 +104,7 @@ var _ = Describe("Headers", func() {
 					},
 				}
 
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 		})
@@ -130,7 +130,7 @@ var _ = Describe("Headers", func() {
 
 		BeforeEach(func() {
 
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 		})
