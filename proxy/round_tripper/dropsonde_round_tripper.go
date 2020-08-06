@@ -50,6 +50,7 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyR
 		MaxIdleConnsPerHost: template.MaxIdleConnsPerHost,
 		DisableCompression:  template.DisableCompression,
 		TLSClientConfig:     customTLSConfig,
+		TLSHandshakeTimeout: template.TLSHandshakeTimeout,
 	}
 	return NewDropsondeRoundTripper(newTransport)
 }

@@ -8,6 +8,7 @@ var RetriableClassifiers = ClassifierGroup{
 	HostnameMismatch,
 	RemoteFailedCertCheck,
 	RemoteHandshakeFailure,
+	RemoteHandshakeTimeout,
 	UntrustedCert,
 	ExpiredOrNotYetValidCertFailure,
 }

@@ -1031,6 +1031,78 @@ var _ = Describe("Proxy", func() {
 				})
 			})
 		})
+
+		Context("when attempting to establish TLS handshake with a TCP application", func() {
+			var nl net.Listener
+			JustBeforeEach(func() {
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "instance-id"})
+				backendCert, err := tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				caCertPool = x509.NewCertPool()
+				caCertPool.AppendCertsFromPEM(certChain.CACertPEM)
+
+				nl, err = net.Listen("tcp", "127.0.0.1:0")
+				Expect(err).NotTo(HaveOccurred())
+
+				go func() {
+					defer GinkgoRecover()
+					for {
+						conn, err := nl.Accept()
+						if err != nil {
+							if ne, ok := err.(net.Error); ok && ne.Temporary() {
+								fmt.Printf("http: Accept error: %v; retrying in %v\n", err, 5*time.Second)
+								time.Sleep(5 * time.Second)
+								continue
+							}
+							break
+						}
+						go func() {
+							defer GinkgoRecover()
+
+							httpConn := test_util.NewHttpConn(conn)
+							time.Sleep(time.Minute)
+							_, err := http.ReadRequest(httpConn.Reader)
+							Expect(err).To(HaveOccurred())
+							resp := test_util.NewResponse(http.StatusServiceUnavailable)
+							httpConn.WriteResponse(resp)
+							httpConn.Close()
+						}()
+					}
+				}()
+
+				rcfg := test_util.RegisterConfig{
+					ServerCertDomainSAN: "a-different-instance-id",
+					InstanceId:          "a-different-instance-id",
+					AppId:               "some-app-id",
+					InstanceIndex:       "2",
+					StaleThreshold:      120,
+					TLSConfig: &tls.Config{
+						Certificates: []tls.Certificate{backendCert},
+					},
+				}
+
+				test_util.RegisterAddr(r, "backend-with-tcp-only", nl.Addr().String(), rcfg)
+			})
+
+			AfterEach(func() {
+				nl.Close()
+			})
+
+			Context("when the server cert does not match the client", func() {
+				It("prunes the route", func() {
+					for _, status := range []int{http.StatusBadGateway, http.StatusNotFound} {
+						body := &bytes.Buffer{}
+						body.WriteString("use an actual body")
+						conn := dialProxy(proxyServer)
+						req := test_util.NewRequest("GET", "backend-with-tcp-only", "/", ioutil.NopCloser(body))
+						conn.WriteRequest(req)
+						resp, _ := conn.ReadResponse()
+						Expect(resp.StatusCode).To(Equal(status))
+					}
+				})
+			})
+		})
 	})
 
 	Describe("Access Logging", func() {
