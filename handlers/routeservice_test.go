@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -38,7 +39,7 @@ var _ = Describe("Route Service Handler", func() {
 		forwardedUrl string
 
 		logger *loggerfakes.FakeLogger
-		ew     = handlers.NewPlaintextErrorWriter()
+		ew     = errorwriter.NewPlaintextErrorWriter()
 
 		reqChan chan *http.Request
 

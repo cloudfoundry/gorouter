@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -34,7 +35,7 @@ var _ = Describe("Clientcert", func() {
 		errorForceDeleteHeader = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
 		skipSanitization       = func(req *http.Request) bool { return true }
 		dontSkipSanitization   = func(req *http.Request) bool { return false }
-		errorWriter            = handlers.NewPlaintextErrorWriter()
+		errorWriter            = errorwriter.NewPlaintextErrorWriter()
 	)
 
 	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {

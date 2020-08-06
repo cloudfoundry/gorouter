@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -18,7 +19,7 @@ import (
 var _ = Describe("Protocolcheck", func() {
 	var (
 		logger logger.Logger
-		ew     = handlers.NewPlaintextErrorWriter()
+		ew     = errorwriter.NewPlaintextErrorWriter()
 
 		nextCalled bool
 		server     *ghttp.Server

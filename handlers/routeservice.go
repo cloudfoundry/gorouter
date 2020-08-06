@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -19,7 +20,7 @@ type RouteService struct {
 	config      *routeservice.RouteServiceConfig
 	registry    registry.Registry
 	logger      logger.Logger
-	errorWriter ErrorWriter
+	errorWriter errorwriter.ErrorWriter
 }
 
 // NewRouteService creates a handler responsible for handling route services
@@ -27,7 +28,7 @@ func NewRouteService(
 	config *routeservice.RouteServiceConfig,
 	routeRegistry registry.Registry,
 	logger logger.Logger,
-	errorWriter ErrorWriter,
+	errorWriter errorwriter.ErrorWriter,
 ) negroni.Handler {
 	return &RouteService{
 		config:      config,

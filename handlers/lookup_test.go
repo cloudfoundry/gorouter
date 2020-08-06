@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -30,7 +31,7 @@ var _ = Describe("Lookup", func() {
 		nextCalled     bool
 		nextRequest    *http.Request
 		maxConnections int64
-		ew             = handlers.NewPlaintextErrorWriter()
+		ew             = errorwriter.NewPlaintextErrorWriter()
 	)
 
 	const fakeAppGUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"

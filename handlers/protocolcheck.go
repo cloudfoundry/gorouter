@@ -8,18 +8,19 @@ import (
 
 	"fmt"
 
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni"
 )
 
 type protocolCheck struct {
 	logger      logger.Logger
-	errorWriter ErrorWriter
+	errorWriter errorwriter.ErrorWriter
 }
 
 // NewProtocolCheck creates a handler responsible for checking the protocol of
 // the request
-func NewProtocolCheck(logger logger.Logger, errorWriter ErrorWriter) negroni.Handler {
+func NewProtocolCheck(logger logger.Logger, errorWriter errorwriter.ErrorWriter) negroni.Handler {
 	return &protocolCheck{
 		logger:      logger,
 		errorWriter: errorWriter,

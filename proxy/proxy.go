@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -41,7 +42,7 @@ type proxy struct {
 	ip                       string
 	traceKey                 string
 	logger                   logger.Logger
-	errorWriter              handlers.ErrorWriter
+	errorWriter              errorwriter.ErrorWriter
 	reporter                 metrics.ProxyReporter
 	accessLogger             accesslog.AccessLogger
 	secureCookies            bool
@@ -75,7 +76,7 @@ func NewProxy(
 ) http.Handler {
 
 	// TODO make configurable
-	ew := handlers.NewPlaintextErrorWriter()
+	ew := errorwriter.NewPlaintextErrorWriter()
 
 	p := &proxy{
 		accessLogger:             accessLogger,

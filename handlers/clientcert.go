@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -18,7 +19,7 @@ type clientCert struct {
 	forceDeleteHeader func(req *http.Request) (bool, error)
 	forwardingMode    string
 	logger            logger.Logger
-	errorWriter       ErrorWriter
+	errorWriter       errorwriter.ErrorWriter
 }
 
 func NewClientCert(
@@ -26,7 +27,7 @@ func NewClientCert(
 	forceDeleteHeader func(req *http.Request) (bool, error),
 	forwardingMode string,
 	logger logger.Logger,
-	ew ErrorWriter,
+	ew errorwriter.ErrorWriter,
 ) negroni.Handler {
 	return &clientCert{
 		skipSanitization:  skipSanitization,

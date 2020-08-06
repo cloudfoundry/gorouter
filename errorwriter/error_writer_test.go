@@ -1,4 +1,4 @@
-package handlers_test
+package errorwriter_test
 
 import (
 	_ "html/template"
@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 
-	. "code.cloudfoundry.org/gorouter/handlers"
+	. "code.cloudfoundry.org/gorouter/errorwriter"
 	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 )
 

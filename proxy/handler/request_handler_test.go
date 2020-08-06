@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	metric "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -23,7 +23,7 @@ var _ = Describe("RequestHandler", func() {
 	var (
 		rh     *handler.RequestHandler
 		logger *test_util.TestZapLogger
-		ew     = handlers.NewPlaintextErrorWriter()
+		ew     = errorwriter.NewPlaintextErrorWriter()
 		req    *http.Request
 		pr     utils.ProxyResponseWriter
 	)

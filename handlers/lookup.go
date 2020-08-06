@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry"
@@ -30,7 +31,7 @@ type lookupHandler struct {
 	registry                 registry.Registry
 	reporter                 metrics.ProxyReporter
 	logger                   logger.Logger
-	errorWriter              ErrorWriter
+	errorWriter              errorwriter.ErrorWriter
 	EmptyPoolResponseCode503 bool
 }
 
@@ -39,7 +40,7 @@ func NewLookup(
 	registry registry.Registry,
 	rep metrics.ProxyReporter,
 	logger logger.Logger,
-	ew ErrorWriter,
+	ew errorwriter.ErrorWriter,
 	emptyPoolResponseCode503 bool,
 ) negroni.Handler {
 	return &lookupHandler{

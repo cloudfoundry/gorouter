@@ -11,6 +11,7 @@ import (
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -27,7 +28,7 @@ var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
 	logger      logger.Logger
-	errorWriter handlers.ErrorWriter
+	errorWriter errorwriter.ErrorWriter
 	reporter    metrics.ProxyReporter
 
 	request  *http.Request
@@ -47,7 +48,7 @@ func NewRequestHandler(
 	response utils.ProxyResponseWriter,
 	r metrics.ProxyReporter,
 	logger logger.Logger,
-	errorWriter handlers.ErrorWriter,
+	errorWriter errorwriter.ErrorWriter,
 	endpointDialTimeout time.Duration,
 	tlsConfig *tls.Config,
 	opts ...func(*RequestHandler),
