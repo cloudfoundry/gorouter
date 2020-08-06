@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/logger"
@@ -50,10 +51,15 @@ type htmlErrorWriter struct {
 	tpl *template.Template
 }
 
-func NewHTMLErrorWriter(text string) (ErrorWriter, error) {
+func NewHTMLErrorWriterFromFile(path string) (ErrorWriter, error) {
 	ew := &htmlErrorWriter{}
 
-	tpl, err := template.New("error-message").Parse(text)
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Could not read HTML error template file: %s", err)
+	}
+
+	tpl, err := template.New("error-message").Parse(string(bytes))
 	if err != nil {
 		return nil, err
 	}

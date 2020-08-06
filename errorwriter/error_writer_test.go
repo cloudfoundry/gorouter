@@ -2,8 +2,10 @@ package errorwriter_test
 
 import (
 	_ "html/template"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -80,6 +82,8 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 
 var _ = Describe("HTML ErrorWriter", func() {
 	var (
+		tmpFile *os.File
+
 		errorWriter ErrorWriter
 		recorder    *httptest.ResponseRecorder
 
@@ -87,25 +91,51 @@ var _ = Describe("HTML ErrorWriter", func() {
 	)
 
 	BeforeEach(func() {
+		var err error
+		tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
+		Expect(err).NotTo(HaveOccurred())
+
 		recorder = httptest.NewRecorder()
 		recorder.Header().Set("Connection", "dummy")
 
 		log = new(loggerfakes.FakeLogger)
 	})
 
-	Context("when the template has invalid syntax", func() {
+	AfterEach(func() {
+		os.Remove(tmpFile.Name())
+	})
+
+	Context("when the template file does not exist", func() {
 		It("should return constructor error", func() {
 			var err error
-			_, err = NewHTMLErrorWriter("{{")
+			_, err = NewHTMLErrorWriterFromFile("/path/to/non/file")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when the template has invalid syntax", func() {
+		BeforeEach(func() {
+			_, err := tmpFile.Write([]byte("{{"))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should return constructor error", func() {
+			var err error
+			_, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	Context("when the template errors", func() {
+		BeforeEach(func() {
+			_, err := tmpFile.Write([]byte(`{{template "notexists"}}`))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		Context("when the response is a success", func() {
 			BeforeEach(func() {
 				var err error
-				errorWriter, err = NewHTMLErrorWriter(`{{template "notexists"}}`)
+				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter.WriteError(recorder, http.StatusOK, "hi", log)
@@ -133,7 +163,10 @@ var _ = Describe("HTML ErrorWriter", func() {
 		Context("when the response is not a success", func() {
 			BeforeEach(func() {
 				var err error
-				errorWriter, err = NewHTMLErrorWriter(`{{template "notexists"}}`)
+				_, err = tmpFile.Write([]byte(`{{template "notexists"}}`))
+				Expect(err).NotTo(HaveOccurred())
+
+				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter.WriteError(recorder, http.StatusBadRequest, "bad", log)
@@ -160,7 +193,10 @@ var _ = Describe("HTML ErrorWriter", func() {
 
 		Context("when the response is a success", func() {
 			BeforeEach(func() {
-				errorWriter, err = NewHTMLErrorWriter(`success`)
+				_, err := tmpFile.Write([]byte(`success`))
+				Expect(err).NotTo(HaveOccurred())
+
+				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter.WriteError(recorder, http.StatusOK, "hi", log)
@@ -185,7 +221,10 @@ var _ = Describe("HTML ErrorWriter", func() {
 
 		Context("when the response is not a success", func() {
 			BeforeEach(func() {
-				errorWriter, err = NewHTMLErrorWriter(`failure`)
+				_, err := tmpFile.Write([]byte(`failure`))
+				Expect(err).NotTo(HaveOccurred())
+
+				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter.WriteError(recorder, http.StatusBadRequest, "bad", log)
