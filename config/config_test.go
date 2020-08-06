@@ -604,6 +604,17 @@ backends:
 			Expect(err).ToNot(HaveOccurred())
 			Expect(config.DisableHTTP).To(BeTrue())
 		})
+
+		It("defaults HTMLErrorTemplateFile to empty", func() {
+			Expect(config.HTMLErrorTemplateFile).To(Equal(""))
+		})
+
+		It("sets HTMLErrorTemplateFile", func() {
+			var b = []byte(`html_error_template_file: "/path/to/file"`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.HTMLErrorTemplateFile).To(Equal("/path/to/file"))
+		})
 	})
 
 	Describe("Process", func() {
