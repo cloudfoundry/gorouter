@@ -65,6 +65,7 @@ type proxy struct {
 func NewProxy(
 	logger logger.Logger,
 	accessLogger accesslog.AccessLogger,
+	errorWriter errorwriter.ErrorWriter,
 	cfg *config.Config,
 	registry registry.Registry,
 	reporter metrics.ProxyReporter,
@@ -75,15 +76,12 @@ func NewProxy(
 	routeServicesTransport http.RoundTripper,
 ) http.Handler {
 
-	// TODO make configurable
-	ew := errorwriter.NewPlaintextErrorWriter()
-
 	p := &proxy{
 		accessLogger:             accessLogger,
 		traceKey:                 cfg.TraceKey,
 		ip:                       cfg.Ip,
 		logger:                   logger,
-		errorWriter:              ew,
+		errorWriter:              errorWriter,
 		reporter:                 reporter,
 		secureCookies:            cfg.SecureCookies,
 		health:                   health,
@@ -150,7 +148,7 @@ func NewProxy(
 		ModifyResponse: p.modifyResponse,
 	}
 
-	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, ew)
+	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, errorWriter)
 
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
 	w3cHandler := handlers.NewW3C(cfg.Tracing.EnableW3C, cfg.Tracing.W3CTenantID, logger)
@@ -173,14 +171,14 @@ func NewProxy(
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)
 	n.Use(w3cHandler)
-	n.Use(handlers.NewProtocolCheck(logger, ew))
-	n.Use(handlers.NewLookup(registry, reporter, logger, ew, cfg.EmptyPoolResponseCode503))
+	n.Use(handlers.NewProtocolCheck(logger, errorWriter))
+	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
 		cfg.ForwardedClientCert,
 		logger,
-		ew,
+		errorWriter,
 	))
 	n.Use(&handlers.XForwardedProto{
 		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),

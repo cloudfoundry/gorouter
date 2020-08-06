@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
@@ -52,6 +53,7 @@ var (
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
 	skipSanitization        func(req *http.Request) bool
+	ew                      = errorwriter.NewPlaintextErrorWriter()
 )
 
 func TestProxy(t *testing.T) {
@@ -128,7 +130,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, al, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
+	p = proxy.NewProxy(testLogger, al, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
 	server := http.Server{Handler: p}
 	go server.Serve(proxyServer)

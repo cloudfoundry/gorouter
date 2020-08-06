@@ -20,6 +20,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -170,10 +171,14 @@ func main() {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
 
+	// TODO make configurable
+	ew := errorwriter.NewPlaintextErrorWriter()
+
 	h = &health.Health{}
 	proxy := proxy.NewProxy(
 		logger,
 		accessLogger,
+		ew,
 		c,
 		registry,
 		compositeReporter,
