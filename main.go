@@ -77,6 +77,16 @@ func main() {
 	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.Format.Timestamp)
 	logger.Info("starting")
 
+	var ew errorwriter.ErrorWriter
+	if c.HTMLErrorTemplateFile != "" {
+		ew, err = errorwriter.NewHTMLErrorWriterFromFile(c.HTMLErrorTemplateFile)
+		if err != nil {
+			logger.Fatal("new-html-error-template-from-file", zap.Error(err))
+		}
+	} else {
+		ew = errorwriter.NewPlaintextErrorWriter()
+	}
+
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
 		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
@@ -170,9 +180,6 @@ func main() {
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
-
-	// TODO make configurable
-	ew := errorwriter.NewPlaintextErrorWriter()
 
 	h = &health.Health{}
 	proxy := proxy.NewProxy(
