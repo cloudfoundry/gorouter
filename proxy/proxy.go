@@ -110,6 +110,7 @@ func NewProxy(
 			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
 			DisableCompression:  true,
 			TLSClientConfig:     backendTLSConfig,
+			TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
 		},
 		RouteServiceTemplate: &http.Transport{
 			Dial:                dialer.Dial,

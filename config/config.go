@@ -208,6 +208,7 @@ type Config struct {
 	MaxTLSVersion                     uint16             `yaml:"-"`
 	ClientCertificateValidationString string             `yaml:"client_cert_validation,omitempty"`
 	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
+	TLSHandshakeTimeout               time.Duration      `yaml:"tls_handshake_timeout"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
 	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval,omitempty"`
@@ -280,6 +281,7 @@ var defaultConfig = Config{
 	EndpointDialTimeout:            5 * time.Second,
 	EndpointKeepAliveProbeInterval: 1 * time.Second,
 	RouteServiceTimeout:            60 * time.Second,
+	TLSHandshakeTimeout:            10 * time.Second,
 
 	PublishStartMessageInterval:               30 * time.Second,
 	PruneStaleDropletsInterval:                30 * time.Second,

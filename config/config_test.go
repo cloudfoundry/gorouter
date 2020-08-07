@@ -1200,6 +1200,19 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					Expect(config.Process()).To(MatchError("must specify list of cipher suite when ssl is enabled"))
 				})
 			})
+
+			Context("when value for tls_handshake_timeout is set", func() {
+				BeforeEach(func() {
+					configSnippet.TLSHandshakeTimeout = 2 * time.Second
+				})
+				It("populates TLSHandshakeTimeout", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err := config.Initialize(configBytes)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(config.Process()).To(Succeed())
+					Expect(config.TLSHandshakeTimeout).To(Equal(2 * time.Second))
+				})
+			})
 		})
 
 		Context("When enable_ssl is set to false", func() {
@@ -1349,6 +1362,7 @@ disable_http: true
 endpoint_timeout: 10s
 route_services_timeout: 10s
 drain_timeout: 15s
+tls_handshake_timeout: 9s
 `)
 
 				err := config.Initialize(b)
@@ -1359,6 +1373,7 @@ drain_timeout: 15s
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 				Expect(config.RouteServiceTimeout).To(Equal(10 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(15 * time.Second))
+				Expect(config.TLSHandshakeTimeout).To(Equal(9 * time.Second))
 			})
 
 			It("defaults to the EndpointTimeout when not set", func() {
