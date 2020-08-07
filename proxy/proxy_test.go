@@ -1032,7 +1032,7 @@ var _ = Describe("Proxy", func() {
 			})
 		})
 
-		Context("when attempting to establish TLS handshake with a TCP application", func() {
+		Context("when TLS handshake is not reciprocated by the application", func() {
 			var nl net.Listener
 			JustBeforeEach(func() {
 				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "instance-id"})
@@ -1089,18 +1089,16 @@ var _ = Describe("Proxy", func() {
 				nl.Close()
 			})
 
-			Context("when the server cert does not match the client", func() {
-				It("prunes the route", func() {
-					for _, status := range []int{http.StatusBadGateway, http.StatusNotFound} {
-						body := &bytes.Buffer{}
-						body.WriteString("use an actual body")
-						conn := dialProxy(proxyServer)
-						req := test_util.NewRequest("GET", "backend-with-tcp-only", "/", ioutil.NopCloser(body))
-						conn.WriteRequest(req)
-						resp, _ := conn.ReadResponse()
-						Expect(resp.StatusCode).To(Equal(status))
-					}
-				})
+			It("prunes the route", func() {
+				for _, status := range []int{http.StatusBadGateway, http.StatusNotFound} {
+					body := &bytes.Buffer{}
+					body.WriteString("use an actual body")
+					conn := dialProxy(proxyServer)
+					req := test_util.NewRequest("GET", "backend-with-tcp-only", "/", ioutil.NopCloser(body))
+					conn.WriteRequest(req)
+					resp, _ := conn.ReadResponse()
+					Expect(resp.StatusCode).To(Equal(status))
+				}
 			})
 		})
 	})
