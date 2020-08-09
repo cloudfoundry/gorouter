@@ -50,8 +50,16 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 			Expect(message).To(Equal("status"))
 		})
 
-		It("should keep the connection header", func() {
+		It("should keep the Connection header", func() {
 			Expect(recorder.Result().Header.Get("Connection")).To(Equal("dummy"))
+		})
+
+		It("should set the Content-Type header", func() {
+			Expect(recorder.Result().Header.Get("Content-Type")).To(Equal("text/plain; charset=utf-8"))
+		})
+
+		It("should set the X-Content-Type-Options header", func() {
+			Expect(recorder.Result().Header.Get("X-Content-Type-Options")).To(Equal("nosniff"))
 		})
 	})
 
@@ -74,7 +82,7 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 			Expect(message).To(Equal("status"))
 		})
 
-		It("should delete the connection header", func() {
+		It("should delete the Connection header", func() {
 			Expect(recorder.Result().Header.Get("Connection")).To(Equal(""))
 		})
 	})
@@ -155,8 +163,16 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Expect(message).To(Equal("status"))
 			})
 
-			It("should keep the connection header", func() {
+			It("should keep the Connection header", func() {
 				Expect(recorder.Result().Header.Get("Connection")).To(Equal("dummy"))
+			})
+
+			It("should set the Content-Type header", func() {
+				Expect(recorder.Result().Header.Get("Content-Type")).To(Equal("text/plain; charset=utf-8"))
+			})
+
+			It("should set the X-Content-Type-Options header", func() {
+				Expect(recorder.Result().Header.Get("X-Content-Type-Options")).To(Equal("nosniff"))
 			})
 		})
 
@@ -180,8 +196,16 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Eventually(BufferReader(recorder.Result().Body)).Should(Say("400 Bad Request: bad"))
 			})
 
-			It("should delete the connection header", func() {
+			It("should delete the Connection header", func() {
 				Expect(recorder.Result().Header.Get("Connection")).To(Equal(""))
+			})
+
+			It("should set the Content-Type header", func() {
+				Expect(recorder.Result().Header.Get("Content-Type")).To(Equal("text/plain; charset=utf-8"))
+			})
+
+			It("should set the X-Content-Type-Options header", func() {
+				Expect(recorder.Result().Header.Get("X-Content-Type-Options")).To(Equal("nosniff"))
 			})
 		})
 	})
@@ -214,8 +238,16 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Eventually(BufferReader(recorder.Result().Body)).Should(Say("200 OK: hi"))
 			})
 
-			It("should keep the connection header", func() {
+			It("should keep the Connection header", func() {
 				Expect(recorder.Result().Header.Get("Connection")).To(Equal("dummy"))
+			})
+
+			It("should set the Content-Type header", func() {
+				Expect(recorder.Result().Header.Get("Content-Type")).To(Equal("text/html; charset=utf-8"))
+			})
+
+			It("should set the X-Content-Type-Options header", func() {
+				Expect(recorder.Result().Header.Get("X-Content-Type-Options")).To(Equal("nosniff"))
 			})
 		})
 
@@ -242,8 +274,16 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Eventually(BufferReader(recorder.Result().Body)).Should(Say("400 Bad Request: bad"))
 			})
 
-			It("should delete the connection header", func() {
+			It("should delete the Connection header", func() {
 				Expect(recorder.Result().Header.Get("Connection")).To(Equal(""))
+			})
+
+			It("should set the Content-Type header", func() {
+				Expect(recorder.Result().Header.Get("Content-Type")).To(Equal("text/html; charset=utf-8"))
+			})
+
+			It("should set the X-Content-Type-Options header", func() {
+				Expect(recorder.Result().Header.Get("X-Content-Type-Options")).To(Equal("nosniff"))
 			})
 		})
 	})

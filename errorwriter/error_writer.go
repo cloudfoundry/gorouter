@@ -43,6 +43,9 @@ func (ew *plaintextErrorWriter) WriteError(
 		rw.Header().Del("Connection")
 	}
 
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	rw.Header().Set("X-Content-Type-Options", "nosniff")
+
 	rw.WriteHeader(code)
 	fmt.Fprintln(rw, body)
 }
@@ -87,14 +90,19 @@ func (ew *htmlErrorWriter) WriteError(
 		rw.Header().Del("Connection")
 	}
 
-	rw.WriteHeader(code)
-
+	var respBytes []byte
 	var rendered bytes.Buffer
 	if err := ew.tpl.Execute(&rendered, nil); err != nil {
 		logger.Error("render-error-failed", zap.Error(err))
-		fmt.Fprintln(rw, body)
-		return
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		respBytes = []byte(body)
+	} else {
+		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		respBytes = rendered.Bytes()
 	}
 
-	rw.Write(rendered.Bytes())
+	rw.WriteHeader(code)
+	rw.Write(respBytes)
 }
