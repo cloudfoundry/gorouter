@@ -54,6 +54,13 @@ type htmlErrorWriter struct {
 	tpl *template.Template
 }
 
+type htmlErrorWriterContext struct {
+	Status     int
+	StatusText string
+	Message    string
+	Header     http.Header
+}
+
 func NewHTMLErrorWriterFromFile(path string) (ErrorWriter, error) {
 	ew := &htmlErrorWriter{}
 
@@ -90,9 +97,17 @@ func (ew *htmlErrorWriter) WriteError(
 		rw.Header().Del("Connection")
 	}
 
+	tplContext := htmlErrorWriterContext{
+		Status:     code,
+		StatusText: http.StatusText(code),
+		Message:    message,
+		Header:     rw.Header(),
+	}
+	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+
 	var respBytes []byte
 	var rendered bytes.Buffer
-	if err := ew.tpl.Execute(&rendered, nil); err != nil {
+	if err := ew.tpl.Execute(&rendered, &tplContext); err != nil {
 		logger.Error("render-error-failed", zap.Error(err))
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")

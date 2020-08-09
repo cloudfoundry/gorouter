@@ -217,7 +217,9 @@ var _ = Describe("HTML ErrorWriter", func() {
 
 		Context("when the response is a success", func() {
 			BeforeEach(func() {
-				_, err := tmpFile.Write([]byte(`success`))
+				_, err := tmpFile.Write([]byte(
+					`{{ .Status }} {{ .StatusText }}: {{ .Message }}`,
+				))
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
@@ -234,7 +236,7 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Expect(recorder.Result().StatusCode).To(Equal(http.StatusOK))
 			})
 
-			XIt("should write the message as text", func() {
+			It("should write the message as text", func() {
 				Eventually(BufferReader(recorder.Result().Body)).Should(Say("200 OK: hi"))
 			})
 
@@ -253,7 +255,9 @@ var _ = Describe("HTML ErrorWriter", func() {
 
 		Context("when the response is not a success", func() {
 			BeforeEach(func() {
-				_, err := tmpFile.Write([]byte(`failure`))
+				_, err := tmpFile.Write([]byte(
+					`{{ .Status }} {{ .StatusText }}: {{ .Message }}`,
+				))
 				Expect(err).NotTo(HaveOccurred())
 
 				errorWriter, err = NewHTMLErrorWriterFromFile(tmpFile.Name())
@@ -270,7 +274,7 @@ var _ = Describe("HTML ErrorWriter", func() {
 				Expect(recorder.Result().StatusCode).To(Equal(http.StatusBadRequest))
 			})
 
-			XIt("should write the message as text", func() {
+			It("should write the message as text", func() {
 				Eventually(BufferReader(recorder.Result().Body)).Should(Say("400 Bad Request: bad"))
 			})
 

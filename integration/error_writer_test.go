@@ -92,7 +92,7 @@ var _ = Describe("Error Writers", func() {
 			)
 
 			BeforeEach(func() {
-				tpl := `<html><body>an error message</body></html>`
+				tpl := `<html><body>{{ .Message }}</body></html>`
 
 				var err error
 				tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
@@ -117,10 +117,10 @@ var _ = Describe("Error Writers", func() {
 
 				Expect(statusCode).To(Equal(404))
 
-				Expect(string(body)).To(Equal(
-					// FIXME
-					"<html><body>an error message</body></html>",
-				))
+				Expect(string(body)).To(Equal(fmt.Sprintf(
+					"<html><body>Requested route (&#39;not-%s&#39;) does not exist.</body></html>",
+					hostname,
+				)))
 			})
 		})
 	})
