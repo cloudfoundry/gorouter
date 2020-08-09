@@ -123,5 +123,41 @@ var _ = Describe("Error Writers", func() {
 				)))
 			})
 		})
+
+		Context("when the template references an HTTP header", func() {
+			var (
+				tmpFile *os.File
+			)
+
+			BeforeEach(func() {
+				tpl := `<html><body>Code: {{ .Status }} ; Cause: {{ .Header.Get "X-Cf-RouterError" }}</body></html>`
+
+				var err error
+				tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
+				Expect(err).NotTo(HaveOccurred())
+
+				testState.cfg.HTMLErrorTemplateFile = tmpFile.Name()
+
+				_, err = tmpFile.Write([]byte(tpl))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			JustBeforeEach(func() {
+				testState.StartGorouterOrFail()
+			})
+
+			AfterEach(func() {
+				os.Remove(tmpFile.Name())
+			})
+
+			It("responds with a templated error message", func() {
+				doRequest()
+
+				Expect(statusCode).To(Equal(404))
+
+				Expect(string(body)).To(ContainSubstring("Code: 404"))
+				Expect(string(body)).To(ContainSubstring("Cause: unknown_route"))
+			})
+		})
 	})
 })
