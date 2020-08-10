@@ -331,9 +331,8 @@ ok
 * Connection #0 to host 10.0.32.15 left intact
 ```
 
-**DEPRECATED:** The `/healthz` endpoint provides a similar response, but it
-always returns a 200 response regardless of whether or not the GoRouter instance
-is healthy.
+**DEPRECATED:** The `/healthz` endpoint is now an alias for the `/health` endpoint
+to ensure backward compatibility.
 
 ## Instrumentation
 

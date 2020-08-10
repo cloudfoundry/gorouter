@@ -211,11 +211,7 @@ func (c *VcapComponent) ListenAndServe() {
 	})
 
 	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Connection", "close")
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-
-		fmt.Fprintf(w, c.Healthz.Value())
+		c.Health.ServeHTTP(w, req)
 	})
 
 	hs.HandleFunc("/varz", func(w http.ResponseWriter, req *http.Request) {
