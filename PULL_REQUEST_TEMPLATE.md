@@ -14,7 +14,7 @@
 
 * [ ] I have viewed signed and have submitted the Contributor License Agreement
 
-* [ ] I have made this pull request to the `develop` branch
+* [ ] I have made this pull request to the `main` branch
 
 * [ ] I have run all the unit tests using `scripts/run-unit-tests-in-docker`
 
