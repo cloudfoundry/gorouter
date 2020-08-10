@@ -16,7 +16,7 @@
 
 * [ ] I have made this pull request to the `main` branch
 
-* [ ] I have run all the unit tests using `scripts/run-unit-tests-in-docker`
+* [ ] I have run all the unit tests using `scripts/run-unit-tests-in-docker` from [routing-release](https://github.com/cloudfoundry/routing-release).
 
 * [ ] (Optional) I have run Routing Acceptance Tests and Routing Smoke Tests on bosh lite
 
