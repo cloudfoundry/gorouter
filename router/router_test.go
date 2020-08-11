@@ -30,6 +30,7 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -1933,10 +1934,12 @@ func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout tim
 	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.RouteServicesHairpinning, config.EndpointTimeout, nil, nil, false)
 
+	ew := errorwriter.NewPlaintextErrorWriter()
+
 	proxyConfig := *config
 	proxyConfig.EndpointTimeout = requestTimeout
 	routeServicesTransport := &sharedfakes.RoundTripper{}
-	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, &proxyConfig, registry, combinedReporter,
+	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, &proxyConfig, registry, combinedReporter,
 		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, routeServicesTransport)
 
 	h := &health.Health{}
