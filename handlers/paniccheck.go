@@ -38,11 +38,13 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 				if !ok {
 					err = fmt.Errorf("%v", rec)
 				}
-				p.logger.Error("panic-check", zap.Nest("error", zap.Error(err), zap.Stack()))
+				p.logger.Error("panic-check", zap.String("host", r.Host), zap.Nest("error", zap.Error(err), zap.Stack()))
 
-				p.health.SetHealth(health.Degraded)
-
-				rw.WriteHeader(http.StatusServiceUnavailable)
+				rw.WriteHeader(http.StatusInternalServerError)
+				_, writeErr := rw.Write([]byte("500 Internal Server Error: An unknown error caused a panic.\n"))
+				if writeErr != nil {
+					p.logger.Fatal("failed-response-in-panic-check", zap.Nest("error", zap.Error(writeErr)))
+				}
 				r.Close = true
 			}
 		}

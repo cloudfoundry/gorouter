@@ -1,10 +1,12 @@
 package handlers_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -31,8 +33,8 @@ var _ = Describe("Paniccheck", func() {
 
 		testLogger = test_util.NewTestZapLogger("test")
 		request = httptest.NewRequest("GET", "http://example.com/foo", nil)
+		request.Host = "somehost.com"
 		recorder = httptest.NewRecorder()
-
 		panicHandler = handlers.NewPanicCheck(healthStatus, testLogger)
 	})
 
@@ -41,19 +43,24 @@ var _ = Describe("Paniccheck", func() {
 			panic(errors.New("we expect this panic"))
 		}
 
-		It("the healthStatus is degraded", func() {
-			panicHandler.ServeHTTP(recorder, request, expectedPanic)
-			Expect(healthStatus.Health()).To(Equal(health.Degraded))
-		})
-
-		It("responds with a 503 Service Unavailable", func() {
+		It("responds with a 500 Internal Server Error", func() {
 			panicHandler.ServeHTTP(recorder, request, expectedPanic)
 			resp := recorder.Result()
-			Expect(resp.StatusCode).To(Equal(503))
+			Expect(resp.StatusCode).To(Equal(500))
 		})
 
-		It("logs the panic message", func() {
+		It("responds with error text in the Response body", func() {
 			panicHandler.ServeHTTP(recorder, request, expectedPanic)
+			resp := recorder.Result()
+			responseBody, err := ioutil.ReadAll(resp.Body)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(responseBody)).To(
+				ContainSubstring("500 Internal Server Error: An unknown error caused a panic."))
+		})
+
+		It("logs the panic message with Host", func() {
+			panicHandler.ServeHTTP(recorder, request, expectedPanic)
+			Expect(testLogger).To(gbytes.Say("somehost.com"))
 			Expect(testLogger).To(gbytes.Say("we expect this panic"))
 			Expect(testLogger).To(gbytes.Say("stacktrace"))
 		})
