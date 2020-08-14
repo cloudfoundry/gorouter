@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"fmt"
 	"net/http"
 
@@ -40,8 +41,10 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 				}
 				p.logger.Error("panic-check", zap.String("host", r.Host), zap.Nest("error", zap.Error(err), zap.Stack()))
 
-				rw.WriteHeader(http.StatusInternalServerError)
-				_, writeErr := rw.Write([]byte("500 Internal Server Error: An unknown error caused a panic.\n"))
+				rw.Header().Set(router_http.CfRouterError, "unknown_failure")
+
+				rw.WriteHeader(http.StatusBadGateway)
+				_, writeErr := rw.Write([]byte("502 Bad Gateway Error: An unknown error caused a panic.\n"))
 				if writeErr != nil {
 					p.logger.Fatal("failed-response-in-panic-check", zap.Nest("error", zap.Error(writeErr)))
 				}

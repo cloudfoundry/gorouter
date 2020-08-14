@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -43,10 +44,10 @@ var _ = Describe("Paniccheck", func() {
 			panic(errors.New("we expect this panic"))
 		}
 
-		It("responds with a 500 Internal Server Error", func() {
+		It("responds with a 502 Bad Gateway Error", func() {
 			panicHandler.ServeHTTP(recorder, request, expectedPanic)
 			resp := recorder.Result()
-			Expect(resp.StatusCode).To(Equal(500))
+			Expect(resp.StatusCode).To(Equal(502))
 		})
 
 		It("responds with error text in the Response body", func() {
@@ -55,7 +56,12 @@ var _ = Describe("Paniccheck", func() {
 			responseBody, err := ioutil.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(responseBody)).To(
-				ContainSubstring("500 Internal Server Error: An unknown error caused a panic."))
+				ContainSubstring("502 Bad Gateway Error: An unknown error caused a panic."))
+		})
+
+		It("responds with an x-cf-RouterError", func() {
+			panicHandler.ServeHTTP(recorder, request, expectedPanic)
+			Expect(recorder.Header().Get(router_http.CfRouterError)).To(Equal("unknown_failure"))
 		})
 
 		It("logs the panic message with Host", func() {
