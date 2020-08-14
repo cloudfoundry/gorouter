@@ -98,13 +98,11 @@ func NewRouter(
 		},
 	}
 
-	healthz := &health.Healthz{}
 	healthCheck := handlers.NewHealthcheck(h, logger)
 	component := &common.VcapComponent{
-		Config:  cfg,
-		Varz:    varz,
-		Healthz: healthz,
-		Health:  healthCheck,
+		Config: cfg,
+		Varz:   varz,
+		Health: healthCheck,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},

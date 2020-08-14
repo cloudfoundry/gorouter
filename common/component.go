@@ -84,9 +84,8 @@ func (p *ProcessStatus) StopUpdate() {
 var procStat *ProcessStatus
 
 type VcapComponent struct {
-	Config     interface{}     `json:"-"`
-	Varz       *health.Varz    `json:"-"`
-	Healthz    *health.Healthz `json:"-"`
+	Config     interface{}  `json:"-"`
+	Varz       *health.Varz `json:"-"`
 	Health     http.Handler
 	InfoRoutes map[string]json.Marshaler `json:"-"`
 	Logger     logger.Logger             `json:"-"`

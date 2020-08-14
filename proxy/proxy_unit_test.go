@@ -122,26 +122,6 @@ var _ = Describe("Proxy Unit tests", func() {
 				Expect(fakeAccessLogger.LogArgsForCall(0).RoundtripFinishedAt).NotTo(Equal(time.Time{}))
 			})
 		})
-
-		Context("when the route registry is nil, causing the proxy to panic", func() {
-			var h *health.Health
-			BeforeEach(func() {
-				h = &health.Health{}
-				h.SetHealth(health.Healthy)
-				proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, nil, combinedReporter, routeServiceConfig, tlsConfig, tlsConfig, h, rt)
-			})
-
-			It("fails the healthcheck", func() {
-				req := test_util.NewRequest("GET", "some-app", "/", nil)
-
-				proxyObj.ServeHTTP(resp, req)
-				Expect(h.Health()).To(Equal(health.Degraded))
-
-				req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
-				proxyObj.ServeHTTP(resp, req)
-				Expect(resp.Status()).To(Equal(http.StatusServiceUnavailable))
-			})
-		})
 	})
 
 	Describe("SkipSanitizeXFP", func() {
