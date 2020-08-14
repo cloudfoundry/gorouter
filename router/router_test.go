@@ -843,7 +843,7 @@ var _ = Describe("Router", func() {
 					Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 					defer resp.Body.Close()
 
-					b, err := ioutil.ReadAll(resp.Body)
+					_, err = ioutil.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
 					Expect(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
