@@ -1,8 +1,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloudfoundry/gorouter)](https://goreportcard.com/report/github.com/cloudfoundry/gorouter)
 
-# GoRouter
+# Gorouter
 This repository contains the source code for the Cloud Foundry L7 HTTP router.
-GoRouter is deployed by default with Cloud Foundry
+Gorouter is deployed by default with Cloud Foundry
 ([cf-deployment](https://github.com/cloudfoundry/cf-deployment)) which includes
 [routing-release](https://github.com/cloudfoundry/routing-release) as submodule.
 
@@ -31,7 +31,7 @@ The following instructions may help you get started with gorouter.
 
 ### Setup
 
-GoRouter dependencies are managed with
+Gorouter dependencies are managed with
 [routing-release](https://github.com/cloudfoundry/routing-release#).  Do not
 clone the gorouter repo directly; instead, follow instructions at
 https://github.com/cloudfoundry/routing-release#get-the-code (summarized below).
@@ -112,9 +112,9 @@ message contains an interval that other components should then send
 `router.register` on, `minimumRegisterIntervalInSeconds`. It is recommended that
 clients should send `router.register` messages on this interval.  This
 `minimumRegisterIntervalInSeconds` value is configured through the
-`start_response_delay_interval` configuration property. GoRouter will prune
+`start_response_delay_interval` configuration property. Gorouter will prune
 routes that it considers to be stale based upon a separate "staleness" value,
-`droplet_stale_threshold`, which defaults to 120 seconds. GoRouter will check if
+`droplet_stale_threshold`, which defaults to 120 seconds. Gorouter will check if
 routes have become stale on an interval defined by
 `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these
 values are represented in seconds and will always be integers.
@@ -270,11 +270,11 @@ pair will be unregistered. The reverse is also true.
 
 ## Healthchecking from a Load Balancer
 
-To scale GoRouter horizontally for high-availability or throughput capacity, you
+To scale Gorouter horizontally for high-availability or throughput capacity, you
 must deploy it behind a highly-available load balancer (F5, AWS ELB, etc).
 
-GoRouter has a health endpoint `/health` on port 8080 that returns a 200 OK
-which indicates the GoRouter instance is healthy; any other response indicates
+Gorouter has a health endpoint `/health` on port 8080 that returns a 200 OK
+which indicates the Gorouter instance is healthy; any other response indicates
 unhealthy.  This port can be configured via the `router.status.port` property in
 the BOSH deployment manifest or via the `status.port` property under
 `/var/vcap/jobs/gorouter/config/gorouter.yml`
@@ -302,8 +302,8 @@ ok
 
 **DEPRECATED:** Your load balancer can be configured to send an HTTP
 healthcheck on port 80 with the `User-Agent` HTTP header set to
-`HTTP-Monitor/1.1`. A 200 response indicates the GoRouter instance is healthy;
-any other response indicates unhealthy. GoRouter can be configured to accept
+`HTTP-Monitor/1.1`. A 200 response indicates the Gorouter instance is healthy;
+any other response indicates unhealthy. Gorouter can be configured to accept
 alternate values for the User Agent header using the `healthcheck_user_agent`
 configuration property; as an example, AWS ELBS send `User-Agent:
 ELB-HealthChecker/1.0`.
@@ -558,7 +558,7 @@ $ curl "http://someuser:somepass@10.0.32.15:8080/varz"
 
 ### Profiling the Server
 
-The GoRouter runs the
+The Gorouter runs the
 [debugserver](https://github.com/cloudfoundry/debugserver), which is a wrapper
 around the go pprof tool. In order to generate this profile, do the following:
 
@@ -571,9 +571,9 @@ go tool pprof http://localhost:8080/debug/pprof/profile
 
 ## Load Balancing
 
-The GoRouter is, in simple terms, a reverse proxy that load balances between
-many backend instances. The default load balancing algorithm that GoRouter will
-use is a simple **round-robin** strategy. GoRouter will retry a request if the
+The Gorouter is, in simple terms, a reverse proxy that load balances between
+many backend instances. The default load balancing algorithm that Gorouter will
+use is a simple **round-robin** strategy. Gorouter will retry a request if the
 chosen backend does not accept the TCP connection.
 
 ### Round-Robin
@@ -581,7 +581,7 @@ Default load balancing algorithm that gorouter will use or may be explicitly set
 in **gorouter.yml** `yaml default_balancing_algorithm: round-robin`
 
 ### Least-Connection
-The GoRouter also supports least connection based routing and this can be
+The Gorouter also supports least connection based routing and this can be
 enabled in **gorouter.yml**
 
 ```yaml
@@ -592,12 +592,12 @@ Least connection based load balancing will select the endpoint with the least
 number of connections. If multiple endpoints match with the same number of least
 connections, it will select a random one within those least connections.
 
-_NOTE: GoRouter currently only supports changing the load balancing strategy at
+_NOTE: Gorouter currently only supports changing the load balancing strategy at
 the gorouter level and does not yet support a finer-grained level such as
 route-level. Therefore changing the load balancing algorithm from the default
 (round-robin) should be proceeded with caution._
 
-## When terminating TLS in front of GoRouter with a component that does not support sending HTTP headers
+## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
 
 ### Enabling apps and CF to detect that request was encrypted using X-Forwarded-Proto
 
@@ -644,13 +644,13 @@ You can test this feature manually:
 echo -e "PROXY TCP4 1.2.3.4 [GOROUTER IP] 12345 [GOROUTER PORT]\r\nGET / HTTP/1.1\r\nHost: [APP URL]\r\n" | nc [GOROUTER IP] [GOROUTER PORT]
 ```
 
-You should see in the access logs on the GoRouter that the `X-Forwarded-For`
+You should see in the access logs on the Gorouter that the `X-Forwarded-For`
 header is `1.2.3.4`. You can read more about the PROXY Protocol
 [here](http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt).
 
 ## HTTP/2 Support
 
-The GoRouter does not currently support proxying HTTP/2 connections, even over
+The Gorouter does not currently support proxying HTTP/2 connections, even over
 TLS. Connections made using HTTP/1.1, either by TLS or cleartext, will be
 proxied to backends over cleartext.
 
@@ -687,23 +687,23 @@ request:
 "<Referer>" "<User-Agent>" <Remote Address> <Backend Address>
 x_forwarded_for:"<X-Forwarded-For>"
 x_forwarded_proto:"<X-Forwarded-Proto>"
-vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> gorouter_time:<GoRouter Time>
+vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> gorouter_time:<Gorouter Time>
 app_id:<Application ID> app_index:<Application Index> x_cf_routererror:<X-Cf-RouterError> <Extra Headers>`
 
-* Status Code, Response Time, GoRouter Time, Application ID, Application Index,
+* Status Code, Response Time, Gorouter Time, Application ID, Application Index,
   X-Cf-RouterError, and Extra Headers are all optional fields. The absence of
   Status Code, Response Time, Application ID, Application Index, or
   X-Cf-RouterError will result in a "-" in the corresponding field.
 
 * `Response Time` is the total time it takes for the request to go through the
-  GoRouter to the app and for the response to travel back through the GoRouter.
+  Gorouter to the app and for the response to travel back through the Gorouter.
   This includes the time the request spends traversing the network to the app
-  and back again to the GoRouter. It also includes the time the app spends
+  and back again to the Gorouter. It also includes the time the app spends
   forming a response.
 
-* `GoRouter Time` is the total time it takes for the request to go through the
-  GoRouter initially plus the time it takes for the response to travel back
-  through the GoRouter. This does not include the time the request spends
+* `Gorouter Time` is the total time it takes for the request to go through the
+  Gorouter initially plus the time it takes for the response to travel back
+  through the Gorouter. This does not include the time the request spends
   traversing the network to the app. This also does not include the time the app
   spends forming a response.
 

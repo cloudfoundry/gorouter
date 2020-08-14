@@ -79,11 +79,11 @@ func NewTestState() *testState {
 	routeServiceTLSCert, err := tls.X509KeyPair(routeServiceCert, routeServiceKey)
 	Expect(err).ToNot(HaveOccurred())
 
-	browserToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	cfg.CACerts = cfg.CACerts + string(browserToGoRouterClientCertChain.CACertPEM)
+	browserToGorouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	cfg.CACerts = cfg.CACerts + string(browserToGorouterClientCertChain.CACertPEM)
 	cfg.CACerts = cfg.CACerts + string(routeServiceCert)
-	routeServiceToGoRouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	cfg.CACerts = cfg.CACerts + string(routeServiceToGoRouterClientCertChain.CACertPEM)
+	routeServiceToGorouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
+	cfg.CACerts = cfg.CACerts + string(routeServiceToGorouterClientCertChain.CACertPEM)
 
 	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN})
@@ -99,8 +99,8 @@ func NewTestState() *testState {
 		PrivateKey: string(gorouterToBackendsClientCertChain.PrivKeyPEM),
 	}
 	cfg.RouteServiceConfig.TLSPem = config.TLSPem{
-		CertChain:  string(browserToGoRouterClientCertChain.CertPEM),
-		PrivateKey: string(browserToGoRouterClientCertChain.PrivKeyPEM),
+		CertChain:  string(browserToGorouterClientCertChain.CertPEM),
+		PrivateKey: string(browserToGorouterClientCertChain.PrivKeyPEM),
 	}
 
 	// make backend trust the CA that signed the gorouter's client cert
@@ -134,8 +134,8 @@ func NewTestState() *testState {
 		trustedExternalServiceTLS: &tls.Config{
 			Certificates: []tls.Certificate{routeServiceTLSCert},
 		},
-		trustedClientTLSConfig:             browserToGoRouterClientCertChain.AsTLSConfig(),
-		trustedRouteServiceClientTLSConfig: routeServiceToGoRouterClientCertChain.AsTLSConfig(),
+		trustedClientTLSConfig:             browserToGorouterClientCertChain.AsTLSConfig(),
+		trustedRouteServiceClientTLSConfig: routeServiceToGorouterClientCertChain.AsTLSConfig(),
 		trustedBackendTLSConfig:            trustedBackendTLSConfig,
 		trustedBackendServerCertSAN:        trustedBackendServerCertSAN,
 	}

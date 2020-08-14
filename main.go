@@ -367,7 +367,7 @@ func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Con
 	if c.OAuth.Port == -1 {
 		logger.Fatal(
 			"tls-not-enabled",
-			zap.Error(errors.New("GoRouter requires TLS enabled to get OAuth token")),
+			zap.Error(errors.New("Gorouter requires TLS enabled to get OAuth token")),
 			zap.String("token-endpoint", c.OAuth.TokenEndpoint),
 			zap.Int("port", c.OAuth.Port),
 		)
