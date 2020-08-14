@@ -845,7 +845,6 @@ var _ = Describe("Router", func() {
 
 					b, err := ioutil.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(string(b)).To(Equal("502 Bad Gateway: Registered endpoint failed to handle the request.\n"))
 					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
 					Expect(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
 				})
