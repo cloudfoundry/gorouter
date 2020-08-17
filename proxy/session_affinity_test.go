@@ -301,8 +301,7 @@ var _ = Describe("Session Affinity", func() {
 		})
 
 		Context("when the response does not contain a JSESSIONID cookie", func() {
-			It("responds with a VCAP_ID cookie anyway", func() {
-				// See: https://github.com/cloudfoundry/routing-release/issues/170
+			It("does not respond with a VCAP_ID cookie", func() {
 				ln := test_util.RegisterHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
@@ -314,7 +313,7 @@ var _ = Describe("Session Affinity", func() {
 
 				resp, _ := x.ReadResponse()
 				Expect(getCookie(StickyCookieKey, resp.Cookies())).To(BeNil())
-				Expect(getCookie(proxy.VcapCookieId, resp.Cookies()).Value).To(Equal("my-id"))
+				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
 			})
 
 			Context("when the preferred server is gone", func() {

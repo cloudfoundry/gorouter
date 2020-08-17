@@ -303,7 +303,7 @@ func setupStickySession(
 	sameSite := http.SameSite(0)
 
 	// did the endpoint change?
-	sticky := originalEndpointId != ""
+	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
 
 	for _, v := range response.Cookies() {
 		if _, ok := stickySessionCookieNames[v.Name]; ok {
