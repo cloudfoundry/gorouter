@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 )
 
 const (
@@ -30,19 +28,6 @@ func addNoCacheControlHeader(rw http.ResponseWriter) {
 		"Cache-Control",
 		"no-cache, no-store",
 	)
-}
-
-func writeStatus(rw http.ResponseWriter, code int, message string, logger logger.Logger) {
-	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
-
-	if code != 404 {
-		logger.Info("status", zap.String("body", body))
-	}
-
-	http.Error(rw, body, code)
-	if code > 299 {
-		rw.Header().Del("Connection")
-	}
 }
 
 func hostWithoutPort(reqHost string) string {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -38,6 +39,7 @@ var _ = Describe("Route Service Handler", func() {
 		forwardedUrl string
 
 		logger *loggerfakes.FakeLogger
+		ew     = errorwriter.NewPlaintextErrorWriter()
 
 		reqChan chan *http.Request
 
@@ -109,7 +111,7 @@ var _ = Describe("Route Service Handler", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.UseFunc(testSetupHandler)
-		handler.Use(handlers.NewRouteService(config, reg, logger))
+		handler.Use(handlers.NewRouteService(config, reg, logger, ew))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -594,7 +596,7 @@ var _ = Describe("Route Service Handler", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewRouteService(config, reg, logger))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Fatal on the logger", func() {
@@ -609,7 +611,7 @@ var _ = Describe("Route Service Handler", func() {
 		BeforeEach(func() {
 			badHandler = negroni.New()
 			badHandler.Use(handlers.NewRequestInfo())
-			badHandler.Use(handlers.NewRouteService(config, reg, logger))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Fatal on the logger", func() {

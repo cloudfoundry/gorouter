@@ -113,7 +113,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					testState.cfg.RouteServiceRecommendHttps = true
 				}
 
-				testState.StartGorouter()
+				testState.StartGorouterOrFail()
 
 				doRequest := func(scheme, hostname string, addXFCCHeader bool) {
 					req := testState.newRequest(fmt.Sprintf("%s://%s", scheme, hostname))

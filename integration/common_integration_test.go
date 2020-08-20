@@ -229,7 +229,7 @@ func (s *testState) registerAndWait(rm mbus.RegistryMessage) {
 	}).Should(BeTrue())
 }
 
-func (s *testState) StartGorouter() {
+func (s *testState) StartGorouter() *Session {
 	Expect(s.cfg).NotTo(BeNil(), "set up test cfg before calling this function")
 
 	s.natsRunner = test_util.NewNATSRunner(int(s.cfg.Nats[0].Port))
@@ -249,15 +249,23 @@ func (s *testState) StartGorouter() {
 	s.gorouterSession, err = Start(cmd, GinkgoWriter, GinkgoWriter)
 	Expect(err).ToNot(HaveOccurred())
 
+	return s.gorouterSession
+}
+
+func (s *testState) StartGorouterOrFail() {
+	s.StartGorouter()
+
 	Eventually(func() *Session {
 		if s.gorouterSession.ExitCode() >= 0 {
 			Fail("gorouter quit early!")
 		}
 		return s.gorouterSession
 	}, 1*time.Minute).Should(Say("starting"))
+
 	Eventually(s.gorouterSession, 1*time.Minute).Should(Say(`Successfully-connected-to-nats.*localhost:\d+`))
 	Eventually(s.gorouterSession, 1*time.Minute).Should(Say(`gorouter.started`))
 
+	var err error
 	s.mbusClient, err = newMessageBus(s.cfg)
 	Expect(err).ToNot(HaveOccurred())
 }

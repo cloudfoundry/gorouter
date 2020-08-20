@@ -33,7 +33,7 @@ var _ = Describe("TLS to backends", func() {
 
 		testState = NewTestState()
 		testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
-		testState.StartGorouter()
+		testState.StartGorouterOrFail()
 	})
 
 	AfterEach(func() {

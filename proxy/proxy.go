@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -41,6 +42,7 @@ type proxy struct {
 	ip                       string
 	traceKey                 string
 	logger                   logger.Logger
+	errorWriter              errorwriter.ErrorWriter
 	reporter                 metrics.ProxyReporter
 	accessLogger             accesslog.AccessLogger
 	secureCookies            bool
@@ -63,6 +65,7 @@ type proxy struct {
 func NewProxy(
 	logger logger.Logger,
 	accessLogger accesslog.AccessLogger,
+	errorWriter errorwriter.ErrorWriter,
 	cfg *config.Config,
 	registry registry.Registry,
 	reporter metrics.ProxyReporter,
@@ -78,6 +81,7 @@ func NewProxy(
 		traceKey:                 cfg.TraceKey,
 		ip:                       cfg.Ip,
 		logger:                   logger,
+		errorWriter:              errorWriter,
 		reporter:                 reporter,
 		secureCookies:            cfg.SecureCookies,
 		health:                   health,
@@ -144,7 +148,7 @@ func NewProxy(
 		ModifyResponse: p.modifyResponse,
 	}
 
-	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger)
+	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, errorWriter)
 
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
 	w3cHandler := handlers.NewW3C(cfg.Tracing.EnableW3C, cfg.Tracing.W3CTenantID, logger)
@@ -167,13 +171,14 @@ func NewProxy(
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)
 	n.Use(w3cHandler)
-	n.Use(handlers.NewProtocolCheck(logger))
-	n.Use(handlers.NewLookup(registry, reporter, logger, cfg.EmptyPoolResponseCode503))
+	n.Use(handlers.NewProtocolCheck(logger, errorWriter))
+	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
 		cfg.ForwardedClientCert,
 		logger,
+		errorWriter,
 	))
 	n.Use(&handlers.XForwardedProto{
 		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),
@@ -227,6 +232,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		proxyWriter,
 		p.reporter,
 		p.logger,
+		p.errorWriter,
 		p.endpointDialTimeout,
 		p.backendTLSConfig,
 		handler.DisableXFFLogging(p.disableXFFLogging),

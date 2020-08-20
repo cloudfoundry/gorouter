@@ -20,6 +20,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -75,6 +76,16 @@ func main() {
 	}
 	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.Format.Timestamp)
 	logger.Info("starting")
+
+	var ew errorwriter.ErrorWriter
+	if c.HTMLErrorTemplateFile != "" {
+		ew, err = errorwriter.NewHTMLErrorWriterFromFile(c.HTMLErrorTemplateFile)
+		if err != nil {
+			logger.Fatal("new-html-error-template-from-file", zap.Error(err))
+		}
+	} else {
+		ew = errorwriter.NewPlaintextErrorWriter()
+	}
 
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
@@ -174,6 +185,7 @@ func main() {
 	proxy := proxy.NewProxy(
 		logger,
 		accessLogger,
+		ew,
 		c,
 		registry,
 		compositeReporter,

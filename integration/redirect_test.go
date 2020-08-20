@@ -39,7 +39,7 @@ var _ = Describe("Headers", func() {
 
 	Context("When an app returns a 3xx-redirect", func() {
 		BeforeEach(func() {
-			testState.StartGorouter()
+			testState.StartGorouterOrFail()
 			testApp.Start()
 			testState.register(testApp.Server, testAppRoute)
 		})

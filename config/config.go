@@ -261,6 +261,8 @@ type Config struct {
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 
 	EmptyPoolResponseCode503 bool `yaml:"empty_pool_response_code_503,omitempty"`
+
+	HTMLErrorTemplateFile string `yaml:"html_error_template_file,omitempty"`
 }
 
 var defaultConfig = Config{

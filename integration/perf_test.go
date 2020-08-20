@@ -9,6 +9,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
@@ -39,10 +40,12 @@ var _ = Describe("AccessLogRecord", func() {
 		accesslog, err := accesslog.CreateRunningAccessLogger(logger, ls, c)
 		Expect(err).ToNot(HaveOccurred())
 
+		ew := errorwriter.NewPlaintextErrorWriter()
+
 		rss, err := router.NewRouteServicesServer()
 		Expect(err).ToNot(HaveOccurred())
 		var h *health.Health
-		proxy.NewProxy(logger, accesslog, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
+		proxy.NewProxy(logger, accesslog, ew, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
 			&tls.Config{}, &tls.Config{}, h, rss.GetRoundTripper())
 
 		b.Time("RegisterTime", func() {

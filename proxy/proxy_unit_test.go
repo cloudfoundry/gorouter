@@ -11,6 +11,7 @@ import (
 	"code.cloudfoundry.org/gorouter/common/health"
 
 	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -38,6 +39,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		routeServiceConfig *routeservice.RouteServiceConfig
 		rt                 *sharedfakes.RoundTripper
 		tlsConfig          *tls.Config
+		ew                 = errorwriter.NewPlaintextErrorWriter()
 	)
 
 	Describe("ServeHTTP", func() {
@@ -71,7 +73,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
-			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, conf, r, combinedReporter,
+			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, ew, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -18,14 +19,22 @@ type clientCert struct {
 	forceDeleteHeader func(req *http.Request) (bool, error)
 	forwardingMode    string
 	logger            logger.Logger
+	errorWriter       errorwriter.ErrorWriter
 }
 
-func NewClientCert(skipSanitization func(req *http.Request) bool, forceDeleteHeader func(req *http.Request) (bool, error), forwardingMode string, logger logger.Logger) negroni.Handler {
+func NewClientCert(
+	skipSanitization func(req *http.Request) bool,
+	forceDeleteHeader func(req *http.Request) (bool, error),
+	forwardingMode string,
+	logger logger.Logger,
+	ew errorwriter.ErrorWriter,
+) negroni.Handler {
 	return &clientCert{
 		skipSanitization:  skipSanitization,
 		forceDeleteHeader: forceDeleteHeader,
 		forwardingMode:    forwardingMode,
 		logger:            logger,
+		errorWriter:       ew,
 	}
 }
 
@@ -48,7 +57,7 @@ func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 	delete, err := c.forceDeleteHeader(r)
 	if err != nil {
 		c.logger.Error("signature-validation-failed", zap.Error(err))
-		writeStatus(
+		c.errorWriter.WriteError(
 			rw,
 			http.StatusBadRequest,
 			"Failed to validate Route Service Signature for x-forwarded-client-cert",

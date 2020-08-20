@@ -17,7 +17,7 @@ var _ = Describe("Route services", func() {
 	BeforeEach(func() {
 		testState = NewTestState()
 
-		testState.StartGorouter()
+		testState.StartGorouterOrFail()
 	})
 
 	AfterEach(func() {

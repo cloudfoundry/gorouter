@@ -15,6 +15,7 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -50,6 +51,8 @@ var _ = Describe("Router", func() {
 		subscriber       ifrit.Process
 		natsPort         uint16
 		healthStatus     *health.Health
+
+		ew = errorwriter.NewPlaintextErrorWriter()
 	)
 
 	testAndVerifyRouterStopsNoDrain := func(signals chan os.Signal, closeChannel chan struct{}, sigs ...os.Signal) {
@@ -182,7 +185,7 @@ var _ = Describe("Router", func() {
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 		rt := &sharedfakes.RoundTripper{}
-		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
+		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthStatus, rt)
 
 		errChan := make(chan error, 2)
@@ -414,7 +417,7 @@ var _ = Describe("Router", func() {
 				h.SetHealth(health.Healthy)
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				rt := &sharedfakes.RoundTripper{}
-				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, config, registry, combinedReporter,
+				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)
 
 				errChan = make(chan error, 2)

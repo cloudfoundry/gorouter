@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -27,8 +27,9 @@ const (
 var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
-	logger   logger.Logger
-	reporter metrics.ProxyReporter
+	logger      logger.Logger
+	errorWriter errorwriter.ErrorWriter
+	reporter    metrics.ProxyReporter
 
 	request  *http.Request
 	response utils.ProxyResponseWriter
@@ -42,8 +43,18 @@ type RequestHandler struct {
 	disableSourceIPLogging bool
 }
 
-func NewRequestHandler(request *http.Request, response utils.ProxyResponseWriter, r metrics.ProxyReporter, logger logger.Logger, endpointDialTimeout time.Duration, tlsConfig *tls.Config, opts ...func(*RequestHandler)) *RequestHandler {
+func NewRequestHandler(
+	request *http.Request,
+	response utils.ProxyResponseWriter,
+	r metrics.ProxyReporter,
+	logger logger.Logger,
+	errorWriter errorwriter.ErrorWriter,
+	endpointDialTimeout time.Duration,
+	tlsConfig *tls.Config,
+	opts ...func(*RequestHandler),
+) *RequestHandler {
 	reqHandler := &RequestHandler{
+		errorWriter:         errorWriter,
 		reporter:            r,
 		request:             request,
 		response:            response,
@@ -107,7 +118,7 @@ func (h *RequestHandler) HandleBadGateway(err error, request *http.Request) {
 
 	handlers.AddRouterErrorHeader(h.response, "endpoint_failure")
 
-	h.writeStatus(http.StatusBadGateway, "Registered endpoint failed to handle the request.")
+	h.errorWriter.WriteError(h.response, http.StatusBadGateway, "Registered endpoint failed to handle the request.", h.logger)
 	h.response.Done()
 }
 
@@ -118,7 +129,7 @@ func (h *RequestHandler) HandleTcpRequest(iter route.EndpointIterator) {
 	backendStatusCode, err := h.serveTcp(iter, nil, onConnectionFailed)
 	if err != nil {
 		h.logger.Error("tcp-request-failed", zap.Error(err))
-		h.writeStatus(http.StatusBadGateway, "TCP forwarding to endpoint failed.")
+		h.errorWriter.WriteError(h.response, http.StatusBadGateway, "TCP forwarding to endpoint failed.", h.logger)
 		return
 	}
 	h.response.SetStatus(backendStatusCode)
@@ -141,24 +152,13 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 
 	if err != nil {
 		h.logger.Error("websocket-request-failed", zap.Error(err))
-		h.writeStatus(http.StatusBadGateway, "WebSocket request to endpoint failed.")
+		h.errorWriter.WriteError(h.response, http.StatusBadGateway, "WebSocket request to endpoint failed.", h.logger)
 		h.reporter.CaptureWebSocketFailure()
 		return
 	}
 
 	h.response.SetStatus(backendStatusCode)
 	h.reporter.CaptureWebSocketUpdate()
-}
-
-func (h *RequestHandler) writeStatus(code int, message string) {
-	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
-
-	h.logger.Info("status", zap.String("body", body))
-
-	http.Error(h.response, body, code)
-	if code > 299 {
-		h.response.Header().Del("Connection")
-	}
 }
 
 type connSuccessCB func(net.Conn, *route.Endpoint) error
