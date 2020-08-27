@@ -210,7 +210,6 @@ func (p *EndpointPool) MaxConnsPerBackend() int64 {
 	return p.maxConnsPerBackend
 }
 
-// Returns true if endpoint was added or updated, false otherwise
 func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 	p.Lock()
 	defer p.Unlock()

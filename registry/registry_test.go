@@ -221,8 +221,16 @@ var _ = Describe("RouteRegistry", func() {
 		})
 
 		Context("when route registration message is received", func() {
-			It("logs at debug level", func() {
+			It("logs the route and endpoint registration at info level", func() {
 				r.Register("a.route", fooEndpoint)
+
+				Expect(logger).To(gbytes.Say(`"log_level":1.*route-registered.*a\.route`))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*endpoint-registered.*a\.route.*192\.168\.1\.1`))
+			})
+
+			It("logs 'uri-added' at debug level for backward compatibility", func() {
+				r.Register("a.route", fooEndpoint)
+
 				Expect(logger).To(gbytes.Say(`"log_level":0.*uri-added.*a\.route`))
 			})
 
@@ -637,14 +645,15 @@ var _ = Describe("RouteRegistry", func() {
 
 		})
 
-		Context("when route unregistration message is received", func() {
+		Context("when route is unregistered", func() {
 			BeforeEach(func() {
 				r.Register("a.route", fooEndpoint)
 				r.Unregister("a.route", fooEndpoint)
 			})
 
-			It("logs at debug level", func() {
-				Expect(logger).To(gbytes.Say(`"log_level":0.*unregister.*a\.route`))
+			It("logs the route and endpoint unregistration at info level", func() {
+				Expect(logger).To(gbytes.Say(`"log_level":1.*endpoint-unregistered.*a\.route.*192\.168\.1\.1`))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*route-unregistered.*a\.route`))
 			})
 
 			It("only logs unregistration for existing routes", func() {

@@ -88,9 +88,12 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
 	}
 
-	if endpointAdded >= route.UPDATED {
+	switch endpointAdded {
+	case route.ADDED:
+		r.logger.Info("endpoint-registered", zapData(uri, endpoint)...)
+	case route.UPDATED:
 		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
-	} else {
+	default:
 		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
 	}
 }
@@ -114,6 +117,8 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 			MaxConnsPerBackend: r.maxConnsPerBackend,
 		})
 		r.byURI.Insert(routekey, pool)
+		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
+		// for backward compatibility:
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
 
@@ -148,13 +153,14 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Debug("endpoint-unregistered", zapData(uri, endpoint)...)
+			r.logger.Info("endpoint-unregistered", zapData(uri, endpoint)...)
 		} else {
 			r.logger.Debug("endpoint-not-unregistered", zapData(uri, endpoint)...)
 		}
 
 		if pool.IsEmpty() {
 			r.byURI.Delete(uri)
+			r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
 		}
 	}
 }
@@ -238,9 +244,9 @@ func (r *RouteRegistry) StartPruningCycle() {
 			for {
 				select {
 				case <-r.ticker.C:
-					r.logger.Info("start-pruning-routes")
+					r.logger.Debug("start-pruning-routes")
 					r.pruneStaleDroplets()
-					r.logger.Info("finished-pruning-routes")
+					r.logger.Debug("finished-pruning-routes")
 					r.reporter.CaptureRouteStats(r.NumUris(), r.MSSinceLastUpdate())
 				}
 			}

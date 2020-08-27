@@ -679,6 +679,46 @@ Sample log message in gorouter.
 - `source`: The function within Gorouter that initiated the log message
 - `data`: Additional information that varies based on the message
 
+### Route table change logs
+
+The following log messages are emitted any time the routing table changes:
+
+- `route-registered`: a new route is added to the table
+- `route-unregistred`: an existing route is removed from the table
+- `endpoint-registered`: a new backend is added to the table
+   e.g. an app is scaled up and a new app instance is started
+- `endpoint-unregistered`: a backend is removed from the table
+   e.g. an app is scaled down and an app instance is stopped
+
+Examples:
+
+Route mapped to existing application with 1 app instance:
+```
+{"log_level":1,"timestamp":"2020-08-27T22:59:43.462087363Z","message":"route-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com"}}
+{"log_level":1,"timestamp":"2020-08-27T22:59:43.462279999Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61002","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+```
+
+App with two mapped routes scaled up from 1 instance to 2:
+```
+{"log_level":1,"timestamp":"2020-08-27T22:59:59.350998043Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+{"log_level":1,"timestamp":"2020-08-27T22:59:59.351131999Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"foo.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+```
+
+App with two mapped routes scaled down from 2 instances to 1:
+```
+{"log_level":1,"timestamp":"2020-08-27T23:00:27.122616625Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+{"log_level":1,"timestamp":"2020-08-27T23:00:27.123043785Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"foo.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+```
+
+Route unmapped from application with 1 app instance:
+```
+{"log_level":1,"timestamp":"2020-08-27T23:00:46.702876112Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61002","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
+{"log_level":1,"timestamp":"2020-08-27T23:00:46.703133349Z","message":"route-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com"}}
+```
+
+
+### Access logs
+
 Access logs provide information for the following fields when receiving a
 request:
 

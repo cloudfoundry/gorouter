@@ -208,7 +208,7 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 			s.registerEndpoint(msg)
 		case "router.unregister":
 			s.unregisterEndpoint(msg)
-			s.logger.Info("unregister-route", zap.String("message", string(message.Data)))
+			s.logger.Debug("unregister-route", zap.String("message", string(message.Data)))
 		default:
 		}
 	})
