@@ -51,15 +51,14 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 	routeServiceURL := reqInfo.RoutePool.RouteServiceUrl()
 	if routeServiceURL == "" {
+		// No route service is associated with this request
 		next(rw, req)
 		return
 	}
-	// Attempted to use a route service when it is not supported
+
 	if !r.config.RouteServiceEnabled() {
 		r.logger.Info("route-service-unsupported")
-
 		AddRouterErrorHeader(rw, "route_service_unsupported")
-
 		r.errorWriter.WriteError(
 			rw,
 			http.StatusBadGateway,
@@ -68,11 +67,10 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		)
 		return
 	}
+
 	if IsWebSocketUpgrade(req) {
 		r.logger.Info("route-service-unsupported")
-
 		AddRouterErrorHeader(rw, "route_service_unsupported")
-
 		r.errorWriter.WriteError(
 			rw,
 			http.StatusServiceUnavailable,
@@ -82,15 +80,6 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		return
 	}
 
-	var recommendedScheme string
-
-	if r.config.RouteServiceRecommendHttps() {
-		recommendedScheme = "https"
-	} else {
-		recommendedScheme = "http"
-	}
-
-	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
 	hasBeenToRouteService, err := r.ArrivedViaRouteService(req)
 	if err != nil {
 		r.logger.Error("signature-validation-failed", zap.Error(err))
@@ -108,33 +97,41 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 		req.Header.Del(routeservice.HeaderKeySignature)
 		req.Header.Del(routeservice.HeaderKeyMetadata)
 		req.Header.Del(routeservice.HeaderKeyForwardedURL)
-	} else {
-		var err error
-		routeServiceArgs, err := r.config.CreateRequest(routeServiceURL, forwardedURLRaw)
-		if err != nil {
-			r.logger.Error("route-service-failed", zap.Error(err))
-
-			r.errorWriter.WriteError(
-				rw,
-				http.StatusInternalServerError,
-				"Route service request failed.",
-				r.logger,
-			)
-			return
-		}
-		req.Header.Set(routeservice.HeaderKeySignature, routeServiceArgs.Signature)
-		req.Header.Set(routeservice.HeaderKeyMetadata, routeServiceArgs.Metadata)
-		req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
-
-		reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
-
-		rsu := routeServiceArgs.ParsedUrl
-		uri := route.Uri(hostWithoutPort(rsu.Host) + rsu.EscapedPath())
-		if r.config.RouteServiceHairpinning() && r.registry.Lookup(uri) != nil {
-			reqInfo.ShouldRouteToInternalRouteService = true
-		}
+		next(rw, req)
+		return
 	}
 
+	// Update request with metadata for route service destination
+	var recommendedScheme string
+	if r.config.RouteServiceRecommendHttps() {
+		recommendedScheme = "https"
+	} else {
+		recommendedScheme = "http"
+	}
+	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
+	routeServiceArgs, err := r.config.CreateRequest(routeServiceURL, forwardedURLRaw)
+	if err != nil {
+		r.logger.Error("route-service-failed", zap.Error(err))
+
+		r.errorWriter.WriteError(
+			rw,
+			http.StatusInternalServerError,
+			"Route service request failed.",
+			r.logger,
+		)
+		return
+	}
+
+	hostWithoutPort := hostWithoutPort(routeServiceArgs.ParsedUrl.Host)
+	escapedPath := routeServiceArgs.ParsedUrl.EscapedPath()
+	if r.config.RouteServiceHairpinning() && r.registry.Lookup(route.Uri(hostWithoutPort+escapedPath)) != nil {
+		reqInfo.ShouldRouteToInternalRouteService = true
+	}
+
+	req.Header.Set(routeservice.HeaderKeySignature, routeServiceArgs.Signature)
+	req.Header.Set(routeservice.HeaderKeyMetadata, routeServiceArgs.Metadata)
+	req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
+	reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
 	next(rw, req)
 }
 
