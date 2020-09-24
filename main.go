@@ -163,10 +163,9 @@ func main() {
 	)
 
 	backendTLSConfig := &tls.Config{
-		CipherSuites:       c.CipherSuites,
-		InsecureSkipVerify: c.SkipSSLValidation,
-		RootCAs:            c.CAPool,
-		Certificates:       []tls.Certificate{c.Backends.ClientAuthCertificate},
+		CipherSuites: c.CipherSuites,
+		RootCAs:      c.CAPool,
+		Certificates: []tls.Certificate{c.Backends.ClientAuthCertificate},
 	}
 
 	routeServiceTLSConfig := &tls.Config{
