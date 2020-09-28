@@ -43,10 +43,9 @@ var _ = Describe("Session Affinity", func() {
 		conf.SecureCookies = false
 
 		jSessionIdCookie = &http.Cookie{
-			Name:    StickyCookieKey,
-			Value:   "xxx",
-			MaxAge:  1,
-			Expires: time.Now(),
+			Name:   StickyCookieKey,
+			Value:  "xxx",
+			MaxAge: 1,
 		}
 	})
 
@@ -188,6 +187,34 @@ var _ = Describe("Session Affinity", func() {
 				Expect(cookie.Secure).To(BeFalse())
 				Expect(cookie.MaxAge).To(BeZero())
 				Expect(cookie.Expires).To(BeZero())
+			})
+
+			Context("and the JSESSIONID cookie has an expiry date", func() {
+				var expiry time.Time
+
+				BeforeEach(func() {
+					expiry, _ = time.Parse(time.RFC3339, "2000-11-01T10:01:01")
+					jSessionIdCookie.Expires = expiry
+				})
+
+				It("responds with a VCAP_ID cookie that has the same expiry", func() {
+					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					defer ln.Close()
+
+					x := dialProxy(proxyServer)
+					req := test_util.NewRequest("GET", "app", "/", nil)
+					x.WriteRequest(req)
+
+					Eventually(done).Should(Receive())
+
+					resp, _ := x.ReadResponse()
+					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
+					Expect(jsessionId).ToNot(BeNil())
+
+					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					Expect(cookie).ToNot(BeNil())
+					Expect(cookie.Expires).To(Equal(expiry))
+				})
 			})
 
 			Context("and JSESSIONID cookie is set to Secure", func() {
