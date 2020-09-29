@@ -232,6 +232,110 @@ var _ = Describe("AccessLog", func() {
 			})
 		})
 
+		Context("redactQueryParameters options", func() {
+			var (
+				syslogServer net.Listener
+				serverAddr   string
+			)
+
+			BeforeEach(func() {
+				logger = test_util.NewTestZapLogger("test")
+				ls = &schemaFakes.FakeLogSender{}
+
+				var err error
+				cfg, err = config.DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
+
+				syslogServer, err = net.Listen("tcp", ":0")
+				Expect(err).NotTo(HaveOccurred())
+				serverAddr = syslogServer.Addr().String()
+			})
+
+			AfterEach(func() {
+				syslogServer.Close()
+			})
+
+			Context("when redactQueryParameters is set to all", func() {
+				It("does not include any query parameters in the records", func() {
+					cfg.Index = 42
+					cfg.AccessLog.EnableStreaming = true
+					cfg.Logging = config.LoggingConfig{
+						Syslog:             "foo",
+						SyslogAddr:         serverAddr,
+						SyslogNetwork:      "tcp",
+						LoggregatorEnabled: true,
+						RedactQueryParams:  "all",
+					}
+
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					Expect(err).ToNot(HaveOccurred())
+
+					b := make(chan string, 1)
+					go runSyslogServer(syslogServer, b)
+
+					accessLogger.Log(*CreateAccessLogRecord())
+
+					contents := <-b
+					Expect(contents).NotTo(ContainSubstring("?wat"))
+
+					accessLogger.Stop()
+				})
+			})
+			Context("when redactQueryParameters is set to none", func() {
+				It("does include all query parameters in the records", func() {
+					cfg.Index = 42
+					cfg.AccessLog.EnableStreaming = true
+					cfg.Logging = config.LoggingConfig{
+						Syslog:             "foo",
+						SyslogAddr:         serverAddr,
+						SyslogNetwork:      "tcp",
+						LoggregatorEnabled: true,
+						RedactQueryParams:  "none",
+					}
+
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					Expect(err).ToNot(HaveOccurred())
+
+					b := make(chan string, 1)
+					go runSyslogServer(syslogServer, b)
+
+					accessLogger.Log(*CreateAccessLogRecord())
+
+					contents := <-b
+					Expect(contents).To(ContainSubstring("?wat"))
+
+					accessLogger.Stop()
+				})
+			})
+			Context("when redactQueryParameters is set to hash", func() {
+				It("does hash all query parameters in the records", func() {
+					cfg.Index = 42
+					cfg.AccessLog.EnableStreaming = true
+					cfg.Logging = config.LoggingConfig{
+						Syslog:             "foo",
+						SyslogAddr:         serverAddr,
+						SyslogNetwork:      "tcp",
+						LoggregatorEnabled: true,
+						RedactQueryParams:  "hash",
+					}
+
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					Expect(err).ToNot(HaveOccurred())
+
+					b := make(chan string, 1)
+					go runSyslogServer(syslogServer, b)
+
+					accessLogger.Log(*CreateAccessLogRecord())
+
+					contents := <-b
+					Expect(contents).To(ContainSubstring("?hash=a3bbe1a8f2f025b8b6c5b66937763bb2b9bebdf2"))
+
+					accessLogger.Stop()
+				})
+			})
+
+		})
+
 		Measure("log write speed", func(b Benchmarker) {
 			w := nullWriter{}
 
