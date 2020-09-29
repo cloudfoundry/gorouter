@@ -34,6 +34,7 @@ type FileAndLoggregatorAccessLogger struct {
 	writerCount            int
 	disableXFFLogging      bool
 	disableSourceIPLogging bool
+	redactQueryParams      string
 	logger                 logger.Logger
 	logsender              schema.LogSender
 }
@@ -69,6 +70,7 @@ func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender,
 		stopCh:                 make(chan struct{}),
 		disableXFFLogging:      config.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging: config.Logging.DisableLogSourceIP,
+		redactQueryParams:      config.Logging.RedactQueryParams,
 		logger:                 logger,
 		logsender:              logsender,
 	}
@@ -109,6 +111,7 @@ func (x *FileAndLoggregatorAccessLogger) Stop() {
 func (x *FileAndLoggregatorAccessLogger) Log(r schema.AccessLogRecord) {
 	r.DisableXFFLogging = x.disableXFFLogging
 	r.DisableSourceIPLogging = x.disableSourceIPLogging
+	r.RedactQueryParams = x.redactQueryParams
 	x.channel <- r
 }
 
