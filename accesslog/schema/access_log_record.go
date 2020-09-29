@@ -2,6 +2,10 @@ package schema
 
 import (
 	"bytes"
+	"code.cloudfoundry.org/gorouter/config"
+	"crypto/sha1"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -97,6 +101,7 @@ type AccessLogRecord struct {
 	ExtraHeadersToLog      []string
 	DisableXFFLogging      bool
 	DisableSourceIPLogging bool
+	RedactQueryParams      string
 	RouterError            string
 	record                 []byte
 }
@@ -152,7 +157,7 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteString(`[` + r.formatStartedAt() + `] `)
 
 	b.AppendSpaces(true)
-	b.WriteStringValues(r.Request.Method, r.Request.URL.RequestURI(), r.Request.Proto)
+	b.WriteStringValues(r.Request.Method, redactURI(*r), r.Request.Proto)
 	b.WriteDashOrIntValue(r.StatusCode)
 	b.WriteIntValue(r.RequestBytesReceived)
 	b.WriteIntValue(r.BodyBytesSent)
@@ -201,6 +206,25 @@ func (r *AccessLogRecord) makeRecord() []byte {
 	b.WriteByte('\n')
 
 	return b.Bytes()
+}
+
+// Redact query parameters on GET requests that have a query part
+func redactURI(r AccessLogRecord) string {
+	if r.Request.Method == http.MethodGet {
+		if r.Request.URL.RawQuery != "" {
+			switch r.RedactQueryParams {
+			case config.REDACT_QUERY_PARMS_ALL:
+				r.Request.URL.RawQuery = ""
+			case config.REDACT_QUERY_PARMS_HASH:
+				hash := sha1.New()
+				hash.Write([]byte(r.Request.URL.RawQuery))
+				hashString := hex.EncodeToString(hash.Sum(nil))
+				r.Request.URL.RawQuery = fmt.Sprintf("hash=%s", hashString)
+			}
+		}
+	}
+
+	return r.Request.URL.RequestURI()
 }
 
 // WriteTo allows the AccessLogRecord to implement the io.WriterTo interface

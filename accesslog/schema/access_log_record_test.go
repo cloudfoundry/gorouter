@@ -2,10 +2,9 @@ package schema_test
 
 import (
 	"bytes"
-
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,6 +77,47 @@ var _ = Describe("AccessLogRecord", func() {
 
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
 				Consistently(r).ShouldNot(Say("FakeRemoteAddr"))
+			})
+		})
+
+		Context("when RedactQueryParams is set to all", func() {
+			It("does redact all query parameters on GET requests", func() {
+				record.Request.URL.RawQuery = "query=value"
+				record.RedactQueryParams = config.REDACT_QUERY_PARMS_ALL
+				record.Request.Method = http.MethodGet
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(Say("query=value"))
+			})
+			It("does not redact any query parameters on non-GET requests", func() {
+				record.Request.URL.RawQuery = "query=value"
+				record.RedactQueryParams = config.REDACT_QUERY_PARMS_ALL
+				record.Request.Method = http.MethodPost
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(Say("query=value"))
+			})
+		})
+
+		Context("when RedactQueryParams is set to hash", func() {
+			It("does sha1sum all query parameters on GET requests", func() {
+				record.Request.URL.RawQuery = "query=value"
+				record.RedactQueryParams = config.REDACT_QUERY_PARMS_HASH
+				record.Request.Method = http.MethodGet
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(Say("hash=9c9042adbe045596c2299990920eaa18536d66a1")) //echo -n query=value | sha1sum
+			})
+			It("does not show 'redacted' if there are no query parameters on GET requests", func() {
+				record.Request.URL.RawQuery = ""
+				record.RedactQueryParams = config.REDACT_QUERY_PARMS_HASH
+				record.Request.Method = http.MethodGet
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(Say("hash="))
+			})
+			It("does not redact any query parameters on non-GET requests", func() {
+				record.Request.URL.RawQuery = "query=value"
+				record.RedactQueryParams = config.REDACT_QUERY_PARMS_HASH
+				record.Request.Method = http.MethodPost
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Eventually(r).Should(Say("query=value"))
 			})
 		})
 
