@@ -156,6 +156,7 @@ suspend_pruning_if_nats_unavailable: true
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 			Expect(config.Logging.DisableLogForwardedFor).To(Equal(false))
 			Expect(config.Logging.DisableLogSourceIP).To(Equal(false))
+			Expect(config.Logging.RedactQueryParams).To(Equal("none"))
 			Expect(config.Logging.Format.Timestamp).To(Equal("unix-epoch"))
 		})
 

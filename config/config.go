@@ -24,11 +24,15 @@ const (
 	ALWAYS_FORWARD            string = "always_forward"
 	SANITIZE_SET              string = "sanitize_set"
 	FORWARD                   string = "forward"
+	REDACT_QUERY_PARMS_NONE   string = "none"
+	REDACT_QUERY_PARMS_ALL    string = "all"
+	REDACT_QUERY_PARMS_HASH   string = "hash"
 )
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
 var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
+var AllowedQueryParmRedactionModes = []string{REDACT_QUERY_PARMS_NONE, REDACT_QUERY_PARMS_ALL, REDACT_QUERY_PARMS_HASH}
 
 type StringSet map[string]struct{}
 
@@ -126,6 +130,7 @@ type LoggingConfig struct {
 	MetronAddress          string       `yaml:"metron_address"`
 	DisableLogForwardedFor bool         `yaml:"disable_log_forwarded_for"`
 	DisableLogSourceIP     bool         `yaml:"disable_log_source_ip"`
+	RedactQueryParams      string       `yaml:"redact_query_params"`
 	Format                 FormatConfig `yaml:"format"`
 
 	// This field is populated by the `Process` function.
@@ -153,10 +158,11 @@ type TLSPem struct {
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level:         "debug",
-	MetronAddress: "localhost:3457",
-	Format:        FormatConfig{"unix-epoch"},
-	JobName:       "gorouter",
+	Level:             "debug",
+	MetronAddress:     "localhost:3457",
+	Format:            FormatConfig{"unix-epoch"},
+	JobName:           "gorouter",
+	RedactQueryParams: REDACT_QUERY_PARMS_NONE,
 }
 
 type HeaderNameValue struct {
@@ -485,6 +491,18 @@ func (c *Config) Process() error {
 
 	if c.RoutingTableShardingMode == SHARD_SEGMENTS && len(c.IsolationSegments) == 0 {
 		return fmt.Errorf("Expected isolation segments; routing table sharding mode set to segments and none provided.")
+	}
+
+	validQueryParamRedaction := false
+	for _, sm := range AllowedQueryParmRedactionModes {
+		if c.Logging.RedactQueryParams == sm {
+			validQueryParamRedaction = true
+			break
+		}
+	}
+	if !validQueryParamRedaction {
+		errMsg := fmt.Sprintf("Invalid query param redaction mode: %s. Allowed values are %s", c.Logging.RedactQueryParams, AllowedQueryParmRedactionModes)
+		return fmt.Errorf(errMsg)
 	}
 
 	if err := c.buildCertPool(); err != nil {
