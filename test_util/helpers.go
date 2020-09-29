@@ -190,11 +190,9 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 		})
 	}
 
-	c.Logging = config.LoggingConfig{
-		Level:         "debug",
-		MetronAddress: "localhost:3457",
-		JobName:       "router_test_z1_0",
-	}
+	c.Logging.Level = "debug"
+	c.Logging.MetronAddress = "localhost:3457"
+	c.Logging.JobName = "router_test_z1_0"
 
 	c.OAuth = config.OAuthConfig{
 		TokenEndpoint:     "uaa.cf.service.internal",
