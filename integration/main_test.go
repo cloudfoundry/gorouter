@@ -170,6 +170,82 @@ var _ = Describe("Router Integration", func() {
 			Expect(dialTls(tls.VersionTLS11)).NotTo(Succeed())
 			Expect(dialTls(tls.VersionTLS12)).To(Succeed())
 		})
+
+		Context("client ca certs", func() {
+			var (
+				onlyTrustClientCACerts bool
+				clientTLSConfig        *tls.Config
+			)
+
+			var curlAppWithCustomClientTLSConfig = func(expectedStatusCode int) {
+				gorouterSession = startGorouterSession(cfgFile)
+
+				runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
+				runningApp1.Register()
+				runningApp1.Listen()
+				routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+				Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
+
+				client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+				resp, err := client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+				if expectedStatusCode >= 200 && expectedStatusCode < 600 {
+					Expect(err).ToNot(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(expectedStatusCode))
+				} else {
+					Expect(err).To(HaveOccurred())
+				}
+			}
+
+			Context("when only_trust_client_ca_certs is false", func() {
+				BeforeEach(func() {
+					onlyTrustClientCACerts = false
+				})
+
+				Context("when the client knows about a CA in the ClientCACerts", func() {
+					BeforeEach(func() {
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, proxyPort, sslPort, natsPort)
+					})
+					It("can reach the gorouter successfully", func() {
+						curlAppWithCustomClientTLSConfig(http.StatusOK)
+					})
+				})
+
+				Context("when the client knows about a CA in the CACerts", func() {
+					BeforeEach(func() {
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, proxyPort, sslPort, natsPort)
+					})
+					It("can reach the gorouter succ", func() {
+						curlAppWithCustomClientTLSConfig(http.StatusOK)
+					})
+				})
+			})
+
+			Context("when only_trust_client_ca_certs is true", func() {
+				BeforeEach(func() {
+					onlyTrustClientCACerts = true
+				})
+
+				Context("when the client presents a cert signed by a CA in ClientCACerts", func() {
+					BeforeEach(func() {
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, proxyPort, sslPort, natsPort)
+					})
+
+					It("can reach the gorouter successfully", func() {
+						curlAppWithCustomClientTLSConfig(http.StatusOK)
+					})
+				})
+
+				Context("when the client presents a cert signed by a CA in CACerts", func() {
+					BeforeEach(func() {
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, proxyPort, sslPort, natsPort)
+					})
+
+					It("cannot reach the gorouter", func() {
+						curlAppWithCustomClientTLSConfig(-1)
+					})
+				})
+			})
+		})
 	})
 
 	Context("Drain", func() {

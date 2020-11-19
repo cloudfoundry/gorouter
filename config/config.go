@@ -180,31 +180,34 @@ type HTTPRewriteResponses struct {
 }
 
 type Config struct {
-	Status                   StatusConfig      `yaml:"status,omitempty"`
-	Nats                     []NatsConfig      `yaml:"nats,omitempty"`
-	Logging                  LoggingConfig     `yaml:"logging,omitempty"`
-	Port                     uint16            `yaml:"port,omitempty"`
-	Index                    uint              `yaml:"index,omitempty"`
-	Zone                     string            `yaml:"zone,omitempty"`
-	GoMaxProcs               int               `yaml:"go_max_procs,omitempty"`
-	Tracing                  Tracing           `yaml:"tracing,omitempty"`
-	TraceKey                 string            `yaml:"trace_key,omitempty"`
-	AccessLog                AccessLog         `yaml:"access_log,omitempty"`
-	DebugAddr                string            `yaml:"debug_addr,omitempty"`
-	EnablePROXY              bool              `yaml:"enable_proxy,omitempty"`
-	EnableSSL                bool              `yaml:"enable_ssl,omitempty"`
-	SSLPort                  uint16            `yaml:"ssl_port,omitempty"`
-	DisableHTTP              bool              `yaml:"disable_http,omitempty"`
-	SSLCertificates          []tls.Certificate `yaml:"-"`
-	TLSPEM                   []TLSPem          `yaml:"tls_pem,omitempty"`
-	CACerts                  string            `yaml:"ca_certs,omitempty"`
-	CAPool                   *x509.CertPool    `yaml:"-"`
-	SkipSSLValidation        bool              `yaml:"skip_ssl_validation,omitempty"`
-	ForwardedClientCert      string            `yaml:"forwarded_client_cert,omitempty"`
-	ForceForwardedProtoHttps bool              `yaml:"force_forwarded_proto_https,omitempty"`
-	SanitizeForwardedProto   bool              `yaml:"sanitize_forwarded_proto,omitempty"`
-	IsolationSegments        []string          `yaml:"isolation_segments,omitempty"`
-	RoutingTableShardingMode string            `yaml:"routing_table_sharding_mode,omitempty"`
+	Status          StatusConfig      `yaml:"status,omitempty"`
+	Nats            []NatsConfig      `yaml:"nats,omitempty"`
+	Logging         LoggingConfig     `yaml:"logging,omitempty"`
+	Port            uint16            `yaml:"port,omitempty"`
+	Index           uint              `yaml:"index,omitempty"`
+	Zone            string            `yaml:"zone,omitempty"`
+	GoMaxProcs      int               `yaml:"go_max_procs,omitempty"`
+	Tracing         Tracing           `yaml:"tracing,omitempty"`
+	TraceKey        string            `yaml:"trace_key,omitempty"`
+	AccessLog       AccessLog         `yaml:"access_log,omitempty"`
+	DebugAddr       string            `yaml:"debug_addr,omitempty"`
+	EnablePROXY     bool              `yaml:"enable_proxy,omitempty"`
+	EnableSSL       bool              `yaml:"enable_ssl,omitempty"`
+	SSLPort         uint16            `yaml:"ssl_port,omitempty"`
+	DisableHTTP     bool              `yaml:"disable_http,omitempty"`
+	SSLCertificates []tls.Certificate `yaml:"-"`
+	TLSPEM          []TLSPem          `yaml:"tls_pem,omitempty"`
+	CACerts         string            `yaml:"ca_certs,omitempty"`
+	CAPool          *x509.CertPool    `yaml:"-"`
+	ClientCACerts   string            `yaml:"client_ca_certs,omitempty"`
+	ClientCAPool    *x509.CertPool    `yaml:"-"`
+
+	SkipSSLValidation        bool     `yaml:"skip_ssl_validation,omitempty"`
+	ForwardedClientCert      string   `yaml:"forwarded_client_cert,omitempty"`
+	ForceForwardedProtoHttps bool     `yaml:"force_forwarded_proto_https,omitempty"`
+	SanitizeForwardedProto   bool     `yaml:"sanitize_forwarded_proto,omitempty"`
+	IsolationSegments        []string `yaml:"isolation_segments,omitempty"`
+	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode,omitempty"`
 
 	CipherString                      string             `yaml:"cipher_suites,omitempty"`
 	CipherSuites                      []uint16           `yaml:"-"`
@@ -214,6 +217,7 @@ type Config struct {
 	MaxTLSVersion                     uint16             `yaml:"-"`
 	ClientCertificateValidationString string             `yaml:"client_cert_validation,omitempty"`
 	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
+	OnlyTrustClientCACerts            bool               `yaml:"only_trust_client_ca_certs"`
 	TLSHandshakeTimeout               time.Duration      `yaml:"tls_handshake_timeout"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
@@ -508,6 +512,9 @@ func (c *Config) Process() error {
 	if err := c.buildCertPool(); err != nil {
 		return err
 	}
+	if err := c.buildClientCertPool(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -582,6 +589,32 @@ func (c *Config) buildCertPool() error {
 		}
 	}
 	c.CAPool = certPool
+	return nil
+}
+
+func (c *Config) buildClientCertPool() error {
+	var certPool *x509.CertPool
+	var err error
+
+	if c.OnlyTrustClientCACerts {
+		certPool = x509.NewCertPool()
+	} else {
+		certPool, err = x509.SystemCertPool()
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.ClientCACerts == "" {
+		if c.OnlyTrustClientCACerts && c.ClientCertificateValidation != tls.NoClientCert {
+			return fmt.Errorf(`router.client_ca_certs cannot be empty if router.only_trust_client_ca_certs is 'true' and router.client_cert_validation is set to 'request' or 'require'.`)
+		}
+	} else {
+		if ok := certPool.AppendCertsFromPEM([]byte(c.ClientCACerts)); !ok {
+			return fmt.Errorf("Error while adding ClientCACerts to gorouter's client cert pool: \n%s\n", c.ClientCACerts)
+		}
+	}
+	c.ClientCAPool = certPool
 	return nil
 }
 

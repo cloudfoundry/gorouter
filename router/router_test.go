@@ -1046,7 +1046,6 @@ var _ = Describe("Router", func() {
 			req, _ = http.NewRequest("GET", uri, nil)
 
 			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*." + test_util.LocalhostDNS})
-			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
 			clientCertTemplate, err := certTemplate("clientSSL")
@@ -1054,11 +1053,15 @@ var _ = Describe("Router", func() {
 			clientCert, err = createClientCert(clientCertTemplate, certChain.CACert, certChain.CAPrivKey)
 			Expect(err).ToNot(HaveOccurred())
 
+			// creating and assigning pool because this test does not run buildClientCertPool
 			rootCAs := x509.NewCertPool()
 			rootCAs.AddCert(certChain.CACert)
+			config.ClientCAPool = rootCAs
+
 			tlsClientConfig = &tls.Config{
 				RootCAs: rootCAs,
 			}
+
 			httpClient = &http.Client{Transport: &http.Transport{
 				TLSClientConfig: tlsClientConfig,
 			}}
@@ -1671,12 +1674,10 @@ var _ = Describe("Router", func() {
 
 			BeforeEach(func() {
 				var (
-					err     error
-					rootPEM []byte
+					err error
 				)
-				rootCert, rootKey, rootPEM, err = createRootCA("rootCA")
+				rootCert, rootKey, _, err = createRootCA("rootCA")
 				Expect(err).ToNot(HaveOccurred())
-				config.CACerts = string(rootPEM)
 
 				clientCertTemplate, err := certTemplate("clientSSL")
 				Expect(err).ToNot(HaveOccurred())
@@ -1684,29 +1685,88 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			Context("when the client cert is valid", func() {
-				It("successfully serves SSL traffic if the certificate is valid", func() {
-					app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
-					app.RegisterAndListen()
-					Eventually(func() bool {
-						return appRegistered(registry, app)
-					}).Should(BeTrue())
+			var expectSuccessfulConnection = func() {
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+				app.RegisterAndListen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
 
-					uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
-					req, _ := http.NewRequest("GET", uri, nil)
+				uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
+				req, _ := http.NewRequest("GET", uri, nil)
 
-					tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+				tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
 
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(resp).ToNot(BeNil())
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
 
-					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-					bytes, err := ioutil.ReadAll(resp.Body)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(bytes).To(ContainSubstring("Hello"))
-					defer resp.Body.Close()
+				bytes, err := ioutil.ReadAll(resp.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(bytes).To(ContainSubstring("Hello"))
+				defer resp.Body.Close()
+			}
+
+			Context("when the client cert is valid ", func() {
+				Context("when the cert is not included in clientCAPool", func() {
+					Context("when gorouter is not configured to verify the cert", func() {
+						BeforeEach(func() {
+							config.ClientCertificateValidation = tls.NoClientCert
+						})
+						It("successfully serves SSL traffic", func() {
+							expectSuccessfulConnection()
+						})
+					})
+
+					Context("when gorouter is configured to verify the cert", func() {
+						BeforeEach(func() {
+							config.ClientCertificateValidation = tls.VerifyClientCertIfGiven
+						})
+						It("unsuccessfully serves SSL traffic", func() {
+							app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+							app.RegisterAndListen()
+							Eventually(func() bool {
+								return appRegistered(registry, app)
+							}).Should(BeTrue())
+
+							uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
+							req, _ := http.NewRequest("GET", uri, nil)
+
+							tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+
+							_, err := client.Do(req)
+							Expect(err).To(HaveOccurred())
+						})
+					})
+				})
+
+				Context("when the cert is included in clientCAPool", func() {
+					BeforeEach(func() {
+						// creating and assigning pool because this test does not run buildClientCertPool
+						rootCAs := x509.NewCertPool()
+						rootCAs.AddCert(rootCert)
+						config.ClientCAPool = rootCAs
+					})
+
+					Context("when gorouter is not configured to verify the cert", func() {
+						BeforeEach(func() {
+							config.ClientCertificateValidation = tls.NoClientCert
+						})
+						It("successfully serves SSL traffic", func() {
+							expectSuccessfulConnection()
+						})
+					})
+
+					Context("when gorouter is configured to verify the cert", func() {
+						BeforeEach(func() {
+							config.ClientCertificateValidation = tls.VerifyClientCertIfGiven
+						})
+						It("unsuccessfully serves SSL traffic", func() {
+							expectSuccessfulConnection()
+						})
+					})
 				})
 			})
 
@@ -1720,6 +1780,9 @@ var _ = Describe("Router", func() {
 				})
 
 				Context("when gorouter is configured with ClientAuth = NoClientCert", func() {
+					BeforeEach(func() {
+						config.ClientCertificateValidation = tls.NoClientCert
+					})
 					Specify("the connection succeeds because the client cert is ignored", func() {
 						app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
 						app.RegisterAndListen()

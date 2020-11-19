@@ -1,14 +1,15 @@
 package integration
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/test_util"
 	"crypto/tls"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/test_util"
 
 	yaml "gopkg.in/yaml.v2"
 
@@ -86,6 +87,13 @@ func startGorouterSession(cfgFile string) *Session {
 func stopGorouter(gorouterSession *Session) {
 	gorouterSession.Command.Process.Signal(syscall.SIGTERM)
 	Eventually(gorouterSession, 5).Should(Exit(0))
+}
+
+func createCustomSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	tempCfg, clientTLSConfig := test_util.CustomSpecSSLConfig(onlyTrustClientCACerts, TLSClientConfigOption, statusPort, proxyPort, sslPort, natsPorts...)
+
+	configDrainSetup(tempCfg, defaultPruneInterval, defaultPruneThreshold, 0)
+	return tempCfg, clientTLSConfig
 }
 
 func createSSLConfig(statusPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {

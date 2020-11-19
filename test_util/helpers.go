@@ -154,6 +154,66 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 	}
 }
 
+const (
+	TLSConfigFromCACerts       = 1
+	TLSConfigFromClientCACerts = 2
+	TLSConfigFromUnknownCA     = 3
+)
+
+func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, proxyPort, natsPorts...)
+
+	c.EnableSSL = true
+
+	rootCertChain := CreateSignedCertWithRootCA(CertNames{SANs: SubjectAltNames{DNS: "*.localhost.routing.cf-app.com", IP: c.Ip}})
+	secondaryCertChain := CreateSignedCertWithRootCA(CertNames{CommonName: "potato2.com"})
+
+	clientCaCertChain := CreateSignedCertWithRootCA(CertNames{SANs: SubjectAltNames{DNS: "*.localhost.routing.cf-app.com", IP: c.Ip}})
+	clientTrustedCertPool := x509.NewCertPool()
+	clientTrustedCertPool.AppendCertsFromPEM(clientCaCertChain.CACertPEM)
+
+	c.TLSPEM = []config.TLSPem{
+		{
+			CertChain:  string(rootCertChain.CertPEM),
+			PrivateKey: string(rootCertChain.PrivKeyPEM),
+		},
+		{
+			CertChain:  string(secondaryCertChain.CertPEM),
+			PrivateKey: string(secondaryCertChain.PrivKeyPEM),
+		},
+	}
+	c.CACerts = string(rootCertChain.CACertPEM)
+	c.ClientCACerts = string(clientCaCertChain.CACertPEM)
+
+	if onlyTrustClientCACerts == false {
+		clientTrustedCertPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
+		clientTrustedCertPool.AppendCertsFromPEM(secondaryCertChain.CACertPEM)
+		c.ClientCACerts += c.CACerts
+	}
+	c.SSLPort = SSLPort
+	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
+	c.ClientCertificateValidationString = "require"
+
+	var clientTLSConfig *tls.Config
+
+	switch TLSClientConfigOption {
+	case TLSConfigFromCACerts:
+		clientTLSConfig = rootCertChain.AsTLSConfig()
+
+	case TLSConfigFromClientCACerts:
+		clientTLSConfig = clientCaCertChain.AsTLSConfig()
+
+	case TLSConfigFromUnknownCA:
+		unknownCertChain := CreateSignedCertWithRootCA(CertNames{CommonName: "neopets-is-gr8.com"})
+		clientTLSConfig = unknownCertChain.AsTLSConfig()
+	}
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
+	clientTLSConfig.RootCAs = certPool
+	return c, clientTLSConfig
+}
+
 func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
 	c, err := config.DefaultConfig()
 	Expect(err).ToNot(HaveOccurred())

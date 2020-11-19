@@ -33,6 +33,9 @@ var _ = Describe("TLS to backends", func() {
 
 		testState = NewTestState()
 		testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
+	})
+
+	JustBeforeEach(func() {
 		testState.StartGorouterOrFail()
 	})
 

@@ -38,8 +38,10 @@ type testState struct {
 	trustedExternalServiceHostname string
 	trustedExternalServiceTLS      *tls.Config
 
-	trustedBackendServerCertSAN string
-	trustedBackendTLSConfig     *tls.Config
+	trustedBackendServerCertSAN   string
+	trustedBackendTLSConfig       *tls.Config
+	untrustedBackendServerCertSAN string
+	untrustedBackendTLSConfig     *tls.Config
 
 	trustedClientTLSConfig             *tls.Config
 	trustedRouteServiceClientTLSConfig *tls.Config
@@ -49,6 +51,15 @@ type testState struct {
 	natsRunner      *test_util.NATSRunner
 	gorouterSession *Session
 	mbusClient      *nats.Conn
+}
+
+func (s *testState) SetOnlyTrustClientCACertsTrue() {
+	s.cfg.OnlyTrustClientCACerts = true
+
+	trustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: s.trustedBackendServerCertSAN})
+	s.cfg.ClientCACerts = string(trustedBackendCLientCertChain.CACertPEM)
+	s.trustedBackendTLSConfig = trustedBackendCLientCertChain.AsTLSConfig()
+
 }
 
 func NewTestState() *testState {
@@ -93,6 +104,14 @@ func NewTestState() *testState {
 	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
 	trustedBackendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
+	untrustedBackendServerCertSAN := "some-trusted-backend.example.net"
+	untrustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: untrustedBackendServerCertSAN})
+	untrustedBackendTLSConfig := untrustedBackendCLientCertChain.AsTLSConfig()
+	cfg.CACerts = cfg.CACerts + string(untrustedBackendCLientCertChain.CACertPEM)
+
+	cfg.OnlyTrustClientCACerts = false
+	cfg.ClientCACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
+
 	// set Gorouter to use client certs
 	cfg.Backends.TLSPem = config.TLSPem{
 		CertChain:  string(gorouterToBackendsClientCertChain.CertPEM),
@@ -136,8 +155,11 @@ func NewTestState() *testState {
 		},
 		trustedClientTLSConfig:             browserToGorouterClientCertChain.AsTLSConfig(),
 		trustedRouteServiceClientTLSConfig: routeServiceToGorouterClientCertChain.AsTLSConfig(),
-		trustedBackendTLSConfig:            trustedBackendTLSConfig,
-		trustedBackendServerCertSAN:        trustedBackendServerCertSAN,
+
+		trustedBackendTLSConfig:       trustedBackendTLSConfig,
+		trustedBackendServerCertSAN:   trustedBackendServerCertSAN,
+		untrustedBackendTLSConfig:     untrustedBackendTLSConfig,
+		untrustedBackendServerCertSAN: untrustedBackendServerCertSAN,
 	}
 }
 
