@@ -298,17 +298,20 @@ func setupStickySession(
 	path string,
 	stickySessionCookieNames config.StringSet,
 ) {
+
+	requestContainsStickySessionCookies := originalEndpointId != ""
+	requestNotSentToRequestedApp := originalEndpointId != endpoint.PrivateInstanceId
+	shouldSetVCAPID := requestContainsStickySessionCookies && requestNotSentToRequestedApp
+
 	secure := false
 	maxAge := 0
 	sameSite := http.SameSite(0)
 	expiry := time.Time{}
 
-	// did the endpoint change?
-	sticky := originalEndpointId != "" && originalEndpointId != endpoint.PrivateInstanceId
-
 	for _, v := range response.Cookies() {
 		if _, ok := stickySessionCookieNames[v.Name]; ok {
-			sticky = true
+			shouldSetVCAPID = true
+
 			if v.MaxAge < 0 {
 				maxAge = v.MaxAge
 			}
@@ -321,19 +324,19 @@ func setupStickySession(
 
 	for _, v := range response.Cookies() {
 		if v.Name == VcapCookieId {
-			sticky = false
+			shouldSetVCAPID = false
 			break
 		}
 	}
 
-	if sticky {
+	if shouldSetVCAPID {
 		// right now secure attribute would as equal to the JSESSION ID cookie (if present),
 		// but override if set to true in config
 		if secureCookies {
 			secure = true
 		}
 
-		cookie := &http.Cookie{
+		vcapIDCookie := &http.Cookie{
 			Name:     VcapCookieId,
 			Value:    endpoint.PrivateInstanceId,
 			Path:     path,
@@ -344,7 +347,7 @@ func setupStickySession(
 			Expires:  expiry,
 		}
 
-		if v := cookie.String(); v != "" {
+		if v := vcapIDCookie.String(); v != "" {
 			response.Header.Add(CookieHeader, v)
 		}
 	}
