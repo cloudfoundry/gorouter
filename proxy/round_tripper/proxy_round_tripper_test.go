@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/routeservice"
+
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -914,6 +916,54 @@ var _ = Describe("ProxyRoundTripper", func() {
 								Expect(newCookies[1].Raw).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
 							})
 						})
+
+						Context("when the VCAP_ID on the request doesn't match the instance id of the chosen backend", func() {
+							// This happens when the requested VCAP_ID does not exist or errored.
+							// This can also happen with route services
+
+							JustBeforeEach(func() {
+								removed := routePool.Remove(endpoint1)
+								Expect(removed).To(BeTrue())
+
+								removed = routePool.Remove(endpoint2)
+								Expect(removed).To(BeTrue())
+
+								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
+								added := routePool.Put(new_endpoint)
+								Expect(added).To(Equal(route.ADDED))
+							})
+
+							Context("when route service headers are not on the request", func(){
+								It("will select a new backend and update the VCAP_ID", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(2))
+									Expect(newCookies[0].Raw).To(Equal(sessionCookie.String()))
+									Expect(newCookies[1].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(newCookies[1].Value).To(Equal("id-5"))
+								})
+							})
+
+							Context("when route service headers are on the request", func(){
+								// This case explicitly disallows sticky sessions to route services
+								JustBeforeEach(func(){
+									req.Header.Set(routeservice.HeaderKeySignature, "foo")
+									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
+								})
+
+								It("it will not set VCAP_ID", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(1))
+									Expect(newCookies[0].Raw).To(Equal(sessionCookie.String()))
+								})
+							})
+						})
+
 					})
 
 					Context("when no cookies are set on the response", func() {
@@ -929,9 +979,53 @@ var _ = Describe("ProxyRoundTripper", func() {
 							new_cookies := resp.Cookies()
 							Expect(new_cookies).To(HaveLen(0))
 						})
+
+						Context("when the VCAP_ID on the request doesn't match the instance id of the chosen backend", func() {
+							// This happens when the requested VCAP_ID does not exist or errored.
+							// This can also happen with route services
+
+							JustBeforeEach(func() {
+								removed := routePool.Remove(endpoint1)
+								Expect(removed).To(BeTrue())
+
+								removed = routePool.Remove(endpoint2)
+								Expect(removed).To(BeTrue())
+
+								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
+								added := routePool.Put(new_endpoint)
+								Expect(added).To(Equal(route.ADDED))
+							})
+
+							Context("when route service headers are not on the request", func(){
+								It("will select a new backend and update the VCAP_ID", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(1))
+									Expect(newCookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(newCookies[0].Value).To(Equal("id-5"))
+								})
+							})
+
+							Context("when route service headers are on the request", func(){
+								JustBeforeEach(func(){
+									req.Header.Set(routeservice.HeaderKeySignature, "foo")
+									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
+								})
+
+								It("it will not set VCAP_ID", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(0))
+								})
+							})
+						})
 					})
 
-					Context("when there is only a VCAP_ID set on the response", func() {
+					Context("when there is a VCAP_ID set on the response", func() {
 						JustBeforeEach(func(){
 							transport.RoundTripStub = responseContainsVCAPID
 						})
@@ -948,32 +1042,58 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Expect(newCookies[0].Value).To(Equal("vcap-id-property-already-on-the-response"))
 						})
 
-					})
+						Context("when the VCAP_ID on the request doesn't match the instance id of the chosen backend", func() {
+							// This happens when the requested VCAP_ID does not exist or errored.
+							// This can also happen with route services
 
-					Context("when the VCAP_ID on the request doesn't match the instance id of the chosen backend", func() {
-						// This happens when the requested VCAP_ID does not exist or errored.
-						// This can also happen with route services
+							JustBeforeEach(func() {
+								removed := routePool.Remove(endpoint1)
+								Expect(removed).To(BeTrue())
 
-						JustBeforeEach(func() {
-							removed := routePool.Remove(endpoint1)
-							Expect(removed).To(BeTrue())
+								removed = routePool.Remove(endpoint2)
+								Expect(removed).To(BeTrue())
 
-							removed = routePool.Remove(endpoint2)
-							Expect(removed).To(BeTrue())
+								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
+								added := routePool.Put(new_endpoint)
+								Expect(added).To(Equal(route.ADDED))
+							})
 
-							new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
-							added := routePool.Put(new_endpoint)
-							Expect(added).To(Equal(route.ADDED))
-						})
+							Context("when route service headers are not on the request", func(){
+								JustBeforeEach(func(){
+									transport.RoundTripStub = responseContainsVCAPID
+								})
 
-						It("will select a new backend and update the VCAP_ID", func() {
-							resp, err := proxyRoundTripper.RoundTrip(req)
-							Expect(err).ToNot(HaveOccurred())
+								It("leaves it alone and does not overwrite it", func() {
+									transport.RoundTripStub = responseContainsVCAPID
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(1))
 
-							new_cookies := resp.Cookies()
-							Expect(new_cookies).To(HaveLen(2))
-							Expect(new_cookies[0]).To(Equal(cookies[0]))
-							Expect(new_cookies[1].Value).To(Equal("id-5"))
+									Expect(newCookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(newCookies[0].Value).To(Equal("vcap-id-property-already-on-the-response"))
+								})
+							})
+
+							Context("when route service headers are on the request", func(){
+								JustBeforeEach(func(){
+									req.Header.Set(routeservice.HeaderKeySignature, "foo")
+									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
+									transport.RoundTripStub = responseContainsVCAPID
+								})
+
+								It("leaves it alone and does not overwrite it", func() {
+									transport.RoundTripStub = responseContainsVCAPID
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									newCookies := resp.Cookies()
+									Expect(newCookies).To(HaveLen(1))
+
+									Expect(newCookies[0].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(newCookies[0].Value).To(Equal("vcap-id-property-already-on-the-response"))
+								})
+							})
 						})
 					})
 				})
