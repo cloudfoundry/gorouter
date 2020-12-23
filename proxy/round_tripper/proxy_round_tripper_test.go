@@ -710,12 +710,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 					responseContainsJSESSIONIDAndVCAPID           func(req *http.Request) (*http.Response, error)
 				)
 
-				setJSESSIONID := func(req *http.Request, resp *http.Response, setExtraProperties bool) (response *http.Response) {
+				setJSESSIONID := func(req *http.Request, resp *http.Response, setExtraProperties bool) {
 
 					//Attach the same JSESSIONID on to the response if it exists on the request
 					if len(req.Cookies()) > 0 && !setExtraProperties {
 						resp.Header.Add(round_tripper.CookieHeader, req.Cookies()[0].String())
-						return resp
+						return
 					}
 
 					if setExtraProperties {
@@ -727,10 +727,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 					sessionCookie.Value, _ = uuid.GenerateUUID()
 					resp.Header.Add(round_tripper.CookieHeader, sessionCookie.String())
-					return resp
 				}
 
-				setVCAPID := func(req *http.Request, resp *http.Response) (response *http.Response) {
+				setVCAPID := func(req *http.Request, resp *http.Response) {
 					vcapCookie := http.Cookie{
 						Name:  round_tripper.VcapCookieId,
 						Value: "vcap-id-property-already-on-the-response",
@@ -739,8 +738,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					if c := vcapCookie.String(); c != "" {
 						resp.Header.Add(round_tripper.CookieHeader, c)
 					}
-
-					return resp
 				}
 
 				responseContainsNoCookies = func(req *http.Request) (*http.Response, error) {
@@ -832,6 +829,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 							})
 						})
 					})
+
 					Context("when there is a JSESSION_ID and a VCAP_ID on the response", func() {
 						BeforeEach(func() {
 							transport.RoundTripStub = responseContainsJSESSIONIDAndVCAPID
@@ -848,6 +846,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Expect(cookies[1].Value).To(Equal("vcap-id-property-already-on-the-response"))
 						})
 					})
+
 					Context("when there is only a VCAP_ID set on the response", func() {
 						BeforeEach(func() {
 							transport.RoundTripStub = responseContainsVCAPID
@@ -888,12 +887,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 							resp, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).ToNot(HaveOccurred())
 
-							new_cookies := resp.Cookies()
-							Expect(new_cookies).To(HaveLen(2))
-							Expect(new_cookies[0]).To(Equal(cookies[0]))
-							Expect(new_cookies[0].Raw).To(Equal(sessionCookie.String()))
-							Expect(new_cookies[1].Value).To(Equal(cookies[1].Value))
-							Expect(new_cookies[1].Name).To(Equal(round_tripper.VcapCookieId))
+							newCookies := resp.Cookies()
+							Expect(newCookies).To(HaveLen(2))
+							Expect(newCookies[0]).To(Equal(cookies[0]))
+							Expect(newCookies[0].Raw).To(Equal(sessionCookie.String()))
+							Expect(newCookies[1].Value).To(Equal(cookies[1].Value))
+							Expect(newCookies[1].Name).To(Equal(round_tripper.VcapCookieId))
 						})
 
 						Context("when the JSESSIONID on the response has new properties", func() {
@@ -926,8 +925,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 							resp, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).ToNot(HaveOccurred())
 
-							new_cookies := resp.Cookies()
-							Expect(new_cookies).To(HaveLen(0))
+							newCookies := resp.Cookies()
+							Expect(newCookies).To(HaveLen(0))
 						})
 					})
 
@@ -970,10 +969,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 							resp, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).ToNot(HaveOccurred())
 
-							new_cookies := resp.Cookies()
-							Expect(new_cookies).To(HaveLen(2))
-							Expect(new_cookies[0]).To(Equal(cookies[0]))
-							Expect(new_cookies[1].Value).To(Equal("id-5"))
+							newCookies := resp.Cookies()
+							Expect(newCookies).To(HaveLen(2))
+							Expect(newCookies[0]).To(Equal(cookies[0]))
+							Expect(newCookies[1].Value).To(Equal("id-5"))
 						})
 					})
 				})
