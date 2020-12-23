@@ -1,6 +1,7 @@
 package round_tripper
 
 import (
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"context"
 	"errors"
 	"io/ioutil"
@@ -209,7 +210,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		return nil, finalErr
 	}
 
-	if res != nil && endpoint.PrivateInstanceId != "" {
+	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request){
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.secureCookies,
 			reqInfo.RoutePool.ContextPath(), rt.stickySessionCookieNames,
@@ -364,3 +365,10 @@ func getStickySession(request *http.Request, stickySessionCookieNames config.Str
 	}
 	return ""
 }
+
+func requestSentToRouteService(request *http.Request) bool {
+	sigHeader := request.Header.Get(routeservice.HeaderKeySignature)
+	rsUrl := request.Header.Get(routeservice.HeaderKeyForwardedURL)
+	return sigHeader != "" && rsUrl != ""
+}
+
