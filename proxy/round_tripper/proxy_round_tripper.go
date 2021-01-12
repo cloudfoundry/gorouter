@@ -1,13 +1,14 @@
 package round_tripper
 
 import (
-	"code.cloudfoundry.org/gorouter/routeservice"
 	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/routeservice"
 
 	"github.com/uber-go/zap"
 
@@ -209,8 +210,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
 		return nil, finalErr
 	}
-
-	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request){
+	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.secureCookies,
 			reqInfo.RoutePool.ContextPath(), rt.stickySessionCookieNames,
@@ -371,4 +371,3 @@ func requestSentToRouteService(request *http.Request) bool {
 	rsUrl := request.Header.Get(routeservice.HeaderKeyForwardedURL)
 	return sigHeader != "" && rsUrl != ""
 }
-
