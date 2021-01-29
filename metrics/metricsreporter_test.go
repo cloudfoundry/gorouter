@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/config"
+
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 
@@ -24,7 +26,9 @@ var _ = Describe("MetricsReporter", func() {
 		endpoint = route.NewEndpoint(&route.EndpointOpts{Tags: map[string]string{}})
 		sender = new(fakes.MetricSender)
 		batcher = new(fakes.MetricBatcher)
-		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
+		cfg, err := config.DefaultConfig()
+		Expect(err).ToNot(HaveOccurred())
+		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: cfg.PerRequestMetricsReporting}
 	})
 
 	It("increments the bad_requests metric", func() {
@@ -326,6 +330,14 @@ var _ = Describe("MetricsReporter", func() {
 
 	})
 
+	It("does not send the latency if switched off", func() {
+		metricReporter.PerRequestMetricsReporting = false
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 0, time.Time{}, 2*time.Second)
+
+		Expect(sender.SendValueCallCount()).To(Equal(0))
+
+	})
+
 	It("sends the latency for the given component", func() {
 		endpoint.Tags["component"] = "CloudController"
 		metricReporter.CaptureRoutingResponseLatency(endpoint, 0, time.Time{}, 2*time.Second)
@@ -335,6 +347,14 @@ var _ = Describe("MetricsReporter", func() {
 		Expect(name).To(Equal("latency.CloudController"))
 		Expect(value).To(BeEquivalentTo(2000))
 		Expect(unit).To(Equal("ms"))
+	})
+
+	It("does not send the latency for the given component if switched off", func() {
+		metricReporter.PerRequestMetricsReporting = false
+		endpoint.Tags["component"] = "CloudController"
+		metricReporter.CaptureRoutingResponseLatency(endpoint, 0, time.Time{}, 2*time.Second)
+
+		Expect(sender.SendValueCallCount()).To(Equal(0))
 	})
 
 	Context("sends route metrics", func() {

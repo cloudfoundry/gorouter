@@ -616,6 +616,18 @@ backends:
 			Expect(err).ToNot(HaveOccurred())
 			Expect(config.HTMLErrorTemplateFile).To(Equal("/path/to/file"))
 		})
+
+		It("defaults PerRequestMetricsReporting to true", func() {
+			Expect(config.PerRequestMetricsReporting).To(Equal(true))
+		})
+
+		It("sets PerRequestMetricsReporting", func() {
+			var b = []byte(`per_request_metrics_reporting: false`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.PerRequestMetricsReporting).To(BeFalse())
+		})
+
 	})
 
 	Describe("Process", func() {
