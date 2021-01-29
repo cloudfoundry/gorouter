@@ -273,6 +273,8 @@ type Config struct {
 	EmptyPoolResponseCode503 bool `yaml:"empty_pool_response_code_503,omitempty"`
 
 	HTMLErrorTemplateFile string `yaml:"html_error_template_file,omitempty"`
+
+	PerRequestMetricsReporting bool `yaml:"per_request_metrics_reporting,omitempty"`
 }
 
 var defaultConfig = Config{
@@ -326,6 +328,8 @@ var defaultConfig = Config{
 	MaxIdleConnsPerHost: 2,
 
 	StickySessionCookieNames: StringSet{"JSESSIONID": struct{}{}},
+
+	PerRequestMetricsReporting: true,
 }
 
 func DefaultConfig() (*Config, error) {

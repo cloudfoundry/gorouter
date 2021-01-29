@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
+
 	"github.com/cloudfoundry/dropsonde/metrics"
 )
 
 type MetricsReporter struct {
-	Sender    metrics.MetricSender
-	Batcher   metrics.MetricBatcher
-	unmuzzled uint64
+	Sender                     metrics.MetricSender
+	Batcher                    metrics.MetricBatcher
+	PerRequestMetricsReporting bool
+	unmuzzled                  uint64
 }
 
 func (m *MetricsReporter) CaptureBackendExhaustedConns() {
@@ -68,20 +70,24 @@ func (m *MetricsReporter) CaptureRoutingResponse(statusCode int) {
 }
 
 func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int, _ time.Time, d time.Duration) {
-	//this function has extra arguments to match varz reporter
-	latency := float64(d / time.Millisecond)
-	unit := "ms"
-	m.Sender.SendValue("latency", latency, unit)
+	if m.PerRequestMetricsReporting {
+		//this function has extra arguments to match varz reporter
+		latency := float64(d / time.Millisecond)
+		unit := "ms"
+		m.Sender.SendValue("latency", latency, unit)
 
-	componentName, ok := b.Tags["component"]
-	if ok && len(componentName) > 0 {
-		m.Sender.SendValue(fmt.Sprintf("latency.%s", componentName), latency, unit)
+		componentName, ok := b.Tags["component"]
+		if ok && len(componentName) > 0 {
+			m.Sender.SendValue(fmt.Sprintf("latency.%s", componentName), latency, unit)
+		}
 	}
 }
 
 func (m *MetricsReporter) CaptureLookupTime(t time.Duration) {
-	unit := "ns"
-	m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
+	if m.PerRequestMetricsReporting {
+		unit := "ns"
+		m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
+	}
 }
 
 func (m *MetricsReporter) UnmuzzleRouteRegistrationLatency() {

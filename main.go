@@ -124,7 +124,8 @@ func main() {
 	}
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
-	metricsReporter := initializeMetrics(sender)
+
+	metricsReporter := initializeMetrics(sender, c)
 	fdMonitor := initializeFDMonitor(sender, logger)
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
@@ -270,7 +271,7 @@ func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.Me
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -292,7 +293,7 @@ func initializeMetrics(sender *metric_sender.MetricSender) *metrics.MetricsRepor
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting}
 }
 
 func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
