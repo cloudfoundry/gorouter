@@ -628,6 +628,17 @@ backends:
 			Expect(config.PerRequestMetricsReporting).To(BeFalse())
 		})
 
+		It("defaults SendHttpStartStopServerEvent to true", func() {
+			Expect(config.SendHttpStartStopServerEvent).To(Equal(true))
+		})
+
+		It("sets SendHttpStartStopServerEvent", func() {
+			var b = []byte(`send_http_start_stop_server_event: false`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.SendHttpStartStopServerEvent).To(BeFalse())
+		})
+
 	})
 
 	Describe("Process", func() {
