@@ -275,6 +275,8 @@ type Config struct {
 	HTMLErrorTemplateFile string `yaml:"html_error_template_file,omitempty"`
 
 	PerRequestMetricsReporting bool `yaml:"per_request_metrics_reporting,omitempty"`
+
+	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
 }
 
 var defaultConfig = Config{
@@ -330,6 +332,8 @@ var defaultConfig = Config{
 	StickySessionCookieNames: StringSet{"JSESSIONID": struct{}{}},
 
 	PerRequestMetricsReporting: true,
+
+	SendHttpStartStopServerEvent: true,
 }
 
 func DefaultConfig() (*Config, error) {
