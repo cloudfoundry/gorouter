@@ -30,6 +30,7 @@ func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
 type FactoryImpl struct {
 	BackendTemplate      *http.Transport
 	RouteServiceTemplate *http.Transport
+	IsInstrumented       bool
 }
 
 func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyRoundTripper {
@@ -52,5 +53,10 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyR
 		TLSClientConfig:     customTLSConfig,
 		TLSHandshakeTimeout: template.TLSHandshakeTimeout,
 	}
-	return NewDropsondeRoundTripper(newTransport)
+	if t.IsInstrumented {
+		return NewDropsondeRoundTripper(newTransport)
+	} else {
+		return newTransport
+	}
+
 }
