@@ -277,6 +277,8 @@ type Config struct {
 	PerRequestMetricsReporting bool `yaml:"per_request_metrics_reporting,omitempty"`
 
 	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
+
+	SendHttpStartStopClientEvent bool `yaml:"send_http_start_stop_client_event,omitempty"`
 }
 
 var defaultConfig = Config{
@@ -334,6 +336,8 @@ var defaultConfig = Config{
 	PerRequestMetricsReporting: true,
 
 	SendHttpStartStopServerEvent: true,
+
+	SendHttpStartStopClientEvent: true,
 }
 
 func DefaultConfig() (*Config, error) {

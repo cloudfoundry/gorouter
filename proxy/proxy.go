@@ -125,6 +125,7 @@ func NewProxy(
 			DisableCompression:  true,
 			TLSClientConfig:     routeServiceTLSConfig,
 		},
+		IsInstrumented: cfg.SendHttpStartStopClientEvent,
 	}
 
 	prt := round_tripper.NewProxyRoundTripper(
