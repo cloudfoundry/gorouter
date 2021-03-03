@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
@@ -106,15 +108,9 @@ func NewProxy(
 	}
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
-		BackendTemplate: &http.Transport{
-			Dial:                dialer.Dial,
-			DisableKeepAlives:   cfg.DisableKeepAlives,
-			MaxIdleConns:        cfg.MaxIdleConns,
-			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
-			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
-			DisableCompression:  true,
-			TLSClientConfig:     backendTLSConfig,
-			TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
+		BackendTemplate: &http2.Transport{
+			DisableCompression: true,
+			TLSClientConfig:    backendTLSConfig,
 		},
 		RouteServiceTemplate: &http.Transport{
 			Dial:                dialer.Dial,

@@ -5,6 +5,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
+	"golang.org/x/net/http2"
 )
 
 func NewDropsondeRoundTripper(p ProxyRoundTripper) ProxyRoundTripper {
@@ -28,18 +29,19 @@ func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
 }
 
 type FactoryImpl struct {
-	BackendTemplate      *http.Transport
+	BackendTemplate      *http2.Transport
 	RouteServiceTemplate *http.Transport
 }
 
 func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyRoundTripper {
-	var template *http.Transport
-	if isRouteService {
-		template = t.RouteServiceTemplate
-	} else {
-		template = t.BackendTemplate
-	}
+	// var template *http.Transport
+	// if isRouteService {
+	// 	template = t.RouteServiceTemplate
+	// } else {
+	// 	template = t.BackendTemplate
+	// }
 
+	template := t.RouteServiceTemplate
 	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig)
 
 	newTransport := &http.Transport{
