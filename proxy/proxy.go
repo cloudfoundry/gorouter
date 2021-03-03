@@ -107,11 +107,12 @@ func NewProxy(
 		KeepAlive: cfg.EndpointKeepAliveProbeInterval,
 	}
 
+	backendTemplate := http2.Transport{
+		DisableCompression: true,
+		TLSClientConfig:    backendTLSConfig,
+	}
 	roundTripperFactory := &round_tripper.FactoryImpl{
-		BackendTemplate: &http2.Transport{
-			DisableCompression: true,
-			TLSClientConfig:    backendTLSConfig,
-		},
+		BackendTemplate: &backendTemplate,
 		RouteServiceTemplate: &http.Transport{
 			Dial:                dialer.Dial,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
@@ -134,6 +135,7 @@ func NewProxy(
 		},
 		routeServicesTransport,
 		cfg,
+		backendTemplate,
 	)
 
 	rproxy := &httputil.ReverseProxy{

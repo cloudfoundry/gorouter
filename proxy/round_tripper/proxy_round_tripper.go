@@ -1,13 +1,15 @@
 package round_tripper
 
 import (
-	"code.cloudfoundry.org/gorouter/routeservice"
 	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"golang.org/x/net/http2"
 
 	"github.com/uber-go/zap"
 
@@ -65,6 +67,8 @@ func NewProxyRoundTripper(
 	errHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
 	cfg *config.Config,
+	backendTemplate http2.Transport,
+
 ) ProxyRoundTripper {
 
 	return &roundTripper{
@@ -78,6 +82,7 @@ func NewProxyRoundTripper(
 		routeServicesTransport:   routeServicesTransport,
 		endpointTimeout:          cfg.EndpointTimeout,
 		stickySessionCookieNames: cfg.StickySessionCookieNames,
+		backendTemplate:          backendTemplate,
 	}
 }
 
@@ -92,6 +97,7 @@ type roundTripper struct {
 	routeServicesTransport   http.RoundTripper
 	endpointTimeout          time.Duration
 	stickySessionCookieNames config.StringSet
+	backendTemplate          http2.Transport
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
@@ -177,7 +183,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				roundTripper = rt.routeServicesTransport
 			}
 
-			res, err = rt.timedRoundTrip(roundTripper, request, logger)
+			res, err = rt.timedRoundTrip(roundTripper, request, logger, endpoint)
 			if err != nil {
 				logger.Error("route-service-connection-failed", zap.Error(err))
 
@@ -209,8 +215,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
 		return nil, finalErr
 	}
-
-	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request){
+	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.secureCookies,
 			reqInfo.RoutePool.ContextPath(), rt.stickySessionCookieNames,
@@ -246,14 +251,14 @@ func (rt *roundTripper) backendRoundTrip(
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
 	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
-	res, err := rt.timedRoundTrip(tr, request, logger)
+	res, err := rt.timedRoundTrip(tr, request, logger, endpoint)
 
 	// decrement connection stats
 	iter.PostRequest(endpoint)
 	return res, err
 }
 
-func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
+func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger, endpoint *route.Endpoint) (*http.Response, error) {
 	if rt.endpointTimeout <= 0 {
 		return tr.RoundTrip(request)
 	}
@@ -273,7 +278,9 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 		}
 	}()
 
-	resp, err := tr.RoundTrip(request)
+	customTLSConfig := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, rt.backendTemplate.TLSClientConfig)
+	rt.backendTemplate.TLSClientConfig = customTLSConfig
+	resp, err := rt.backendTemplate.RoundTrip(request)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -371,4 +378,3 @@ func requestSentToRouteService(request *http.Request) bool {
 	rsUrl := request.Header.Get(routeservice.HeaderKeyForwardedURL)
 	return sigHeader != "" && rsUrl != ""
 }
-
