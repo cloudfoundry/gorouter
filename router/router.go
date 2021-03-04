@@ -27,6 +27,7 @@ import (
 	"github.com/armon/go-proxyproto"
 	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
+	"golang.org/x/net/http2"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
@@ -251,12 +252,14 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.tlsListener = tls.NewListener(listener, tlsConfig)
+	server.TLSConfig = tlsConfig
+	http2.ConfigureServer(server, nil)
 
-	r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
+	// r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
 
 	go func() {
-		err := server.Serve(r.tlsListener)
+		// err := server.Serve(r.tlsListener)
+		err := server.ServeTLS(listener, "", "")
 		r.stopLock.Lock()
 		if !r.stopping {
 			errChan <- err
