@@ -700,9 +700,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("when using sticky sessions", func() {
 				var (
-					sessionCookie                                 *http.Cookie
-					endpoint1                                     *route.Endpoint
-					endpoint2                                     *route.Endpoint
+					sessionCookie *http.Cookie
+					endpoint1     *route.Endpoint
+					endpoint2     *route.Endpoint
 
 					// options for transport.RoundTripStub
 					responseContainsNoCookies                     func(req *http.Request) (*http.Response, error)
@@ -796,7 +796,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				Context("when there are no cookies on the request", func() {
 					Context("when there is a JSESSIONID set on the response", func() {
-						BeforeEach(func(){
+						BeforeEach(func() {
 							transport.RoundTripStub = responseContainsJSESSIONID
 						})
 
@@ -882,7 +882,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					Context("when there is a JSESSIONID set on the response", func() {
-						JustBeforeEach(func(){
+						JustBeforeEach(func() {
 							transport.RoundTripStub = responseContainsJSESSIONID
 						})
 
@@ -899,7 +899,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						})
 
 						Context("when the JSESSIONID on the response has new properties", func() {
-							JustBeforeEach(func(){
+							JustBeforeEach(func() {
 								transport.RoundTripStub = responseContainsJSESSIONIDWithExtraProperties
 							})
 
@@ -933,7 +933,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 								Expect(added).To(Equal(route.ADDED))
 							})
 
-							Context("when route service headers are not on the request", func(){
+							Context("when route service headers are not on the request", func() {
 								It("will select a new backend and update the VCAP_ID", func() {
 									resp, err := proxyRoundTripper.RoundTrip(req)
 									Expect(err).ToNot(HaveOccurred())
@@ -946,9 +946,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 								})
 							})
 
-							Context("when route service headers are on the request", func(){
+							Context("when route service headers are on the request", func() {
 								// This case explicitly disallows sticky sessions to route services
-								JustBeforeEach(func(){
+								JustBeforeEach(func() {
 									req.Header.Set(routeservice.HeaderKeySignature, "foo")
 									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
 								})
@@ -967,7 +967,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					Context("when no cookies are set on the response", func() {
-						JustBeforeEach(func(){
+						JustBeforeEach(func() {
 							transport.RoundTripStub = responseContainsNoCookies
 						})
 
@@ -996,7 +996,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 								Expect(added).To(Equal(route.ADDED))
 							})
 
-							Context("when route service headers are not on the request", func(){
+							Context("when route service headers are not on the request", func() {
 								It("will select a new backend and update the VCAP_ID", func() {
 									resp, err := proxyRoundTripper.RoundTrip(req)
 									Expect(err).ToNot(HaveOccurred())
@@ -1008,8 +1008,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 								})
 							})
 
-							Context("when route service headers are on the request", func(){
-								JustBeforeEach(func(){
+							Context("when route service headers are on the request", func() {
+								JustBeforeEach(func() {
 									req.Header.Set(routeservice.HeaderKeySignature, "foo")
 									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
 								})
@@ -1026,7 +1026,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					Context("when there is a VCAP_ID set on the response", func() {
-						JustBeforeEach(func(){
+						JustBeforeEach(func() {
 							transport.RoundTripStub = responseContainsVCAPID
 						})
 
@@ -1058,8 +1058,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 								Expect(added).To(Equal(route.ADDED))
 							})
 
-							Context("when route service headers are not on the request", func(){
-								JustBeforeEach(func(){
+							Context("when route service headers are not on the request", func() {
+								JustBeforeEach(func() {
 									transport.RoundTripStub = responseContainsVCAPID
 								})
 
@@ -1075,8 +1075,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 								})
 							})
 
-							Context("when route service headers are on the request", func(){
-								JustBeforeEach(func(){
+							Context("when route service headers are on the request", func() {
+								JustBeforeEach(func() {
 									req.Header.Set(routeservice.HeaderKeySignature, "foo")
 									req.Header.Set(routeservice.HeaderKeyForwardedURL, "bar")
 									transport.RoundTripStub = responseContainsVCAPID
