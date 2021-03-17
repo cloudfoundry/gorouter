@@ -48,7 +48,7 @@ var (
 	testLogger              logger.Logger
 	cryptoPrev              secure.Crypto
 	caCertPool              *x509.CertPool
-	recommendHttps          bool
+	recommendHTTPS          bool
 	healthStatus            *health.Health
 	fakeEmitter             *fake.FakeEventEmitter
 	fakeRouteServicesClient *sharedfakes.RoundTripper
@@ -115,7 +115,7 @@ var _ = JustBeforeEach(func() {
 		conf.RouteServiceTimeout,
 		crypto,
 		cryptoPrev,
-		recommendHttps,
+		recommendHTTPS,
 	)
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

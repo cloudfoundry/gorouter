@@ -46,7 +46,7 @@ var _ = Describe("Route Services", func() {
 
 	BeforeEach(func() {
 		conf.RouteServiceEnabled = true
-		recommendHttps = true
+		recommendHTTPS = true
 		forwardedUrl = "https://my_host.com/resource+9-9_9?query=123&query$2=345#page1..5"
 
 		routeServiceHandler = func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +78,7 @@ var _ = Describe("Route Services", func() {
 			1*time.Hour,
 			crypto,
 			nil,
-			recommendHttps,
+			recommendHTTPS,
 		)
 		reqArgs, err := config.CreateRequest("", forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())
@@ -309,7 +309,7 @@ var _ = Describe("Route Services", func() {
 
 		Context("when recommendHttps is set to false", func() {
 			BeforeEach(func() {
-				recommendHttps = false
+				recommendHTTPS = false
 				routeServiceHandler = func(w http.ResponseWriter, r *http.Request) {
 					Expect(r.Header.Get("X-CF-Forwarded-Url")).To(ContainSubstring("http://"))
 
