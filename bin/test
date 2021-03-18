@@ -41,6 +41,7 @@ if ! ginkgo \
   -p \
   -race \
   -timeout 20m \
+  -slowSpecThreshold 20 \
   "$@"; then
     echo -e "\nSWEET SUITE SUCCESS"
 else
