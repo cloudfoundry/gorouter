@@ -2,17 +2,17 @@
 
 set -exu
 
-function printStatus {
-      if [ $? -eq 0 ]; then
-          echo -e "\nSWEET SUITE SUCCESS"
-      else
-          echo -e "\nSUITE FAILURE"
-      fi
-  }
+if ! [ -x "$(command -v go)" ]; then
+    echo "Go is not installed."
+    exit 1
+fi
 
-trap printStatus EXIT
+if [ "${GOPATH:-}" = "" ]; then
+  echo "GOPATH empty or not set."
+  exit 1
+fi
 
-. $(dirname $0)/gorequired
+echo "GOPATH=$GOPATH"
 
 # install nats-server
 go get -v github.com/nats-io/nats-server
@@ -24,11 +24,14 @@ go vet ./...
 go vet -vettool="$(command -v shadow)"
 
 # install ginkgo
-go install -v github.com/onsi/ginkgo/ginkgo
-echo -e "\n Formatting packages..."
+if ! [ -x "$(command -v ginkgo)" ]; then
+    go get -u github.com/onsi/ginkgo/ginkgo
+fi
 
+echo -e "\n Formatting packages..."
 go fmt ./...
-ginkgo \
+
+if ! ginkgo \
   -keepGoing \
   -trace \
   -progress \
@@ -38,4 +41,8 @@ ginkgo \
   -p \
   -race \
   -timeout 20m \
-  "$@"
+  "$@"; then
+    echo -e "\nSWEET SUITE SUCCESS"
+else
+    echo -e "\nSUITE FAILURE"
+fi
