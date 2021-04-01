@@ -21,6 +21,11 @@ type Registry interface {
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
 	Lookup(uri route.Uri) *route.EndpointPool
 	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.EndpointPool
+	NumEndpoints() int
+	NumUris() int
+	StartPruningCycle()
+	TimeOfLastUpdate() time.Time
+	MarshalJSON() ([]byte, error)
 }
 
 type PruneStatus int

@@ -161,13 +161,13 @@ type Varz interface {
 
 type RealVarz struct {
 	sync.Mutex
-	r          *registry.RouteRegistry
+	r          registry.Registry
 	activeApps *stats.ActiveApps
 	topApps    *stats.TopApps
 	varz
 }
 
-func NewVarz(r *registry.RouteRegistry) Varz {
+func NewVarz(r registry.Registry) Varz {
 	x := &RealVarz{r: r}
 
 	x.activeApps = stats.NewActiveApps()

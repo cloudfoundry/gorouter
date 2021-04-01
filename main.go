@@ -127,9 +127,16 @@ func main() {
 
 	metricsReporter := initializeMetrics(sender, c)
 	fdMonitor := initializeFDMonitor(sender, logger)
-	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
-	if c.SuspendPruningIfNatsUnavailable {
-		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
+
+	var registry rregistry.Registry
+	if c.RouterRouter {
+		registry = rregistry.NewRouterRouterRegistry(logger.Session("registry"), c)
+	} else {
+		registry = rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
+		if c.SuspendPruningIfNatsUnavailable {
+			routeRegistry := registry.(*rregistry.RouteRegistry)
+			routeRegistry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
+		}
 	}
 
 	varz := rvarz.NewVarz(registry)

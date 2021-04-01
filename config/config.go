@@ -179,6 +179,11 @@ type HTTPRewriteResponses struct {
 	RemoveHeaders          []HeaderNameValue `yaml:"remove_headers,omitempty"`
 }
 
+type RouterRouterBackend struct {
+	Host string `yaml:"host,omitempty"`
+	Port uint16 `yaml:"port,omitempty"`
+}
+
 type Config struct {
 	Status          StatusConfig      `yaml:"status,omitempty"`
 	Nats            []NatsConfig      `yaml:"nats,omitempty"`
@@ -279,6 +284,9 @@ type Config struct {
 	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
 
 	SendHttpStartStopClientEvent bool `yaml:"send_http_start_stop_client_event,omitempty"`
+
+	RouterRouter              bool                  `yaml:"router_router"`
+	RouterRouterTargetRouters []RouterRouterBackend `yaml:"router_router_target_routers"`
 }
 
 var defaultConfig = Config{

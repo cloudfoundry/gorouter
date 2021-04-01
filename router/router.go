@@ -47,7 +47,7 @@ type Router struct {
 	config     *config.Config
 	handler    http.Handler
 	mbusClient *nats.Conn
-	registry   *registry.RouteRegistry
+	registry   registry.Registry
 	varz       varz.Varz
 	component  *common.VcapComponent
 
@@ -74,7 +74,7 @@ func NewRouter(
 	cfg *config.Config,
 	handler http.Handler,
 	mbusClient *nats.Conn,
-	r *registry.RouteRegistry,
+	r registry.Registry,
 	v varz.Varz,
 	h *health.Health,
 	logCounter *schema.LogCounter,
