@@ -59,5 +59,5 @@ func (p *protocolCheck) hijack(rw http.ResponseWriter) (net.Conn, *bufio.ReadWri
 }
 
 func isProtocolSupported(request *http.Request) bool {
-	return request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1)
+	return request.ProtoMajor == 2 || (request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1))
 }
