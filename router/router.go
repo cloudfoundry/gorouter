@@ -228,6 +228,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 	}
 
 	tlsConfig := &tls.Config{
+		NextProtos:   []string{"h2"},
 		Certificates: r.config.SSLCertificates,
 		CipherSuites: r.config.CipherSuites,
 		MinVersion:   r.config.MinTLSVersion,
