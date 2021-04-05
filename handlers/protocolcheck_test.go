@@ -48,6 +48,22 @@ var _ = Describe("Protocolcheck", func() {
 		server.Close()
 	})
 
+	Context("http2", func() {
+		It("passes the request through", func() {
+			conn, err := net.Dial("tcp", server.Addr())
+			defer conn.Close()
+			Expect(err).ToNot(HaveOccurred())
+			respReader := bufio.NewReader(conn)
+
+			conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
+			resp, err := http.ReadResponse(respReader, nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(resp.StatusCode).To(Equal(200))
+			Expect(nextCalled).To(BeTrue())
+		})
+	})
+
 	Context("http 1.1", func() {
 		It("passes the request through", func() {
 			conn, err := net.Dial("tcp", server.Addr())
@@ -92,20 +108,6 @@ var _ = Describe("Protocolcheck", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 
 			Expect(nextCalled).To(BeFalse())
-		})
-	})
-
-	Context("http2", func() {
-		It("returns a 400 bad request", func() {
-			conn, err := net.Dial("tcp", server.Addr())
-			Expect(err).ToNot(HaveOccurred())
-			respReader := bufio.NewReader(conn)
-
-			conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
-
-			resp, err := http.ReadResponse(respReader, nil)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 		})
 	})
 })

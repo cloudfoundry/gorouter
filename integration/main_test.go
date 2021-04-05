@@ -20,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	tls_helpers "code.cloudfoundry.org/cf-routing-test-helpers/tls"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -245,6 +247,52 @@ var _ = Describe("Router Integration", func() {
 					})
 				})
 			})
+		})
+	})
+
+	Describe("HTTP/2 traffic", func() {
+		var (
+			clientTLSConfig *tls.Config
+			mbusClient      *nats.Conn
+		)
+		BeforeEach(func() {
+			cfg, clientTLSConfig = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+
+		})
+		JustBeforeEach(func() {
+			var err error
+			writeConfig(cfg, cfgFile)
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("serves HTTP/2 traffic", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done := make(chan bool, 1)
+			defer func() { done <- true }()
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+			client := &http.Client{Transport: &http2.Transport{TLSClientConfig: clientTLSConfig}}
+			resp, err := client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Proto).To(Equal("HTTP/2.0"))
 		})
 	})
 
