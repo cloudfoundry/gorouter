@@ -32,11 +32,7 @@ var ConnectionResetOnRead = ClassifierFunc(func(err error) bool {
 })
 
 var RemoteFailedCertCheck = ClassifierFunc(func(err error) bool {
-	if ne, ok := err.(*net.OpError); ok {
-		return ne.Op == "remote error" && ne.Err.Error() == "tls: bad certificate"
-	}
-
-	return err != nil && err.Error() == "readLoopPeekFailLocked: remote error: tls: bad certificate"
+	return err != nil && (err.Error() == "readLoopPeekFailLocked: remote error: tls: bad certificate" || err.Error() == "remote error: tls: bad certificate")
 })
 
 var RemoteHandshakeTimeout = ClassifierFunc(func(err error) bool {
@@ -55,8 +51,7 @@ var ExpiredOrNotYetValidCertFailure = ClassifierFunc(func(err error) bool {
 })
 
 var RemoteHandshakeFailure = ClassifierFunc(func(err error) bool {
-	ne, ok := err.(*net.OpError)
-	return ok && ne.Op == "remote error" && ne.Err.Error() == "tls: handshake failure"
+	return err != nil && err.Error() == "remote error: tls: handshake failure"
 })
 
 var HostnameMismatch = ClassifierFunc(func(err error) bool {
