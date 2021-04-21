@@ -2,6 +2,7 @@ package schema_test
 
 import (
 	"bytes"
+
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -68,7 +69,7 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"`))
-			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"\n`))
+			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"`))
 		})
 
 		Context("when DisableSourceIPLogging is specified", func() {
@@ -153,7 +154,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`x_forwarded_proto:"FooOriginalRequestProto" `))
 				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3"`))
-				Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"\n`))
+				Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"`))
 			})
 		})
 
@@ -181,7 +182,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`x_forwarded_proto:"-" `))
 				Eventually(r).Should(Say(`vcap_request_id:"-" response_time:"-" gorouter_time:"-" app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"-"`))
-				Eventually(r).Should(Say(`x_cf_routererror:"-"\n`))
+				Eventually(r).Should(Say(`x_cf_routererror:"-"`))
 			})
 		})
 
@@ -212,7 +213,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3" x_cf_routererror:"some-router-error" cache_control:"no-cache" accept_encoding:"gzip, deflate" `))
-				Eventually(r).Should(Say(`if_match:"737060cd8c284d8af7ad3082f209582d" doesnt_exist:"-"\n`))
+				Eventually(r).Should(Say(`if_match:"737060cd8c284d8af7ad3082f209582d" doesnt_exist:"-"`))
 			})
 		})
 
@@ -254,7 +255,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 				Eventually(r).Should(Say(`app_index:"3"`))
-				Eventually(r).Should(Say(`x_cf_routererror:"-"\n`))
+				Eventually(r).Should(Say(`x_cf_routererror:"-"`))
 			})
 		})
 	})

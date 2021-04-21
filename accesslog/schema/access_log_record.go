@@ -2,7 +2,6 @@ package schema
 
 import (
 	"bytes"
-	"code.cloudfoundry.org/gorouter/config"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/config"
 
 	"code.cloudfoundry.org/gorouter/route"
 )
@@ -203,8 +204,6 @@ func (r *AccessLogRecord) makeRecord() []byte {
 
 	r.addExtraHeaders(b)
 
-	b.WriteByte('\n')
-
 	return b.Bytes()
 }
 
@@ -230,7 +229,11 @@ func redactURI(r AccessLogRecord) string {
 // WriteTo allows the AccessLogRecord to implement the io.WriterTo interface
 func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
 	bytesWritten, err := w.Write(r.getRecord())
-	return int64(bytesWritten), err
+	if err != nil {
+		return int64(bytesWritten), err
+	}
+	newline, err := w.Write([]byte("\n"))
+	return int64(bytesWritten + newline), err
 }
 
 func (r *AccessLogRecord) SendLog(ls LogSender) {
