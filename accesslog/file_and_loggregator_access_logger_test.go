@@ -52,7 +52,7 @@ var _ = Describe("AccessLog", func() {
 				Eventually(ls.SendAppLogCallCount).Should(Equal(1))
 				appID, message, tags := ls.SendAppLogArgsForCall(0)
 				Expect(appID).To(Equal("my_awesome_id"))
-				Expect(message).To(MatchRegexp("^.*foo.bar.*\n"))
+				Expect(message).To(MatchRegexp("^.*foo.bar.*"))
 				Expect(tags).To(BeNil())
 
 				accessLogger.Stop()
