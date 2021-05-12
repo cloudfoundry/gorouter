@@ -240,14 +240,15 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 		Pass: "pass",
 	}
 
-	c.Nats = []config.NatsConfig{}
-	for _, natsPort := range natsPorts {
-		c.Nats = append(c.Nats, config.NatsConfig{
-			Host: "localhost",
-			Port: natsPort,
-			User: "nats",
-			Pass: "nats",
-		})
+	natsHosts := make([]config.NatsHost, len(natsPorts))
+	for i, natsPort := range natsPorts {
+		natsHosts[i].Hostname = "localhost"
+		natsHosts[i].Port = natsPort
+	}
+	c.Nats = config.NatsConfig{
+		User:  "nats",
+		Pass:  "nats",
+		Hosts: natsHosts,
 	}
 
 	c.Logging.Level = "debug"
