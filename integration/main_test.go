@@ -1111,14 +1111,14 @@ func hostnameAndPort(url string) (string, int) {
 }
 
 func newMessageBus(c *config.Config) (*nats.Conn, error) {
-	natsMembers := make([]string, len(c.Nats))
+	natsMembers := make([]string, len(c.Nats.Hosts))
 	options := nats.DefaultOptions
 	options.PingInterval = 200 * time.Millisecond
-	for _, info := range c.Nats {
+	for _, host := range c.Nats.Hosts {
 		uri := url.URL{
 			Scheme: "nats",
-			User:   url.UserPassword(info.User, info.Pass),
-			Host:   fmt.Sprintf("%s:%d", info.Host, info.Port),
+			User:   url.UserPassword(c.Nats.User, c.Nats.Pass),
+			Host:   fmt.Sprintf("%s:%d", host.Hostname, host.Port),
 		}
 		natsMembers = append(natsMembers, uri.String())
 	}
