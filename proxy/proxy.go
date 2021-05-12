@@ -219,7 +219,7 @@ func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwarde
 		if err != nil {
 			return false, err
 		}
-		return valid && forwardedClientCert != config.SANITIZE_SET, nil
+		return valid && forwardedClientCert != config.SANITIZE_SET && forwardedClientCert != config.ALWAYS_FORWARD, nil
 	}
 }
 
