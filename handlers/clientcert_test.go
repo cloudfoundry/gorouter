@@ -128,6 +128,7 @@ var _ = Describe("Clientcert", func() {
 				}))
 			}
 		})
+
 		By("when there is a mtls connection with client certs", func() {
 			privKey, certDER := test_util.CreateCertDER("client_cert1.com")
 			keyPEM, certPEM := test_util.CreateKeyPairFromDER(certDER, privKey)

@@ -46,17 +46,17 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 			// | client scheme | route service scheme | clientCert | clientXFCC | expectedXFCCAtRouteService | expectedXFCCAtApp |
 			// |---------------|----------------------|------------|------------|----------------------------|-------------------|
 			{"http", "http", false, false, "", ""},
-			{"http", "http", false, true, "clientXFCC", ""},
+			{"http", "http", false, true, "clientXFCC", "clientXFCC"},
 			{"http", "https", false, false, "", ""},
-			{"http", "https", false, true, "clientXFCC", ""},
+			{"http", "https", false, true, "clientXFCC", "clientXFCC"},
 			{"https", "http", false, false, "", ""},
-			{"https", "http", false, true, "clientXFCC", ""},
+			{"https", "http", false, true, "clientXFCC", "clientXFCC"},
 			{"https", "http", true, false, "", ""},
-			{"https", "http", true, true, "clientXFCC", ""},
+			{"https", "http", true, true, "clientXFCC", "clientXFCC"},
 			{"https", "https", false, false, "", ""},
-			{"https", "https", false, true, "clientXFCC", ""},
+			{"https", "https", false, true, "clientXFCC", "clientXFCC"},
 			{"https", "https", true, false, "", ""},
-			{"https", "https", true, true, "clientXFCC", ""},
+			{"https", "https", true, true, "clientXFCC", "clientXFCC"},
 		},
 		{config.FORWARD}: {
 			// | client scheme | route service scheme | clientCert | clientXFCC | expectedXFCCAtRouteService | expectedXFCCAtApp |
