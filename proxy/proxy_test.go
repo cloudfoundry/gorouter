@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
@@ -1454,6 +1455,75 @@ var _ = Describe("Proxy", func() {
 				It("responds with a 404 NotFound", func() {
 					nilEndpointsTest(http.StatusNotFound)
 				})
+			})
+		})
+
+		Context("when the round trip errors and original client has disconnected", func() {
+			It("response code is always 499", func() {
+				ln := test_util.RegisterHandler(r, "post-some-data", func(conn *test_util.HttpConn) {
+					req, err := http.ReadRequest(conn.Reader)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					defer req.Body.Close()
+					Expect(req.Method).To(Equal("POST"))
+					Expect(req.URL.Path).To(Equal("/"))
+					Expect(req.ProtoMajor).To(Equal(1))
+					Expect(req.ProtoMinor).To(Equal(1))
+					ioutil.ReadAll(req.Body)
+					rsp := test_util.NewResponse(200)
+					conn.WriteResponse(rsp)
+					conn.Close()
+				}, test_util.RegisterConfig{InstanceId: "499", AppId: "502"})
+				defer ln.Close()
+
+				payloadSize := 2 << 24
+				payload := strings.Repeat("a", payloadSize)
+				sendrequest := func(wg *sync.WaitGroup) {
+					defer wg.Done()
+					req := test_util.NewRequest("POST", "post-some-data", "/", bytes.NewReader([]byte(payload)))
+					tcpaddr, err := net.ResolveTCPAddr("tcp", proxyServer.Addr().String())
+					Expect(err).ToNot(HaveOccurred())
+					conn, err := net.DialTCP("tcp", nil, tcpaddr)
+					Expect(err).ToNot(HaveOccurred())
+					conn.SetLinger(0)
+					conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
+					writer := bufio.NewWriter(conn)
+					go func(req *http.Request, writer *bufio.Writer) {
+						err = req.Write(writer)
+						Expect(err).To(HaveOccurred())
+						writer.Flush()
+					}(req, writer)
+					time.Sleep(100 * time.Millisecond) // give time for the data to start transmitting
+
+					// need to shutdown the writer first or conn.Close will block until the large payload finishes sending.
+					// Another way to do this is to get syscall.rawconn and use control to syscall.SetNonblock on the
+					// connections file descriptor
+					conn.CloseWrite()
+					conn.Close()
+				}
+
+				var wg sync.WaitGroup
+				for i := 0; i < 4; i++ {
+					wg.Add(1)
+					go sendrequest(&wg)
+				}
+				wg.Wait()
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}).ShouldNot(BeZero())
+
+				b, err := ioutil.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 499"))
+				Expect(string(b)).ToNot(ContainSubstring("HTTP/1.1\" 502"))
+				Expect(string(b)).ToNot(ContainSubstring("HTTP/1.1\" 503"))
 			})
 		})
 	})
