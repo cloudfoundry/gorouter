@@ -3,10 +3,13 @@ package fails
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net"
 
 	"context"
 )
+
+var IdempotentRequestEOFError = errors.New("EOF (via idempotent request)")
 
 var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
 	switch err.(type) {
@@ -70,4 +73,8 @@ var UntrustedCert = ClassifierFunc(func(err error) bool {
 	default:
 		return false
 	}
+})
+
+var IdempotentRequestEOF = ClassifierFunc(func(err error) bool {
+	return err == IdempotentRequestEOFError
 })

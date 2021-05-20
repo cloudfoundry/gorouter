@@ -3,6 +3,7 @@ package round_tripper
 import (
 	"context"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -147,6 +148,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
 			if err != nil {
+				// io.EOF errors are considered safe to retry for certain requests
+				// Replace the error here to track this state when classifying later.
+				if err == io.EOF && isIdempotent(request) {
+					err = fails.IdempotentRequestEOFError
+				}
+
 				iter.EndpointFailed(err)
 				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)))
 
@@ -370,4 +377,22 @@ func requestSentToRouteService(request *http.Request) bool {
 	sigHeader := request.Header.Get(routeservice.HeaderKeySignature)
 	rsUrl := request.Header.Get(routeservice.HeaderKeyForwardedURL)
 	return sigHeader != "" && rsUrl != ""
+}
+
+// Matches behavior of isReplayable() in standard library net/http/request.go
+// https://github.com/golang/go/blob/5c489514bc5e61ad9b5b07bd7d8ec65d66a0512a/src/net/http/request.go
+func isIdempotent(request *http.Request) bool {
+	if request.Body == nil || request.Body == http.NoBody || request.GetBody != nil {
+		switch request.Method {
+		case "GET", "HEAD", "OPTIONS", "TRACE", "":
+			return true
+		}
+		// The Idempotency-Key, while non-standard, is widely used to
+		// mean a POST or other request is idempotent. See
+		// https://golang.org/issue/19943#issuecomment-421092421
+		if request.Header.Get("Idempotency-Key") != "" || request.Header.Get("X-Idempotency-Key") != "" {
+			return true
+		}
+	}
+	return false
 }
