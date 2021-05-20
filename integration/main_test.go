@@ -255,12 +255,14 @@ var _ = Describe("Router Integration", func() {
 			clientTLSConfig *tls.Config
 			mbusClient      *nats.Conn
 		)
+
 		BeforeEach(func() {
 			cfg, clientTLSConfig = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
-
 		})
+
 		JustBeforeEach(func() {
 			var err error
+			cfg.EnableHTTP2 = true
 			writeConfig(cfg, cfgFile)
 			mbusClient, err = newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
@@ -297,7 +299,6 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	Context("Drain", func() {
-
 		BeforeEach(func() {
 			cfg = createConfig(statusPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
 		})

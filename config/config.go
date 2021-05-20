@@ -195,6 +195,7 @@ type Config struct {
 	EnableSSL       bool              `yaml:"enable_ssl,omitempty"`
 	SSLPort         uint16            `yaml:"ssl_port,omitempty"`
 	DisableHTTP     bool              `yaml:"disable_http,omitempty"`
+	EnableHTTP2     bool              `yaml:"enable_http2,omitempty"`
 	SSLCertificates []tls.Certificate `yaml:"-"`
 	TLSPEM          []TLSPem          `yaml:"tls_pem,omitempty"`
 	CACerts         string            `yaml:"ca_certs,omitempty"`
@@ -292,6 +293,7 @@ var defaultConfig = Config{
 	EnableSSL:     false,
 	SSLPort:       443,
 	DisableHTTP:   false,
+	EnableHTTP2:   false,
 	MinTLSVersion: tls.VersionTLS12,
 	MaxTLSVersion: tls.VersionTLS12,
 

@@ -21,12 +21,13 @@ var _ = Describe("Protocolcheck", func() {
 		logger logger.Logger
 		ew     = errorwriter.NewPlaintextErrorWriter()
 
-		nextCalled bool
-		server     *ghttp.Server
-		n          *negroni.Negroni
+		nextCalled  bool
+		server      *ghttp.Server
+		n           *negroni.Negroni
+		enableHTTP2 bool
 	)
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		logger = test_util.NewTestZapLogger("protocolcheck")
 		nextCalled = false
 
@@ -34,7 +35,7 @@ var _ = Describe("Protocolcheck", func() {
 		n.UseFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 			next(rw, req)
 		})
-		n.Use(handlers.NewProtocolCheck(logger, ew))
+		n.Use(handlers.NewProtocolCheck(logger, ew, enableHTTP2))
 		n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})
@@ -49,18 +50,44 @@ var _ = Describe("Protocolcheck", func() {
 	})
 
 	Context("http2", func() {
-		It("passes the request through", func() {
-			conn, err := net.Dial("tcp", server.Addr())
-			defer conn.Close()
-			Expect(err).ToNot(HaveOccurred())
-			respReader := bufio.NewReader(conn)
+		Context("when http2 is enabled", func() {
+			BeforeEach(func() {
+				enableHTTP2 = true
+			})
 
-			conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
-			resp, err := http.ReadResponse(respReader, nil)
-			Expect(err).ToNot(HaveOccurred())
+			It("passes the request through", func() {
+				conn, err := net.Dial("tcp", server.Addr())
+				defer conn.Close()
+				Expect(err).ToNot(HaveOccurred())
+				respReader := bufio.NewReader(conn)
 
-			Expect(resp.StatusCode).To(Equal(200))
-			Expect(nextCalled).To(BeTrue())
+				conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
+				resp, err := http.ReadResponse(respReader, nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(200))
+				Expect(nextCalled).To(BeTrue())
+			})
+		})
+
+		Context("when http2 is disabled", func() {
+			BeforeEach(func() {
+				enableHTTP2 = false
+			})
+
+			It("returns a 400 witha helpful error ", func() {
+				conn, err := net.Dial("tcp", server.Addr())
+				defer conn.Close()
+				Expect(err).ToNot(HaveOccurred())
+				respReader := bufio.NewReader(conn)
+
+				conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
+				resp, err := http.ReadResponse(respReader, nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(400))
+				Expect(nextCalled).To(BeFalse())
+			})
 		})
 	})
 
