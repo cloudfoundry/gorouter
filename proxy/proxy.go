@@ -174,7 +174,7 @@ func NewProxy(
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
 	n.Use(zipkinHandler)
 	n.Use(w3cHandler)
-	n.Use(handlers.NewProtocolCheck(logger, errorWriter))
+	n.Use(handlers.NewProtocolCheck(logger, errorWriter, cfg.EnableHTTP2))
 	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
