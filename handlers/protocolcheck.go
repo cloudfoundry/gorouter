@@ -16,19 +16,21 @@ import (
 type protocolCheck struct {
 	logger      logger.Logger
 	errorWriter errorwriter.ErrorWriter
+	enableHTTP2 bool
 }
 
 // NewProtocolCheck creates a handler responsible for checking the protocol of
 // the request
-func NewProtocolCheck(logger logger.Logger, errorWriter errorwriter.ErrorWriter) negroni.Handler {
+func NewProtocolCheck(logger logger.Logger, errorWriter errorwriter.ErrorWriter, enableHTTP2 bool) negroni.Handler {
 	return &protocolCheck{
 		logger:      logger,
 		errorWriter: errorWriter,
+		enableHTTP2: enableHTTP2,
 	}
 }
 
 func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if !isProtocolSupported(r) {
+	if !p.isProtocolSupported(r) {
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)
 		if err != nil {
@@ -58,6 +60,6 @@ func (p *protocolCheck) hijack(rw http.ResponseWriter) (net.Conn, *bufio.ReadWri
 	return hijacker.Hijack()
 }
 
-func isProtocolSupported(request *http.Request) bool {
-	return request.ProtoMajor == 2 || (request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1))
+func (p *protocolCheck) isProtocolSupported(request *http.Request) bool {
+	return (p.enableHTTP2 && request.ProtoMajor == 2) || (request.ProtoMajor == 1 && (request.ProtoMinor == 0 || request.ProtoMinor == 1))
 }
