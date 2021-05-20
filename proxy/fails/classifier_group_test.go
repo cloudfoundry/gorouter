@@ -42,6 +42,7 @@ var _ = Describe("ClassifierGroup", func() {
 			Expect(rc.Classify(x509.UnknownAuthorityError{})).To(BeTrue())
 			Expect(rc.Classify(x509.CertificateInvalidError{Reason: x509.Expired})).To(BeTrue())
 			Expect(rc.Classify(errors.New("i'm a potato"))).To(BeFalse())
+			Expect(rc.Classify(fails.IdempotentRequestEOFError)).To(BeTrue())
 		})
 	})
 
@@ -59,6 +60,7 @@ var _ = Describe("ClassifierGroup", func() {
 			Expect(pc.Classify(x509.UnknownAuthorityError{})).To(BeTrue())
 			Expect(pc.Classify(x509.CertificateInvalidError{Reason: x509.Expired})).To(BeTrue())
 			Expect(pc.Classify(errors.New("i'm a potato"))).To(BeFalse())
+			Expect(pc.Classify(fails.IdempotentRequestEOFError)).To(BeTrue())
 		})
 	})
 })

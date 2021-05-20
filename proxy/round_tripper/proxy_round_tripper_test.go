@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,7 @@ import (
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
@@ -28,6 +30,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/uber-go/zap"
@@ -364,6 +367,94 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(logOutput).To(gbytes.Say(`vcap_request_id`))
 				})
 			})
+
+			DescribeTable("when the backend fails with an empty reponse error (io.EOF)",
+				func(reqBody io.ReadCloser, getBodyIsNil bool, reqMethod string, headers map[string]string, expectRetry bool) {
+					badResponse := &http.Response{
+						Header: make(map[string][]string),
+					}
+					badResponse.Header.Add(handlers.VcapRequestIdHeader, "some-request-id")
+
+					// The first request fails with io.EOF, the second (if retried) succeeds
+					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+						switch transport.RoundTripCallCount() {
+						case 1:
+							return nil, io.EOF
+						case 2:
+							return &http.Response{StatusCode: http.StatusTeapot}, nil
+						default:
+							return nil, nil
+						}
+					}
+
+					retriableClassifier.ClassifyStub = fails.IdempotentRequestEOF
+					req.Method = reqMethod
+					req.Body = reqBody
+					if !getBodyIsNil {
+						req.GetBody = func() (io.ReadCloser, error) {
+							return new(testBody), nil
+						}
+					}
+					if headers != nil {
+						for key, value := range headers {
+							req.Header.Add(key, value)
+						}
+					}
+
+					res, err := proxyRoundTripper.RoundTrip(req)
+
+					if expectRetry {
+						Expect(err).NotTo(HaveOccurred())
+						Expect(transport.RoundTripCallCount()).To(Equal(2))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+					} else {
+						Expect(err).To(Equal(io.EOF))
+						Expect(transport.RoundTripCallCount()).To(Equal(1))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+					}
+				},
+
+				Entry("POST, body is empty: does not retry", nil, true, "POST", nil, false),
+				Entry("POST, body is not empty and GetBody is non-nil: does not retry", reqBody, false, "POST", nil, false),
+				Entry("POST, body is not empty: does not retry", reqBody, true, "POST", nil, false),
+				Entry("POST, body is http.NoBody: does not retry", http.NoBody, true, "POST", nil, false),
+
+				Entry("POST, body is empty, X-Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, true),
+				Entry("POST, body is not empty and GetBody is non-nil, X-Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, true),
+				Entry("POST, body is not empty, X-Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, false),
+				Entry("POST, body is http.NoBody, X-Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, false),
+
+				Entry("POST, body is empty, Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, true),
+				Entry("POST, body is not empty and GetBody is non-nil, Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"Idempotency-Key": "abc123"}, true),
+				Entry("POST, body is not empty, Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, false),
+				Entry("POST, body is http.NoBody, Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, false),
+
+				Entry("GET, body is empty: attempts retry", nil, true, "GET", nil, true),
+				Entry("GET, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "GET", nil, true),
+				Entry("GET, body is not empty: does not retry", reqBody, true, "GET", nil, false),
+				Entry("GET, body is http.NoBody: does not retry", http.NoBody, true, "GET", nil, false),
+
+				Entry("TRACE, body is empty: attempts retry", nil, true, "TRACE", nil, true),
+				Entry("TRACE, body is not empty: does not retry", reqBody, true, "TRACE", nil, false),
+				Entry("TRACE, body is http.NoBody: does not retry", http.NoBody, true, "TRACE", nil, false),
+				Entry("TRACE, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "TRACE", nil, true),
+
+				Entry("HEAD, body is empty: attempts retry", nil, true, "HEAD", nil, true),
+				Entry("HEAD, body is not empty: does not retry", reqBody, true, "HEAD", nil, false),
+				Entry("HEAD, body is http.NoBody: does not retry", http.NoBody, true, "HEAD", nil, false),
+				Entry("HEAD, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "HEAD", nil, true),
+
+				Entry("OPTIONS, body is empty: attempts retry", nil, true, "OPTIONS", nil, true),
+				Entry("OPTIONS, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "OPTIONS", nil, true),
+				Entry("OPTIONS, body is not empty: does not retry", reqBody, true, "OPTIONS", nil, false),
+				Entry("OPTIONS, body is http.NoBody: does not retry", http.NoBody, true, "OPTIONS", nil, false),
+
+				Entry("<empty method>, body is empty: attempts retry", nil, true, "", nil, true),
+				Entry("<empty method>, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "", nil, true),
+				Entry("<empty method>, body is not empty: does not retry", reqBody, true, "", nil, false),
+				Entry("<empty method>, body is http.NoBody: does not retry", http.NoBody, true, "", nil, false),
+			)
 
 			Context("when there are no more endpoints available", func() {
 				BeforeEach(func() {

@@ -19,6 +19,7 @@ var RetriableClassifiers = ClassifierGroup{
 	RemoteHandshakeTimeout,
 	UntrustedCert,
 	ExpiredOrNotYetValidCertFailure,
+	IdempotentRequestEOF,
 }
 
 var FailableClassifiers = ClassifierGroup{
