@@ -249,7 +249,8 @@ var _ = Describe("Router Integration", func() {
 			})
 		})
 	})
-	Describe("HTTP/1.1 only mode", func() {
+
+	Describe("HTTP/2 traffic disabled", func() {
 		var (
 			clientTLSConfig *tls.Config
 			mbusClient      *nats.Conn
@@ -266,7 +267,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("it servers HTTP/1.1 and doesn't serve HTTP/2 traffic", func() {
+		It("serves HTTP/1.1 and doesn't serve HTTP/2 traffic", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 			runningApp1.Register()
@@ -301,7 +302,7 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Describe("HTTP/2 traffic", func() {
+	Describe("HTTP/2 traffic enabled", func() {
 		var (
 			clientTLSConfig *tls.Config
 			mbusClient      *nats.Conn
@@ -319,7 +320,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("serves HTTP/2 traffic", func() {
+		It("serves HTTP/2 traffic and HTTP/1.1 traffic", func() {
 			gorouterSession = startGorouterSession(cfgFile)
 			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 			runningApp1.Register()
@@ -346,6 +347,12 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			Expect(resp.Proto).To(Equal("HTTP/2.0"))
+
+			h1Client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+			h1Resp, err := h1Client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(h1Resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(h1Resp.Proto).To(Equal("HTTP/1.1"))
 		})
 	})
 
