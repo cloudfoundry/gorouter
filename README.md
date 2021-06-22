@@ -650,9 +650,15 @@ header is `1.2.3.4`. You can read more about the PROXY Protocol
 
 ## HTTP/2 Support
 
-The Gorouter does not currently support proxying HTTP/2 connections, even over
-TLS. Connections made using HTTP/1.1, either by TLS or cleartext, will be
-proxied to backends over cleartext.
+The Gorouter supports accepting HTTP/2 connections when the manifest property is
+enabled. Connections made using HTTP/2 will be proxied to backends over
+HTTP/1.1.
+
+```yaml
+properties:
+  router:
+    enable_http2: true
+```
 
 ## Logs
 
