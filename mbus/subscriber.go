@@ -28,6 +28,7 @@ import (
 type RegistryMessage struct {
 	Host                    string            `json:"host"`
 	Port                    uint16            `json:"port"`
+	HttpVersion             uint16            `json:"http_version"`
 	TLSPort                 uint16            `json:"tls_port"`
 	Uris                    []route.Uri       `json:"uris"`
 	Tags                    map[string]string `json:"tags"`
@@ -55,6 +56,7 @@ func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
 		AppId:                   rm.App,
 		Host:                    rm.Host,
 		Port:                    port,
+		HttpVersion:             uint32(rm.HttpVersion),
 		ServerCertDomainSAN:     rm.ServerCertDomainSAN,
 		PrivateInstanceId:       rm.PrivateInstanceID,
 		PrivateInstanceIndex:    rm.PrivateInstanceIndex,
@@ -194,6 +196,9 @@ func (s *Subscriber) subscribeToGreetMessage() error {
 
 func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 	natsSubscription, err := s.mbusClient.Subscribe("router.*", func(message *nats.Msg) {
+		s.logger.Debug("raw NATS: ",
+			zap.String("message.Data", string(message.Data)),
+		)
 		msg, regErr := createRegistryMessage(message.Data)
 		if regErr != nil {
 			s.logger.Error("validation-error",
@@ -227,6 +232,10 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 	endpoint, err := msg.makeEndpoint()
+	s.logger.Debug("Zap me up a message and endpoint, plz:",
+		zap.Object("message", msg),
+		zap.Object("endpoint", endpoint),
+	)
 	if err != nil {
 		s.logger.Error("Unable to register route",
 			zap.Error(err),

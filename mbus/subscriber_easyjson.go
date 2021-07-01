@@ -159,6 +159,8 @@ func easyjson639f989aDecodeCodeCloudfoundryOrgGorouterMbus2(in *jlexer.Lexer, ou
 			out.Host = string(in.String())
 		case "port":
 			out.Port = uint16(in.Uint16())
+		case "http_version":
+			out.HttpVersion = uint16(in.Uint16())
 		case "tls_port":
 			out.TLSPort = uint16(in.Uint16())
 		case "uris":
@@ -246,6 +248,12 @@ func easyjson639f989aEncodeCodeCloudfoundryOrgGorouterMbus2(out *jwriter.Writer,
 	first = false
 	out.RawString("\"port\":")
 	out.Uint16(uint16(in.Port))
+	if !first {
+		out.RawByte(',')
+	}
+	first = false
+	out.RawString("\"http_version\":")
+	out.Uint16(uint16(in.HttpVersion))
 	if !first {
 		out.RawByte(',')
 	}

@@ -61,6 +61,7 @@ type ProxyRoundTripper interface {
 type Endpoint struct {
 	ApplicationId        string
 	addr                 string
+	HttpVersion          uint32
 	Tags                 map[string]string
 	ServerCertDomainSAN  string
 	PrivateInstanceId    string
@@ -138,6 +139,7 @@ type EndpointOpts struct {
 	AppId                   string
 	Host                    string
 	Port                    uint16
+	HttpVersion             uint32
 	ServerCertDomainSAN     string
 	PrivateInstanceId       string
 	PrivateInstanceIndex    string
@@ -154,6 +156,7 @@ func NewEndpoint(opts *EndpointOpts) *Endpoint {
 	return &Endpoint{
 		ApplicationId:        opts.AppId,
 		addr:                 fmt.Sprintf("%s:%d", opts.Host, opts.Port),
+		HttpVersion:          opts.HttpVersion,
 		Tags:                 opts.Tags,
 		useTls:               opts.UseTLS,
 		ServerCertDomainSAN:  opts.ServerCertDomainSAN,
@@ -446,6 +449,7 @@ func (e *endpointElem) isOverloaded() bool {
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	var jsonObj struct {
 		Address             string            `json:"address"`
+		HttpVersion         int               `json:"http_version"`
 		TLS                 bool              `json:"tls"`
 		TTL                 int               `json:"ttl"`
 		RouteServiceUrl     string            `json:"route_service_url,omitempty"`
@@ -456,6 +460,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	}
 
 	jsonObj.Address = e.addr
+	jsonObj.HttpVersion = int(e.HttpVersion)
 	jsonObj.TLS = e.IsTLS()
 	jsonObj.RouteServiceUrl = e.RouteServiceUrl
 	jsonObj.TTL = int(e.StaleThreshold.Seconds())
