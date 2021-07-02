@@ -116,6 +116,16 @@ func NewProxy(
 			TLSClientConfig:     backendTLSConfig,
 			TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
 		},
+		// Http2BackendTemplate: &http2.Transport{
+		// 	// Dial:                dialer.Dial,
+		// 	// DisableKeepAlives:   cfg.DisableKeepAlives,
+		// 	// MaxIdleConns:        cfg.MaxIdleConns,
+		// 	// IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
+		// 	// MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
+		// 	DisableCompression: true,
+		// 	TLSClientConfig:    backendTLSConfig,
+		// 	// TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
+		// },
 		RouteServiceTemplate: &http.Transport{
 			Dial:                dialer.Dial,
 			DisableKeepAlives:   cfg.DisableKeepAlives,

@@ -5,6 +5,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
+	"golang.org/x/net/http2"
 )
 
 func NewDropsondeRoundTripper(p ProxyRoundTripper) ProxyRoundTripper {
@@ -29,11 +30,28 @@ func (d *dropsondeRoundTripper) CancelRequest(r *http.Request) {
 
 type FactoryImpl struct {
 	BackendTemplate      *http.Transport
+	Http2BackendTemplate *http2.Transport
 	RouteServiceTemplate *http.Transport
 	IsInstrumented       bool
 }
 
-func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyRoundTripper {
+// type CancellableHttp2Transport struct {
+// 	t *http2.Transport
+// }
+
+// func (cht CancellableHttp2Transport) CancelRequest(r *http.Request) {}
+
+// func (cht CancellableHttp2Transport) RoundTrip(r *http.Request) (*http.Response, error) {
+// 	return cht.t.RoundTrip(r)
+// }
+
+func (t *FactoryImpl) New(expectedServerName string, isRouteService, isHttp2 bool) ProxyRoundTripper {
+
+	// if isHttp2 {
+	// cht := CancellableHttp2Transport{t: t.Http2BackendTemplate}
+	// return cht
+	// }
+
 	var template *http.Transport
 	if isRouteService {
 		template = t.RouteServiceTemplate
@@ -52,6 +70,7 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyR
 		DisableCompression:  template.DisableCompression,
 		TLSClientConfig:     customTLSConfig,
 		TLSHandshakeTimeout: template.TLSHandshakeTimeout,
+		ForceAttemptHTTP2:   isHttp2,
 	}
 	if t.IsInstrumented {
 		return NewDropsondeRoundTripper(newTransport)

@@ -41,13 +41,14 @@ type ProxyRoundTripper interface {
 }
 
 type RoundTripperFactory interface {
-	New(expectedServerName string, isRouteService bool) ProxyRoundTripper
+	New(expectedServerName string, isRouteService, isHttp2 bool) ProxyRoundTripper
 }
 
 func GetRoundTripper(endpoint *route.Endpoint, roundTripperFactory RoundTripperFactory, isRouteService bool) ProxyRoundTripper {
 	endpoint.RoundTripperInit.Do(func() {
 		endpoint.SetRoundTripperIfNil(func() route.ProxyRoundTripper {
-			return roundTripperFactory.New(endpoint.ServerCertDomainSAN, isRouteService)
+			isHttp2 := endpoint.HttpVersion == 2
+			return roundTripperFactory.New(endpoint.ServerCertDomainSAN, isRouteService, isHttp2)
 		})
 	})
 
