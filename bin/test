@@ -7,18 +7,20 @@ if ! [ -x "$(command -v go)" ]; then
     exit 1
 fi
 
-if [ "${GOPATH:-}" = "" ]; then
-  echo "GOPATH empty or not set."
+if [ "${RELEASE_DIR:-}" = "" ]; then
+  echo "RELEASE_DIR empty or not set."
   exit 1
 fi
 
-echo "GOPATH=$GOPATH"
+echo "RELEASE_DIR=$RELEASE_DIR"
 
-# install nats-server
-go get -v github.com/nats-io/nats-server
+export BIN_DIR="$RELEASE_DIR/bin"
 
-# install shadow tool
-go get -u golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+
+pushd $RELEASE_DIR/src/code.cloudfoundry.org
+go build -o "$BIN_DIR/nats-server" github.com/nats-io/nats-server/v2
+go build -o "$BIN_DIR/shadow" golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+popd
 
 go vet ./...
 go vet -vettool="$(command -v shadow)"
