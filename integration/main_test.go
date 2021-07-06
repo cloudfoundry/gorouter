@@ -20,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	tls_helpers "code.cloudfoundry.org/cf-routing-test-helpers/tls"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/mbus"
@@ -248,8 +250,113 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Context("Drain", func() {
+	Describe("HTTP/2 traffic disabled", func() {
+		var (
+			clientTLSConfig *tls.Config
+			mbusClient      *nats.Conn
+		)
+		BeforeEach(func() {
+			cfg, clientTLSConfig = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+			clientTLSConfig.InsecureSkipVerify = true
+		})
 
+		JustBeforeEach(func() {
+			var err error
+			writeConfig(cfg, cfgFile)
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("serves HTTP/1.1 and doesn't serve HTTP/2 traffic", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done := make(chan bool, 1)
+			defer func() { done <- true }()
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+			client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+			resp, err := client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Proto).To(Equal("HTTP/1.1"))
+
+			h2_client := &http.Client{Transport: &http2.Transport{TLSClientConfig: clientTLSConfig}}
+			resp, err = h2_client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unexpected ALPN protocol"))
+		})
+	})
+
+	Describe("HTTP/2 traffic enabled", func() {
+		var (
+			clientTLSConfig *tls.Config
+			mbusClient      *nats.Conn
+		)
+
+		BeforeEach(func() {
+			cfg, clientTLSConfig = createSSLConfig(statusPort, proxyPort, sslPort, natsPort)
+		})
+
+		JustBeforeEach(func() {
+			var err error
+			cfg.EnableHTTP2 = true
+			writeConfig(cfg, cfgFile)
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("serves HTTP/2 traffic and HTTP/1.1 traffic", func() {
+			gorouterSession = startGorouterSession(cfgFile)
+			runningApp1 := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done := make(chan bool, 1)
+			defer func() { done <- true }()
+			go func() {
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+			client := &http.Client{Transport: &http2.Transport{TLSClientConfig: clientTLSConfig}}
+			resp, err := client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Proto).To(Equal("HTTP/2.0"))
+
+			h1Client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
+			h1Resp, err := h1Client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(h1Resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(h1Resp.Proto).To(Equal("HTTP/1.1"))
+		})
+	})
+
+	Context("Drain", func() {
 		BeforeEach(func() {
 			cfg = createConfig(statusPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
 		})

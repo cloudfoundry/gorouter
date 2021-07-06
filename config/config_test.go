@@ -1399,6 +1399,23 @@ disable_http: true
 			})
 		})
 
+		Context("enable_http2", func() {
+			It("defaults to false", func() {
+				Expect(config.Process()).To(Succeed())
+				Expect(config.EnableHTTP2).To(BeFalse())
+			})
+
+			It("setting enable_http2 succeeds", func() {
+				var b = []byte(fmt.Sprintf(`
+enable_http2: true
+`))
+				err := config.Initialize(b)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Process()).To(Succeed())
+				Expect(config.EnableHTTP2).To(BeTrue())
+			})
+		})
+
 		Context("When given a routing_table_sharding_mode that is supported ", func() {
 			Context("sharding mode `all`", func() {
 				It("succeeds", func() {

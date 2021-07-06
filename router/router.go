@@ -236,6 +236,10 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		ClientAuth:   r.config.ClientCertificateValidation,
 	}
 
+	if r.config.EnableHTTP2 {
+		tlsConfig.NextProtos = []string{"h2"}
+	}
+
 	tlsConfig.BuildNameToCertificate()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))

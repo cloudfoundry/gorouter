@@ -1350,6 +1350,50 @@ var _ = Describe("Router", func() {
 
 	})
 
+	Context("serving multiple http versions", func() {
+		var (
+			rootCAs *x509.CertPool
+		)
+		BeforeEach(func() {
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
+			config.CACerts = string(certChain.CACertPEM)
+			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
+
+			rootCAs = x509.NewCertPool()
+			rootCAs.AddCert(certChain.CACert)
+		})
+
+		It("can serve HTTP/1.1 requests", func() {
+			tlsClientConfig := &tls.Config{
+				RootCAs: rootCAs,
+			}
+			client := &http.Client{Transport: &http.Transport{
+				TLSClientConfig: tlsClientConfig,
+			}}
+
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+			app.RegisterAndListen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
+			req, _ := http.NewRequest("GET", uri, nil)
+
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+
+			Expect(resp.Proto).To(Equal("HTTP/1.1"))
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			bytes, err := ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(bytes).To(ContainSubstring("Hello"))
+			defer resp.Body.Close()
+		})
+	})
+
 	Context("serving https", func() {
 		var (
 			cert []byte
