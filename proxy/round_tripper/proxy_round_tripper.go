@@ -155,9 +155,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				}
 
 				iter.EndpointFailed(err)
-				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)))
 
-				if rt.retriableClassifier.Classify(err) {
+				retriable := rt.retriableClassifier.Classify(err)
+				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable))
+
+				if retriable {
 					logger.Debug("retriable-error", zap.Object("error", err))
 					continue
 				}
