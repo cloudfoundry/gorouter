@@ -959,7 +959,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					configBytes := createYMLSnippet(configSnippet)
 					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(config.Process()).To(MatchError(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`))
+					Expect(config.Process()).To(MatchError(`router.min_tls_version should be one of "", "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1.0"`))
 				})
 			})
 			Context("when min_tls_version is not set", func() {
@@ -1002,12 +1002,12 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 				BeforeEach(func() {
 					configSnippet.MaxTLSVersionString = ""
 				})
-				It("sets the default to TLSv1.2", func() {
+				It("sets the default to TLSv1.3", func() {
 					configBytes := createYMLSnippet(configSnippet)
 					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(config.Process()).To(Succeed())
-					Expect(config.MaxTLSVersion).To(Equal(uint16(tls.VersionTLS12)))
+					Expect(config.MaxTLSVersion).To(Equal(uint16(tls.VersionTLS13)))
 				})
 			})
 
