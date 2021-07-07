@@ -124,6 +124,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 
 	stickyEndpointID := getStickySession(request, rt.stickySessionCookieNames)
+	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	var selectEndpointErr error
@@ -157,7 +158,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				iter.EndpointFailed(err)
 
 				retriable := rt.retriableClassifier.Classify(err)
-				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable))
+				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable), zap.Int("num-endpoints", numberOfEndpoints))
 
 				if retriable {
 					logger.Debug("retriable-error", zap.Object("error", err))

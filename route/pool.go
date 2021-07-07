@@ -342,6 +342,12 @@ func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIte
 	}
 }
 
+func (p *EndpointPool) NumEndpoints() int {
+	p.Lock()
+	defer p.Unlock()
+	return len(p.endpoints)
+}
+
 func (p *EndpointPool) findById(id string) *endpointElem {
 	p.Lock()
 	defer p.Unlock()
