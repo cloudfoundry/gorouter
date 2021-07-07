@@ -418,14 +418,16 @@ func (c *Config) Process() error {
 			c.MinTLSVersion = tls.VersionTLS11
 		case "TLSv1.2", "":
 			c.MinTLSVersion = tls.VersionTLS12
+		case "TLSv1.3":
+			c.MinTLSVersion = tls.VersionTLS13
 		default:
-			return fmt.Errorf(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
+			return fmt.Errorf(`router.min_tls_version should be one of "", "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1.0"`)
 		}
 
 		switch c.MaxTLSVersionString {
-		case "TLSv1.2", "":
+		case "TLSv1.2":
 			c.MaxTLSVersion = tls.VersionTLS12
-		case "TLSv1.3":
+		case "TLSv1.3", "":
 			c.MaxTLSVersion = tls.VersionTLS13
 		default:
 			return fmt.Errorf(`router.max_tls_version should be one of "TLSv1.2" or "TLSv1.3"`)
