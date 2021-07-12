@@ -254,7 +254,7 @@ func (s *testState) registerAndWait(rm mbus.RegistryMessage) {
 func (s *testState) StartGorouter() *Session {
 	Expect(s.cfg).NotTo(BeNil(), "set up test cfg before calling this function")
 
-	s.natsRunner = test_util.NewNATSRunner(int(s.cfg.Nats[0].Port))
+	s.natsRunner = test_util.NewNATSRunner(int(s.cfg.Nats.Hosts[0].Port))
 	s.natsRunner.Start()
 
 	var err error

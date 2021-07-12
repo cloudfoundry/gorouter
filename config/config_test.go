@@ -116,22 +116,78 @@ endpoint_keep_alive_probe_interval: 500ms
 			Expect(config.EndpointKeepAliveProbeInterval).To(Equal(500 * time.Millisecond))
 		})
 
-		It("sets nats config", func() {
-			var b = []byte(`
+		Context("NATS Config", func() {
+			It("handles basic nats config", func() {
+				var b = []byte(`
 nats:
-  - host: remotehost
+  user: user
+  pass: pass
+  hosts:
+  - hostname: remotehost
     port: 4223
-    user: user
-    pass: pass
 `)
-			err := config.Initialize(b)
-			Expect(err).ToNot(HaveOccurred())
+				err := config.Initialize(b)
+				Expect(err).ToNot(HaveOccurred())
 
-			Expect(config.Nats).To(HaveLen(1))
-			Expect(config.Nats[0].Host).To(Equal("remotehost"))
-			Expect(config.Nats[0].Port).To(Equal(uint16(4223)))
-			Expect(config.Nats[0].User).To(Equal("user"))
-			Expect(config.Nats[0].Pass).To(Equal("pass"))
+				Expect(config.Nats.User).To(Equal("user"))
+				Expect(config.Nats.Pass).To(Equal("pass"))
+				Expect(config.Nats.Hosts).To(HaveLen(1))
+				Expect(config.Nats.Hosts[0].Hostname).To(Equal("remotehost"))
+				Expect(config.Nats.Hosts[0].Port).To(Equal(uint16(4223)))
+			})
+
+			Context("when TLSEnabled is set to true", func() {
+				var (
+					err           error
+					configSnippet *Config
+					caCert        tls.Certificate
+					clientPair    tls.Certificate
+				)
+
+				createYMLSnippet := func(snippet *Config) []byte {
+					cfgBytes, err := yaml.Marshal(snippet)
+					Expect(err).ToNot(HaveOccurred())
+					return cfgBytes
+				}
+
+				BeforeEach(func() {
+					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					clientKeyPEM, clientCertPEM := test_util.CreateKeyPair("potato.com")
+
+					caCert, err = tls.X509KeyPair(append(caCertChain.CertPEM, caCertChain.CACertPEM...), caCertChain.PrivKeyPEM)
+					Expect(err).ToNot(HaveOccurred())
+					clientPair, err = tls.X509KeyPair(clientCertPEM, clientKeyPEM)
+					Expect(err).ToNot(HaveOccurred())
+
+					configSnippet = &Config{
+						Nats: NatsConfig{
+							TLSEnabled: true,
+							CACerts:    fmt.Sprintf("%s%s", caCertChain.CertPEM, caCertChain.CACertPEM),
+							TLSPem: TLSPem{
+								CertChain:  string(clientCertPEM),
+								PrivateKey: string(clientKeyPEM),
+							},
+						},
+					}
+				})
+
+				It("configures TLS", func() {
+					configBytes := createYMLSnippet(configSnippet)
+					err = config.Initialize(configBytes)
+					Expect(err).NotTo(HaveOccurred())
+					err = config.Process()
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(config.Nats.CAPool).ToNot(BeNil())
+					poolSubjects := config.Nats.CAPool.Subjects()
+					parsedCert, err := x509.ParseCertificate(caCert.Certificate[0])
+					Expect(err).NotTo(HaveOccurred())
+					expectedSubject := parsedCert.RawSubject
+
+					Expect(string(poolSubjects[0])).To(Equal(string(expectedSubject)))
+					Expect(config.Nats.ClientAuthCertificate).To(Equal(clientPair))
+				})
+			})
 		})
 
 		Context("Suspend Pruning option", func() {
@@ -752,14 +808,13 @@ secure_cookies: false
 		Describe("NatsServers", func() {
 			var b = []byte(`
 nats:
-  - host: remotehost
+  user: user
+  pass: pass
+  hosts:
+  - hostname: remotehost
     port: 4223
-    user: user
-    pass: pass
-  - host: remotehost2
-    port: 4223
-    user: user2
-    pass: pass2
+  - hostname: remotehost2
+    port: 4224
 `)
 
 			It("returns a slice of the configured NATS servers", func() {
@@ -768,7 +823,7 @@ nats:
 
 				natsServers := config.NatsServers()
 				Expect(natsServers[0]).To(Equal("nats://user:pass@remotehost:4223"))
-				Expect(natsServers[1]).To(Equal("nats://user2:pass2@remotehost2:4223"))
+				Expect(natsServers[1]).To(Equal("nats://user:pass@remotehost2:4224"))
 			})
 		})
 

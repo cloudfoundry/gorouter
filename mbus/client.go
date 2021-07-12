@@ -8,6 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/tlsconfig"
 	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
 )
@@ -54,10 +55,20 @@ func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats
 }
 
 func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, reconnected chan<- Signal) nats.Options {
-	natsServers := c.NatsServers()
-
 	options := nats.DefaultOptions
-	options.Servers = natsServers
+	options.Servers = c.NatsServers()
+	if c.Nats.TLSEnabled {
+		var err error
+		options.TLSConfig, err = tlsconfig.Build(
+			tlsconfig.WithInternalServiceDefaults(),
+			tlsconfig.WithIdentity(c.Nats.ClientAuthCertificate),
+		).Client(
+			tlsconfig.WithAuthority(c.Nats.CAPool),
+		)
+		if err != nil {
+			l.Fatal("nats-tls-config-invalid", zap.Object("error", err))
+		}
+	}
 	options.PingInterval = c.NatsClientPingInterval
 	options.MaxReconnect = -1
 	notDisconnected := make(chan Signal)

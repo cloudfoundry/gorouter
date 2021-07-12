@@ -78,10 +78,25 @@ var defaultStatusConfig = StatusConfig{
 }
 
 type NatsConfig struct {
-	Host string `yaml:"host"`
-	Port uint16 `yaml:"port"`
-	User string `yaml:"user"`
-	Pass string `yaml:"pass"`
+	Hosts                 []NatsHost       `yaml:"hosts"`
+	User                  string           `yaml:"user"`
+	Pass                  string           `yaml:"pass"`
+	TLSEnabled            bool             `yaml:"tls_enabled"`
+	CACerts               string           `yaml:"ca_certs"`
+	CAPool                *x509.CertPool   `yaml:"-"`
+	ClientAuthCertificate tls.Certificate  `yaml:"-"`
+	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
+}
+
+type NatsHost struct {
+	Hostname string
+	Port     uint16
+}
+
+var defaultNatsConfig = NatsConfig{
+	Hosts: []NatsHost{{Hostname: "localhost", Port: 42222}},
+	User:  "",
+	Pass:  "",
 }
 
 type RoutingApiConfig struct {
@@ -92,13 +107,6 @@ type RoutingApiConfig struct {
 	CAPool                *x509.CertPool `yaml:"-"`
 	ClientAuthCertificate tls.Certificate
 	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
-}
-
-var defaultNatsConfig = NatsConfig{
-	Host: "localhost",
-	Port: 4222,
-	User: "",
-	Pass: "",
 }
 
 type OAuthConfig struct {
@@ -181,7 +189,7 @@ type HTTPRewriteResponses struct {
 
 type Config struct {
 	Status          StatusConfig      `yaml:"status,omitempty"`
-	Nats            []NatsConfig      `yaml:"nats,omitempty"`
+	Nats            NatsConfig        `yaml:"nats,omitempty"`
 	Logging         LoggingConfig     `yaml:"logging,omitempty"`
 	Port            uint16            `yaml:"port,omitempty"`
 	Index           uint              `yaml:"index,omitempty"`
@@ -283,7 +291,7 @@ type Config struct {
 
 var defaultConfig = Config{
 	Status:        defaultStatusConfig,
-	Nats:          []NatsConfig{defaultNatsConfig},
+	Nats:          defaultNatsConfig,
 	Logging:       defaultLoggingConfig,
 	Port:          8081,
 	Index:         0,
@@ -397,6 +405,21 @@ func (c *Config) Process() error {
 			return fmt.Errorf("Error while adding CACerts to gorouter's routing-api cert pool: \n%s\n", c.RoutingApi.CACerts)
 		}
 		c.RoutingApi.CAPool = certPool
+	}
+
+	if c.Nats.TLSEnabled {
+		certificate, err := tls.X509KeyPair([]byte(c.Nats.CertChain), []byte(c.Nats.PrivateKey))
+		if err != nil {
+			errMsg := fmt.Sprintf("Error loading NATS key pair: %s", err.Error())
+			return fmt.Errorf(errMsg)
+		}
+		c.Nats.ClientAuthCertificate = certificate
+
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(c.Nats.CACerts)); !ok {
+			return fmt.Errorf("Error while adding CACerts to gorouter's routing-api cert pool: \n%s\n", c.Nats.CACerts)
+		}
+		c.Nats.CAPool = certPool
 	}
 
 	if c.EnableSSL {
@@ -650,11 +673,11 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 
 func (c *Config) NatsServers() []string {
 	var natsServers []string
-	for _, info := range c.Nats {
+	for _, host := range c.Nats.Hosts {
 		uri := url.URL{
 			Scheme: "nats",
-			User:   url.UserPassword(info.User, info.Pass),
-			Host:   fmt.Sprintf("%s:%d", info.Host, info.Port),
+			User:   url.UserPassword(c.Nats.User, c.Nats.Pass),
+			Host:   fmt.Sprintf("%s:%d", host.Hostname, host.Port),
 		}
 		natsServers = append(natsServers, uri.String())
 	}
@@ -667,7 +690,6 @@ func (c *Config) RoutingApiEnabled() bool {
 }
 
 func (c *Config) Initialize(configYAML []byte) error {
-	c.Nats = []NatsConfig{}
 	return yaml.Unmarshal(configYAML, &c)
 }
 
