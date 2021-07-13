@@ -959,7 +959,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					configBytes := createYMLSnippet(configSnippet)
 					err := config.Initialize(configBytes)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(config.Process()).To(MatchError(`router.min_tls_version should be one of "", "TLSv1.2", "TLSv1.1", "TLSv1.0"`))
+					Expect(config.Process()).To(MatchError(`router.min_tls_version should be one of "", "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1.0"`))
 				})
 			})
 			Context("when min_tls_version is not set", func() {
