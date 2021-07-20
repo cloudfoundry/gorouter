@@ -28,6 +28,7 @@ import (
 type RegistryMessage struct {
 	Host                    string            `json:"host"`
 	Port                    uint16            `json:"port"`
+	Protocol                string            `json:"protocol"`
 	TLSPort                 uint16            `json:"tls_port"`
 	Uris                    []route.Uri       `json:"uris"`
 	Tags                    map[string]string `json:"tags"`
@@ -55,6 +56,7 @@ func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
 		AppId:                   rm.App,
 		Host:                    rm.Host,
 		Port:                    port,
+		Protocol:                rm.Protocol,
 		ServerCertDomainSAN:     rm.ServerCertDomainSAN,
 		PrivateInstanceId:       rm.PrivateInstanceID,
 		PrivateInstanceIndex:    rm.PrivateInstanceIndex,

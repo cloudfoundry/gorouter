@@ -673,6 +673,7 @@ var _ = Describe("EndpointPool", func() {
 		e2 := route.NewEndpoint(&route.EndpointOpts{
 			Host:                    "5.6.7.8",
 			Port:                    5678,
+			Protocol:                "http2",
 			StaleThresholdInSeconds: -1,
 			ServerCertDomainSAN:     "pvt_test_san",
 			PrivateInstanceId:       "pvt_test_instance_id",
@@ -685,7 +686,7 @@ var _ = Describe("EndpointPool", func() {
 		json, err := pool.MarshalJSON()
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san"}]`))
+		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","protocol":"http2","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san"}]`))
 	})
 
 	Context("when endpoints do not have empty tags", func() {
@@ -696,6 +697,7 @@ var _ = Describe("EndpointPool", func() {
 			e = route.NewEndpoint(&route.EndpointOpts{
 				Host:                    "1.2.3.4",
 				Port:                    5678,
+				Protocol:                "http2",
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
 				Tags:                    sample_tags,
@@ -706,7 +708,7 @@ var _ = Describe("EndpointPool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{"some-key":"some-value"}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{"some-key":"some-value"}}]`))
 		})
 	})
 
@@ -717,6 +719,7 @@ var _ = Describe("EndpointPool", func() {
 			e = route.NewEndpoint(&route.EndpointOpts{
 				Host:                    "1.2.3.4",
 				Port:                    5678,
+				Protocol:                "http2",
 				RouteServiceUrl:         "https://my-rs.com",
 				StaleThresholdInSeconds: -1,
 				Tags:                    sample_tags,
@@ -728,7 +731,7 @@ var _ = Describe("EndpointPool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
 		})
 	})
 })
