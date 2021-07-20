@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/health"
+	"golang.org/x/net/http2"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -73,6 +74,79 @@ var _ = Describe("Proxy", func() {
 
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
+		Context("when HTTP2 is enabled", func() {
+			var (
+				registerConfig    test_util.RegisterConfig
+				gorouterCertChain test_util.CertChain
+			)
+
+			BeforeEach(func() {
+				serverCertDomainSAN := "some-domain-uuid"
+				var err error
+				caCertPool, err = x509.SystemCertPool()
+				Expect(err).NotTo(HaveOccurred())
+				backendCACertPool := x509.NewCertPool()
+
+				backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
+					CommonName: serverCertDomainSAN,
+					SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
+				}, caCertPool)
+
+				gorouterCertChain = test_util.CreateCertAndAddCA(test_util.CertNames{
+					CommonName: "gorouter",
+					SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
+				}, backendCACertPool)
+
+				backendTLSConfig := backendCertChain.AsTLSConfig()
+				backendTLSConfig.ClientCAs = backendCACertPool
+				backendTLSConfig.NextProtos = []string{"h2", "http/1.1"}
+
+				conf.Backends.ClientAuthCertificate, err = tls.X509KeyPair(gorouterCertChain.CertPEM, gorouterCertChain.PrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				registerConfig = test_util.RegisterConfig{
+					Protocol:   "http2",
+					TLSConfig:  backendTLSConfig,
+					InstanceId: "instance-1",
+					AppId:      "app-1",
+				}
+				conf.EnableHTTP2 = true
+			})
+
+			It("responds to HTTP/2", func() {
+				ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					Expect(r.Proto).To(Equal("HTTP/2.0"))
+
+					w.WriteHeader(http.StatusOK)
+				}), registerConfig)
+				defer ln.Close()
+
+				rootCACertPool := x509.NewCertPool()
+				rootCACertPool.AddCert(gorouterCertChain.CACert)
+				tlsCert, err := tls.X509KeyPair(gorouterCertChain.CACertPEM, gorouterCertChain.CAPrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				client := &http.Client{
+					Transport: &http2.Transport{
+						TLSClientConfig: &tls.Config{
+							Certificates: []tls.Certificate{tlsCert},
+							RootCAs:      rootCACertPool,
+						},
+					},
+				}
+
+				req, err := http.NewRequest("GET", "https://"+proxyServer.Addr().String(), nil)
+				Expect(err).NotTo(HaveOccurred())
+
+				req.Host = "test"
+
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(resp.Proto).To(Equal("HTTP/2.0"))
+			})
 		})
 
 		It("does not respond to unsupported HTTP versions", func() {
