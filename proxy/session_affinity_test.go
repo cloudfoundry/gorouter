@@ -52,9 +52,9 @@ var _ = Describe("Session Affinity", func() {
 	Context("context paths", func() {
 		Context("when two requests have the same context paths", func() {
 			It("responds with the same instance id", func() {
-				ln := test_util.RegisterHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
+				ln := test_util.RegisterConnHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := test_util.RegisterHandler(r, "app.com/path2/context/path", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
+				ln2 := test_util.RegisterConnHandler(r, "app.com/path2/context/path", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -84,9 +84,9 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when two requests have different context paths", func() {
 			It("responds with different instance ids", func() {
-				ln := test_util.RegisterHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
+				ln := test_util.RegisterConnHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := test_util.RegisterHandler(r, "app.com/path2/context/path", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
+				ln2 := test_util.RegisterConnHandler(r, "app.com/path2/context/path", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -116,9 +116,9 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when only one request has a context path", func() {
 			It("responds with different instance ids", func() {
-				ln := test_util.RegisterHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
+				ln := test_util.RegisterConnHandler(r, "app.com/path1", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-1"})
 				defer ln.Close()
-				ln2 := test_util.RegisterHandler(r, "app.com", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
+				ln2 := test_util.RegisterConnHandler(r, "app.com", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "instance-id-2"})
 				defer ln2.Close()
 
 				conn := dialProxy(proxyServer)
@@ -151,7 +151,7 @@ var _ = Describe("Session Affinity", func() {
 	Context("first request", func() {
 		Context("when the response does not contain a JSESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
-				ln := test_util.RegisterHandler(r, "app", responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
+				ln := test_util.RegisterConnHandler(r, "app", responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -168,7 +168,7 @@ var _ = Describe("Session Affinity", func() {
 		Context("when the response contains a JSESSIONID cookie", func() {
 
 			It("responds with a VCAP_ID cookie scoped to the session", func() {
-				ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+				ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -198,7 +198,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("responds with a VCAP_ID cookie that has the same expiry", func() {
-					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -224,7 +224,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("responds with a VCAP_ID cookie that is also Secure ", func() {
-					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -251,7 +251,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("marks the cookie as secure only", func() {
-					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -280,7 +280,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("responds with a VCAP_ID cookie that has the same SameSite attribute", func() {
-					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -329,7 +329,7 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when the response does not contain a JSESSIONID cookie", func() {
 			It("does not respond with a VCAP_ID cookie", func() {
-				ln := test_util.RegisterHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
+				ln := test_util.RegisterConnHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "my-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -345,7 +345,7 @@ var _ = Describe("Session Affinity", func() {
 
 			Context("when the preferred server is gone", func() {
 				It("updates the VCAP_ID with the new server", func() {
-					ln := test_util.RegisterHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "other-id"})
+					ln := test_util.RegisterConnHandler(r, host, responseNoCookies, test_util.RegisterConfig{InstanceId: "other-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)
@@ -367,7 +367,7 @@ var _ = Describe("Session Affinity", func() {
 
 		Context("when the response contains a JSESSIONID cookie", func() {
 			It("responds with a VCAP_ID cookie", func() {
-				ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "some-id"})
+				ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "some-id"})
 				defer ln.Close()
 
 				x := dialProxy(proxyServer)
@@ -394,7 +394,7 @@ var _ = Describe("Session Affinity", func() {
 				})
 
 				It("expires the VCAP_ID", func() {
-					ln := test_util.RegisterHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
+					ln := test_util.RegisterConnHandler(r, "app", responseWithJSessionID, test_util.RegisterConfig{InstanceId: "my-id"})
 					defer ln.Close()
 
 					x := dialProxy(proxyServer)

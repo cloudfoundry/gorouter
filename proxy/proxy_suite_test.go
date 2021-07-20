@@ -144,7 +144,7 @@ var _ = AfterEach(func() {
 })
 
 func shouldEcho(input string, expected string) {
-	ln := test_util.RegisterHandler(r, "encoding", func(x *test_util.HttpConn) {
+	ln := test_util.RegisterConnHandler(r, "encoding", func(x *test_util.HttpConn) {
 		x.CheckLine("GET " + expected + " HTTP/1.1")
 		resp := test_util.NewResponse(http.StatusOK)
 		x.WriteResponse(resp)

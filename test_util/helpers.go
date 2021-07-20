@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -51,33 +52,52 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 
 type connHandler func(*HttpConn)
 
-func RegisterHandler(reg *registry.RouteRegistry, path string, handler connHandler, cfg ...RegisterConfig) net.Listener {
-	var (
-		ln  net.Listener
-		err error
-	)
+func RegisterConnHandler(reg *registry.RouteRegistry, path string, handler connHandler, cfg ...RegisterConfig) net.Listener {
 	var rcfg RegisterConfig
 	if len(cfg) > 0 {
 		rcfg = cfg[0]
 	}
-	if rcfg.TLSConfig != nil && !rcfg.IgnoreTLSConfig {
-		ln, err = tls.Listen("tcp", "127.0.0.1:0", rcfg.TLSConfig)
-	} else {
-		ln, err = net.Listen("tcp", "127.0.0.1:0")
-	}
+	ln, err := startBackendListener(rcfg)
 	Expect(err).NotTo(HaveOccurred())
 
 	go runBackendInstance(ln, handler)
 
+	RegisterAddr(reg, path, ln.Addr().String(), prepareConfig(rcfg))
+
+	return ln
+}
+
+func RegisterHTTPHandler(reg *registry.RouteRegistry, path string, handler http.HandlerFunc, cfg ...RegisterConfig) net.Listener {
+	var rcfg RegisterConfig
+	if len(cfg) > 0 {
+		rcfg = cfg[0]
+	}
+	ln, err := startBackendListener(rcfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	server := http.Server{Handler: handler}
+	go server.Serve(ln)
+
+	RegisterAddr(reg, path, ln.Addr().String(), prepareConfig(rcfg))
+
+	return ln
+}
+
+func startBackendListener(rcfg RegisterConfig) (net.Listener, error) {
+	if rcfg.TLSConfig != nil && !rcfg.IgnoreTLSConfig {
+		return tls.Listen("tcp", "127.0.0.1:0", rcfg.TLSConfig)
+	}
+	return net.Listen("tcp", "127.0.0.1:0")
+}
+
+func prepareConfig(rcfg RegisterConfig) RegisterConfig {
 	if rcfg.InstanceIndex == "" {
 		rcfg.InstanceIndex = "2"
 	}
 	if rcfg.StaleThreshold == 0 {
 		rcfg.StaleThreshold = 120
 	}
-	RegisterAddr(reg, path, ln.Addr().String(), rcfg)
-
-	return ln
+	return rcfg
 }
 
 type RegisterConfig struct {
@@ -545,3 +565,11 @@ func (h *SlowReadCloser) Read(p []byte) (n int, err error) {
 }
 
 func (h *SlowReadCloser) Close() error { return nil }
+
+// CreateCertAndAddCA creates a signed cert with a root CA and adds the CA
+// to the specified cert pool
+func CreateCertAndAddCA(cn CertNames, cp *x509.CertPool) CertChain {
+	certChain := CreateSignedCertWithRootCA(cn)
+	cp.AddCert(certChain.CACert)
+	return certChain
+}
