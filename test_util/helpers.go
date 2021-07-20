@@ -39,6 +39,7 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 		route.NewEndpoint(&route.EndpointOpts{
 			AppId:                   cfg.AppId,
 			Host:                    host,
+			Protocol:                cfg.Protocol,
 			Port:                    uint16(port),
 			ServerCertDomainSAN:     cfg.ServerCertDomainSAN,
 			PrivateInstanceIndex:    cfg.InstanceIndex,
@@ -109,6 +110,7 @@ type RegisterConfig struct {
 	StaleThreshold      int
 	TLSConfig           *tls.Config
 	IgnoreTLSConfig     bool
+	Protocol            string
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {

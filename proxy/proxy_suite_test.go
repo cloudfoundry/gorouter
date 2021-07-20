@@ -132,8 +132,15 @@ var _ = JustBeforeEach(func() {
 
 	p = proxy.NewProxy(testLogger, al, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
-	server := http.Server{Handler: p}
-	go server.Serve(proxyServer)
+	if conf.EnableHTTP2 {
+		server := http.Server{Handler: p}
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+		tlsListener := tls.NewListener(proxyServer, tlsConfig)
+		go server.Serve(tlsListener)
+	} else {
+		server := http.Server{Handler: p}
+		go server.Serve(proxyServer)
+	}
 })
 
 var _ = AfterEach(func() {
