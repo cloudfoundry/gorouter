@@ -45,10 +45,10 @@ type RoundTripperFactory interface {
 	New(expectedServerName string, isRouteService, isHttp2 bool) ProxyRoundTripper
 }
 
-func GetRoundTripper(endpoint *route.Endpoint, roundTripperFactory RoundTripperFactory, isRouteService bool) ProxyRoundTripper {
+func GetRoundTripper(endpoint *route.Endpoint, roundTripperFactory RoundTripperFactory, isRouteService, http2Enabled bool) ProxyRoundTripper {
 	endpoint.RoundTripperInit.Do(func() {
 		endpoint.SetRoundTripperIfNil(func() route.ProxyRoundTripper {
-			isHttp2 := endpoint.Protocol == HTTP2Protocol
+			isHttp2 := (endpoint.Protocol == HTTP2Protocol) && http2Enabled
 			return roundTripperFactory.New(endpoint.ServerCertDomainSAN, isRouteService, isHttp2)
 		})
 	})
@@ -82,6 +82,7 @@ func NewProxyRoundTripper(
 		routeServicesTransport:   routeServicesTransport,
 		endpointTimeout:          cfg.EndpointTimeout,
 		stickySessionCookieNames: cfg.StickySessionCookieNames,
+		http2Enabled:             cfg.EnableHTTP2,
 	}
 }
 
@@ -96,6 +97,7 @@ type roundTripper struct {
 	routeServicesTransport   http.RoundTripper
 	endpointTimeout          time.Duration
 	stickySessionCookieNames config.StringSet
+	http2Enabled             bool
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
@@ -182,7 +184,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			*request.URL = *reqInfo.RouteServiceURL
 
 			var roundTripper http.RoundTripper
-			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory, true)
+			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory, true, rt.http2Enabled)
 			if reqInfo.ShouldRouteToInternalRouteService {
 				roundTripper = rt.routeServicesTransport
 			}
@@ -241,7 +243,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 		return
 	}
 
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
 	tr.CancelRequest(request)
 }
 
@@ -260,7 +262,7 @@ func (rt *roundTripper) backendRoundTrip(
 	iter.PreRequest(endpoint)
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
 	res, err := rt.timedRoundTrip(tr, request, logger)
 
 	// decrement connection stats

@@ -76,7 +76,7 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
-		Context("when HTTP2 is enabled", func() {
+		Describe("proxying HTTP2", func() {
 			var (
 				registerConfig    test_util.RegisterConfig
 				gorouterCertChain test_util.CertChain
@@ -112,40 +112,72 @@ var _ = Describe("Proxy", func() {
 					InstanceId: "instance-1",
 					AppId:      "app-1",
 				}
-				conf.EnableHTTP2 = true
 			})
 
-			It("responds to HTTP/2", func() {
-				ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					Expect(r.Proto).To(Equal("HTTP/2.0"))
+			Context("when HTTP/2 is disabled", func() {
+				BeforeEach(func() {
+					conf.EnableHTTP2 = false
+				})
 
-					w.WriteHeader(http.StatusOK)
-				}), registerConfig)
-				defer ln.Close()
+				It("does NOT issue HTTP/2 requests to backends configured with 'http2' protocol", func() {
+					ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						Expect(r.Proto).To(Equal("HTTP/1.1"))
 
-				rootCACertPool := x509.NewCertPool()
-				rootCACertPool.AddCert(gorouterCertChain.CACert)
-				tlsCert, err := tls.X509KeyPair(gorouterCertChain.CACertPEM, gorouterCertChain.CAPrivKeyPEM)
-				Expect(err).NotTo(HaveOccurred())
+						w.WriteHeader(http.StatusOK)
+					}), registerConfig)
+					defer ln.Close()
 
-				client := &http.Client{
-					Transport: &http2.Transport{
-						TLSClientConfig: &tls.Config{
-							Certificates: []tls.Certificate{tlsCert},
-							RootCAs:      rootCACertPool,
+					client := &http.Client{}
+
+					req, err := http.NewRequest("GET", "http://"+proxyServer.Addr().String(), nil)
+					Expect(err).NotTo(HaveOccurred())
+
+					req.Host = "test"
+
+					resp, err := client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					Expect(resp.Proto).To(Equal("HTTP/1.1"))
+				})
+			})
+
+			Context("when HTTP/2 is enabled", func() {
+				BeforeEach(func() {
+					conf.EnableHTTP2 = true
+				})
+
+				It("can proxy inbound HTTP/2 requests to the backend over HTTP/2", func() {
+					ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						Expect(r.Proto).To(Equal("HTTP/2.0"))
+
+						w.WriteHeader(http.StatusOK)
+					}), registerConfig)
+					defer ln.Close()
+
+					rootCACertPool := x509.NewCertPool()
+					rootCACertPool.AddCert(gorouterCertChain.CACert)
+					tlsCert, err := tls.X509KeyPair(gorouterCertChain.CACertPEM, gorouterCertChain.CAPrivKeyPEM)
+					Expect(err).NotTo(HaveOccurred())
+
+					client := &http.Client{
+						Transport: &http2.Transport{
+							TLSClientConfig: &tls.Config{
+								Certificates: []tls.Certificate{tlsCert},
+								RootCAs:      rootCACertPool,
+							},
 						},
-					},
-				}
+					}
 
-				req, err := http.NewRequest("GET", "https://"+proxyServer.Addr().String(), nil)
-				Expect(err).NotTo(HaveOccurred())
+					req, err := http.NewRequest("GET", "https://"+proxyServer.Addr().String(), nil)
+					Expect(err).NotTo(HaveOccurred())
 
-				req.Host = "test"
+					req.Host = "test"
 
-				resp, err := client.Do(req)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusOK))
-				Expect(resp.Proto).To(Equal("HTTP/2.0"))
+					resp, err := client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					Expect(resp.Proto).To(Equal("HTTP/2.0"))
+				})
 			})
 		})
 
