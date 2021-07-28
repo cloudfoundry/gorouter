@@ -1455,19 +1455,19 @@ disable_http: true
 		})
 
 		Context("enable_http2", func() {
-			It("defaults to false", func() {
+			It("defaults to true", func() {
 				Expect(config.Process()).To(Succeed())
-				Expect(config.EnableHTTP2).To(BeFalse())
+				Expect(config.EnableHTTP2).To(BeTrue())
 			})
 
 			It("setting enable_http2 succeeds", func() {
 				var b = []byte(fmt.Sprintf(`
-enable_http2: true
+enable_http2: false
 `))
 				err := config.Initialize(b)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(config.Process()).To(Succeed())
-				Expect(config.EnableHTTP2).To(BeTrue())
+				Expect(config.EnableHTTP2).To(BeFalse())
 			})
 		})
 
