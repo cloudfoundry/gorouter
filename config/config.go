@@ -301,7 +301,7 @@ var defaultConfig = Config{
 	EnableSSL:     false,
 	SSLPort:       443,
 	DisableHTTP:   false,
-	EnableHTTP2:   false,
+	EnableHTTP2:   true,
 	MinTLSVersion: tls.VersionTLS12,
 	MaxTLSVersion: tls.VersionTLS12,
 

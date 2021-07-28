@@ -262,6 +262,7 @@ var _ = Describe("Router Integration", func() {
 
 		JustBeforeEach(func() {
 			var err error
+			cfg.EnableHTTP2 = false
 			writeConfig(cfg, cfgFile)
 			mbusClient, err = newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
@@ -314,7 +315,6 @@ var _ = Describe("Router Integration", func() {
 
 		JustBeforeEach(func() {
 			var err error
-			cfg.EnableHTTP2 = true
 			writeConfig(cfg, cfgFile)
 			mbusClient, err = newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
