@@ -255,6 +255,17 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(logger).To(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 
+			It("logs register message with application_id,instance_id,domain_san when it's provided", func() {
+				endpointWithAppId := route.NewEndpoint(&route.EndpointOpts{
+					AppId:               "app_id1",
+					PrivateInstanceId:   "instance_id1",
+					ServerCertDomainSAN: "san1",
+				})
+
+				r.Register("b.route", endpointWithAppId)
+				Expect(logger).To(gbytes.Say(`b\.route.*.*app_id1.*instance_id.*instance_id1.*server_cert_domain_san.*san1`))
+			})
+
 			Context("when routing table sharding mode is `segments`", func() {
 				BeforeEach(func() {
 					configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS

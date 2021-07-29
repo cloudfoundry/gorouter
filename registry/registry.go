@@ -376,6 +376,9 @@ func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
 	return []zap.Field{
 		zap.Stringer("uri", uri),
 		zap.String("backend", endpoint.CanonicalAddr()),
+		zap.String("application_id", endpoint.ApplicationId),
+		zap.String("instance_id", endpoint.PrivateInstanceId),
+		zap.String("server_cert_domain_san", endpoint.ServerCertDomainSAN),
 		zap.Object("modification_tag", endpoint.ModificationTag),
 		isoSegField,
 		zap.Bool("isTLS", endpoint.IsTLS()),
