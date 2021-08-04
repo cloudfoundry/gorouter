@@ -138,12 +138,13 @@ func (r *AccessLogRecord) getRecord() []byte {
 }
 
 func (r *AccessLogRecord) makeRecord() []byte {
-	var appID, destIPandPort, appIndex string
+	var appID, destIPandPort, appIndex, instanceId string
 
 	if r.RouteEndpoint != nil {
 		appID = r.RouteEndpoint.ApplicationId
 		appIndex = r.RouteEndpoint.PrivateInstanceIndex
 		destIPandPort = r.RouteEndpoint.CanonicalAddr()
+		instanceId = r.RouteEndpoint.PrivateInstanceId
 	}
 
 	headers := r.Request.Header
@@ -197,6 +198,9 @@ func (r *AccessLogRecord) makeRecord() []byte {
 
 	b.WriteString(`app_index:`)
 	b.WriteDashOrStringValue(appIndex)
+
+	b.WriteString(`instance_id:`)
+	b.WriteDashOrStringValue(instanceId)
 
 	b.AppendSpaces(false)
 	b.WriteString(`x_cf_routererror:`)
