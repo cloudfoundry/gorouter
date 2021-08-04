@@ -28,6 +28,7 @@ var _ = Describe("AccessLogRecord", func() {
 			Host:                 "1.2.3.4",
 			Port:                 1234,
 			PrivateInstanceIndex: "3",
+			PrivateInstanceId:    "FakeInstanceId",
 		})
 
 		record = &schema.AccessLogRecord{
@@ -69,6 +70,7 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"`))
+			Eventually(r).Should(Say(`instance_id:"FakeInstanceId"`))
 			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"`))
 		})
 
@@ -212,7 +214,7 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`"1.2.3.4:1234" x_forwarded_for:"FakeProxy1, FakeProxy2" `))
 				Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 				Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
-				Eventually(r).Should(Say(`app_index:"3" x_cf_routererror:"some-router-error" cache_control:"no-cache" accept_encoding:"gzip, deflate" `))
+				Eventually(r).Should(Say(`app_index:"3" instance_id:"FakeInstanceId" x_cf_routererror:"some-router-error" cache_control:"no-cache" accept_encoding:"gzip, deflate" `))
 				Eventually(r).Should(Say(`if_match:"737060cd8c284d8af7ad3082f209582d" doesnt_exist:"-"`))
 			})
 		})
