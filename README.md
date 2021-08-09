@@ -145,6 +145,7 @@ The format of the `router.register` message is as follows:
   "host": "127.0.0.1",
   "port": 4567,
   "tls_port": 1234,
+  "protocol": "http1",
   "uris": [
     "my_first_url.localhost.routing.cf-app.com",
     "my_second_url.localhost.routing.cf-app.com"
@@ -650,14 +651,27 @@ header is `1.2.3.4`. You can read more about the PROXY Protocol
 
 ## HTTP/2 Support
 
-The Gorouter supports accepting HTTP/2 connections when the manifest property is
-enabled. Connections made using HTTP/2 will be proxied to backends over
-HTTP/1.1.
+The Gorouter supports ingress and egress HTTP/2 connections when the BOSH
+deployment manifest property is enabled.
 
 ```yaml
 properties:
   router:
     enable_http2: true
+```
+
+By default, connections will be proxied to backends over HTTP/1.1, regardless of
+ingress protocol. Backends can be configured with the `http2` protocol to enable
+end-to-end HTTP/2 routing for use cases like gRPC.
+
+Example `router.register` message with `http2` protocol:
+```json
+{
+  "host": "127.0.0.1",
+  "port": 4567,
+  "protocol": "http2",
+  "...": "..."
+}
 ```
 
 ## Logs
