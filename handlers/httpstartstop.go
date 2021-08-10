@@ -43,6 +43,12 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Remove these headers if pre-set so they aren't logged in the event.
+	// ProxyRoundTripper will set them to correct values later
+	r.Header.Del("X-CF-ApplicationID")
+	r.Header.Del("X-CF-InstanceIndex")
+	r.Header.Del("X-CF-InstanceID")
+
 	startTime := time.Now()
 
 	next(rw, r)

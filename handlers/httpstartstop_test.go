@@ -77,8 +77,9 @@ var _ = Describe("HTTPStartStop Handler", func() {
 
 			requestInfo, err := handlers.ContextRequestInfo(req)
 			Expect(err).ToNot(HaveOccurred())
+			appID := "11111111-1111-1111-1111-111111111111"
 			requestInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{
-				AppId: "appID",
+				AppId: appID,
 				Tags: map[string]string{
 					"component":           "some-component",
 					"instance_id":         "some-instance-id",
@@ -133,6 +134,44 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		Expect(envelope.Tags["process_instance_id"]).To(Equal("some-proc-instance-id"))
 		Expect(envelope.Tags["process_type"]).To(Equal("some-proc-type"))
 		Expect(envelope.Tags["source_id"]).To(Equal("some-source-id"))
+	})
+
+	Context("when x-cf-instanceindex is present", func() {
+		It("does not use the value from the header", func() {
+			req.Header.Set("X-CF-InstanceIndex", "99")
+			var emptyInt *int32
+			handler.ServeHTTP(resp, req)
+
+			envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
+			Expect(envelope).ToNot(BeNil())
+			Expect(envelope.HttpStartStop.InstanceIndex).To(Equal(emptyInt))
+		})
+	})
+
+	Context("when x-cf-instanceid is present", func() {
+		It("does not use the value from the header", func() {
+			req.Header.Set("X-CF-InstanceID", "fakeID")
+			var emptyString *string
+			handler.ServeHTTP(resp, req)
+
+			envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
+			Expect(envelope).ToNot(BeNil())
+			Expect(envelope.HttpStartStop.InstanceId).To(Equal(emptyString))
+		})
+	})
+
+	Context("when x-cf-applicationID is present", func() {
+		It("does not use value from header", func() {
+			req.Header.Set("X-Cf-ApplicationID", "11111111-1111-1111-1111-111111111112")
+
+			var emptyUUID *events.UUID
+
+			handler.ServeHTTP(resp, req)
+
+			envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
+			Expect(envelope).ToNot(BeNil())
+			Expect(envelope.HttpStartStop.ApplicationId).To(Equal(emptyUUID))
+		})
 	})
 
 	Context("when there is no RouteEndpoint", func() {
