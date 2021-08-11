@@ -1,6 +1,7 @@
 package round_tripper
 
 import (
+	"fmt"
 	"net/http"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -43,7 +44,12 @@ type ErrorHandler struct {
 }
 
 func (eh *ErrorHandler) HandleError(responseWriter utils.ProxyResponseWriter, err error) {
-	responseWriter.Header().Set(router_http.CfRouterError, "endpoint_failure")
+	msg := "endpoint_failure"
+	if err != nil {
+		msg = fmt.Sprintf("%s (%s)", msg, err)
+	}
+
+	responseWriter.Header().Set(router_http.CfRouterError, msg)
 
 	eh.writeErrorCode(err, responseWriter)
 	responseWriter.Header().Del("Connection")
