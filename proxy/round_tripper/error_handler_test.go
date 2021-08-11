@@ -62,7 +62,7 @@ var _ = Describe("HandleError", func() {
 
 	It("sets a header to describe the endpoint_failure", func() {
 		errorHandler.HandleError(responseWriter, errors.New("potato"))
-		Expect(responseWriter.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure"))
+		Expect(responseWriter.Header().Get(router_http.CfRouterError)).To(Equal("endpoint_failure (potato)"))
 	})
 
 	Context("when the error does not match any of the classifiers", func() {
