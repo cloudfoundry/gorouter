@@ -52,11 +52,16 @@ func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
 		updatedAt = time.Unix(0, rm.EndpointUpdatedAtNs).UTC()
 	}
 
+	protocol := rm.Protocol
+	if protocol == "" {
+		protocol = "http1"
+	}
+
 	return route.NewEndpoint(&route.EndpointOpts{
 		AppId:                   rm.App,
 		Host:                    rm.Host,
 		Port:                    port,
-		Protocol:                rm.Protocol,
+		Protocol:                protocol,
 		ServerCertDomainSAN:     rm.ServerCertDomainSAN,
 		PrivateInstanceId:       rm.PrivateInstanceID,
 		PrivateInstanceIndex:    rm.PrivateInstanceIndex,
