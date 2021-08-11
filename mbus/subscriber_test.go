@@ -349,6 +349,37 @@ var _ = Describe("Subscriber", func() {
 		})
 	})
 
+	Context("when the message does not contain a protocol", func() {
+		BeforeEach(func() {
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
+		It("endpoint is constructed with protocol http1", func() {
+			msg := mbus.RegistryMessage{
+				Host: "host",
+				App:  "app",
+				Uris: []route.Uri{"test.example.com"},
+			}
+
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host:     "host",
+				AppId:    "app",
+				Protocol: "http1",
+			})
+
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
+		})
+	})
+
 	Context("when the message contains a protocol", func() {
 		BeforeEach(func() {
 			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
@@ -412,6 +443,7 @@ var _ = Describe("Subscriber", func() {
 				Host:                    "host",
 				AppId:                   "app",
 				Port:                    1999,
+				Protocol:                "http1",
 				UseTLS:                  true,
 				ServerCertDomainSAN:     "san",
 				PrivateInstanceId:       "id",
@@ -445,6 +477,7 @@ var _ = Describe("Subscriber", func() {
 		expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
 			Host:      "host",
 			Port:      1111,
+			Protocol:  "http1",
 			UpdatedAt: time.Unix(0, 1234).UTC(),
 		})
 
@@ -483,6 +516,7 @@ var _ = Describe("Subscriber", func() {
 				Host:                    "host",
 				AppId:                   "app",
 				Port:                    1111,
+				Protocol:                "http1",
 				UseTLS:                  false,
 				ServerCertDomainSAN:     "san",
 				PrivateInstanceId:       "id",
