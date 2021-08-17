@@ -20,16 +20,9 @@ var _ = Describe("Backend TLS", func() {
 		Expect(err).NotTo(HaveOccurred())
 		return caCertPool
 	}
-	// createCertAndAddCA creates a signed cert with a root CA and adds the CA
-	// to the specified cert pool
-	createCertAndAddCA := func(cn test_util.CertNames, cp *x509.CertPool) test_util.CertChain {
-		certChain := test_util.CreateSignedCertWithRootCA(cn)
-		cp.AddCert(certChain.CACert)
-		return certChain
-	}
 
 	registerAppAndTest := func() *http.Response {
-		ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+		ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 			req, err := http.ReadRequest(conn.Reader)
 			if err != nil {
 				conn.WriteResponse(test_util.NewResponse(http.StatusInternalServerError))
@@ -62,8 +55,8 @@ var _ = Describe("Backend TLS", func() {
 		// Clear backend app's CA cert pool
 		backendCACertPool := x509.NewCertPool()
 
-		backendCertChain := createCertAndAddCA(test_util.CertNames{CommonName: serverCertDomainSAN}, proxyCertPool)
-		clientCertChain := createCertAndAddCA(test_util.CertNames{CommonName: "gorouter"}, backendCACertPool)
+		backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{CommonName: serverCertDomainSAN}, proxyCertPool)
+		clientCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{CommonName: "gorouter"}, backendCACertPool)
 
 		backendTLSConfig := backendCertChain.AsTLSConfig()
 		backendTLSConfig.ClientCAs = backendCACertPool
@@ -162,7 +155,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend instance returns a cert that only has a DNS SAN", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
-			backendCertChain := createCertAndAddCA(test_util.CertNames{
+			backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
 				SANs: test_util.SubjectAltNames{DNS: registerConfig.ServerCertDomainSAN},
 			}, proxyCertPool)
 			registerConfig.TLSConfig = backendCertChain.AsTLSConfig()
@@ -178,7 +171,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend instance returns a cert that has a matching CommonName but non-matching DNS SAN", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
-			backendCertChain := createCertAndAddCA(test_util.CertNames{
+			backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
 				CommonName: registerConfig.InstanceId,
 				SANs:       test_util.SubjectAltNames{DNS: "foo"},
 			}, proxyCertPool)
@@ -194,7 +187,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend instance returns a cert that has a non-matching CommonName but matching DNS SAN", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
-			backendCertChain := createCertAndAddCA(test_util.CertNames{
+			backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
 				CommonName: "foo",
 				SANs:       test_util.SubjectAltNames{DNS: registerConfig.ServerCertDomainSAN},
 			}, proxyCertPool)
@@ -210,7 +203,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend instance returns a cert that has a matching CommonName but non-matching IP SAN", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
-			backendCertChain := createCertAndAddCA(test_util.CertNames{
+			backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
 				CommonName: registerConfig.InstanceId,
 				SANs:       test_util.SubjectAltNames{IP: "192.0.2.1"},
 			}, proxyCertPool)
@@ -226,7 +219,7 @@ var _ = Describe("Backend TLS", func() {
 	Context("when the backend instance returns a cert that has a non-matching CommonName but matching IP SAN", func() {
 		BeforeEach(func() {
 			proxyCertPool := freshProxyCACertPool()
-			backendCertChain := createCertAndAddCA(test_util.CertNames{
+			backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
 				CommonName: "foo",
 				SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
 			}, proxyCertPool)

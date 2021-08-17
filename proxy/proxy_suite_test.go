@@ -132,8 +132,15 @@ var _ = JustBeforeEach(func() {
 
 	p = proxy.NewProxy(testLogger, al, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
-	server := http.Server{Handler: p}
-	go server.Serve(proxyServer)
+	if conf.EnableHTTP2 {
+		server := http.Server{Handler: p}
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+		tlsListener := tls.NewListener(proxyServer, tlsConfig)
+		go server.Serve(tlsListener)
+	} else {
+		server := http.Server{Handler: p}
+		go server.Serve(proxyServer)
+	}
 })
 
 var _ = AfterEach(func() {
@@ -144,7 +151,7 @@ var _ = AfterEach(func() {
 })
 
 func shouldEcho(input string, expected string) {
-	ln := test_util.RegisterHandler(r, "encoding", func(x *test_util.HttpConn) {
+	ln := test_util.RegisterConnHandler(r, "encoding", func(x *test_util.HttpConn) {
 		x.CheckLine("GET " + expected + " HTTP/1.1")
 		resp := test_util.NewResponse(http.StatusOK)
 		x.WriteResponse(resp)

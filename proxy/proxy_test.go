@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/health"
+	"golang.org/x/net/http2"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -39,7 +40,7 @@ import (
 var _ = Describe("Proxy", func() {
 	Describe("Supported HTTP Protocol Versions", func() {
 		It("responds to http/1.0", func() {
-			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -57,7 +58,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to HTTP/1.1", func() {
-			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -75,6 +76,111 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
+		Describe("proxying HTTP2", func() {
+			var (
+				registerConfig    test_util.RegisterConfig
+				gorouterCertChain test_util.CertChain
+			)
+
+			BeforeEach(func() {
+				serverCertDomainSAN := "some-domain-uuid"
+				var err error
+				caCertPool, err = x509.SystemCertPool()
+				Expect(err).NotTo(HaveOccurred())
+				backendCACertPool := x509.NewCertPool()
+
+				backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{
+					CommonName: serverCertDomainSAN,
+					SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
+				}, caCertPool)
+
+				gorouterCertChain = test_util.CreateCertAndAddCA(test_util.CertNames{
+					CommonName: "gorouter",
+					SANs:       test_util.SubjectAltNames{IP: "127.0.0.1"},
+				}, backendCACertPool)
+
+				backendTLSConfig := backendCertChain.AsTLSConfig()
+				backendTLSConfig.ClientCAs = backendCACertPool
+				backendTLSConfig.NextProtos = []string{"h2", "http/1.1"}
+
+				conf.Backends.ClientAuthCertificate, err = tls.X509KeyPair(gorouterCertChain.CertPEM, gorouterCertChain.PrivKeyPEM)
+				Expect(err).NotTo(HaveOccurred())
+
+				registerConfig = test_util.RegisterConfig{
+					Protocol:   "http2",
+					TLSConfig:  backendTLSConfig,
+					InstanceId: "instance-1",
+					AppId:      "app-1",
+				}
+			})
+
+			Context("when HTTP/2 is disabled", func() {
+				BeforeEach(func() {
+					conf.EnableHTTP2 = false
+				})
+
+				It("does NOT issue HTTP/2 requests to backends configured with 'http2' protocol", func() {
+					ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						Expect(r.Proto).To(Equal("HTTP/1.1"))
+
+						w.WriteHeader(http.StatusOK)
+					}), registerConfig)
+					defer ln.Close()
+
+					client := &http.Client{}
+
+					req, err := http.NewRequest("GET", "http://"+proxyServer.Addr().String(), nil)
+					Expect(err).NotTo(HaveOccurred())
+
+					req.Host = "test"
+
+					resp, err := client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					Expect(resp.Proto).To(Equal("HTTP/1.1"))
+				})
+			})
+
+			Context("when HTTP/2 is enabled", func() {
+				BeforeEach(func() {
+					conf.EnableHTTP2 = true
+				})
+
+				It("can proxy inbound HTTP/2 requests to the backend over HTTP/2", func() {
+					ln := test_util.RegisterHTTPHandler(r, "test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						Expect(r.Proto).To(Equal("HTTP/2.0"))
+
+						w.WriteHeader(http.StatusOK)
+					}), registerConfig)
+					defer ln.Close()
+
+					rootCACertPool := x509.NewCertPool()
+					rootCACertPool.AddCert(gorouterCertChain.CACert)
+					tlsCert, err := tls.X509KeyPair(gorouterCertChain.CACertPEM, gorouterCertChain.CAPrivKeyPEM)
+					Expect(err).NotTo(HaveOccurred())
+
+					client := &http.Client{
+						Transport: &http2.Transport{
+							TLSClientConfig: &tls.Config{
+								Certificates: []tls.Certificate{tlsCert},
+								RootCAs:      rootCACertPool,
+							},
+						},
+					}
+
+					req, err := http.NewRequest("GET", "https://"+proxyServer.Addr().String(), nil)
+					Expect(err).NotTo(HaveOccurred())
+
+					req.Host = "test"
+
+					resp, err := client.Do(req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					Expect(resp.Proto).To(Equal("HTTP/2.0"))
+				})
+			})
+		})
+
 		It("does not respond to unsupported HTTP versions", func() {
 			conn := dialProxy(proxyServer)
 
@@ -90,14 +196,14 @@ var _ = Describe("Proxy", func() {
 
 	Describe("URL Handling", func() {
 		It("responds transparently to a trailing slash versus no trailing slash", func() {
-			lnWithoutSlash := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
+			lnWithoutSlash := test_util.RegisterConnHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /my%20path/your_path/ HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
 			defer lnWithoutSlash.Close()
 
-			lnWithSlash := test_util.RegisterHandler(r, "test/another-path/your_path/", func(conn *test_util.HttpConn) {
+			lnWithSlash := test_util.RegisterConnHandler(r, "test/another-path/your_path/", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /another-path/your_path HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -121,7 +227,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("does not append ? to the request", func() {
-			ln := test_util.RegisterHandler(r, "test/?", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test/?", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /? HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -137,7 +243,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to http/1.0 with path", func() {
-			ln := test_util.RegisterHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test/my_path", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /my_path HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -155,7 +261,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to http/1.0 with path/path", func() {
-			ln := test_util.RegisterHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test/my%20path/your_path", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET /my%20path/your_path HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -173,7 +279,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to HTTP/1.1 with absolute-form request target", func() {
-			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test.io", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET http://test.io/ HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -192,7 +298,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to http/1.1 with absolute-form request that has encoded characters in the path", func() {
-			ln := test_util.RegisterHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test.io/my%20path/your_path", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET http://test.io/my%20path/your_path HTTP/1.1")
 
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
@@ -237,7 +343,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("treats double slashes in request URI as an absolute-form request target", func() {
-			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test.io", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET http://test.io//something.io HTTP/1.1")
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
@@ -254,7 +360,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("handles double slashes in an absolute-form request target correctly", func() {
-			ln := test_util.RegisterHandler(r, "test.io", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test.io", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET http://test.io//something.io?q=something HTTP/1.1")
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
@@ -289,7 +395,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		JustBeforeEach(func() {
-			ln = test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+			ln = test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
 				tmpReq, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -426,7 +532,7 @@ var _ = Describe("Proxy", func() {
 
 	Describe("Response Handling", func() {
 		It("trace headers added on correct TraceKey", func() {
-			ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "trace-test", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -450,7 +556,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("trace headers not added on incorrect TraceKey", func() {
-			ln := test_util.RegisterHandler(r, "trace-test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "trace-test", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -473,7 +579,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("adds X-Vcap-Request-Id if it doesn't already exist in the response", func() {
-			ln := test_util.RegisterHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -494,7 +600,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("does not adds X-Vcap-Request-Id if it already exists in the response", func() {
-			ln := test_util.RegisterHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "vcap-id-test", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -516,7 +622,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("Status No Content returns no Transfer Encoding response header", func() {
-			ln := test_util.RegisterHandler(r, "not-modified", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "not-modified", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -540,7 +646,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("transfers chunked encodings", func() {
-			ln := test_util.RegisterHandler(r, "chunk", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "chunk", func(conn *test_util.HttpConn) {
 				r, w := io.Pipe()
 
 				// Write 3 times on a 100ms interval
@@ -592,7 +698,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("disables compression", func() {
-			ln := test_util.RegisterHandler(r, "remote", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "remote", func(conn *test_util.HttpConn) {
 				request, _ := http.ReadRequest(conn.Reader)
 				encoding := request.Header["Accept-Encoding"]
 				var resp *http.Response
@@ -617,7 +723,7 @@ var _ = Describe("Proxy", func() {
 
 	Describe("HTTP Rewrite", func() {
 		mockedHandler := func(host string, headers []string) net.Listener {
-			return test_util.RegisterHandler(r, host, func(conn *test_util.HttpConn) {
+			return test_util.RegisterConnHandler(r, host, func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -722,7 +828,7 @@ var _ = Describe("Proxy", func() {
 			})
 
 			It("responds with 503 after conn limit is reached ", func() {
-				ln := test_util.RegisterHandler(r, "sleep", func(x *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "sleep", func(x *test_util.HttpConn) {
 					defer GinkgoRecover()
 					_, err := http.ReadRequest(x.Reader)
 					Expect(err).NotTo(HaveOccurred())
@@ -765,7 +871,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("request terminates with slow response", func() {
-			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -792,7 +898,7 @@ var _ = Describe("Proxy", func() {
 
 		It("proxy closes connections with slow apps", func() {
 			serverResult := make(chan error)
-			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
 				timesToTick := 5
@@ -840,7 +946,7 @@ var _ = Describe("Proxy", func() {
 		It("proxy detects closed client connection", func() {
 			serverResult := make(chan error)
 			readRequest := make(chan struct{})
-			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
 				readRequest <- struct{}{}
@@ -882,7 +988,7 @@ var _ = Describe("Proxy", func() {
 		It("proxy closes connections to backends when client closes the connection", func() {
 			serverResult := make(chan error)
 			readRequest := make(chan struct{})
-			ln := test_util.RegisterHandler(r, "slow-app", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "slow-app", func(conn *test_util.HttpConn) {
 				conn.CheckLine("GET / HTTP/1.1")
 
 				readRequest <- struct{}{}
@@ -917,7 +1023,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("retries when failed endpoints exist", func() {
-			ln := test_util.RegisterHandler(r, "retries", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "retries", func(conn *test_util.HttpConn) {
 				req, _ := conn.ReadRequest()
 				Expect(req.Method).To(Equal("GET"))
 				Expect(req.Host).To(Equal("retries"))
@@ -956,7 +1062,7 @@ var _ = Describe("Proxy", func() {
 				caCertPool = x509.NewCertPool()
 				caCertPool.AppendCertsFromPEM(certChain.CACertPEM)
 
-				nl = test_util.RegisterHandler(r, "backend-with-different-instance-id", func(conn *test_util.HttpConn) {
+				nl = test_util.RegisterConnHandler(r, "backend-with-different-instance-id", func(conn *test_util.HttpConn) {
 					_, err := http.ReadRequest(conn.Reader)
 					Expect(err).To(HaveOccurred())
 					resp := test_util.NewResponse(http.StatusServiceUnavailable)
@@ -1106,7 +1212,7 @@ var _ = Describe("Proxy", func() {
 
 	Describe("Access Logging", func() {
 		It("logs a request", func() {
-			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 				req, body := conn.ReadRequest()
 				Expect(req.Method).To(Equal("POST"))
 				Expect(req.URL.Path).To(Equal("/"))
@@ -1155,7 +1261,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
-			ln := test_util.RegisterHandler(r, "test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 				conn.ReadRequest()
 				conn.WriteResponse(test_util.NewResponse(http.StatusOK))
 			})
@@ -1227,12 +1333,12 @@ var _ = Describe("Proxy", func() {
 				uuid1, _ = uuid.NewV4()
 				uuid2, _ = uuid.NewV4()
 
-				ln = test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
+				ln = test_util.RegisterConnHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					Fail("App should not have received request")
 				}, test_util.RegisterConfig{AppId: uuid1.String()})
 				defer ln.Close()
 
-				ln2 = test_util.RegisterHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
+				ln2 = test_util.RegisterConnHandler(r, "app."+test_util.LocalhostDNS, func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -1280,7 +1386,7 @@ var _ = Describe("Proxy", func() {
 
 			It("x_b3_traceid does show up in the access log", func() {
 				done := make(chan string)
-				ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -1386,7 +1492,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to misbehaving host with 502", func() {
-			ln := test_util.RegisterHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
 				conn.Close()
 			})
 			defer ln.Close()
@@ -1414,7 +1520,7 @@ var _ = Describe("Proxy", func() {
 			}
 
 			nilEndpointsTest := func(expectedStatusCode int) {
-				ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
 					conn.CheckLine("GET / HTTP/1.1")
 					resp := test_util.NewResponse(http.StatusOK)
 					conn.WriteResponse(resp)
@@ -1460,7 +1566,7 @@ var _ = Describe("Proxy", func() {
 
 		Context("when the round trip errors and original client has disconnected", func() {
 			It("response code is always 499", func() {
-				ln := test_util.RegisterHandler(r, "post-some-data", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "post-some-data", func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					if err != nil {
 						fmt.Println(err)
@@ -1534,7 +1640,7 @@ var _ = Describe("Proxy", func() {
 			It("responds with 503", func() {
 				done := make(chan bool)
 
-				ln := test_util.RegisterHandler(r, "ws", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "ws", func(conn *test_util.HttpConn) {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -1580,7 +1686,7 @@ var _ = Describe("Proxy", func() {
 		It("upgrades for a WebSocket request", func() {
 			done := make(chan bool)
 
-			ln := test_util.RegisterHandler(r, "ws", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -1625,7 +1731,7 @@ var _ = Describe("Proxy", func() {
 		It("upgrades for a WebSocket request with comma-separated Connection header", func() {
 			done := make(chan bool)
 
-			ln := test_util.RegisterHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -1671,7 +1777,7 @@ var _ = Describe("Proxy", func() {
 		It("upgrades for a WebSocket request with multiple Connection headers", func() {
 			done := make(chan bool)
 
-			ln := test_util.RegisterHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -1718,7 +1824,7 @@ var _ = Describe("Proxy", func() {
 
 		It("logs the response time and status code 101 in the access logs", func() {
 			done := make(chan bool)
-			ln := test_util.RegisterHandler(r, "ws", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws", func(conn *test_util.HttpConn) {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -1777,7 +1883,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("emits a xxx metric", func() {
-			ln := test_util.RegisterHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
 				resp.Header.Set("Upgrade", "Websocket")
 				resp.Header.Set("Connection", "Upgrade")
@@ -1808,7 +1914,7 @@ var _ = Describe("Proxy", func() {
 
 		It("does not emit a latency metric", func() {
 			var wg sync.WaitGroup
-			ln := test_util.RegisterHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
 				defer conn.Close()
 				defer wg.Done()
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
@@ -1891,7 +1997,7 @@ var _ = Describe("Proxy", func() {
 
 	Describe("Metrics", func() {
 		It("captures the routing response", func() {
-			ln := test_util.RegisterHandler(r, "reporter-test", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "reporter-test", func(conn *test_util.HttpConn) {
 				_, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -1931,7 +2037,7 @@ var _ = Describe("Proxy", func() {
 
 		It("emits HTTP startstop events", func() {
 			var vcapHeader string
-			ln := test_util.RegisterHandler(r, "app", func(conn *test_util.HttpConn) {
+			ln := test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
 				req, _ := conn.ReadRequest()
 				vcapHeader = req.Header.Get(handlers.VcapRequestIdHeader)
 				resp := test_util.NewResponse(http.StatusOK)
@@ -1975,7 +2081,7 @@ var _ = Describe("Proxy", func() {
 			}
 
 			metricsNilEndpointsTest := func(expectedStatusCode, expectedBadRequestCallCount int) {
-				ln := test_util.RegisterHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
+				ln := test_util.RegisterConnHandler(r, "nil-endpoint", func(conn *test_util.HttpConn) {
 					conn.CheckLine("GET / HTTP/1.1")
 					resp := test_util.NewResponse(http.StatusOK)
 					conn.WriteResponse(resp)

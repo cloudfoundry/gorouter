@@ -33,7 +33,7 @@ type FactoryImpl struct {
 	IsInstrumented       bool
 }
 
-func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyRoundTripper {
+func (t *FactoryImpl) New(expectedServerName string, isRouteService bool, isHttp2 bool) ProxyRoundTripper {
 	var template *http.Transport
 	if isRouteService {
 		template = t.RouteServiceTemplate
@@ -52,6 +52,7 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool) ProxyR
 		DisableCompression:  template.DisableCompression,
 		TLSClientConfig:     customTLSConfig,
 		TLSHandshakeTimeout: template.TLSHandshakeTimeout,
+		ForceAttemptHTTP2:   isHttp2,
 	}
 	if t.IsInstrumented {
 		return NewDropsondeRoundTripper(newTransport)

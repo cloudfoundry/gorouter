@@ -48,13 +48,21 @@ func (t *testBody) Close() error {
 	return nil
 }
 
-type FakeRoundTripperFactory struct {
-	ReturnValue                round_tripper.ProxyRoundTripper
-	RequestedRoundTripperTypes []bool
+type RequestedRoundTripperType struct {
+	IsRouteService bool
+	IsHttp2        bool
 }
 
-func (f *FakeRoundTripperFactory) New(expectedServerName string, isRouteService bool) round_tripper.ProxyRoundTripper {
-	f.RequestedRoundTripperTypes = append(f.RequestedRoundTripperTypes, isRouteService)
+type FakeRoundTripperFactory struct {
+	ReturnValue                round_tripper.ProxyRoundTripper
+	RequestedRoundTripperTypes []RequestedRoundTripperType
+}
+
+func (f *FakeRoundTripperFactory) New(expectedServerName string, isRouteService bool, isHttp2 bool) round_tripper.ProxyRoundTripper {
+	f.RequestedRoundTripperTypes = append(f.RequestedRoundTripperTypes, RequestedRoundTripperType{
+		IsRouteService: isRouteService,
+		IsHttp2:        isHttp2,
+	})
 	return f.ReturnValue
 }
 
@@ -648,11 +656,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("re-uses transports for the same endpoint", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+						{IsRouteService: false, IsHttp2: false},
+					}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+						{IsRouteService: false, IsHttp2: false},
+					}))
 				})
 
 				It("does not re-use transports between endpoints", func() {
@@ -664,15 +676,63 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false}))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+						{IsRouteService: false, IsHttp2: false},
+					}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false, false}))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+						{IsRouteService: false, IsHttp2: false},
+						{IsRouteService: false, IsHttp2: false},
+					}))
 
 					_, err = proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]bool{false, false}))
+					Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+						{IsRouteService: false, IsHttp2: false},
+						{IsRouteService: false, IsHttp2: false},
+					}))
+				})
+			})
+
+			Context("using HTTP/2", func() {
+				Context("when HTTP/2 is enabled", func() {
+					BeforeEach(func() {
+						cfg.EnableHTTP2 = true
+					})
+					It("uses HTTP/2 when endpoint's Protocol is set to http2", func() {
+						endpoint.Protocol = "http2"
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+							{IsRouteService: false, IsHttp2: true},
+						}))
+					})
+
+					It("does not use HTTP/2 when endpoint's Protocol is not set to http2", func() {
+						endpoint.Protocol = ""
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+							{IsRouteService: false, IsHttp2: false},
+						}))
+					})
+				})
+
+				Context("when HTTP/2 is disabled", func() {
+					BeforeEach(func() {
+						cfg.EnableHTTP2 = false
+					})
+
+					It("does not use HTTP/2, regardless of the endpoint's protocol", func() {
+						endpoint.Protocol = "http2"
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(roundTripperFactory.RequestedRoundTripperTypes).To(Equal([]RequestedRoundTripperType{
+							{IsRouteService: false, IsHttp2: false},
+						}))
+					})
 				})
 			})
 
