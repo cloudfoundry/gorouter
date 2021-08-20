@@ -31,7 +31,7 @@ fi
 echo -e "\n Formatting packages..."
 go fmt ./...
 
-if ! ginkgo \
+if ginkgo \
   -keepGoing \
   -trace \
   -progress \
@@ -46,4 +46,5 @@ if ! ginkgo \
     echo -e "\nSWEET SUITE SUCCESS"
 else
     echo -e "\nSUITE FAILURE"
+    exit 1
 fi
