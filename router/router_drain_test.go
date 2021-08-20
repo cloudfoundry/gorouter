@@ -416,6 +416,7 @@ var _ = Describe("Router", func() {
 				h = &health.Health{}
 				h.SetHealth(health.Healthy)
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
+				config.Status.Port = test_util.NextAvailPort()
 				rt := &sharedfakes.RoundTripper{}
 				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)

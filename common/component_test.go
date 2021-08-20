@@ -47,6 +47,20 @@ var _ = Describe("Component", func() {
 		}
 	})
 
+	It("fails to start when the configured port is in use", func() {
+		component.Logger = test_util.NewTestZapLogger("test")
+		component.Varz.Type = "TestType"
+
+		srv, err := net.Listen("tcp", varz.GenericVarz.Host)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(srv).ToNot(BeNil())
+		err = component.Start()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal(fmt.Sprintf("listen tcp %s: bind: address already in use", varz.GenericVarz.Host)))
+		err = srv.Close()
+		Expect(err).ToNot(HaveOccurred())
+	})
+
 	It("prevents unauthorized access", func() {
 		path := "/test"
 
