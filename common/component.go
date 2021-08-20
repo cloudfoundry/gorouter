@@ -161,8 +161,7 @@ func (c *VcapComponent) Start() error {
 
 	procStat = NewProcessStatus()
 
-	c.ListenAndServe()
-	return nil
+	return c.ListenAndServe()
 }
 
 func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
@@ -202,7 +201,7 @@ func (c *VcapComponent) Stop() {
 	}
 }
 
-func (c *VcapComponent) ListenAndServe() {
+func (c *VcapComponent) ListenAndServe() error {
 	hs := http.NewServeMux()
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
@@ -250,7 +249,7 @@ func (c *VcapComponent) ListenAndServe() {
 	l, err := net.Listen("tcp", c.Varz.Host)
 	if err != nil {
 		c.statusCh <- err
-		return
+		return err
 	}
 	c.listener = l
 
@@ -264,4 +263,5 @@ func (c *VcapComponent) ListenAndServe() {
 			c.statusCh <- err
 		}
 	}()
+	return nil
 }
