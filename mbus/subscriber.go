@@ -42,7 +42,7 @@ type RegistryMessage struct {
 	EndpointUpdatedAtNs     int64             `json:"endpoint_updated_at_ns"`
 }
 
-func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
+func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, error) {
 	port, useTLS, err := rm.port()
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (rm *RegistryMessage) makeEndpoint() (*route.Endpoint, error) {
 	}
 
 	protocol := rm.Protocol
-	if protocol == "" {
+	if protocol == "" || (!http2Enabled && protocol == "http2") {
 		protocol = "http1"
 	}
 
@@ -95,6 +95,7 @@ type Subscriber struct {
 	subscription     *nats.Subscription
 	reconnected      <-chan Signal
 	natsPendingLimit int
+	http2Enabled     bool
 
 	params startMessageParams
 
@@ -131,6 +132,7 @@ func NewSubscriber(
 		reconnected:      reconnected,
 		natsPendingLimit: c.NatsClientMessageBufferSize,
 		logger:           l,
+		http2Enabled:     c.EnableHTTP2,
 	}
 }
 
@@ -233,7 +235,7 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 }
 
 func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint()
+	endpoint, err := msg.makeEndpoint(s.http2Enabled)
 	if err != nil {
 		s.logger.Error("Unable to register route",
 			zap.Error(err),
@@ -248,7 +250,7 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 }
 
 func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
-	endpoint, err := msg.makeEndpoint()
+	endpoint, err := msg.makeEndpoint(s.http2Enabled)
 	if err != nil {
 		s.logger.Error("Unable to unregister route",
 			zap.Error(err),
