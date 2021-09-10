@@ -1,8 +1,18 @@
 package main
 
-import "watchdog"
+import (
+	"fmt"
+)
 
 func main() {
-	w := watchdog.NewWatchdog()
-	err := hitHealthcheckEndpoint()
+	fmt.Println("hi")
+	// w := watchdog.NewWatchdog()
+	// _ = w.HitHealthcheckEndpoint()
+	msg := make(chan string)
+
+	go func() {
+		msg <- "yo"
+	}()
+
+	fmt.Println(<-msg)
 }
