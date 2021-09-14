@@ -2,8 +2,9 @@ package watchdog_test
 
 import (
 	"context"
-	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"code.cloudfoundry.org/gorouter/healthchecker/watchdog"
 	. "github.com/onsi/ginkgo"
@@ -11,71 +12,150 @@ import (
 )
 
 var _ = Describe("Watchdog", func() {
-	var srv http.Server
-	var httpHandler http.ServeMux
+	var (
+		srv                http.Server
+		httpHandler        http.ServeMux
+		dog                *watchdog.Watchdog
+		addr               string
+		pollInterval       time.Duration
+		healthcheckTimeout time.Duration
+	)
+
 	BeforeEach(func() {
 		httpHandler = *http.NewServeMux()
+		addr = "localhost:8888"
+		pollInterval = 10 * time.Millisecond
+		healthcheckTimeout = 5 * time.Millisecond
 		srv = http.Server{
-			Addr:    "localhost:8888",
+			Addr:    addr,
 			Handler: &httpHandler,
 		}
-		go srv.ListenAndServe()
-		fmt.Fprintf(GinkgoWriter, "[DEBUG] OUTPUT LINE: %s\n", "setup")
+		go func() {
+			defer GinkgoRecover()
+			srv.ListenAndServe()
+		}()
+		Eventually(func() error {
+			_, err := net.Dial("tcp", addr)
+			return err
+		}).Should(Not(HaveOccurred()))
+
+	})
+
+	JustBeforeEach(func() {
+		dog, _ = watchdog.NewWatchdog("http://"+addr, pollInterval, healthcheckTimeout)
 	})
 
 	AfterEach(func() {
-		srv.Shutdown(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+		defer cancel()
+		srv.Shutdown(ctx)
 		srv.Close()
 	})
 
-	It("does not allow use of an unbuffered channel", func() {
-		errorChannel := make(chan error)
-
-		dog, err := watchdog.NewWatchdog(errorChannel, "http://localhost:8888")
-
-		Expect(dog).To(BeNil())
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("does not return an error if the endpoint does not respond with a 200", func() {
-		errorChannel := make(chan error, 2)
-		dog, _ := watchdog.NewWatchdog(errorChannel, "http://localhost:8888")
+	It("does not return an error if the endpoint responds with a 200", func() {
 		httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 			rw.WriteHeader(http.StatusOK)
 			r.Close = true
 		})
 
-		dog.HitHealthcheckEndpoint()
+		err := dog.HitHealthcheckEndpoint()
 
-		Consistently(errorChannel).ShouldNot(Receive())
-		Consistently(errorChannel).ShouldNot(BeClosed())
-		Consistently(len(errorChannel)).Should(BeNumerically("==", 0))
+		// Consistently(errorChannel).ShouldNot(Receive())
+		// Consistently(errorChannel).ShouldNot(BeClosed())
+		// Consistently(len(errorChannel)).Should(BeNumerically("==", 0))
 		// Consistently(func() error { return <-errorChannel }).ShouldNot(HaveOccurred())
-		// Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("returns an error if the endpoint does not respond with a 200", func() {
-		errorChannel := make(chan error, 2)
-		dog, _ := watchdog.NewWatchdog(errorChannel, "http://localhost:8888")
 		httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			r.Close = true
 		})
 
-		dog.HitHealthcheckEndpoint()
+		err := dog.HitHealthcheckEndpoint()
 
-		Eventually(errorChannel).Should(Receive())
-		Eventually(errorChannel).Should(BeClosed())
-		// Expect(err).To(HaveOccurred())
+		// Eventually(errorChannel).Should(Receive())
+		// Eventually(errorChannel).Should(BeClosed())
+		Expect(err).To(HaveOccurred())
 	})
 
-	XIt("returns an error if the endpoint does not respond in the configured timeout", func() {
 
+	Context("the endpoint does not respond in the configured timeout", func() {
+		BeforeEach(func() {
+			healthcheckTimeout = 5 * time.Millisecond
+			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+				time.Sleep(5 * healthcheckTimeout)
+				rw.WriteHeader(http.StatusOK)
+				r.Close = true
+			})
+		})
+
+		It("returns an error", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*healthcheckTimeout)
+			defer cancel()
+			err := dog.WatchHealthcheckEndpoint(ctx)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("the healthcheck passes repeatedly", func() {
+		BeforeEach(func() {
+			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+				rw.WriteHeader(http.StatusOK)
+				r.Close = true
+			})
+		})
+
+		It("does not return an error", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*pollInterval)
+			defer cancel()
+			err := dog.WatchHealthcheckEndpoint(ctx)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	Context("the healthcheck first passes, and subsequently fails", func() {
-		XIt("returns an error", func() {
+		BeforeEach(func() {
+			var visitCount int
+			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+				if visitCount == 0 {
+					rw.WriteHeader(http.StatusOK)
+				} else {
+					rw.WriteHeader(http.StatusNotAcceptable)
+				}
+				r.Close = true
+				visitCount++
+			})
+		})
 
+		It("returns an error", func() {
+			err := dog.WatchHealthcheckEndpoint(context.Background())
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("context is canceled", func() {
+		var ctx context.Context
+		var visitCount int
+
+		BeforeEach(func() {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(context.Background())
+			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+				rw.WriteHeader(http.StatusOK)
+				r.Close = true
+				visitCount++
+				if visitCount == 3 {
+					cancel()
+				}
+			})
+		})
+
+		It("stops the healthchecker", func() {
+			err := dog.WatchHealthcheckEndpoint(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(visitCount).To(Equal(3))
 		})
 	})
 })

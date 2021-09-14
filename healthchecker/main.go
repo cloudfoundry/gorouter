@@ -1,18 +1,31 @@
 package main
 
 import (
-	"fmt"
+	"flag"
+
+	"code.cloudfoundry.org/gorouter/healthchecker/watchdog"
 )
 
 func main() {
-	fmt.Println("hi")
-	// w := watchdog.NewWatchdog()
-	// _ = w.HitHealthcheckEndpoint()
-	msg := make(chan string)
+	flag.StringVar(&configFile, "c", "", "Configuration File")
+	flag.Parse()
 
-	go func() {
-		msg <- "yo"
-	}()
+	// bind syscall.SIGUSR
 
-	fmt.Println(<-msg)
+	// configFile.read
+	address := "http://"
+
+	w := watchdog.NewWatchdog()
+	_ = w.HitHealthcheckEndpoint()
+
+	// give enough retries or a grace period to not interfere with the
+	// desired gorouter behavior
+
+	// followup story about gorouter hanging
+	// gorouter :80       status :8080        healthchecker
+	// healthy            healthy             200 -> no exit
+	// hangs              not health
+	// bad state
+
+	// responds           not healthy
 }

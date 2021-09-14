@@ -1,37 +1,59 @@
 package watchdog
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
+	"net/htp"
+	"time"
 )
 
 const healthCheckEndpoint = "/healthz"
 
 type Watchdog struct {
-	channel chan<- error
-	host    string
+	host         string
+	pollInterval time.Duration
+	client       http.Client
 }
 
-func NewWatchdog(channel chan<- error, host string) (*Watchdog, error) {
-	if cap(channel) <= 0 { //if unbuffered channel
-		return nil, errors.New("attempted construction of a watchdog with an unbuffered channel")
+func NewWatchdog(host string, pollInterval time.Duration, healthcheckTimeout time.Duration) (*Watchdog, error) {
+	client := http.Client{
+		Timeout: healthcheckTimeout,
 	}
 	return &Watchdog{
-		channel: channel,
-		host:    host,
+		host:         host,
+		pollInterval: pollInterval,
+		client:       client,
 	}, nil
 }
 
+func (w *Watchdog) WatchHealthcheckEndpoint(ctx context.Context) error {
+	pollTimer := time.NewTimer(w.pollInterval)
+	defer pollTimer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-pollTimer.C:
+			err := w.HitHealthcheckEndpoint()
+			if err != nil {
+				return err
+			}
+			pollTimer.Reset(w.pollInterval)
+		}
+	}
+}
+
 func (w *Watchdog) HitHealthcheckEndpoint() error {
-	response, err := http.DefaultClient.Get(w.host + healthCheckEndpoint)
+	response, err := w.client.Get(w.host + healthCheckEndpoint)
 	if err != nil {
 		return err
 	}
-	// fmt.Errorf("%v", response)
+	// fmt.Printf("status: %d", response.StatusCode)
 	if response.StatusCode != http.StatusOK {
-		w.channel <- errors.New(fmt.Sprintf("%v received from healthcheck endpoint (200 expected)", response.StatusCode))
-		close(w.channel)
+		return errors.New(fmt.Sprintf(
+			"%v received from healthcheck endpoint (200 expected)",
+			response.StatusCode))
 	}
 	return nil
 }
