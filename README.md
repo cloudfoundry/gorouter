@@ -43,10 +43,6 @@ cd routing-release
 cd src/code.cloudfoundry.org/gorouter
 ```
 
-> Note: direnv will automatically set your GOPATH when you cd into the
-> routing-release directory. You will need to run `direnv allow` the first
-> time.
-
 ### Running Tests
 
 Tests in this repo cannot be run on their own, only as part of Routing Release.
