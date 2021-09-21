@@ -288,6 +288,9 @@ type Config struct {
 	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
 
 	SendHttpStartStopClientEvent bool `yaml:"send_http_start_stop_client_event,omitempty"`
+
+	HealthCheckPollInterval time.Duration `yaml:"healthcheck_poll_interval"`
+	HealthCheckTimeout      time.Duration `yaml:"healthcheck_timeout"`
 }
 
 var defaultConfig = Config{
@@ -348,6 +351,10 @@ var defaultConfig = Config{
 	SendHttpStartStopServerEvent: true,
 
 	SendHttpStartStopClientEvent: true,
+
+	// Default load balancer values
+	HealthCheckPollInterval: 10 * time.Second,
+	HealthCheckTimeout:      5 * time.Second,
 }
 
 func DefaultConfig() (*Config, error) {
