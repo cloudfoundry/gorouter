@@ -15,7 +15,7 @@ func NewOpenZipkin(zipkinEnabled bool, logger logger.Logger) func(http.Handler) 
 
 	openZipkinHandler := openZipkinhttp.NewServerMiddleware(openZipkinTracer)
 
-	return openZipkinHandler
+	return openZipkinHandler.handler
 }
 
 func createOpenZipkinReporter(zipkinEnabled bool) openZipkinReporter.Reporter {

@@ -151,10 +151,11 @@ func NewProxy(
 
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, errorWriter)
 
+	var zipkinHandler http.Handler
 	if cfg.Tracing.EnableOpenZipkin {
-		zipkinHandler := handler.NewOpenZipkin(cfg.Tracing.EnableZipkin, logger)
+		zipkinHandler = handlers.NewOpenZipkin(cfg.Tracing.EnableZipkin, logger)
 	} else {
-		zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
+		zipkinHandler = handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
 	}
 
 	w3cHandler := handlers.NewW3C(cfg.Tracing.EnableW3C, cfg.Tracing.W3CTenantID, logger)

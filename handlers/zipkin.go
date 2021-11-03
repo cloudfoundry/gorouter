@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/hex"
 	"net/http"
-	"strconv"
 
+	"github.com/openzipkin/zipkin-go"
+	"github.com/openzipkin/zipkin-go/model"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 
@@ -53,32 +55,17 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 		return
 	}
 
-	existingTraceID := r.Header.Get(B3TraceIdHeader)
-	existingSpanID := r.Header.Get(B3SpanIdHeader)
-	if existingTraceID == "" || existingSpanID == "" {
-		traceID, err := generateSpanID()
-		if err != nil {
-			z.logger.Info("failed-to-create-b3-trace-id", zap.Error(err))
-			return
-		}
-
-		r.Header.Set(B3TraceIdHeader, traceID)
-		r.Header.Set(B3SpanIdHeader, traceID)
-		r.Header.Set(B3Header, traceID+"-"+traceID)
-	} else {
-		r.Header.Set(B3Header, BuildB3SingleHeader(
-			existingTraceID,
-			existingSpanID,
-			r.Header.Get(B3SampledHeader),
-			r.Header.Get(B3FlagsHeader),
-			r.Header.Get(B3ParentSpanIdHeader),
-		))
-
-		z.logger.Debug("b3-trace-id-span-id-header-exists",
-			zap.String("B3TraceIdHeader", existingTraceID),
-			zap.String("B3SpanIdHeader", existingSpanID),
-		)
+	tracer, err := zipkin.NewTracer(nil, zipkin.WithNoopTracer(!z.zipkinEnabled))
+	if err != nil {
+		z.logger.Info("failed-to-create-tracer", zap.Error(err))
+		return
 	}
+
+	sp, _ := tracer.StartSpanFromContext(
+		r.Context(), r.URL.Scheme+"/"+r.Method, zipkin.Kind(model.Client),
+	)
+
+	b3.InjectHTTP(r)(sp.Context())
 }
 
 func generateSpanID() (string, error) {
@@ -88,35 +75,6 @@ func generateSpanID() (string, error) {
 	}
 
 	return hex.EncodeToString(randBytes), nil
-}
-
-// BuildB3SingleHeader assembles the B3 single header based on existing trace
-// values
-func BuildB3SingleHeader(traceID, spanID, sampling, flags, parentSpanID string) string {
-	if traceID == "" || spanID == "" {
-		return ""
-	}
-
-	if sampling == "" && flags == "" {
-		return traceID + "-" + spanID
-	}
-
-	samplingBit := "0"
-	if flags == "1" {
-		samplingBit = "d"
-	} else if s, err := strconv.ParseBool(sampling); err == nil {
-		if s {
-			samplingBit = "1"
-		}
-	} else {
-		return traceID + "-" + spanID
-	}
-
-	if parentSpanID == "" {
-		return traceID + "-" + spanID + "-" + samplingBit
-	}
-
-	return traceID + "-" + spanID + "-" + samplingBit + "-" + parentSpanID
 }
 
 // HeadersToLog specifies the headers which should be logged if Zipkin headers
