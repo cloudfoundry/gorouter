@@ -31,6 +31,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
 	uuid "github.com/nu7hatch/gouuid"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1394,7 +1395,7 @@ var _ = Describe("Proxy", func() {
 					conn.WriteResponse(resp)
 					conn.Close()
 
-					done <- req.Header.Get(handlers.B3TraceIdHeader)
+					done <- req.Header.Get(b3.Context)
 				})
 				defer ln.Close()
 

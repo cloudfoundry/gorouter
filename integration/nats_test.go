@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -19,6 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gexec"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
 )
 
 var _ = Describe("NATS Integration", func() {
@@ -76,8 +76,8 @@ var _ = Describe("NATS Integration", func() {
 		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander." + test_util.LocalhostDNS}, proxyPort, mbusClient, nil)
 		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
-			traceHeader := r.Header.Get(handlers.B3TraceIdHeader)
-			spanIDHeader := r.Header.Get(handlers.B3SpanIdHeader)
+			traceHeader := r.Header.Get(b3.TraceID)
+			spanIDHeader := r.Header.Get(b3.SpanID)
 			Expect(traceHeader).ToNot(BeEmpty())
 			Expect(spanIDHeader).ToNot(BeEmpty())
 			w.WriteHeader(http.StatusOK)
