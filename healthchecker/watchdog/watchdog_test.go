@@ -19,8 +19,7 @@ import (
 
 var _ = Describe("Watchdog", func() {
 	var (
-		srv                http.Server
-		httpHandler        http.ServeMux
+		srv                *http.Server
 		dog                *watchdog.Watchdog
 		addr               string
 		pollInterval       time.Duration
@@ -28,23 +27,26 @@ var _ = Describe("Watchdog", func() {
 		logger             logger.Logger
 	)
 
-	BeforeEach(func() {
-		httpHandler = *http.NewServeMux()
-		addr = fmt.Sprintf("localhost:%d", 9850+ginkgo.GinkgoParallelNode())
-		pollInterval = 10 * time.Millisecond
-		healthcheckTimeout = 5 * time.Millisecond
-		srv = http.Server{
+	healthcheckTimeout = 5 * time.Millisecond
+	runServer := func(httpHandler http.Handler) *http.Server {
+		localSrv := http.Server{
 			Addr:    addr,
-			Handler: &httpHandler,
+			Handler: httpHandler,
 		}
 		go func() {
 			defer GinkgoRecover()
-			srv.ListenAndServe()
+			localSrv.ListenAndServe()
 		}()
 		Eventually(func() error {
 			_, err := net.Dial("tcp", addr)
 			return err
 		}).Should(Not(HaveOccurred()))
+		return &localSrv
+	}
+
+	BeforeEach(func() {
+		addr = fmt.Sprintf("localhost:%d", 9850+ginkgo.GinkgoParallelNode())
+		pollInterval = 10 * time.Millisecond
 		logger = test_util.NewTestZapLogger("router-test")
 	})
 
@@ -60,21 +62,23 @@ var _ = Describe("Watchdog", func() {
 	})
 
 	Context("HitHealthcheckEndpoint", func() {
-		It("does not return an error if the endpoint responds with a 200", func() {
+		var statusCode int
+		BeforeEach(func() {
+			httpHandler := http.NewServeMux()
 			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
-				rw.WriteHeader(http.StatusOK)
+				rw.WriteHeader(statusCode)
 				r.Close = true
 			})
-
+			srv = runServer(httpHandler)
+		})
+		It("does not return an error if the endpoint responds with a 200", func() {
+			statusCode = http.StatusOK
 			err := dog.HitHealthcheckEndpoint()
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("returns an error if the endpoint does not respond with a 200", func() {
-			httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
-				rw.WriteHeader(http.StatusServiceUnavailable)
-				r.Close = true
-			})
+			statusCode = http.StatusServiceUnavailable
 
 			err := dog.HitHealthcheckEndpoint()
 			Expect(err).To(HaveOccurred())
@@ -90,10 +94,12 @@ var _ = Describe("Watchdog", func() {
 
 		Context("the healthcheck passes repeatedly", func() {
 			BeforeEach(func() {
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					rw.WriteHeader(http.StatusOK)
 					r.Close = true
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("does not return an error", func() {
@@ -107,6 +113,7 @@ var _ = Describe("Watchdog", func() {
 		Context("the healthcheck first passes, and subsequently fails", func() {
 			BeforeEach(func() {
 				var visitCount int
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					if visitCount == 0 {
 						rw.WriteHeader(http.StatusOK)
@@ -116,6 +123,7 @@ var _ = Describe("Watchdog", func() {
 					r.Close = true
 					visitCount++
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("returns an error", func() {
@@ -126,12 +134,13 @@ var _ = Describe("Watchdog", func() {
 
 		Context("the endpoint does not respond in the configured timeout", func() {
 			BeforeEach(func() {
-				healthcheckTimeout = 5 * time.Millisecond
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					time.Sleep(5 * healthcheckTimeout)
 					rw.WriteHeader(http.StatusOK)
 					r.Close = true
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("returns an error", func() {
@@ -149,6 +158,7 @@ var _ = Describe("Watchdog", func() {
 			BeforeEach(func() {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(context.Background())
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					rw.WriteHeader(http.StatusOK)
 					r.Close = true
@@ -157,6 +167,7 @@ var _ = Describe("Watchdog", func() {
 						cancel()
 					}
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("stops the healthchecker", func() {
@@ -170,6 +181,7 @@ var _ = Describe("Watchdog", func() {
 			var visitCount int
 
 			BeforeEach(func() {
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					rw.WriteHeader(http.StatusOK)
 					r.Close = true
@@ -180,6 +192,7 @@ var _ = Describe("Watchdog", func() {
 						}()
 					}
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("stops the healthchecker without an error", func() {
@@ -191,6 +204,7 @@ var _ = Describe("Watchdog", func() {
 
 		Context("gorouter exited before we received USR1 signal", func() {
 			BeforeEach(func() {
+				httpHandler := http.NewServeMux()
 				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 					rw.WriteHeader(http.StatusServiceUnavailable)
 					r.Close = true
@@ -198,6 +212,7 @@ var _ = Describe("Watchdog", func() {
 						signals <- syscall.SIGUSR1
 					}()
 				})
+				srv = runServer(httpHandler)
 			})
 
 			It("stops the healthchecker without an error", func() {

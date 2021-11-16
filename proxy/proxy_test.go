@@ -1395,7 +1395,7 @@ var _ = Describe("Proxy", func() {
 					conn.WriteResponse(resp)
 					conn.Close()
 
-					done <- req.Header.Get(b3.Context)
+					done <- req.Header.Get(b3.TraceID)
 				})
 				defer ln.Close()
 
