@@ -816,7 +816,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 						Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
 						for i := 0; i < 3; i++ {
-							Expect(logger.Buffer()).To(gbytes.Say(`route-service-connection-failed`))
+							logOutput := logger.Buffer()
+							Expect(logOutput).To(gbytes.Say(`route-service-connection-failed`))
+							Expect(logOutput).To(gbytes.Say(`foo.com`))
 						}
 					})
 
@@ -842,8 +844,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 						It("logs the error", func() {
 							_, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).To(MatchError("banana"))
-
-							Expect(logger.Buffer()).To(gbytes.Say(`route-service-connection-failed`))
+							logOutput := logger.Buffer()
+							Expect(logOutput).To(gbytes.Say(`route-service-connection-failed`))
+							Expect(logOutput).To(gbytes.Say(`foo.com`))
 						})
 					})
 				})

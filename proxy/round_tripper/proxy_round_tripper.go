@@ -194,7 +194,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 			res, err = rt.timedRoundTrip(roundTripper, request, logger)
 			if err != nil {
-				logger.Error("route-service-connection-failed", zap.Error(err))
+				logger.Error(
+					"route-service-connection-failed",
+					zap.String("route-service-endpoint", request.URL.String()),
+					zap.Error(err),
+				)
 
 				if rt.retriableClassifier.Classify(err) {
 					continue
@@ -204,7 +208,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
 				logger.Info(
 					"route-service-response",
-					zap.String("endpoint", request.URL.String()),
+					zap.String("route-service-endpoint", request.URL.String()),
 					zap.Int("status-code", res.StatusCode),
 				)
 			}
