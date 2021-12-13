@@ -237,7 +237,7 @@ type Config struct {
 	PublishActiveAppsInterval       time.Duration `yaml:"publish_active_apps_interval,omitempty"`
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval,omitempty"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout,omitempty"`
-	EndpointDialTimeout             time.Duration `yaml:"-"`
+	EndpointDialTimeout             time.Duration `yaml:"endpoint_dial_timeout,omitempty"`
 	EndpointKeepAliveProbeInterval  time.Duration `yaml:"endpoint_keep_alive_probe_interval,omitempty"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout,omitempty"`
 	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout,omitempty"`
