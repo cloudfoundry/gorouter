@@ -100,6 +100,17 @@ endpoint_timeout: 10s
 			Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
 		})
 
+		It("sets endpoint dial timeout", func() {
+			var b = []byte(`
+endpoint_dial_timeout: 6s
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.EndpointDialTimeout).To(Equal(6 * time.Second))
+		})
+
 		It("defaults keep alive probe interval to 1 second", func() {
 			Expect(config.FrontendIdleTimeout).To(Equal(900 * time.Second))
 			Expect(config.EndpointKeepAliveProbeInterval).To(Equal(1 * time.Second))
@@ -1590,6 +1601,7 @@ enable_http2: false
 			It("converts timeouts to a duration", func() {
 				var b = []byte(`
 endpoint_timeout: 10s
+endpoint_dial_timeout: 6s
 route_services_timeout: 10s
 drain_timeout: 15s
 tls_handshake_timeout: 9s
@@ -1601,6 +1613,7 @@ tls_handshake_timeout: 9s
 				Expect(config.Process()).To(Succeed())
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Expect(config.EndpointDialTimeout).To(Equal(6 * time.Second))
 				Expect(config.RouteServiceTimeout).To(Equal(10 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(15 * time.Second))
 				Expect(config.TLSHandshakeTimeout).To(Equal(9 * time.Second))
@@ -1617,6 +1630,7 @@ endpoint_timeout: 10s
 				Expect(config.Process()).To(Succeed())
 
 				Expect(config.EndpointTimeout).To(Equal(10 * time.Second))
+				Expect(config.EndpointDialTimeout).To(Equal(5 * time.Second))
 				Expect(config.DrainTimeout).To(Equal(10 * time.Second))
 			})
 
