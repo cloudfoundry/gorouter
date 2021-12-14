@@ -184,7 +184,7 @@ var _ = Describe("EndpointPool", func() {
 
 			Context("when modification_tag is older", func() {
 				BeforeEach(func() {
-					modTag.Increment()
+					modTag2.Increment()
 					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
 					pool.Put(endpoint)
 				})
@@ -482,7 +482,7 @@ var _ = Describe("EndpointPool", func() {
 
 		Context("when pool is empty", func() {
 			It("returns true", func() {
-				Expect(pool.IsOverloaded()).To(BeTrue())
+				Expect(pool.IsOverloaded()).To(BeFalse())
 			})
 		})
 
@@ -493,6 +493,11 @@ var _ = Describe("EndpointPool", func() {
 					endpoint.Stats.NumberConnections.Increment()
 					endpoint.Stats.NumberConnections.Increment()
 					pool.Put(endpoint)
+
+					Expect(pool.IsOverloaded()).To(BeTrue())
+
+					newEndpoint := route.NewEndpoint(&route.EndpointOpts{Port: 5678})
+					pool.Put(newEndpoint)
 
 					Expect(pool.IsOverloaded()).To(BeTrue())
 				})
