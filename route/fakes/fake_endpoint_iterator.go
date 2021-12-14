@@ -42,9 +42,10 @@ func (fake *FakeEndpointIterator) EndpointFailed(arg1 error) {
 	fake.endpointFailedArgsForCall = append(fake.endpointFailedArgsForCall, struct {
 		arg1 error
 	}{arg1})
+	stub := fake.EndpointFailedStub
 	fake.recordInvocation("EndpointFailed", []interface{}{arg1})
 	fake.endpointFailedMutex.Unlock()
-	if fake.EndpointFailedStub != nil {
+	if stub != nil {
 		fake.EndpointFailedStub(arg1)
 	}
 }
@@ -73,15 +74,16 @@ func (fake *FakeEndpointIterator) Next() *route.Endpoint {
 	ret, specificReturn := fake.nextReturnsOnCall[len(fake.nextArgsForCall)]
 	fake.nextArgsForCall = append(fake.nextArgsForCall, struct {
 	}{})
+	stub := fake.NextStub
+	fakeReturns := fake.nextReturns
 	fake.recordInvocation("Next", []interface{}{})
 	fake.nextMutex.Unlock()
-	if fake.NextStub != nil {
-		return fake.NextStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.nextReturns
 	return fakeReturns.result1
 }
 
@@ -125,9 +127,10 @@ func (fake *FakeEndpointIterator) PostRequest(arg1 *route.Endpoint) {
 	fake.postRequestArgsForCall = append(fake.postRequestArgsForCall, struct {
 		arg1 *route.Endpoint
 	}{arg1})
+	stub := fake.PostRequestStub
 	fake.recordInvocation("PostRequest", []interface{}{arg1})
 	fake.postRequestMutex.Unlock()
-	if fake.PostRequestStub != nil {
+	if stub != nil {
 		fake.PostRequestStub(arg1)
 	}
 }
@@ -156,9 +159,10 @@ func (fake *FakeEndpointIterator) PreRequest(arg1 *route.Endpoint) {
 	fake.preRequestArgsForCall = append(fake.preRequestArgsForCall, struct {
 		arg1 *route.Endpoint
 	}{arg1})
+	stub := fake.PreRequestStub
 	fake.recordInvocation("PreRequest", []interface{}{arg1})
 	fake.preRequestMutex.Unlock()
-	if fake.PreRequestStub != nil {
+	if stub != nil {
 		fake.PreRequestStub(arg1)
 	}
 }

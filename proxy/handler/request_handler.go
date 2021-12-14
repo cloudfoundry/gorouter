@@ -205,9 +205,11 @@ func (h *RequestHandler) serveTcp(
 			backendConnection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
 		}
 
-		iter.PostRequest(endpoint)
 		if err == nil {
+			defer iter.PostRequest(endpoint)
 			break
+		} else {
+			iter.PostRequest(endpoint)
 		}
 
 		iter.EndpointFailed(err)

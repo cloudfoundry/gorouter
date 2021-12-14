@@ -101,6 +101,26 @@ func (e *Endpoint) SetRoundTripperIfNil(roundTripperCtor func() ProxyRoundTrippe
 	}
 }
 
+func (e *Endpoint) Equal(e2 *Endpoint) bool {
+	if e2 == nil {
+		return false
+	}
+	return e.ApplicationId == e2.ApplicationId &&
+		e.addr == e2.addr &&
+		e.Protocol == e2.Protocol &&
+		fmt.Sprint(e.Tags) == fmt.Sprint(e2.Tags) &&
+		e.ServerCertDomainSAN == e2.ServerCertDomainSAN &&
+		e.PrivateInstanceId == e2.PrivateInstanceId &&
+		e.StaleThreshold == e2.StaleThreshold &&
+		e.RouteServiceUrl == e2.RouteServiceUrl &&
+		e.PrivateInstanceIndex == e2.PrivateInstanceIndex &&
+		e.ModificationTag == e2.ModificationTag &&
+		e.IsolationSegment == e2.IsolationSegment &&
+		e.useTls == e2.useTls &&
+		e.UpdatedAt == e2.UpdatedAt
+
+}
+
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
 	Next() *Endpoint
@@ -221,7 +241,7 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
 		result = UPDATED
-		if e.endpoint != endpoint {
+		if !e.endpoint.Equal(endpoint) {
 			e.Lock()
 			defer e.Unlock()
 
@@ -378,7 +398,7 @@ func (p *EndpointPool) IsEmpty() bool {
 
 func (p *EndpointPool) IsOverloaded() bool {
 	if p.IsEmpty() {
-		return true
+		return false
 	}
 
 	p.Lock()
