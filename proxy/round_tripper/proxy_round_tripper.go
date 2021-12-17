@@ -3,6 +3,7 @@ package round_tripper
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -155,9 +156,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				// io.EOF errors are considered safe to retry for certain requests
 				// Replace the error here to track this state when classifying later.
+				fmt.Println("JRMPJRMP", err)
 				if err == io.EOF && isIdempotent(request) {
 					err = fails.IdempotentRequestEOFError
 				}
+				fmt.Println("JRMPJRMP - proxy round tripper - retry on EoF")
 
 				iter.EndpointFailed(err)
 
@@ -231,6 +234,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 
 	if finalErr != nil {
+		fmt.Println("JRMPJRMP")
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
 		return nil, finalErr
 	}
@@ -254,12 +258,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 	tr.CancelRequest(request)
 }
 
-func (rt *roundTripper) backendRoundTrip(
-	request *http.Request,
-	endpoint *route.Endpoint,
-	iter route.EndpointIterator,
-	logger logger.Logger,
-) (*http.Response, error) {
+func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.Endpoint, iter route.EndpointIterator, logger logger.Logger) (*http.Response, error) {
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)
@@ -271,6 +270,7 @@ func (rt *roundTripper) backendRoundTrip(
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
 	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
 	res, err := rt.timedRoundTrip(tr, request, logger)
+	fmt.Println("JRMPJRMP - backendRoundTrip", err)
 
 	// decrement connection stats
 	iter.PostRequest(endpoint)

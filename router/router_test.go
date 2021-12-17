@@ -1045,7 +1045,9 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("https://test.%s:%d/record_headers", test_util.LocalhostDNS, config.SSLPort)
 			req, _ = http.NewRequest("GET", uri, nil)
 
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*." + test_util.LocalhostDNS})
+			certNames := test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "*." + test_util.LocalhostDNS, IP: "127.0.0.1"}}
+			certChain := test_util.CreateSignedCertWithRootCA(certNames)
+
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
 			clientCertTemplate, err := certTemplate("clientSSL")
@@ -1997,9 +1999,6 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 	}
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if cname != "" {
-		subject.CommonName = cname
-	}
 
 	tmpl := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -2008,6 +2007,8 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{cname},
 	}
 	return &tmpl, nil
 }

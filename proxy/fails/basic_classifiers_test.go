@@ -36,8 +36,11 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 		server = httptest.NewUnstartedServer(teapotHandler)
 		tlsServer = httptest.NewUnstartedServer(teapotHandler)
 
-		serverCert = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "server"})
-		clientCert = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "client"})
+		serverCertChain := test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "server", IP: "127.0.0.1"}}
+		clientCertChain := test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "client", IP: "127.0.0.1"}}
+
+		serverCert = test_util.CreateSignedCertWithRootCA(serverCertChain)
+		clientCert = test_util.CreateSignedCertWithRootCA(clientCertChain)
 		tlsServer.TLS = serverCert.AsTLSConfig()
 		tlsServer.TLS.ClientCAs = x509.NewCertPool()
 		tlsServer.TLS.ClientCAs.AddCert(clientCert.CACert)

@@ -1492,7 +1492,7 @@ var _ = Describe("Proxy", func() {
 			Expect(body).To(Equal("404 Not Found: Requested route ('abcdefghijklmnopqrstuvwxyz.0123456789-ABCDEFGHIJKLMNOPQRSTUVW.XYZ') does not exist.\n"))
 		})
 
-		It("responds to misbehaving host with 502", func() {
+		FIt("responds to misbehaving host with 502", func() {
 			ln := test_util.RegisterConnHandler(r, "enfant-terrible", func(conn *test_util.HttpConn) {
 				conn.Close()
 			})

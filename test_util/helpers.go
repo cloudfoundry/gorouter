@@ -378,7 +378,7 @@ func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	subject.CommonName = cert.CommonName
+	// subject.CommonName = cert.CommonName
 
 	certTemplate := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -426,9 +426,8 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if cname != "" {
-		subject.CommonName = cname
-	}
+
+	// subject.CommonName = ""
 
 	tmpl := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -513,6 +512,7 @@ func CreateECKeyPair(cname string) (keyPEM, certPEM []byte) {
 	})
 	// the values for oid came from https://golang.org/src/crypto/x509/x509.go?s=54495:54612#L290
 	ecdsaOid, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2})
+	Expect(err).ToNot(HaveOccurred())
 	paramPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PARAMETERS", Bytes: ecdsaOid})
 	keyPEM = []byte(fmt.Sprintf("%s%s", paramPEM, keyPEM))
 	return
