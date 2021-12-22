@@ -426,8 +426,9 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-
-	// subject.CommonName = ""
+	if cname != "" {
+		subject.CommonName = cname
+	}
 
 	tmpl := x509.Certificate{
 		SerialNumber:          serialNumber,

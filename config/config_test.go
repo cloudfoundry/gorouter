@@ -151,7 +151,7 @@ nats:
 				}
 
 				BeforeEach(func() {
-					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
 					clientKeyPEM, clientCertPEM := test_util.CreateKeyPair("potato.com")
 
 					caCert, err = tls.X509KeyPair(append(caCertChain.CertPEM, caCertChain.CACertPEM...), caCertChain.PrivKeyPEM)
@@ -331,7 +331,7 @@ routing_table_sharding_mode: "segments"
 				)
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
 					cfg = &Config{
 						RoutingApi: RoutingApiConfig{
 							Uri:          "http://bob.url/token",
@@ -919,7 +919,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 			}
 
 			BeforeEach(func() {
-				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
@@ -1356,15 +1356,15 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
 						Expect(err).NotTo(HaveOccurred())
-						c, err := x509.ParseCertificate(clientCACertDER.Bytes)
+						clientCACert, err := x509.ParseCertificate(clientCACertDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
+						Expect(config.ClientCAPool.Subjects()).To(ContainElement(clientCACert.RawSubject))
 
 						caCertDER, _ := pem.Decode([]byte(config.CACerts))
 						Expect(err).NotTo(HaveOccurred())
-						c, err = x509.ParseCertificate(caCertDER.Bytes)
+						caCerts, err := x509.ParseCertificate(caCertDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.RawSubject))
+						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(caCerts.RawSubject))
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
@@ -1642,7 +1642,7 @@ drain_timeout: 60s
 				var cfgYaml []byte
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "foo"})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
 					expectedTLSPEM = TLSPem{
 						CertChain:  string(certChain.CertPEM),
 						PrivateKey: string(certChain.PrivKeyPEM),
