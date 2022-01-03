@@ -3,16 +3,11 @@ package round_tripper
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/routeservice"
-
-	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -22,6 +17,8 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -156,11 +153,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				// io.EOF errors are considered safe to retry for certain requests
 				// Replace the error here to track this state when classifying later.
-				fmt.Println("JRMPJRMP", err)
 				if err == io.EOF && isIdempotent(request) {
 					err = fails.IdempotentRequestEOFError
 				}
-				fmt.Println("JRMPJRMP - proxy round tripper - retry on EoF")
 
 				iter.EndpointFailed(err)
 
@@ -234,7 +229,6 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 
 	if finalErr != nil {
-		fmt.Println("JRMPJRMP")
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
 		return nil, finalErr
 	}
@@ -270,7 +264,6 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
 	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
 	res, err := rt.timedRoundTrip(tr, request, logger)
-	fmt.Println("JRMPJRMP - backendRoundTrip", err)
 
 	// decrement connection stats
 	iter.PostRequest(endpoint)
