@@ -6,17 +6,16 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strings"
-
-	yaml "gopkg.in/yaml.v2"
+	"time"
 
 	. "code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
-	"time"
+	"code.cloudfoundry.org/gorouter/test_util"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 var _ = Describe("Config", func() {
@@ -151,7 +150,7 @@ nats:
 				}
 
 				BeforeEach(func() {
-					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
+					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					clientKeyPEM, clientCertPEM := test_util.CreateKeyPair("potato.com")
 
 					caCert, err = tls.X509KeyPair(append(caCertChain.CertPEM, caCertChain.CACertPEM...), caCertChain.PrivKeyPEM)
@@ -331,7 +330,7 @@ routing_table_sharding_mode: "segments"
 				)
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					cfg = &Config{
 						RoutingApi: RoutingApiConfig{
 							Uri:          "http://bob.url/token",
@@ -919,7 +918,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 			}
 
 			BeforeEach(func() {
-				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
@@ -1642,7 +1641,7 @@ drain_timeout: 60s
 				var cfgYaml []byte
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{IP: "127.0.0.1"}})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					expectedTLSPEM = TLSPem{
 						CertChain:  string(certChain.CertPEM),
 						PrivateKey: string(certChain.PrivKeyPEM),
