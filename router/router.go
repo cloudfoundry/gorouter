@@ -14,12 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"

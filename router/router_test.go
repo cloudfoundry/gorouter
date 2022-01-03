@@ -23,37 +23,37 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"code.cloudfoundry.org/gorouter/config"
-
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
-	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
-	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
-	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
-	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	. "code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test/common"
-	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
-	vvarz "code.cloudfoundry.org/gorouter/varz"
 	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
+
+	cfg "code.cloudfoundry.org/gorouter/config"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
+	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
+	rregistry "code.cloudfoundry.org/gorouter/registry"
+	testcommon "code.cloudfoundry.org/gorouter/test/common"
+	vvarz "code.cloudfoundry.org/gorouter/varz"
+
+	. "code.cloudfoundry.org/gorouter/router"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Router", func() {
@@ -1404,7 +1404,7 @@ var _ = Describe("Router", func() {
 			tlsClientConfig *tls.Config
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
