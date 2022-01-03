@@ -184,7 +184,7 @@ nats:
 					Expect(err).NotTo(HaveOccurred())
 					expectedSubject := parsedCert.RawSubject
 
-					Expect(string(poolSubjects[0])).To(Equal(string(expectedSubject)))
+					Expect(poolSubjects).To(ContainElement(expectedSubject))
 					Expect(config.Nats.ClientAuthCertificate).To(Equal(clientPair))
 				})
 			})
@@ -1354,17 +1354,17 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						Expect(config.ClientCACerts).To(Equal(strings.Join(expectedClientCAPEMs, "")))
 						Expect(config.OnlyTrustClientCACerts).To(BeTrue())
 
-						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
-						Expect(err).NotTo(HaveOccurred())
-						clientCACert, err := x509.ParseCertificate(clientCACertDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).To(ContainElement(clientCACert.RawSubject))
-
 						caCertDER, _ := pem.Decode([]byte(config.CACerts))
 						Expect(err).NotTo(HaveOccurred())
-						caCerts, err := x509.ParseCertificate(caCertDER.Bytes)
+						c, err := x509.ParseCertificate(caCertDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(caCerts.RawSubject))
+						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.Subject.CommonName))
+
+						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
+						Expect(err).NotTo(HaveOccurred())
+						c, err = x509.ParseCertificate(clientCACertDER.Bytes)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
