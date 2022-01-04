@@ -23,6 +23,10 @@ import (
 	"syscall"
 	"time"
 
+	. "code.cloudfoundry.org/gorouter/router"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -50,10 +54,6 @@ import (
 	rregistry "code.cloudfoundry.org/gorouter/registry"
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-
-	. "code.cloudfoundry.org/gorouter/router"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Router", func() {
@@ -1357,7 +1357,7 @@ var _ = Describe("Router", func() {
 			rootCAs *x509.CertPool
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 
@@ -1558,9 +1558,9 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
-
+				Expect(certs[0].DNSNames).To(ContainElement("test." + test_util.LocalhostDNS))
 			})
+
 			Context("with certificate chain", func() {
 				BeforeEach(func() {
 					chainRootCaCert, chainRootCaKey, rootPEM, err := createRootCA("a." + test_util.LocalhostDNS)
@@ -1606,10 +1606,9 @@ var _ = Describe("Router", func() {
 					cstate := conn.ConnectionState()
 					certs := cstate.PeerCertificates
 					Expect(len(certs)).To(Equal(3))
-					Expect(certs[0].Subject.CommonName).To(Equal("c." + test_util.LocalhostDNS))
-					Expect(certs[1].Subject.CommonName).To(Equal("b." + test_util.LocalhostDNS))
-					Expect(certs[2].Subject.CommonName).To(Equal("a." + test_util.LocalhostDNS))
-
+					Expect(certs[0].DNSNames).To(ContainElement("c." + test_util.LocalhostDNS))
+					Expect(certs[1].DNSNames).To(ContainElement("b." + test_util.LocalhostDNS))
+					Expect(certs[2].DNSNames).To(ContainElement("a." + test_util.LocalhostDNS))
 				})
 
 			})
@@ -1635,7 +1634,8 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+				Expect(certs[0].DNSNames).To(ContainElement("default"))
+				Expect(certs[0].DNSNames).ToNot(ContainElement("text." + test_util.LocalhostDNS))
 			})
 		})
 
@@ -1659,7 +1659,7 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
+				Expect(certs[0].DNSNames).To(ContainElement("test." + test_util.LocalhostDNS))
 			})
 
 			It("uses the default cert when hostname does not match any cert", func() {
@@ -1679,7 +1679,7 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+				Expect(certs[0].DNSNames).To(ContainElement("default"))
 			})
 		})
 
