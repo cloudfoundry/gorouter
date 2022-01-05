@@ -97,15 +97,15 @@ func NewTestState() *testState {
 	cfg.CACerts = cfg.CACerts + string(routeServiceToGorouterClientCertChain.CACertPEM)
 
 	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
-	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: trustedBackendServerCertSAN, IP: "127.0.0.1"}})
+	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: trustedBackendServerCertSAN}})
 	cfg.CACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
 
-	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter", SANs: test_util.SubjectAltNames{DNS: "gorouter", IP: "127.0.0.1"}})
+	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter", SANs: test_util.SubjectAltNames{DNS: "gorouter"}})
 	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
 	trustedBackendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
 	untrustedBackendServerCertSAN := "some-trusted-backend.example.net"
-	untrustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: untrustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: untrustedBackendServerCertSAN, IP: "127.0.0.1"}})
+	untrustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: untrustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: untrustedBackendServerCertSAN}})
 	untrustedBackendTLSConfig := untrustedBackendCLientCertChain.AsTLSConfig()
 	cfg.CACerts = cfg.CACerts + string(untrustedBackendCLientCertChain.CACertPEM)
 

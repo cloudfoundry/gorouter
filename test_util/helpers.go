@@ -378,7 +378,6 @@ func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	Expect(err).ToNot(HaveOccurred())
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	// subject.CommonName = cert.CommonName
 
 	certTemplate := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -391,6 +390,7 @@ func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	if cert.SANs.IP != "" {
 		certTemplate.IPAddresses = []net.IP{net.ParseIP(cert.SANs.IP)}
 	}
+
 	if cert.SANs.DNS != "" {
 		certTemplate.DNSNames = []string{cert.SANs.DNS}
 	}

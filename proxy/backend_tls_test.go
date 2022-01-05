@@ -55,8 +55,8 @@ var _ = Describe("Backend TLS", func() {
 		// Clear backend app's CA cert pool
 		backendCACertPool := x509.NewCertPool()
 
-		backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: serverCertDomainSAN, IP: "127.0.0.1"}}, proxyCertPool)
-		clientCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "gorouter", IP: "127.0.0.1"}}, proxyCertPool)
+		backendCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{CommonName: serverCertDomainSAN, SANs: test_util.SubjectAltNames{DNS: serverCertDomainSAN}}, proxyCertPool)
+		clientCertChain := test_util.CreateCertAndAddCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "gorouter"}}, backendCACertPool)
 
 		backendTLSConfig := backendCertChain.AsTLSConfig()
 		backendTLSConfig.ClientCAs = backendCACertPool
