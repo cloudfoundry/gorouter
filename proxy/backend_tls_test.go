@@ -232,18 +232,6 @@ var _ = Describe("Backend TLS", func() {
 		})
 	})
 
-	// Is this test invalid now?
-	// Context("when the backend registration does not include server cert domain SAN", func() {
-	// 	BeforeEach(func() {
-	// 		registerConfig.ServerCertDomainSAN = ""
-	// 	})
-
-	// 	It("fails to validate (backends registering with a tls_port MUST provide a name that we can validate on their server certificate)", func() {
-	// 		resp := registerAppAndTest()
-	// 		Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
-	// 	})
-	// })
-
 	Context("when the backend is only listening for non TLS connections", func() {
 		BeforeEach(func() {
 			registerConfig.IgnoreTLSConfig = true
