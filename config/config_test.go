@@ -6,17 +6,16 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strings"
-
-	yaml "gopkg.in/yaml.v2"
+	"time"
 
 	. "code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
-	"time"
+	"code.cloudfoundry.org/gorouter/test_util"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 var _ = Describe("Config", func() {
@@ -151,7 +150,7 @@ nats:
 				}
 
 				BeforeEach(func() {
-					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					caCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					clientKeyPEM, clientCertPEM := test_util.CreateKeyPair("potato.com")
 
 					caCert, err = tls.X509KeyPair(append(caCertChain.CertPEM, caCertChain.CACertPEM...), caCertChain.PrivKeyPEM)
@@ -184,7 +183,7 @@ nats:
 					Expect(err).NotTo(HaveOccurred())
 					expectedSubject := parsedCert.RawSubject
 
-					Expect(string(poolSubjects[0])).To(Equal(string(expectedSubject)))
+					Expect(poolSubjects).To(ContainElement(expectedSubject))
 					Expect(config.Nats.ClientAuthCertificate).To(Equal(clientPair))
 				})
 			})
@@ -331,7 +330,7 @@ routing_table_sharding_mode: "segments"
 				)
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					cfg = &Config{
 						RoutingApi: RoutingApiConfig{
 							Uri:          "http://bob.url/token",
@@ -919,7 +918,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 			}
 
 			BeforeEach(func() {
-				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "spinach.com"})
+				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 				keyPEM1, certPEM1 = test_util.CreateKeyPair("potato.com")
 				keyPEM2, certPEM2 := test_util.CreateKeyPair("potato2.com")
 
@@ -1354,17 +1353,17 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						Expect(config.ClientCACerts).To(Equal(strings.Join(expectedClientCAPEMs, "")))
 						Expect(config.OnlyTrustClientCACerts).To(BeTrue())
 
-						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
-						Expect(err).NotTo(HaveOccurred())
-						c, err := x509.ParseCertificate(clientCACertDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
-
 						caCertDER, _ := pem.Decode([]byte(config.CACerts))
 						Expect(err).NotTo(HaveOccurred())
-						c, err = x509.ParseCertificate(caCertDER.Bytes)
+						c, err := x509.ParseCertificate(caCertDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.RawSubject))
+						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.Subject.CommonName))
+
+						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
+						Expect(err).NotTo(HaveOccurred())
+						c, err = x509.ParseCertificate(clientCACertDER.Bytes)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
@@ -1642,7 +1641,7 @@ drain_timeout: 60s
 				var cfgYaml []byte
 
 				BeforeEach(func() {
-					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "foo"})
+					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
 					expectedTLSPEM = TLSPem{
 						CertChain:  string(certChain.CertPEM),
 						PrivateKey: string(certChain.PrivKeyPEM),

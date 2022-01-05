@@ -23,37 +23,37 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"code.cloudfoundry.org/gorouter/config"
+	. "code.cloudfoundry.org/gorouter/router"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
-	cfg "code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
-	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
-	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
-	rregistry "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	. "code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test/common"
-	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
-	vvarz "code.cloudfoundry.org/gorouter/varz"
 	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
+
+	cfg "code.cloudfoundry.org/gorouter/config"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
+	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
+	rregistry "code.cloudfoundry.org/gorouter/registry"
+	testcommon "code.cloudfoundry.org/gorouter/test/common"
+	vvarz "code.cloudfoundry.org/gorouter/varz"
 )
 
 var _ = Describe("Router", func() {
@@ -1045,7 +1045,9 @@ var _ = Describe("Router", func() {
 			uri := fmt.Sprintf("https://test.%s:%d/record_headers", test_util.LocalhostDNS, config.SSLPort)
 			req, _ = http.NewRequest("GET", uri, nil)
 
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "*." + test_util.LocalhostDNS})
+			certNames := test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "*." + test_util.LocalhostDNS, IP: "127.0.0.1"}}
+			certChain := test_util.CreateSignedCertWithRootCA(certNames)
+
 			config.SSLCertificates = []tls.Certificate{certChain.TLSCert()}
 
 			clientCertTemplate, err := certTemplate("clientSSL")
@@ -1355,7 +1357,7 @@ var _ = Describe("Router", func() {
 			rootCAs *x509.CertPool
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 
@@ -1402,7 +1404,7 @@ var _ = Describe("Router", func() {
 			tlsClientConfig *tls.Config
 		)
 		BeforeEach(func() {
-			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "test." + test_util.LocalhostDNS})
+			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
 			config.CACerts = string(certChain.CACertPEM)
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
@@ -1556,9 +1558,9 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
-
+				Expect(certs[0].DNSNames).To(ContainElement("test." + test_util.LocalhostDNS))
 			})
+
 			Context("with certificate chain", func() {
 				BeforeEach(func() {
 					chainRootCaCert, chainRootCaKey, rootPEM, err := createRootCA("a." + test_util.LocalhostDNS)
@@ -1604,10 +1606,9 @@ var _ = Describe("Router", func() {
 					cstate := conn.ConnectionState()
 					certs := cstate.PeerCertificates
 					Expect(len(certs)).To(Equal(3))
-					Expect(certs[0].Subject.CommonName).To(Equal("c." + test_util.LocalhostDNS))
-					Expect(certs[1].Subject.CommonName).To(Equal("b." + test_util.LocalhostDNS))
-					Expect(certs[2].Subject.CommonName).To(Equal("a." + test_util.LocalhostDNS))
-
+					Expect(certs[0].DNSNames).To(ContainElement("c." + test_util.LocalhostDNS))
+					Expect(certs[1].DNSNames).To(ContainElement("b." + test_util.LocalhostDNS))
+					Expect(certs[2].DNSNames).To(ContainElement("a." + test_util.LocalhostDNS))
 				})
 
 			})
@@ -1633,7 +1634,8 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+				Expect(certs[0].DNSNames).To(ContainElement("default"))
+				Expect(certs[0].DNSNames).ToNot(ContainElement("text." + test_util.LocalhostDNS))
 			})
 		})
 
@@ -1657,7 +1659,7 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("test." + test_util.LocalhostDNS))
+				Expect(certs[0].DNSNames).To(ContainElement("test." + test_util.LocalhostDNS))
 			})
 
 			It("uses the default cert when hostname does not match any cert", func() {
@@ -1677,7 +1679,7 @@ var _ = Describe("Router", func() {
 				cstate := conn.ConnectionState()
 				certs := cstate.PeerCertificates
 				Expect(len(certs)).To(Equal(1))
-				Expect(certs[0].Subject.CommonName).To(Equal("default"))
+				Expect(certs[0].DNSNames).To(ContainElement("default"))
 			})
 		})
 
@@ -1997,9 +1999,6 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 	}
 
 	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
-	if cname != "" {
-		subject.CommonName = cname
-	}
 
 	tmpl := x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -2008,6 +2007,8 @@ func certTemplate(cname string) (*x509.Certificate, error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
 		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{cname},
 	}
 	return &tmpl, nil
 }

@@ -9,10 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/routeservice"
-
-	"github.com/uber-go/zap"
-
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -21,6 +17,8 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -254,12 +252,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 	tr.CancelRequest(request)
 }
 
-func (rt *roundTripper) backendRoundTrip(
-	request *http.Request,
-	endpoint *route.Endpoint,
-	iter route.EndpointIterator,
-	logger logger.Logger,
-) (*http.Response, error) {
+func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.Endpoint, iter route.EndpointIterator, logger logger.Logger) (*http.Response, error) {
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)

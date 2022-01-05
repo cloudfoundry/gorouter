@@ -1,11 +1,12 @@
 package round_tripper_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"testing"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 func TestRoundTripper(t *testing.T) {

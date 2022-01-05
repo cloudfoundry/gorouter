@@ -1,25 +1,23 @@
 package round_tripper_test
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"net/http/httptest"
 
-	router_http "code.cloudfoundry.org/gorouter/common/http"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
-	"crypto/tls"
-
-	"crypto/x509"
-
-	"context"
-
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/fails"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 )
 
 var _ = Describe("HandleError", func() {
