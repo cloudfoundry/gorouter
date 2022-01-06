@@ -2047,7 +2047,7 @@ func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout tim
 	proxyConfig := *config
 	proxyConfig.EndpointTimeout = requestTimeout
 	routeServicesTransport := &sharedfakes.RoundTripper{}
-	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, &proxyConfig, registry, combinedReporter,
+	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, &proxyConfig, registry, combinedReporter,
 		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, routeServicesTransport)
 
 	h := &health.Health{}

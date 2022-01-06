@@ -185,7 +185,7 @@ var _ = Describe("Router", func() {
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 		rt := &sharedfakes.RoundTripper{}
-		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
+		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthStatus, rt)
 
 		errChan := make(chan error, 2)
@@ -418,7 +418,7 @@ var _ = Describe("Router", func() {
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				config.Status.Port = test_util.NextAvailPort()
 				rt := &sharedfakes.RoundTripper{}
-				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
+				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)
 
 				errChan = make(chan error, 2)

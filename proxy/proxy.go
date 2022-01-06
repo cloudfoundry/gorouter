@@ -45,6 +45,7 @@ type proxy struct {
 	errorWriter              errorwriter.ErrorWriter
 	reporter                 metrics.ProxyReporter
 	accessLogger             accesslog.AccessLogger
+	promRegistry             handlers.Registry
 	secureCookies            bool
 	health                   *health.Health
 	routeServiceConfig       *routeservice.RouteServiceConfig
@@ -65,6 +66,7 @@ type proxy struct {
 func NewProxy(
 	logger logger.Logger,
 	accessLogger accesslog.AccessLogger,
+	promRegistry handlers.Registry,
 	errorWriter errorwriter.ErrorWriter,
 	cfg *config.Config,
 	registry registry.Registry,
@@ -78,6 +80,7 @@ func NewProxy(
 
 	p := &proxy{
 		accessLogger:             accessLogger,
+		promRegistry:             promRegistry,
 		traceKey:                 cfg.TraceKey,
 		ip:                       cfg.Ip,
 		logger:                   logger,
@@ -167,6 +170,11 @@ func NewProxy(
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
 	if cfg.SendHttpStartStopServerEvent {
 		n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
+	}
+	if p.promRegistry != nil {
+		if cfg.PerAppPrometheusHttpMetricsReporting {
+			n.Use(handlers.NewHTTPLatencyPrometheus(p.promRegistry))
+		}
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
 	n.Use(handlers.NewReporter(reporter, logger))

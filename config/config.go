@@ -77,6 +77,13 @@ var defaultStatusConfig = StatusConfig{
 	Pass: "",
 }
 
+type PrometheusConfig struct {
+	Port     uint16 `yaml:"port"`
+	CertPath string `yaml:"cert_path"`
+	KeyPath  string `yaml:"key_path"`
+	CAPath   string `yaml:"ca_path"`
+}
+
 type NatsConfig struct {
 	Hosts                 []NatsHost       `yaml:"hosts"`
 	User                  string           `yaml:"user"`
@@ -192,6 +199,7 @@ type Config struct {
 	Nats            NatsConfig        `yaml:"nats,omitempty"`
 	Logging         LoggingConfig     `yaml:"logging,omitempty"`
 	Port            uint16            `yaml:"port,omitempty"`
+	Prometheus      PrometheusConfig  `yaml:"prometheus,omitempty"`
 	Index           uint              `yaml:"index,omitempty"`
 	Zone            string            `yaml:"zone,omitempty"`
 	GoMaxProcs      int               `yaml:"go_max_procs,omitempty"`
@@ -283,11 +291,17 @@ type Config struct {
 
 	HTMLErrorTemplateFile string `yaml:"html_error_template_file,omitempty"`
 
+	// Old metric, to eventually be replaced by prometheus reporting
+	// reports latency under gorouter sourceid, and with and without component name
 	PerRequestMetricsReporting bool `yaml:"per_request_metrics_reporting,omitempty"`
 
+	// Old metric, to eventually be replaced by prometheus reporting
 	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
 
+	// Old metric, to eventually be replaced by prometheus reporting
 	SendHttpStartStopClientEvent bool `yaml:"send_http_start_stop_client_event,omitempty"`
+
+	PerAppPrometheusHttpMetricsReporting bool `yaml:"per_app_prometheus_http_metrics_reporting",omitempty`
 
 	HealthCheckPollInterval time.Duration `yaml:"healthcheck_poll_interval"`
 	HealthCheckTimeout      time.Duration `yaml:"healthcheck_timeout"`
