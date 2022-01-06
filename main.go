@@ -5,18 +5,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"code.cloudfoundry.org/tlsconfig"
-
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
+	mr "code.cloudfoundry.org/go-metric-registry"
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
@@ -33,6 +32,7 @@ import (
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
 	routing_api "code.cloudfoundry.org/routing-api"
+	"code.cloudfoundry.org/tlsconfig"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
@@ -185,10 +185,17 @@ func main() {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}
 
+	var metricsRegistry *mr.Registry
+	if c.Prometheus.Port != 0 {
+		metricsRegistry = mr.NewRegistry(log.Default(),
+			mr.WithTLSServer(int(c.Prometheus.Port), c.Prometheus.CertPath, c.Prometheus.KeyPath, c.Prometheus.CAPath))
+	}
+
 	h = &health.Health{}
 	proxy := proxy.NewProxy(
 		logger,
 		accessLogger,
+		metricsRegistry,
 		ew,
 		c,
 		registry,

@@ -45,7 +45,7 @@ var _ = Describe("AccessLogRecord", func() {
 		rss, err := router.NewRouteServicesServer()
 		Expect(err).ToNot(HaveOccurred())
 		var h *health.Health
-		proxy.NewProxy(logger, accesslog, ew, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
+		proxy.NewProxy(logger, accesslog, nil, ew, c, r, combinedReporter, &routeservice.RouteServiceConfig{},
 			&tls.Config{}, &tls.Config{}, h, rss.GetRoundTripper())
 
 		b.Time("RegisterTime", func() {

@@ -73,6 +73,24 @@ status:
 
 		})
 
+		It("sets prometheus endpoint config", func() {
+			var b = []byte(`
+prometheus:
+  port: 1234
+  cert_path: /some-cert-path
+  key_path: /some-key-path
+  ca_path: /some-ca-path
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Prometheus.Port).To(Equal(uint16(1234)))
+			Expect(config.Prometheus.CertPath).To(Equal("/some-cert-path"))
+			Expect(config.Prometheus.KeyPath).To(Equal("/some-key-path"))
+			Expect(config.Prometheus.CAPath).To(Equal("/some-ca-path"))
+		})
+
 		It("defaults frontend idle timeout to 900", func() {
 			Expect(config.FrontendIdleTimeout).To(Equal(900 * time.Second))
 		})

@@ -614,7 +614,7 @@ var _ = Describe("Router Integration", func() {
 		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Router registered successfully"))
 	})
 
-	Describe("metrics emitted", func() {
+	Describe("loggregator metrics emitted", func() {
 		var (
 			fakeMetron test_util.FakeMetron
 		)
@@ -690,6 +690,46 @@ var _ = Describe("Router Integration", func() {
 
 			Expect(measuredLatency_ms).To(BeNumerically(">=", 10000))
 			Expect(measuredLatency_ms).To(BeNumerically("<=", 14000))
+		})
+	})
+
+	Describe("prometheus metrics", func() {
+		It("starts a prometheus https server", func() {
+			c := createConfig(statusPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			metricsPort := test_util.NextAvailPort()
+			serverCAPath, serverCertPath, serverKeyPath, clientCert := tls_helpers.GenerateCaAndMutualTlsCerts()
+
+			c.Prometheus.Port = metricsPort
+			c.Prometheus.CertPath = serverCertPath
+			c.Prometheus.KeyPath = serverKeyPath
+			c.Prometheus.CAPath = serverCAPath
+
+			writeConfig(c, cfgFile)
+
+			gorouterSession = startGorouterSession(cfgFile)
+
+			tlsConfig, err := tlsconfig.Build(
+				tlsconfig.WithInternalServiceDefaults(),
+				tlsconfig.WithIdentity(clientCert),
+			).Client(
+				tlsconfig.WithAuthorityFromFile(serverCAPath),
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: tlsConfig,
+				},
+			}
+
+			metricsURL := fmt.Sprintf("https://127.0.0.1:%d/metrics", metricsPort)
+			r, err := client.Get(metricsURL)
+			Expect(err).ToNot(HaveOccurred())
+
+			response, err := ioutil.ReadAll(r.Body)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(string(response)).To(ContainSubstring("process_resident_memory_bytes"))
 		})
 	})
 
