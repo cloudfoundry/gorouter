@@ -347,12 +347,52 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			Expect(resp.Proto).To(Equal("HTTP/2.0"))
+			Expect(resp.TLS.NegotiatedProtocol).To(Equal("h2"))
 
 			h1Client := &http.Client{Transport: &http.Transport{TLSClientConfig: clientTLSConfig}}
 			h1Resp, err := h1Client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(h1Resp.StatusCode).To(Equal(http.StatusOK))
 			Expect(h1Resp.Proto).To(Equal("HTTP/1.1"))
+			Expect(h1Resp.TLS.NegotiatedProtocol).To(Equal(""))
+
+			By("throwing an error with an h1 transport and unsupported client protocol", func() {
+				clientTLSConfig.NextProtos = append(clientTLSConfig.NextProtos, "badproto")
+				alpnClient := &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: clientTLSConfig,
+					},
+				}
+				_, err := alpnClient.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("no application protocol"))
+			})
+			By("supports h1 transport with http/1.1 alpn", func() {
+				clientTLSConfig.NextProtos = append(clientTLSConfig.NextProtos, "http/1.1")
+				alpnClient := &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: clientTLSConfig,
+					},
+				}
+				resp, err := alpnClient.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(resp.Proto).To(Equal("HTTP/1.1"))
+				Expect(resp.TLS.NegotiatedProtocol).To(Equal("http/1.1"))
+			})
+			By("supports h1 transport with HTTP/1.1 alpn", func() {
+				clientTLSConfig.NextProtos = append(clientTLSConfig.NextProtos, "HTTP/1.1")
+				alpnClient := &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: clientTLSConfig,
+					},
+				}
+				resp, err := alpnClient.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(resp.Proto).To(Equal("HTTP/1.1"))
+				Expect(resp.TLS.NegotiatedProtocol).To(Equal("http/1.1"))
+			})
 		})
 	})
 
