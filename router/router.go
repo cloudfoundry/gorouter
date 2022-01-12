@@ -236,7 +236,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 	}
 
 	if r.config.EnableHTTP2 {
-		tlsConfig.NextProtos = []string{"h2"}
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
 	}
 
 	tlsConfig.BuildNameToCertificate()
