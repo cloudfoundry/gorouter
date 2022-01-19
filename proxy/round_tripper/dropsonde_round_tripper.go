@@ -41,7 +41,7 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool, isHttp
 		template = t.BackendTemplate
 	}
 
-	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig)
+	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig, isRouteService)
 
 	newTransport := &http.Transport{
 		Dial:                template.Dial,

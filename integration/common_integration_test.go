@@ -67,7 +67,7 @@ func NewTestState() *testState {
 	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
 	cfg.SkipSSLValidation = false
 	cfg.RouteServicesHairpinning = false
-	cfg.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+	cfg.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 
 	// TODO: why these magic numbers?
 	cfg.PruneStaleDropletsInterval = 2 * time.Second
