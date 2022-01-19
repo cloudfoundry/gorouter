@@ -163,6 +163,8 @@ func main() {
 		c.RouteServiceRecommendHttps,
 	)
 
+	// These TLS configs are just tempaltes. If you add other keys you will
+	// also need to edit proxy/utils/tls_config.go
 	backendTLSConfig := &tls.Config{
 		CipherSuites: c.CipherSuites,
 		RootCAs:      c.CAPool,
@@ -174,6 +176,8 @@ func main() {
 		InsecureSkipVerify: c.SkipSSLValidation,
 		RootCAs:            c.CAPool,
 		Certificates:       []tls.Certificate{c.RouteServiceConfig.ClientAuthCertificate},
+		MinVersion:         c.MinTLSVersion,
+		MaxVersion:         c.MaxTLSVersion,
 	}
 
 	rss, err := router.NewRouteServicesServer()

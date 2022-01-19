@@ -199,7 +199,7 @@ func (h *RequestHandler) serveTcp(
 		iter.PreRequest(endpoint)
 
 		if endpoint.IsTLS() {
-			tlsConfigLocal := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, h.tlsConfigTemplate)
+			tlsConfigLocal := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, h.tlsConfigTemplate, false)
 			backendConnection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), tlsConfigLocal)
 		} else {
 			backendConnection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)

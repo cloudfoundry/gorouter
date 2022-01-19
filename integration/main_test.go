@@ -752,6 +752,9 @@ var _ = Describe("Router Integration", func() {
 				}))
 				routeServiceURL = fmt.Sprintf("https://some-route-service.%s:%d/rs", test_util.LocalhostDNS, cfg.SSLPort)
 			})
+			AfterEach(func() {
+				routeSvcApp.Unregister()
+			})
 
 			It("successfully connects to the route service", func() {
 				routeSvcApp.Register()
