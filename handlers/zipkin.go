@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/openzipkin/zipkin-go/idgenerator"
@@ -47,8 +46,7 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	existingSpanID := r.Header.Get(b3.SpanID)
 	if existingTraceID == "" || existingSpanID == "" {
 		trace := idgenerator.NewRandom128().TraceID()
-
-		span := fmt.Sprintf("%016x", trace.Low)
+		span := idgenerator.NewRandom128().SpanID(trace).String()
 
 		r.Header.Set(b3.TraceID, trace.String())
 		r.Header.Set(b3.SpanID, span)
