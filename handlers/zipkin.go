@@ -45,11 +45,12 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	existingTraceID := r.Header.Get(b3.TraceID)
 	existingSpanID := r.Header.Get(b3.SpanID)
 	if existingTraceID == "" || existingSpanID == "" {
-		traceID := idgenerator.NewRandom128().TraceID().String()
+		trace := idgenerator.NewRandom128().TraceID()
+		span := idgenerator.NewRandom128().SpanID(trace).String()
 
-		r.Header.Set(b3.TraceID, traceID)
-		r.Header.Set(b3.SpanID, traceID)
-		r.Header.Set(b3.Context, traceID+"-"+traceID)
+		r.Header.Set(b3.TraceID, trace.String())
+		r.Header.Set(b3.SpanID, span)
+		r.Header.Set(b3.Context,  trace.String()+"-"+span)
 	} else {
 		sc, err := b3.ParseHeaders(
 			existingTraceID,

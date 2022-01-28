@@ -16,9 +16,10 @@ import (
 // 64-bit random hexadecimal string
 const (
 	b3IDRegex      = `^[[:xdigit:]]{32}$`
-	b3Regex        = `^[[:xdigit:]]{32}-[[:xdigit:]]{32}(-[01d](-[[:xdigit:]]{32})?)?$`
+	b3Regex        = `^[[:xdigit:]]{32}-[[:xdigit:]]{16}(-[01d](-[[:xdigit:]]{16})?)?$`
 	b3TraceID      = "7f46165474d11ee5836777d85df2cdab"
 	b3SpanID       = "54ebcb82b14862d9"
+	b3SpanRegex    = `[[:xdigit:]]{16}$`
 	b3ParentSpanID = "e56b75d6af463476"
 	b3Single       = "1g56165474d11ee5836777d85df2cdab-32ebcb82b14862d9-1-ab6b75d6af463476"
 )
@@ -53,7 +54,7 @@ var _ = Describe("Zipkin", func() {
 
 		It("sets zipkin headers", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(req.Header.Get(b3.SpanID)).ToNot(BeEmpty())
+			Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3SpanRegex))
 			Expect(req.Header.Get(b3.TraceID)).ToNot(BeEmpty())
 			Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 			Expect(req.Header.Get(b3.Context)).ToNot(BeEmpty())
@@ -157,7 +158,7 @@ var _ = Describe("Zipkin", func() {
 			It("adds the B3TraceIdHeader and overwrites the SpanId", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(b3.TraceID)).To(MatchRegexp(b3IDRegex))
-				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3IDRegex))
+				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3SpanRegex))
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.Context)).To(MatchRegexp(b3Regex))
 
@@ -173,7 +174,7 @@ var _ = Describe("Zipkin", func() {
 			It("overwrites the B3TraceIdHeader and adds a SpanId", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(b3.TraceID)).To(MatchRegexp(b3IDRegex))
-				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3IDRegex))
+				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3SpanRegex))
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.Context)).To(MatchRegexp(b3Regex))
 
