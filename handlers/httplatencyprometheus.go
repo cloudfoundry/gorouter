@@ -16,8 +16,7 @@ type httpLatencyPrometheusHandler struct {
 	registry Registry
 }
 
-// NewHTTPStartStop creates a new handler that handles emitting frontent
-// HTTP StartStop events
+// NewHTTPLatencyPrometheus creates a new handler that handles prometheus metrics for latency
 func NewHTTPLatencyPrometheus(r Registry) negroni.Handler {
 	return &httpLatencyPrometheusHandler{
 		registry: r,
