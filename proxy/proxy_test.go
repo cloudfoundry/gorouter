@@ -32,6 +32,7 @@ import (
 	"github.com/cloudfoundry/sonde-go/events"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
+	"github.com/uber-go/zap"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1211,6 +1212,29 @@ var _ = Describe("Proxy", func() {
 		})
 	})
 
+	Describe("QueryParam", func() {
+		It("logs requests with semicolons in them", func() {
+			ln := test_util.RegisterConnHandler(r, "query-param-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("GET", "query-param-test", "/?param1;param2", nil)
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(testLogger.(*test_util.TestZapLogger).Lines(zap.WarnLevel)).To(ContainElement(ContainSubstring("deprecated-semicolon-params")))
+
+		})
+	})
 	Describe("Access Logging", func() {
 		It("logs a request", func() {
 			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
