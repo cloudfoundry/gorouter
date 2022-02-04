@@ -1598,11 +1598,12 @@ var _ = Describe("Proxy", func() {
 					conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 					writer := bufio.NewWriter(conn)
 					go func(req *http.Request, writer *bufio.Writer) {
+						defer GinkgoRecover()
 						err = req.Write(writer)
 						Expect(err).To(HaveOccurred())
 						writer.Flush()
 					}(req, writer)
-					time.Sleep(100 * time.Millisecond) // give time for the data to start transmitting
+					time.Sleep(10 * time.Millisecond) // give time for the data to start transmitting
 
 					// need to shutdown the writer first or conn.Close will block until the large payload finishes sending.
 					// Another way to do this is to get syscall.rawconn and use control to syscall.SetNonblock on the
