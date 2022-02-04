@@ -169,6 +169,7 @@ func NewProxy(
 		n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
+	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
