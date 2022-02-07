@@ -69,7 +69,9 @@ go install
 
 ```bash
 # Start NATS server in daemon mode
-go get github.com/nats-io/nats-server
+git clone https://github.com/nats-io/nats-server
+cd nats-server/
+go install
 nats-server &
 
 # Start gorouter
