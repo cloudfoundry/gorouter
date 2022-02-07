@@ -94,7 +94,7 @@ type NatsHost struct {
 }
 
 var defaultNatsConfig = NatsConfig{
-	Hosts: []NatsHost{{Hostname: "localhost", Port: 42222}},
+	Hosts: []NatsHost{{Hostname: "localhost", Port: 4222}},
 	User:  "",
 	Pass:  "",
 }
