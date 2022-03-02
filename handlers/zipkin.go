@@ -50,7 +50,7 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 
 		r.Header.Set(b3.TraceID, trace.String())
 		r.Header.Set(b3.SpanID, span)
-		r.Header.Set(b3.Context,  trace.String()+"-"+span)
+		r.Header.Set(b3.Context, trace.String()+"-"+span)
 	} else {
 		sc, err := b3.ParseHeaders(
 			existingTraceID,
