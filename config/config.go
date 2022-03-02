@@ -301,7 +301,7 @@ type Config struct {
 	// Old metric, to eventually be replaced by prometheus reporting
 	SendHttpStartStopClientEvent bool `yaml:"send_http_start_stop_client_event,omitempty"`
 
-	PerAppPrometheusHttpMetricsReporting bool `yaml:"per_app_prometheus_http_metrics_reporting",omitempty`
+	PerAppPrometheusHttpMetricsReporting bool `yaml:"per_app_prometheus_http_metrics_reporting,omitempty"`
 
 	HealthCheckPollInterval time.Duration `yaml:"healthcheck_poll_interval"`
 	HealthCheckTimeout      time.Duration `yaml:"healthcheck_timeout"`
