@@ -287,7 +287,8 @@ type Config struct {
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 
-	EmptyPoolResponseCode503 bool `yaml:"empty_pool_response_code_503,omitempty"`
+	EmptyPoolResponseCode503 bool          `yaml:"empty_pool_response_code_503,omitempty"`
+	EmptyPoolTimeout         time.Duration `yaml:"empty_pool_timeout,omitempty"`
 
 	HTMLErrorTemplateFile string `yaml:"html_error_template_file,omitempty"`
 

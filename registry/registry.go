@@ -54,6 +54,9 @@ type RouteRegistry struct {
 	isolationSegments        []string
 
 	maxConnsPerBackend int64
+
+	EmptyPoolTimeout         time.Duration
+	EmptyPoolResponseCode503 bool
 }
 
 func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
@@ -71,7 +74,8 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 	r.isolationSegments = c.IsolationSegments
 
 	r.maxConnsPerBackend = c.Backends.MaxConns
-
+	r.EmptyPoolTimeout = c.EmptyPoolTimeout
+	r.EmptyPoolResponseCode503 = c.EmptyPoolResponseCode503
 	return r
 }
 
@@ -115,6 +119,7 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 			Host:               host,
 			ContextPath:        contextPath,
 			MaxConnsPerBackend: r.maxConnsPerBackend,
+			EmptyPoolTimeout:   r.EmptyPoolTimeout,
 		})
 		r.byURI.Insert(routekey, pool)
 		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
@@ -319,7 +324,14 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 
 	r.byURI.EachNodeWithPool(func(t *container.Trie) {
 		endpoints := t.Pool.PruneEndpoints()
-		t.Snip()
+		if r.EmptyPoolResponseCode503 && t.Pool.EmptyPoolTimeout > 0 {
+			if time.Since(t.Pool.LastUpdated()) > t.Pool.EmptyPoolTimeout {
+				t.Snip()
+			}
+		} else {
+			t.Snip()
+		}
+
 		if len(endpoints) > 0 {
 			addresses := []string{}
 			for _, e := range endpoints {
