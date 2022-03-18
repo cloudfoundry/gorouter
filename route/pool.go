@@ -151,8 +151,10 @@ type EndpointPool struct {
 	nextIdx            int
 	maxConnsPerBackend int64
 
-	random *rand.Rand
-	logger logger.Logger
+	random           *rand.Rand
+	logger           logger.Logger
+	updatedAt        time.Time
+	EmptyPoolTimeout time.Duration
 }
 
 type EndpointOpts struct {
@@ -201,6 +203,7 @@ type PoolOpts struct {
 	ContextPath        string
 	MaxConnsPerBackend int64
 	Logger             logger.Logger
+	EmptyPoolTimeout   time.Duration
 }
 
 func NewPool(opts *PoolOpts) *EndpointPool {
@@ -214,6 +217,8 @@ func NewPool(opts *PoolOpts) *EndpointPool {
 		contextPath:        opts.ContextPath,
 		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
 		logger:             opts.Logger,
+		updatedAt:          time.Now(),
+		EmptyPoolTimeout:   opts.EmptyPoolTimeout,
 	}
 }
 
@@ -231,6 +236,14 @@ func (p *EndpointPool) ContextPath() string {
 
 func (p *EndpointPool) MaxConnsPerBackend() int64 {
 	return p.maxConnsPerBackend
+}
+
+func (p *EndpointPool) LastUpdated() time.Time {
+	return p.updatedAt
+}
+
+func (p *EndpointPool) Update() {
+	p.updatedAt = time.Now()
 }
 
 func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
@@ -273,9 +286,12 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 
 		p.index[endpoint.CanonicalAddr()] = e
 		p.index[endpoint.PrivateInstanceId] = e
+
 	}
 
 	e.updated = time.Now()
+	// set the update time of the pool
+	p.Update()
 
 	return result
 }
@@ -365,6 +381,7 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 
 	delete(p.index, e.endpoint.CanonicalAddr())
 	delete(p.index, e.endpoint.PrivateInstanceId)
+	p.Update()
 }
 
 func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
