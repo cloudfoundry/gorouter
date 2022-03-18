@@ -961,17 +961,57 @@ var _ = Describe("RouteRegistry", func() {
 			r.StopPruningCycle()
 		})
 
-		It("logs the route info for stale routes", func() {
-			r.Register("bar.com/path1/path2/path3", barEndpoint)
-			r.Register("bar.com/path1/path2/path3", fooEndpoint)
+		Context("when emptyPoolResponseCode503 is true and EmptyPoolTimeout greater than 0", func() {
+			JustBeforeEach(func() {
+				configObj.EmptyPoolResponseCode503 = true
+				configObj.EmptyPoolTimeout = 100 * time.Millisecond
+			})
 
-			Expect(r.NumUris()).To(Equal(1))
+			It("logs the route info for stale routes", func() {
+				r.Register("bar.com/path1/path2/path3", barEndpoint)
+				r.Register("bar.com/path1/path2/path3", fooEndpoint)
 
-			r.StartPruningCycle()
-			time.Sleep(2 * configObj.PruneStaleDropletsInterval)
+				Expect(r.NumUris()).To(Equal(1))
 
-			Expect(r.NumUris()).To(Equal(0))
-			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+				r.StartPruningCycle()
+				time.Sleep(2 * (configObj.PruneStaleDropletsInterval + configObj.EmptyPoolTimeout))
+
+				Expect(r.NumUris()).To(Equal(0))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+			})
+		})
+		Context("when emptyPoolResponseCode503 is true and EmptyPoolTimeout equals 0", func() {
+			JustBeforeEach(func() {
+				configObj.EmptyPoolResponseCode503 = true
+				configObj.EmptyPoolTimeout = 0
+			})
+
+			It("logs the route info for stale routes", func() {
+				r.Register("bar.com/path1/path2/path3", barEndpoint)
+				r.Register("bar.com/path1/path2/path3", fooEndpoint)
+
+				Expect(r.NumUris()).To(Equal(1))
+
+				r.StartPruningCycle()
+				time.Sleep(2 * configObj.PruneStaleDropletsInterval)
+
+				Expect(r.NumUris()).To(Equal(0))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+			})
+		})
+		Context("when emptyPoolResponseCode503 is false", func() {
+			It("logs the route info for stale routes", func() {
+				r.Register("bar.com/path1/path2/path3", barEndpoint)
+				r.Register("bar.com/path1/path2/path3", fooEndpoint)
+
+				Expect(r.NumUris()).To(Equal(1))
+
+				r.StartPruningCycle()
+				time.Sleep(2 * configObj.PruneStaleDropletsInterval)
+
+				Expect(r.NumUris()).To(Equal(0))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+			})
 		})
 
 		It("removes stale droplets", func() {
