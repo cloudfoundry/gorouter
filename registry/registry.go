@@ -119,7 +119,6 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 			Host:               host,
 			ContextPath:        contextPath,
 			MaxConnsPerBackend: r.maxConnsPerBackend,
-			EmptyPoolTimeout:   r.EmptyPoolTimeout,
 		})
 		r.byURI.Insert(routekey, pool)
 		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
@@ -164,8 +163,15 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 		}
 
 		if pool.IsEmpty() {
-			r.byURI.Delete(uri)
-			r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
+			if r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 {
+				if time.Since(pool.LastUpdated()) > r.EmptyPoolTimeout {
+					r.byURI.Delete(uri)
+					r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
+				}
+			} else {
+				r.byURI.Delete(uri)
+				r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
+			}
 		}
 	}
 }
@@ -324,8 +330,8 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 
 	r.byURI.EachNodeWithPool(func(t *container.Trie) {
 		endpoints := t.Pool.PruneEndpoints()
-		if r.EmptyPoolResponseCode503 && t.Pool.EmptyPoolTimeout > 0 {
-			if time.Since(t.Pool.LastUpdated()) > t.Pool.EmptyPoolTimeout {
+		if r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 {
+			if time.Since(t.Pool.LastUpdated()) > r.EmptyPoolTimeout {
 				t.Snip()
 			}
 		} else {

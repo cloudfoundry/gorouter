@@ -151,10 +151,9 @@ type EndpointPool struct {
 	nextIdx            int
 	maxConnsPerBackend int64
 
-	random           *rand.Rand
-	logger           logger.Logger
-	updatedAt        time.Time
-	EmptyPoolTimeout time.Duration
+	random    *rand.Rand
+	logger    logger.Logger
+	updatedAt time.Time
 }
 
 type EndpointOpts struct {
@@ -203,7 +202,6 @@ type PoolOpts struct {
 	ContextPath        string
 	MaxConnsPerBackend int64
 	Logger             logger.Logger
-	EmptyPoolTimeout   time.Duration
 }
 
 func NewPool(opts *PoolOpts) *EndpointPool {
@@ -218,7 +216,6 @@ func NewPool(opts *PoolOpts) *EndpointPool {
 		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
 		logger:             opts.Logger,
 		updatedAt:          time.Now(),
-		EmptyPoolTimeout:   opts.EmptyPoolTimeout,
 	}
 }
 
