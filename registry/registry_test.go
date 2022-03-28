@@ -524,6 +524,60 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(0))
 		})
 
+		Context("Unregister a route for a crashed app according to EmptyPoolResponseCode503 and EmptyPoolTimeout values", func() {
+			Context("EmptyPoolResponseCode503 is true and EmptyPoolTimeout greater than 0", func() {
+				JustBeforeEach(func() {
+					r.EmptyPoolResponseCode503 = true
+					r.EmptyPoolTimeout = 5 * time.Second
+				})
+
+				It("Removes the route after EmptyPoolTimeout period of time is passed", func() {
+					r.Register("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(1))
+
+					r.Unregister("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(1))
+					time.Sleep(r.EmptyPoolTimeout)
+					r.Unregister("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(0))
+
+				})
+			})
+
+			Context("EmptyPoolResponseCode503 is true and EmptyPoolTimeout equals 0", func() {
+				BeforeEach(func() {
+					r.EmptyPoolResponseCode503 = true
+					r.EmptyPoolTimeout = 0 * time.Second
+				})
+
+				It("Removes the route immediately", func() {
+					r.Register("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(1))
+
+					r.Unregister("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(0))
+
+				})
+			})
+
+			Context("EmptyPoolResponseCode503 is false", func() {
+				BeforeEach(func() {
+					r.EmptyPoolResponseCode503 = false
+					r.EmptyPoolTimeout = 1 * time.Second
+				})
+
+				It("Removes the route immediately", func() {
+					r.Register("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(1))
+
+					r.Unregister("bar", barEndpoint)
+					Expect(r.NumUris()).To(Equal(0))
+
+				})
+			})
+
+		})
+
 		Context("when routing table sharding mode is `segments`", func() {
 			BeforeEach(func() {
 				configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS
