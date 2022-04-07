@@ -8,7 +8,6 @@ import (
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"github.com/uber-go/zap"
@@ -40,12 +39,6 @@ func NewRouteService(
 }
 
 func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
-	prw, ok := rw.(utils.ProxyResponseWriter)
-	if !ok {
-		r.logger.Fatal("request-info-err", zap.String("error", "ProxyResponseWriter not found"))
-		return
-	}
-
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
 		r.logger.Fatal("request-info-err", zap.Error(err))
@@ -140,17 +133,6 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
 	reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
 	next(rw, req)
-
-	// drop the first endpoint from the pool in the event of route service failure,
-	// to prevent a stale route at index 0 with a bad route-service-url from being
-	// able to prune, and causing all other requests to fail. Using >= 400 here,
-	// rather than >= 500, since the route_service_url could contain authi
-	// information that is out of date
-	if prw.Status() >= http.StatusBadRequest {
-		if reqInfo.RoutePool.NumEndpoints() > 1 && !reqInfo.RoutePool.RemoveByIndex(0) {
-			r.logger.Error("route-service-prune-failed", zap.String("error", "failed to prune endpoint with failing route-service-url"))
-		}
-	}
 }
 
 func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
