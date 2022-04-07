@@ -30,9 +30,8 @@ var _ = Describe("Route Service Handler", func() {
 		reg      *fakeRegistry.FakeRegistry
 		routeMap map[string]*route.EndpointPool
 
-		resp       *httptest.ResponseRecorder
-		respStatus int
-		req        *http.Request
+		resp *httptest.ResponseRecorder
+		req  *http.Request
 
 		config       *routeservice.RouteServiceConfig
 		crypto       *secure.AesGCM
@@ -52,7 +51,7 @@ var _ = Describe("Route Service Handler", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		reqChan <- req
-		rw.WriteHeader(respStatus)
+		rw.WriteHeader(http.StatusTeapot)
 		rw.Write([]byte("I'm a little teapot, short and stout."))
 
 		nextCalled = true
@@ -76,7 +75,6 @@ var _ = Describe("Route Service Handler", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		resp = httptest.NewRecorder()
-		respStatus = http.StatusTeapot
 
 		reqChan = make(chan *http.Request, 1)
 
@@ -113,7 +111,6 @@ var _ = Describe("Route Service Handler", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.UseFunc(testSetupHandler)
-		handler.Use(handlers.NewProxyWriter(logger))
 		handler.Use(handlers.NewRouteService(config, reg, logger, ew))
 		handler.UseHandlerFunc(nextHandler)
 	})
@@ -591,71 +588,6 @@ var _ = Describe("Route Service Handler", func() {
 				Expect(resp.Body.String()).To(ContainSubstring("Route service request failed."))
 
 				Expect(nextCalled).To(BeFalse())
-			})
-		})
-
-		Context("When a route service returns unsuccessfully", func() {
-			var endpoint *route.Endpoint
-			var expectedPool *route.EndpointPool
-			BeforeEach(func() {
-				endpoint = route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://badservice.com"})
-				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
-
-				expectedPool = route.NewPool(&route.PoolOpts{
-					Logger:             logger,
-					RetryAfterFailure:  1 * time.Second,
-					Host:               "my_host.com",
-					ContextPath:        "/resource+9-9_9",
-					MaxConnsPerBackend: 0,
-				})
-				respStatus = http.StatusBadGateway
-			})
-			It("returns the status code from the route svc", func() {
-				handler.ServeHTTP(resp, req)
-
-				Expect(resp.Code).To(Equal(http.StatusBadGateway))
-
-				Expect(nextCalled).To(BeTrue())
-			})
-			Context("when multiple endpoints remain in the pool", func() {
-				BeforeEach(func() {
-					endpoint2 := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodsvc.com", Host: "other-host", Port: 42})
-					added := routePool.Put(endpoint2)
-					Expect(added).To(Equal(route.ADDED))
-
-					added = expectedPool.Put(endpoint2)
-					Expect(added).To(Equal(route.ADDED))
-				})
-				It("prunes the endpoint route that was used to define the route service, as it may be stale", func() {
-					handler.ServeHTTP(resp, req)
-
-					endpoints, err := routePool.MarshalJSON()
-					Expect(err).ToNot(HaveOccurred())
-					expectedEndpoints, err := expectedPool.MarshalJSON()
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(endpoints).To(MatchJSON(expectedEndpoints))
-				})
-			})
-			// Doing this prevents single-instance apps from flapping between 502 + 404 when they have
-			// a bad route svc. Additionally, sending a 404 about an app not having any registered endpoints
-			// while it has instances up and running seems very misleading to operators
-			Context("when there is only one endpoint left in the pool", func() {
-				BeforeEach(func() {
-					added := expectedPool.Put(endpoint)
-					Expect(added).To(Equal(route.ADDED))
-				})
-				It("does not prune the last endpoint in the pool", func() {
-					handler.ServeHTTP(resp, req)
-
-					endpoints, err := routePool.MarshalJSON()
-					Expect(err).ToNot(HaveOccurred())
-					expectedEndpoints, err := expectedPool.MarshalJSON()
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(endpoints).To(MatchJSON(expectedEndpoints))
-				})
 			})
 		})
 	})

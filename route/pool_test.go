@@ -2,7 +2,6 @@ package route_test
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -325,50 +324,6 @@ var _ = Describe("EndpointPool", func() {
 
 				Expect(pool.IsEmpty()).To(BeFalse())
 			})
-		})
-	})
-
-	Context("RemoveByIndex", func() {
-		It("removes the requested endpoint", func() {
-			for i := 1; i <= 3; i++ {
-				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: fmt.Sprintf("host%d", i)}))
-			}
-
-			b := pool.RemoveByIndex(1)
-			Expect(b).To(BeTrue())
-
-			expected := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
-				RetryAfterFailure:  2 * time.Minute,
-				Host:               "",
-				ContextPath:        "",
-				MaxConnsPerBackend: 0,
-			})
-			expected.Put(route.NewEndpoint(&route.EndpointOpts{Host: "host1"}))
-			expected.Put(route.NewEndpoint(&route.EndpointOpts{Host: "host2"}))
-			Expect(route.PoolsMatch(pool, expected)).To(BeTrue())
-		})
-
-		It("removes down to zero endpoints", func() {
-			endpoint := &route.Endpoint{}
-			pool.Put(endpoint)
-
-			b := pool.RemoveByIndex(0)
-			Expect(b).To(BeTrue())
-			Expect(pool.IsEmpty()).To(BeTrue())
-		})
-
-		It("fails when no endpoints exist", func() {
-			b := pool.RemoveByIndex(0)
-			Expect(b).To(BeFalse())
-		})
-
-		It("fails to remove an endpoint that doesn't exist", func() {
-			endpoint := &route.Endpoint{}
-			pool.Put(endpoint)
-
-			b := pool.RemoveByIndex(15)
-			Expect(b).To(BeFalse())
 		})
 	})
 

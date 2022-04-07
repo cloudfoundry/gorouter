@@ -354,17 +354,6 @@ func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
 	return false
 }
 
-func (p *EndpointPool) RemoveByIndex(i int) bool {
-	p.Lock()
-	defer p.Unlock()
-	l := len(p.endpoints)
-	if i >= 0 && i < l {
-		p.removeEndpoint(p.endpoints[i])
-		return true
-	}
-	return false
-}
-
 func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	i := e.index
 	es := p.endpoints
