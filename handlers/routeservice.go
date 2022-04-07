@@ -142,11 +142,10 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 
 	// drop the first endpoint from the pool in the event of route service failure,
-	// because a stale route at index 0 with a bad route-service-url will result in
-	// all other requests failing at the route-service level. (the non-stale routes'
-	// route-services would never be hit)
-	// Using >= 400 here, rather than >= 500, since the route_service_url could
-	// contain auth information that is out of date
+	// to prevent a stale route at index 0 with a bad route-service-url from being
+	// able to prune, and causing all other requests to fail. Using >= 400 here,
+	// rather than >= 500, since the route_service_url could contain authi
+	// information that is out of date
 	if prw.Status() >= http.StatusBadRequest {
 		if reqInfo.RoutePool.NumEndpoints() > 1 && !reqInfo.RoutePool.RemoveByIndex(0) {
 			r.logger.Error("route-service-prune-failed", zap.String("error", "failed to prune endpoint with failing route-service-url"))
