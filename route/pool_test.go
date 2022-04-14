@@ -251,6 +251,34 @@ var _ = Describe("EndpointPool", func() {
 				Expect(url).To(Equal(""))
 			})
 		})
+		Context("when any endpoint updates its route_service_url", func() {
+			It("returns the route_service_url most recently updated in the pool", func() {
+				endpointRS1 := route.NewEndpoint(&route.EndpointOpts{Host: "host-1", Port: 1234, RouteServiceUrl: "first-url"})
+				endpointRS2 := route.NewEndpoint(&route.EndpointOpts{Host: "host-2", Port: 2234, RouteServiceUrl: "second-url"})
+				b := pool.Put(endpointRS1)
+				Expect(b).To(Equal(route.ADDED))
+
+				url := pool.RouteServiceUrl()
+				Expect(url).To(Equal("first-url"))
+
+				b = pool.Put(endpointRS2)
+				Expect(b).To(Equal(route.ADDED))
+				url = pool.RouteServiceUrl()
+				Expect(url).To(Equal("second-url"))
+
+				endpointRS1.RouteServiceUrl = "third-url"
+				b = pool.Put(endpointRS1)
+				Expect(b).To(Equal(route.UPDATED))
+				url = pool.RouteServiceUrl()
+				Expect(url).To(Equal("third-url"))
+
+				endpointRS2.RouteServiceUrl = "fourth-url"
+				b = pool.Put(endpointRS2)
+				Expect(b).To(Equal(route.UPDATED))
+				url = pool.RouteServiceUrl()
+				Expect(url).To(Equal("fourth-url"))
+			})
+		})
 	})
 
 	Context("EndpointFailed", func() {

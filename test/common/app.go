@@ -26,6 +26,7 @@ type TestApp struct {
 	mbusClient   *nats.Conn
 	tags         map[string]string
 	mux          *http.ServeMux
+	server       *http.Server
 	stopped      bool
 	routeService string
 	GUID         string
@@ -57,18 +58,22 @@ func (a *TestApp) Urls() []route.Uri {
 	return a.urls
 }
 
+func (a *TestApp) SetRouteService(routeService string) {
+	a.routeService = routeService
+}
+
 func (a *TestApp) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
 }
 
 func (a *TestApp) TlsListen(tlsConfig *tls.Config) error {
-	server := &http.Server{
+	a.server = &http.Server{
 		Addr:      fmt.Sprintf(":%d", a.port),
 		Handler:   a.mux,
 		TLSConfig: tlsConfig,
 	}
 
-	go server.ListenAndServeTLS("", "")
+	go a.server.ListenAndServeTLS("", "")
 	return nil
 }
 
@@ -117,6 +122,9 @@ func (a *TestApp) WaitUntilReady() {
 }
 
 func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
+	a.TlsRegisterWithIndex(serverCertDomainSAN, 0)
+}
+func (a *TestApp) TlsRegisterWithIndex(serverCertDomainSAN string, index int) {
 	id, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host:                    "127.0.0.1",
@@ -126,7 +134,7 @@ func (a *TestApp) TlsRegister(serverCertDomainSAN string) {
 		Tags:                    a.tags,
 		Dea:                     "dea",
 		App:                     a.GUID,
-		PrivateInstanceIndex:    "0",
+		PrivateInstanceIndex:    fmt.Sprintf("%d", index),
 		StaleThresholdInSeconds: 1,
 
 		RouteServiceUrl:     a.routeService,
@@ -170,7 +178,7 @@ func (a *TestApp) Unregister() {
 	b, _ := json.Marshal(rm)
 	a.mbusClient.Publish("router.unregister", b)
 
-	a.stop()
+	a.Stop()
 }
 
 func (a *TestApp) VerifyAppStatus(status int) {
@@ -223,9 +231,12 @@ func (a *TestApp) start() {
 	a.mutex.Unlock()
 }
 
-func (a *TestApp) stop() {
+func (a *TestApp) Stop() {
 	a.mutex.Lock()
 	a.stopped = true
+	if a.server != nil {
+		a.server.Close()
+	}
 	a.mutex.Unlock()
 }
 

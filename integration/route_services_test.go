@@ -6,7 +6,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"time"
 
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -28,6 +32,7 @@ var _ = Describe("Route services", func() {
 		testState = NewTestState()
 		testApp = httptest.NewServer(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Add("X-App-Instance", "app1")
 				w.WriteHeader(200)
 				_, err := w.Write([]byte("I'm the app"))
 				Expect(err).ToNot(HaveOccurred())
@@ -57,6 +62,7 @@ var _ = Describe("Route services", func() {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(body).To(Equal([]byte("I'm the app")))
 
+					w.Header().Add("X-App-Instance", res.Header.Get("X-App-Instance"))
 					w.WriteHeader(res.StatusCode)
 					_, err = w.Write([]byte("I'm the route service"))
 					Expect(err).ToNot(HaveOccurred())
@@ -71,6 +77,11 @@ var _ = Describe("Route services", func() {
 		routeService.Close()
 		testApp.Close()
 	})
+
+	routeSvcUrl := func(routeService *httptest.Server) string {
+		port := strings.Split(routeService.Listener.Addr().String(), ":")[1]
+		return fmt.Sprintf("https://%s:%s", testState.trustedExternalServiceHostname, port)
+	}
 
 	Context("Happy Path", func() {
 		Context("When an app is registered with a simple route service", func() {
@@ -110,6 +121,133 @@ var _ = Describe("Route services", func() {
 				body, err := ioutil.ReadAll(res.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
+			})
+		})
+	})
+
+	Context("When an route with a route service has a stale endpoint", func() {
+		var (
+			tlsTestApp1, tlsTestApp2 *common.TestApp
+			tlsTestAppID             string
+		)
+
+		tlsTestAppID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+		setupAppInstance := func(index int) *common.TestApp {
+			app := common.NewTestApp(
+				[]route.Uri{appHostname},
+				testState.cfg.Port,
+				testState.mbusClient,
+				nil,
+				routeSvcUrl(routeService),
+			)
+
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Add("X-App-Instance", fmt.Sprintf("app%d", index+1))
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte("I'm the app"))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			app.GUID = tlsTestAppID
+			app.TlsRegisterWithIndex(testState.trustedBackendServerCertSAN, index)
+			err := app.TlsListen(testState.trustedBackendTLSConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			return app
+		}
+
+		BeforeEach(func() {
+			testState.StartGorouterOrFail()
+			routeService.TLS = testState.trustedExternalServiceTLS
+			routeService.StartTLS()
+
+			tlsTestApp1 = setupAppInstance(0)
+			tlsTestApp2 = setupAppInstance(1)
+
+			// Verify we get app1 if we request it while it's running
+			req := testState.newRequest(
+				fmt.Sprintf("https://%s", appHostname),
+			)
+			Eventually(func(g Gomega) {
+				res, err := testState.client.Do(req)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.StatusCode).To(Equal(http.StatusOK))
+				g.Expect(res.Header.Get("X-App-Instance")).To(Equal("app1"))
+			}).Should(Succeed())
+			tlsTestApp1.Stop()
+		})
+
+		AfterEach(func() {
+			tlsTestApp1.Unregister()
+			tlsTestApp2.Unregister()
+		})
+
+		It("prunes the stale endpoint", func() {
+			req := testState.newRequest(
+				fmt.Sprintf("https://%s", appHostname),
+			)
+			time.Sleep(100 * time.Millisecond)
+			Consistently(func(g Gomega) {
+				res, err := testState.client.Do(req)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(res.StatusCode).To(Equal(http.StatusOK))
+				g.Expect(res.Header.Get("X-App-Instance")).To(Equal("app2"))
+			}).Should(Succeed())
+		})
+		Context("when the route service on the stale route was out of date", func() {
+			var routeService2 *httptest.Server
+			BeforeEach(func() {
+				routeService2 = httptest.NewUnstartedServer(
+					http.HandlerFunc(
+						func(w http.ResponseWriter, r *http.Request) {
+							defer GinkgoRecover()
+
+							forwardedURL := r.Header.Get("X-CF-Forwarded-Url")
+							sigHeader := r.Header.Get("X-Cf-Proxy-Signature")
+							metadata := r.Header.Get("X-Cf-Proxy-Metadata")
+
+							req := testState.newRequest(forwardedURL)
+
+							req.Header.Add("X-CF-Forwarded-Url", forwardedURL)
+							req.Header.Add("X-Cf-Proxy-Metadata", metadata)
+							req.Header.Add("X-Cf-Proxy-Signature", sigHeader)
+
+							res, err := testState.routeServiceClient.Do(req)
+							Expect(err).ToNot(HaveOccurred())
+							defer res.Body.Close()
+							Expect(res.StatusCode).To(Equal(http.StatusOK))
+
+							body, err := ioutil.ReadAll(res.Body)
+							Expect(err).ToNot(HaveOccurred())
+							Expect(body).To(Equal([]byte("I'm the app")))
+
+							w.Header().Add("X-App-Instance", res.Header.Get("X-App-Instance"))
+							w.WriteHeader(res.StatusCode)
+							_, err = w.Write([]byte("I'm the route service"))
+							Expect(err).ToNot(HaveOccurred())
+						}))
+				routeService2.TLS = testState.trustedExternalServiceTLS
+				routeService2.StartTLS()
+				tlsTestApp2.SetRouteService(routeSvcUrl(routeService2))
+				tlsTestApp2.TlsRegisterWithIndex(testState.trustedBackendServerCertSAN, 1)
+				routeService.Close()
+			})
+			AfterEach(func() {
+				routeService2.Close()
+			})
+
+			It("still prunes the stale endpoint", func() {
+				req := testState.newRequest(
+					fmt.Sprintf("https://%s", appHostname),
+				)
+				time.Sleep(100 * time.Millisecond)
+
+				Consistently(func(g Gomega) {
+					res, err := testState.client.Do(req)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(res.StatusCode).To(Equal(http.StatusOK))
+					g.Expect(res.Header.Get("X-App-Instance")).To(Equal("app2"))
+				}).Should(Succeed())
 			})
 		})
 	})
