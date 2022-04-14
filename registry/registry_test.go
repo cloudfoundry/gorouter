@@ -209,6 +209,16 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(route.PoolsMatch(p1, p2)).To(BeTrue())
 				Expect(route.PoolsMatch(p1, p3)).To(BeFalse())
 			})
+
+			It("sets the route service URL on the pool", func() {
+				m1 := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://www.neopets.com"})
+
+				r.Register("dora.app.com/app", m1)
+
+				p1 := r.Lookup("dora.app.com/app")
+
+				Expect(p1.RouteSvcUrl).To(Equal("https://www.neopets.com"))
+			})
 		})
 
 		Context("wildcard routes", func() {
