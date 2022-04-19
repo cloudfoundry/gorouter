@@ -74,7 +74,7 @@ func NewTestState() *testState {
 	cfg.DropletStaleThreshold = 10 * time.Second
 	cfg.StartResponseDelayInterval = 1 * time.Second
 	cfg.EndpointTimeout = 15 * time.Second
-	cfg.EndpointDialTimeout = 100 * time.Millisecond
+	cfg.EndpointDialTimeout = 500 * time.Millisecond
 	cfg.DrainTimeout = 200 * time.Millisecond
 	cfg.DrainWait = 1 * time.Second
 

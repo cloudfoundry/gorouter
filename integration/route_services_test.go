@@ -150,7 +150,7 @@ var _ = Describe("Route services", func() {
 
 			app.GUID = tlsTestAppID
 			app.TlsRegisterWithIndex(testState.trustedBackendServerCertSAN, index)
-			err := app.TlsListen(testState.trustedBackendTLSConfig)
+			err := app.TlsListen(testState.trustedBackendTLSConfig.Clone())
 			Expect(err).NotTo(HaveOccurred())
 
 			return app

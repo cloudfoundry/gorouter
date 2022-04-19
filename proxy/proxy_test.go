@@ -653,6 +653,7 @@ var _ = Describe("Proxy", func() {
 
 				// Write 3 times on a 100ms interval
 				go func() {
+					defer GinkgoRecover()
 					t := time.NewTicker(100 * time.Millisecond)
 					defer t.Stop()
 					defer w.Close()
@@ -2101,6 +2102,7 @@ var _ = Describe("Proxy", func() {
 			})
 			It("records http prometheus metrics", func() {
 				ln := test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
+					conn.ReadRequest()
 					resp := test_util.NewResponse(http.StatusOK)
 					conn.WriteResponse(resp)
 					conn.Close()
@@ -2121,6 +2123,7 @@ var _ = Describe("Proxy", func() {
 
 		It("does not register http prometheus metrics", func() {
 			ln := test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
+				conn.ReadRequest()
 				resp := test_util.NewResponse(http.StatusOK)
 				conn.WriteResponse(resp)
 				conn.Close()
