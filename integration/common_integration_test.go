@@ -91,14 +91,14 @@ func NewTestState() *testState {
 	Expect(err).ToNot(HaveOccurred())
 
 	browserToGorouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	cfg.CACerts = cfg.CACerts + string(browserToGorouterClientCertChain.CACertPEM)
-	cfg.CACerts = cfg.CACerts + string(routeServiceCert)
+	cfg.CACerts = append(cfg.CACerts, string(browserToGorouterClientCertChain.CACertPEM))
+	cfg.CACerts = append(cfg.CACerts, string(routeServiceCert))
 	routeServiceToGorouterClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{})
-	cfg.CACerts = cfg.CACerts + string(routeServiceToGorouterClientCertChain.CACertPEM)
+	cfg.CACerts = append(cfg.CACerts, string(routeServiceToGorouterClientCertChain.CACertPEM))
 
 	trustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	backendCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: trustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: trustedBackendServerCertSAN}})
-	cfg.CACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
+	cfg.CACerts = append(cfg.CACerts, string(backendCertChain.CACertPEM))
 
 	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter", SANs: test_util.SubjectAltNames{DNS: "gorouter"}})
 	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
@@ -107,10 +107,10 @@ func NewTestState() *testState {
 	untrustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	untrustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: untrustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: untrustedBackendServerCertSAN}})
 	untrustedBackendTLSConfig := untrustedBackendCLientCertChain.AsTLSConfig()
-	cfg.CACerts = cfg.CACerts + string(untrustedBackendCLientCertChain.CACertPEM)
+	cfg.CACerts = append(cfg.CACerts, string(untrustedBackendCLientCertChain.CACertPEM))
 
 	cfg.OnlyTrustClientCACerts = false
-	cfg.ClientCACerts = cfg.CACerts + string(backendCertChain.CACertPEM)
+	cfg.ClientCACerts = strings.Join(cfg.CACerts, "") + string(backendCertChain.CACertPEM)
 
 	// set Gorouter to use client certs
 	cfg.Backends.TLSPem = config.TLSPem{

@@ -1358,7 +1358,7 @@ var _ = Describe("Router", func() {
 		)
 		BeforeEach(func() {
 			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
-			config.CACerts = string(certChain.CACertPEM)
+			config.CACerts = []string{string(certChain.CACertPEM)}
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 
 			rootCAs = x509.NewCertPool()
@@ -1405,7 +1405,7 @@ var _ = Describe("Router", func() {
 		)
 		BeforeEach(func() {
 			certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
-			config.CACerts = string(certChain.CACertPEM)
+			config.CACerts = []string{string(certChain.CACertPEM)}
 			config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
 			cert = certChain.CertPEM
 
@@ -1482,7 +1482,7 @@ var _ = Describe("Router", func() {
 
 		Context("when a ca cert is provided", func() {
 			BeforeEach(func() {
-				config.CACerts = string(cert)
+				config.CACerts = []string{string(cert)}
 			})
 			It("add the ca cert to the trusted pool and returns 200", func() {
 				certPool, err := x509.SystemCertPool()

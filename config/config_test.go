@@ -1096,7 +1096,9 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 			Context("when a valid CACerts is provided", func() {
 				BeforeEach(func() {
-					configSnippet.CACerts = string(rootRSAPEM) + string(rootECDSAPEM)
+					configSnippet.CACerts = []string{
+						string(rootRSAPEM), string(rootECDSAPEM),
+					}
 				})
 
 				It("populates the CACerts and CAPool property", func() {
@@ -1106,13 +1108,15 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 					Expect(config.EnableSSL).To(Equal(true))
 					Expect(config.Process()).To(Succeed())
-					Expect(config.CACerts).To(Equal(strings.Join(expectedCAPEMs, "")))
+					Expect(config.CACerts).To(Equal(expectedCAPEMs))
 
-					certDER, _ := pem.Decode([]byte(config.CACerts))
-					Expect(err).NotTo(HaveOccurred())
-					c, err := x509.ParseCertificate(certDER.Bytes)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(config.CAPool.Subjects()).To(ContainElement(c.RawSubject))
+					for _, cert := range config.CACerts {
+						certDER, _ := pem.Decode([]byte(cert))
+						Expect(err).NotTo(HaveOccurred())
+						c, err := x509.ParseCertificate(certDER.Bytes)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(config.CAPool.Subjects()).To(ContainElement(c.RawSubject))
+					}
 				})
 			})
 
@@ -1364,7 +1368,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						string(clientRSAPEM),
 					}
 
-					configSnippet.CACerts = string(rootRSAPEM) + string(rootECDSAPEM)
+					configSnippet.CACerts = []string {string(rootRSAPEM), string(rootECDSAPEM)}
 				})
 
 				Context("When only_trust_client_ca_certs is true", func() {
@@ -1382,17 +1386,20 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						Expect(config.ClientCACerts).To(Equal(strings.Join(expectedClientCAPEMs, "")))
 						Expect(config.OnlyTrustClientCACerts).To(BeTrue())
 
-						caCertDER, _ := pem.Decode([]byte(config.CACerts))
-						Expect(err).NotTo(HaveOccurred())
-						c, err := x509.ParseCertificate(caCertDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.Subject.CommonName))
 
-						clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
-						Expect(err).NotTo(HaveOccurred())
-						c, err = x509.ParseCertificate(clientCACertDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
+						for _, caCert := range config.CACerts {
+							caCertDER, _ := pem.Decode([]byte(caCert))
+							Expect(err).NotTo(HaveOccurred())
+							c, err := x509.ParseCertificate(caCertDER.Bytes)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.Subject.CommonName))
+
+							clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
+							Expect(err).NotTo(HaveOccurred())
+							c, err = x509.ParseCertificate(clientCACertDER.Bytes)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
+						}
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
@@ -1421,7 +1428,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 				Context("When only_trust_client_ca_certs is false", func() {
 					BeforeEach(func() {
 						configSnippet.OnlyTrustClientCACerts = false
-						configSnippet.ClientCACerts = configSnippet.CACerts + string(clientRSAPEM)
+						configSnippet.ClientCACerts = strings.Join(configSnippet.CACerts, "") + string(clientRSAPEM)
 					})
 
 					It("client_ca_pool contains CAs from client_ca_certs, ca_certs, and the system CAs", func() {
@@ -1439,11 +1446,13 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						Expect(err).NotTo(HaveOccurred())
 						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 
-						caCertDER, _ := pem.Decode([]byte(config.CACerts))
-						Expect(err).NotTo(HaveOccurred())
-						c, err = x509.ParseCertificate(caCertDER.Bytes)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
+						for _, caCert := range config.CACerts {
+							caCertDER, _ := pem.Decode([]byte(caCert))
+							Expect(err).NotTo(HaveOccurred())
+							c, err = x509.ParseCertificate(caCertDER.Bytes)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
+						}
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
