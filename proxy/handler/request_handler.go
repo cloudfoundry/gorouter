@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -239,7 +240,14 @@ func (h *RequestHandler) serveTcp(
 
 	// Any status code has already been sent to the client,
 	// but this is the value that gets written to the access logs
-	backendStatusCode := h.forwarder.ForwardIO(client, backendConnection)
+	backendStatusCode, err := h.forwarder.ForwardIO(client, backendConnection)
+
+	// add X-Cf-RouterError header to improve traceability in access log
+	if err != nil {
+		errMsg:= fmt.Sprintf("endpoint_failure (%s)", err.Error())
+		handlers.AddRouterErrorHeader(h.response, errMsg)
+	}
+
 	return backendStatusCode, nil
 }
 
