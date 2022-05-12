@@ -25,7 +25,7 @@ type Forwarder struct {
 //
 // If the backend response code is not 101 Switching Protocols, then
 // ForwardIO will return immediately, allowing the caller to close the connections.
-func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
+func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) (int, error) {
 	done := make(chan bool, 2)
 
 	copy := func(dst io.Writer, src io.Reader) {
@@ -45,7 +45,7 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 		if writeErr != nil {
 			f.Logger.Error("websocket-client-write", zap.Error(writeErr))
 		}
-		return http.StatusBadGateway
+		return http.StatusBadGateway, err
 	}
 
 	// as long as we got a valid response from the backend,
@@ -59,14 +59,14 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 		// but there isn't much we can do about that at this point
 		//
 		// return it so we can log it in access logs
-		return resp.StatusCode
+		return resp.StatusCode, err
 	}
 
 	if !isValidWebsocketResponse(resp) {
 		errMsg := fmt.Sprintf("backend responded with non-101 status code: %d", resp.StatusCode)
 		err = errors.New(errMsg)
 		f.Logger.Error("websocket-backend", zap.Error(err))
-		return resp.StatusCode
+		return resp.StatusCode, err
 	}
 
 	// only now do we start copying body data
@@ -75,7 +75,7 @@ func (f *Forwarder) ForwardIO(clientConn, backendConn io.ReadWriter) int {
 
 	// Note: this blocks until the entire websocket activity completes
 	<-done
-	return http.StatusSwitchingProtocols
+	return http.StatusSwitchingProtocols, nil
 }
 
 func isValidWebsocketResponse(resp *http.Response) bool {

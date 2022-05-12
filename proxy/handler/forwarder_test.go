@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 
 	"code.cloudfoundry.org/gorouter/proxy/handler"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -44,7 +45,9 @@ var _ = Describe("Forwarder", func() {
 		})
 
 		It("returns the status code that the backend responded with", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusSwitchingProtocols))
+			code, err := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(code).To(Equal(http.StatusSwitchingProtocols))
+			Expect(err).To(BeNil())
 		})
 
 		It("always copies the full response header to the client conn, before it returns", func() {
@@ -54,7 +57,9 @@ var _ = Describe("Forwarder", func() {
 
 		It("eventually writes all the response data", func() {
 			backendConn = buildFakeBackend("101 Switching Protocols", bytes.NewBufferString("some websocket data"))
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusSwitchingProtocols))
+			code, err := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(code).To(Equal(http.StatusSwitchingProtocols))
+			Expect(err).To(BeNil())
 			Eventually(clientConn.GetWrittenBytes).Should(ContainSubstring("some websocket data"))
 		})
 	})
@@ -65,7 +70,9 @@ var _ = Describe("Forwarder", func() {
 		})
 
 		It("immediately returns the code, without waiting for either connection to close", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusOK))
+			code, err := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(code).To(Equal(http.StatusOK))
+			Expect(err).To(MatchError("backend responded with non-101 status code: 200"))
 		})
 
 		It("always copies the full response header to the client conn, before it returns", func() {
@@ -80,7 +87,8 @@ var _ = Describe("Forwarder", func() {
 		})
 
 		It("returns code 502 and logs the error", func() {
-			code := forwarder.ForwardIO(clientConn, backendConn)
+			code, err := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(err).Should(MatchError("malformed HTTP status code \"banana\""))
 			Expect(code).To(Equal(http.StatusBadGateway))
 			Expect(logger.Buffer()).To(gbytes.Say(`websocket-forwardio`))
 			Expect(clientConn.GetWrittenBytes()).To(HavePrefix("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
@@ -91,7 +99,8 @@ var _ = Describe("Forwarder", func() {
 				clientConn.WriteError("banana")
 			})
 			It("returns code 502 and logs the error", func() {
-				code := forwarder.ForwardIO(clientConn, backendConn)
+				code, err := forwarder.ForwardIO(clientConn, backendConn)
+				Expect(err).Should(MatchError("malformed HTTP status code \"banana\""))
 				Expect(code).To(Equal(http.StatusBadGateway))
 				Expect(logger.Buffer()).To(gbytes.Say(`websocket-forwardio`))
 				Expect(logger.Buffer()).To(gbytes.Say(`websocket-client-write.*banana`))
@@ -105,7 +114,9 @@ var _ = Describe("Forwarder", func() {
 		})
 
 		It("times out after some time and logs the timeout", func() {
-			Expect(forwarder.ForwardIO(clientConn, backendConn)).To(Equal(http.StatusBadGateway))
+			code, err := forwarder.ForwardIO(clientConn, backendConn)
+			Expect(code).To(Equal(http.StatusBadGateway))
+			Expect(err).To(MatchError(utils.TimeoutError{}))
 			Expect(logger.Buffer()).To(gbytes.Say(`timeout waiting for http response from backend`))
 		})
 	})
