@@ -83,6 +83,7 @@ func setupLogger(disableXFFLogging, disableSourceIPLogging bool, request *http.R
 		zap.String("Path", request.URL.Path),
 		zap.Object("X-Forwarded-For", request.Header["X-Forwarded-For"]),
 		zap.Object("X-Forwarded-Proto", request.Header["X-Forwarded-Proto"]),
+		zap.Object("X-Vcap-Request-Id", request.Header["X-Vcap-Request-Id"]),
 	}
 	// Specific indexes below is to preserve the schema in the log line
 	if disableSourceIPLogging {
