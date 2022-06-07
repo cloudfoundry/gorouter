@@ -10,9 +10,13 @@ import (
 	"time"
 
 	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
 )
 
-const healthCheckEndpoint = "/healthz"
+const (
+	healthCheckEndpoint = "/healthz"
+	numRetries          = 3
+)
 
 type Watchdog struct {
 	host         string
@@ -35,6 +39,7 @@ func NewWatchdog(host string, pollInterval time.Duration, healthcheckTimeout tim
 
 func (w *Watchdog) WatchHealthcheckEndpoint(ctx context.Context, signals <-chan os.Signal) error {
 	pollTimer := time.NewTimer(w.pollInterval)
+	errCounter := 0
 	defer pollTimer.Stop()
 	for {
 		select {
@@ -50,15 +55,22 @@ func (w *Watchdog) WatchHealthcheckEndpoint(ctx context.Context, signals <-chan 
 			w.logger.Debug("Verifying gorouter endpoint")
 			err := w.HitHealthcheckEndpoint()
 			if err != nil {
-				select {
-				case sig := <-signals:
-					if sig == syscall.SIGUSR1 {
-						w.logger.Info("Received USR1 signal, exiting")
-						return nil
+				errCounter += 1
+				if errCounter >= numRetries {
+					select {
+					case sig := <-signals:
+						if sig == syscall.SIGUSR1 {
+							w.logger.Info("Received USR1 signal, exiting")
+							return nil
+						}
+					default:
+						return err
 					}
-				default:
-					return err
+				} else {
+					w.logger.Debug("Received error", zap.Error(err), zap.Int("attempt", errCounter))
 				}
+			} else {
+				errCounter = 0
 			}
 			pollTimer.Reset(w.pollInterval)
 		}
