@@ -132,6 +132,82 @@ var _ = Describe("Watchdog", func() {
 			})
 		})
 
+		Context("the healthcheck fails repeatedly", func() {
+			var retriesNum int
+
+			BeforeEach(func() {
+				httpHandler := http.NewServeMux()
+
+				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+					rw.WriteHeader(http.StatusNotAcceptable)
+					retriesNum++
+					r.Close = true
+				})
+				srv = runServer(httpHandler)
+			})
+
+			It("retries 3 times and then fails", func() {
+				err := dog.WatchHealthcheckEndpoint(context.Background(), signals)
+				Expect(err).To(HaveOccurred())
+				Expect(retriesNum).To(Equal(3))
+			})
+		})
+
+		Context("the healthcheck fails and then succeeds", func() {
+			BeforeEach(func() {
+				var visitCount int
+				httpHandler := http.NewServeMux()
+				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+					if visitCount < 2 {
+						rw.WriteHeader(http.StatusNotAcceptable)
+					} else {
+						rw.WriteHeader(http.StatusOK)
+					}
+					r.Close = true
+					visitCount++
+				})
+				srv = runServer(httpHandler)
+			})
+
+			It("retries on failures and then succeeds", func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*pollInterval)
+				defer cancel()
+				err := dog.WatchHealthcheckEndpoint(ctx, signals)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		Context("the healthcheck fails and then succeeds, and then fails again", func() {
+			var firstRetriesNum int
+			var secondRetriesNum int
+
+			BeforeEach(func() {
+				var visitCount int
+				httpHandler := http.NewServeMux()
+				httpHandler.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+					if visitCount < 2 {
+						rw.WriteHeader(http.StatusNotAcceptable)
+						firstRetriesNum++
+					} else if visitCount < 4 {
+						rw.WriteHeader(http.StatusOK)
+					} else {
+						rw.WriteHeader(http.StatusNotAcceptable)
+						secondRetriesNum++
+					}
+					r.Close = true
+					visitCount++
+				})
+				srv = runServer(httpHandler)
+			})
+
+			It("retries on second failures", func() {
+				err := dog.WatchHealthcheckEndpoint(context.Background(), signals)
+				Expect(err).To(HaveOccurred())
+				Expect(firstRetriesNum).To(Equal(2))
+				Expect(secondRetriesNum).To(Equal(3))
+			})
+		})
+
 		Context("the endpoint does not respond in the configured timeout", func() {
 			BeforeEach(func() {
 				httpHandler := http.NewServeMux()
