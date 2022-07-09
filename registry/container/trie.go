@@ -44,7 +44,7 @@ func (r *Trie) Find(uri route.Uri) *route.EndpointPool {
 	return nil
 }
 
-// MatchUri returns the longest route that matches the URI parameter, nil if nothing matches.
+// MatchUri returns the longest route that matches the URI parameter and has endpoints, nil if nothing matches.
 func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
@@ -61,7 +61,8 @@ func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 
 		node = matchingChild
 
-		if nil != node.Pool {
+		// Matching pools with endpoints is what we want
+		if nil != node.Pool && !node.Pool.IsEmpty() {
 			lastPool = node.Pool
 		}
 
@@ -72,15 +73,12 @@ func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 		key = pathParts[1]
 	}
 
-	if nil != node.Pool {
+	// Prefer lastPool over node.Pool since we know it must have endpoints
+	if nil != node.Pool && nil == lastPool {
 		return node.Pool
 	}
 
-	if nil != lastPool {
-		return lastPool
-	}
-
-	return nil
+	return lastPool
 }
 
 func (r *Trie) Insert(uri route.Uri, value *route.EndpointPool) *Trie {
