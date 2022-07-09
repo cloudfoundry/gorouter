@@ -95,6 +95,8 @@ var _ = Describe("Trie", func() {
 		})
 
 		It("returns the longest found match when routes overlap", func() {
+			p1.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			p2.Put(route.NewEndpoint(&route.EndpointOpts{}))
 			r.Insert("/foo", p1)
 			r.Insert("/foo/bar/baz", p2)
 			node := r.MatchUri("/foo/bar")
@@ -102,10 +104,53 @@ var _ = Describe("Trie", func() {
 		})
 
 		It("returns the longest found match when routes overlap and longer path created first", func() {
+			p1.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			p2.Put(route.NewEndpoint(&route.EndpointOpts{}))
 			r.Insert("/foo/bar/baz", p2)
 			r.Insert("/foo", p1)
 			node := r.MatchUri("/foo/bar")
 			Expect(node).To(Equal(p1))
+		})
+
+		It("returns a.b.com if it is not empty", func() {
+			p1.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			r.Insert("a.b.com", p1)
+			node := r.MatchUri("a.b.com")
+			Expect(node).To(Equal(p1))
+			node = r.MatchUri("a.b.com/foo")
+			Expect(node).To(Equal(p1))
+		})
+
+		It("returns a.b.com even if is empty", func() {
+			r.Insert("a.b.com", p1)
+			node := r.MatchUri("a.b.com")
+			Expect(node).To(Equal(p1))
+			node = r.MatchUri("a.b.com/foo")
+			Expect(node).To(Equal(p1))
+		})
+
+		It("returns a.b.com if a.b.com/foo is empty", func() {
+			p1.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			r.Insert("a.b.com", p1)
+			r.Insert("a.b.com/foo", p2)
+			node := r.MatchUri("a.b.com/foo")
+			Expect(node).To(Equal(p1))
+		})
+
+		It("returns a.b.com/foo if both a.b.com and a.b.com/foo are not empty", func() {
+			p1.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			p2.Put(route.NewEndpoint(&route.EndpointOpts{}))
+			r.Insert("a.b.com", p1)
+			r.Insert("a.b.com/foo", p2)
+			node := r.MatchUri("a.b.com/foo")
+			Expect(node).To(Equal(p2))
+		})
+
+		It("returns a.b.com/foo if both a.b.com and a.b.com/foo are empty", func() {
+			r.Insert("a.b.com", p1)
+			r.Insert("a.b.com/foo", p2)
+			node := r.MatchUri("a.b.com/foo")
+			Expect(node).To(Equal(p2))
 		})
 	})
 
