@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -30,12 +32,15 @@ var _ = Describe("Clientcert", func() {
 		xfccSanitizeMTLS = "xfcc"
 		certSanitizeMTLS = "cert"
 
-		forceDeleteHeader      = func(req *http.Request) (bool, error) { return true, nil }
-		dontForceDeleteHeader  = func(req *http.Request) (bool, error) { return false, nil }
-		errorForceDeleteHeader = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
-		skipSanitization       = func(req *http.Request) bool { return true }
-		dontSkipSanitization   = func(req *http.Request) bool { return false }
-		errorWriter            = errorwriter.NewPlaintextErrorWriter()
+		forceDeleteHeader             = func(req *http.Request) (bool, error) { return true, nil }
+		dontForceDeleteHeader         = func(req *http.Request) (bool, error) { return false, nil }
+		errorForceDeleteHeader        = func(req *http.Request) (bool, error) { return false, errors.New("forceDelete error") }
+		errorForceDeleteHeaderTimeout = func(req *http.Request) (bool, error) {
+			return false, fmt.Errorf("forceDelete error: %w", routeservice.ErrExpired)
+		}
+		skipSanitization     = func(req *http.Request) bool { return true }
+		dontSkipSanitization = func(req *http.Request) bool { return false }
+		errorWriter          = errorwriter.NewPlaintextErrorWriter()
 	)
 
 	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {
@@ -55,21 +60,22 @@ var _ = Describe("Clientcert", func() {
 
 		message, zapFields := logger.ErrorArgsForCall(0)
 		Expect(message).To(Equal("signature-validation-failed"))
+
 		switch errorCase {
-		case "sanitizeError":
-			Expect(zapFields).To(ContainElement(zap.Error(errors.New("skipSanitization error"))))
 		case "forceDeleteError":
 			Expect(zapFields).To(ContainElement(zap.Error(errors.New("forceDelete error"))))
-		default:
-			Fail("Unexpected error case")
+			Expect(rw.Code).To(Equal(http.StatusBadGateway))
+		case "routeServiceTimeout":
+			Expect(rw.Code).To(Equal(http.StatusGatewayTimeout))
 		}
-		Expect(rw.Code).To(Equal(http.StatusBadRequest))
-		Expect(rw.HeaderMap).NotTo(HaveKey("Connection"))
+
+		Expect(rw.Result().Header).NotTo(HaveKey("Connection"))
 		Expect(rw.Body).To(ContainSubstring("Failed to validate Route Service Signature"))
 
 		Expect(nextHandlerWasCalled).To(BeFalse())
 	},
 		Entry("forceDelete returns an error", errorForceDeleteHeader, skipSanitization, "forceDeleteError"),
+		Entry("forceDelete returns route service timeout error", errorForceDeleteHeaderTimeout, skipSanitization, "routeServiceTimeout"),
 	)
 
 	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
