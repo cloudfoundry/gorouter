@@ -92,12 +92,21 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	hasBeenToRouteService, err := r.ArrivedViaRouteService(req)
 	if err != nil {
 		r.logger.Error("signature-validation-failed", zap.Error(err))
-		r.errorWriter.WriteError(
-			rw,
-			http.StatusBadRequest,
-			"Failed to validate Route Service Signature",
-			r.logger,
-		)
+		if errors.Is(err, routeservice.ErrExpired) {
+			r.errorWriter.WriteError(
+				rw,
+				http.StatusGatewayTimeout,
+				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
+				r.logger,
+			)
+		} else {
+			r.errorWriter.WriteError(
+				rw,
+				http.StatusBadGateway,
+				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
+				r.logger,
+			)
+		}
 		return
 	}
 

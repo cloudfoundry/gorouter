@@ -494,10 +494,10 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeySignature, reqArgs.Signature)
 				})
 
-				It("returns a 400 bad request response", func() {
+				It("returns a 502 bad gateway response", func() {
 					handler.ServeHTTP(resp, req)
 
-					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 					Expect(logger.ErrorCallCount()).To(Equal(2))
 					errMsg, _ := logger.ErrorArgsForCall(1)
@@ -520,10 +520,10 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 				})
 
-				It("returns a 400 bad request response", func() {
+				It("returns a 504 gateway timeout response", func() {
 					handler.ServeHTTP(resp, req)
 
-					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+					Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 					Expect(logger.ErrorCallCount()).To(Equal(2))
 					errMsg, _ := logger.ErrorArgsForCall(1)
@@ -550,10 +550,10 @@ var _ = Describe("Route Service Handler", func() {
 					routeMap["my_host.com/original_path"] = rsPool
 				})
 
-				It("returns a 400 bad request response", func() {
+				It("returns a 502 bad gateway response", func() {
 					handler.ServeHTTP(resp, req)
 
-					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 					Expect(logger.ErrorCallCount()).To(Equal(1))
 					errMsg, _ := logger.ErrorArgsForCall(0)
@@ -579,10 +579,10 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 				})
 
-				It("returns a 400 bad request response", func() {
+				It("returns a 502 bad gateway response", func() {
 					handler.ServeHTTP(resp, req)
 
-					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 					Expect(logger.ErrorCallCount()).To(Equal(2))
 					errMsg, _ := logger.ErrorArgsForCall(1)
@@ -645,10 +645,10 @@ var _ = Describe("Route Service Handler", func() {
 						req.Header.Set(routeservice.HeaderKeyMetadata, metadataHeader)
 					})
 
-					It("returns a 400 bad request response", func() {
+					It("returns a 504 gateway timeout response", func() {
 						handler.ServeHTTP(resp, req)
 
-						Expect(resp.Code).To(Equal(http.StatusBadRequest))
+						Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 						Expect(logger.ErrorCallCount()).To(Equal(2))
 
@@ -678,7 +678,7 @@ var _ = Describe("Route Service Handler", func() {
 					It("returns a 400 bad request response", func() {
 						handler.ServeHTTP(resp, req)
 
-						Expect(resp.Code).To(Equal(http.StatusBadRequest))
+						Expect(resp.Code).To(Equal(http.StatusBadGateway))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
 
 						Expect(nextCalled).To(BeFalse())
