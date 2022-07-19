@@ -45,7 +45,7 @@ var _ = Describe("Watchdog", func() {
 	}
 
 	BeforeEach(func() {
-		addr = fmt.Sprintf("localhost:%d", 9850+ginkgo.GinkgoParallelNode())
+		addr = fmt.Sprintf("localhost:%d", 9850+ginkgo.GinkgoParallelProcess())
 		pollInterval = 10 * time.Millisecond
 		logger = test_util.NewTestZapLogger("router-test")
 	})
