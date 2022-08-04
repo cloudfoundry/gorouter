@@ -783,6 +783,7 @@ var _ = Describe("Router Integration", func() {
 			var routeSvcApp *common.TestApp
 
 			BeforeEach(func() {
+				cfg.DisableHTTP = false
 				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
