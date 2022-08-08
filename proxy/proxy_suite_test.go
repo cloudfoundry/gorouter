@@ -116,6 +116,7 @@ var _ = JustBeforeEach(func() {
 		testLogger,
 		conf.RouteServiceEnabled,
 		conf.RouteServicesHairpinning,
+		conf.RouteServicesHairpinningAllowlist,
 		conf.RouteServiceTimeout,
 		crypto,
 		cryptoPrev,
