@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
+	/* 	"regexp"
+	   	"testing" */
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -97,7 +99,7 @@ var _ = Describe("Route Service Handler", func() {
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
 		config = routeservice.NewRouteServiceConfig(
-			logger, true, true, 60*time.Second, crypto, nil, true,
+			logger, true, true, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
 		)
 
 		nextCalled = false
@@ -117,7 +119,7 @@ var _ = Describe("Route Service Handler", func() {
 
 	Context("with route services disabled", func() {
 		BeforeEach(func() {
-			config = routeservice.NewRouteServiceConfig(logger, false, false, 0, nil, nil, false)
+			config = routeservice.NewRouteServiceConfig(logger, false, false, []string{"foo", "baar"}, 0, nil, nil, false)
 		})
 
 		Context("for normal routes", func() {
@@ -255,7 +257,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := false
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, 60*time.Second, crypto, nil, true,
+							logger, true, hairpinning, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
 						)
 					})
 
@@ -287,7 +289,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("when recommendHttps is set to false", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, 60*time.Second, crypto, nil, false,
+						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, nil, false,
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
@@ -466,7 +468,7 @@ var _ = Describe("Route Service Handler", func() {
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, 60*time.Second, crypto, cryptoPrev, true,
+						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, cryptoPrev, true,
 					)
 				})
 
@@ -621,3 +623,91 @@ var _ = Describe("Route Service Handler", func() {
 		})
 	})
 })
+
+/* func Test_HostnameDNSWildcardsubdomain(t *testing.T) {
+	type args struct {
+		wildcardHost string
+	}
+
+	tests := []struct {
+		name              string
+		args              args
+		hostHeaderAndPath string
+		matched           bool
+	}{
+		{
+			name:              "Test wildcard domain without path",
+			args:              args{"*.wildcard-a.com"},
+			hostHeaderAndPath: "authentication.wildcard-a.com",
+			matched:           true,
+		},
+		{
+			name:              "Test wildcard domain with path",
+			args:              args{"*.wildcard-a.com"},
+			hostHeaderAndPath: "authentication.wildcard-a.com/login",
+			matched:           true,
+		},
+		{
+			name:              "Test wildcard domain is not a part of other domain",
+			args:              args{"*.wildcard-a.com"},
+			hostHeaderAndPath: "cola-wildcard-a.com/login",
+			matched:           false,
+		},
+		{
+			name:              "Test wildcard domain with two leading subdomains",
+			args:              args{"*.wildcard-a.com"},
+			hostHeaderAndPath: "first.authentication.wildcard-a.com/login",
+			matched:           false,
+		},
+		{
+			name:              "Test escaping of points works",
+			args:              args{"*.authentication.wildcard-a.com"},
+			hostHeaderAndPath: "first.authentication-wildcard-a.com/login",
+			matched:           false,
+		},
+		{
+			name:              "Test complex wildcard that should match",
+			args:              args{"*.wildcard-a.com/auth/login/*"},
+			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/XXX",
+			matched:           true,
+		},
+		{
+			name:              "Test complex wildcard that should not match",
+			args:              args{"*.wildcard-a.com/auth/login/*"},
+			hostHeaderAndPath: "authentication.wildcard-a.com/login/XXX",
+			matched:           false,
+		},
+		{
+			name:              "Test complex wildcard that should not match as path does not contain wildcard",
+			args:              args{"*.wildcard-a.com/auth/login/"},
+			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/secret/",
+			matched:           false,
+		},
+		{
+			name:              "Test host and path without wildcard that should match",
+			args:              args{"no.wildcard-a.com/auth/login/"},
+			hostHeaderAndPath: "no.wildcard-a.com/auth/login/",
+			matched:           true,
+		},
+		{
+			name:              "Test host and path without wildcard that should not match",
+			args:              args{"no.wildcard-a.com/auth/login/"},
+			hostHeaderAndPath: "no.wildcard-a.com/auth/login/secret/",
+			matched:           false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			regexString := handlers.hostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
+			matchResult, err := regexp.MatchString(regexString, testCase.hostHeaderAndPath)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if matchResult != testCase.matched {
+				t.Errorf("Unexpected behavior: the result of matching host header and path: %v and regex: %v should be %v but is %v", testCase.hostHeaderAndPath, regexString, testCase.matched, matchResult)
+			}
+		})
+	}
+}
+*/

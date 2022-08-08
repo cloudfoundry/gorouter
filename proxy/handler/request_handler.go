@@ -244,7 +244,7 @@ func (h *RequestHandler) serveTcp(
 
 	// add X-Cf-RouterError header to improve traceability in access log
 	if err != nil {
-		errMsg:= fmt.Sprintf("endpoint_failure (%s)", err.Error())
+		errMsg := fmt.Sprintf("endpoint_failure (%s)", err.Error())
 		handlers.AddRouterErrorHeader(h.response, errMsg)
 	}
 

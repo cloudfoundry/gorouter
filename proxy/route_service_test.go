@@ -75,6 +75,7 @@ var _ = Describe("Route Services", func() {
 			testLogger,
 			conf.RouteServiceEnabled,
 			conf.RouteServicesHairpinning,
+			conf.RouteServicesHairpinningAllowlist,
 			1*time.Hour,
 			crypto,
 			nil,
