@@ -19,10 +19,11 @@ import (
 )
 
 type RouteService struct {
-	config      *routeservice.RouteServiceConfig
-	registry    registry.Registry
-	logger      logger.Logger
-	errorWriter errorwriter.ErrorWriter
+	config                         *routeservice.RouteServiceConfig
+	registry                       registry.Registry
+	logger                         logger.Logger
+	errorWriter                    errorwriter.ErrorWriter
+	hairpinningAllowlistRegexCache []*regexp.Regexp
 }
 
 // NewRouteService creates a handler responsible for handling route services
@@ -31,15 +32,41 @@ func NewRouteService(
 	routeRegistry registry.Registry,
 	logger logger.Logger,
 	errorWriter errorwriter.ErrorWriter,
+
 ) negroni.Handler {
+	allowlistRegex, err := createAllowlistRegex(config.RouteServiceHairpinningAllowlist())
+
+	if err !=nil {
+		logger.Fatal("allowlist is not valid")
+	}
 	return &RouteService{
-		config:      config,
-		registry:    routeRegistry,
-		logger:      logger,
-		errorWriter: errorWriter,
+		config:                         config,
+		registry:                       routeRegistry,
+		logger:                         logger,
+		errorWriter:                    errorWriter,
+		hairpinningAllowlistRegexCache: allowlistRegex,
 	}
 }
 
+func createAllowlistRegex(allowlist []string) ([]*regexp.Regexp, error) {
+
+	regexes := make([]*regexp.Regexp, 0, len(allowlist))
+
+	for _, entry := range allowlist {
+
+		wildcardpattern, err := WildcardDnsToRegex(entry)
+
+		if err != nil {
+			return nil, fmt.Errorf("invalid hairpinning allowlist entry: %s", entry)
+		}
+		entryRegex := regexp.MustCompile(wildcardpattern)
+
+		regexes = append(regexes, entryRegex)
+
+	}
+	return regexes, nil
+
+}
 func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
@@ -139,23 +166,20 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
-	routeKnown := r.registry.Lookup(uri) != nil
-
-	if !routeKnown {
+	route := r.registry.Lookup(uri)
+	if route == nil {
 		return false
 	}
 
-	// if allow list configured
-	allowlist := r.config.RouteServiceHairpinningAllowlist()
+	if len(r.hairpinningAllowlistRegexCache) > 0 {
 
-	if allowlist != nil {
+		host := route.Host()
 
-		for _, entry := range allowlist {
-			entryRegex := regexp.MustCompile(hostnameDNSWildcardSubdomain(entry))
+		for _, entryRegex := range r.hairpinningAllowlistRegexCache {
 
 			// check and compare allow list with DNS wildcard schema
 			// "regex entry matches for the uri"
-			if entryRegex.MatchString(entry) {
+			if entryRegex.MatchString(host) {
 
 				return true
 			}
@@ -172,18 +196,31 @@ func escapeSpecialChars(rawString string) string {
 	return escapedString
 }
 
-func hostnameDNSWildcardSubdomain(host string) string {
+func WildcardDnsToRegex(host string) (string, error) {
 
 	var subdomainRegex string
 
+	char := strings.Count(host, "*")
+
+	if char > 1 {
+
+		return "", fmt.Errorf("DNS wildcard can have only one wildcard subdomain %s ", host)
+
+	} else if char == 1 && !strings.HasPrefix(host, "*.") {
+
+		return "", fmt.Errorf("DNS wildcard can only have leading subdomain %s", host)
+
+	}
+
 	switch {
+
 	case strings.HasPrefix(host, "*."):
 		subdomainRegex = "^([^.]*)" + escapeSpecialChars(host[1:]) + "$"
 	default:
 		subdomainRegex = "^" + escapeSpecialChars(host) + "$"
 	}
 
-	return subdomainRegex
+	return subdomainRegex, nil
 }
 
 func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {

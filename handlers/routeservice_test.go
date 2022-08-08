@@ -6,9 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"time"
-	/* 	"regexp"
-	   	"testing" */
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -99,7 +98,7 @@ var _ = Describe("Route Service Handler", func() {
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
 		config = routeservice.NewRouteServiceConfig(
-			logger, true, true, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
+			logger, true, true, nil, 60*time.Second, crypto, nil, true,
 		)
 
 		nextCalled = false
@@ -119,7 +118,7 @@ var _ = Describe("Route Service Handler", func() {
 
 	Context("with route services disabled", func() {
 		BeforeEach(func() {
-			config = routeservice.NewRouteServiceConfig(logger, false, false, []string{"foo", "baar"}, 0, nil, nil, false)
+			config = routeservice.NewRouteServiceConfig(logger, false, false, nil, 0, nil, nil, false)
 		})
 
 		Context("for normal routes", func() {
@@ -257,7 +256,101 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := false
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
+							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+				Context("when the hairpin feature flag is enabled", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeTrue())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+				Context("when the hairpin feature flag is enabled with allowlist", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, []string{"route-service.com"}, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeTrue())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+
+				Context("when the hairpin feature flag is enabled with blocking allowlist", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, []string{"foo"}, 60*time.Second, crypto, nil, true,
 						)
 					})
 
@@ -289,7 +382,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("when recommendHttps is set to false", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, nil, false,
+						logger, true, false, nil, 60*time.Second, crypto, nil, false,
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
@@ -468,7 +561,7 @@ var _ = Describe("Route Service Handler", func() {
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, cryptoPrev, true,
+						logger, true, false, nil, 60*time.Second, crypto, cryptoPrev, true,
 					)
 				})
 
@@ -622,92 +715,100 @@ var _ = Describe("Route Service Handler", func() {
 			Expect(nextCalled).To(BeFalse())
 		})
 	})
-})
+	Context("allowlist wildcards resolve correctly", func() {
 
-/* func Test_HostnameDNSWildcardsubdomain(t *testing.T) {
-	type args struct {
-		wildcardHost string
-	}
+		type args struct {
+			wildcardHost string
+		}
 
-	tests := []struct {
-		name              string
-		args              args
-		hostHeaderAndPath string
-		matched           bool
-	}{
-		{
-			name:              "Test wildcard domain without path",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "authentication.wildcard-a.com",
-			matched:           true,
-		},
-		{
-			name:              "Test wildcard domain with path",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/login",
-			matched:           true,
-		},
-		{
-			name:              "Test wildcard domain is not a part of other domain",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "cola-wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test wildcard domain with two leading subdomains",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "first.authentication.wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test escaping of points works",
-			args:              args{"*.authentication.wildcard-a.com"},
-			hostHeaderAndPath: "first.authentication-wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test complex wildcard that should match",
-			args:              args{"*.wildcard-a.com/auth/login/*"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/XXX",
-			matched:           true,
-		},
-		{
-			name:              "Test complex wildcard that should not match",
-			args:              args{"*.wildcard-a.com/auth/login/*"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/login/XXX",
-			matched:           false,
-		},
-		{
-			name:              "Test complex wildcard that should not match as path does not contain wildcard",
-			args:              args{"*.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/secret/",
-			matched:           false,
-		},
-		{
-			name:              "Test host and path without wildcard that should match",
-			args:              args{"no.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "no.wildcard-a.com/auth/login/",
-			matched:           true,
-		},
-		{
-			name:              "Test host and path without wildcard that should not match",
-			args:              args{"no.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "no.wildcard-a.com/auth/login/secret/",
-			matched:           false,
-		},
-	}
+		type testcase struct {
+			name    string
+			args    args
+			host    string
+			matched bool
+			err     bool
+		}
+		tests := []testcase{
 
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			regexString := handlers.hostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
-			matchResult, err := regexp.MatchString(regexString, testCase.hostHeaderAndPath)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if matchResult != testCase.matched {
-				t.Errorf("Unexpected behavior: the result of matching host header and path: %v and regex: %v should be %v but is %v", testCase.hostHeaderAndPath, regexString, testCase.matched, matchResult)
+			{
+				name:    "Test invalid wildcard leading with 2 subdomains",
+				args:    args{"*.*.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     true,
+			},
+
+			{
+				name:    "Test wildcard in the wrong position",
+				args:    args{"first.*.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     true,
+			},
+			{
+				name:    "Test wildcard domain without path",
+				args:    args{"*.wildcard-a.com"},
+				host:    "authentication.wildcard-a.com",
+				matched: true,
+				err:     false,
+			},
+			{
+				name:    "Test wildcard domain is not a part of other domain",
+				args:    args{"*.wildcard-a.com"},
+				host:    "cola-wildcard-a.com",
+				matched: false,
+				err:     false,
+			},
+			{
+				name:    "Test wildcard for subdomain",
+				args:    args{"*.authentication.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: true,
+				err:     false,
+			},
+
+			{
+				name:    "Test wildcard for wrong domain on subdomain",
+				args:    args{"*.authentication.wildcard-a.com"},
+				host:    "first.authentication-wildcard-a.com",
+				matched: false,
+				err:     false,
+			},
+			{
+				name:    "Test fixed host name",
+				args:    args{"authentication.wildcard-a.com"},
+				host:    "authentication.wildcard-a.com",
+				matched: true,
+				err:     false,
+			},
+			{
+				name:    "Test wrong fixed host name",
+				args:    args{"authentication.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     false,
+			},
+		}
+
+		It("tests", func() {
+			for _, testCase := range tests {
+				By(testCase.name)
+
+				regexString, err := handlers.WildcardDnsToRegex(testCase.args.wildcardHost)
+				if testCase.err {
+
+					Expect(err).Should(HaveOccurred())
+					continue
+
+				} else {
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+				matchResult, err := regexp.MatchString(regexString, testCase.host)
+
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(matchResult).To(Equal(testCase.matched))
 			}
 		})
-	}
-}
-*/
+
+	})
+})
