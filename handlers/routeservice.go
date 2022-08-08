@@ -140,7 +140,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
 	route := r.registry.Lookup(uri)
-	if route != nil{
+	if route != nil {
 		return false
 	}
 

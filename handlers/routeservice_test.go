@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -713,6 +714,67 @@ var _ = Describe("Route Service Handler", func() {
 			Expect(logger.FatalCallCount()).To(Equal(1))
 			Expect(nextCalled).To(BeFalse())
 		})
+	})
+	Context("allowlist wildcards resolve correctly", func() {
+
+		type args struct {
+			wildcardHost string
+		}
+
+		tests := []struct {
+			name    string
+			args    args
+			host    string
+			matched bool
+		}{
+			{
+				name:    "Test wildcard domain without path",
+				args:    args{"*.wildcard-a.com"},
+				host:    "authentication.wildcard-a.com",
+				matched: true,
+			},
+			{
+				name:    "Test wildcard domain is not a part of other domain",
+				args:    args{"*.wildcard-a.com"},
+				host:    "cola-wildcard-a.com",
+				matched: false,
+			},
+			{
+				name:    "Test wildcard for subdomain",
+				args:    args{"*.authentication.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: true,
+			},
+
+			{
+				name:    "Test wildcard for wrong domain on subdomain",
+				args:    args{"*.authentication.wildcard-a.com"},
+				host:    "first.authentication-wildcard-a.com",
+				matched: false,
+			},
+			{
+				name:    "Test fixed host name",
+				args:    args{"authentication.wildcard-a.com"},
+				host:    "authentication.wildcard-a.com",
+				matched: true,
+			},
+			{
+				name:    "Test wrong fixed host name",
+				args:    args{"authentication.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+			},
+		}
+
+		for _, testCase := range tests {
+			It(testCase.name, func() {
+				regexString := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
+				matchResult, err := regexp.MatchString(regexString, testCase.host)
+
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(matchResult).ToNot(Equal(testCase.matched))
+			})
+		}
 	})
 })
 
