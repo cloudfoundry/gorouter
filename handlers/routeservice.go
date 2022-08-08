@@ -139,9 +139,8 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
-	routeKnown := r.registry.Lookup(uri) != nil
-
-	if !routeKnown {
+	route := r.registry.Lookup(uri)
+	if route != nil{
 		return false
 	}
 
@@ -150,12 +149,14 @@ func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
 	if allowlist != nil {
 
+		host := route.Host()
+
 		for _, entry := range allowlist {
-			entryRegex := regexp.MustCompile(hostnameDNSWildcardSubdomain(entry))
+			entryRegex := regexp.MustCompile(HostnameDNSWildcardSubdomain(entry))
 
 			// check and compare allow list with DNS wildcard schema
 			// "regex entry matches for the uri"
-			if entryRegex.MatchString(entry) {
+			if entryRegex.MatchString(host) {
 
 				return true
 			}
@@ -172,7 +173,7 @@ func escapeSpecialChars(rawString string) string {
 	return escapedString
 }
 
-func hostnameDNSWildcardSubdomain(host string) string {
+func HostnameDNSWildcardSubdomain(host string) string {
 
 	var subdomainRegex string
 

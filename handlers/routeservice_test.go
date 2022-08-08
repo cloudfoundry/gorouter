@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
-	/* 	"regexp"
-	   	"testing" */
 
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -99,7 +97,7 @@ var _ = Describe("Route Service Handler", func() {
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
 		config = routeservice.NewRouteServiceConfig(
-			logger, true, true, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
+			logger, true, true, nil, 60*time.Second, crypto, nil, true,
 		)
 
 		nextCalled = false
@@ -119,7 +117,7 @@ var _ = Describe("Route Service Handler", func() {
 
 	Context("with route services disabled", func() {
 		BeforeEach(func() {
-			config = routeservice.NewRouteServiceConfig(logger, false, false, []string{"foo", "baar"}, 0, nil, nil, false)
+			config = routeservice.NewRouteServiceConfig(logger, false, false, nil, 0, nil, nil, false)
 		})
 
 		Context("for normal routes", func() {
@@ -257,7 +255,101 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := false
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, []string{"foo", "baar"}, 60*time.Second, crypto, nil, true,
+							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+				Context("when the hairpin feature flag is enabled", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeTrue())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+				Context("when the hairpin feature flag is enabled with allowlist", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, []string{"route-service.com"}, 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeTrue())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+
+				Context("when the hairpin feature flag is enabled with blocking allowlist", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, []string{"foo"}, 60*time.Second, crypto, nil, true,
 						)
 					})
 
@@ -289,7 +381,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("when recommendHttps is set to false", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, nil, false,
+						logger, true, false, nil, 60*time.Second, crypto, nil, false,
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
@@ -468,7 +560,7 @@ var _ = Describe("Route Service Handler", func() {
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, []string{"foo", "baar"}, 60*time.Second, crypto, cryptoPrev, true,
+						logger, true, false, nil, 60*time.Second, crypto, cryptoPrev, true,
 					)
 				})
 
@@ -699,7 +791,7 @@ var _ = Describe("Route Service Handler", func() {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			regexString := handlers.hostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
+			regexString := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
 			matchResult, err := regexp.MatchString(regexString, testCase.hostHeaderAndPath)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
@@ -709,5 +801,4 @@ var _ = Describe("Route Service Handler", func() {
 			}
 		})
 	}
-}
-*/
+} */
