@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -124,7 +126,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 	hostWithoutPort := hostWithoutPort(routeServiceArgs.ParsedUrl.Host)
 	escapedPath := routeServiceArgs.ParsedUrl.EscapedPath()
-	if r.config.RouteServiceHairpinning() && r.registry.Lookup(route.Uri(hostWithoutPort+escapedPath)) != nil {
+	if r.config.RouteServiceHairpinning() && r.AllowRouteServiceHairpinningRequest(route.Uri(hostWithoutPort+escapedPath)) {
 		reqInfo.ShouldRouteToInternalRouteService = true
 	}
 
@@ -133,6 +135,55 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	req.Header.Set(routeservice.HeaderKeyForwardedURL, routeServiceArgs.ForwardedURL)
 	reqInfo.RouteServiceURL = routeServiceArgs.ParsedUrl
 	next(rw, req)
+}
+
+func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
+
+	routeKnown := r.registry.Lookup(uri) != nil
+
+	if !routeKnown {
+		return false
+	}
+
+	// if allow list configured
+	allowlist := r.config.RouteServiceHairpinningAllowlist()
+
+	if allowlist != nil {
+
+		for _, entry := range allowlist {
+			entryRegex := regexp.MustCompile(hostnameDNSWildcardSubdomain(entry))
+
+			// check and compare allow list with DNS wildcard schema
+			// "regex entry matches for the uri"
+			if entryRegex.MatchString(entry) {
+
+				return true
+			}
+
+		}
+		return false
+	}
+	return true
+}
+
+func escapeSpecialChars(rawString string) string {
+	escapedString := strings.ReplaceAll(rawString, ".", `\.`)
+
+	return escapedString
+}
+
+func hostnameDNSWildcardSubdomain(host string) string {
+
+	var subdomainRegex string
+
+	switch {
+	case strings.HasPrefix(host, "*."):
+		subdomainRegex = "^([^.]*)" + escapeSpecialChars(host[1:]) + "$"
+	default:
+		subdomainRegex = "^" + escapeSpecialChars(host) + "$"
+	}
+
+	return subdomainRegex
 }
 
 func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {

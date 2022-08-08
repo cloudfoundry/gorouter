@@ -157,6 +157,7 @@ func main() {
 		logger.Session("proxy"),
 		c.RouteServiceEnabled,
 		c.RouteServicesHairpinning,
+		c.RouteServicesHairpinningAllowlist,
 		c.RouteServiceTimeout,
 		crypto,
 		cryptoPrev,

@@ -58,6 +58,7 @@ var _ = Describe("Proxy Unit tests", func() {
 				logger,
 				conf.RouteServiceEnabled,
 				conf.RouteServicesHairpinning,
+				conf.RouteServicesHairpinningAllowlist,
 				conf.RouteServiceTimeout,
 				crypto,
 				cryptoPrev,

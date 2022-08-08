@@ -258,12 +258,13 @@ type Config struct {
 	StickySessionCookieNames StringSet     `yaml:"sticky_session_cookie_names"`
 	HealthCheckUserAgent     string        `yaml:"healthcheck_user_agent,omitempty"`
 
-	OAuth                      OAuthConfig      `yaml:"oauth,omitempty"`
-	RoutingApi                 RoutingApiConfig `yaml:"routing_api,omitempty"`
-	RouteServiceSecret         string           `yaml:"route_services_secret,omitempty"`
-	RouteServiceSecretPrev     string           `yaml:"route_services_secret_decrypt_only,omitempty"`
-	RouteServiceRecommendHttps bool             `yaml:"route_services_recommend_https,omitempty"`
-	RouteServicesHairpinning   bool             `yaml:"route_services_hairpinning"`
+	OAuth                             OAuthConfig      `yaml:"oauth,omitempty"`
+	RoutingApi                        RoutingApiConfig `yaml:"routing_api,omitempty"`
+	RouteServiceSecret                string           `yaml:"route_services_secret,omitempty"`
+	RouteServiceSecretPrev            string           `yaml:"route_services_secret_decrypt_only,omitempty"`
+	RouteServiceRecommendHttps        bool             `yaml:"route_services_recommend_https,omitempty"`
+	RouteServicesHairpinning          bool             `yaml:"route_services_hairpinning"`
+	RouteServicesHairpinningAllowlist []string         `yaml:"route_services_hairpinning_allowlist,omitempty"`
 	// These fields are populated by the `Process` function.
 	Ip                          string        `yaml:"-"`
 	RouteServiceEnabled         bool          `yaml:"-"`
