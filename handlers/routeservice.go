@@ -140,19 +140,24 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
 	route := r.registry.Lookup(uri)
-	if route != nil {
+	if route == nil {
 		return false
 	}
 
 	// if allow list configured
 	allowlist := r.config.RouteServiceHairpinningAllowlist()
 
-	if allowlist != nil {
+	if len(allowlist) > 0 {
 
 		host := route.Host()
 
 		for _, entry := range allowlist {
-			entryRegex := regexp.MustCompile(HostnameDNSWildcardSubdomain(entry))
+			wildcardpattern, err := HostnameDNSWildcardSubdomain(entry)
+			if err != nil {
+				continue
+			}
+			// TODO : to cache or buffer regular expressions
+			entryRegex := regexp.MustCompile(wildcardpattern)
 
 			// check and compare allow list with DNS wildcard schema
 			// "regex entry matches for the uri"
@@ -173,18 +178,31 @@ func escapeSpecialChars(rawString string) string {
 	return escapedString
 }
 
-func HostnameDNSWildcardSubdomain(host string) string {
+func HostnameDNSWildcardSubdomain(host string) (string, error) {
 
 	var subdomainRegex string
 
+	char := strings.Count(host, "*")
+
+	if char > 1 {
+
+		return "", fmt.Errorf("DNS wildcard can have only one wildcard subdomain %s ", host)
+
+	} else if char == 1 && !strings.HasPrefix(host, "*.") {
+
+		return "", fmt.Errorf("DNS wildcard can only have leading subdomain %s", host)
+
+	}
+
 	switch {
+
 	case strings.HasPrefix(host, "*."):
 		subdomainRegex = "^([^.]*)" + escapeSpecialChars(host[1:]) + "$"
 	default:
 		subdomainRegex = "^" + escapeSpecialChars(host) + "$"
 	}
 
-	return subdomainRegex
+	return subdomainRegex, nil
 }
 
 func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {

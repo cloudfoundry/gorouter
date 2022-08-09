@@ -721,29 +721,51 @@ var _ = Describe("Route Service Handler", func() {
 			wildcardHost string
 		}
 
-		tests := []struct {
+		type testcase struct {
 			name    string
 			args    args
 			host    string
 			matched bool
-		}{
+			err     bool
+		}
+		tests := []testcase{
+
+			{
+				name:    "Test invalid wildcard leading with 2 subdomains",
+				args:    args{"*.*.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     true,
+			},
+
+
+			{
+				name:    "Test wildcard in the wrong position",
+				args:    args{"first.*.wildcard-a.com"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     true,
+			},
 			{
 				name:    "Test wildcard domain without path",
 				args:    args{"*.wildcard-a.com"},
 				host:    "authentication.wildcard-a.com",
 				matched: true,
+				err:     false,
 			},
 			{
 				name:    "Test wildcard domain is not a part of other domain",
 				args:    args{"*.wildcard-a.com"},
 				host:    "cola-wildcard-a.com",
 				matched: false,
+				err:     false,
 			},
 			{
 				name:    "Test wildcard for subdomain",
 				args:    args{"*.authentication.wildcard-a.com"},
 				host:    "first.authentication.wildcard-a.com",
 				matched: true,
+				err:     false,
 			},
 
 			{
@@ -751,116 +773,45 @@ var _ = Describe("Route Service Handler", func() {
 				args:    args{"*.authentication.wildcard-a.com"},
 				host:    "first.authentication-wildcard-a.com",
 				matched: false,
+				err:     false,
 			},
 			{
 				name:    "Test fixed host name",
 				args:    args{"authentication.wildcard-a.com"},
 				host:    "authentication.wildcard-a.com",
 				matched: true,
+				err:     false,
 			},
 			{
 				name:    "Test wrong fixed host name",
 				args:    args{"authentication.wildcard-a.com"},
 				host:    "first.authentication.wildcard-a.com",
 				matched: false,
+				err:     false,
 			},
 		}
 
-		for _, testCase := range tests {
-			It(testCase.name, func() {
-				regexString := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
+		It("tests", func() {
+			for _, testCase := range tests {
+				By(testCase.name)
+
+				// TODO: To handle the errors
+
+				regexString, err := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
+				if testCase.err  {
+
+					Expect(err).Should(HaveOccurred())
+					continue
+
+				}else {
+					Expect(err).ShouldNot(HaveOccurred())
+				}
 				matchResult, err := regexp.MatchString(regexString, testCase.host)
 
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(matchResult).ToNot(Equal(testCase.matched))
-			})
-		}
-	})
-})
-
-/* func Test_HostnameDNSWildcardsubdomain(t *testing.T) {
-	type args struct {
-		wildcardHost string
-	}
-
-	tests := []struct {
-		name              string
-		args              args
-		hostHeaderAndPath string
-		matched           bool
-	}{
-		{
-			name:              "Test wildcard domain without path",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "authentication.wildcard-a.com",
-			matched:           true,
-		},
-		{
-			name:              "Test wildcard domain with path",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/login",
-			matched:           true,
-		},
-		{
-			name:              "Test wildcard domain is not a part of other domain",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "cola-wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test wildcard domain with two leading subdomains",
-			args:              args{"*.wildcard-a.com"},
-			hostHeaderAndPath: "first.authentication.wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test escaping of points works",
-			args:              args{"*.authentication.wildcard-a.com"},
-			hostHeaderAndPath: "first.authentication-wildcard-a.com/login",
-			matched:           false,
-		},
-		{
-			name:              "Test complex wildcard that should match",
-			args:              args{"*.wildcard-a.com/auth/login/*"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/XXX",
-			matched:           true,
-		},
-		{
-			name:              "Test complex wildcard that should not match",
-			args:              args{"*.wildcard-a.com/auth/login/*"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/login/XXX",
-			matched:           false,
-		},
-		{
-			name:              "Test complex wildcard that should not match as path does not contain wildcard",
-			args:              args{"*.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "authentication.wildcard-a.com/auth/login/secret/",
-			matched:           false,
-		},
-		{
-			name:              "Test host and path without wildcard that should match",
-			args:              args{"no.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "no.wildcard-a.com/auth/login/",
-			matched:           true,
-		},
-		{
-			name:              "Test host and path without wildcard that should not match",
-			args:              args{"no.wildcard-a.com/auth/login/"},
-			hostHeaderAndPath: "no.wildcard-a.com/auth/login/secret/",
-			matched:           false,
-		},
-	}
-
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			regexString := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
-			matchResult, err := regexp.MatchString(regexString, testCase.hostHeaderAndPath)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if matchResult != testCase.matched {
-				t.Errorf("Unexpected behavior: the result of matching host header and path: %v and regex: %v should be %v but is %v", testCase.hostHeaderAndPath, regexString, testCase.matched, matchResult)
+				Expect(matchResult).To(Equal(testCase.matched))
 			}
 		})
-	}
-} */
+
+	})
+})

@@ -55,6 +55,7 @@ func NewRouteServiceConfig(
 	cryptoPrev secure.Crypto,
 	recommendHttps bool,
 ) *RouteServiceConfig {
+	// TODO: Initialize cache/buffer hairpinning allow list
 	return &RouteServiceConfig{
 		routeServiceEnabled:              enabled,
 		routeServiceTimeout:              timeout,
