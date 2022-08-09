@@ -738,7 +738,6 @@ var _ = Describe("Route Service Handler", func() {
 				err:     true,
 			},
 
-
 			{
 				name:    "Test wildcard in the wrong position",
 				args:    args{"first.*.wildcard-a.com"},
@@ -795,15 +794,13 @@ var _ = Describe("Route Service Handler", func() {
 			for _, testCase := range tests {
 				By(testCase.name)
 
-				// TODO: To handle the errors
-
-				regexString, err := handlers.HostnameDNSWildcardSubdomain(testCase.args.wildcardHost)
-				if testCase.err  {
+				regexString, err := handlers.WildcardDnsToRegex(testCase.args.wildcardHost)
+				if testCase.err {
 
 					Expect(err).Should(HaveOccurred())
 					continue
 
-				}else {
+				} else {
 					Expect(err).ShouldNot(HaveOccurred())
 				}
 				matchResult, err := regexp.MatchString(regexString, testCase.host)

@@ -49,18 +49,17 @@ func NewRouteServiceConfig(
 	logger logger.Logger,
 	enabled bool,
 	hairpinning bool,
-	hairpinningallowlist []string,
+	hairpinningAllowlist []string,
 	timeout time.Duration,
 	crypto secure.Crypto,
 	cryptoPrev secure.Crypto,
 	recommendHttps bool,
 ) *RouteServiceConfig {
-	// TODO: Initialize cache/buffer hairpinning allow list
 	return &RouteServiceConfig{
 		routeServiceEnabled:              enabled,
 		routeServiceTimeout:              timeout,
 		routeServiceHairpinning:          hairpinning,
-		routeServiceHairpinningAllowlist: hairpinningallowlist,
+		routeServiceHairpinningAllowlist: hairpinningAllowlist,
 		crypto:                           crypto,
 		cryptoPrev:                       cryptoPrev,
 		logger:                           logger,
