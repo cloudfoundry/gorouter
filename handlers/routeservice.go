@@ -18,6 +18,8 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 )
 
+var hairpinningAllowlistPattern = regexp.MustCompile("(?i)^(\\*\\.)?[a-z\\d-]+(\\.[a-z\\d-]+)+$")
+
 type RouteService struct {
 	config                         *routeservice.RouteServiceConfig
 	registry                       registry.Registry
@@ -32,12 +34,11 @@ func NewRouteService(
 	routeRegistry registry.Registry,
 	logger logger.Logger,
 	errorWriter errorwriter.ErrorWriter,
-
 ) negroni.Handler {
 	allowlistRegex, err := createAllowlistRegex(config.RouteServiceHairpinningAllowlist())
 
-	if err !=nil {
-		logger.Fatal("allowlist is not valid")
+	if err != nil {
+		logger.Fatal("allowlist-entry-invalid", zap.Error(err))
 	}
 	return &RouteService{
 		config:                         config,
@@ -48,25 +49,24 @@ func NewRouteService(
 	}
 }
 
+// createAllowlistRegex converts the DNS wildcard entry, e.g. *.example.com to the appropriate regular expression.
 func createAllowlistRegex(allowlist []string) ([]*regexp.Regexp, error) {
 
 	regexes := make([]*regexp.Regexp, 0, len(allowlist))
 
 	for _, entry := range allowlist {
-
-		wildcardpattern, err := WildcardDnsToRegex(entry)
+		wildcardPattern, err := WildcardDnsToRegex(entry)
 
 		if err != nil {
-			return nil, fmt.Errorf("invalid hairpinning allowlist entry: %s", entry)
+			return nil, fmt.Errorf("invalid route service hairpinning allowlist entry: %s, %v", entry, err)
 		}
-		entryRegex := regexp.MustCompile(wildcardpattern)
 
+		entryRegex := regexp.MustCompile(wildcardPattern)
 		regexes = append(regexes, entryRegex)
-
 	}
 	return regexes, nil
-
 }
+
 func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
@@ -164,6 +164,16 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 }
 
+// AllowRouteServiceHairpinningRequest decides whether a route service request can be resolved
+// internally via the route registry or should be handled as external request.
+// If the provided route is not known to this gorouter's route registry, the request will always be external.
+// If the route is known, the hairpinning allowlist is consulted (if defined).
+//
+// Only routes with host names that match an entry on the allowlist are resolved internally.
+// Should the allowlist be empty, it is considered disabled and will allow internal resolution of any request
+// that can be resolved via the gorouter's route registry.
+//
+// returns true to use internal resolution via this gorouter, false for external resolution via route service URL call.
 func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 
 	route := r.registry.Lookup(uri)
@@ -172,52 +182,34 @@ func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 	}
 
 	if len(r.hairpinningAllowlistRegexCache) > 0 {
-
 		host := route.Host()
 
 		for _, entryRegex := range r.hairpinningAllowlistRegexCache {
-
 			// check and compare allow list with DNS wildcard schema
 			// "regex entry matches for the uri"
 			if entryRegex.MatchString(host) {
-
 				return true
 			}
-
 		}
 		return false
 	}
 	return true
 }
 
-func escapeSpecialChars(rawString string) string {
-	escapedString := strings.ReplaceAll(rawString, ".", `\.`)
-
-	return escapedString
-}
-
+// WildcardDnsToRegex converts the given DNS name or wildcard to the corresponding regular expression.
 func WildcardDnsToRegex(host string) (string, error) {
-
-	var subdomainRegex string
-
-	char := strings.Count(host, "*")
-
-	if char > 1 {
-
-		return "", fmt.Errorf("DNS wildcard can have only one wildcard subdomain %s ", host)
-
-	} else if char == 1 && !strings.HasPrefix(host, "*.") {
-
-		return "", fmt.Errorf("DNS wildcard can only have leading subdomain %s", host)
-
+	if !hairpinningAllowlistPattern.MatchString(host) {
+		return  "", fmt.Errorf("allowlist entry is not a DNS name or wildcard: %s", host)
 	}
 
+	var subdomainRegex string
 	switch {
-
 	case strings.HasPrefix(host, "*."):
-		subdomainRegex = "^([^.]*)" + escapeSpecialChars(host[1:]) + "$"
+		// DNS wildcard
+		subdomainRegex = "^([^.]*)" + regexp.QuoteMeta(host[1:]) + "$"
 	default:
-		subdomainRegex = "^" + escapeSpecialChars(host) + "$"
+		// DNS name
+		subdomainRegex = "^" + regexp.QuoteMeta(host) + "$"
 	}
 
 	return subdomainRegex, nil

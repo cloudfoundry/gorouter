@@ -350,7 +350,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, []string{"foo"}, 60*time.Second, crypto, nil, true,
+							logger, true, hairpinning, []string{"example.com"}, 60*time.Second, crypto, nil, true,
 						)
 					})
 
@@ -729,7 +729,6 @@ var _ = Describe("Route Service Handler", func() {
 			err     bool
 		}
 		tests := []testcase{
-
 			{
 				name:    "Test invalid wildcard leading with 2 subdomains",
 				args:    args{"*.*.wildcard-a.com"},
@@ -737,7 +736,6 @@ var _ = Describe("Route Service Handler", func() {
 				matched: false,
 				err:     true,
 			},
-
 			{
 				name:    "Test wildcard in the wrong position",
 				args:    args{"first.*.wildcard-a.com"},
@@ -766,7 +764,6 @@ var _ = Describe("Route Service Handler", func() {
 				matched: true,
 				err:     false,
 			},
-
 			{
 				name:    "Test wildcard for wrong domain on subdomain",
 				args:    args{"*.authentication.wildcard-a.com"},
@@ -787,6 +784,13 @@ var _ = Describe("Route Service Handler", func() {
 				host:    "first.authentication.wildcard-a.com",
 				matched: false,
 				err:     false,
+			},
+			{
+				name:    "Test injecting a regex",
+				args:    args{"(.|\\w)+"},
+				host:    "first.authentication.wildcard-a.com",
+				matched: false,
+				err:     true,
 			},
 		}
 
