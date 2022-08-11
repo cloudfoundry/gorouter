@@ -3,10 +3,10 @@ package handlers_test
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -291,7 +291,7 @@ var _ = Describe("Route Service Handler", func() {
 						)
 					})
 
-					It("does not add a flag to the request context", func() {
+					It("adds a flag to the request context", func() {
 						handler.ServeHTTP(resp, req)
 
 						Expect(resp.Code).To(Equal(http.StatusTeapot))
@@ -322,7 +322,7 @@ var _ = Describe("Route Service Handler", func() {
 						)
 					})
 
-					It("does not add a flag to the request context", func() {
+					It("adds a flag to the request context", func() {
 						handler.ServeHTTP(resp, req)
 
 						Expect(resp.Code).To(Equal(http.StatusTeapot))
@@ -346,7 +346,7 @@ var _ = Describe("Route Service Handler", func() {
 
 				})
 
-				Context("when the hairpin feature flag is enabled with blocking allowlist", func() {
+				Context("when the hairpin feature flag is enabled, only with not matching allowlist entries", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
@@ -356,6 +356,44 @@ var _ = Describe("Route Service Handler", func() {
 
 					It("does not add a flag to the request context", func() {
 						handler.ServeHTTP(resp, req)
+
+						Expect(resp.Code).To(Equal(http.StatusTeapot))
+
+						var passedReq *http.Request
+						Eventually(reqChan).Should(Receive(&passedReq))
+
+						Expect(passedReq.Header.Get(routeservice.HeaderKeySignature)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyMetadata)).ToNot(BeEmpty())
+						Expect(passedReq.Header.Get(routeservice.HeaderKeyForwardedURL)).To(ContainSubstring("https://"))
+
+						reqInfo, err := handlers.ContextRequestInfo(passedReq)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(reqInfo.RouteServiceURL).ToNot(BeNil())
+
+						Expect(reqInfo.RouteServiceURL.Host).To(Equal("route-service.com"))
+						Expect(reqInfo.RouteServiceURL.Scheme).To(Equal("https"))
+						Expect(reqInfo.ShouldRouteToInternalRouteService).To(BeFalse())
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+					})
+
+				})
+
+				Context("when the hairpin feature flag is enabled, with a large list of not matching allowlist entries", func() {
+					BeforeEach(func() {
+						hairpinning := true
+						config = routeservice.NewRouteServiceConfig(
+							logger, true, hairpinning, generateHugeAllowlist(1000000), 60*time.Second, crypto, nil, true,
+						)
+					})
+
+					It("does not add a flag to the request context", func() {
+
+						start := time.Now()
+						handler.ServeHTTP(resp, req)
+						duration := time.Since(start)
+
+						// This test does no warmup / cache and a single sample. Take with a grain of salt.
+						fmt.Printf("Time taken to process request with large allowlist: %s", duration)
 
 						Expect(resp.Code).To(Equal(http.StatusTeapot))
 
@@ -717,102 +755,118 @@ var _ = Describe("Route Service Handler", func() {
 	})
 	Context("allowlist wildcards resolve correctly", func() {
 
-		type args struct {
-			wildcardHost string
-		}
-
 		type testcase struct {
-			name    string
-			args    args
-			host    string
-			matched bool
-			err     bool
+			name      string
+			allowlist []string
+			host      string
+			matched   bool
+			err       bool
 		}
 		tests := []testcase{
 			{
-				name:    "Test invalid wildcard leading with 2 subdomains",
-				args:    args{"*.*.wildcard-a.com"},
-				host:    "first.authentication.wildcard-a.com",
-				matched: false,
-				err:     true,
+				name:      "Test invalid wildcard leading with 2 subdomains",
+				allowlist: []string{"*.*.wildcard-a.com"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   false,
+				err:       true,
 			},
 			{
-				name:    "Test wildcard in the wrong position",
-				args:    args{"first.*.wildcard-a.com"},
-				host:    "first.authentication.wildcard-a.com",
-				matched: false,
-				err:     true,
+				name:      "Test wildcard in the wrong position",
+				allowlist: []string{"first.*.wildcard-a.com"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   false,
+				err:       true,
 			},
 			{
-				name:    "Test wildcard domain without path",
-				args:    args{"*.wildcard-a.com"},
-				host:    "authentication.wildcard-a.com",
-				matched: true,
-				err:     false,
+				name:      "Test wildcard domain without path",
+				allowlist: []string{"*.wildcard-a.com"},
+				host:      "authentication.wildcard-a.com",
+				matched:   true,
+				err:       false,
 			},
 			{
-				name:    "Test wildcard domain is not a part of other domain",
-				args:    args{"*.wildcard-a.com"},
-				host:    "cola-wildcard-a.com",
-				matched: false,
-				err:     false,
+				name:      "Test wildcard domain is not a part of other domain",
+				allowlist: []string{"*.wildcard-a.com"},
+				host:      "cola-wildcard-a.com",
+				matched:   false,
+				err:       false,
 			},
 			{
-				name:    "Test wildcard for subdomain",
-				args:    args{"*.authentication.wildcard-a.com"},
-				host:    "first.authentication.wildcard-a.com",
-				matched: true,
-				err:     false,
+				name:      "Test wildcard for subdomain",
+				allowlist: []string{"*.authentication.wildcard-a.com"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   true,
+				err:       false,
 			},
 			{
-				name:    "Test wildcard for wrong domain on subdomain",
-				args:    args{"*.authentication.wildcard-a.com"},
-				host:    "first.authentication-wildcard-a.com",
-				matched: false,
-				err:     false,
+				name:      "Test wildcard for wrong domain on subdomain",
+				allowlist: []string{"*.authentication.wildcard-a.com"},
+				host:      "first.authentication-wildcard-a.com",
+				matched:   false,
+				err:       false,
 			},
 			{
-				name:    "Test fixed host name",
-				args:    args{"authentication.wildcard-a.com"},
-				host:    "authentication.wildcard-a.com",
-				matched: true,
-				err:     false,
+				name:      "Test fixed host name",
+				allowlist: []string{"authentication.wildcard-a.com"},
+				host:      "authentication.wildcard-a.com",
+				matched:   true,
+				err:       false,
 			},
 			{
-				name:    "Test wrong fixed host name",
-				args:    args{"authentication.wildcard-a.com"},
-				host:    "first.authentication.wildcard-a.com",
-				matched: false,
-				err:     false,
+				name:      "Test wrong fixed host name",
+				allowlist: []string{"authentication.wildcard-a.com"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   false,
+				err:       false,
 			},
 			{
-				name:    "Test injecting a regex",
-				args:    args{"(.|\\w)+"},
-				host:    "first.authentication.wildcard-a.com",
-				matched: false,
-				err:     true,
+				name:      "Test injecting a regex",
+				allowlist: []string{"(.|\\w)+"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   false,
+				err:       true,
+			},
+			{
+				name:      "Test bad allowlist entry",
+				allowlist: []string{"*.ba d.cöm"},
+				host:      "host.bad.com",
+				matched:   false,
+				err:       true,
+			},
+			{
+				name:      "Subdomain wildcard should not match domain w/o segment covered by the wildcard",
+				allowlist: []string{"*.authentication.wildcard-a.com"},
+				host:      "authentication.wildcard-a.com",
+				matched:   false,
+				err:       false,
 			},
 		}
 
-		It("tests", func() {
+		It("for the pattern", func() {
 			for _, testCase := range tests {
 				By(testCase.name)
 
-				regexString, err := handlers.WildcardDnsToRegex(testCase.args.wildcardHost)
+				allowlist, err := handlers.CreateAllowlistPatterns(testCase.allowlist)
+
 				if testCase.err {
-
 					Expect(err).Should(HaveOccurred())
-					continue
-
 				} else {
 					Expect(err).ShouldNot(HaveOccurred())
 				}
-				matchResult, err := regexp.MatchString(regexString, testCase.host)
 
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(matchResult).To(Equal(testCase.matched))
+				matched := handlers.MatchAllowlistHostname(allowlist, testCase.host)
+				Expect(matched).To(Equal(testCase.matched))
 			}
 		})
-
 	})
 })
+
+func generateHugeAllowlist(size int) []string {
+	buffer := make([]string, 0, size)
+
+	for i := 0; i < size; i++ {
+		buffer = append(buffer, fmt.Sprintf("*.subdomain-%d.example.com", i))
+	}
+
+	return buffer
+}
