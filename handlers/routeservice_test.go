@@ -874,15 +874,22 @@ var _ = Describe("Route Service Handler", func() {
 			for _, testCase := range tests {
 				By(testCase.name)
 
-				allowlist, err := handlers.CreateAllowlistPatterns(testCase.allowlist)
+				oldFatalCount := logger.FatalCallCount()
 
+				config = routeservice.NewRouteServiceConfig(
+					logger, true, true, testCase.allowlist, 60*time.Second, crypto, nil, true,
+				)
+
+				r := handlers.NewRouteService(config, reg, logger, ew).(*handlers.RouteService)
+
+				expectFatals := 0
 				if testCase.err {
-					Expect(err).Should(HaveOccurred())
-				} else {
-					Expect(err).ShouldNot(HaveOccurred())
+					expectFatals = 1
+					Expect(logger.FatalCallCount() - oldFatalCount).Should(Equal(expectFatals))
+					continue
 				}
 
-				matched := handlers.MatchAllowlistHostname(allowlist, testCase.host)
+				matched := r.MatchAllowlistHostname(testCase.host)
 				Expect(matched).To(Equal(testCase.matched))
 			}
 		})
