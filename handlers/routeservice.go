@@ -167,7 +167,7 @@ func CreateDomainAllowlist(allowlist []string) (map[string]struct{}, error) {
 			return nil, fmt.Errorf("invalid route service hairpinning allowlist entry: %s. Must be wildcard (*.domain.com) or FQDN (hostname.domain.com)", entry)
 		}
 
-		hostName := sanitizeFQDN(entry)
+		hostName := sanitizeFqdnStripHostname(entry, true)
 
 		allowlistHostNames[hostName] = struct{}{}
 	}
@@ -176,26 +176,33 @@ func CreateDomainAllowlist(allowlist []string) (map[string]struct{}, error) {
 }
 
 // stripHostFromFQDN strips the host, i.e. first segment, from a fully qualified domain name
-func sanitizeFQDN(entry string) string {
-                 sanitizedEntry := entry
-		if strings.HasPrefix(entry, "*") {
-			// strip wildcard, leave the rest of the FQDN, including leading '.'
-			splitString := strings.SplitN(entry, ".", 2)
-			sanitizedEntry = "." + splitString[1]
-		}
-	
-	return sanitizedEntry
+//
+// onlyWildcard defines, whether only wildcards (*.) any hostname is stripped from the FQDN.
+func sanitizeFqdnStripHostname(entry string, onlyWildcard bool) string {
+	// normalize case to lowercase
+	strippedEntry := strings.ToLower(entry)
+
+	if !onlyWildcard || strings.HasPrefix(strippedEntry, "*") {
+		// strip wildcard, leave the rest of the FQDN, including leading '.'
+		splitString := strings.SplitN(strippedEntry, ".", 2)
+		strippedEntry = "." + splitString[1]
+	}
+
+	return strippedEntry
 }
 
 // MatchAllowlistHostname checks, if the provided host name matches an entry as is, or matches a wildcard when stripping the first segment.
 func (r *RouteService) MatchAllowlistHostname(host string) bool {
+
+	sanitizedHostname := sanitizeFqdnStripHostname(host, true)
 	// FQDN matches an allowlist entry
-	if _, ok := r. hairpinningAllowlistDomains[host]; ok {
+	if _, ok := r.hairpinningAllowlistDomains[sanitizedHostname]; ok {
 		return true
 	}
 
 	// Wildcard FQDN suffix matches an allowlist entry
-	if _, ok := r. hairpinningAllowlistDomains[sanitizeFQDN(host)]; ok {
+	strippedHostname := sanitizeFqdnStripHostname(host, false)
+	if _, ok := r.hairpinningAllowlistDomains[strippedHostname]; ok {
 		return true
 	}
 
