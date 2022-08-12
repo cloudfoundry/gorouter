@@ -163,45 +163,45 @@ func CreateDomainAllowlist(allowlist []string) (map[string]struct{}, error) {
 
 	for _, entry := range allowlist {
 
+		// canonicalize host name to lowercase
+		entry = strings.ToLower(entry)
+
 		if !validAllowlistEntryPattern.MatchString(entry) {
 			return nil, fmt.Errorf("invalid route service hairpinning allowlist entry: %s. Must be wildcard (*.domain.com) or FQDN (hostname.domain.com)", entry)
 		}
 
-		hostName := sanitizeFqdnStripHostname(entry, true)
+		// the allowlist entry is a wildcard. Strip the leading segment ('*').
+		if entry[0] == '*' {
+			entry = stripFqdnHostname(entry)
+		}
 
-		allowlistHostNames[hostName] = struct{}{}
+		allowlistHostNames[entry] = struct{}{}
 	}
 
 	return allowlistHostNames, nil
 }
 
-// stripHostFromFQDN strips the host, i.e. first segment, from a fully qualified domain name
-//
-// onlyWildcard defines, whether only wildcards (*.) any hostname is stripped from the FQDN.
-func sanitizeFqdnStripHostname(entry string, onlyWildcard bool) string {
-	// normalize case to lowercase
-	strippedEntry := strings.ToLower(entry)
-
-	if !onlyWildcard || strings.HasPrefix(strippedEntry, "*") {
-		// strip wildcard, leave the rest of the FQDN, including leading '.'
-		splitString := strings.SplitN(strippedEntry, ".", 2)
-		strippedEntry = "." + splitString[1]
+// stripHostFromFQDN strips the first segment of an FQDN, for wildcards or host names.
+func stripFqdnHostname(entry string) string {
+	splitString := strings.SplitN(entry, ".", 2)
+	if len(splitString) > 1 {
+		return "." + splitString[1]
 	}
-
-	return strippedEntry
+	return entry
 }
 
 // MatchAllowlistHostname checks, if the provided host name matches an entry as is, or matches a wildcard when stripping the first segment.
 func (r *RouteService) MatchAllowlistHostname(host string) bool {
+	// canonicalize case of the host
+	host = strings.ToLower(host)
 
-	sanitizedHostname := sanitizeFqdnStripHostname(host, true)
 	// FQDN matches an allowlist entry
-	if _, ok := r.hairpinningAllowlistDomains[sanitizedHostname]; ok {
+	if _, ok := r.hairpinningAllowlistDomains[host]; ok {
 		return true
 	}
 
 	// Wildcard FQDN suffix matches an allowlist entry
-	strippedHostname := sanitizeFqdnStripHostname(host, false)
+	strippedHostname := stripFqdnHostname(host)
 	if _, ok := r.hairpinningAllowlistDomains[strippedHostname]; ok {
 		return true
 	}
