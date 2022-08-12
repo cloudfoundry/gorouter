@@ -882,10 +882,9 @@ var _ = Describe("Route Service Handler", func() {
 
 				r := handlers.NewRouteService(config, reg, logger, ew).(*handlers.RouteService)
 
-				expectFatals := 0
 				if testCase.err {
-					expectFatals = 1
-					Expect(logger.FatalCallCount() - oldFatalCount).Should(Equal(expectFatals))
+					// one new "Fatal" level log should be there if the allowlist contains invalid entries
+					Expect(logger.FatalCallCount() - oldFatalCount).Should(Equal(1))
 					continue
 				}
 
