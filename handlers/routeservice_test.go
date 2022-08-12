@@ -799,6 +799,20 @@ var _ = Describe("Route Service Handler", func() {
 				err:       false,
 			},
 			{
+				name:      "Test wildcard for subdomain with CamelCase",
+				allowlist: []string{"*.authentication.wildcard-a.com"},
+				host:      "First.Authentication.Wildcard-A.com",
+				matched:   true,
+				err:       false,
+			},
+			{
+				name:      "Test wildcard for subdomain with CamelCase in allowlist",
+				allowlist: []string{"*.Authentication.Wildcard-A.com"},
+				host:      "first.authentication.wildcard-a.com",
+				matched:   true,
+				err:       false,
+			},
+			{
 				name:      "Test wildcard for wrong domain on subdomain",
 				allowlist: []string{"*.authentication.wildcard-a.com"},
 				host:      "first.authentication-wildcard-a.com",
@@ -808,6 +822,20 @@ var _ = Describe("Route Service Handler", func() {
 			{
 				name:      "Test fixed host name",
 				allowlist: []string{"authentication.wildcard-a.com"},
+				host:      "authentication.wildcard-a.com",
+				matched:   true,
+				err:       false,
+			},
+			{
+				name:      "Test fixed host name with CamelCase",
+				allowlist: []string{"authentication.wildcard-a.com"},
+				host:      "Authentication.Wildcard-A.com",
+				matched:   true,
+				err:       false,
+			},
+			{
+				name:      "Test fixed host name with CamelCase in allowlist",
+				allowlist: []string{"Authentication.Wildcard-A.com"},
 				host:      "authentication.wildcard-a.com",
 				matched:   true,
 				err:       false,

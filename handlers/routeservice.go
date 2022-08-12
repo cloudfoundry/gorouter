@@ -33,7 +33,7 @@ func NewRouteService(
 	logger logger.Logger,
 	errorWriter errorwriter.ErrorWriter,
 ) negroni.Handler {
-	allowlistDomains, err := CreateAllowlistPatterns(config.RouteServiceHairpinningAllowlist())
+	allowlistDomains, err := CreateDomainAllowlist(config.RouteServiceHairpinningAllowlist())
 
 	if err != nil {
 		logger.Fatal("allowlist-entry-invalid", zap.Error(err))
@@ -144,7 +144,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	next(rw, req)
 }
 
-// createAllowlistPatterns collects the static parts of wildcard allowlist expressions and wildcards stripped of their first segment.
+// CreateDomainAllowlist collects the static parts of wildcard allowlist expressions and wildcards stripped of their first segment.
 //
 // Each entry is checked to follow DNS wildcard notation, e.g.
 // *.domain-123.com, subdomain.example.com
@@ -152,7 +152,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 // but not subdomain.*.example.com, *.*.example.com or invalid DNS names, e.g. ?!.example.com
 //
 // This function is exported so it can be tested as part of the route service test
-func CreateAllowlistPatterns(allowlist []string) (map[string]struct{}, error) {
+func CreateDomainAllowlist(allowlist []string) (map[string]struct{}, error) {
 
 	// This check is a preliminary configuration check and case insensitive. Route URL host names are matched verbatim.
 	var validAllowlistEntryPattern = regexp.MustCompile(`(?i)^(\*\.)?[a-z\d-]+(\.[a-z\d-]+)+$`)
@@ -164,15 +164,11 @@ func CreateAllowlistPatterns(allowlist []string) (map[string]struct{}, error) {
 	for _, entry := range allowlist {
 
 		if !validAllowlistEntryPattern.MatchString(entry) {
-			return nil, fmt.Errorf("invalid route service hairpinning allowlist entry: %s. Must be wildcard (*.domain.com) or FQDN (subdomain.domain.com)", entry)
+			return nil, fmt.Errorf("invalid route service hairpinning allowlist entry: %s. Must be wildcard (*.domain.com) or FQDN (hostname.domain.com)", entry)
 		}
 
-		hostName := entry
+		hostName := sanitizeFQDN(entry)
 
-		if strings.HasPrefix(entry, "*") {
-			// strip wildcard, leave the rest of the FQDN, including leading '.'
-			hostName = stripHostFromFQDN(entry)
-		}
 		allowlistHostNames[hostName] = struct{}{}
 	}
 
@@ -180,20 +176,26 @@ func CreateAllowlistPatterns(allowlist []string) (map[string]struct{}, error) {
 }
 
 // stripHostFromFQDN strips the host, i.e. first segment, from a fully qualified domain name
-func stripHostFromFQDN(entry string) string {
-	splitString := strings.SplitN(entry, ".", 2)
-	return "." + splitString[1]
+func sanitizeFQDN(entry string) string {
+                 sanitizedEntry := entry
+		if strings.HasPrefix(entry, "*") {
+			// strip wildcard, leave the rest of the FQDN, including leading '.'
+			splitString := strings.SplitN(entry, ".", 2)
+			sanitizedEntry = "." + splitString[1]
+		}
+	
+	return sanitizedEntry
 }
 
 // MatchAllowlistHostname checks, if the provided host name matches an entry as is, or matches a wildcard when stripping the first segment.
-func MatchAllowlistHostname(allowlist map[string]struct{}, host string) bool {
+func (r *RouteService) MatchAllowlistHostname(host string) bool {
 	// FQDN matches an allowlist entry
-	if _, ok := allowlist[host]; ok {
+	if _, ok := r. hairpinningAllowlistDomains[host]; ok {
 		return true
 	}
 
 	// Wildcard FQDN suffix matches an allowlist entry
-	if _, ok := allowlist[stripHostFromFQDN(host)]; ok {
+	if _, ok := r. hairpinningAllowlistDomains[sanitizeFQDN(host)]; ok {
 		return true
 	}
 
@@ -224,7 +226,7 @@ func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
 	}
 
 	// check if the host URI's host matches the allowlist
-	return MatchAllowlistHostname(r.hairpinningAllowlistDomains, pool.Host())
+	return r.MatchAllowlistHostname(pool.Host())
 }
 
 func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
