@@ -54,6 +54,7 @@ type proxy struct {
 	sanitizeForwardedProto   bool
 	defaultLoadBalance       string
 	endpointDialTimeout      time.Duration
+	websocketDialTimeout     time.Duration
 	endpointTimeout          time.Duration
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
@@ -94,6 +95,7 @@ func NewProxy(
 		sanitizeForwardedProto:   cfg.SanitizeForwardedProto,
 		defaultLoadBalance:       cfg.LoadBalance,
 		endpointDialTimeout:      cfg.EndpointDialTimeout,
+		websocketDialTimeout:     cfg.WebsocketDialTimeout,
 		endpointTimeout:          cfg.EndpointTimeout,
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         backendTLSConfig,
@@ -246,6 +248,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.logger,
 		p.errorWriter,
 		p.endpointDialTimeout,
+		p.websocketDialTimeout,
 		p.backendTLSConfig,
 		handler.DisableXFFLogging(p.disableXFFLogging),
 		handler.DisableSourceIPLogging(p.disableSourceIPLogging),
