@@ -48,7 +48,7 @@ var _ = Describe("RequestHandler", func() {
 			rh = handler.NewRequestHandler(
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
-				time.Second*2, &tls.Config{},
+				time.Second*2, time.Second*2, &tls.Config{},
 				handler.DisableXFFLogging(true),
 			)
 		})
@@ -96,7 +96,7 @@ var _ = Describe("RequestHandler", func() {
 			rh = handler.NewRequestHandler(
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
-				time.Second*2, &tls.Config{},
+				time.Second*2, time.Second*2, &tls.Config{},
 				handler.DisableSourceIPLogging(true),
 			)
 		})

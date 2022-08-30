@@ -35,7 +35,8 @@ type RequestHandler struct {
 	request  *http.Request
 	response utils.ProxyResponseWriter
 
-	endpointDialTimeout time.Duration
+	endpointDialTimeout  time.Duration
+	websocketDialTimeout time.Duration
 
 	tlsConfigTemplate *tls.Config
 
@@ -51,16 +52,18 @@ func NewRequestHandler(
 	logger logger.Logger,
 	errorWriter errorwriter.ErrorWriter,
 	endpointDialTimeout time.Duration,
+	websocketDialTimeout time.Duration,
 	tlsConfig *tls.Config,
 	opts ...func(*RequestHandler),
 ) *RequestHandler {
 	reqHandler := &RequestHandler{
-		errorWriter:         errorWriter,
-		reporter:            r,
-		request:             request,
-		response:            response,
-		endpointDialTimeout: endpointDialTimeout,
-		tlsConfigTemplate:   tlsConfig,
+		errorWriter:          errorWriter,
+		reporter:             r,
+		request:              request,
+		response:             response,
+		endpointDialTimeout:  endpointDialTimeout,
+		websocketDialTimeout: websocketDialTimeout,
+		tlsConfigTemplate:    tlsConfig,
 	}
 
 	for _, option := range opts {
@@ -69,7 +72,7 @@ func NewRequestHandler(
 
 	requestLogger := setupLogger(reqHandler.disableXFFLogging, reqHandler.disableSourceIPLogging, request, logger)
 	reqHandler.forwarder = &Forwarder{
-		BackendReadTimeout: endpointDialTimeout, // TODO: different values?
+		BackendReadTimeout: websocketDialTimeout,
 		Logger:             requestLogger,
 	}
 	reqHandler.logger = requestLogger
