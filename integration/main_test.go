@@ -805,9 +805,11 @@ var _ = Describe("Router Integration", func() {
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", localIP, proxyPort), nil)
 				Expect(err).ToNot(HaveOccurred())
 				req.Host = "demo." + test_util.LocalhostDNS
-				res, err := client.Do(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
+				Eventually(func() int {
+					res, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					return res.StatusCode
+				}, 5*time.Second).Should(Equal(TEST_STATUS_CODE))
 			})
 
 			Context("when the client connects with HTTPS", func() {
@@ -819,9 +821,11 @@ var _ = Describe("Router Integration", func() {
 					req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 					Expect(err).ToNot(HaveOccurred())
 					req.Host = "demo." + test_util.LocalhostDNS
-					res, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
+					Eventually(func() int {
+						res, err := client.Do(req)
+						Expect(err).ToNot(HaveOccurred())
+						return res.StatusCode
+					}, 5*time.Second).Should(Equal(TEST_STATUS_CODE))
 				})
 
 				Context("when the gorouter has http disabled", func() {
@@ -837,9 +841,11 @@ var _ = Describe("Router Integration", func() {
 						req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:%d", localIP, sslPort), nil)
 						Expect(err).ToNot(HaveOccurred())
 						req.Host = "demo." + test_util.LocalhostDNS
-						res, err := client.Do(req)
-						Expect(err).ToNot(HaveOccurred())
-						Expect(res.StatusCode).To(Equal(TEST_STATUS_CODE))
+						Eventually(func() int {
+							res, err := client.Do(req)
+							Expect(err).ToNot(HaveOccurred())
+							return res.StatusCode
+						}, 5*time.Second).Should(Equal(TEST_STATUS_CODE))
 					})
 				})
 			})

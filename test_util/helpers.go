@@ -255,6 +255,7 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 	c.Zone = "z1"
 
 	c.EndpointTimeout = 500 * time.Millisecond
+	c.WebsocketDialTimeout = c.EndpointDialTimeout
 
 	c.Status = config.StatusConfig{
 		Port: statusPort,
