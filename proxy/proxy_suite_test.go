@@ -79,6 +79,7 @@ var _ = BeforeEach(func() {
 	conf.TLSHandshakeTimeout = 900 * time.Millisecond
 	conf.EndpointTimeout = 1 * time.Second
 	conf.EndpointDialTimeout = 50 * time.Millisecond
+	conf.WebsocketDialTimeout = 50 * time.Millisecond
 	conf.EnableHTTP2 = false
 	fakeReporter = &fakes.FakeCombinedReporter{}
 	fakeRegistry = fake_registry.NewMetricsRegistry()
