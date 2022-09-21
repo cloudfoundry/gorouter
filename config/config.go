@@ -286,6 +286,7 @@ type Config struct {
 	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
 	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
 	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
+	MaxHeaderBytes      int  `yaml:"max_header_bytes"`
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 

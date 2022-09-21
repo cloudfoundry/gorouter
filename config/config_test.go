@@ -72,6 +72,16 @@ status:
 			Expect(config.Status.Pass).To(Equal("pass"))
 
 		})
+		It("sets MaxHeaderBytes", func() {
+			var b = []byte(`
+max_header_bytes: 10
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.MaxHeaderBytes).To(Equal(10))
+		})
 
 		It("sets prometheus endpoint config", func() {
 			var b = []byte(`

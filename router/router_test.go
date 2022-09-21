@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -803,6 +804,63 @@ var _ = Describe("Router", func() {
 		})
 	})
 
+	Describe("MaxHeaderBytes", func() {
+		var client http.Client
+
+		BeforeEach(func() {
+			config.MaxHeaderBytes = 1
+			client = http.Client{}
+		})
+
+		JustBeforeEach(func() {
+			app := newSlowApp(
+				[]route.Uri{"maxheadersize." + test_util.LocalhostDNS},
+				config.Port,
+				mbusClient,
+				1*time.Millisecond,
+			)
+
+			app.RegisterAndListen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			signals := make(chan os.Signal)
+			readyChan := make(chan struct{})
+
+			go func() {
+				err = router.Run(signals, readyChan)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+		})
+
+		It("the request fails if the headers are over the limit", func() {
+			longRequestPath := strings.Repeat("ninebytes", 500) // golang adds 4096 bytes of padding to MaxHeaderBytes, so we need something at least that big + 1 bytes
+			uri := fmt.Sprintf("http://maxheadersize.%s:%d/%s", test_util.LocalhostDNS, config.Port, longRequestPath)
+			req, _ := http.NewRequest("GET", uri, nil)
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
+			defer resp.Body.Close()
+
+			_, err = ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("the request succeeds if the headers are under the limit", func() {
+			uri := fmt.Sprintf("http://maxheadersize.%s:%d/smallheader", test_util.LocalhostDNS, config.Port)
+			req, _ := http.NewRequest("GET", uri, nil)
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			defer resp.Body.Close()
+
+			_, err = ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
 	Describe("request timeout for long requests", func() {
 		var (
 			req             *http.Request
