@@ -824,14 +824,6 @@ var _ = Describe("Router", func() {
 			Eventually(func() bool {
 				return appRegistered(registry, app)
 			}).Should(BeTrue())
-
-			signals := make(chan os.Signal)
-			readyChan := make(chan struct{})
-
-			go func() {
-				err = router.Run(signals, readyChan)
-				Expect(err).NotTo(HaveOccurred())
-			}()
 		})
 
 		It("the request fails if the headers are over the limit", func() {
