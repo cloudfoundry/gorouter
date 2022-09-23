@@ -159,7 +159,7 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 		if endpointRemoved {
 			r.logger.Info("endpoint-unregistered", zapData(uri, endpoint)...)
 		} else {
-			r.logger.Debug("endpoint-not-unregistered", zapData(uri, endpoint)...)
+			r.logger.Info("endpoint-not-unregistered", zapData(uri, endpoint)...)
 		}
 
 		if pool.IsEmpty() {
