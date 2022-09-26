@@ -2,12 +2,15 @@ package schema_test
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 
@@ -72,6 +75,57 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(Say(`app_index:"3"`))
 			Eventually(r).Should(Say(`instance_id:"FakeInstanceId"`))
 			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"`))
+		})
+
+		Context("when the AccessLogRecord is too large for UDP", func() {
+			Context("when the URL is too large", func() {
+				It("truncates the log", func() {
+					record.RedactQueryParams = config.REDACT_QUERY_PARMS_NONE
+					qp := strings.Repeat("&a=a", 100_000)
+					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-query-params?a=a%s", qp))
+					record.Request.Method = http.MethodGet
+					b := record.LogMessage()
+
+					startOfQueryParams := strings.Index(b, `&a=a`)
+					Expect(startOfQueryParams).Should(BeNumerically(">", 0))
+					endOfQueryParams := strings.Index(b, "...REQUEST-URI-TOO-LONG-TO-LOG--TRUNCATED")
+					Expect(endOfQueryParams).Should(BeNumerically(">", 0))
+					Expect(endOfQueryParams - startOfQueryParams).Should(BeNumerically("<", 20000))
+				})
+			})
+			Context("when the extra request headers are too large", func() {
+				It("truncates the log", func() {
+					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-headers"))
+					record.Request.Method = http.MethodGet
+					for i := 0; i < 30000; i++ {
+						record.Request.Header.Add(fmt.Sprintf("%d", i), fmt.Sprintf("%d", i))
+						record.ExtraHeadersToLog = append(record.ExtraHeadersToLog, fmt.Sprintf("%d", i))
+					}
+					b := record.LogMessage()
+
+					startOfExtraHeaders := strings.Index(b, `0:"0"`)
+					Expect(startOfExtraHeaders).Should(BeNumerically(">", 0))
+					endOfExtraHeaders := strings.Index(b, "...EXTRA-REQUEST-HEADERS-TOO-LONG-TO-LOG--TRUNCATED")
+					Expect(endOfExtraHeaders).Should(BeNumerically(">", 0))
+					Expect(endOfExtraHeaders - startOfExtraHeaders).Should(BeNumerically("<", 20000))
+				})
+			})
+
+			DescribeTable("when the request headers are too large",
+				func(headerToTest string, limit int) {
+					record.Request.Header.Set(headerToTest, strings.Repeat(headerToTest, 100_000))
+					b := record.LogMessage()
+					startOfHeader := strings.Index(b, headerToTest)
+					Expect(startOfHeader).Should(BeNumerically(">", 0))
+					endOfHeader := strings.Index(b, fmt.Sprintf("...%s-TOO-LONG-TO-LOG--TRUNCATED", strings.ToUpper(headerToTest)))
+					Expect(endOfHeader).Should(BeNumerically(">", 0))
+					Expect(endOfHeader - startOfHeader).Should(BeNumerically("<", limit))
+				},
+				Entry("User-Agent", "User-Agent", 1_000),
+				Entry("Referer", "Referer", 1_000),
+				Entry("X-Forwarded-For", "X-Forwarded-For", 1_000),
+				Entry("X-Forwarded-Proto", "X-Forwarded-Proto", 1_000),
+			)
 		})
 
 		Context("when DisableSourceIPLogging is specified", func() {
@@ -277,6 +331,59 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"`))
 			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"\n`))
+		})
+
+		Context("when the AccessLogRecord is too large for UDP", func() {
+			Context("when the URL is too large", func() {
+				It("does not truncate the log", func() {
+					record.RedactQueryParams = config.REDACT_QUERY_PARMS_NONE
+					qp := strings.Repeat("&a=a", 10_000)
+					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-query-params?a=a%s&b=b", qp))
+					record.Request.Method = http.MethodGet
+
+					b := new(bytes.Buffer)
+					_, err := record.WriteTo(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					r := BufferReader(b)
+					Eventually(r).Should(Say("b=b"))
+					Consistently(r).ShouldNot(Say("...REQUEST-URI-TOO-LONG-TO-LOG--TRUNCATED"))
+				})
+			})
+			Context("when the extra request headers are too large", func() {
+				It("does not truncate the log", func() {
+					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-headers"))
+					record.Request.Method = http.MethodGet
+					for i := 0; i < 2000; i++ {
+						record.Request.Header.Add(fmt.Sprintf("%d", i), fmt.Sprintf("%d", i))
+						record.ExtraHeadersToLog = append(record.ExtraHeadersToLog, fmt.Sprintf("%d", i))
+					}
+					b := new(bytes.Buffer)
+					_, err := record.WriteTo(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					r := BufferReader(b)
+					Eventually(r).Should(Say(`1999:"1999"`))
+					Consistently(r).ShouldNot(Say("...EXTRA-REQUEST-HEADERS-TOO-LONG-TO-LOG--TRUNCATED"))
+				})
+			})
+
+			DescribeTable("does not truncate when the request headers are too large",
+				func(headerToTest string, limit int) {
+					record.Request.Header.Set(headerToTest, strings.Repeat(headerToTest, 1_000)+"LastEntry")
+					b := new(bytes.Buffer)
+					_, err := record.WriteTo(b)
+					Expect(err).ToNot(HaveOccurred())
+
+					r := BufferReader(b)
+					Eventually(r).Should(Say("LastEntry"))
+					Consistently(r).ShouldNot(Say(fmt.Sprintf("...%s-TOO-LONG-TO-LOG--TRUNCATED", headerToTest)))
+				},
+				Entry("User-Agent", "User-Agent", 1_000),
+				Entry("Referer", "Referer", 1_000),
+				Entry("X-Forwarded-For", "X-Forwarded-For", 1_000),
+				Entry("X-Forwarded-Proto", "X-Forwarded-Proto", 1_000),
+			)
 		})
 	})
 
