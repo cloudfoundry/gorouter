@@ -369,28 +369,32 @@ var _ = Describe("AccessLog", func() {
 			Expect(accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)).To(BeAssignableToTypeOf(&accesslog.NullAccessLogger{}))
 		})
 
-		It("creates an access log when loggegrator is enabled", func() {
+		It("does not creates an a file AccessLogger when only loggegrator is enabled", func() {
 			cfg.Logging.LoggregatorEnabled = true
 			cfg.AccessLog.File = ""
+			cfg.AccessLog.EnableStreaming = false
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).To(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).To(BeEmpty())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(0))
 		})
 
-		It("creates an access log if an access log is specified", func() {
+		It("creates a file AccessLogger when an access log is specified", func() {
 			cfg.AccessLog.File = "/dev/null"
+			cfg.AccessLog.EnableStreaming = false
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeEmpty())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
 
-		It("creates an AccessLogger if both access log and loggregator is enabled", func() {
+		It("creates a file AccessLogger if both access log and loggregator is enabled", func() {
 			cfg.Logging.LoggregatorEnabled = true
 			cfg.AccessLog.File = "/dev/null"
+			cfg.AccessLog.EnableStreaming = false
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeEmpty())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
 
@@ -400,7 +404,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.EnableStreaming = true
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(2))
 		})
 
@@ -410,7 +414,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.EnableStreaming = false
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
 
@@ -420,7 +424,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.EnableStreaming = true
 
 			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
-			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriter()).ToNot(BeNil())
+			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
 

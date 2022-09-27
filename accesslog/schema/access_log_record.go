@@ -97,10 +97,10 @@ func (b *recordBuffer) WriteDashOrStringValue(s string) {
 
 // AccessLogRecord represents a single access log line
 type AccessLogRecord struct {
-	Request                *http.Request // risk!
+	Request                *http.Request
 	HeadersOverride        http.Header
 	StatusCode             int
-	RouteEndpoint          *route.Endpoint // risk!
+	RouteEndpoint          *route.Endpoint
 	RoundtripStartedAt     time.Time
 	FirstByteAt            time.Time
 	RoundtripFinishedAt    time.Time
@@ -108,12 +108,12 @@ type AccessLogRecord struct {
 	AppRequestFinishedAt   time.Time
 	BodyBytesSent          int
 	RequestBytesReceived   int
-	ExtraHeadersToLog      []string // risk!
+	ExtraHeadersToLog      []string
 	DisableXFFLogging      bool
 	DisableSourceIPLogging bool
 	RedactQueryParams      string
 	RouterError            string
-	record                 []byte // the whole thing
+	record                 []byte
 }
 
 func (r *AccessLogRecord) formatStartedAt() string {
@@ -137,9 +137,14 @@ func (r *AccessLogRecord) appTime() float64 {
 	return float64(r.AppRequestFinishedAt.UnixNano()-r.AppRequestStartedAt.UnixNano()) / float64(time.Second)
 }
 
-// getRecord memoizes makeRecord()
 func (r *AccessLogRecord) getRecord(performTruncate bool) []byte {
-	if len(r.record) == 0 {
+	recordLen := len(r.record)
+	isEmpty := recordLen == 0
+	recordTooBigForUDP := recordLen > 65_400
+
+	// this optimizes for most cases where the record is small and does not
+	// require truncation for UDP
+	if isEmpty || (recordTooBigForUDP && performTruncate) {
 		r.record = r.makeRecord(performTruncate)
 	}
 
