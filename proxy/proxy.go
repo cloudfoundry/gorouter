@@ -179,6 +179,7 @@ func NewProxy(
 		}
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
+	n.Use(handlers.NewMaxRequestSize(cfg.MaxHeaderBytes, logger))
 	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))

@@ -138,6 +138,9 @@ func NewRouter(
 	return router, nil
 }
 
+// golang's default was 1mb. We want to make this explicit, so that we're able to create access logs via our own handler to process MAX_HEADER_BYTES
+const MAX_HEADER_BYTES = 1024 * 1024
+
 func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
@@ -153,7 +156,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		Handler:        r.handler,
 		ConnState:      r.HandleConnState,
 		IdleTimeout:    r.config.FrontendIdleTimeout,
-		MaxHeaderBytes: r.config.MaxHeaderBytes,
+		MaxHeaderBytes: MAX_HEADER_BYTES,
 	}
 
 	err := r.serveHTTP(server, r.errChan)

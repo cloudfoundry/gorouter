@@ -808,7 +808,6 @@ var _ = Describe("Router", func() {
 		var client http.Client
 
 		BeforeEach(func() {
-			config.MaxHeaderBytes = 1
 			client = http.Client{}
 		})
 
@@ -827,7 +826,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("the request fails if the headers are over the limit", func() {
-			longRequestPath := strings.Repeat("ninebytes", 500) // golang adds 4096 bytes of padding to MaxHeaderBytes, so we need something at least that big + 1 bytes
+			longRequestPath := strings.Repeat("ninebytes", 117_000) // golang adds 4096 bytes of padding to MaxHeaderBytes, so we need something at least that big + 1mb
 			uri := fmt.Sprintf("http://maxheadersize.%s:%d/%s", test_util.LocalhostDNS, config.Port, longRequestPath)
 			req, _ := http.NewRequest("GET", uri, nil)
 			resp, err := client.Do(req)
@@ -841,7 +840,8 @@ var _ = Describe("Router", func() {
 		})
 
 		It("the request succeeds if the headers are under the limit", func() {
-			uri := fmt.Sprintf("http://maxheadersize.%s:%d/smallheader", test_util.LocalhostDNS, config.Port)
+			longRequestPath := strings.Repeat("ninebytes", 116_000) // golang adds 4096 bytes of padding to MaxHeaderBytes, so we need something at least that big + 1mb
+			uri := fmt.Sprintf("http://maxheadersize.%s:%d/%s", test_util.LocalhostDNS, config.Port, longRequestPath)
 			req, _ := http.NewRequest("GET", uri, nil)
 			resp, err := client.Do(req)
 			Expect(err).ToNot(HaveOccurred())
