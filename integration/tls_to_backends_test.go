@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -23,16 +21,11 @@ import (
 var _ = Describe("TLS to backends", func() {
 	var (
 		testState *testState
-		accessLog string
 	)
 
 	BeforeEach(func() {
-		var err error
-		accessLog, err = ioutil.TempDir("", "accesslog")
-		Expect(err).NotTo(HaveOccurred())
-
 		testState = NewTestState()
-		testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
+		testState.EnableAccessLog()
 	})
 
 	JustBeforeEach(func() {
@@ -42,7 +35,6 @@ var _ = Describe("TLS to backends", func() {
 	AfterEach(func() {
 		if testState != nil {
 			testState.StopAndCleanup()
-			os.RemoveAll(accessLog)
 		}
 	})
 
@@ -149,14 +141,11 @@ var _ = Describe("TLS to backends", func() {
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)
 
-		// test access log
-		Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
-
 		Eventually(func() ([]byte, error) {
-			return ioutil.ReadFile(testState.cfg.AccessLog.File)
+			return ioutil.ReadFile(testState.AccessLogFilePath())
 		}).Should(ContainSubstring(`response_time`))
 
-		f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
+		f, err := ioutil.ReadFile(testState.AccessLogFilePath())
 		Expect(err).NotTo(HaveOccurred())
 		fmt.Printf("contents %s", f)
 

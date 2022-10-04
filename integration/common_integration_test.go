@@ -297,11 +297,27 @@ func (s *testState) StopAndCleanup() {
 		s.natsRunner.Stop()
 	}
 
+	if s.AccessLogFilePath() != "" {
+		err := os.Remove(s.AccessLogFilePath())
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	os.RemoveAll(s.tmpdir)
 
 	if s.gorouterSession != nil && s.gorouterSession.ExitCode() == -1 {
 		Eventually(s.gorouterSession.Terminate(), 5).Should(Exit(0))
 	}
+}
+
+func (s *testState) EnableAccessLog() {
+	file, err := os.CreateTemp("", "RTR-ACCESS-LOG")
+	Expect(err).NotTo(HaveOccurred())
+
+	s.cfg.AccessLog = config.AccessLog{File: file.Name()}
+}
+
+func (s *testState) AccessLogFilePath() string {
+	return s.cfg.AccessLog.File
 }
 
 func assertRequestSucceeds(client *http.Client, req *http.Request) {
