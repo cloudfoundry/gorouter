@@ -6,8 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -34,11 +32,7 @@ var _ = Describe("GDPR", func() {
 
 	Context("when disable_log_forwarded_for is set true", func() {
 		It("omits x-forwarded-for headers in log", func() {
-			accessLog, err := ioutil.TempDir("", "accesslog")
-			Expect(err).NotTo(HaveOccurred())
-			defer os.RemoveAll(accessLog)
-
-			testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
+			testState.EnableAccessLog()
 
 			testState.cfg.Logging.DisableLogForwardedFor = true
 			testState.StartGorouterOrFail()
@@ -58,13 +52,11 @@ var _ = Describe("GDPR", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
 
-			Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
-
 			Eventually(func() ([]byte, error) {
-				return ioutil.ReadFile(testState.cfg.AccessLog.File)
+				return ioutil.ReadFile(testState.AccessLogFilePath())
 			}).Should(ContainSubstring(`x_forwarded_for:"-"`))
 
-			f, err := ioutil.ReadFile(testState.cfg.AccessLog.File)
+			f, err := ioutil.ReadFile(testState.AccessLogFilePath())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(f).NotTo(ContainSubstring("192.168.0.1"))
 		})
@@ -111,12 +103,7 @@ var _ = Describe("GDPR", func() {
 
 	Context("when disable_log_source_ip is set true", func() {
 		It("omits RemoteAddr in log", func() {
-			accessLog, err := ioutil.TempDir("", "accesslog")
-			Expect(err).NotTo(HaveOccurred())
-			defer os.RemoveAll(accessLog)
-
-			testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
-
+			testState.EnableAccessLog()
 			testState.cfg.Logging.DisableLogSourceIP = true
 			testState.StartGorouterOrFail()
 
@@ -135,10 +122,8 @@ var _ = Describe("GDPR", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
 
-			Expect(testState.cfg.AccessLog.File).To(BeARegularFile())
-
 			Eventually(func() ([]byte, error) {
-				return ioutil.ReadFile(testState.cfg.AccessLog.File)
+				return ioutil.ReadFile(testState.AccessLogFilePath())
 			}).Should(ContainSubstring(`"foo-agent" "-"`))
 		})
 

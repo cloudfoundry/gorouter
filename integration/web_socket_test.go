@@ -2,11 +2,8 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -20,23 +17,16 @@ import (
 var _ = Describe("Websockets", func() {
 	var (
 		testState *testState
-		accessLog string
 	)
 
 	BeforeEach(func() {
-		var err error
-		accessLog, err = ioutil.TempDir("", "accesslog")
-		Expect(err).NotTo(HaveOccurred())
-
 		testState = NewTestState()
-		testState.cfg.AccessLog.File = filepath.Join(accessLog, "access.log")
 		testState.StartGorouterOrFail()
 	})
 
 	AfterEach(func() {
 		if testState != nil {
 			testState.StopAndCleanup()
-			os.RemoveAll(accessLog)
 		}
 	})
 
