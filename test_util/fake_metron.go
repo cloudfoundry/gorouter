@@ -72,7 +72,7 @@ func (f *fakeMetron) AllEvents() []Event {
 // modified from https://github.com/cloudfoundry/dropsonde/blob/9b2cd8f8f9e99dca1f764ca4511d6011b4f44d0c/integration_test/dropsonde_end_to_end_test.go
 func (f *fakeMetron) listenForEvents() {
 	for {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, 1024*128)
 		n, _, err := f.listener.ReadFrom(buffer)
 		if err != nil {
 			return
@@ -84,7 +84,7 @@ func (f *fakeMetron) listenForEvents() {
 		envelope := new(events.Envelope)
 		err = proto.Unmarshal(buffer[0:n], envelope)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("Error unmarshalling envelope: %s", err.Error()))
 		}
 
 		var eventId = envelope.GetEventType().String()
@@ -102,6 +102,9 @@ func (f *fakeMetron) listenForEvents() {
 			countMetric := envelope.GetCounterEvent()
 			newEvent.Name = countMetric.GetName()
 			newEvent.Value = float64(countMetric.GetDelta())
+		case events.Envelope_LogMessage:
+			logMessage := envelope.GetLogMessage()
+			newEvent.Name = string(logMessage.Message)
 		default:
 			panic("Unexpected message type: " + envelope.GetEventType().String())
 
