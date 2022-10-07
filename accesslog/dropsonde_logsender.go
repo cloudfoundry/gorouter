@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -22,6 +23,12 @@ type DropsondeLogSender struct {
 
 func (l *DropsondeLogSender) SendAppLog(appID, message string, tags map[string]string) {
 	if l.sourceInstance == "" || appID == "" {
+		l.logger.Debug("dropping-loggregator-access-log",
+			zap.Error(fmt.Errorf("either no appId or source instance present")),
+			zap.String("appID", appID),
+			zap.String("sourceInstance", l.sourceInstance),
+		)
+
 		return
 	}
 
