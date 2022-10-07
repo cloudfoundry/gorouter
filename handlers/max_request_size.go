@@ -8,22 +8,22 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
 )
 
 type MaxRequestSize struct {
-	MaxSize                  int
-	logger                   logger.Logger
-	loadBalancingMethod      string
-	stickySessionFunc        func(*http.Request, config.StringSet) string
-	stickySessionCookieNames config.StringSet
+	cfg                 *config.Config
+	MaxSize             int
+	logger              logger.Logger
+	loadBalancingMethod string
 }
 
 const ONE_MB = 1024 * 1024 // bytes * kb
 
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
-func NewMaxRequestSize(maxSize int, logger logger.Logger, loadBalancingMethod string, stickySessionFunc func(request *http.Request, stickySessionCookieNames config.StringSet) string, stickySessionCookieNames config.StringSet) negroni.Handler {
+func NewMaxRequestSize(cfg *config.Config, logger logger.Logger) *MaxRequestSize {
+	maxSize := cfg.MaxHeaderBytes
+
 	if maxSize < 1 {
 		maxSize = ONE_MB
 	}
@@ -34,11 +34,9 @@ func NewMaxRequestSize(maxSize int, logger logger.Logger, loadBalancingMethod st
 	}
 
 	return &MaxRequestSize{
-		MaxSize:                  maxSize,
-		logger:                   logger,
-		loadBalancingMethod:      loadBalancingMethod,
-		stickySessionFunc:        stickySessionFunc,
-		stickySessionCookieNames: stickySessionCookieNames,
+		MaxSize: maxSize,
+		logger:  logger,
+		cfg:     cfg,
 	}
 }
 
@@ -53,12 +51,15 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	if reqSize >= m.MaxSize {
 		reqInfo, err := ContextRequestInfo(r)
 		if err != nil {
-			m.logger.Fatal("request-info-err", zap.Error(err))
-			return
+			m.logger.Error("request-info-err", zap.Error(err))
+		} else {
+			endpointIterator, err := EndpointIteratorForRequest(r, m.cfg.LoadBalance, m.cfg.StickySessionCookieNames)
+			if err != nil {
+				m.logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
+			} else {
+				reqInfo.RouteEndpoint = endpointIterator.Next()
+			}
 		}
-		m.logger.Debug("req-info", zap.String("reqInfo", fmt.Sprintf("%#v", reqInfo)))
-
-		reqInfo.RouteEndpoint = reqInfo.RoutePool.Endpoints(m.loadBalancingMethod, m.stickySessionFunc(r, m.stickySessionCookieNames)).Next()
 		rw.Header().Set(router_http.CfRouterError, "max-request-size-exceeded")
 		rw.WriteHeader(http.StatusRequestHeaderFieldsTooLarge)
 		r.Close = true

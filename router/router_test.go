@@ -311,7 +311,7 @@ var _ = Describe("Router", func() {
 
 		var vcapCookie *http.Cookie
 		for _, cookie := range resp.Cookies() {
-			if cookie.Name == proxy.VcapCookieId {
+			if cookie.Name == handlers.VcapCookieId {
 				vcapCookie = cookie
 			}
 		}
@@ -341,7 +341,7 @@ var _ = Describe("Router", func() {
 
 		var vcapCookie *http.Cookie
 		for _, cookie := range resp.Cookies() {
-			if cookie.Name == proxy.VcapCookieId {
+			if cookie.Name == handlers.VcapCookieId {
 				vcapCookie = cookie
 			}
 		}

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/proxy"
+	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo"
@@ -64,7 +64,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := conn.ReadResponse()
-				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/path1"))
 				Expect(cookie.Value).To(Equal("instance-id-1"))
@@ -75,7 +75,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ = conn.ReadResponse()
-				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie = getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/path1"))
 				Expect(cookie.Value).To(Equal("instance-id-1"))
@@ -96,7 +96,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := conn.ReadResponse()
-				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/path1"))
 				Expect(cookie.Value).To(Equal("instance-id-1"))
@@ -107,7 +107,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ = conn.ReadResponse()
-				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie = getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/path2/context/path"))
 				Expect(cookie.Value).To(Equal("instance-id-2"))
@@ -128,7 +128,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := conn.ReadResponse()
-				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/path1"))
 				Expect(cookie.Value).To(Equal("instance-id-1"))
@@ -139,7 +139,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ = conn.ReadResponse()
-				cookie = getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie = getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Path).To(Equal("/"))
 				Expect(cookie.Value).To(Equal("instance-id-2"))
@@ -161,7 +161,7 @@ var _ = Describe("Session Affinity", func() {
 				Eventually(done).Should(Receive())
 
 				resp, _ := x.ReadResponse()
-				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
+				Expect(getCookie(handlers.VcapCookieId, resp.Cookies())).To(BeNil())
 			})
 		})
 
@@ -181,7 +181,7 @@ var _ = Describe("Session Affinity", func() {
 				jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 				Expect(jsessionId).ToNot(BeNil())
 
-				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Value).To(Equal("my-id"))
 				Expect(cookie.Secure).To(BeFalse())
@@ -211,7 +211,7 @@ var _ = Describe("Session Affinity", func() {
 					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Expires).To(Equal(expiry))
 				})
@@ -237,7 +237,7 @@ var _ = Describe("Session Affinity", func() {
 					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Value).To(Equal("my-id"))
 					Expect(cookie.Secure).To(BeTrue())
@@ -264,7 +264,7 @@ var _ = Describe("Session Affinity", func() {
 					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Value).To(Equal("my-id"))
 					Expect(cookie.Secure).To(BeTrue())
@@ -293,7 +293,7 @@ var _ = Describe("Session Affinity", func() {
 					jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 					Expect(jsessionId).ToNot(BeNil())
 
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Value).To(Equal("my-id"))
 					Expect(cookie.SameSite).To(Equal(http.SameSiteStrictMode))
@@ -309,7 +309,7 @@ var _ = Describe("Session Affinity", func() {
 
 		BeforeEach(func() {
 			cookie := &http.Cookie{
-				Name:  proxy.VcapCookieId,
+				Name:  handlers.VcapCookieId,
 				Value: "my-id",
 				Path:  "/",
 
@@ -340,7 +340,7 @@ var _ = Describe("Session Affinity", func() {
 
 				resp, _ := x.ReadResponse()
 				Expect(getCookie(StickyCookieKey, resp.Cookies())).To(BeNil())
-				Expect(getCookie(proxy.VcapCookieId, resp.Cookies())).To(BeNil())
+				Expect(getCookie(handlers.VcapCookieId, resp.Cookies())).To(BeNil())
 			})
 
 			Context("when the preferred server is gone", func() {
@@ -355,7 +355,7 @@ var _ = Describe("Session Affinity", func() {
 					Eventually(done).Should(Receive())
 
 					resp, _ := x.ReadResponse()
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Value).To(Equal("other-id"))
 					Expect(cookie.Secure).To(BeFalse())
@@ -380,7 +380,7 @@ var _ = Describe("Session Affinity", func() {
 				jsessionId := getCookie(StickyCookieKey, resp.Cookies())
 				Expect(jsessionId).ToNot(BeNil())
 
-				cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+				cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 				Expect(cookie).ToNot(BeNil())
 				Expect(cookie.Value).To(Equal("some-id"))
 				Expect(cookie.Secure).To(BeFalse())
@@ -408,7 +408,7 @@ var _ = Describe("Session Affinity", func() {
 					Expect(jsessionId).ToNot(BeNil())
 					Expect(jsessionId.MaxAge).To(Equal(-1))
 
-					cookie := getCookie(proxy.VcapCookieId, resp.Cookies())
+					cookie := getCookie(handlers.VcapCookieId, resp.Cookies())
 					Expect(cookie).ToNot(BeNil())
 					Expect(cookie.Value).To(Equal("my-id"))
 					Expect(cookie.Secure).To(BeFalse())

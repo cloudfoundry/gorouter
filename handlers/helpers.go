@@ -6,10 +6,13 @@ import (
 	"strings"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 const (
 	cacheMaxAgeSeconds = 2
+	VcapCookieId       = "__VCAP_ID__"
 )
 
 func AddRouterErrorHeader(rw http.ResponseWriter, val string) {
@@ -56,5 +59,25 @@ func upgradeHeader(request *http.Request) string {
 		}
 	}
 
+	return ""
+}
+
+func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet) (route.EndpointIterator, error) {
+	reqInfo, err := ContextRequestInfo(request)
+	if err != nil {
+		return nil, fmt.Errorf("could not find reqInfo in context")
+	}
+	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, getStickySession(request, stickySessionCookieNames)), nil
+}
+
+func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
+	// Try choosing a backend using sticky session
+	for stickyCookieName, _ := range stickySessionCookieNames {
+		if _, err := request.Cookie(stickyCookieName); err == nil {
+			if sticky, err := request.Cookie(VcapCookieId); err == nil {
+				return sticky.Value
+			}
+		}
+	}
 	return ""
 }
