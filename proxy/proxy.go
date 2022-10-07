@@ -30,10 +30,6 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const (
-	VcapCookieId = "__VCAP_ID__"
-)
-
 var (
 	headersToAlwaysRemove = []string{"X-CF-Proxy-Signature"}
 )
@@ -187,7 +183,7 @@ func NewProxy(
 	n.Use(w3cHandler)
 	n.Use(handlers.NewProtocolCheck(logger, errorWriter, cfg.EnableHTTP2))
 	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
-	n.Use(handlers.NewMaxRequestSize(cfg.MaxHeaderBytes, logger, p.defaultLoadBalance, getStickySession, p.stickySessionCookieNames))
+	n.Use(handlers.NewMaxRequestSize(cfg, logger))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
@@ -259,9 +255,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
 
-	stickyEndpointId := getStickySession(request, p.stickySessionCookieNames)
+	nestedIterator, err := handlers.EndpointIteratorForRequest(request, p.defaultLoadBalance, p.stickySessionCookieNames)
+	if err != nil {
+		p.logger.Fatal("request-info-err", zap.Error(err))
+	}
+
 	endpointIterator := &wrappedIterator{
-		nested: reqInfo.RoutePool.Endpoints(p.defaultLoadBalance, stickyEndpointId),
+		nested: nestedIterator,
 
 		afterNext: func(endpoint *route.Endpoint) {
 			if endpoint != nil {
@@ -324,16 +324,4 @@ func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
 }
 func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
 	i.nested.PostRequest(e)
-}
-
-func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
-	// Try choosing a backend using sticky session
-	for stickyCookieName, _ := range stickySessionCookieNames {
-		if _, err := request.Cookie(stickyCookieName); err == nil {
-			if sticky, err := request.Cookie(VcapCookieId); err == nil {
-				return sticky.Value
-			}
-		}
-	}
-	return ""
 }

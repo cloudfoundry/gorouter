@@ -15,7 +15,7 @@ import (
 
 type key string
 
-const requestInfoCtxKey key = "RequestInfo"
+const RequestInfoCtxKey key = "RequestInfo"
 
 // RequestInfo stores all metadata about the request and is used to pass
 // informaton between handlers
@@ -47,7 +47,7 @@ func NewRequestInfo() negroni.Handler {
 
 func (r *RequestInfoHandler) ServeHTTP(w http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqInfo := new(RequestInfo)
-	req = req.WithContext(context.WithValue(req.Context(), requestInfoCtxKey, reqInfo))
+	req = req.WithContext(context.WithValue(req.Context(), RequestInfoCtxKey, reqInfo))
 	reqInfo.StartedAt = time.Now()
 	next(w, req)
 }
@@ -65,7 +65,7 @@ func GetEndpoint(ctx context.Context) (*route.Endpoint, error) {
 }
 
 func getRequestInfo(ctx context.Context) (*RequestInfo, error) {
-	ri := ctx.Value(requestInfoCtxKey)
+	ri := ctx.Value(RequestInfoCtxKey)
 	if ri == nil {
 		return nil, errors.New("RequestInfo not set on context")
 	}
