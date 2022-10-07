@@ -51,6 +51,7 @@ type testState struct {
 	natsRunner      *test_util.NATSRunner
 	gorouterSession *Session
 	mbusClient      *nats.Conn
+	fakeMetron      test_util.FakeMetron
 }
 
 func (s *testState) SetOnlyTrustClientCACertsTrue() {
@@ -309,6 +310,29 @@ func (s *testState) StopAndCleanup() {
 	if s.gorouterSession != nil && s.gorouterSession.ExitCode() == -1 {
 		Eventually(s.gorouterSession.Terminate(), 5).Should(Exit(0))
 	}
+
+	if s.fakeMetron != nil {
+		s.StopMetron()
+	}
+}
+
+func (s *testState) EnableMetron() {
+	s.fakeMetron = test_util.NewFakeMetron()
+	s.cfg.Logging = config.LoggingConfig{
+		MetronAddress:      s.fakeMetron.Address(),
+		RedactQueryParams:  "none",
+		Level:              "debug",
+		JobName:            "router_test_z1_0",
+		LoggregatorEnabled: true,
+	}
+}
+
+func (s *testState) StopMetron() {
+	Expect(s.fakeMetron.Close()).To(Succeed())
+}
+
+func (s *testState) MetronEvents() []test_util.Event {
+	return s.fakeMetron.AllEvents()
 }
 
 func (s *testState) EnableAccessLog() {
