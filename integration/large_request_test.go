@@ -23,6 +23,7 @@ var _ = Describe("Large requests", func() {
 	BeforeEach(func() {
 		testState = NewTestState()
 		testState.EnableAccessLog()
+		testState.EnableMetron()
 		testState.StartGorouterOrFail()
 
 		appURL = "echo-app." + test_util.LocalhostDNS
@@ -56,5 +57,15 @@ var _ = Describe("Large requests", func() {
 		}
 
 		Eventually(getAccessLogContents).Should(MatchRegexp("echo-app.*/aaaaaaaa.*431.*x_cf_routererror:\"max-request-size-exceeded\""))
+		Eventually(func() []string {
+			var messages []string
+			events := testState.MetronEvents()
+			for _, event := range events {
+				if event.EventType == "LogMessage" {
+					messages = append(messages, event.Name)
+				}
+			}
+			return messages
+		}).Should(ContainElement(MatchRegexp("echo-app.*/aaaaaaaa.*431.*x_cf_routererror:\"max-request-size-exceeded\"")))
 	})
 })

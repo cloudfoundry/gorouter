@@ -179,7 +179,6 @@ func NewProxy(
 		}
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
-	n.Use(handlers.NewMaxRequestSize(cfg.MaxHeaderBytes, logger))
 	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
@@ -188,6 +187,7 @@ func NewProxy(
 	n.Use(w3cHandler)
 	n.Use(handlers.NewProtocolCheck(logger, errorWriter, cfg.EnableHTTP2))
 	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
+	n.Use(handlers.NewMaxRequestSize(cfg.MaxHeaderBytes, logger, p.defaultLoadBalance, getStickySession, p.stickySessionCookieNames))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
 		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),

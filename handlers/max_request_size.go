@@ -5,20 +5,25 @@ import (
 	"net/http"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
+	"github.com/urfave/negroni"
 )
 
 type MaxRequestSize struct {
-	MaxSize int
-	logger  logger.Logger
+	MaxSize                  int
+	logger                   logger.Logger
+	loadBalancingMethod      string
+	stickySessionFunc        func(*http.Request, config.StringSet) string
+	stickySessionCookieNames config.StringSet
 }
 
 const ONE_MB = 1024 * 1024 // bytes * kb
 
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
-func NewMaxRequestSize(maxSize int, logger logger.Logger) *MaxRequestSize {
+func NewMaxRequestSize(maxSize int, logger logger.Logger, loadBalancingMethod string, stickySessionFunc func(request *http.Request, stickySessionCookieNames config.StringSet) string, stickySessionCookieNames config.StringSet) negroni.Handler {
 	if maxSize < 1 {
 		maxSize = ONE_MB
 	}
@@ -29,8 +34,11 @@ func NewMaxRequestSize(maxSize int, logger logger.Logger) *MaxRequestSize {
 	}
 
 	return &MaxRequestSize{
-		MaxSize: maxSize,
-		logger:  logger,
+		MaxSize:                  maxSize,
+		logger:                   logger,
+		loadBalancingMethod:      loadBalancingMethod,
+		stickySessionFunc:        stickySessionFunc,
+		stickySessionCookieNames: stickySessionCookieNames,
 	}
 }
 
@@ -43,6 +51,14 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	reqSize += len(r.Host) + 4 // add two bytes for ": " delimiting, and 2 more for \r\n
 
 	if reqSize >= m.MaxSize {
+		reqInfo, err := ContextRequestInfo(r)
+		if err != nil {
+			m.logger.Fatal("request-info-err", zap.Error(err))
+			return
+		}
+		m.logger.Debug("req-info", zap.String("reqInfo", fmt.Sprintf("%#v", reqInfo)))
+
+		reqInfo.RouteEndpoint = reqInfo.RoutePool.Endpoints(m.loadBalancingMethod, m.stickySessionFunc(r, m.stickySessionCookieNames)).Next()
 		rw.Header().Set(router_http.CfRouterError, "max-request-size-exceeded")
 		rw.WriteHeader(http.StatusRequestHeaderFieldsTooLarge)
 		r.Close = true
