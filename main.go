@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -33,8 +33,6 @@ import (
 	"code.cloudfoundry.org/lager"
 	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/tlsconfig"
-	uaa_client "code.cloudfoundry.org/uaa-go-client"
-	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
@@ -336,11 +334,10 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	logger.Debug("fetching-token")
 	clock := clock.NewClock()
 
-	uaaClient := newUaaClient(logger, clock, c)
+	uaaClient := route_fetcher.NewUaaClient(logger, clock, c)
 
 	if !c.RoutingApi.AuthDisabled {
-		forceUpdate := true
-		token, err := uaaClient.FetchToken(forceUpdate)
+		token, err := uaaClient.Token(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("unable-to-fetch-token: %s", err.Error())
 		}
@@ -360,10 +357,9 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
 	cl := clock.NewClock()
 
-	uaaClient := newUaaClient(logger, cl, c)
+	uaaClient := route_fetcher.NewUaaClient(logger, cl, c)
 
-	forceUpdate := true
-	_, err := uaaClient.FetchToken(forceUpdate)
+	_, err := uaaClient.Token(context.Background())
 	if err != nil {
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
@@ -380,41 +376,6 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		cl,
 	)
 	return routeFetcher
-}
-
-func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
-	if c.RoutingApi.AuthDisabled {
-		logger.Info("using-noop-token-fetcher")
-		return uaa_client.NewNoOpUaaClient()
-	}
-
-	if c.OAuth.Port == -1 {
-		logger.Fatal(
-			"tls-not-enabled",
-			zap.Error(errors.New("Gorouter requires TLS enabled to get OAuth token")),
-			zap.String("token-endpoint", c.OAuth.TokenEndpoint),
-			zap.Int("port", c.OAuth.Port),
-		)
-	}
-
-	tokenURL := fmt.Sprintf("https://%s:%d", c.OAuth.TokenEndpoint, c.OAuth.Port)
-
-	cfg := &uaa_config.Config{
-		UaaEndpoint:           tokenURL,
-		SkipVerification:      c.OAuth.SkipSSLValidation,
-		ClientName:            c.OAuth.ClientName,
-		ClientSecret:          c.OAuth.ClientSecret,
-		CACerts:               c.OAuth.CACerts,
-		MaxNumberOfRetries:    c.TokenFetcherMaxRetries,
-		RetryInterval:         c.TokenFetcherRetryInterval,
-		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
-	}
-
-	uaaClient, err := uaa_client.NewClient(goRouterLogger.NewLagerAdapter(logger), cfg, clock)
-	if err != nil {
-		logger.Fatal("initialize-token-fetcher-error", zap.Error(err))
-	}
-	return uaaClient
 }
 
 func createLogger(component string, level string, timestampFormat string) (goRouterLogger.Logger, lager.LogLevel) {

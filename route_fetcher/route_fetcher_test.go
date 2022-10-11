@@ -12,18 +12,18 @@ import (
 	testRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	. "code.cloudfoundry.org/gorouter/route_fetcher"
+	testUaaClient "code.cloudfoundry.org/gorouter/route_fetcher/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api"
+	routing_api "code.cloudfoundry.org/routing-api"
 	fake_routing_api "code.cloudfoundry.org/routing-api/fake_routing_api"
 	"code.cloudfoundry.org/routing-api/models"
-	testUaaClient "code.cloudfoundry.org/uaa-go-client/fakes"
-	"code.cloudfoundry.org/uaa-go-client/schema"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
+	"golang.org/x/oauth2"
 )
 
 var sender *metrics_fakes.FakeMetricSender
@@ -36,14 +36,14 @@ func init() {
 var _ = Describe("RouteFetcher", func() {
 	var (
 		cfg         *config.Config
-		uaaClient   *testUaaClient.FakeClient
+		uaaClient   *testUaaClient.FakeUAAClient
 		registry    *testRegistry.FakeRegistry
 		fetcher     *RouteFetcher
 		logger      logger.Logger
 		client      *fake_routing_api.FakeClient
 		eventSource *fake_routing_api.FakeEventSource
 
-		token *schema.Token
+		token *oauth2.Token
 
 		response     []models.Route
 		process      ifrit.Process
@@ -61,12 +61,12 @@ var _ = Describe("RouteFetcher", func() {
 		cfg.PruneStaleDropletsInterval = 2 * time.Millisecond
 
 		retryInterval := 0 * time.Second
-		uaaClient = &testUaaClient.FakeClient{}
+		uaaClient = &testUaaClient.FakeUAAClient{}
 		registry = &testRegistry.FakeRegistry{}
 
-		token = &schema.Token{
+		token = &oauth2.Token{
 			AccessToken: "access_token",
-			ExpiresIn:   5,
+			Expiry:      time.Now().Add(5 * time.Second),
 		}
 		client = &fake_routing_api.FakeClient{}
 
@@ -99,7 +99,7 @@ var _ = Describe("RouteFetcher", func() {
 
 	Describe("FetchRoutes", func() {
 		BeforeEach(func() {
-			uaaClient.FetchTokenReturns(token, nil)
+			uaaClient.TokenReturns(token, nil)
 
 			response = []models.Route{
 				models.NewRoute(
@@ -179,8 +179,7 @@ var _ = Describe("RouteFetcher", func() {
 
 			err := fetcher.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
-			Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
+			Expect(uaaClient.TokenCallCount()).To(Equal(1))
 		})
 
 		Context("when a cached token is invalid", func() {
@@ -200,9 +199,7 @@ var _ = Describe("RouteFetcher", func() {
 				client = &fake_routing_api.FakeClient{}
 				err := fetcher.FetchRoutes()
 				Expect(err).ToNot(HaveOccurred())
-				Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
-				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
-				Expect(uaaClient.FetchTokenArgsForCall(1)).To(Equal(true))
+				Expect(uaaClient.TokenCallCount()).To(Equal(2))
 			})
 		})
 
@@ -254,8 +251,7 @@ var _ = Describe("RouteFetcher", func() {
 					err := fetcher.FetchRoutes()
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(Equal("Oops!"))
-					Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
-					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
+					Expect(uaaClient.TokenCallCount()).To(Equal(1))
 				})
 			})
 
@@ -264,9 +260,7 @@ var _ = Describe("RouteFetcher", func() {
 					client.RoutesReturns(nil, errors.New("unauthorized"))
 
 					err := fetcher.FetchRoutes()
-					Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
-					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
-					Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeTrue())
+					Expect(uaaClient.TokenCallCount()).To(Equal(2))
 					Expect(client.RoutesCallCount()).To(Equal(2))
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(Equal("unauthorized"))
@@ -276,14 +270,14 @@ var _ = Describe("RouteFetcher", func() {
 
 		Context("When the token fetcher returns an error", func() {
 			BeforeEach(func() {
-				uaaClient.FetchTokenReturns(nil, errors.New("token fetcher error"))
+				uaaClient.TokenReturns(nil, errors.New("token fetcher error"))
 			})
 
 			It("returns an error", func() {
 				currentTokenFetchErrors := sender.GetCounter(TokenFetchErrors)
 				err := fetcher.FetchRoutes()
 				Expect(err).To(HaveOccurred())
-				Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
+				Expect(uaaClient.TokenCallCount()).To(Equal(1))
 				Expect(registry.RegisterCallCount()).To(Equal(0))
 				Eventually(func() uint64 {
 					return sender.GetCounter(TokenFetchErrors)
@@ -295,7 +289,7 @@ var _ = Describe("RouteFetcher", func() {
 
 	Describe("Run", func() {
 		BeforeEach(func() {
-			uaaClient.FetchTokenReturns(token, nil)
+			uaaClient.TokenReturns(token, nil)
 			client.RoutesReturns(response, nil)
 			fetcher.FetchRoutesInterval = 10 * time.Millisecond
 		})
@@ -328,13 +322,12 @@ var _ = Describe("RouteFetcher", func() {
 			It("uses cache when fetching token from uaa", func() {
 				clock.Increment(cfg.PruneStaleDropletsInterval + 100*time.Millisecond)
 				Eventually(client.RoutesCallCount, 2*time.Second, 50*time.Millisecond).Should(Equal(1))
-				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
 			})
 		})
 
 		Context("when token fetcher returns error", func() {
 			BeforeEach(func() {
-				uaaClient.FetchTokenReturns(nil, errors.New("Unauthorized"))
+				uaaClient.TokenReturns(nil, errors.New("Unauthorized"))
 			})
 
 			It("logs the error", func() {
@@ -342,7 +335,7 @@ var _ = Describe("RouteFetcher", func() {
 
 				Eventually(logger).Should(gbytes.Say("Unauthorized"))
 
-				Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">=", 2))
+				Eventually(uaaClient.TokenCallCount).Should(BeNumerically(">=", 2))
 				Expect(client.SubscribeToEventsWithMaxRetriesCallCount()).Should(Equal(0))
 				Expect(client.RoutesCallCount()).Should(Equal(0))
 
@@ -379,14 +372,16 @@ var _ = Describe("RouteFetcher", func() {
 				It("responds to errors, and retries subscribing", func() {
 					currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
-					fetchTokenCallCount := uaaClient.FetchTokenCallCount()
+					fetchTokenCallCount := uaaClient.TokenCallCount()
 					subscribeCallCount := client.SubscribeToEventsWithMaxRetriesCallCount()
 
+					errorChannel <- errors.New("beep boop im a robot")
+					errorChannel <- errors.New("beep boop im a robot")
 					errorChannel <- errors.New("beep boop im a robot")
 
 					Eventually(logger).Should(gbytes.Say("beep boop im a robot"))
 
-					Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
+					Eventually(uaaClient.TokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
 					Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(BeNumerically(">", subscribeCallCount))
 
 					Eventually(func() uint64 {
@@ -405,14 +400,14 @@ var _ = Describe("RouteFetcher", func() {
 					})
 
 					It("logs the error and tries again", func() {
-						fetchTokenCallCount := uaaClient.FetchTokenCallCount()
+						fetchTokenCallCount := uaaClient.TokenCallCount()
 						subscribeCallCount := client.SubscribeToEventsWithMaxRetriesCallCount()
 
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 
 						Eventually(logger).Should(gbytes.Say("i failed to subscribe"))
 
-						Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
+						Eventually(uaaClient.TokenCallCount).Should(BeNumerically(">", fetchTokenCallCount))
 						Eventually(client.SubscribeToEventsWithMaxRetriesCallCount).Should(BeNumerically(">", subscribeCallCount))
 
 						Eventually(func() uint64 {
@@ -432,9 +427,7 @@ var _ = Describe("RouteFetcher", func() {
 					It("logs the error and tries again by not using cached access token", func() {
 						currentSubscribeEventsErrors := sender.GetCounter(SubscribeEventsErrors)
 						Eventually(logger).Should(gbytes.Say("unauthorized"))
-						Eventually(uaaClient.FetchTokenCallCount).Should(BeNumerically(">", 2))
-						Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
-						Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeTrue())
+						Eventually(uaaClient.TokenCallCount).Should(BeNumerically(">", 2))
 
 						Eventually(func() uint64 {
 							return sender.GetCounter(SubscribeEventsErrors)

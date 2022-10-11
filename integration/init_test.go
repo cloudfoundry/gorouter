@@ -106,6 +106,7 @@ func setupTLSServer() *ghttp.Server {
 	)
 	server.RouteToHandler("POST", "/oauth/token",
 		func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
 			jsonBytes := []byte(`{"access_token":"some-token", "expires_in":10}`)
 			w.Write(jsonBytes)
 		})
