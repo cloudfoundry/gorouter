@@ -32,6 +32,7 @@ import (
 	rvarz "code.cloudfoundry.org/gorouter/varz"
 	"code.cloudfoundry.org/lager"
 	routing_api "code.cloudfoundry.org/routing-api"
+	"code.cloudfoundry.org/routing-api/uaaclient"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
@@ -334,10 +335,22 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	logger.Debug("fetching-token")
 	clock := clock.NewClock()
 
-	uaaClient := route_fetcher.NewUaaClient(logger, clock, c)
+	uaaConfig := uaaclient.Config{
+		Port:              c.OAuth.Port,
+		SkipSSLValidation: c.OAuth.SkipSSLValidation,
+		ClientName:        c.OAuth.ClientName,
+		ClientSecret:      c.OAuth.ClientSecret,
+		CACerts:           c.OAuth.CACerts,
+		TokenEndpoint:     c.OAuth.TokenEndpoint,
+	}
+
+	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clock, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, goRouterLogger.NewLagerAdapter(logger))
+	if err != nil {
+		logger.Fatal("initialize-uaa-client", zap.Error(err))
+	}
 
 	if !c.RoutingApi.AuthDisabled {
-		token, err := uaaClient.Token(context.Background())
+		token, err := uaaTokenFetcher.FetchToken(context.Background(), true)
 		if err != nil {
 			return nil, fmt.Errorf("unable-to-fetch-token: %s", err.Error())
 		}
@@ -357,9 +370,21 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
 	cl := clock.NewClock()
 
-	uaaClient := route_fetcher.NewUaaClient(logger, cl, c)
+	uaaConfig := uaaclient.Config{
+		Port:              c.OAuth.Port,
+		SkipSSLValidation: c.OAuth.SkipSSLValidation,
+		ClientName:        c.OAuth.ClientName,
+		ClientSecret:      c.OAuth.ClientSecret,
+		CACerts:           c.OAuth.CACerts,
+		TokenEndpoint:     c.OAuth.TokenEndpoint,
+	}
+	clock := clock.NewClock()
+	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clock, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, goRouterLogger.NewLagerAdapter(logger))
+	if err != nil {
+		logger.Fatal("initialize-uaa-client", zap.Error(err))
+	}
 
-	_, err := uaaClient.Token(context.Background())
+	_, err = uaaTokenFetcher.FetchToken(context.Background(), true)
 	if err != nil {
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
@@ -368,7 +393,7 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 
 	routeFetcher := route_fetcher.NewRouteFetcher(
 		logger,
-		uaaClient,
+		uaaTokenFetcher,
 		registry,
 		c,
 		routingAPIClient,

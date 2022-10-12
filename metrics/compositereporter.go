@@ -9,6 +9,7 @@ import (
 
 // Deprecated: this interface is marked for removal. It should be removed upon
 // removal of Varz
+//
 //go:generate counterfeiter -o fakes/fake_varzreporter.go . VarzReporter
 type VarzReporter interface {
 	CaptureBadRequest()

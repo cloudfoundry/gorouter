@@ -196,10 +196,12 @@ var _ = Describe("Varz", func() {
 
 // Extract value using key(s) from JSON data
 // For example, when extracting value from
-//       {
-//         "foo": { "bar" : 1 },
-//         "foobar": 2,
-//        }
+//
+//	{
+//	  "foo": { "bar" : 1 },
+//	  "foobar": 2,
+//	 }
+//
 // findValue(Varz,"foo", "bar") returns 1
 // findValue(Varz,"foobar") returns 2
 func findValue(varz Varz, x ...string) interface{} {
