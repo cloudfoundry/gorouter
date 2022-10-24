@@ -22,9 +22,10 @@ import (
 	"github.com/uber-go/zap"
 )
 
-//go:generate easyjson --all subscriber.go
 // RegistryMessage defines the format of a route registration/unregistration
 // easyjson:json
+//
+//go:generate easyjson --all subscriber.go
 type RegistryMessage struct {
 	Host                    string            `json:"host"`
 	Port                    uint16            `json:"port"`

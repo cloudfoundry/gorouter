@@ -1118,7 +1118,7 @@ var _ = Describe("Router Integration", func() {
 				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 				Expect(err).ToNot(HaveOccurred())
 				defer session.Kill()
-				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
+				Eventually(session, 30*time.Second).Should(Say("UAA client requires TLS enabled"))
 				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
 		})

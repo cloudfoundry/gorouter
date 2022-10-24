@@ -1,6 +1,7 @@
 package route_fetcher
 
 import (
+	"context"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -11,16 +12,16 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/routing-api"
+	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/models"
-	uaa_client "code.cloudfoundry.org/uaa-go-client"
-	"code.cloudfoundry.org/uaa-go-client/schema"
+	"code.cloudfoundry.org/routing-api/uaaclient"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/uber-go/zap"
+	"golang.org/x/oauth2"
 )
 
 type RouteFetcher struct {
-	UaaClient                 uaa_client.Client
+	UaaTokenFetcher           uaaclient.TokenFetcher
 	RouteRegistry             registry.Registry
 	FetchRoutesInterval       time.Duration
 	SubscriptionRetryInterval time.Duration
@@ -28,6 +29,8 @@ type RouteFetcher struct {
 	logger          logger.Logger
 	endpoints       []models.Route
 	endpointsMutex  sync.Mutex
+	uaaToken        *oauth2.Token
+	uaaTokenMutex   sync.Mutex
 	client          routing_api.Client
 	stopEventSource int32
 	eventSource     atomic.Value
@@ -44,7 +47,7 @@ const (
 
 func NewRouteFetcher(
 	logger logger.Logger,
-	uaaClient uaa_client.Client,
+	uaaTokenFetcher uaaclient.TokenFetcher,
 	routeRegistry registry.Registry,
 	cfg *config.Config,
 	client routing_api.Client,
@@ -52,7 +55,7 @@ func NewRouteFetcher(
 	clock clock.Clock,
 ) *RouteFetcher {
 	return &RouteFetcher{
-		UaaClient:                 uaaClient,
+		UaaTokenFetcher:           uaaTokenFetcher,
 		RouteRegistry:             routeRegistry,
 		FetchRoutesInterval:       cfg.PruneStaleDropletsInterval / 2,
 		SubscriptionRetryInterval: subscriptionRetryInterval,
@@ -102,7 +105,7 @@ func (r *RouteFetcher) startEventCycle() {
 		forceUpdate := false
 		for {
 			r.logger.Debug("fetching-token")
-			token, err := r.UaaClient.FetchToken(forceUpdate)
+			token, err := r.UaaTokenFetcher.FetchToken(context.Background(), forceUpdate)
 			if err != nil {
 				metrics.IncrementCounter(TokenFetchErrors)
 				r.logger.Error("failed-to-fetch-token", zap.Error(err))
@@ -126,7 +129,7 @@ func (r *RouteFetcher) startEventCycle() {
 	}()
 }
 
-func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
+func (r *RouteFetcher) subscribeToEvents(token *oauth2.Token) error {
 	r.client.SetToken(token.AccessToken)
 
 	r.logger.Info("subscribing-to-routing-api-event-stream")
@@ -206,7 +209,8 @@ func (r *RouteFetcher) fetchRoutesWithTokenRefresh() ([]models.Route, error) {
 	var routes []models.Route
 	for count := 0; count < 2; count++ {
 		r.logger.Debug("syncer-fetching-token")
-		token, tokenErr := r.UaaClient.FetchToken(forceUpdate)
+		token, tokenErr := r.UaaTokenFetcher.FetchToken(context.Background(), forceUpdate)
+
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return []models.Route{}, tokenErr

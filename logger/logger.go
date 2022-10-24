@@ -7,6 +7,7 @@ import (
 )
 
 // Logger is the zap.Logger interface with additional Session methods.
+//
 //go:generate counterfeiter -o fakes/fake_logger.go . Logger
 type Logger interface {
 	With(...zap.Field) Logger
