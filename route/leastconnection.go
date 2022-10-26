@@ -1,6 +1,7 @@
 package route
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -84,6 +85,10 @@ func (r *LeastConnection) next() *endpointElem {
 	// select the least connection endpoint OR
 	// random one within the least connection endpoints
 	randIndices := randomize.Perm(total)
+	fmt.Printf("***** randomizer: %v", randomize)
+	fmt.Printf("randomize int: %d", randomize.Int())
+
+	fmt.Sprintf("********* randIndices: %v", randIndices)
 
 	for i := 0; i < total; i++ {
 		randIdx := randIndices[i]
