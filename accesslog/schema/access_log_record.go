@@ -92,6 +92,7 @@ type AccessLogRecord struct {
 	HeadersOverride        http.Header
 	StatusCode             int
 	RouteEndpoint          *route.Endpoint
+	RoutePool              *route.EndpointPool
 	RoundtripStartedAt     time.Time
 	FirstByteAt            time.Time
 	RoundtripFinishedAt    time.Time
@@ -139,12 +140,14 @@ func (r *AccessLogRecord) getRecord() []byte {
 
 func (r *AccessLogRecord) makeRecord() []byte {
 	var appID, destIPandPort, appIndex, instanceId string
+	var numberConnections int
 
 	if r.RouteEndpoint != nil {
 		appID = r.RouteEndpoint.ApplicationId
 		appIndex = r.RouteEndpoint.PrivateInstanceIndex
 		destIPandPort = r.RouteEndpoint.CanonicalAddr()
 		instanceId = r.RouteEndpoint.PrivateInstanceId
+		numberConnections = int(r.RouteEndpoint.Stats.NumberConnections.Count())
 	}
 
 	headers := r.Request.Header
@@ -186,6 +189,26 @@ func (r *AccessLogRecord) makeRecord() []byte {
 
 	b.WriteString(`vcap_request_id:`)
 	b.WriteDashOrStringValue(headers.Get("X-Vcap-Request-Id"))
+
+	vcapIdCookieVal, err := r.Request.Cookie("__VCAP_ID__")
+	if err == nil {
+		b.WriteString(`vcap_id:`)
+		b.WriteDashOrStringValue(vcapIdCookieVal.Value)
+	}
+
+	jSessionCookieVal, err := r.Request.Cookie("JSESSIONID")
+	if err == nil {
+		b.WriteString(`jsessionid:`)
+		b.WriteDashOrStringValue(jSessionCookieVal.Value)
+	}
+
+	b.WriteString(`number_connections:`)
+	b.WriteDashOrIntValue(numberConnections)
+
+	if r.RoutePool != nil {
+		b.WriteString(`pool_number_connections:`)
+		b.WriteDashOrStringValue(r.RoutePool.NumberConnectionsJSON())
+	}
 
 	b.WriteString(`response_time:`)
 	b.WriteDashOrFloatValue(r.roundtripTime())

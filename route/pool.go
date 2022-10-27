@@ -456,6 +456,21 @@ func (p *EndpointPool) Each(f func(endpoint *Endpoint)) {
 	p.Unlock()
 }
 
+func (p *EndpointPool) NumberConnectionsJSON() string {
+	p.Lock()
+	defer p.Unlock()
+	endpointsToNumberConnections := map[string]int64{}
+	for _, e := range p.endpoints {
+		endpointsToNumberConnections[e.addr()] = e.numberConnections()
+	}
+	b, err := json.Marshal(endpointsToNumberConnections)
+	if err != nil {
+		return ""
+	}
+
+	return string(b)
+}
+
 func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	p.Lock()
 	endpoints := make([]*Endpoint, 0, len(p.endpoints))
@@ -470,6 +485,14 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 func (e *endpointElem) failed() {
 	t := time.Now()
 	e.failedAt = &t
+}
+
+func (e *endpointElem) addr() string {
+	return e.endpoint.CanonicalAddr()
+}
+
+func (e *endpointElem) numberConnections() int64 {
+	return e.endpoint.Stats.NumberConnections.Count()
 }
 
 func (e *endpointElem) isOverloaded() bool {

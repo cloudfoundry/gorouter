@@ -61,6 +61,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
 	alr.HeadersOverride = reqInfo.BackendReqHeaders
 	alr.RouteEndpoint = reqInfo.RouteEndpoint
+	alr.RoutePool = reqInfo.RoutePool
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
 	alr.StatusCode = proxyWriter.Status()
