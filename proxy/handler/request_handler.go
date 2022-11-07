@@ -21,10 +21,6 @@ import (
 	"github.com/uber-go/zap"
 )
 
-const (
-	MaxRetries = 3
-)
-
 var NoEndpointsAvailable = errors.New("No endpoints available")
 
 type RequestHandler struct {
@@ -37,6 +33,7 @@ type RequestHandler struct {
 
 	endpointDialTimeout  time.Duration
 	websocketDialTimeout time.Duration
+	maxRetries           int
 
 	tlsConfigTemplate *tls.Config
 
@@ -53,6 +50,7 @@ func NewRequestHandler(
 	errorWriter errorwriter.ErrorWriter,
 	endpointDialTimeout time.Duration,
 	websocketDialTimeout time.Duration,
+	maxRetries int,
 	tlsConfig *tls.Config,
 	opts ...func(*RequestHandler),
 ) *RequestHandler {
@@ -63,6 +61,7 @@ func NewRequestHandler(
 		response:             response,
 		endpointDialTimeout:  endpointDialTimeout,
 		websocketDialTimeout: websocketDialTimeout,
+		maxRetries:           maxRetries,
 		tlsConfigTemplate:    tlsConfig,
 	}
 
@@ -221,7 +220,7 @@ func (h *RequestHandler) serveTcp(
 		onConnectionFailed(err)
 
 		retry++
-		if retry == MaxRetries {
+		if retry == h.maxRetries {
 			return 0, err
 		}
 	}
