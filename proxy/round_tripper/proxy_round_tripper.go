@@ -76,6 +76,8 @@ func NewProxyRoundTripper(
 		secureCookies:            cfg.SecureCookies,
 		roundTripperFactory:      roundTripperFactory,
 		retriableClassifier:      retriableClassifiers,
+		maxRetries:               cfg.Backends.MaxRetries,
+		maxRouteServiceRetries:   cfg.RouteServiceConfig.MaxRetries,
 		errorHandler:             errHandler,
 		routeServicesTransport:   routeServicesTransport,
 		endpointTimeout:          cfg.EndpointTimeout,
@@ -91,6 +93,8 @@ type roundTripper struct {
 	secureCookies            bool
 	roundTripperFactory      RoundTripperFactory
 	retriableClassifier      fails.Classifier
+	maxRetries               int
+	maxRouteServiceRetries   int
 	errorHandler             errorHandler
 	routeServicesTransport   http.RoundTripper
 	endpointTimeout          time.Duration
@@ -130,7 +134,13 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	var selectEndpointErr error
-	for retry := 0; retry < handler.MaxRetries; retry++ {
+	var maxRetries int
+	if reqInfo.RouteServiceURL == nil {
+		maxRetries = rt.maxRetries
+	} else {
+		maxRetries = rt.maxRouteServiceRetries
+	}
+	for retry := 0; retry < maxRetries || maxRetries == 0; retry++ {
 		logger := rt.logger
 
 		if reqInfo.RouteServiceURL == nil {

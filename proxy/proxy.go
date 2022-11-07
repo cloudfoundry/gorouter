@@ -52,6 +52,7 @@ type proxy struct {
 	endpointDialTimeout      time.Duration
 	websocketDialTimeout     time.Duration
 	endpointTimeout          time.Duration
+	maxRetries               int
 	bufferPool               httputil.BufferPool
 	backendTLSConfig         *tls.Config
 	routeServiceTLSConfig    *tls.Config
@@ -93,6 +94,7 @@ func NewProxy(
 		endpointDialTimeout:      cfg.EndpointDialTimeout,
 		websocketDialTimeout:     cfg.WebsocketDialTimeout,
 		endpointTimeout:          cfg.EndpointTimeout,
+		maxRetries:               cfg.Backends.MaxRetries,
 		bufferPool:               NewBufferPool(),
 		backendTLSConfig:         backendTLSConfig,
 		routeServiceTLSConfig:    routeServiceTLSConfig,
@@ -246,6 +248,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.errorWriter,
 		p.endpointDialTimeout,
 		p.websocketDialTimeout,
+		p.maxRetries,
 		p.backendTLSConfig,
 		handler.DisableXFFLogging(p.disableXFFLogging),
 		handler.DisableSourceIPLogging(p.disableSourceIPLogging),

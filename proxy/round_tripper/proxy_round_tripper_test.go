@@ -144,6 +144,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			cfg, err = config.DefaultConfig()
 			Expect(err).ToNot(HaveOccurred())
 			cfg.EndpointTimeout = 0 * time.Millisecond
+			cfg.Backends.MaxRetries = 3
+			cfg.RouteServiceConfig.MaxRetries = 3
 		})
 
 		JustBeforeEach(func() {
@@ -305,6 +307,62 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("does not log anything about route services", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
+				})
+			})
+
+			Context("with 5 backends, 4 of them failing", func() {
+				BeforeEach(func() {
+					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+						switch transport.RoundTripCallCount() {
+						case 1:
+							return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+						case 2:
+							return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+						case 3:
+							return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+						case 4:
+							return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+						case 5:
+							return &http.Response{StatusCode: http.StatusTeapot}, nil
+						default:
+							return nil, nil
+						}
+					}
+
+					retriableClassifier.ClassifyReturns(true)
+				})
+
+				Context("when MaxRetries is set to 4", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxRetries = 4
+					})
+
+					It("stops after 4 tries, returning an error", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(MatchError(ContainSubstring("connection refused")))
+						Expect(transport.RoundTripCallCount()).To(Equal(4))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
+
+						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
+						Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+					})
+				})
+
+				Context("when MaxRetries is set to 0 (unlimited)", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxRetries = 0
+					})
+
+					It("retries until success", func() {
+						res, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(transport.RoundTripCallCount()).To(Equal(5))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
+
+						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
+						Expect(reqInfo.StoppedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+					})
 				})
 			})
 
@@ -820,6 +878,18 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Expect(logOutput).To(gbytes.Say(`route-service-connection-failed`))
 							Expect(logOutput).To(gbytes.Say(`foo.com`))
 						}
+					})
+
+					Context("when MaxRetries is set to 5", func() {
+						BeforeEach(func() {
+							cfg.RouteServiceConfig.MaxRetries = 5
+						})
+
+						It("tries for 5 times before giving up", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).To(MatchError(dialError))
+							Expect(transport.RoundTripCallCount()).To(Equal(5))
+						})
 					})
 
 					Context("when route service is unavailable due to non-retriable error", func() {
