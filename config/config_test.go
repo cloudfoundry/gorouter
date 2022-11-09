@@ -1404,7 +1404,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						string(clientRSAPEM),
 					}
 
-					configSnippet.CACerts = []string {string(rootRSAPEM), string(rootECDSAPEM)}
+					configSnippet.CACerts = []string{string(rootRSAPEM), string(rootECDSAPEM)}
 				})
 
 				Context("When only_trust_client_ca_certs is true", func() {
@@ -1421,7 +1421,6 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 						Expect(config.Process()).To(Succeed())
 						Expect(config.ClientCACerts).To(Equal(strings.Join(expectedClientCAPEMs, "")))
 						Expect(config.OnlyTrustClientCACerts).To(BeTrue())
-
 
 						for _, caCert := range config.CACerts {
 							caCertDER, _ := pem.Decode([]byte(caCert))
