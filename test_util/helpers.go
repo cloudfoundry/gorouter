@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -166,7 +167,7 @@ func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (
 			PrivateKey: string(secondaryCertChain.PrivKeyPEM),
 		},
 	}
-	c.CACerts = string(rootCertChain.CACertPEM)
+	c.CACerts = []string{string(rootCertChain.CACertPEM)}
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
 	c.ClientCertificateValidationString = "none"
@@ -204,13 +205,13 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 			PrivateKey: string(secondaryCertChain.PrivKeyPEM),
 		},
 	}
-	c.CACerts = string(rootCertChain.CACertPEM)
+	c.CACerts = []string{string(rootCertChain.CACertPEM)}
 	c.ClientCACerts = string(clientCaCertChain.CACertPEM)
 
 	if onlyTrustClientCACerts == false {
 		clientTrustedCertPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
 		clientTrustedCertPool.AppendCertsFromPEM(secondaryCertChain.CACertPEM)
-		c.ClientCACerts += c.CACerts
+		c.ClientCACerts += strings.Join(c.CACerts, "")
 	}
 	c.SSLPort = SSLPort
 	c.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"
