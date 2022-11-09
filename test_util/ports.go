@@ -18,7 +18,7 @@ func NextAvailPort() uint16 {
 
 	if lastPortUsed == 0 {
 		once.Do(func() {
-			const portRangeStart = 61000
+			const portRangeStart = 25000
 			lastPortUsed = portRangeStart + GinkgoConfig.ParallelNode
 		})
 	}
