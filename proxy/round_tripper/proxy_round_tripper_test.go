@@ -144,8 +144,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			cfg, err = config.DefaultConfig()
 			Expect(err).ToNot(HaveOccurred())
 			cfg.EndpointTimeout = 0 * time.Millisecond
-			cfg.Backends.MaxRetries = 3
-			cfg.RouteServiceConfig.MaxRetries = 3
+			cfg.Backends.MaxAttempts = 3
+			cfg.RouteServiceConfig.MaxAttempts = 3
 		})
 
 		JustBeforeEach(func() {
@@ -332,9 +332,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					retriableClassifier.ClassifyReturns(true)
 				})
 
-				Context("when MaxRetries is set to 4", func() {
+				Context("when MaxAttempts is set to 4", func() {
 					BeforeEach(func() {
-						cfg.Backends.MaxRetries = 4
+						cfg.Backends.MaxAttempts = 4
 					})
 
 					It("stops after 4 tries, returning an error", func() {
@@ -348,9 +348,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 				})
 
-				Context("when MaxRetries is set to 0 (unlimited)", func() {
+				Context("when MaxAttempts is set to 0 (unlimited)", func() {
 					BeforeEach(func() {
-						cfg.Backends.MaxRetries = 0
+						cfg.Backends.MaxAttempts = 0
 					})
 
 					It("retries until success", func() {
@@ -880,9 +880,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 						}
 					})
 
-					Context("when MaxRetries is set to 5", func() {
+					Context("when MaxAttempts is set to 5", func() {
 						BeforeEach(func() {
-							cfg.RouteServiceConfig.MaxRetries = 5
+							cfg.RouteServiceConfig.MaxAttempts = 5
 						})
 
 						It("tries for 5 times before giving up", func() {

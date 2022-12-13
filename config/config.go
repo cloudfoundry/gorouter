@@ -128,13 +128,13 @@ type OAuthConfig struct {
 type BackendConfig struct {
 	ClientAuthCertificate tls.Certificate
 	MaxConns              int64            `yaml:"max_conns"`
-	MaxRetries            int              `yaml:"max_retries"`
+	MaxAttempts           int              `yaml:"max_attempts"`
 	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }
 
 type RouteServiceConfig struct {
 	ClientAuthCertificate tls.Certificate
-	MaxRetries            int              `yaml:"max_retries"`
+	MaxAttempts           int              `yaml:"max_attempts"`
 	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }
 
