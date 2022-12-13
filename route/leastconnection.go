@@ -5,18 +5,18 @@ import (
 	"time"
 )
 
-var randomize = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 type LeastConnection struct {
 	pool            *EndpointPool
 	initialEndpoint string
 	lastEndpoint    *Endpoint
+	randomize       *rand.Rand
 }
 
 func NewLeastConnection(p *EndpointPool, initial string) EndpointIterator {
 	return &LeastConnection{
 		pool:            p,
 		initialEndpoint: initial,
+		randomize:       rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -83,7 +83,7 @@ func (r *LeastConnection) next() *endpointElem {
 	// more than 1 endpoint
 	// select the least connection endpoint OR
 	// random one within the least connection endpoints
-	randIndices := randomize.Perm(total)
+	randIndices := r.randomize.Perm(total)
 
 	for i := 0; i < total; i++ {
 		randIdx := randIndices[i]

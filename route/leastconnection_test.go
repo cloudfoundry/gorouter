@@ -2,6 +2,7 @@ package route_test
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/logger/fakes"
@@ -69,9 +70,22 @@ var _ = Describe("LeastConnection", func() {
 				})
 
 				It("selects a random endpoint", func() {
-					iter := route.NewLeastConnection(pool, "")
-					n := iter.Next()
-					Expect(n).NotTo(BeNil())
+					var wg sync.WaitGroup
+					for i := 0; i < 100; i++ {
+						wg.Add(1)
+						go func() {
+							iter := route.NewLeastConnection(pool, "")
+							n1 := iter.Next()
+							Expect(n1).NotTo(BeNil())
+
+							Eventually(func() bool {
+								n2 := iter.Next()
+								return n1.Equal(n2)
+							}).Should(BeFalse())
+							wg.Done()
+						}()
+					}
+					wg.Wait()
 				})
 			})
 
