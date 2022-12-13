@@ -33,7 +33,7 @@ type RequestHandler struct {
 
 	endpointDialTimeout  time.Duration
 	websocketDialTimeout time.Duration
-	maxRetries           int
+	maxAttempts          int
 
 	tlsConfigTemplate *tls.Config
 
@@ -50,7 +50,7 @@ func NewRequestHandler(
 	errorWriter errorwriter.ErrorWriter,
 	endpointDialTimeout time.Duration,
 	websocketDialTimeout time.Duration,
-	maxRetries int,
+	maxAttempts int,
 	tlsConfig *tls.Config,
 	opts ...func(*RequestHandler),
 ) *RequestHandler {
@@ -61,7 +61,7 @@ func NewRequestHandler(
 		response:             response,
 		endpointDialTimeout:  endpointDialTimeout,
 		websocketDialTimeout: websocketDialTimeout,
-		maxRetries:           maxRetries,
+		maxAttempts:          maxAttempts,
 		tlsConfigTemplate:    tlsConfig,
 	}
 
@@ -220,7 +220,7 @@ func (h *RequestHandler) serveTcp(
 		onConnectionFailed(err)
 
 		retry++
-		if retry == h.maxRetries {
+		if retry == h.maxAttempts {
 			return 0, err
 		}
 	}

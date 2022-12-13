@@ -76,8 +76,8 @@ func NewProxyRoundTripper(
 		secureCookies:            cfg.SecureCookies,
 		roundTripperFactory:      roundTripperFactory,
 		retriableClassifier:      retriableClassifiers,
-		maxRetries:               cfg.Backends.MaxRetries,
-		maxRouteServiceRetries:   cfg.RouteServiceConfig.MaxRetries,
+		maxAttempts:              cfg.Backends.MaxAttempts,
+		maxRouteServiceAttempts:  cfg.RouteServiceConfig.MaxAttempts,
 		errorHandler:             errHandler,
 		routeServicesTransport:   routeServicesTransport,
 		endpointTimeout:          cfg.EndpointTimeout,
@@ -93,8 +93,8 @@ type roundTripper struct {
 	secureCookies            bool
 	roundTripperFactory      RoundTripperFactory
 	retriableClassifier      fails.Classifier
-	maxRetries               int
-	maxRouteServiceRetries   int
+	maxAttempts              int
+	maxRouteServiceAttempts  int
 	errorHandler             errorHandler
 	routeServicesTransport   http.RoundTripper
 	endpointTimeout          time.Duration
@@ -134,13 +134,13 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
 	var selectEndpointErr error
-	var maxRetries int
+	var maxAttempts int
 	if reqInfo.RouteServiceURL == nil {
-		maxRetries = rt.maxRetries
+		maxAttempts = rt.maxAttempts
 	} else {
-		maxRetries = rt.maxRouteServiceRetries
+		maxAttempts = rt.maxRouteServiceAttempts
 	}
-	for retry := 0; retry < maxRetries || maxRetries == 0; retry++ {
+	for attempt := 0; attempt < maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
 
 		if reqInfo.RouteServiceURL == nil {
@@ -152,7 +152,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 			reqInfo.RouteEndpoint = endpoint
 
-			logger.Debug("backend", zap.Int("attempt", retry+1))
+			logger.Debug("backend", zap.Int("attempt", attempt+1))
 			if endpoint.IsTLS() {
 				request.URL.Scheme = "https"
 			} else {
@@ -170,7 +170,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				iter.EndpointFailed(err)
 
 				retriable := rt.retriableClassifier.Classify(err)
-				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", retry+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable), zap.Int("num-endpoints", numberOfEndpoints))
+				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", attempt+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable), zap.Int("num-endpoints", numberOfEndpoints))
 
 				if retriable {
 					logger.Debug("retriable-error", zap.Object("error", err))
@@ -183,7 +183,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger.Debug(
 				"route-service",
 				zap.Object("route-service-url", reqInfo.RouteServiceURL),
-				zap.Int("attempt", retry+1),
+				zap.Int("attempt", attempt+1),
 			)
 
 			endpoint = &route.Endpoint{
