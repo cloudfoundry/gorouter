@@ -216,7 +216,7 @@ type Config struct {
 	EnableHTTP2     bool              `yaml:"enable_http2"`
 	SSLCertificates []tls.Certificate `yaml:"-"`
 	TLSPEM          []TLSPem          `yaml:"tls_pem,omitempty"`
-	CACerts         string            `yaml:"ca_certs,omitempty"`
+	CACerts         []string          `yaml:"ca_certs,omitempty"`
 	CAPool          *x509.CertPool    `yaml:"-"`
 	ClientCACerts   string            `yaml:"client_ca_certs,omitempty"`
 	ClientCAPool    *x509.CertPool    `yaml:"-"`
@@ -653,9 +653,9 @@ func (c *Config) buildCertPool() error {
 		return err
 	}
 
-	if c.CACerts != "" {
-		if ok := certPool.AppendCertsFromPEM([]byte(c.CACerts)); !ok {
-			return fmt.Errorf("Error while adding CACerts to gorouter's cert pool: \n%s\n", c.CACerts)
+	for i, cert := range c.CACerts {
+		if ok := certPool.AppendCertsFromPEM([]byte(cert)); !ok {
+			return fmt.Errorf("Error while adding %d cert in CACerts to gorouter's cert pool", i)
 		}
 	}
 	c.CAPool = certPool

@@ -858,7 +858,7 @@ var _ = Describe("Router Integration", func() {
 				}))
 
 				rsKey, rsCert := test_util.CreateKeyPair("test.routeservice.com")
-				cfg.CACerts = string(rsCert)
+				cfg.CACerts = []string{string(rsCert)}
 				rsTLSCert, err := tls.X509KeyPair(rsCert, rsKey)
 				Expect(err).ToNot(HaveOccurred())
 

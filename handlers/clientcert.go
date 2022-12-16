@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/routeservice"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
@@ -57,12 +60,21 @@ func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 	delete, err := c.forceDeleteHeader(r)
 	if err != nil {
 		c.logger.Error("signature-validation-failed", zap.Error(err))
-		c.errorWriter.WriteError(
-			rw,
-			http.StatusBadRequest,
-			"Failed to validate Route Service Signature for x-forwarded-client-cert",
-			c.logger,
-		)
+		if errors.Is(err, routeservice.ErrExpired) {
+			c.errorWriter.WriteError(
+				rw,
+				http.StatusGatewayTimeout,
+				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
+				c.logger,
+			)
+		} else {
+			c.errorWriter.WriteError(
+				rw,
+				http.StatusBadGateway,
+				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
+				c.logger,
+			)
+		}
 		return
 	}
 	if delete {
