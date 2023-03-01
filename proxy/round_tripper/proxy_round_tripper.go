@@ -3,11 +3,13 @@ package round_tripper
 import (
 	"context"
 	"errors"
-	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"time"
+
+	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -18,7 +20,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"github.com/uber-go/zap"
 )
 
 const (
@@ -100,6 +101,7 @@ type roundTripper struct {
 	endpointTimeout          time.Duration
 	stickySessionCookieNames config.StringSet
 	http2Enabled             bool
+	aggressiveRetries        bool
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
@@ -108,6 +110,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	var endpoint *route.Endpoint
 
 	request := originalRequest.Clone(originalRequest.Context())
+	trace := traceRequest(request)
 
 	if request.Body != nil {
 		// Temporarily disable closing of the body while in the RoundTrip function, since
@@ -142,6 +145,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 	for attempt := 0; attempt < maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
+		trace.reset()
 
 		if reqInfo.RouteServiceURL == nil {
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
@@ -161,16 +165,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
 			if err != nil {
-				// io.EOF errors are considered safe to retry for certain requests
-				// Replace the error here to track this state when classifying later.
-				if err == io.EOF && isIdempotent(request) {
-					err = fails.IdempotentRequestEOFError
-				}
-
 				iter.EndpointFailed(err)
 
-				retriable := rt.retriableClassifier.Classify(err)
-				logger.Error("backend-endpoint-failed", zap.Error(err), zap.Int("attempt", attempt+1), zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)), zap.Bool("retriable", retriable), zap.Int("num-endpoints", numberOfEndpoints))
+				// We can retry for sure if we never obtained a connection
+				// since there is no way any data was transmitted. If retries
+				// are configured to be aggressive we will also consider
+				// requests that didn't make it past the header transmission
+				// to be retryable. Independent of that logic, idempotent
+				// requests can always be retried.
+				retriable := !trace.gotConn || (rt.aggressiveRetries && !trace.wroteHeaders) || isIdempotent(request)
+				logger.Error("backend-endpoint-failed",
+					zap.Error(err),
+					zap.Int("attempt", attempt+1),
+					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+					zap.Bool("retriable", retriable),
+					zap.Int("num-endpoints", numberOfEndpoints),
+					zap.Bool("got-connection", trace.gotConn),
+					zap.Bool("wrote-headers", trace.wroteHeaders),
+				)
 
 				if retriable {
 					logger.Debug("retriable-error", zap.Object("error", err))
@@ -417,4 +429,31 @@ func isIdempotent(request *http.Request) bool {
 		}
 	}
 	return false
+}
+
+type requestTracer struct {
+	gotConn      bool
+	wroteHeaders bool
+}
+
+// reset the trace data. Helpful when performing the same request again.
+func (t *requestTracer) reset() {
+	t.gotConn = false
+	t.wroteHeaders = false
+}
+
+// traceRequest attaches a httptrace.ClientTrace to the given request. The
+// returned requestTracer indicates whether certain stages of the requests
+// lifecycle have been reached.
+func traceRequest(req *http.Request) *requestTracer {
+	t := &requestTracer{}
+	req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) {
+			t.gotConn = true
+		},
+		WroteHeaders: func() {
+			t.wroteHeaders = true
+		},
+	}))
+	return t
 }
