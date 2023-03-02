@@ -1,15 +1,29 @@
 package handlers_test
 
 import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
+	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
+	zipkinmodel "github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
 )
 
@@ -26,22 +40,72 @@ const (
 
 var _ = Describe("Zipkin", func() {
 	var (
-		handler    *handlers.Zipkin
-		logger     logger.Logger
-		resp       http.ResponseWriter
-		req        *http.Request
-		nextCalled bool
+		handler            *handlers.Zipkin
+		logger             logger.Logger
+		resp               http.ResponseWriter
+		req                *http.Request
+		nextCalled         bool
+		zipkinServer       *ghttp.Server
+		zipkinServerConfig config.ZipkinCollectorConfig
+		receivedSpans      chan []zipkinmodel.SpanModel
 	)
 
-	nextHandler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(http.StatusBadGateway)
+		rw.Header().Set(router_http.CfRouterError, "endpoint_failure")
 		nextCalled = true
 	})
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("zipkin")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
-		resp = httptest.NewRecorder()
+		reqInfo := &handlers.RequestInfo{}
+		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{
+			AppId:                "some-app-id",
+			Host:                 "some-host",
+			Port:                 8080,
+			PrivateInstanceId:    "some-instance-id",
+			PrivateInstanceIndex: "some-app-idx",
+		})
+		req = req.WithContext(context.WithValue(req.Context(), handlers.RequestInfoCtxKey, reqInfo))
+		resp = utils.NewProxyResponseWriter(httptest.NewRecorder())
 		nextCalled = false
+		zipkinServer = ghttp.NewUnstartedServer()
+		zipkinServer.HTTPTestServer.TLS = &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert}
+		clientKey, clientCert := test_util.CreateKeyPair("client-cert")
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(clientCert)
+
+		zipkinServer.HTTPTestServer.TLS.ClientCAs = certPool
+		zipkinServer.HTTPTestServer.StartTLS()
+		receivedSpans = make(chan []zipkinmodel.SpanModel, 1)
+
+		zipkinServer.AppendHandlers(ghttp.CombineHandlers(
+			ghttp.VerifyRequest("POST", "/api/v2/spans"),
+			func(w http.ResponseWriter, req *http.Request) {
+				defer GinkgoRecover()
+				b, err := io.ReadAll(req.Body)
+				Expect(err).NotTo(HaveOccurred())
+				var spans []zipkinmodel.SpanModel
+				err = json.Unmarshal(b, &spans)
+				Expect(err).NotTo(HaveOccurred())
+				receivedSpans <- spans
+			},
+		))
+
+		caPEM := new(bytes.Buffer)
+		pem.Encode(caPEM, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: zipkinServer.HTTPTestServer.TLS.Certificates[0].Certificate[0],
+		})
+
+		zipkinServerConfig = config.ZipkinCollectorConfig{
+			URL: fmt.Sprintf("%s%s", zipkinServer.URL(), "/api/v2/spans"),
+			// URL:        "http://127.0.0.1:9411/api/v2/spans",
+			ClientCert: string(clientCert),
+			ClientKey:  string(clientKey),
+			CACert:     caPEM.String(),
+		}
 	})
 
 	AfterEach(func() {
@@ -49,7 +113,7 @@ var _ = Describe("Zipkin", func() {
 
 	Context("with Zipkin enabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(true, logger)
+			handler = handlers.NewZipkin(true, zipkinServerConfig, logger)
 		})
 
 		It("sets zipkin headers", func() {
@@ -60,6 +124,25 @@ var _ = Describe("Zipkin", func() {
 			Expect(req.Header.Get(b3.Context)).ToNot(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		})
+
+		It("sends a message to zipkin collector", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+			spans := <-receivedSpans
+			Expect(spans).To(HaveLen(1))
+			Expect(spans[0].SpanContext.ID.String()).To(Equal(req.Header.Get(b3.SpanID)))
+			Expect(spans[0].SpanContext.TraceID.String()).To(Equal(req.Header.Get(b3.TraceID)))
+			Expect(spans[0].SpanContext.ParentID).To(BeNil())
+			Expect(spans[0].Kind).To(Equal(zipkinmodel.Client))
+			Expect(spans[0].Tags).To(Equal(map[string]string{
+				"app_id":           "some-app-id",
+				"app_index":        "some-app-idx",
+				"instance_id":      "some-instance-id",
+				"addr":             "some-host:8080",
+				"status_code":      "502",
+				"x_cf_routererror": "endpoint_failure",
+			}))
 		})
 
 		Context("with B3TraceIdHeader, B3SpanIdHeader and B3ParentSpanIdHeader already set", func() {
@@ -89,6 +172,16 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
+
+			It("sends a message to zipkin collector", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.ID.String()).To(Equal(b3SpanID))
+				Expect(spans[0].SpanContext.TraceID.String()).To(Equal(b3TraceID))
+				Expect(spans[0].SpanContext.ParentID.String()).To(Equal(b3ParentSpanID))
+			})
 		})
 
 		Context("with B3TraceIdHeader and B3SpanIdHeader already set", func() {
@@ -102,6 +195,13 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(req.Header.Get(b3.Context)).To(Equal(b3TraceID + "-" + b3SpanID))
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.ID.String()).To(Equal(req.Header.Get(b3.SpanID)))
+				Expect(spans[0].SpanContext.TraceID.String()).To(Equal(req.Header.Get(b3.TraceID)))
+				Expect(spans[0].SpanContext.ParentID).To(BeNil())
 			})
 
 			It("propagates the B3Header with Sampled header", func() {
@@ -111,6 +211,12 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(req.Header.Get(b3.Context)).To(Equal(b3TraceID + "-" + b3SpanID + "-1"))
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				// Sampled is not reported
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.Sampled).To(BeNil())
+				Expect(spans[0].SpanContext.Debug).To(BeFalse())
 			})
 
 			It("propagates the B3Header with Flags header", func() {
@@ -121,6 +227,12 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(req.Header.Get(b3.Context)).To(Equal(b3TraceID + "-" + b3SpanID + "-d"))
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				// Sampled is not reported
+				Expect(spans[0].SpanContext.Sampled).To(BeNil())
+				Expect(spans[0].SpanContext.Debug).To(BeTrue())
 			})
 
 			It("propagates the B3Header with ParentSpanID header", func() {
@@ -131,6 +243,13 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(req.Header.Get(b3.Context)).To(Equal(b3TraceID + "-" + b3SpanID + "-0-" + b3ParentSpanID))
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				// Sampled is not reported
+				Expect(spans[0].SpanContext.Sampled).To(BeNil())
+				Expect(spans[0].SpanContext.ParentID.String()).To(Equal(b3ParentSpanID))
 			})
 
 			It("doesn't overwrite the B3SpanIdHeader", func() {
@@ -140,6 +259,12 @@ var _ = Describe("Zipkin", func() {
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.ID.String()).To(Equal(b3SpanID))
+				Expect(spans[0].SpanContext.ParentID).To(BeNil())
 			})
 
 			It("doesn't overwrite the B3TraceIdHeader", func() {
@@ -147,6 +272,11 @@ var _ = Describe("Zipkin", func() {
 				Expect(req.Header.Get(b3.TraceID)).To(Equal(b3TraceID))
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.TraceID.String()).To(Equal(b3TraceID))
 			})
 		})
 
@@ -159,10 +289,19 @@ var _ = Describe("Zipkin", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(b3.TraceID)).To(MatchRegexp(b3IDRegex))
 				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3SpanRegex))
+				Expect(req.Header.Get(b3.SpanID)).NotTo(Equal(b3SpanID))
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.Context)).To(MatchRegexp(b3Regex))
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+				Expect(zipkinServer.ReceivedRequests()).To(HaveLen(1))
+				spans := <-receivedSpans
+				Expect(spans).To(HaveLen(1))
+				Expect(spans[0].SpanContext.TraceID.String()).To(MatchRegexp(b3IDRegex))
+				Expect(spans[0].SpanContext.ID.String()).To(MatchRegexp(b3SpanRegex))
+				Expect(spans[0].SpanContext.ID.String()).NotTo(Equal(b3SpanID))
+				Expect(spans[0].SpanContext.ParentID).To(BeNil())
 			})
 		})
 
@@ -174,6 +313,7 @@ var _ = Describe("Zipkin", func() {
 			It("overwrites the B3TraceIdHeader and adds a SpanId", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
 				Expect(req.Header.Get(b3.TraceID)).To(MatchRegexp(b3IDRegex))
+				Expect(req.Header.Get(b3.TraceID)).NotTo(Equal(b3TraceID))
 				Expect(req.Header.Get(b3.SpanID)).To(MatchRegexp(b3SpanRegex))
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.Context)).To(MatchRegexp(b3Regex))
@@ -201,7 +341,7 @@ var _ = Describe("Zipkin", func() {
 
 	Context("with Zipkin disabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(false, logger)
+			handler = handlers.NewZipkin(false, config.ZipkinCollectorConfig{}, logger)
 		})
 
 		It("doesn't set any headers", func() {

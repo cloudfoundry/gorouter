@@ -163,10 +163,18 @@ type AccessLog struct {
 	EnableStreaming bool   `yaml:"enable_streaming"`
 }
 
+type ZipkinCollectorConfig struct {
+	URL        string `yaml:"url"`
+	CACert     string `yaml:"ca_cert"`
+	ClientCert string `yaml:"client_cert"`
+	ClientKey  string `yaml:"client_key"`
+}
+
 type Tracing struct {
-	EnableZipkin bool   `yaml:"enable_zipkin"`
-	EnableW3C    bool   `yaml:"enable_w3c"`
-	W3CTenantID  string `yaml:"w3c_tenant_id"`
+	EnableZipkin          bool                  `yaml:"enable_zipkin"`
+	ZipkinCollectorConfig ZipkinCollectorConfig `yaml:"zipkin_collector"`
+	EnableW3C             bool                  `yaml:"enable_w3c"`
+	W3CTenantID           string                `yaml:"w3c_tenant_id"`
 }
 
 type TLSPem struct {
