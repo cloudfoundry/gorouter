@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -27,7 +27,14 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 	// The X-Vcap-Request-Id must be set before the request is passed into the
 	// dropsonde InstrumentedHandler
 
-	guid, err := uuid.GenerateUUID()
+	requestInfo, err := ContextRequestInfo(r)
+	if err != nil {
+		s.logger.Error("failed-to-get-request-info", zap.Error(err))
+		return
+	}
+	traceID, spanID := requestInfo.ProvideTraceInfo()
+	guid := s.buildVcapRequestID(traceID, spanID)
+
 	if err == nil {
 		r.Header.Set(VcapRequestIdHeader, guid)
 		s.logger.Debug("vcap-request-id-header-set", zap.String("VcapRequestIdHeader", guid))
@@ -36,4 +43,8 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 	}
 
 	next(rw, r)
+}
+
+func (s *setVcapRequestIdHeader) buildVcapRequestID(traceID string, spanID string) string {
+	return fmt.Sprintf("%s-%s", traceID, spanID)
 }

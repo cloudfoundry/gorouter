@@ -10,6 +10,7 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 
+	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/urfave/negroni"
 )
 
@@ -60,7 +61,20 @@ type RequestInfo struct {
 	ShouldRouteToInternalRouteService bool
 	FailedAttempts                    int
 
+	TraceID string
+	SpanID  string
+
 	BackendReqHeaders http.Header
+}
+
+func (r *RequestInfo) ProvideTraceInfo() (string, string) {
+	if r.TraceID != "" && r.SpanID != "" {
+		return r.TraceID, r.SpanID
+	}
+	trace := idgenerator.NewRandom128().TraceID()
+	r.TraceID = trace.String()
+	r.SpanID = idgenerator.NewRandom128().SpanID(trace).String()
+	return r.TraceID, r.SpanID
 }
 
 // ContextRequestInfo gets the RequestInfo from the request Context

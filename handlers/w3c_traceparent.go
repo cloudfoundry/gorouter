@@ -23,15 +23,19 @@ type W3CTraceparent struct {
 	Flags    uint8
 }
 
-// NewW3CTraceparent generates a W3C traceparent header value according to
+// NewW3CTraceparent returns W3C traceparent header value according to
 // https://www.w3.org/TR/trace-context/#version-format
-func NewW3CTraceparent() (W3CTraceparent, error) {
-	traceID, err := generateW3CTraceID()
+// It uses trace ID and span ID provided in the request context
+// Or generates new IDs
+func NewW3CTraceparent(requestInfo *RequestInfo) (W3CTraceparent, error) {
+	traceID, parentID := requestInfo.ProvideTraceInfo()
+
+	traceIDB, err := hex.DecodeString(traceID)
 	if err != nil {
 		return W3CTraceparent{}, err
 	}
 
-	parentID, err := generateW3CParentID()
+	parentIDB, err := hex.DecodeString(parentID)
 	if err != nil {
 		return W3CTraceparent{}, err
 	}
@@ -40,8 +44,8 @@ func NewW3CTraceparent() (W3CTraceparent, error) {
 		Version: W3CTraceparentVersion,
 		Flags:   W3CTraceparentSampled,
 
-		TraceID:  traceID,
-		ParentID: parentID,
+		TraceID:  traceIDB,
+		ParentID: parentIDB,
 	}, nil
 }
 
@@ -84,15 +88,6 @@ func ParseW3CTraceparent(header string) *W3CTraceparent {
 		TraceID:  traceIDBytes,
 		ParentID: parentIDBytes,
 	}
-}
-
-func generateW3CTraceID() ([]byte, error) {
-	randBytes, err := secure.RandomBytes(16)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return randBytes, nil
 }
 
 func generateW3CParentID() ([]byte, error) {

@@ -168,6 +168,8 @@ func NewProxy(
 	n.Use(handlers.NewPanicCheck(p.health, logger))
 	n.Use(handlers.NewRequestInfo())
 	n.Use(handlers.NewProxyWriter(logger))
+	n.Use(zipkinHandler)
+	n.Use(w3cHandler)
 	n.Use(handlers.NewVcapRequestIdHeader(logger))
 	if cfg.SendHttpStartStopServerEvent {
 		n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
@@ -182,8 +184,6 @@ func NewProxy(
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
 	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
-	n.Use(zipkinHandler)
-	n.Use(w3cHandler)
 	n.Use(handlers.NewProtocolCheck(logger, errorWriter, cfg.EnableHTTP2))
 	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewMaxRequestSize(cfg, logger))

@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
@@ -33,24 +32,37 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 		return
 	}
 
+	requestInfo, err := ContextRequestInfo(r)
+	if err != nil {
+		z.logger.Error("failed-to-get-request-info", zap.Error(err))
+		return
+	}
+
 	existingContext := r.Header.Get(b3.Context)
 	if existingContext != "" {
 		z.logger.Debug("b3-header-exists",
 			zap.String("b3", existingContext),
 		)
 
-		return
+		sc, err := b3.ParseSingleHeader(existingContext)
+		if err != nil {
+			z.logger.Error("failed-to-parse-single-header", zap.Error(err))
+		} else {
+			requestInfo.TraceID = sc.TraceID.String()
+			requestInfo.SpanID = sc.ID.String()
+
+			return
+		}
 	}
 
 	existingTraceID := r.Header.Get(b3.TraceID)
 	existingSpanID := r.Header.Get(b3.SpanID)
 	if existingTraceID == "" || existingSpanID == "" {
-		trace := idgenerator.NewRandom128().TraceID()
-		span := idgenerator.NewRandom128().SpanID(trace).String()
+		traceID, spanID := requestInfo.ProvideTraceInfo()
 
-		r.Header.Set(b3.TraceID, trace.String())
-		r.Header.Set(b3.SpanID, span)
-		r.Header.Set(b3.Context, trace.String()+"-"+span)
+		r.Header.Set(b3.TraceID, traceID)
+		r.Header.Set(b3.SpanID, spanID)
+		r.Header.Set(b3.Context, traceID+"-"+spanID)
 	} else {
 		sc, err := b3.ParseHeaders(
 			existingTraceID,
@@ -69,6 +81,9 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 			zap.String("traceID", existingTraceID),
 			zap.String("spanID", existingSpanID),
 		)
+
+		requestInfo.TraceID = existingTraceID
+		requestInfo.SpanID = existingSpanID
 	}
 }
 

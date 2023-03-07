@@ -1,8 +1,10 @@
 package handlers_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -13,21 +15,26 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const uuid_regex = `^[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}$`
+const uuid_regex = `^[[:xdigit:]]{32}(-[[:xdigit:]]{16})$`
 
 var _ = Describe("Set Vcap Request Id header", func() {
 	var (
-		logger       logger.Logger
-		nextCalled   bool
-		resp         *httptest.ResponseRecorder
-		req          *http.Request
-		nextHandler  http.HandlerFunc
-		handler      negroni.Handler
-		vcapIdHeader string
+		logger          logger.Logger
+		nextCalled      bool
+		resp            *httptest.ResponseRecorder
+		req             *http.Request
+		nextHandler     http.HandlerFunc
+		handler         negroni.Handler
+		previousReqInfo *handlers.RequestInfo
+		newReqInfo      *handlers.RequestInfo
+		vcapIdHeader    string
 	)
 
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		vcapIdHeader = req.Header.Get(handlers.VcapRequestIdHeader)
+		var err error
+		newReqInfo, err = handlers.ContextRequestInfo(req)
+		Expect(err).NotTo(HaveOccurred())
 		nextCalled = true
 	})
 
@@ -36,28 +43,43 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		nextCalled = false
 		handler = handlers.NewVcapRequestIdHeader(logger)
 
-		req = test_util.NewRequest("GET", "example.com", "/", nil)
+		previousReqInfo = new(handlers.RequestInfo)
+		req = test_util.NewRequest("GET", "example.com", "/", nil).
+			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, previousReqInfo))
 		resp = httptest.NewRecorder()
 	})
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		handler.ServeHTTP(resp, req, nextHandler)
 	})
 
-	Context("when UUID generated the guid", func() {
+	It("sets the ID header correctly", func() {
+		Expect(vcapIdHeader).ToNot(BeEmpty())
+		Expect(vcapIdHeader).To(MatchRegexp(uuid_regex))
+	})
 
-		It("sets the ID header correctly", func() {
-			Expect(vcapIdHeader).ToNot(BeEmpty())
-			Expect(vcapIdHeader).To(MatchRegexp(uuid_regex))
+	It("always call next", func() {
+		Expect(nextCalled).To(BeTrue())
+	})
+
+	It("logs the header", func() {
+		Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
+		Expect(logger).To(gbytes.Say(vcapIdHeader))
+	})
+
+	It("sets request context", func() {
+		Expect(newReqInfo.TraceID).To(MatchRegexp(b3IDRegex))
+		Expect(newReqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+	})
+
+	Context("when request context has trace and span id", func() {
+		BeforeEach(func() {
+			previousReqInfo.TraceID = strings.Repeat("1", 32)
+			previousReqInfo.SpanID = strings.Repeat("2", 16)
 		})
 
-		It("always call next", func() {
-			Expect(nextCalled).To(BeTrue())
-		})
-
-		It("logs the header", func() {
-			Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
-			Expect(logger).To(gbytes.Say(vcapIdHeader))
+		It("sets the ID header from request context", func() {
+			Expect(vcapIdHeader).To(Equal(strings.Repeat("1", 32) + "-" + strings.Repeat("2", 16)))
 		})
 	})
 
