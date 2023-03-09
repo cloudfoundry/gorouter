@@ -87,9 +87,8 @@ func (m *W3C) ServeUpdatedTraceparent(
 		return
 	}
 
-	if requestInfo.TraceID == "" {
-		requestInfo.TraceID = fmt.Sprintf("%x", traceparent.TraceID)
-		requestInfo.SpanID = fmt.Sprintf("%x", traceparent.ParentID)
+	if requestInfo.TraceInfo.TraceID == "" {
+		requestInfo.SetTraceInfo(fmt.Sprintf("%x", traceparent.TraceID), fmt.Sprintf("%x", traceparent.ParentID))
 	}
 
 	tracestate := ParseW3CTracestate(r.Header.Get(W3CTracestateHeader))

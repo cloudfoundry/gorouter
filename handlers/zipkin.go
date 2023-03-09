@@ -48,22 +48,18 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 		if err != nil {
 			z.logger.Error("failed-to-parse-single-header", zap.Error(err))
 		} else {
-			requestInfo.TraceID = sc.TraceID.String()
-			requestInfo.SpanID = sc.ID.String()
-
-			return
+			err = requestInfo.SetTraceInfo(sc.TraceID.String(), sc.ID.String())
+			if err != nil {
+				z.logger.Error("failed-to-set-trace-info", zap.Error(err))
+			} else {
+				return
+			}
 		}
 	}
 
 	existingTraceID := r.Header.Get(b3.TraceID)
 	existingSpanID := r.Header.Get(b3.SpanID)
-	if existingTraceID == "" || existingSpanID == "" {
-		traceID, spanID := requestInfo.ProvideTraceInfo()
-
-		r.Header.Set(b3.TraceID, traceID)
-		r.Header.Set(b3.SpanID, spanID)
-		r.Header.Set(b3.Context, traceID+"-"+spanID)
-	} else {
+	if existingTraceID != "" && existingSpanID != "" {
 		sc, err := b3.ParseHeaders(
 			existingTraceID,
 			existingSpanID,
@@ -82,9 +78,23 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 			zap.String("spanID", existingSpanID),
 		)
 
-		requestInfo.TraceID = existingTraceID
-		requestInfo.SpanID = existingSpanID
+		err = requestInfo.SetTraceInfo(sc.TraceID.String(), sc.ID.String())
+		if err != nil {
+			z.logger.Error("failed-to-set-trace-info", zap.Error(err))
+		} else {
+			return
+		}
 	}
+
+	traceInfo, err := requestInfo.ProvideTraceInfo()
+	if err != nil {
+		z.logger.Error("failed-to-get-trace-info", zap.Error(err))
+		return
+	}
+
+	r.Header.Set(b3.TraceID, traceInfo.TraceID)
+	r.Header.Set(b3.SpanID, traceInfo.SpanID)
+	r.Header.Set(b3.Context, traceInfo.TraceID+"-"+traceInfo.SpanID)
 }
 
 // HeadersToLog specifies the headers which should be logged if Zipkin headers

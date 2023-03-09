@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/logger"
@@ -32,19 +31,14 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 		s.logger.Error("failed-to-get-request-info", zap.Error(err))
 		return
 	}
-	traceID, spanID := requestInfo.ProvideTraceInfo()
-	guid := s.buildVcapRequestID(traceID, spanID)
-
-	if err == nil {
-		r.Header.Set(VcapRequestIdHeader, guid)
-		s.logger.Debug("vcap-request-id-header-set", zap.String("VcapRequestIdHeader", guid))
-	} else {
-		s.logger.Error("failed-to-set-vcap-request-id-header", zap.Error(err))
+	traceInfo, err := requestInfo.ProvideTraceInfo()
+	if err != nil {
+		s.logger.Error("failed-to-get-trace-info", zap.Error(err))
+		return
 	}
 
-	next(rw, r)
-}
+	r.Header.Set(VcapRequestIdHeader, traceInfo.UUID)
+	s.logger.Debug("vcap-request-id-header-set", zap.String("VcapRequestIdHeader", traceInfo.UUID))
 
-func (s *setVcapRequestIdHeader) buildVcapRequestID(traceID string, spanID string) string {
-	return fmt.Sprintf("%s-%s", traceID, spanID)
+	next(rw, r)
 }

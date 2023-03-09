@@ -28,14 +28,17 @@ type W3CTraceparent struct {
 // It uses trace ID and span ID provided in the request context
 // Or generates new IDs
 func NewW3CTraceparent(requestInfo *RequestInfo) (W3CTraceparent, error) {
-	traceID, parentID := requestInfo.ProvideTraceInfo()
-
-	traceIDB, err := hex.DecodeString(traceID)
+	traceInfo, err := requestInfo.ProvideTraceInfo()
 	if err != nil {
 		return W3CTraceparent{}, err
 	}
 
-	parentIDB, err := hex.DecodeString(parentID)
+	traceIDB, err := hex.DecodeString(traceInfo.TraceID)
+	if err != nil {
+		return W3CTraceparent{}, err
+	}
+
+	parentIDB, err := hex.DecodeString(traceInfo.SpanID)
 	if err != nil {
 		return W3CTraceparent{}, err
 	}

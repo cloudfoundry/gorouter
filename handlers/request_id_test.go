@@ -15,7 +15,7 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const uuid_regex = `^[[:xdigit:]]{32}(-[[:xdigit:]]{16})$`
+const UUIDRegex = "^(urn\\:uuid\\:)?\\{?([a-z0-9]{8})-([a-z0-9]{4})-([1-5][a-z0-9]{3})-([a-z0-9]{4})-([a-z0-9]{12})\\}?$"
 
 var _ = Describe("Set Vcap Request Id header", func() {
 	var (
@@ -55,7 +55,7 @@ var _ = Describe("Set Vcap Request Id header", func() {
 
 	It("sets the ID header correctly", func() {
 		Expect(vcapIdHeader).ToNot(BeEmpty())
-		Expect(vcapIdHeader).To(MatchRegexp(uuid_regex))
+		Expect(vcapIdHeader).To(MatchRegexp(UUIDRegex))
 	})
 
 	It("always call next", func() {
@@ -68,18 +68,20 @@ var _ = Describe("Set Vcap Request Id header", func() {
 	})
 
 	It("sets request context", func() {
-		Expect(newReqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-		Expect(newReqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+		Expect(newReqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+		Expect(newReqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+		Expect(newReqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 	})
 
 	Context("when request context has trace and span id", func() {
 		BeforeEach(func() {
-			previousReqInfo.TraceID = strings.Repeat("1", 32)
-			previousReqInfo.SpanID = strings.Repeat("2", 16)
+			previousReqInfo.TraceInfo.TraceID = strings.Repeat("1", 32)
+			previousReqInfo.TraceInfo.SpanID = strings.Repeat("2", 16)
+			previousReqInfo.TraceInfo.UUID = "11111111-1111-1111-1111-111111111111"
 		})
 
 		It("sets the ID header from request context", func() {
-			Expect(vcapIdHeader).To(Equal(strings.Repeat("1", 32) + "-" + strings.Repeat("2", 16)))
+			Expect(vcapIdHeader).To(Equal("11111111-1111-1111-1111-111111111111"))
 		})
 	})
 
@@ -91,7 +93,7 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		It("overwrites the X-Vcap-Request-Id header", func() {
 			Expect(vcapIdHeader).ToNot(BeEmpty())
 			Expect(vcapIdHeader).ToNot(Equal("BOGUS-HEADER"))
-			Expect(vcapIdHeader).To(MatchRegexp(uuid_regex))
+			Expect(vcapIdHeader).To(MatchRegexp(UUIDRegex))
 		})
 
 		It("logs the header", func() {

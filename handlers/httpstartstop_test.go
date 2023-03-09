@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
@@ -20,6 +20,7 @@ import (
 	gouuid "github.com/nu7hatch/gouuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni"
 )
 
@@ -45,12 +46,13 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		vcapHeader  string
 		handler     *negroni.Negroni
 		nextHandler http.HandlerFunc
+		prevHandler negroni.Handler
 
 		resp http.ResponseWriter
 		req  *http.Request
 
 		fakeEmitter *fake.FakeEventEmitter
-		fakeLogger  *logger_fakes.FakeLogger
+		logger      logger.Logger
 
 		nextCalled bool
 	)
@@ -66,7 +68,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		req.Header.Set(handlers.VcapRequestIdHeader, vcapHeader)
 
 		fakeEmitter = fake.NewFakeEventEmitter("fake")
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestZapLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := ioutil.ReadAll(req.Body)
@@ -93,13 +95,16 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			nextCalled = true
 		})
 		nextCalled = false
+
+		prevHandler = &PrevHandler{}
 	})
 
 	JustBeforeEach(func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(fakeLogger))
-		handler.Use(handlers.NewHTTPStartStop(fakeEmitter, fakeLogger))
+		handler.Use(prevHandler)
+		handler.Use(handlers.NewProxyWriter(logger))
+		handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -198,29 +203,58 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		})
 	})
 
-	Context("when the response writer is not a proxy response writer", func() {
-		var badHandler *negroni.Negroni
-		BeforeEach(func() {
-			badHandler = negroni.New()
-			badHandler.Use(handlers.NewHTTPStartStop(fakeEmitter, fakeLogger))
-		})
-		It("calls Fatal on the logger", func() {
-			badHandler.ServeHTTP(resp, req)
-			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
-
-			Expect(nextCalled).To(BeFalse())
-		})
-	})
-
 	Context("when VcapRequestIdHeader is not provided", func() {
 		BeforeEach(func() {
 			req.Header.Set(handlers.VcapRequestIdHeader, "")
 		})
-		It("calls Fatal on the logger", func() {
-			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
 
-			Expect(nextCalled).To(BeFalse())
+		It("calls error on the logger", func() {
+			defer func() {
+				recover()
+				Expect(logger).To(gbytes.Say(`"data":{"error":"X-Vcap-Request-Id not found"}`))
+				Expect(nextCalled).To(BeFalse())
+			}()
+
+			handler.ServeHTTP(resp, req)
+		})
+
+		Context("when request context has trace info", func() {
+			BeforeEach(func() {
+				prevHandler = &PrevHandlerWithTrace{}
+			})
+
+			It("logs message with trace info", func() {
+				defer func() {
+					recover()
+					Expect(logger).To(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","error":"X-Vcap-Request-Id not found"}`))
+					Expect(nextCalled).To(BeFalse())
+				}()
+
+				handler.ServeHTTP(resp, req)
+			})
+		})
+	})
+
+	Context("when VcapRequestIdHeader is provided", func() {
+		BeforeEach(func() {
+			req.Header.Set(handlers.VcapRequestIdHeader, "11111111-1111-1111-1111-111111111111")
+		})
+
+		Context("when the response writer is not a proxy response writer", func() {
+			var badHandler *negroni.Negroni
+			BeforeEach(func() {
+				badHandler = negroni.New()
+				badHandler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
+			})
+
+			It("calls error on the logger with request trace id", func() {
+				defer func() {
+					recover()
+					Eventually(logger).Should(gbytes.Say(`"data":{"error":"ProxyResponseWriter not found"}`))
+					Expect(nextCalled).To(BeFalse())
+				}()
+				badHandler.ServeHTTP(resp, req)
+			})
 		})
 	})
 
@@ -230,9 +264,29 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		})
 		It("calls Info on the logger, but does not fail the request", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.InfoCallCount()).To(Equal(1))
+			Expect(logger).To(gbytes.Say(`"message":"failed-to-emit-startstop-event"`))
 
 			Expect(nextCalled).To(BeTrue())
 		})
 	})
 })
+
+type PrevHandler struct{}
+
+func (h *PrevHandler) ServeHTTP(w http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	next(w, req)
+}
+
+type PrevHandlerWithTrace struct{}
+
+func (h *PrevHandlerWithTrace) ServeHTTP(w http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	reqInfo, err := handlers.ContextRequestInfo(req)
+	if err == nil {
+		reqInfo.TraceInfo = handlers.TraceInfo{
+			TraceID: "1111",
+			SpanID:  "2222",
+		}
+	}
+
+	next(w, req)
+}

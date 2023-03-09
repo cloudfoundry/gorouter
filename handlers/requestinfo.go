@@ -5,18 +5,30 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
+	gouuid "github.com/nu7hatch/gouuid"
+	"github.com/uber-go/zap"
 
 	"github.com/openzipkin/zipkin-go/idgenerator"
+	"github.com/openzipkin/zipkin-go/model"
 	"github.com/urfave/negroni"
 )
 
 type key string
 
 const RequestInfoCtxKey key = "RequestInfo"
+
+type TraceInfo struct {
+	TraceID string
+	SpanID  string
+	UUID    string
+}
 
 // RequestInfo stores all metadata about the request and is used to pass
 // information between handlers. The timing information is ordered by time of
@@ -61,20 +73,85 @@ type RequestInfo struct {
 	ShouldRouteToInternalRouteService bool
 	FailedAttempts                    int
 
-	TraceID string
-	SpanID  string
+	TraceInfo TraceInfo
 
 	BackendReqHeaders http.Header
 }
 
-func (r *RequestInfo) ProvideTraceInfo() (string, string) {
-	if r.TraceID != "" && r.SpanID != "" {
-		return r.TraceID, r.SpanID
+func (r *RequestInfo) ProvideTraceInfo() (TraceInfo, error) {
+	if r.TraceInfo != (TraceInfo{}) {
+		return r.TraceInfo, nil
 	}
-	trace := idgenerator.NewRandom128().TraceID()
-	r.TraceID = trace.String()
-	r.SpanID = idgenerator.NewRandom128().SpanID(trace).String()
-	return r.TraceID, r.SpanID
+
+	// use UUID as TraceID so that it can be used in VCAP_REQUEST_ID per RFC 4122
+	guid, err := uuid.GenerateUUID()
+	if err != nil {
+		return TraceInfo{}, err
+	}
+
+	traceID, spanID, err := generateTraceAndSpanIDFromGUID(guid)
+	if err != nil {
+		return TraceInfo{}, err
+	}
+
+	r.TraceInfo = TraceInfo{
+		UUID:    guid,
+		TraceID: traceID,
+		SpanID:  spanID,
+	}
+
+	return r.TraceInfo, nil
+}
+
+func (r *RequestInfo) SetTraceInfo(traceID, spanID string) error {
+	guid := traceID[0:8] + "-" + traceID[8:12] + "-" + traceID[12:16] + "-" + traceID[16:20] + "-" + traceID[20:]
+	_, err := gouuid.ParseHex(guid)
+	if err == nil {
+		r.TraceInfo = TraceInfo{
+			TraceID: traceID,
+			SpanID:  spanID,
+			UUID:    guid,
+		}
+		return nil
+	}
+
+	guid, err = uuid.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	traceID, spanID, err = generateTraceAndSpanIDFromGUID(guid)
+	if err != nil {
+		return err
+	}
+
+	r.TraceInfo = TraceInfo{
+		TraceID: traceID,
+		SpanID:  spanID,
+		UUID:    guid,
+	}
+	return nil
+}
+
+func generateTraceAndSpanIDFromGUID(guid string) (string, string, error) {
+	traceHex := strings.Replace(guid, "-", "", -1)
+	traceID, err := model.TraceIDFromHex(traceHex)
+	if err != nil {
+		return "", "", err
+	}
+	spanID := idgenerator.NewRandom128().SpanID(traceID)
+	return traceID.String(), spanID.String(), nil
+}
+
+func LoggerWithTraceInfo(l logger.Logger, r *http.Request) logger.Logger {
+	reqInfo, err := ContextRequestInfo(r)
+	if err != nil {
+		return l
+	}
+	if reqInfo.TraceInfo.TraceID == "" {
+		return l
+	}
+
+	return l.With(zap.String("trace-id", reqInfo.TraceInfo.TraceID), zap.String("span-id", reqInfo.TraceInfo.SpanID))
 }
 
 // ContextRequestInfo gets the RequestInfo from the request Context

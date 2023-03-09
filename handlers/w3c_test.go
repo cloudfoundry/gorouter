@@ -70,8 +70,9 @@ var _ = Describe("W3C", func() {
 				Context("when request context has trace and span id", func() {
 					BeforeEach(func() {
 						ri := new(handlers.RequestInfo)
-						ri.TraceID = strings.Repeat("1", 32)
-						ri.SpanID = strings.Repeat("2", 16)
+						ri.TraceInfo.TraceID = strings.Repeat("1", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("2", 16)
+						ri.TraceInfo.UUID = "11111111-1111-1111-1111-111111111111"
 						req = test_util.NewRequest("GET", "example.com", "/", nil).
 							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
 					})
@@ -83,8 +84,9 @@ var _ = Describe("W3C", func() {
 
 						Expect(traceparentHeader).To(Equal("00-11111111111111111111111111111111-2222222222222222-01"))
 
-						Expect(reqInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
-						Expect(reqInfo.SpanID).To(Equal(strings.Repeat("2", 16)))
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(Equal(strings.Repeat("2", 16)))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("11111111-1111-1111-1111-111111111111"))
 					})
 				})
 
@@ -106,8 +108,9 @@ var _ = Describe("W3C", func() {
 
 						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 
-						Expect(reqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-						Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+						Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 					})
 				})
 			})
@@ -149,24 +152,27 @@ var _ = Describe("W3C", func() {
 				Context("when request context has trace and span id", func() {
 					BeforeEach(func() {
 						ri := new(handlers.RequestInfo)
-						ri.TraceID = strings.Repeat("3", 32)
-						ri.SpanID = strings.Repeat("4", 16)
+						ri.TraceInfo.TraceID = strings.Repeat("3", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("4", 16)
+						ri.TraceInfo.UUID = "33333333-3333-3333-3333-333333333333"
 						req = test_util.NewRequest("GET", "example.com", "/", nil).
 							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
 					})
 
 					It("doesn't update request context", func() {
 						handler.ServeHTTP(resp, req, nextHandler)
-						Expect(reqInfo.TraceID).To(Equal(strings.Repeat("3", 32)))
-						Expect(reqInfo.SpanID).To(Equal(strings.Repeat("4", 16)))
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("3", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(Equal(strings.Repeat("4", 16)))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("33333333-3333-3333-3333-333333333333"))
 					})
 				})
 
 				Context("when request context doesn't have trace and span id", func() {
 					It("updates request context with trace ID and generated parent ID", func() {
 						handler.ServeHTTP(resp, req, nextHandler)
-						Expect(reqInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
-						Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("11111111-1111-1111-1111-111111111111"))
 					})
 				})
 			})
@@ -206,8 +212,9 @@ var _ = Describe("W3C", func() {
 
 				It("sets request context", func() {
 					handler.ServeHTTP(resp, req, nextHandler)
-					Expect(reqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-					Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 		})
@@ -272,8 +279,9 @@ var _ = Describe("W3C", func() {
 
 				It("sets request context", func() {
 					handler.ServeHTTP(resp, req, nextHandler)
-					Expect(reqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-					Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 
@@ -312,8 +320,9 @@ var _ = Describe("W3C", func() {
 
 				It("sets request context", func() {
 					handler.ServeHTTP(resp, req, nextHandler)
-					Expect(reqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-					Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 
@@ -352,8 +361,9 @@ var _ = Describe("W3C", func() {
 
 				It("sets request context", func() {
 					handler.ServeHTTP(resp, req, nextHandler)
-					Expect(reqInfo.TraceID).To(MatchRegexp(b3IDRegex))
-					Expect(reqInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 		})
@@ -376,8 +386,9 @@ var _ = Describe("W3C", func() {
 
 		It("sets request context", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
-			Expect(reqInfo.TraceID).To(BeEmpty())
-			Expect(reqInfo.SpanID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.TraceID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.SpanID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.UUID).To(BeEmpty())
 		})
 	})
 })
