@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -101,6 +102,7 @@ type AccessLogRecord struct {
 	HeadersOverride        http.Header
 	StatusCode             int
 	RouteEndpoint          *route.Endpoint
+	RouteServiceUrl        *url.URL
 	RoundtripStartedAt     time.Time
 	FirstByteAt            time.Time
 	RoundtripFinishedAt    time.Time
@@ -152,13 +154,17 @@ func (r *AccessLogRecord) getRecord(performTruncate bool) []byte {
 }
 
 func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
-	var appID, destIPandPort, appIndex, instanceId string
+	var appID, destIPandPort, appIndex, instanceId, routeServiceUrl string
 
 	if r.RouteEndpoint != nil {
 		appID = r.RouteEndpoint.ApplicationId
 		appIndex = r.RouteEndpoint.PrivateInstanceIndex
 		destIPandPort = r.RouteEndpoint.CanonicalAddr()
 		instanceId = r.RouteEndpoint.PrivateInstanceId
+	}
+
+	if r.RouteServiceUrl != nil {
+		routeServiceUrl = truncateToSize(r.RouteServiceUrl.String(), "route-service-url", LARGE_BYTES_LIMIT)
 	}
 
 	headers := r.Request.Header
@@ -223,6 +229,9 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 
 	b.WriteString(`instance_id:`)
 	b.WriteDashOrStringValue(instanceId)
+
+	b.WriteString(`route_service_url:`)
+	b.WriteDashOrStringValue(routeServiceUrl)
 
 	b.AppendSpaces(false)
 	b.WriteString(`x_cf_routererror:`)

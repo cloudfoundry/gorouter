@@ -18,7 +18,7 @@ type key string
 const RequestInfoCtxKey key = "RequestInfo"
 
 // RequestInfo stores all metadata about the request and is used to pass
-// informaton between handlers
+// information between handlers
 type RequestInfo struct {
 	StartedAt, StoppedAt                      time.Time
 	AppRequestStartedAt, AppRequestFinishedAt time.Time
