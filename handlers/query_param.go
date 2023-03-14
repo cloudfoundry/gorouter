@@ -21,9 +21,10 @@ func NewQueryParam(logger logger.Logger) negroni.Handler {
 }
 
 func (q *queryParam) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(q.logger, r)
 	semicolonInParams := strings.Contains(r.RequestURI, ";")
 	if semicolonInParams {
-		q.logger.Warn("deprecated-semicolon-params", zap.String("vcap_request_id", r.Header.Get(VcapRequestIdHeader)))
+		logger.Warn("deprecated-semicolon-params", zap.String("vcap_request_id", r.Header.Get(VcapRequestIdHeader)))
 	}
 
 	next(rw, r)

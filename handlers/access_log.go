@@ -55,7 +55,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 
 	reqInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		a.logger.Fatal("request-info-err", zap.Error(err))
+		a.logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 

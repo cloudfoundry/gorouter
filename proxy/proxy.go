@@ -183,13 +183,13 @@ func NewProxy(
 	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
-	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health, logger))
+	n.Use(handlers.NewProxyHealthcheck(cfg.HealthCheckUserAgent, p.health))
 	n.Use(handlers.NewProtocolCheck(logger, errorWriter, cfg.EnableHTTP2))
 	n.Use(handlers.NewLookup(registry, reporter, logger, errorWriter, cfg.EmptyPoolResponseCode503))
 	n.Use(handlers.NewMaxRequestSize(cfg, logger))
 	n.Use(handlers.NewClientCert(
 		SkipSanitize(routeServiceHandler.(*handlers.RouteService)),
-		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert),
+		ForceDeleteXFCCHeader(routeServiceHandler.(*handlers.RouteService), cfg.ForwardedClientCert, logger),
 		cfg.ForwardedClientCert,
 		logger,
 		errorWriter,
@@ -198,7 +198,6 @@ func NewProxy(
 		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),
 		ForceForwardedProtoHttps: p.forceForwardedProtoHttps,
 		SanitizeForwardedProto:   p.sanitizeForwardedProto,
-		Logger:                   logger,
 	})
 	n.Use(routeServiceHandler)
 	n.Use(p)
@@ -208,7 +207,7 @@ func NewProxy(
 }
 
 type RouteServiceValidator interface {
-	ArrivedViaRouteService(req *http.Request) (bool, error)
+	ArrivedViaRouteService(req *http.Request, logger logger.Logger) (bool, error)
 	IsRouteServiceTraffic(req *http.Request) bool
 }
 
@@ -224,9 +223,9 @@ func SkipSanitize(routeServiceValidator RouteServiceValidator) func(*http.Reques
 	}
 }
 
-func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwardedClientCert string) func(*http.Request) (bool, error) {
+func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwardedClientCert string, logger logger.Logger) func(*http.Request) (bool, error) {
 	return func(req *http.Request) (bool, error) {
-		valid, err := routeServiceValidator.ArrivedViaRouteService(req)
+		valid, err := routeServiceValidator.ArrivedViaRouteService(req, logger)
 		if err != nil {
 			return false, err
 		}
@@ -235,11 +234,12 @@ func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwarde
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
+	logger := handlers.LoggerWithTraceInfo(p.logger, request)
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
 	if err != nil {
-		p.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 	}
 	handler := handler.NewRequestHandler(
 		request,
@@ -256,12 +256,12 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	)
 
 	if reqInfo.RoutePool == nil {
-		p.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
+		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
 
 	nestedIterator, err := handlers.EndpointIteratorForRequest(request, p.defaultLoadBalance, p.stickySessionCookieNames)
 	if err != nil {
-		p.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 	}
 
 	endpointIterator := &wrappedIterator{
@@ -286,7 +286,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 func (p *proxy) setupProxyRequest(target *http.Request) {
 	reqInfo, err := handlers.ContextRequestInfo(target)
 	if err != nil {
-		p.logger.Fatal("request-info-err", zap.Error(err))
+		p.logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 	reqInfo.BackendReqHeaders = target.Header

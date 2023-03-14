@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("W3C", func() {
@@ -87,6 +88,27 @@ var _ = Describe("W3C", func() {
 						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
 						Expect(reqInfo.TraceInfo.SpanID).To(Equal(strings.Repeat("2", 16)))
 						Expect(reqInfo.TraceInfo.UUID).To(Equal("11111111-1111-1111-1111-111111111111"))
+					})
+				})
+
+				Context("when request context has invalid trace and span id", func() {
+					BeforeEach(func() {
+						ri := new(handlers.RequestInfo)
+						ri.TraceInfo.TraceID = strings.Repeat("g", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("2", 16)
+						ri.TraceInfo.UUID = "11111111-1111-1111-1111-111111111111"
+						req = test_util.NewRequest("GET", "example.com", "/", nil).
+							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
+					})
+
+					It("does not set traceparentHeader and logs the error", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
+
+						traceparentHeader := req.Header.Get(handlers.W3CTraceparentHeader)
+
+						Expect(traceparentHeader).To(BeEmpty())
+
+						Expect(logger).To(gbytes.Say(`failed-to-create-w3c-traceparent`))
 					})
 				})
 

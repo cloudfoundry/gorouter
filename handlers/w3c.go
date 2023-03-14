@@ -48,23 +48,24 @@ func (m *W3C) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Handl
 		return
 	}
 
+	logger := LoggerWithTraceInfo(m.logger, r)
+
 	prevTraceparent := ParseW3CTraceparent(r.Header.Get(W3CTraceparentHeader))
 
 	if prevTraceparent == nil {
 		// If we cannot parse an existing traceparent header
 		// or if there is no traceparent header
 		// then we should use trace ID and span ID saved in the request context
-		m.ServeNewTraceparent(rw, r, requestInfo)
+		m.ServeNewTraceparent(rw, r, requestInfo, logger)
 	} else {
-		m.ServeUpdatedTraceparent(rw, r, requestInfo, *prevTraceparent)
+		m.ServeUpdatedTraceparent(rw, r, requestInfo, *prevTraceparent, logger)
 	}
 }
 
-func (m *W3C) ServeNewTraceparent(rw http.ResponseWriter, r *http.Request, requestInfo *RequestInfo) {
+func (m *W3C) ServeNewTraceparent(rw http.ResponseWriter, r *http.Request, requestInfo *RequestInfo, logger logger.Logger) {
 	traceparent, err := NewW3CTraceparent(requestInfo)
-
 	if err != nil {
-		m.logger.Error("failed-to-create-w3c-traceparent", zap.Error(err))
+		logger.Error("failed-to-create-w3c-traceparent", zap.Error(err))
 		return
 	}
 
@@ -79,11 +80,11 @@ func (m *W3C) ServeUpdatedTraceparent(
 	r *http.Request,
 	requestInfo *RequestInfo,
 	prevTraceparent W3CTraceparent,
+	logger logger.Logger,
 ) {
 	traceparent, err := prevTraceparent.Next()
-
 	if err != nil {
-		m.logger.Info("failed-to-generate-next-w3c-traceparent", zap.Error(err))
+		logger.Info("failed-to-generate-next-w3c-traceparent", zap.Error(err))
 		return
 	}
 

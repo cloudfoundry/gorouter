@@ -9,13 +9,13 @@ import (
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/uber-go/zap"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni"
 )
 
@@ -26,7 +26,9 @@ var _ = Describe("QueryParamHandler", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeLogger *logger_fakes.FakeLogger
+		logger logger.Logger
+
+		prevHandler negroni.Handler
 
 		nextCalled bool
 
@@ -62,17 +64,21 @@ var _ = Describe("QueryParamHandler", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		fakeLogger = new(logger_fakes.FakeLogger)
-
-		handler = negroni.New()
-		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(fakeLogger))
-		handler.Use(handlers.NewQueryParam(fakeLogger))
-		handler.Use(nextHandler)
+		logger = test_util.NewTestZapLogger("test")
 
 		reqChan = make(chan *http.Request, 1)
 
 		nextCalled = false
+		prevHandler = &PrevHandler{}
+	})
+
+	JustBeforeEach(func() {
+		handler = negroni.New()
+		handler.Use(handlers.NewRequestInfo())
+		handler.Use(prevHandler)
+		handler.Use(handlers.NewProxyWriter(logger))
+		handler.Use(handlers.NewQueryParam(logger))
+		handler.Use(nextHandler)
 	})
 
 	AfterEach(func() {
@@ -94,12 +100,25 @@ var _ = Describe("QueryParamHandler", func() {
 				req.RequestURI = "/example?param1;param2"
 				handler.ServeHTTP(resp, req)
 
-				Expect(fakeLogger.WarnCallCount()).To(Equal(1))
-				msg, fields := fakeLogger.WarnArgsForCall(0)
-				Expect(msg).To(Equal("deprecated-semicolon-params"))
-				Expect(fields).To(Equal([]zap.Field{zap.String("vcap_request_id", id)}))
+				Expect(logger).To(gbytes.Say(`deprecated-semicolon-params`))
+				Expect(logger).To(gbytes.Say(`"data":{"vcap_request_id":"` + id + `"}`))
 
 				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("deprecated-semicolon-params"))
+			})
+
+			Context("when request context has trace info", func() {
+				BeforeEach(func() {
+					prevHandler = &PrevHandlerWithTrace{}
+				})
+
+				It("logs a warning with trace info", func() {
+					req.RequestURI = "/example?param1;param2"
+					handler.ServeHTTP(resp, req)
+
+					Expect(logger).To(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","vcap_request_id":"` + id + `"}`))
+
+					Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("deprecated-semicolon-params"))
+				})
 			})
 		})
 		Context("when semicolons are not present", func() {
@@ -107,7 +126,7 @@ var _ = Describe("QueryParamHandler", func() {
 				req.RequestURI = "/example?param1&param2"
 				handler.ServeHTTP(resp, req)
 
-				Expect(fakeLogger.WarnCallCount()).To(Equal(0))
+				Expect(logger).NotTo(gbytes.Say(`deprecated-semicolon-params`))
 				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal(""))
 			})
 		})

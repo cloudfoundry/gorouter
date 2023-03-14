@@ -25,16 +25,21 @@ var _ = Describe("Protocolcheck", func() {
 		server      *ghttp.Server
 		n           *negroni.Negroni
 		enableHTTP2 bool
+		prevHandler negroni.Handler
 	)
 
-	JustBeforeEach(func() {
+	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("protocolcheck")
 		nextCalled = false
+		prevHandler = &PrevHandler{}
+	})
 
+	JustBeforeEach(func() {
 		n = negroni.New()
 		n.UseFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 			next(rw, req)
 		})
+		n.Use(prevHandler)
 		n.Use(handlers.NewProtocolCheck(logger, ew, enableHTTP2))
 		n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
@@ -75,7 +80,7 @@ var _ = Describe("Protocolcheck", func() {
 				enableHTTP2 = false
 			})
 
-			It("returns a 400 witha helpful error ", func() {
+			It("returns a 400 with a helpful error ", func() {
 				conn, err := net.Dial("tcp", server.Addr())
 				defer conn.Close()
 				Expect(err).ToNot(HaveOccurred())

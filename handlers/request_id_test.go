@@ -83,6 +83,11 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		It("sets the ID header from request context", func() {
 			Expect(vcapIdHeader).To(Equal("11111111-1111-1111-1111-111111111111"))
 		})
+
+		It("logs the header with trace info", func() {
+			Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
+			Expect(logger).To(gbytes.Say(`"data":{"trace-id":"11111111111111111111111111111111","span-id":"2222222222222222","VcapRequestIdHeader":"` + vcapIdHeader + `"}`))
+		})
 	})
 
 	Context("when X-Vcap-Request-Id is set", func() {

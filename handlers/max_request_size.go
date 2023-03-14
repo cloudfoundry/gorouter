@@ -41,6 +41,7 @@ func NewMaxRequestSize(cfg *config.Config, logger logger.Logger) *MaxRequestSize
 }
 
 func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(m.logger, r)
 	reqSize := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 5 // add 5 bytes for space-separation of method, URI, protocol, and /r/n
 
 	for k, v := range r.Header {
@@ -51,11 +52,11 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	if reqSize >= m.MaxSize {
 		reqInfo, err := ContextRequestInfo(r)
 		if err != nil {
-			m.logger.Error("request-info-err", zap.Error(err))
+			logger.Error("request-info-err", zap.Error(err))
 		} else {
 			endpointIterator, err := EndpointIteratorForRequest(r, m.cfg.LoadBalance, m.cfg.StickySessionCookieNames)
 			if err != nil {
-				m.logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
+				logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
 			} else {
 				reqInfo.RouteEndpoint = endpointIterator.Next()
 			}

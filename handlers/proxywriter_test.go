@@ -90,9 +90,9 @@ var _ = Describe("ProxyWriter", func() {
 			badHandler.Use(handlers.NewProxyWriter(fakeLogger))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
-		It("calls Fatal on the logger", func() {
+		It("calls Panic on the logger", func() {
 			badHandler.ServeHTTP(resp, req)
-			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+			Expect(fakeLogger.PanicCallCount()).To(Equal(1))
 			Expect(nextCalled).To(BeFalse())
 		})
 	})

@@ -150,9 +150,9 @@ var _ = Describe("AccessLog", func() {
 			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, fakeLogger))
 			handler.Use(nextHandler)
 		})
-		It("calls Fatal on the logger", func() {
+		It("calls Panic on the logger", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+			Expect(fakeLogger.PanicCallCount()).To(Equal(1))
 		})
 	})
 
