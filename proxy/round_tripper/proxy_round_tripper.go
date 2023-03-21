@@ -143,7 +143,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	} else {
 		maxAttempts = rt.maxRouteServiceAttempts
 	}
-	for attempt := 0; attempt < maxAttempts || maxAttempts == 0; attempt++ {
+	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
 		trace.reset()
 
@@ -156,7 +156,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
 			reqInfo.RouteEndpoint = endpoint
 
-			logger.Debug("backend", zap.Int("attempt", attempt+1))
+			logger.Debug("backend", zap.Int("attempt", attempt))
 			if endpoint.IsTLS() {
 				request.URL.Scheme = "https"
 			} else {
@@ -176,7 +176,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				retriable := !trace.gotConn || (rt.aggressiveRetries && !trace.wroteHeaders) || isIdempotent(request)
 				logger.Error("backend-endpoint-failed",
 					zap.Error(err),
-					zap.Int("attempt", attempt+1),
+					zap.Int("attempt", attempt),
 					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					zap.Bool("retriable", retriable),
 					zap.Int("num-endpoints", numberOfEndpoints),
@@ -195,7 +195,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			logger.Debug(
 				"route-service",
 				zap.Object("route-service-url", reqInfo.RouteServiceURL),
-				zap.Int("attempt", attempt+1),
+				zap.Int("attempt", attempt),
 			)
 
 			endpoint = &route.Endpoint{
