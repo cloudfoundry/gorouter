@@ -11,6 +11,10 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/health"
 
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/uber-go/zap"
+	"github.com/urfave/negroni"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -25,9 +29,6 @@ import (
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
 )
 
 var (
@@ -110,7 +111,7 @@ func NewProxy(
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
 		BackendTemplate: &http.Transport{
-			Dial:                dialer.Dial,
+			DialContext:         dialer.DialContext,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
 			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
@@ -120,7 +121,7 @@ func NewProxy(
 			TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
 		},
 		RouteServiceTemplate: &http.Transport{
-			Dial:                dialer.Dial,
+			DialContext:         dialer.DialContext,
 			DisableKeepAlives:   cfg.DisableKeepAlives,
 			MaxIdleConns:        cfg.MaxIdleConns,
 			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport

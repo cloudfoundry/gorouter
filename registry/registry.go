@@ -393,6 +393,7 @@ func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
 	}
 	return []zap.Field{
 		zap.Stringer("uri", uri),
+		zap.String("route_service_url", endpoint.RouteServiceUrl),
 		zap.String("backend", endpoint.CanonicalAddr()),
 		zap.String("application_id", endpoint.ApplicationId),
 		zap.String("instance_id", endpoint.PrivateInstanceId),
