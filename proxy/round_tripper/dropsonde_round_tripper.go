@@ -3,8 +3,9 @@ package round_tripper
 import (
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
+
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 func NewDropsondeRoundTripper(p ProxyRoundTripper) ProxyRoundTripper {
@@ -44,7 +45,7 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool, isHttp
 	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig, isRouteService)
 
 	newTransport := &http.Transport{
-		Dial:                template.Dial,
+		DialContext:         template.DialContext,
 		DisableKeepAlives:   template.DisableKeepAlives,
 		MaxIdleConns:        template.MaxIdleConns,
 		IdleConnTimeout:     template.IdleConnTimeout,

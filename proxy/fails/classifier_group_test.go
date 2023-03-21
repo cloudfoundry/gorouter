@@ -1,16 +1,16 @@
 package fails_test
 
 import (
-	"errors"
-
+	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net"
 
-	"crypto/tls"
-
-	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 )
 
 var _ = Describe("ClassifierGroup", func() {
@@ -34,15 +34,25 @@ var _ = Describe("ClassifierGroup", func() {
 			rc := fails.RetriableClassifiers
 
 			Expect(rc.Classify(&net.OpError{Op: "dial"})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, &net.OpError{Op: "dial"}))).To(BeTrue())
 			Expect(rc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, &net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")}))).To(BeTrue())
 			Expect(rc.Classify(&net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")}))).To(BeTrue())
 			Expect(rc.Classify(errors.New("net/http: TLS handshake timeout"))).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, errors.New("net/http: TLS handshake timeout")))).To(BeTrue())
 			Expect(rc.Classify(tls.RecordHeaderError{})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, tls.RecordHeaderError{}))).To(BeTrue())
 			Expect(rc.Classify(x509.HostnameError{})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, x509.HostnameError{}))).To(BeTrue())
 			Expect(rc.Classify(x509.UnknownAuthorityError{})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, x509.UnknownAuthorityError{}))).To(BeTrue())
 			Expect(rc.Classify(x509.CertificateInvalidError{Reason: x509.Expired})).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, x509.CertificateInvalidError{Reason: x509.Expired}))).To(BeTrue())
 			Expect(rc.Classify(errors.New("i'm a potato"))).To(BeFalse())
 			Expect(rc.Classify(fails.IdempotentRequestEOFError)).To(BeTrue())
+			Expect(rc.Classify(fails.IncompleteRequestError)).To(BeTrue())
+			Expect(rc.Classify(fmt.Errorf("%w (%w)", fails.IncompleteRequestError, x509.HostnameError{}))).To(BeTrue())
 		})
 	})
 
@@ -61,6 +71,7 @@ var _ = Describe("ClassifierGroup", func() {
 			Expect(pc.Classify(x509.CertificateInvalidError{Reason: x509.Expired})).To(BeTrue())
 			Expect(pc.Classify(errors.New("i'm a potato"))).To(BeFalse())
 			Expect(pc.Classify(fails.IdempotentRequestEOFError)).To(BeTrue())
+			Expect(pc.Classify(fails.IncompleteRequestError)).To(BeTrue())
 		})
 	})
 })

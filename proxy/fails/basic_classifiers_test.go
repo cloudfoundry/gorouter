@@ -234,7 +234,8 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 	Describe("ExpiredOrNotYetValidCertFailure", func() {
 		Context("when the cert is expired or not yet valid", func() {
 			var (
-				expiredClientCert *x509.Certificate
+				expiredClientCert   *x509.Certificate
+				expiredClientCACert *x509.CertPool
 			)
 
 			BeforeEach(func() {
@@ -243,10 +244,12 @@ var _ = Describe("ErrorClassifiers - enemy tests", func() {
 				var err error
 				expiredClientCert, err = x509.ParseCertificate(block.Bytes)
 				Expect(err).NotTo(HaveOccurred())
+				expiredClientCACert = x509.NewCertPool()
+				expiredClientCACert.AddCert(expiredClientCertPool.CACert)
 			})
 
 			It("matches", func() {
-				_, err := expiredClientCert.Verify(x509.VerifyOptions{})
+				_, err := expiredClientCert.Verify(x509.VerifyOptions{Roots: expiredClientCACert})
 				Expect(fails.ExpiredOrNotYetValidCertFailure(err)).To(BeTrue())
 			})
 		})

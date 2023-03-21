@@ -291,6 +291,9 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 		EnableZipkin: true,
 	}
 
+	c.Backends.MaxAttempts = 3
+	c.RouteServiceConfig.MaxAttempts = 3
+
 	return c
 }
 
@@ -399,7 +402,7 @@ func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootCert, err := x509.ParseCertificate(rootCADER)
 	Expect(err).NotTo(HaveOccurred())
 
-	ownKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	ownKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	Expect(err).NotTo(HaveOccurred())
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)

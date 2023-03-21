@@ -20,6 +20,7 @@ var RetriableClassifiers = ClassifierGroup{
 	UntrustedCert,
 	ExpiredOrNotYetValidCertFailure,
 	IdempotentRequestEOF,
+	IncompleteRequest,
 }
 
 var FailableClassifiers = ClassifierGroup{

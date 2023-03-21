@@ -3,9 +3,10 @@ package round_tripper
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptrace"
 	"net/url"
 	"time"
 
@@ -101,7 +102,6 @@ type roundTripper struct {
 	endpointTimeout          time.Duration
 	stickySessionCookieNames config.StringSet
 	http2Enabled             bool
-	aggressiveRetries        bool
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
@@ -110,7 +110,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	var endpoint *route.Endpoint
 
 	request := originalRequest.Clone(originalRequest.Context())
-	trace := traceRequest(request)
+	request, trace := traceRequest(request)
 
 	if request.Body != nil {
 		// Temporarily disable closing of the body while in the RoundTrip function, since
@@ -145,7 +145,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
-		trace.reset()
+		trace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
@@ -165,27 +165,25 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
 			if err != nil {
-				iter.EndpointFailed(err)
+				retriable, err := rt.isRetriable(request, err, trace)
 
-				// We can retry for sure if we never obtained a connection
-				// since there is no way any data was transmitted. If retries
-				// are configured to be aggressive we will also consider
-				// requests that didn't make it past the header transmission
-				// to be retryable. Independent of that logic, idempotent
-				// requests can always be retried.
-				retriable := !trace.gotConn || (rt.aggressiveRetries && !trace.wroteHeaders) || isIdempotent(request)
 				logger.Error("backend-endpoint-failed",
 					zap.Error(err),
 					zap.Int("attempt", attempt),
 					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					zap.Bool("retriable", retriable),
 					zap.Int("num-endpoints", numberOfEndpoints),
-					zap.Bool("got-connection", trace.gotConn),
-					zap.Bool("wrote-headers", trace.wroteHeaders),
+					zap.Bool("got-connection", trace.GotConn()),
+					zap.Bool("wrote-headers", trace.WroteHeaders()),
+					zap.Bool("conn-reused", trace.ConnReused()),
+					zap.Float64("dns-lookup-time", trace.DnsTime()),
+					zap.Float64("dial-time", trace.DialTime()),
+					zap.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
+				iter.EndpointFailed(err)
+
 				if retriable {
-					logger.Debug("retriable-error", zap.Object("error", err))
 					continue
 				}
 			}
@@ -214,13 +212,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 			res, err = rt.timedRoundTrip(roundTripper, request, logger)
 			if err != nil {
+				retriable, err := rt.isRetriable(request, err, trace)
 				logger.Error(
 					"route-service-connection-failed",
 					zap.String("route-service-endpoint", request.URL.String()),
 					zap.Error(err),
+					zap.Int("attempt", attempt),
+					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+					zap.Bool("retriable", retriable),
+					zap.Int("num-endpoints", numberOfEndpoints),
+					zap.Bool("got-connection", trace.GotConn()),
+					zap.Bool("wrote-headers", trace.WroteHeaders()),
+					zap.Bool("conn-reused", trace.ConnReused()),
+					zap.Float64("dns-lookup-time", trace.DnsTime()),
+					zap.Float64("dial-time", trace.DialTime()),
+					zap.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
-				if rt.retriableClassifier.Classify(err) {
+				if retriable {
 					continue
 				}
 			}
@@ -431,29 +440,19 @@ func isIdempotent(request *http.Request) bool {
 	return false
 }
 
-type requestTracer struct {
-	gotConn      bool
-	wroteHeaders bool
-}
+func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer) (bool, error) {
+	// io.EOF errors are considered safe to retry for certain requests
+	// Replace the error here to track this state when classifying later.
+	if err == io.EOF && isIdempotent(request) {
+		err = fails.IdempotentRequestEOFError
+	}
+	// We can retry for sure if we never obtained a connection
+	// since there is no way any data was transmitted. If headers could not
+	// be written in full, the request should also be safe to retry.
+	if !trace.GotConn() || !trace.WroteHeaders() {
+		err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, err)
+	}
 
-// reset the trace data. Helpful when performing the same request again.
-func (t *requestTracer) reset() {
-	t.gotConn = false
-	t.wroteHeaders = false
-}
-
-// traceRequest attaches a httptrace.ClientTrace to the given request. The
-// returned requestTracer indicates whether certain stages of the requests
-// lifecycle have been reached.
-func traceRequest(req *http.Request) *requestTracer {
-	t := &requestTracer{}
-	req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
-		GotConn: func(info httptrace.GotConnInfo) {
-			t.gotConn = true
-		},
-		WroteHeaders: func() {
-			t.wroteHeaders = true
-		},
-	}))
-	return t
+	retriable := rt.retriableClassifier.Classify(err)
+	return retriable, err
 }

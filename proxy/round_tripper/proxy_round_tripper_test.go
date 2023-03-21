@@ -17,6 +17,9 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
+	"github.com/onsi/gomega/gbytes"
+	"github.com/uber-go/zap"
+
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
@@ -28,8 +31,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/uber-go/zap"
 
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
@@ -434,8 +435,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 
-			DescribeTable("when the backend fails with an empty reponse error (io.EOF)",
-				func(reqBody io.ReadCloser, getBodyIsNil bool, reqMethod string, headers map[string]string, expectRetry bool) {
+			DescribeTable("when the backend fails with an empty response error (io.EOF)",
+				func(reqBody io.ReadCloser, getBodyIsNil bool, reqMethod string, headers map[string]string, classify fails.ClassifierFunc, expectRetry bool) {
 					badResponse := &http.Response{
 						Header: make(map[string][]string),
 					}
@@ -453,7 +454,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						}
 					}
 
-					retriableClassifier.ClassifyStub = fails.IdempotentRequestEOF
+					retriableClassifier.ClassifyStub = classify
 					req.Method = reqMethod
 					req.Body = reqBody
 					if !getBodyIsNil {
@@ -475,51 +476,51 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
 						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 					} else {
-						Expect(err).To(Equal(io.EOF))
+						Expect(errors.Is(err, io.EOF)).To(BeTrue())
 						Expect(transport.RoundTripCallCount()).To(Equal(1))
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
 					}
 				},
 
-				Entry("POST, body is empty: does not retry", nil, true, "POST", nil, false),
-				Entry("POST, body is not empty and GetBody is non-nil: does not retry", reqBody, false, "POST", nil, false),
-				Entry("POST, body is not empty: does not retry", reqBody, true, "POST", nil, false),
-				Entry("POST, body is http.NoBody: does not retry", http.NoBody, true, "POST", nil, false),
+				Entry("POST, body is empty: does not retry", nil, true, "POST", nil, fails.IdempotentRequestEOF, false),
+				Entry("POST, body is not empty and GetBody is non-nil: does not retry", reqBody, false, "POST", nil, fails.IdempotentRequestEOF, false),
+				Entry("POST, body is not empty: does not retry", reqBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
+				Entry("POST, body is http.NoBody: does not retry", http.NoBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("POST, body is empty, X-Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, true),
-				Entry("POST, body is not empty and GetBody is non-nil, X-Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, true),
-				Entry("POST, body is not empty, X-Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, false),
-				Entry("POST, body is http.NoBody, X-Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, false),
+				Entry("POST, body is empty, X-Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+				Entry("POST, body is not empty and GetBody is non-nil, X-Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+				Entry("POST, body is not empty, X-Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+				Entry("POST, body is http.NoBody, X-Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
 
-				Entry("POST, body is empty, Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, true),
-				Entry("POST, body is not empty and GetBody is non-nil, Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"Idempotency-Key": "abc123"}, true),
-				Entry("POST, body is not empty, Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, false),
-				Entry("POST, body is http.NoBody, Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, false),
+				Entry("POST, body is empty, Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+				Entry("POST, body is not empty and GetBody is non-nil, Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+				Entry("POST, body is not empty, Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+				Entry("POST, body is http.NoBody, Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
 
-				Entry("GET, body is empty: attempts retry", nil, true, "GET", nil, true),
-				Entry("GET, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "GET", nil, true),
-				Entry("GET, body is not empty: does not retry", reqBody, true, "GET", nil, false),
-				Entry("GET, body is http.NoBody: does not retry", http.NoBody, true, "GET", nil, false),
+				Entry("GET, body is empty: attempts retry", nil, true, "GET", nil, fails.IncompleteRequest, true),
+				Entry("GET, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "GET", nil, fails.IncompleteRequest, true),
+				Entry("GET, body is not empty: does not retry", reqBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
+				Entry("GET, body is http.NoBody: does not retry", http.NoBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("TRACE, body is empty: attempts retry", nil, true, "TRACE", nil, true),
-				Entry("TRACE, body is not empty: does not retry", reqBody, true, "TRACE", nil, false),
-				Entry("TRACE, body is http.NoBody: does not retry", http.NoBody, true, "TRACE", nil, false),
-				Entry("TRACE, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "TRACE", nil, true),
+				Entry("TRACE, body is empty: attempts retry", nil, true, "TRACE", nil, fails.IncompleteRequest, true),
+				Entry("TRACE, body is not empty: does not retry", reqBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
+				Entry("TRACE, body is http.NoBody: does not retry", http.NoBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
+				Entry("TRACE, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "TRACE", nil, fails.IncompleteRequest, true),
 
-				Entry("HEAD, body is empty: attempts retry", nil, true, "HEAD", nil, true),
-				Entry("HEAD, body is not empty: does not retry", reqBody, true, "HEAD", nil, false),
-				Entry("HEAD, body is http.NoBody: does not retry", http.NoBody, true, "HEAD", nil, false),
-				Entry("HEAD, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "HEAD", nil, true),
+				Entry("HEAD, body is empty: attempts retry", nil, true, "HEAD", nil, fails.IncompleteRequest, true),
+				Entry("HEAD, body is not empty: does not retry", reqBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
+				Entry("HEAD, body is http.NoBody: does not retry", http.NoBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
+				Entry("HEAD, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "HEAD", nil, fails.IncompleteRequest, true),
 
-				Entry("OPTIONS, body is empty: attempts retry", nil, true, "OPTIONS", nil, true),
-				Entry("OPTIONS, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "OPTIONS", nil, true),
-				Entry("OPTIONS, body is not empty: does not retry", reqBody, true, "OPTIONS", nil, false),
-				Entry("OPTIONS, body is http.NoBody: does not retry", http.NoBody, true, "OPTIONS", nil, false),
+				Entry("OPTIONS, body is empty: attempts retry", nil, true, "OPTIONS", nil, fails.IncompleteRequest, true),
+				Entry("OPTIONS, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "OPTIONS", nil, fails.IncompleteRequest, true),
+				Entry("OPTIONS, body is not empty: does not retry", reqBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
+				Entry("OPTIONS, body is http.NoBody: does not retry", http.NoBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("<empty method>, body is empty: attempts retry", nil, true, "", nil, true),
-				Entry("<empty method>, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "", nil, true),
-				Entry("<empty method>, body is not empty: does not retry", reqBody, true, "", nil, false),
-				Entry("<empty method>, body is http.NoBody: does not retry", http.NoBody, true, "", nil, false),
+				Entry("<empty method>, body is empty: attempts retry", nil, true, "", nil, fails.IncompleteRequest, true),
+				Entry("<empty method>, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "", nil, fails.IncompleteRequest, true),
+				Entry("<empty method>, body is not empty: does not retry", reqBody, true, "", nil, fails.IdempotentRequestEOF, false),
+				Entry("<empty method>, body is http.NoBody: does not retry", http.NoBody, true, "", nil, fails.IdempotentRequestEOF, false),
 			)
 
 			Context("when there are no more endpoints available", func() {
