@@ -13,7 +13,6 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	nats "github.com/nats-io/nats.go"
-	"github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -78,7 +77,7 @@ var _ = Describe("Large upload", func() {
 func newEchoApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration, routeServiceUrl string) *common.TestApp {
 	app := common.NewTestApp(urls, rPort, mbusClient, nil, routeServiceUrl)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		defer ginkgo.GinkgoRecover()
+		defer GinkgoRecover()
 
 		if r.Method == http.MethodPost {
 			buf := make([]byte, 4096)
