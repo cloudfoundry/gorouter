@@ -27,7 +27,7 @@ go vet -vettool="$(command -v shadow)"
 
 # install ginkgo
 if ! [ -x "$(command -v ginkgo)" ]; then
-    go get -u github.com/onsi/ginkgo/ginkgo
+    go get -u github.com/onsi/ginkgo/v2/ginkgo
 fi
 
 echo -e "\n Formatting packages..."
