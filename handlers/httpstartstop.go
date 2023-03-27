@@ -53,7 +53,7 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	next(rw, r)
 
-	startStopEvent := factories.NewHttpStartStop(r, prw.Status(), int64(prw.Size()), events.PeerType_Server, requestID)
+	startStopEvent := factories.NewHttpStartStop(r, int32(prw.Status()), int64(prw.Size()), events.PeerType_Server, requestID)
 	startStopEvent.StartTimestamp = proto.Int64(startTime.UnixNano())
 
 	envelope, err := emitter.Wrap(startStopEvent, hh.emitter.Origin())
