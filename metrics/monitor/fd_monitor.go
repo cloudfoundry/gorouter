@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/uber-go/zap"
+
+	"code.cloudfoundry.org/gorouter/logger"
 )
 
 type FileDescriptor struct {
@@ -44,14 +45,19 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 				}
 				numFds = symlinks(fdInfo)
 			} else if runtime.GOOS == "darwin" {
-				// no /proc on MacOS, falling back to lsof
-				out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("lsof -p %v", os.Getpid())).Output()
+				fdInfo, err := ioutil.ReadDir(f.path)
 				if err != nil {
-					f.logger.Error("error-running-lsof", zap.Error(err))
-					break
+					// no /proc on MacOS, falling back to lsof
+					out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("lsof -p %v", os.Getpid())).Output()
+					if err != nil {
+						f.logger.Error("error-running-lsof", zap.Error(err))
+						break
+					}
+					lines := strings.Split(string(out), "\n")
+					numFds = len(lines) - 1 //cut the table header
+				} else {
+					numFds = symlinks(fdInfo)
 				}
-				lines := strings.Split(string(out), "\n")
-				numFds = len(lines) - 1 //cut the table header
 			}
 			if err := f.sender.SendValue("file_descriptors", float64(numFds), "file"); err != nil {
 				f.logger.Error("error-sending-file-descriptor-metric", zap.Error(err))
