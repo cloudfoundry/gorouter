@@ -2,6 +2,7 @@ package logger_test
 
 import (
 	"errors"
+	"net/http"
 
 	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/lager"
@@ -219,6 +220,55 @@ var _ = Describe("LagerAdapter", func() {
 			zapFields := zapLogger.WithArgsForCall(0)
 			Expect(zapFields).To(HaveLen(2))
 			Expect(zapFields).To(ConsistOf(zap.String("foo", "bar"), zap.String("bar", "baz")))
+		})
+	})
+
+	Describe("WithTraceInfo", func() {
+		var req *http.Request
+
+		BeforeEach(func() {
+			var err error
+			req, err = http.NewRequest("GET", "/foo", nil)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		Context("when request does not contain trace id", func() {
+			It("does not set trace and span id", func() {
+				lagerLogger = lagerLogger.WithTraceInfo(req)
+				lagerLogger.Info("test-log")
+
+				Expect(zapLogger.WithCallCount()).To(Equal(1))
+				zapFields := zapLogger.WithArgsForCall(0)
+				Expect(zapFields).To(HaveLen(0))
+			})
+		})
+
+		Context("when request contains trace id", func() {
+			It("sets trace and span id", func() {
+				req.Header.Set("X-Vcap-Request-Id", "7f461654-74d1-1ee5-8367-77d85df2cdab")
+
+				lagerLogger = lagerLogger.WithTraceInfo(req)
+				lagerLogger.Info("test-log")
+
+				zapFields := zapLogger.WithArgsForCall(0)
+				Expect(zapFields).To(HaveLen(2))
+				Expect(zapFields).To(ContainElement(zap.String("trace-id", "7f46165474d11ee5836777d85df2cdab")))
+				Expect(zapFields).To(ContainElement(zap.String("span-id", "836777d85df2cdab")))
+
+			})
+		})
+
+		Context("when request contains invalid trace id", func() {
+			It("does not set trace and span id", func() {
+				req.Header.Set("X-Vcap-Request-Id", "invalid-request-id")
+
+				lagerLogger = lagerLogger.WithTraceInfo(req)
+				lagerLogger.Info("test-log")
+
+				Expect(zapLogger.WithCallCount()).To(Equal(1))
+				zapFields := zapLogger.WithArgsForCall(0)
+				Expect(zapFields).To(HaveLen(0))
+			})
 		})
 	})
 })

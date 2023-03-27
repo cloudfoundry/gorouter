@@ -2,9 +2,17 @@ package logger
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
 
 	"code.cloudfoundry.org/lager"
+	"github.com/openzipkin/zipkin-go/idgenerator"
+	"github.com/openzipkin/zipkin-go/model"
 	"github.com/uber-go/zap"
+)
+
+const (
+	RequestIdHeader = "X-Vcap-Request-Id"
 )
 
 // LagerAdapter satisfies the lager.Logger interface with zap as the
@@ -66,6 +74,21 @@ func (l *LagerAdapter) WithData(data lager.Data) lager.Logger {
 	return &LagerAdapter{
 		originalLogger: l.originalLogger.With(dataToFields([]lager.Data{data})...),
 	}
+}
+
+func (l *LagerAdapter) WithTraceInfo(req *http.Request) lager.Logger {
+	traceIDHeader := req.Header.Get(RequestIdHeader)
+	if traceIDHeader == "" {
+		return l.WithData(nil)
+	}
+	traceHex := strings.Replace(traceIDHeader, "-", "", -1)
+	traceID, err := model.TraceIDFromHex(traceHex)
+	if err != nil {
+		return l.WithData(nil)
+	}
+
+	spanID := idgenerator.NewRandom128().SpanID(traceID)
+	return l.WithData(lager.Data{"trace-id": traceID.String(), "span-id": spanID.String()})
 }
 
 func dataToFields(data []lager.Data) []zap.Field {
