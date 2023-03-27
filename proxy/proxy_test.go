@@ -20,19 +20,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
 	"golang.org/x/net/http2"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+
+	"github.com/cloudfoundry/dropsonde/factories"
+	"github.com/cloudfoundry/sonde-go/events"
+	uuid "github.com/nu7hatch/gouuid"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
+	"github.com/uber-go/zap"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/cloudfoundry/dropsonde/factories"
-	"github.com/cloudfoundry/sonde-go/events"
-	uuid "github.com/nu7hatch/gouuid"
-	"github.com/openzipkin/zipkin-go/propagation/b3"
-	"github.com/uber-go/zap"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1057,14 +1059,17 @@ var _ = Describe("Proxy", func() {
 
 		Context("when a TLS handshake occurs", func() {
 			var nl net.Listener
-			JustBeforeEach(func() {
+			var backendCert tls.Certificate
+			BeforeEach(func() {
 				certChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "instance-id"})
-				backendCert, err := tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
+				var err error
+				backendCert, err = tls.X509KeyPair(certChain.CertPEM, certChain.PrivKeyPEM)
 				Expect(err).NotTo(HaveOccurred())
 
 				caCertPool = x509.NewCertPool()
 				caCertPool.AppendCertsFromPEM(certChain.CACertPEM)
-
+			})
+			JustBeforeEach(func() {
 				nl = test_util.RegisterConnHandler(r, "backend-with-different-instance-id", func(conn *test_util.HttpConn) {
 					_, err := http.ReadRequest(conn.Reader)
 					Expect(err).To(HaveOccurred())
@@ -1079,6 +1084,7 @@ var _ = Describe("Proxy", func() {
 						Certificates: []tls.Certificate{backendCert},
 					},
 				})
+
 			})
 
 			AfterEach(func() {
