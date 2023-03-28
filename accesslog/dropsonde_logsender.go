@@ -11,8 +11,8 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/gogo/protobuf/proto"
 	"github.com/uber-go/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type DropsondeLogSender struct {

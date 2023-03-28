@@ -5,9 +5,9 @@ import (
 
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/gogo/protobuf/proto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/protobuf/proto"
 )
 
 const (

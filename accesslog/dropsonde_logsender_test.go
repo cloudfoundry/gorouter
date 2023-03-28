@@ -6,9 +6,9 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	loggerFakes "code.cloudfoundry.org/gorouter/logger/fakes"
-	"github.com/gogo/protobuf/proto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/protobuf/proto"
 )
 
 //go:generate counterfeiter -o fakes/eventemitter.go github.com/cloudfoundry/dropsonde.EventEmitter
