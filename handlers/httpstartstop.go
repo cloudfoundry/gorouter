@@ -10,10 +10,10 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/gogo/protobuf/proto"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
+	"google.golang.org/protobuf/proto"
 )
 
 type httpStartStopHandler struct {
