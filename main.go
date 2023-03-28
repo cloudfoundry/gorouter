@@ -30,7 +30,7 @@ import (
 	"code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/v3"
 	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/uaaclient"
 	"code.cloudfoundry.org/tlsconfig"
