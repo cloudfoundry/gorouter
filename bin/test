@@ -34,16 +34,14 @@ echo -e "\n Formatting packages..."
 go fmt ./...
 
 if ginkgo \
-  -keepGoing \
+  -keep-going \
   -trace \
-  -progress \
   -r \
-  -failOnPending \
-  -randomizeAllSpecs \
+  -fail-on-pending \
+  -randomize-all \
   -p \
   -race \
   -timeout 20m \
-  -slowSpecThreshold 20 \
   "$@"; then
     echo -e "\nSWEET SUITE SUCCESS"
 else
