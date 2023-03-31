@@ -92,6 +92,12 @@ func traceRequest(req *http.Request) (*http.Request, *requestTracer) {
 		GotConn: func(info httptrace.GotConnInfo) {
 			t.gotConn.Store(true)
 			t.connInfo.Store(&info)
+			if !info.Reused {
+				// FIXME: workaround for https://github.com/golang/go/issues/59310
+				// This gives net/http: Transport.persistConn.readLoop the time possibly mark the connection
+				// as broken before roundtrip starts.
+				time.Sleep(500 * time.Microsecond)
+			}
 		},
 		DNSStart: func(_ httptrace.DNSStartInfo) {
 			t.tDNSStart.Store(time.Now().UnixNano())
