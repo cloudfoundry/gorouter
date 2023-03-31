@@ -724,6 +724,35 @@ var _ = Describe("Proxy", func() {
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
+
+		It("retries on POST requests if nothing was written", func() {
+			bad1 := test_util.RegisterConnHandler(r, "retry-test", func(conn *test_util.HttpConn) {
+				conn.Close()
+			})
+			defer bad1.Close()
+			bad2 := test_util.RegisterConnHandler(r, "retry-test", func(conn *test_util.HttpConn) {
+				conn.Close()
+			})
+			defer bad2.Close()
+			good := test_util.RegisterConnHandler(r, "retry-test", func(conn *test_util.HttpConn) {
+				_, err := http.ReadRequest(conn.Reader)
+				Expect(err).NotTo(HaveOccurred())
+
+				resp := test_util.NewResponse(http.StatusOK)
+				conn.WriteResponse(resp)
+				conn.Close()
+			})
+			defer good.Close()
+
+			conn := dialProxy(proxyServer)
+
+			req := test_util.NewRequest("POST", "retry-test", "/", strings.NewReader("some body"))
+			conn.WriteRequest(req)
+
+			resp, _ := conn.ReadResponse()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+
 	})
 
 	Describe("HTTP Rewrite", func() {
