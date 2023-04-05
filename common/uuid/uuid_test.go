@@ -2,7 +2,7 @@ package uuid_test
 
 import (
 	"code.cloudfoundry.org/gorouter/common/uuid"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

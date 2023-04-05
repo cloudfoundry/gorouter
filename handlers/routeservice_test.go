@@ -19,7 +19,7 @@ import (
 	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"
 )

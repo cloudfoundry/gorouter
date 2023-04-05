@@ -1,7 +1,7 @@
 package test_util
 
 import (
-	. "github.com/onsi/ginkgo/config"
+	. "github.com/onsi/ginkgo/v2"
 
 	"sync"
 )
@@ -19,10 +19,11 @@ func NextAvailPort() uint16 {
 	if lastPortUsed == 0 {
 		once.Do(func() {
 			const portRangeStart = 25000
-			lastPortUsed = portRangeStart + GinkgoConfig.ParallelNode
+			lastPortUsed = portRangeStart + GinkgoParallelNode()
 		})
 	}
 
-	lastPortUsed += GinkgoConfig.ParallelTotal
+	suiteCfg, _ := GinkgoConfiguration()
+	lastPortUsed += suiteCfg.ParallelTotal
 	return uint16(lastPortUsed)
 }

@@ -10,7 +10,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 
 	"code.cloudfoundry.org/gorouter/route"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

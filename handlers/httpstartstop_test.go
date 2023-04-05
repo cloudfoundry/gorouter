@@ -18,7 +18,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/sonde-go/events"
 	gouuid "github.com/nu7hatch/gouuid"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"
 )

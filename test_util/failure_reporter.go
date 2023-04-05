@@ -2,10 +2,11 @@ package test_util
 
 import (
 	"fmt"
-	"github.com/cloudfoundry/custom-cats-reporters/honeycomb/client"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
 	"strings"
+
+	"github.com/cloudfoundry/custom-cats-reporters/honeycomb/client"
+	"github.com/onsi/ginkgo/v2/config"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 type FailureReporter struct {
@@ -36,12 +37,15 @@ func (fr FailureReporter) SpecDidComplete(ss *types.SpecSummary) {
 	}
 }
 
+func (fr FailureReporter) SuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
+}
 func (fr FailureReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 }
 func (fr FailureReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
 func (fr FailureReporter) SpecWillRun(specSummary *types.SpecSummary)         {}
 func (fr FailureReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary)  {}
 func (fr FailureReporter) SpecSuiteDidEnd(summary *types.SuiteSummary)        {}
+func (fr FailureReporter) SuiteDidEnd(summary *types.SuiteSummary)            {}
 
 func getTestState(state types.SpecState) string {
 	switch state {
@@ -55,7 +59,7 @@ func getTestState(state types.SpecState) string {
 		return "skipped"
 	case types.SpecStatePanicked:
 		return "panicked"
-	case types.SpecStateTimedOut:
+	case types.SpecStateTimedout:
 		return "timedOut"
 	case types.SpecStateInvalid:
 		return "invalid"

@@ -19,7 +19,7 @@ import (
 	test_uaa_client "code.cloudfoundry.org/routing-api/uaaclient/fakes"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"

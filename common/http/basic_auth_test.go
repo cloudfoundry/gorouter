@@ -2,7 +2,7 @@ package http_test
 
 import (
 	. "code.cloudfoundry.org/gorouter/common/http"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"net"

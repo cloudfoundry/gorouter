@@ -14,7 +14,7 @@ import (
 	iter "code.cloudfoundry.org/gorouter/route/fakes"
 	"code.cloudfoundry.org/gorouter/test_util"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 )
