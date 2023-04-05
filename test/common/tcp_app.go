@@ -1,16 +1,17 @@
 package common
 
 import (
+	"encoding/json"
+	"fmt"
+	"net"
+	"sync"
+
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"encoding/json"
-	"fmt"
 	nats "github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"net"
-	"sync"
 )
 
 type TcpApp struct {
