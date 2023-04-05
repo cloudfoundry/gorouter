@@ -30,7 +30,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

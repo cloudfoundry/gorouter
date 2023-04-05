@@ -7,7 +7,7 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	loggerFakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"github.com/gogo/protobuf/proto"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

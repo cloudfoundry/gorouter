@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/uber-go/zap"
 )

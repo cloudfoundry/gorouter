@@ -5,7 +5,7 @@ import (
 
 	commonhttp "code.cloudfoundry.org/gorouter/common/http"
 	httpfakes "code.cloudfoundry.org/gorouter/common/http/fakes"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

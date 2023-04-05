@@ -9,7 +9,7 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

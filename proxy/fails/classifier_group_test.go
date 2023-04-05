@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"net"
 
-	. "github.com/onsi/ginkgo"
+	"code.cloudfoundry.org/gorouter/proxy/fails"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"code.cloudfoundry.org/gorouter/proxy/fails"
