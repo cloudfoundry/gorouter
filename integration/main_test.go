@@ -729,7 +729,7 @@ var _ = Describe("Router Integration", func() {
 			response, err := ioutil.ReadAll(r.Body)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(string(response)).To(ContainSubstring("process_resident_memory_bytes"))
+			Expect(string(response)).To(ContainSubstring("promhttp_metric_handler_errors_total"))
 		})
 	})
 
