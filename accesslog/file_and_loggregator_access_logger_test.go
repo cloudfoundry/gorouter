@@ -488,13 +488,12 @@ func CreateAccessLogRecord() *schema.AccessLogRecord {
 	})
 
 	r := schema.AccessLogRecord{
-		Request:             req,
-		StatusCode:          res.StatusCode,
-		RouteEndpoint:       b,
-		RoundtripStartedAt:  time.Unix(10, 100000000),
-		FirstByteAt:         time.Unix(10, 200000000),
-		RoundtripFinishedAt: time.Unix(10, 300000000),
-		BodyBytesSent:       42,
+		Request:       req,
+		StatusCode:    res.StatusCode,
+		RouteEndpoint: b,
+		ReceivedAt:    time.Unix(10, 100000000),
+		FinishedAt:    time.Unix(10, 300000000),
+		BodyBytesSent: 42,
 	}
 
 	return &r

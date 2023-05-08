@@ -136,6 +136,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
 	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
 
+	// The selectEndpointErr needs to be tracked separately. If we get an error
+	// while selecting an endpoint we might just have run out of routes. In
+	// such cases the last error that was returned by the round trip should be
+	// used to produce a 502 instead of the error returned from selecting the
+	// endpoint which would result in a 404 Not Found.
 	var selectEndpointErr error
 	var maxAttempts int
 	if reqInfo.RouteServiceURL == nil {
@@ -143,8 +148,13 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	} else {
 		maxAttempts = rt.maxRouteServiceAttempts
 	}
+
+	reqInfo.AppRequestStartedAt = time.Now()
+
 	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
+
+		// Reset the trace to prepare for new times and prevent old data from polluting our results.
 		trace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
@@ -165,6 +175,8 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
 			if err != nil {
+				reqInfo.FailedAttempts++
+				reqInfo.LastFailedAttemptFinishedAt = time.Now()
 				retriable, err := rt.isRetriable(request, err, trace)
 
 				logger.Error("backend-endpoint-failed",
@@ -212,7 +224,10 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 			res, err = rt.timedRoundTrip(roundTripper, request, logger)
 			if err != nil {
+				reqInfo.FailedAttempts++
+				reqInfo.LastFailedAttemptFinishedAt = time.Now()
 				retriable, err := rt.isRetriable(request, err, trace)
+
 				logger.Error(
 					"route-service-connection-failed",
 					zap.String("route-service-endpoint", request.URL.String()),
@@ -246,7 +261,23 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		}
 	}
 
-	reqInfo.StoppedAt = time.Now()
+	// three possible cases:
+	// err == nil && selectEndpointErr == nil
+	//   => all good, separate LastFailedAttemptFinishedAt and
+	//      AppRequestFinishedAt (else case)
+	// err == nil && selectEndpointErr != nil
+	//   => we failed on the first attempt to find an endpoint so 404 it is,
+	//      no LastFailedAttemptFinishedAt, AppRequestFinishedAt is set for
+	//      completeness (else case)
+	// err != nil
+	//   => unable to complete round trip (possibly after multiple tries)
+	//      so 502 and AppRequestFinishedAt and LastFailedAttemptFinishedAt
+	//      must be identical (first if-branch).
+	if err != nil {
+		reqInfo.AppRequestFinishedAt = reqInfo.LastFailedAttemptFinishedAt
+	} else {
+		reqInfo.AppRequestFinishedAt = time.Now()
+	}
 
 	// if the client disconnects before response is sent then return context.Canceled (499) instead of the gateway error
 	if err != nil && originalRequest.Context().Err() == context.Canceled && err != context.Canceled {
@@ -255,15 +286,26 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		originalRequest.Body.Close()
 	}
 
-	finalErr := err
-	if finalErr == nil {
-		finalErr = selectEndpointErr
+	// If we have an error from the round trip, we prefer it over errors
+	// returned from selecting the endpoint, see declaration of
+	// selectEndpointErr for details.
+	if err == nil {
+		err = selectEndpointErr
 	}
 
-	if finalErr != nil {
-		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, finalErr)
-		return nil, finalErr
+	if err != nil {
+		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
+		return nil, err
 	}
+
+	// Record the times from the last attempt, but only if it succeeded.
+	reqInfo.DnsStartedAt = trace.DnsStart()
+	reqInfo.DnsFinishedAt = trace.DnsDone()
+	reqInfo.DialStartedAt = trace.DialStart()
+	reqInfo.DialFinishedAt = trace.DialDone()
+	reqInfo.TlsHandshakeStartedAt = trace.TlsStart()
+	reqInfo.TlsHandshakeFinishedAt = trace.TlsDone()
+
 	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.secureCookies,

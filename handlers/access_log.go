@@ -17,9 +17,10 @@ import (
 )
 
 type accessLog struct {
-	accessLogger      accesslog.AccessLogger
-	extraHeadersToLog []string
-	logger            logger.Logger
+	accessLogger       accesslog.AccessLogger
+	extraHeadersToLog  []string
+	logAttemptsDetails bool
+	logger             logger.Logger
 }
 
 // NewAccessLog creates a new handler that handles logging requests to the
@@ -27,12 +28,14 @@ type accessLog struct {
 func NewAccessLog(
 	accessLogger accesslog.AccessLogger,
 	extraHeadersToLog []string,
+	logAttemptsDetails bool,
 	logger logger.Logger,
 ) negroni.Handler {
 	return &accessLog{
-		accessLogger:      accessLogger,
-		extraHeadersToLog: extraHeadersToLog,
-		logger:            logger,
+		accessLogger:       accessLogger,
+		extraHeadersToLog:  extraHeadersToLog,
+		logAttemptsDetails: logAttemptsDetails,
+		logger:             logger,
 	}
 }
 
@@ -40,8 +43,9 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 
 	alr := &schema.AccessLogRecord{
-		Request:           r,
-		ExtraHeadersToLog: a.extraHeadersToLog,
+		Request:            r,
+		ExtraHeadersToLog:  a.extraHeadersToLog,
+		LogAttemptsDetails: a.logAttemptsDetails,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}
@@ -55,16 +59,27 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		return
 	}
 
-	alr.RoundtripStartedAt = reqInfo.StartedAt
-	alr.RoundtripFinishedAt = time.Now()
-	alr.AppRequestStartedAt = reqInfo.AppRequestStartedAt
-	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
+	reqInfo.FinishedAt = time.Now()
+
 	alr.HeadersOverride = reqInfo.BackendReqHeaders
 	alr.RouteEndpoint = reqInfo.RouteEndpoint
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
 	alr.BodyBytesSent = proxyWriter.Size()
 	alr.StatusCode = proxyWriter.Status()
 	alr.RouterError = proxyWriter.Header().Get(router_http.CfRouterError)
+	alr.FailedAttempts = reqInfo.FailedAttempts
+
+	alr.ReceivedAt = reqInfo.ReceivedAt
+	alr.AppRequestStartedAt = reqInfo.AppRequestStartedAt
+	alr.LastFailedAttemptFinishedAt = reqInfo.LastFailedAttemptFinishedAt
+	alr.DnsStartedAt = reqInfo.DnsStartedAt
+	alr.DnsFinishedAt = reqInfo.DnsFinishedAt
+	alr.DialStartedAt = reqInfo.DialStartedAt
+	alr.DialFinishedAt = reqInfo.DialFinishedAt
+	alr.TlsHandshakeStartedAt = reqInfo.TlsHandshakeStartedAt
+	alr.TlsHandshakeFinishedAt = reqInfo.TlsHandshakeFinishedAt
+	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
+	alr.FinishedAt = reqInfo.FinishedAt
 
 	a.accessLogger.Log(*alr)
 }

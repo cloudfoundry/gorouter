@@ -45,11 +45,11 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 	rh.reporter.CaptureRoutingResponse(proxyWriter.Status())
 
-	if requestInfo.StoppedAt.Equal(time.Time{}) {
+	if requestInfo.AppRequestFinishedAt.Equal(time.Time{}) {
 		return
 	}
 	rh.reporter.CaptureRoutingResponseLatency(
 		requestInfo.RouteEndpoint, proxyWriter.Status(),
-		requestInfo.StartedAt, requestInfo.StoppedAt.Sub(requestInfo.StartedAt),
+		requestInfo.ReceivedAt, requestInfo.AppRequestFinishedAt.Sub(requestInfo.ReceivedAt),
 	)
 }

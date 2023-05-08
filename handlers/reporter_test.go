@@ -50,7 +50,7 @@ var _ = Describe("Reporter Handler", func() {
 			reqInfo, err := handlers.ContextRequestInfo(req)
 			Expect(err).NotTo(HaveOccurred())
 			reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{AppId: "appID", PrivateInstanceIndex: "1", PrivateInstanceId: "id"})
-			reqInfo.StoppedAt = time.Now()
+			reqInfo.AppRequestFinishedAt = time.Now()
 
 			nextCalled = true
 		})
@@ -128,7 +128,7 @@ var _ = Describe("Reporter Handler", func() {
 
 				reqInfo, err := handlers.ContextRequestInfo(req)
 				Expect(err).NotTo(HaveOccurred())
-				reqInfo.StoppedAt = time.Now()
+				reqInfo.AppRequestFinishedAt = time.Now()
 			})
 		})
 		It("does not emit routing response metrics", func() {

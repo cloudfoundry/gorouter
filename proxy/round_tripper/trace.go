@@ -13,12 +13,14 @@ type requestTracer struct {
 	gotConn      atomic.Bool
 	connInfo     atomic.Pointer[httptrace.GotConnInfo]
 	wroteHeaders atomic.Bool
-	tDNSStart    atomic.Int64
-	tDNSDone     atomic.Int64
-	tDialStart   atomic.Int64
-	tDialDone    atomic.Int64
-	tTLSStart    atomic.Int64
-	tTLSDone     atomic.Int64
+
+	// all times are stored as returned by time.Time{}.UnixNano()
+	dnsStart  atomic.Int64
+	dnsDone   atomic.Int64
+	dialStart atomic.Int64
+	dialDone  atomic.Int64
+	tlsStart  atomic.Int64
+	tlsDone   atomic.Int64
 }
 
 // Reset the trace data. Helpful when performing the same request again.
@@ -26,12 +28,12 @@ func (t *requestTracer) Reset() {
 	t.gotConn.Store(false)
 	t.connInfo.Store(nil)
 	t.wroteHeaders.Store(false)
-	t.tDNSStart.Store(0)
-	t.tDNSDone.Store(0)
-	t.tDialStart.Store(0)
-	t.tDialDone.Store(0)
-	t.tTLSStart.Store(0)
-	t.tTLSDone.Store(0)
+	t.dnsStart.Store(0)
+	t.dnsDone.Store(0)
+	t.dialStart.Store(0)
+	t.dialDone.Store(0)
+	t.tlsStart.Store(0)
+	t.tlsDone.Store(0)
 }
 
 // GotConn returns true if a connection (TCP + TLS) to the backend was established on the traced request.
@@ -54,33 +56,61 @@ func (t *requestTracer) ConnReused() bool {
 	return false
 }
 
-// timeDelta returns the duration from t1 to t2.
-// t1 and t2 are expected to be derived from time.UnixNano()
-// it returns -1 if the duration isn't positive.
-func timeDelta(t1, t2 int64) float64 {
-	d := float64(t2-t1) / float64(time.Second)
-	if d < 0 {
-		d = -1
-	}
-	return d
+func (t *requestTracer) DnsStart() time.Time {
+	return time.Unix(0, t.dnsStart.Load())
+}
+
+func (t *requestTracer) DnsDone() time.Time {
+	return time.Unix(0, t.dnsDone.Load())
+}
+
+func (t *requestTracer) DialStart() time.Time {
+	return time.Unix(0, t.dialStart.Load())
+}
+
+func (t *requestTracer) DialDone() time.Time {
+	return time.Unix(0, t.dialDone.Load())
+}
+
+func (t *requestTracer) TlsStart() time.Time {
+	return time.Unix(0, t.tlsStart.Load())
+}
+
+func (t *requestTracer) TlsDone() time.Time {
+	return time.Unix(0, t.tlsDone.Load())
 }
 
 // DnsTime returns the time taken for the DNS lookup of the traced request.
-// in error cases the time will be set to -1.
+// If the time can't be calculated -1 is returned.
 func (t *requestTracer) DnsTime() float64 {
-	return timeDelta(t.tDNSStart.Load(), t.tDNSDone.Load())
+	s := t.DnsDone().Sub(t.DnsStart()).Seconds()
+	if s < 0 {
+		return -1
+	} else {
+		return s
+	}
 }
 
 // DialTime returns the time taken for the TCP handshake of the traced request.
-// in error cases the time will be set to -1.
+// If the time can't be calculated -1 is returned.
 func (t *requestTracer) DialTime() float64 {
-	return timeDelta(t.tDialStart.Load(), t.tDialDone.Load())
+	s := t.DialDone().Sub(t.DialStart()).Seconds()
+	if s < 0 {
+		return -1
+	} else {
+		return s
+	}
 }
 
 // TlsTime returns the time taken for the TLS handshake of the traced request.
-// in error cases the time will be set to -1.
+// If the time can't be calculated -1 is returned.
 func (t *requestTracer) TlsTime() float64 {
-	return timeDelta(t.tTLSStart.Load(), t.tTLSDone.Load())
+	s := t.TlsDone().Sub(t.TlsStart()).Seconds()
+	if s < 0 {
+		return -1
+	} else {
+		return s
+	}
 }
 
 // traceRequest attaches a httptrace.ClientTrace to the given request. The
@@ -102,22 +132,22 @@ func traceRequest(req *http.Request) (*http.Request, *requestTracer) {
 			// }
 		},
 		DNSStart: func(_ httptrace.DNSStartInfo) {
-			t.tDNSStart.Store(time.Now().UnixNano())
+			t.dnsStart.Store(time.Now().UnixNano())
 		},
 		DNSDone: func(_ httptrace.DNSDoneInfo) {
-			t.tDNSDone.Store(time.Now().UnixNano())
+			t.dnsDone.Store(time.Now().UnixNano())
 		},
 		ConnectStart: func(_, _ string) {
-			t.tDialStart.Store(time.Now().UnixNano())
+			t.dialStart.Store(time.Now().UnixNano())
 		},
 		ConnectDone: func(_, _ string, _ error) {
-			t.tDialDone.Store(time.Now().UnixNano())
+			t.dialDone.Store(time.Now().UnixNano())
 		},
 		TLSHandshakeStart: func() {
-			t.tTLSStart.Store(time.Now().UnixNano())
+			t.tlsStart.Store(time.Now().UnixNano())
 		},
 		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
-			t.tTLSDone.Store(time.Now().UnixNano())
+			t.tlsDone.Store(time.Now().UnixNano())
 		},
 		WroteHeaders: func() {
 			t.wroteHeaders.Store(true)

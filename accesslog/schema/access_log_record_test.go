@@ -53,8 +53,8 @@ var _ = Describe("AccessLogRecord", func() {
 			BodyBytesSent:        23,
 			StatusCode:           200,
 			RouteEndpoint:        endpoint,
-			RoundtripStartedAt:   time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-			RoundtripFinishedAt:  time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+			ReceivedAt:           time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
 			AppRequestStartedAt:  time.Date(2000, time.January, 1, 0, 0, 5, 0, time.UTC),
 			AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 			RequestBytesReceived: 30,
@@ -222,7 +222,7 @@ var _ = Describe("AccessLogRecord", func() {
 				}
 				record.BodyBytesSent = 0
 				record.StatusCode = 0
-				record.RoundtripFinishedAt = time.Time{}
+				record.FinishedAt = time.Time{}
 				record.AppRequestFinishedAt = time.Time{}
 				record.RequestBytesReceived = 0
 				record.RouterError = ""
@@ -294,8 +294,8 @@ var _ = Describe("AccessLogRecord", func() {
 					BodyBytesSent:        23,
 					StatusCode:           200,
 					RouteEndpoint:        endpoint,
-					RoundtripStartedAt:   time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
-					RoundtripFinishedAt:  time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
+					ReceivedAt:           time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+					FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
 					AppRequestStartedAt:  time.Date(2000, time.January, 1, 0, 0, 5, 0, time.UTC),
 					AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 					RequestBytesReceived: 30,
@@ -416,6 +416,89 @@ var _ = Describe("AccessLogRecord", func() {
 			It("returns the application ID", func() {
 				Expect(emptyRecord.ApplicationID()).To(Equal("FakeApplicationId"))
 			})
+		})
+	})
+
+	Describe("AttemptsDetails", func() {
+		It("does not add fields if set to false", func() {
+			record.LogAttemptsDetails = false
+			record.FailedAttempts = 4
+			record.AppRequestStartedAt = time.Now().Add(-time.Second)
+			record.AppRequestFinishedAt = time.Now()
+
+			var b bytes.Buffer
+			_, err := record.WriteTo(&b)
+			Expect(err).ToNot(HaveOccurred())
+
+			r := string(b.Bytes())
+
+			Expect(r).ToNot(ContainSubstring("failed_attempts"))
+			Expect(r).ToNot(ContainSubstring("failed_attempts_time"))
+			Expect(r).ToNot(ContainSubstring("dns_time"))
+			Expect(r).ToNot(ContainSubstring("dial_time"))
+			Expect(r).ToNot(ContainSubstring("tls_time"))
+			Expect(r).ToNot(ContainSubstring("backend_time"))
+		})
+
+		It("adds all fields if set to true", func() {
+			record.LogAttemptsDetails = true
+			record.FailedAttempts = 4
+			start := time.Now()
+			record.ReceivedAt = start.Add(1 * time.Second)
+			record.AppRequestStartedAt = start.Add(2 * time.Second)
+			record.LastFailedAttemptFinishedAt = start.Add(3 * time.Second)
+			record.DnsStartedAt = start.Add(4 * time.Second)
+			record.DnsFinishedAt = start.Add(5 * time.Second)
+			record.DialStartedAt = start.Add(6 * time.Second)
+			record.DialFinishedAt = start.Add(7 * time.Second)
+			record.TlsHandshakeStartedAt = start.Add(8 * time.Second)
+			record.TlsHandshakeFinishedAt = start.Add(9 * time.Second)
+			record.AppRequestFinishedAt = start.Add(10 * time.Second)
+			record.FinishedAt = start.Add(11 * time.Second)
+
+			var b bytes.Buffer
+			_, err := record.WriteTo(&b)
+			Expect(err).ToNot(HaveOccurred())
+
+			r := string(b.Bytes())
+
+			Expect(r).To(ContainSubstring("failed_attempts:4"))
+			Expect(r).To(ContainSubstring("failed_attempts_time:1.0"))
+			Expect(r).To(ContainSubstring("dns_time:1.0"))
+			Expect(r).To(ContainSubstring("dial_time:1.0"))
+			Expect(r).To(ContainSubstring("tls_time:1.0"))
+			Expect(r).To(ContainSubstring("backend_time:7.0"))
+		})
+
+		It("adds all appropriate empty values if fields are unset", func() {
+			record.LogAttemptsDetails = true
+			record.FailedAttempts = 0
+
+			var b bytes.Buffer
+			_, err := record.WriteTo(&b)
+			Expect(err).ToNot(HaveOccurred())
+
+			r := string(b.Bytes())
+
+			Expect(r).To(ContainSubstring(`failed_attempts:0`))
+			Expect(r).To(ContainSubstring(`failed_attempts_time:"-"`))
+			Expect(r).To(ContainSubstring(`dns_time:"-"`))
+			Expect(r).To(ContainSubstring(`dial_time:"-"`))
+			Expect(r).To(ContainSubstring(`tls_time:"-"`))
+		})
+
+		It("adds a '-' if there was no successful attempt", func() {
+			record.LogAttemptsDetails = true
+			record.FailedAttempts = 1
+			record.LastFailedAttemptFinishedAt = record.AppRequestFinishedAt
+
+			var b bytes.Buffer
+			_, err := record.WriteTo(&b)
+			Expect(err).ToNot(HaveOccurred())
+
+			r := string(b.Bytes())
+
+			Expect(r).To(ContainSubstring(`backend_time:"-"`))
 		})
 	})
 })

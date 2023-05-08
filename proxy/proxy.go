@@ -177,7 +177,7 @@ func NewProxy(
 			n.Use(handlers.NewHTTPLatencyPrometheus(p.promRegistry))
 		}
 	}
-	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, logger))
+	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, cfg.Logging.EnableAttemptsDetails, logger))
 	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
@@ -280,9 +280,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		return
 	}
 
-	reqInfo.AppRequestStartedAt = time.Now()
 	next(responseWriter, request)
-	reqInfo.AppRequestFinishedAt = time.Now()
 }
 
 func (p *proxy) setupProxyRequest(target *http.Request) {

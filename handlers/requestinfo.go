@@ -18,15 +18,47 @@ type key string
 const RequestInfoCtxKey key = "RequestInfo"
 
 // RequestInfo stores all metadata about the request and is used to pass
-// informaton between handlers
+// information between handlers. The timing information is ordered by time of
+// occurrence.
 type RequestInfo struct {
-	StartedAt, StoppedAt                      time.Time
-	AppRequestStartedAt, AppRequestFinishedAt time.Time
-	RoutePool                                 *route.EndpointPool
-	RouteEndpoint                             *route.Endpoint
-	ProxyResponseWriter                       utils.ProxyResponseWriter
-	RouteServiceURL                           *url.URL
-	ShouldRouteToInternalRouteService         bool
+	// ReceivedAt records the time at which this request was received by
+	// gorouter as recorded in the RequestInfo middleware.
+	ReceivedAt time.Time
+	// AppRequestStartedAt records the time at which gorouter starts sending
+	// the request to the backend.
+	AppRequestStartedAt time.Time
+	// LastFailedAttemptFinishedAt is the end of the last failed request,
+	// if any. If there was at least one failed attempt this will be set, if
+	// there was no successful attempt this value will equal
+	// AppRequestFinishedAt.
+	LastFailedAttemptFinishedAt time.Time
+
+	// These times document at which timestamps the individual phases of the
+	// request started / finished if there was a successful attempt.
+	DnsStartedAt           time.Time
+	DnsFinishedAt          time.Time
+	DialStartedAt          time.Time
+	DialFinishedAt         time.Time
+	TlsHandshakeStartedAt  time.Time
+	TlsHandshakeFinishedAt time.Time
+
+	// AppRequestFinishedAt records the time at which either a response was
+	// received or the last performed attempt failed and no further attempts
+	// could be made.
+	AppRequestFinishedAt time.Time
+
+	// FinishedAt is recorded once the access log middleware is executed after
+	// performing the request, in contrast to the ReceivedAt value which is
+	// recorded before the access log, but we need the value to be able to
+	// produce the log.
+	FinishedAt time.Time
+
+	RoutePool                         *route.EndpointPool
+	RouteEndpoint                     *route.Endpoint
+	ProxyResponseWriter               utils.ProxyResponseWriter
+	RouteServiceURL                   *url.URL
+	ShouldRouteToInternalRouteService bool
+	FailedAttempts                    int
 
 	BackendReqHeaders http.Header
 }
@@ -48,7 +80,7 @@ func NewRequestInfo() negroni.Handler {
 func (r *RequestInfoHandler) ServeHTTP(w http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	reqInfo := new(RequestInfo)
 	req = req.WithContext(context.WithValue(req.Context(), RequestInfoCtxKey, reqInfo))
-	reqInfo.StartedAt = time.Now()
+	reqInfo.ReceivedAt = time.Now()
 	next(w, req)
 }
 
