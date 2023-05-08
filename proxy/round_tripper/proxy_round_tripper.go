@@ -441,6 +441,11 @@ func isIdempotent(request *http.Request) bool {
 }
 
 func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer) (bool, error) {
+	// if the context has been cancelled we do not perform further retries
+	if request.Context().Err() != nil {
+		return false, fmt.Errorf("%w (%w)", request.Context().Err(), err)
+	}
+
 	// io.EOF errors are considered safe to retry for certain requests
 	// Replace the error here to track this state when classifying later.
 	if err == io.EOF && isIdempotent(request) {
