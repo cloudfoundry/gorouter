@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -27,6 +28,44 @@ var _ = Describe("Retries", func() {
 		if testState != nil {
 			testState.StopAndCleanup()
 		}
+	})
+
+	Context("when gorouter is called by a bad client", func() {
+		var appURL string
+		var app *common.TestApp
+
+		BeforeEach(func() {
+			appURL = "bad-app." + test_util.LocalhostDNS
+
+			app = common.NewTestApp([]route.Uri{route.Uri(appURL)}, testState.cfg.Port, testState.mbusClient, nil, "")
+			app.TlsRegister(testState.trustedBackendServerCertSAN)
+
+			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			})
+
+			err := app.TlsListen(testState.trustedBackendTLSConfig)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			app.Stop()
+		})
+
+		It("does not prune the endpoint on context cancelled", func() {
+			conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", appURL, testState.cfg.Port))
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = conn.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", appURL)))
+			Expect(err).ToNot(HaveOccurred())
+
+			_ = conn.Close()
+
+			Consistently(func() bool {
+				res, err := testState.client.Do(testState.newRequest("http://" + appURL))
+				return err == nil && res.StatusCode == http.StatusTeapot
+			}).Should(Equal(true))
+		})
 	})
 
 	Context("when gorouter talks to a broken app behind envoy", func() {
