@@ -24,11 +24,27 @@ var RetriableClassifiers = ClassifierGroup{
 }
 
 var FailableClassifiers = ClassifierGroup{
-	RetriableClassifiers,
+	Dial,
+	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
+	RemoteFailedCertCheck,
+	RemoteHandshakeFailure,
+	RemoteHandshakeTimeout,
+	UntrustedCert,
+	ExpiredOrNotYetValidCertFailure,
 	ConnectionResetOnRead,
 }
 
-var PrunableClassifiers = RetriableClassifiers
+var PrunableClassifiers = ClassifierGroup{
+	Dial,
+	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
+	RemoteFailedCertCheck,
+	RemoteHandshakeFailure,
+	RemoteHandshakeTimeout,
+	UntrustedCert,
+	ExpiredOrNotYetValidCertFailure,
+}
 
 // Classify returns true on errors that are retryable
 func (cg ClassifierGroup) Classify(err error) bool {

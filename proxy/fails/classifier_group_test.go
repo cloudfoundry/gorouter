@@ -56,7 +56,7 @@ var _ = Describe("ClassifierGroup", func() {
 	})
 
 	Describe("prunable", func() {
-		It("matches hostname mismatch", func() {
+		It("matches prunable errors", func() {
 			pc := fails.PrunableClassifiers
 
 			Expect(pc.Classify(&net.OpError{Op: "dial"})).To(BeTrue())
@@ -69,8 +69,6 @@ var _ = Describe("ClassifierGroup", func() {
 			Expect(pc.Classify(x509.UnknownAuthorityError{})).To(BeTrue())
 			Expect(pc.Classify(x509.CertificateInvalidError{Reason: x509.Expired})).To(BeTrue())
 			Expect(pc.Classify(errors.New("i'm a potato"))).To(BeFalse())
-			Expect(pc.Classify(fails.IdempotentRequestEOFError)).To(BeTrue())
-			Expect(pc.Classify(fails.IncompleteRequestError)).To(BeTrue())
 		})
 	})
 })
