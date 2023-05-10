@@ -26,6 +26,11 @@ var RetriableClassifiers = ClassifierGroup{
 	ExpiredOrNotYetValidCertFailure,
 }
 
+// FailableClassifiers match all errors that should result in the endpoint
+// being marked as failed and taken out of the available pool. These endpoints
+// will be cleaned up automatically by the route-pruning in case they have
+// become stale, therefore there is no need to prune those endpoints
+// proactively.
 var FailableClassifiers = ClassifierGroup{
 	Dial,
 	AttemptedTLSWithNonTLSBackend,
@@ -38,6 +43,10 @@ var FailableClassifiers = ClassifierGroup{
 	ConnectionResetOnRead,
 }
 
+// PrunableClassifiers match all errors that should result in the endpoint
+// being pruned. This applies only if the connection to the backend is using
+// TLS since the route-integrity prevents routes from being pruned
+// automatically if they are configured with TLS.
 var PrunableClassifiers = ClassifierGroup{
 	Dial,
 	AttemptedTLSWithNonTLSBackend,
@@ -49,7 +58,8 @@ var PrunableClassifiers = ClassifierGroup{
 	ExpiredOrNotYetValidCertFailure,
 }
 
-// Classify returns true on errors that are retryable
+// Classify returns true on errors that match the at least one Classifier from
+// the ClassifierGroup it is called on.
 func (cg ClassifierGroup) Classify(err error) bool {
 	for _, classifier := range cg {
 		if classifier.Classify(err) {
