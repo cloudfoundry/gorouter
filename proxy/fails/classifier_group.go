@@ -10,6 +10,11 @@ type ClassifierGroup []Classifier
 //
 // Otherwise, there’s risk of a mutating non-idempotent request (e.g. send
 // payment) being silently retried without the client knowing.
+//
+// IMPORTANT: to truly determine whether a request is retry-able the function
+// round_tripper.isRetrieable must be used. It includes additional checks that
+// allow requests to be retried more often than it is allowed by the
+// classifiers.
 var RetriableClassifiers = ClassifierGroup{
 	Dial,
 	AttemptedTLSWithNonTLSBackend,
@@ -19,8 +24,6 @@ var RetriableClassifiers = ClassifierGroup{
 	RemoteHandshakeTimeout,
 	UntrustedCert,
 	ExpiredOrNotYetValidCertFailure,
-	IdempotentRequestEOF,
-	IncompleteRequest,
 }
 
 var FailableClassifiers = ClassifierGroup{
