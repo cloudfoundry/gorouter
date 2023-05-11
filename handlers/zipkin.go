@@ -77,8 +77,8 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 		r.Header.Set(b3.Context, b3.BuildSingleHeader(*sc))
 
 		logger.Debug("b3-trace-id-span-id-header-exists",
-			zap.String("traceID", existingTraceID),
-			zap.String("spanID", existingSpanID),
+			zap.String("trace-id", existingTraceID),
+			zap.String("span-id", existingSpanID),
 		)
 
 		err = requestInfo.SetTraceInfo(sc.TraceID.String(), sc.ID.String())
