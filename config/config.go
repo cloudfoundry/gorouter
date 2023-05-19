@@ -148,6 +148,7 @@ type LoggingConfig struct {
 	DisableLogForwardedFor bool         `yaml:"disable_log_forwarded_for"`
 	DisableLogSourceIP     bool         `yaml:"disable_log_source_ip"`
 	RedactQueryParams      string       `yaml:"redact_query_params"`
+	EnableAttemptsDetails  bool         `yaml:"enable_attempts_details"`
 	Format                 FormatConfig `yaml:"format"`
 
 	// This field is populated by the `Process` function.
@@ -175,11 +176,12 @@ type TLSPem struct {
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level:             "debug",
-	MetronAddress:     "localhost:3457",
-	Format:            FormatConfig{"unix-epoch"},
-	JobName:           "gorouter",
-	RedactQueryParams: REDACT_QUERY_PARMS_NONE,
+	Level:                 "debug",
+	MetronAddress:         "localhost:3457",
+	Format:                FormatConfig{"unix-epoch"},
+	JobName:               "gorouter",
+	RedactQueryParams:     REDACT_QUERY_PARMS_NONE,
+	EnableAttemptsDetails: false,
 }
 
 type HeaderNameValue struct {

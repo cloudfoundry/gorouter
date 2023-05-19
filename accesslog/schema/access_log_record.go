@@ -55,7 +55,7 @@ func (b *recordBuffer) WriteIntValue(v int) {
 	b.writeSpace()
 }
 
-// WriteDashOrStringValue writes an int or a "-" to the buffer if the int is
+// WriteDashOrIntValue writes an int or a "-" to the buffer if the int is
 // equal to 0
 func (b *recordBuffer) WriteDashOrIntValue(v int) {
 	if v == 0 {
@@ -66,8 +66,8 @@ func (b *recordBuffer) WriteDashOrIntValue(v int) {
 	}
 }
 
-// WriteDashOrStringValue writes a float or a "-" to the buffer if the float is
-// 0 or lower
+// WriteDashOrFloatValue writes a float if the value is >= 0 or a "-" if the
+// value is negative to the buffer.
 func (b *recordBuffer) WriteDashOrFloatValue(v float64) {
 	if v >= 0 {
 		_, _ = b.WriteString(strconv.FormatFloat(v, 'f', 6, 64))
@@ -101,11 +101,6 @@ type AccessLogRecord struct {
 	HeadersOverride        http.Header
 	StatusCode             int
 	RouteEndpoint          *route.Endpoint
-	RoundtripStartedAt     time.Time
-	FirstByteAt            time.Time
-	RoundtripFinishedAt    time.Time
-	AppRequestStartedAt    time.Time
-	AppRequestFinishedAt   time.Time
 	BodyBytesSent          int
 	RequestBytesReceived   int
 	ExtraHeadersToLog      []string
@@ -113,28 +108,91 @@ type AccessLogRecord struct {
 	DisableSourceIPLogging bool
 	RedactQueryParams      string
 	RouterError            string
+	LogAttemptsDetails     bool
+	FailedAttempts         int
 	record                 []byte
+
+	// See the handlers.RequestInfo struct for details on these timings.
+	ReceivedAt                  time.Time
+	AppRequestStartedAt         time.Time
+	LastFailedAttemptFinishedAt time.Time
+	DnsStartedAt                time.Time
+	DnsFinishedAt               time.Time
+	DialStartedAt               time.Time
+	DialFinishedAt              time.Time
+	TlsHandshakeStartedAt       time.Time
+	TlsHandshakeFinishedAt      time.Time
+	AppRequestFinishedAt        time.Time
+	FinishedAt                  time.Time
 }
 
 func (r *AccessLogRecord) formatStartedAt() string {
-	return r.RoundtripStartedAt.Format("2006-01-02T15:04:05.000000000Z")
+	return r.ReceivedAt.Format("2006-01-02T15:04:05.000000000Z")
 }
 
 func (r *AccessLogRecord) roundtripTime() float64 {
-	return float64(r.RoundtripFinishedAt.UnixNano()-r.RoundtripStartedAt.UnixNano()) / float64(time.Second)
+	return r.FinishedAt.Sub(r.ReceivedAt).Seconds()
 }
 
 func (r *AccessLogRecord) gorouterTime() float64 {
 	rt := r.roundtripTime()
 	at := r.appTime()
+
 	if rt >= 0 && at >= 0 {
 		return r.roundtripTime() - r.appTime()
+	} else {
+		return -1
 	}
-	return -1
+}
+
+func (r *AccessLogRecord) dialTime() float64 {
+	if r.DialStartedAt.IsZero() || r.DialFinishedAt.IsZero() {
+		return -1
+	}
+	return r.DialFinishedAt.Sub(r.DialStartedAt).Seconds()
+}
+
+func (r *AccessLogRecord) dnsTime() float64 {
+	if r.DnsStartedAt.IsZero() || r.DnsFinishedAt.IsZero() {
+		return -1
+	}
+	return r.DnsFinishedAt.Sub(r.DnsStartedAt).Seconds()
+}
+
+func (r *AccessLogRecord) tlsTime() float64 {
+	if r.TlsHandshakeStartedAt.IsZero() || r.TlsHandshakeFinishedAt.IsZero() {
+		return -1
+	}
+	return r.TlsHandshakeFinishedAt.Sub(r.TlsHandshakeStartedAt).Seconds()
 }
 
 func (r *AccessLogRecord) appTime() float64 {
-	return float64(r.AppRequestFinishedAt.UnixNano()-r.AppRequestStartedAt.UnixNano()) / float64(time.Second)
+	return r.AppRequestFinishedAt.Sub(r.AppRequestStartedAt).Seconds()
+}
+
+// failedAttemptsTime will be negative if there was no failed attempt.
+func (r *AccessLogRecord) failedAttemptsTime() float64 {
+	if r.LastFailedAttemptFinishedAt.IsZero() {
+		return -1
+	}
+	return r.LastFailedAttemptFinishedAt.Sub(r.AppRequestStartedAt).Seconds()
+}
+
+// successfulAttemptTime returns -1 if there was an error, so no attempt was
+// successful. If there was a successful attempt the returned time indicates
+// how long it took.
+func (r *AccessLogRecord) successfulAttemptTime() float64 {
+	if r.AppRequestFinishedAt.Equal(r.LastFailedAttemptFinishedAt) {
+		return -1
+	}
+
+	// we only want the time of the successful attempt
+	if !r.LastFailedAttemptFinishedAt.IsZero() {
+		// exclude the time any failed attempts took
+		return r.AppRequestFinishedAt.Sub(r.LastFailedAttemptFinishedAt).Seconds()
+	} else {
+		return r.AppRequestFinishedAt.Sub(r.AppRequestStartedAt).Seconds()
+	}
 }
 
 func (r *AccessLogRecord) getRecord(performTruncate bool) []byte {
@@ -223,6 +281,26 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 
 	b.WriteString(`instance_id:`)
 	b.WriteDashOrStringValue(instanceId)
+
+	if r.LogAttemptsDetails {
+		b.WriteString(`failed_attempts:`)
+		b.WriteIntValue(r.FailedAttempts)
+
+		b.WriteString(`failed_attempts_time:`)
+		b.WriteDashOrFloatValue(r.failedAttemptsTime())
+
+		b.WriteString(`dns_time:`)
+		b.WriteDashOrFloatValue(r.dnsTime())
+
+		b.WriteString(`dial_time:`)
+		b.WriteDashOrFloatValue(r.dialTime())
+
+		b.WriteString(`tls_time:`)
+		b.WriteDashOrFloatValue(r.tlsTime())
+
+		b.WriteString(`backend_time:`)
+		b.WriteDashOrFloatValue(r.successfulAttemptTime())
+	}
 
 	b.AppendSpaces(false)
 	b.WriteString(`x_cf_routererror:`)

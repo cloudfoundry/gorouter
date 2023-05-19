@@ -67,7 +67,7 @@ var _ = Describe("RequestInfoHandler", func() {
 		ri, err := handlers.ContextRequestInfo(contextReq)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ri).ToNot(BeNil())
-		Expect(ri.StartedAt).To(BeTemporally("~", expectedStartTime, 10*time.Millisecond))
+		Expect(ri.ReceivedAt).To(BeTemporally("~", expectedStartTime, 10*time.Millisecond))
 
 	})
 })
