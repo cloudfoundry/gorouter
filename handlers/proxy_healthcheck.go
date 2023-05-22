@@ -1,27 +1,25 @@
 package handlers
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/urfave/negroni"
 	"net/http"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+	"github.com/urfave/negroni"
 )
 
 type proxyHealthcheck struct {
 	userAgent string
 	health    *health.Health
-	logger    logger.Logger
 }
 
 // NewHealthcheck creates a handler that responds to healthcheck requests.
 // If userAgent is set to a non-empty string, it will use that user agent to
 // differentiate between healthcheck requests and non-healthcheck requests.
 // Otherwise, it will treat all requests as healthcheck requests.
-func NewProxyHealthcheck(userAgent string, health *health.Health, logger logger.Logger) negroni.Handler {
+func NewProxyHealthcheck(userAgent string, health *health.Health) negroni.Handler {
 	return &proxyHealthcheck{
 		userAgent: userAgent,
 		health:    health,
-		logger:    logger,
 	}
 }
 

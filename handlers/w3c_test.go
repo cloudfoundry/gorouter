@@ -1,10 +1,12 @@
 package handlers_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -12,11 +14,12 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("W3C", func() {
 	extractParentID := func(traceparent string) string {
-		r := regexp.MustCompile("^00-[a-f0-9]{32}-([a-f0-9]{16})-01$")
+		r := regexp.MustCompile("^00-[[:xdigit:]]{32}-([[:xdigit:]]{16})-01$")
 
 		matches := r.FindStringSubmatch(traceparent)
 
@@ -34,16 +37,23 @@ var _ = Describe("W3C", func() {
 		logger     logger.Logger
 		resp       http.ResponseWriter
 		req        *http.Request
+		reqInfo    *handlers.RequestInfo
 		nextCalled bool
 	)
 
-	nextHandler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		var err error
+		reqInfo, err = handlers.ContextRequestInfo(r)
+		Expect(err).NotTo(HaveOccurred())
 		nextCalled = true
 	})
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("w3c")
-		req = test_util.NewRequest("GET", "example.com", "/", nil)
+		ri := new(handlers.RequestInfo)
+		req = test_util.NewRequest("GET", "example.com", "/", nil).
+			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
+
 		resp = httptest.NewRecorder()
 		nextCalled = false
 	})
@@ -58,22 +68,72 @@ var _ = Describe("W3C", func() {
 			})
 
 			Context("when there are no pre-existing headers", func() {
-				It("sets W3C headers and calls the next handler", func() {
-					handler.ServeHTTP(resp, req, nextHandler)
+				Context("when request context has trace and span id", func() {
+					BeforeEach(func() {
+						ri := new(handlers.RequestInfo)
+						ri.TraceInfo.TraceID = strings.Repeat("1", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("2", 16)
+						ri.TraceInfo.UUID = "11111111-1111-1111-1111-111111111111"
+						req = test_util.NewRequest("GET", "example.com", "/", nil).
+							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
+					})
 
-					traceparentHeader := req.Header.Get(handlers.W3CTraceparentHeader)
+					It("uses trace ID from request context", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
 
-					Expect(traceparentHeader).To(MatchRegexp(
-						"^00-[a-f0-9]{32}-[a-f0-9]{16}-01$"), "Must match the W3C spec",
-					)
+						traceparentHeader := req.Header.Get(handlers.W3CTraceparentHeader)
 
-					parentID := extractParentID(traceparentHeader)
+						Expect(traceparentHeader).To(Equal("00-11111111111111111111111111111111-2222222222222222-01"))
 
-					Expect(req.Header.Get(handlers.W3CTracestateHeader)).To(
-						Equal(fmt.Sprintf("gorouter=%s", parentID)),
-					)
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(Equal(strings.Repeat("2", 16)))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("11111111-1111-1111-1111-111111111111"))
+					})
+				})
 
-					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				Context("when request context has invalid trace and span id", func() {
+					BeforeEach(func() {
+						ri := new(handlers.RequestInfo)
+						ri.TraceInfo.TraceID = strings.Repeat("g", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("2", 16)
+						ri.TraceInfo.UUID = "11111111-1111-1111-1111-111111111111"
+						req = test_util.NewRequest("GET", "example.com", "/", nil).
+							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
+					})
+
+					It("does not set traceparentHeader and logs the error", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
+
+						traceparentHeader := req.Header.Get(handlers.W3CTraceparentHeader)
+
+						Expect(traceparentHeader).To(BeEmpty())
+
+						Expect(logger).To(gbytes.Say(`failed-to-create-w3c-traceparent`))
+					})
+				})
+
+				Context("when request context doesn't have trace and span id", func() {
+					It("sets W3C headers from request context and calls the next handler", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
+
+						traceparentHeader := req.Header.Get(handlers.W3CTraceparentHeader)
+
+						Expect(traceparentHeader).To(MatchRegexp(
+							"^00-[[:xdigit:]]{32}-[[:xdigit:]]{16}-01$"), "Must match the W3C spec",
+						)
+
+						parentID := extractParentID(traceparentHeader)
+
+						Expect(req.Header.Get(handlers.W3CTracestateHeader)).To(
+							Equal(fmt.Sprintf("gorouter=%s", parentID)),
+						)
+
+						Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+
+						Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+						Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+					})
 				})
 			})
 
@@ -110,6 +170,33 @@ var _ = Describe("W3C", func() {
 
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
+
+				Context("when request context has trace and span id", func() {
+					BeforeEach(func() {
+						ri := new(handlers.RequestInfo)
+						ri.TraceInfo.TraceID = strings.Repeat("3", 32)
+						ri.TraceInfo.SpanID = strings.Repeat("4", 16)
+						ri.TraceInfo.UUID = "33333333-3333-3333-3333-333333333333"
+						req = test_util.NewRequest("GET", "example.com", "/", nil).
+							WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
+					})
+
+					It("doesn't update request context", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("3", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(Equal(strings.Repeat("4", 16)))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("33333333-3333-3333-3333-333333333333"))
+					})
+				})
+
+				Context("when request context doesn't have trace and span id", func() {
+					It("updates request context with trace ID and generated parent ID", func() {
+						handler.ServeHTTP(resp, req, nextHandler)
+						Expect(reqInfo.TraceInfo.TraceID).To(Equal(strings.Repeat("1", 32)))
+						Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+						Expect(reqInfo.TraceInfo.UUID).To(Equal("11111111-1111-1111-1111-111111111111"))
+					})
+				})
 			})
 
 			Context("when there are pre-existing headers including gorouter", func() {
@@ -143,6 +230,13 @@ var _ = Describe("W3C", func() {
 					)
 
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				})
+
+				It("sets request context", func() {
+					handler.ServeHTTP(resp, req, nextHandler)
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 		})
@@ -204,6 +298,13 @@ var _ = Describe("W3C", func() {
 
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
+
+				It("sets request context", func() {
+					handler.ServeHTTP(resp, req, nextHandler)
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+				})
 			})
 
 			Context("when there are pre-existing headers including gorouter which has a different tenant ID", func() {
@@ -237,6 +338,13 @@ var _ = Describe("W3C", func() {
 					)
 
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+				})
+
+				It("sets request context", func() {
+					handler.ServeHTTP(resp, req, nextHandler)
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 				})
 			})
 
@@ -272,6 +380,13 @@ var _ = Describe("W3C", func() {
 
 					Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 				})
+
+				It("sets request context", func() {
+					handler.ServeHTTP(resp, req, nextHandler)
+					Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+					Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+					Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+				})
 			})
 		})
 
@@ -289,6 +404,13 @@ var _ = Describe("W3C", func() {
 			Expect(req.Header.Get(handlers.W3CTracestateHeader)).To(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		})
+
+		It("sets request context", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(reqInfo.TraceInfo.TraceID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.SpanID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.UUID).To(BeEmpty())
 		})
 	})
 })

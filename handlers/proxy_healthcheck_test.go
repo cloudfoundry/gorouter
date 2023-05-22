@@ -1,13 +1,13 @@
 package handlers_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 
+	"code.cloudfoundry.org/gorouter/common/health"
+
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,7 +17,6 @@ import (
 var _ = Describe("Proxy Healthcheck", func() {
 	var (
 		handler      negroni.Handler
-		logger       logger.Logger
 		resp         *httptest.ResponseRecorder
 		req          *http.Request
 		healthStatus *health.Health
@@ -25,13 +24,12 @@ var _ = Describe("Proxy Healthcheck", func() {
 		nextCalled   bool
 	)
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
 
-		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", healthStatus, logger)
+		handler = handlers.NewProxyHealthcheck("HTTP-Monitor/1.1", healthStatus)
 		nextHandler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})

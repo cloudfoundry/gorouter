@@ -42,6 +42,7 @@ func NewClientCert(
 }
 
 func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(c.logger, r)
 	skip := c.skipSanitization(r)
 	if !skip {
 		switch c.forwardingMode {
@@ -65,14 +66,14 @@ func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 				rw,
 				http.StatusGatewayTimeout,
 				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
-				c.logger,
+				logger,
 			)
 		} else {
 			c.errorWriter.WriteError(
 				rw,
 				http.StatusBadGateway,
 				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
-				c.logger,
+				logger,
 			)
 		}
 		return

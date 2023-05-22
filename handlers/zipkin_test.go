@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 
@@ -15,13 +16,18 @@ import (
 
 // 64-bit random hexadecimal string
 const (
-	b3IDRegex      = `^[[:xdigit:]]{32}$`
-	b3Regex        = `^[[:xdigit:]]{32}-[[:xdigit:]]{16}(-[01d](-[[:xdigit:]]{16})?)?$`
-	b3TraceID      = "7f46165474d11ee5836777d85df2cdab"
-	b3SpanID       = "54ebcb82b14862d9"
-	b3SpanRegex    = `[[:xdigit:]]{16}$`
-	b3ParentSpanID = "e56b75d6af463476"
-	b3Single       = "1g56165474d11ee5836777d85df2cdab-32ebcb82b14862d9-1-ab6b75d6af463476"
+	b3IDRegex            = `^[[:xdigit:]]{32}$`
+	b3Regex              = `^[[:xdigit:]]{32}-[[:xdigit:]]{16}(-[01d](-[[:xdigit:]]{16})?)?$`
+	b3TraceID            = "7f46165474d11ee5836777d85df2cdab"
+	UUID                 = "7f461654-74d1-1ee5-8367-77d85df2cdab"
+	b3SpanID             = "54ebcb82b14862d9"
+	b3SpanRegex          = `[[:xdigit:]]{16}$`
+	b3ParentSpanID       = "e56b75d6af463476"
+	invalidB3Single      = "1g56165474d11ee5836777d85df2cdab-32ebcb82b14862d9-1-ab6b75d6af463476"
+	validB3Single        = "6d8780b7d3ee13f5108c880d778f29eb-108c880d778f29eb"
+	invalidUUIDB3Single  = "6d8780b7d3eed3f5108c880d778f29eb-108c880d778f29eb"
+	invalidUUIDb3TraceID = "6d8780b7d3eed3f5108c880d778f29eb"
+	invalidUUIDb3SpanID  = "108c880d778f29eb"
 )
 
 var _ = Describe("Zipkin", func() {
@@ -31,15 +37,21 @@ var _ = Describe("Zipkin", func() {
 		resp       http.ResponseWriter
 		req        *http.Request
 		nextCalled bool
+		reqInfo    *handlers.RequestInfo
 	)
 
-	nextHandler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		var err error
+		reqInfo, err = handlers.ContextRequestInfo(r)
+		Expect(err).NotTo(HaveOccurred())
 		nextCalled = true
 	})
 
 	BeforeEach(func() {
 		logger = test_util.NewTestZapLogger("zipkin")
-		req = test_util.NewRequest("GET", "example.com", "/", nil)
+		ri := new(handlers.RequestInfo)
+		req = test_util.NewRequest("GET", "example.com", "/", nil).
+			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
 		resp = httptest.NewRecorder()
 		nextCalled = false
 	})
@@ -60,6 +72,13 @@ var _ = Describe("Zipkin", func() {
 			Expect(req.Header.Get(b3.Context)).ToNot(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		})
+
+		It("sets request context", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+			Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+			Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 		})
 
 		Context("with B3TraceIdHeader, B3SpanIdHeader and B3ParentSpanIdHeader already set", func() {
@@ -88,6 +107,13 @@ var _ = Describe("Zipkin", func() {
 				Expect(req.Header.Get(b3.TraceID)).To(Equal(b3TraceID))
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(Equal(b3TraceID))
+				Expect(reqInfo.TraceInfo.SpanID).To(Equal(b3SpanID))
+				Expect(reqInfo.TraceInfo.UUID).To(Equal(UUID))
 			})
 		})
 
@@ -148,6 +174,38 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(Equal(b3TraceID))
+				Expect(reqInfo.TraceInfo.SpanID).To(Equal(b3SpanID))
+				Expect(reqInfo.TraceInfo.UUID).To(Equal(UUID))
+			})
+		})
+
+		Context("with B3TraceIdHeader that is invalid UUID and valid B3SpanIdHeader already set", func() {
+			BeforeEach(func() {
+				req.Header.Set(b3.TraceID, invalidUUIDb3TraceID)
+				req.Header.Set(b3.SpanID, b3SpanID)
+			})
+
+			It("doesn't overwrite the B3 headers", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(req.Header.Get(b3.TraceID)).To(Equal(invalidUUIDb3TraceID))
+				Expect(req.Header.Get(b3.SpanID)).To(Equal(b3SpanID))
+				Expect(req.Header.Get(b3.Context)).To(Equal(invalidUUIDb3TraceID + "-" + b3SpanID))
+
+				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).NotTo(Equal(invalidUUIDb3TraceID))
+				Expect(reqInfo.TraceInfo.SpanID).NotTo(Equal(b3SpanID))
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
 		})
 
 		Context("with only B3SpanIdHeader set", func() {
@@ -163,6 +221,13 @@ var _ = Describe("Zipkin", func() {
 				Expect(req.Header.Get(b3.Context)).To(MatchRegexp(b3Regex))
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 			})
 		})
 
@@ -180,21 +245,84 @@ var _ = Describe("Zipkin", func() {
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
 		})
 
-		Context("with B3Header already set", func() {
+		Context("with a valid B3Header already set", func() {
 			BeforeEach(func() {
-				req.Header.Set(b3.Context, b3Single)
+				req.Header.Set(b3.Context, validB3Single)
 			})
 
 			It("doesn't overwrite the B3Header", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
-				Expect(req.Header.Get(b3.Context)).To(Equal(b3Single))
+				Expect(req.Header.Get(b3.Context)).To(Equal(validB3Single))
 				Expect(req.Header.Get(b3.TraceID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.SpanID)).To(BeEmpty())
 				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
 
 				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
+		})
+
+		Context("with invalid B3Header already set", func() {
+			BeforeEach(func() {
+				req.Header.Set(b3.Context, invalidB3Single)
+			})
+
+			It("overwrites the B3Header", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(req.Header.Get(b3.Context)).NotTo(Equal(invalidB3Single))
+				Expect(req.Header.Get(b3.Context)).NotTo(BeEmpty())
+				Expect(req.Header.Get(b3.TraceID)).NotTo(BeEmpty())
+				Expect(req.Header.Get(b3.SpanID)).NotTo(BeEmpty())
+				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
+
+				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
+		})
+
+		Context("with B3Header which is an invalid UUID", func() {
+			BeforeEach(func() {
+				req.Header.Set(b3.Context, invalidUUIDB3Single)
+			})
+
+			It("overwrites the B3Header", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(req.Header.Get(b3.Context)).To(Equal(invalidUUIDB3Single))
+				Expect(req.Header.Get(b3.TraceID)).To(BeEmpty())
+				Expect(req.Header.Get(b3.SpanID)).To(BeEmpty())
+				Expect(req.Header.Get(b3.ParentSpanID)).To(BeEmpty())
+
+				Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+			})
+
+			It("sets request context", func() {
+				handler.ServeHTTP(resp, req, nextHandler)
+				Expect(reqInfo.TraceInfo.TraceID).NotTo(Equal(invalidUUIDb3TraceID))
+				Expect(reqInfo.TraceInfo.SpanID).NotTo(Equal(b3SpanID))
+				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 			})
 		})
 	})
@@ -212,6 +340,13 @@ var _ = Describe("Zipkin", func() {
 			Expect(req.Header.Get(b3.Context)).To(BeEmpty())
 
 			Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
+		})
+
+		It("doesn't set trace and span IDs in request context", func() {
+			handler.ServeHTTP(resp, req, nextHandler)
+			Expect(reqInfo.TraceInfo.TraceID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.SpanID).To(BeEmpty())
+			Expect(reqInfo.TraceInfo.UUID).To(BeEmpty())
 		})
 	})
 })

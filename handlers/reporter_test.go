@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	"code.cloudfoundry.org/gorouter/logger"
 	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni"
 )
 
@@ -27,7 +28,8 @@ var _ = Describe("Reporter Handler", func() {
 		req  *http.Request
 
 		fakeReporter *metrics_fakes.FakeCombinedReporter
-		fakeLogger   *logger_fakes.FakeLogger
+		logger       logger.Logger
+		prevHandler  negroni.Handler
 
 		nextCalled bool
 	)
@@ -38,7 +40,7 @@ var _ = Describe("Reporter Handler", func() {
 		resp = httptest.NewRecorder()
 
 		fakeReporter = new(metrics_fakes.FakeCombinedReporter)
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestZapLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := ioutil.ReadAll(req.Body)
@@ -55,13 +57,15 @@ var _ = Describe("Reporter Handler", func() {
 			nextCalled = true
 		})
 		nextCalled = false
+		prevHandler = &PrevHandler{}
 	})
 
 	JustBeforeEach(func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(fakeLogger))
-		handler.Use(handlers.NewReporter(fakeReporter, fakeLogger))
+		handler.Use(handlers.NewProxyWriter(logger))
+		handler.Use(prevHandler)
+		handler.Use(handlers.NewReporter(fakeReporter, logger))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -105,7 +109,6 @@ var _ = Describe("Reporter Handler", func() {
 		})
 		It("emits the routing response status code, but does not emit a latency metric", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.ErrorCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
 			capturedRespCode := fakeReporter.CaptureRoutingResponseArgsForCall(0)
@@ -131,9 +134,9 @@ var _ = Describe("Reporter Handler", func() {
 				reqInfo.AppRequestFinishedAt = time.Now()
 			})
 		})
+
 		It("does not emit routing response metrics", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.ErrorCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))
@@ -146,11 +149,17 @@ var _ = Describe("Reporter Handler", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewReporter(fakeReporter, fakeLogger))
+			badHandler.Use(handlers.NewReporter(fakeReporter, logger))
 		})
-		It("calls Fatal on the logger", func() {
+
+		It("calls Panic on the logger", func() {
+			defer func() {
+				recover()
+				Expect(logger).To(gbytes.Say(`"error":"RequestInfo not set on context"`))
+				Expect(nextCalled).To(BeFalse())
+			}()
 			badHandler.ServeHTTP(resp, req)
-			Expect(fakeLogger.FatalCallCount()).To(Equal(1))
+
 			Expect(fakeReporter.CaptureBadGatewayCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseCallCount()).To(Equal(0))
 			Expect(fakeReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(0))

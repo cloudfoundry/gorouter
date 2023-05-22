@@ -491,8 +491,8 @@ var _ = Describe("Lookup", func() {
 				pool.Put(testEndpoint1)
 				reg.LookupReturns(pool)
 			})
-			It("calls Fatal on the logger", func() {
-				Expect(logger.FatalCallCount()).To(Equal(1))
+			It("calls Panic on the logger", func() {
+				Expect(logger.PanicCallCount()).To(Equal(1))
 				Expect(nextCalled).To(BeFalse())
 			})
 		})

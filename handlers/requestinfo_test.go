@@ -6,14 +6,18 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )
 
@@ -118,5 +122,121 @@ var _ = Describe("GetEndpoint", func() {
 			Expect(err).To(MatchError("route endpoint not set on request info"))
 		})
 
+	})
+})
+
+var _ = Describe("RequestInfo", func() {
+	var requestInfo *handlers.RequestInfo
+
+	BeforeEach(func() {
+		requestInfo = &handlers.RequestInfo{}
+	})
+
+	Describe("ProvideTraceInfo", func() {
+		Context("when TraceInfo is set", func() {
+			BeforeEach(func() {
+				requestInfo.TraceInfo = handlers.TraceInfo{
+					TraceID: "11111111111111111111111111111111",
+					SpanID:  "2222222222222222",
+					UUID:    "11111111-1111-1111-1111-111111111111",
+				}
+			})
+
+			It("returns TraceInfo", func() {
+				traceInfo, err := requestInfo.ProvideTraceInfo()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(traceInfo).To(Equal(handlers.TraceInfo{
+					TraceID: "11111111111111111111111111111111",
+					SpanID:  "2222222222222222",
+					UUID:    "11111111-1111-1111-1111-111111111111",
+				}))
+			})
+		})
+
+		Context("when TraceInfo is not set", func() {
+			It("generates TraceInfo", func() {
+				traceInfo, err := requestInfo.ProvideTraceInfo()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(traceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(traceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(traceInfo.UUID).To(MatchRegexp(UUIDRegex))
+
+				uuidWithoutDashes := strings.Replace(traceInfo.UUID, "-", "", -1)
+				Expect(uuidWithoutDashes).To(Equal(traceInfo.TraceID))
+			})
+		})
+	})
+
+	Describe("SetTraceInfo", func() {
+		Context("when traceID that can be converted to UUID and spanID are provided", func() {
+			It("sets UUID from traceID", func() {
+				requestInfo.SetTraceInfo("11111111111111111111111111111111", "2222222222222222")
+				Expect(requestInfo.TraceInfo).To(Equal(handlers.TraceInfo{
+					TraceID: "11111111111111111111111111111111",
+					SpanID:  "2222222222222222",
+					UUID:    "11111111-1111-1111-1111-111111111111",
+				}))
+			})
+		})
+
+		Context("when traceID that can not be converted to UUID and spanID are provided", func() {
+			It("generates new UUID, trace and span ID", func() {
+				requestInfo.SetTraceInfo("111111111111d1111111111111111111", "2222222222222222")
+				Expect(requestInfo.TraceInfo.TraceID).NotTo(Equal("111111111111d1111111111111111111"))
+				Expect(requestInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(requestInfo.TraceInfo.SpanID).NotTo(Equal("2222222222222222"))
+				Expect(requestInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(requestInfo.TraceInfo.UUID).ToNot(Equal("11111111-1111-d111-1111-111111111111"))
+				Expect(requestInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
+		})
+	})
+
+	Describe("LoggerWithTraceInfo", func() {
+		var testSink *test_util.TestZapSink
+		var testLogger logger.Logger
+
+		BeforeEach(func() {
+			testSink = &test_util.TestZapSink{Buffer: gbytes.NewBuffer()}
+			testLogger = logger.NewLogger(
+				"request-info",
+				"unix-epoch",
+				zap.DebugLevel,
+				zap.Output(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))),
+				zap.ErrorOutput(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))))
+		})
+
+		Context("when request has trace context", func() {
+			BeforeEach(func() {
+				req, err := http.NewRequest("GET", "http://example.com", nil)
+				Expect(err).NotTo(HaveOccurred())
+				ri := new(handlers.RequestInfo)
+				ri.TraceInfo.TraceID = "abc"
+				ri.TraceInfo.SpanID = "def"
+				req = req.WithContext(context.WithValue(req.Context(), handlers.RequestInfoCtxKey, ri))
+
+				testLogger = handlers.LoggerWithTraceInfo(testLogger, req)
+				testLogger.Info("some-action")
+			})
+
+			It("returns a logger that adds trace and spand ids to every log line", func() {
+				Expect(testSink.Lines()).To(HaveLen(1))
+				Expect(testSink.Lines()[0]).To(MatchRegexp(`{.*"data":{"trace-id":"abc","span-id":"def"}}`))
+			})
+		})
+
+		Context("when request doesn't have vcap request id", func() {
+			BeforeEach(func() {
+				req, err := http.NewRequest("GET", "http://example.com", nil)
+				Expect(err).NotTo(HaveOccurred())
+				testLogger = handlers.LoggerWithTraceInfo(testLogger, req)
+				testLogger.Info("some-action")
+			})
+
+			It("returns a logger that doesn't add trace and span ids to log lines", func() {
+				Expect(testSink.Lines()).To(HaveLen(1))
+				Expect(testSink.Lines()[0]).NotTo(MatchRegexp(`trace-id`))
+			})
+		})
 	})
 })

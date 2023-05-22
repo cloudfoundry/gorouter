@@ -30,6 +30,7 @@ func NewProtocolCheck(logger logger.Logger, errorWriter errorwriter.ErrorWriter,
 }
 
 func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(p.logger, r)
 	if !p.isProtocolSupported(r) {
 		// must be hijacked, otherwise no response is sent back
 		conn, buf, err := p.hijack(rw)
@@ -38,7 +39,7 @@ func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 				rw,
 				http.StatusBadRequest,
 				"Unsupported protocol",
-				p.logger,
+				logger,
 			)
 			return
 		}

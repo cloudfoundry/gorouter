@@ -26,7 +26,7 @@ func NewProxyWriter(logger logger.Logger) negroni.Handler {
 func (p *proxyWriterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	reqInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		p.logger.Fatal("request-info-err", zap.Error(err))
+		p.logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 	proxyWriter := utils.NewProxyResponseWriter(rw)

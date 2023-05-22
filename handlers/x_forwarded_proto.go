@@ -2,15 +2,12 @@ package handlers
 
 import (
 	"net/http"
-
-	"code.cloudfoundry.org/gorouter/logger"
 )
 
 type XForwardedProto struct {
 	SkipSanitization         func(req *http.Request) bool
 	ForceForwardedProtoHttps bool
 	SanitizeForwardedProto   bool
-	Logger                   logger.Logger
 }
 
 func (h *XForwardedProto) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {

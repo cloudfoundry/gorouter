@@ -28,13 +28,14 @@ func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.H
 
 // ServeHTTP handles reporting the response after the request has been completed
 func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(rh.logger, r)
 	next(rw, r)
 
 	requestInfo, err := ContextRequestInfo(r)
-	// logger.Fatal does not cause gorouter to exit 1 but rather throw panic with
+	// logger.Panic does not cause gorouter to exit 1 but rather throw panic with
 	// stacktrace in error log
 	if err != nil {
-		rh.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 

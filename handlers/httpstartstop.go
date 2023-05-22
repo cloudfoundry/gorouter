@@ -32,14 +32,16 @@ func NewHTTPStartStop(emitter dropsonde.EventEmitter, logger logger.Logger) negr
 
 // ServeHTTP handles emitting a StartStop event after the request has been completed
 func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	prw, ok := rw.(utils.ProxyResponseWriter)
-	if !ok {
-		hh.logger.Fatal("request-info-err", zap.String("error", "ProxyResponseWriter not found"))
-		return
-	}
+	logger := LoggerWithTraceInfo(hh.logger, r)
+
 	requestID, err := uuid.ParseHex(r.Header.Get(VcapRequestIdHeader))
 	if err != nil {
-		hh.logger.Fatal("start-stop-handler-err", zap.String("error", "X-Vcap-Request-Id not found"))
+		logger.Panic("start-stop-handler-err", zap.String("error", "X-Vcap-Request-Id not found"))
+		return
+	}
+	prw, ok := rw.(utils.ProxyResponseWriter)
+	if !ok {
+		logger.Panic("request-info-err", zap.String("error", "ProxyResponseWriter not found"))
 		return
 	}
 
@@ -58,7 +60,7 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	envelope, err := emitter.Wrap(startStopEvent, hh.emitter.Origin())
 	if err != nil {
-		hh.logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
+		logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
 	}
 
 	endpoint, _ := GetEndpoint(r.Context())
@@ -68,6 +70,6 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	err = hh.emitter.EmitEnvelope(envelope)
 	if err != nil {
-		hh.logger.Info("failed-to-emit-startstop-event", zap.Error(err))
+		logger.Info("failed-to-emit-startstop-event", zap.Error(err))
 	}
 }

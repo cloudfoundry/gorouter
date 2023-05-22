@@ -36,7 +36,7 @@ func NewRouteService(
 	allowlistDomains, err := CreateDomainAllowlist(config.RouteServiceHairpinningAllowlist())
 
 	if err != nil {
-		logger.Fatal("allowlist-entry-invalid", zap.Error(err))
+		logger.Panic("allowlist-entry-invalid", zap.Error(err))
 	}
 	return &RouteService{
 		config:                      config,
@@ -48,13 +48,14 @@ func NewRouteService(
 }
 
 func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(r.logger, req)
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
-		r.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 	if reqInfo.RoutePool == nil {
-		r.logger.Fatal("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
+		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 		return
 	}
 
@@ -66,45 +67,45 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	}
 
 	if !r.config.RouteServiceEnabled() {
-		r.logger.Info("route-service-unsupported")
+		logger.Info("route-service-unsupported")
 		AddRouterErrorHeader(rw, "route_service_unsupported")
 		r.errorWriter.WriteError(
 			rw,
 			http.StatusBadGateway,
 			"Support for route services is disabled.",
-			r.logger,
+			logger,
 		)
 		return
 	}
 
 	if IsWebSocketUpgrade(req) {
-		r.logger.Info("route-service-unsupported")
+		logger.Info("route-service-unsupported")
 		AddRouterErrorHeader(rw, "route_service_unsupported")
 		r.errorWriter.WriteError(
 			rw,
 			http.StatusServiceUnavailable,
 			"Websocket requests are not supported for routes bound to Route Services.",
-			r.logger,
+			logger,
 		)
 		return
 	}
 
-	hasBeenToRouteService, err := r.ArrivedViaRouteService(req)
+	hasBeenToRouteService, err := r.ArrivedViaRouteService(req, logger)
 	if err != nil {
-		r.logger.Error("signature-validation-failed", zap.Error(err))
+		logger.Error("signature-validation-failed", zap.Error(err))
 		if errors.Is(err, routeservice.ErrExpired) {
 			r.errorWriter.WriteError(
 				rw,
 				http.StatusGatewayTimeout,
 				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
-				r.logger,
+				logger,
 			)
 		} else {
 			r.errorWriter.WriteError(
 				rw,
 				http.StatusBadGateway,
 				fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
-				r.logger,
+				logger,
 			)
 		}
 		return
@@ -129,13 +130,13 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	forwardedURLRaw := recommendedScheme + "://" + hostWithoutPort(req.Host) + req.RequestURI
 	routeServiceArgs, err := r.config.CreateRequest(routeServiceURL, forwardedURLRaw)
 	if err != nil {
-		r.logger.Error("route-service-failed", zap.Error(err))
+		logger.Error("route-service-failed", zap.Error(err))
 
 		r.errorWriter.WriteError(
 			rw,
 			http.StatusInternalServerError,
 			"Route service request failed.",
-			r.logger,
+			logger,
 		)
 		return
 	}
@@ -258,15 +259,15 @@ func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
 	return err == nil
 }
 
-func (r *RouteService) ArrivedViaRouteService(req *http.Request) (bool, error) {
+func (r *RouteService) ArrivedViaRouteService(req *http.Request, logger logger.Logger) (bool, error) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
-		r.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 		return false, err
 	}
 	if reqInfo.RoutePool == nil {
 		err = errors.New("failed-to-access-RoutePool")
-		r.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 		return false, err
 	}
 

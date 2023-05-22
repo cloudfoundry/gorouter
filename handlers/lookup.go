@@ -53,6 +53,7 @@ func NewLookup(
 }
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	logger := LoggerWithTraceInfo(l.logger, r)
 	// gorouter requires the Host header to know to which backend to proxy to.
 	//
 	// The Host header is optional in HTTP/1.0,
@@ -69,46 +70,46 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	// It is not vali for the Host header to be an IP address,
 	// because Gorouter should not have an IP address as a route.
 	if r.Host == "" || hostWithoutPort(r.Host) == hostWithoutPort(r.RemoteAddr) {
-		l.handleMissingHost(rw, r)
+		l.handleMissingHost(rw, r, logger)
 		return
 	}
 
-	pool, err := l.lookup(r)
+	pool, err := l.lookup(r, logger)
 	if _, ok := err.(InvalidInstanceHeaderError); ok {
-		l.handleInvalidInstanceHeader(rw, r)
+		l.handleInvalidInstanceHeader(rw, r, logger)
 		return
 	}
 
 	if pool == nil {
-		l.handleMissingRoute(rw, r)
+		l.handleMissingRoute(rw, r, logger)
 		return
 	}
 
 	if pool.IsEmpty() {
 		if l.EmptyPoolResponseCode503 {
-			l.handleUnavailableRoute(rw, r)
+			l.handleUnavailableRoute(rw, r, logger)
 			return
 		} else {
-			l.handleMissingRoute(rw, r)
+			l.handleMissingRoute(rw, r, logger)
 			return
 		}
 	}
 
 	if pool.IsOverloaded() {
-		l.handleOverloadedRoute(rw, r)
+		l.handleOverloadedRoute(rw, r, logger)
 		return
 	}
 
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		l.logger.Fatal("request-info-err", zap.Error(err))
+		logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
 	requestInfo.RoutePool = pool
 	next(rw, r)
 }
 
-func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request) {
+func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "invalid_cf_app_instance_header")
@@ -118,11 +119,11 @@ func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *h
 		rw,
 		http.StatusBadRequest,
 		"Invalid X-CF-App-Instance Header",
-		l.logger,
+		logger,
 	)
 }
 
-func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request) {
+func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "empty_host")
@@ -132,11 +133,11 @@ func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Reques
 		rw,
 		http.StatusBadRequest,
 		"Request had empty Host header",
-		l.logger,
+		logger,
 	)
 }
 
-func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request) {
+func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "unknown_route")
@@ -155,11 +156,11 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 		rw,
 		returnStatus,
 		errorMsg,
-		l.logger,
+		logger,
 	)
 }
 
-func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.Request) {
+func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
 	AddRouterErrorHeader(rw, "no_endpoints")
 	addInvalidResponseCacheControlHeader(rw)
 
@@ -167,11 +168,11 @@ func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.R
 		rw,
 		http.StatusServiceUnavailable,
 		fmt.Sprintf("Requested route ('%s') has no available endpoints.", r.Host),
-		l.logger,
+		logger,
 	)
 }
 
-func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request) {
+func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
 	l.reporter.CaptureBackendExhaustedConns()
 	l.logger.Info("connection-limit-reached")
 
@@ -181,11 +182,11 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 		rw,
 		http.StatusServiceUnavailable,
 		fmt.Sprintf("Requested route ('%s') has reached the connection limit.", r.Host),
-		l.logger,
+		logger,
 	)
 }
 
-func (l *lookupHandler) lookup(r *http.Request) (*route.EndpointPool, error) {
+func (l *lookupHandler) lookup(r *http.Request, logger logger.Logger) (*route.EndpointPool, error) {
 	requestPath := r.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
@@ -194,7 +195,7 @@ func (l *lookupHandler) lookup(r *http.Request) (*route.EndpointPool, error) {
 	if appInstanceHeader != "" {
 		err := validateInstanceHeader(appInstanceHeader)
 		if err != nil {
-			l.logger.Error("invalid-app-instance-header", zap.Error(err))
+			logger.Error("invalid-app-instance-header", zap.Error(err))
 			return nil, InvalidInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 

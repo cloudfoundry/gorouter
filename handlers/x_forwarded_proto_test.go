@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,11 +16,9 @@ var _ = Describe("X-Forwarded-Proto", func() {
 		req        *http.Request
 		res        *httptest.ResponseRecorder
 		nextCalled bool
-		logger     *logger_fakes.FakeLogger
 	)
 
 	BeforeEach(func() {
-		logger = new(logger_fakes.FakeLogger)
 		req, _ = http.NewRequest("GET", "/foo", nil)
 		nextCalled = false
 	})
@@ -44,7 +41,6 @@ var _ = Describe("X-Forwarded-Proto", func() {
 				SkipSanitization:         func(req *http.Request) bool { return true },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   false,
-				Logger:                   logger,
 			}
 		})
 
@@ -71,7 +67,6 @@ var _ = Describe("X-Forwarded-Proto", func() {
 				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: true,
 				SanitizeForwardedProto:   false,
-				Logger:                   logger,
 			}
 		})
 
@@ -94,7 +89,6 @@ var _ = Describe("X-Forwarded-Proto", func() {
 				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   true,
-				Logger:                   logger,
 			}
 		})
 
@@ -124,7 +118,6 @@ var _ = Describe("X-Forwarded-Proto", func() {
 				SkipSanitization:         func(req *http.Request) bool { return false },
 				ForceForwardedProtoHttps: false,
 				SanitizeForwardedProto:   false,
-				Logger:                   logger,
 			}
 		})
 
