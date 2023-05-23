@@ -743,10 +743,14 @@ request:
 `<Request Host> - [<Start Date>] "<Request Method> <Request URL>
 <Request Protocol>" <Status Code> <Bytes Received> <Bytes Sent>
 "<Referer>" "<User-Agent>" <Remote Address> <Backend Address>
-x_forwarded_for:"<X-Forwarded-For>"
-x_forwarded_proto:"<X-Forwarded-Proto>"
-vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time> gorouter_time:<Gorouter Time>
-app_id:<Application ID> app_index:<Application Index> x_cf_routererror:<X-Cf-RouterError> <Extra Headers>`
+x_forwarded_for:"<X-Forwarded-For>" x_forwarded_proto:"<X-Forwarded-Proto>"
+vcap_request_id:<X-Vcap-Request-ID> response_time:<Response Time>
+gorouter_time:<Gorouter Time> app_id:<Application ID>
+app_index:<Application Index> instance_id:"<Instance ID>"
+failed_attempts:<Failed Attempts> failed_attempts_time:<Failed Attempts Time>
+dns_time:<DNS Time> dial_time:<Dial Time> tls_time:<TLS Time>
+backend_time:<Backend Time> x_cf_routererror:<X-Cf-RouterError>
+<Extra Headers>`
 
 * Status Code, Response Time, Gorouter Time, Application ID, Application Index,
   X-Cf-RouterError, and Extra Headers are all optional fields. The absence of
@@ -764,6 +768,14 @@ app_id:<Application ID> app_index:<Application Index> x_cf_routererror:<X-Cf-Rou
   through the Gorouter. This does not include the time the request spends
   traversing the network to the app. This also does not include the time the app
   spends forming a response.
+
+* `failed_attempts`, `failed_attempts_time`, `dns_time`, `dial_time`,
+  `tls_time` and `backend_time` are only logged if
+  `logging.enable_attempts_details` is set to true. The `*_time` will only be
+  provided for the last, successful attempt, if the request fails they will be
+  empty and the error log can be consulted to get the details about each
+  attempt. `failed_attempts_time` contains the total time spent performing
+  attempts that failed.
 
 * `X-CF-RouterError` is populated if the Gorouter encounters an error. This can
   help distinguish if a non-2xx response code is due to an error in the Gorouter
