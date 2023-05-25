@@ -702,7 +702,7 @@ Sample log message in gorouter.
 The following log messages are emitted any time the routing table changes:
 
 - `route-registered`: a new route is added to the table
-- `route-unregistred`: an existing route is removed from the table
+- `route-unregistered`: an existing route is removed from the table
 - `endpoint-registered`: a new backend is added to the table
    e.g. an app is scaled up and a new app instance is started
 - `endpoint-unregistered`: a backend is removed from the table
