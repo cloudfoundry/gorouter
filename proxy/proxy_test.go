@@ -744,13 +744,15 @@ var _ = Describe("Proxy", func() {
 			})
 			defer good.Close()
 
-			conn := dialProxy(proxyServer)
+			Consistently(func() int {
+				conn := dialProxy(proxyServer)
 
-			req := test_util.NewRequest("POST", "retry-test", "/", strings.NewReader("some body"))
-			conn.WriteRequest(req)
+				req := test_util.NewRequest("POST", "retry-test", "/", strings.NewReader("some body"))
+				conn.WriteRequest(req)
 
-			resp, _ := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				resp, _ := conn.ReadResponse()
+				return resp.StatusCode
+			}, 2*time.Second, 100*time.Millisecond).Should(Equal(http.StatusOK))
 		})
 
 	})
