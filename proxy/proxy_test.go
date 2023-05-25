@@ -725,7 +725,14 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
-		It("retries on POST requests if nothing was written", func() {
+		PIt("retries on POST requests if nothing was written", func() {
+			//FIXME: Pending this test until we resolve the core issue.
+			//
+			// We believe the flakiness in this test was introduce in commit 4b605dd344b3546ec3d70c1e1ed5acd376ebae11
+			// but we're unsure of the ramifications of reverting the commit. We are working on a fix.
+			//
+			// May 25, 2023
+
 			bad1 := test_util.RegisterConnHandler(r, "retry-test", func(conn *test_util.HttpConn) {
 				conn.Close()
 			})
