@@ -411,29 +411,18 @@ func (r *Router) ScheduleFlushApps() {
 }
 
 func (r *Router) HandleConnState(conn net.Conn, state http.ConnState) {
-	endpointTimeout := r.config.EndpointTimeout
-
 	r.connLock.Lock()
 
 	switch state {
 	case http.StateActive:
 		r.activeConns[conn] = struct{}{}
 		delete(r.idleConns, conn)
-
-		conn.SetDeadline(noDeadline)
 	case http.StateIdle:
 		delete(r.activeConns, conn)
 		r.idleConns[conn] = struct{}{}
 
 		if r.closeConnections {
 			conn.Close()
-		} else {
-			deadline := noDeadline
-			if endpointTimeout > 0 {
-				deadline = time.Now().Add(endpointTimeout)
-			}
-
-			conn.SetDeadline(deadline)
 		}
 	case http.StateHijacked, http.StateClosed:
 		i := len(r.idleConns)
