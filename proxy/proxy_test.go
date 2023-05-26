@@ -725,8 +725,9 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
-		PIt("retries on POST requests if nothing was written", func() {
-			//FIXME: Pending this test until we resolve the core issue.
+		It("retries on POST requests if nothing was written", func() {
+			//FIXME: this test is flakey. we can't skip/pend this test since CI will fail on any skipped/pending
+			//       tests
 			//
 			// We believe the flakiness in this test was introduce in commit 4b605dd344b3546ec3d70c1e1ed5acd376ebae11
 			// but we're unsure of the ramifications of reverting the commit. We are working on a fix.
