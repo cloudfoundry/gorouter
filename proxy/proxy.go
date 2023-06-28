@@ -111,23 +111,25 @@ func NewProxy(
 
 	roundTripperFactory := &round_tripper.FactoryImpl{
 		BackendTemplate: &http.Transport{
-			DialContext:         dialer.DialContext,
-			DisableKeepAlives:   cfg.DisableKeepAlives,
-			MaxIdleConns:        cfg.MaxIdleConns,
-			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
-			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
-			DisableCompression:  true,
-			TLSClientConfig:     backendTLSConfig,
-			TLSHandshakeTimeout: cfg.TLSHandshakeTimeout,
+			DialContext:           dialer.DialContext,
+			DisableKeepAlives:     cfg.DisableKeepAlives,
+			MaxIdleConns:          cfg.MaxIdleConns,
+			IdleConnTimeout:       90 * time.Second, // setting the value to golang default transport
+			MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
+			DisableCompression:    true,
+			TLSClientConfig:       backendTLSConfig,
+			TLSHandshakeTimeout:   cfg.TLSHandshakeTimeout,
+			ExpectContinueTimeout: 1 * time.Second,
 		},
 		RouteServiceTemplate: &http.Transport{
-			DialContext:         dialer.DialContext,
-			DisableKeepAlives:   cfg.DisableKeepAlives,
-			MaxIdleConns:        cfg.MaxIdleConns,
-			IdleConnTimeout:     90 * time.Second, // setting the value to golang default transport
-			MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
-			DisableCompression:  true,
-			TLSClientConfig:     routeServiceTLSConfig,
+			DialContext:           dialer.DialContext,
+			DisableKeepAlives:     cfg.DisableKeepAlives,
+			MaxIdleConns:          cfg.MaxIdleConns,
+			IdleConnTimeout:       90 * time.Second, // setting the value to golang default transport
+			MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
+			DisableCompression:    true,
+			TLSClientConfig:       routeServiceTLSConfig,
+			ExpectContinueTimeout: 1 * time.Second,
 		},
 		IsInstrumented: cfg.SendHttpStartStopClientEvent,
 	}
