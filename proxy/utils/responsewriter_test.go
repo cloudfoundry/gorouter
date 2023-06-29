@@ -154,6 +154,14 @@ var _ = Describe("ProxyWriter", func() {
 		Expect(proxy.Status()).To(Equal(http.StatusTeapot))
 	})
 
+	It("WriteHeader rewrites the status if the original status was 1XX", func() {
+		Expect(proxy.Status()).To(Equal(0))
+		proxy.WriteHeader(http.StatusContinue)
+		Expect(proxy.Status()).To(Equal(http.StatusContinue))
+		proxy.WriteHeader(http.StatusOK)
+		Expect(proxy.Status()).To(Equal(http.StatusOK))
+	})
+
 	It("delegates the call to Write", func() {
 		l, err := proxy.Write([]byte("foo"))
 		Expect(l).To(BeNumerically("==", 3))

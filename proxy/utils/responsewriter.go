@@ -89,7 +89,7 @@ func (p *proxyResponseWriter) WriteHeader(s int) {
 
 	p.w.WriteHeader(s)
 
-	if p.status == 0 {
+	if p.status == 0 || (p.status >= 100 && p.status <= 199) {
 		p.status = s
 	}
 }
