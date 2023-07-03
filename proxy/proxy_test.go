@@ -1332,6 +1332,63 @@ var _ = Describe("Proxy", func() {
 			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
+		Context("when an HTTP 100 continue response is sent first", func() {
+			It("logs the data for the final response", func() {
+				ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
+					req, body := conn.ReadRequest()
+					Expect(req.Method).To(Equal("POST"))
+					Expect(req.URL.Path).To(Equal("/"))
+					Expect(req.ProtoMajor).To(Equal(1))
+					Expect(req.ProtoMinor).To(Equal(1))
+
+					Expect(body).To(Equal("ABCD"))
+
+					expectRsp := test_util.NewResponse(100)
+					conn.WriteResponse(expectRsp)
+
+					rsp := test_util.NewResponse(200)
+					rsp.Body = ioutil.NopCloser(strings.NewReader("DEFGHI"))
+					conn.WriteResponse(rsp)
+
+					conn.Close()
+				}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				body := &bytes.Buffer{}
+				body.WriteString("ABCD")
+				req := test_util.NewRequest("POST", "test", "/", body)
+				conn.WriteRequest(req)
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusContinue))
+
+				resp, _ = conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}).ShouldNot(BeZero())
+
+				//make sure the record includes all the data
+				//since the building of the log record happens throughout the life of the request
+				b, err := ioutil.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
+				Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 6 "-"`))
+				Expect(string(b)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+				Expect(string(b)).To(ContainSubstring(`response_time:`))
+				Expect(string(b)).To(ContainSubstring(`app_id:"456"`))
+				Expect(string(b)).To(ContainSubstring(`app_index:"2"`))
+				Expect(b[len(b)-1]).To(Equal(byte('\n')))
+			})
+		})
+
 		It("logs a request when X-Forwarded-Proto and X-Forwarded-For are provided", func() {
 			ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {
 				conn.ReadRequest()
