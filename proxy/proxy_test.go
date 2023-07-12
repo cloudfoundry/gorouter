@@ -1541,14 +1541,19 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("responds to host with malicious script with 400", func() {
-			conn := dialProxy(proxyServer)
+			conn, err := net.Dial("tcp", proxyServer.Addr().String())
+			defer conn.Close()
+			Expect(err).NotTo(HaveOccurred())
 
-			req := test_util.NewRequest("GET", "<html><header><script>alert(document.cookie);</script></header><body/></html>", "/", nil)
-			conn.WriteRequest(req)
+			rawReq := "GET / HTTP/1.1\nHost: <html><header><script>alert(document.cookie);</script></header><body/></html>\n\n\n"
 
-			resp, body := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			Expect(body).To(ContainSubstring("malformed Host header"))
+			conn.Write([]byte(rawReq))
+
+			resp, err := ioutil.ReadAll(conn)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(string(resp)).To(ContainSubstring("HTTP/1.1 400 Bad Request"))               // status header
+			Expect(string(resp)).To(ContainSubstring("400 Bad Request: malformed Host header")) // body
 		})
 
 		It("responds with 404 for a not found host name with only valid characters", func() {
