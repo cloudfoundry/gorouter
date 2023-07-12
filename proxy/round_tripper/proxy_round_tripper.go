@@ -30,6 +30,7 @@ const (
 	HostnameErrorMessage      = "503 Service Unavailable"
 	InvalidCertificateMessage = "526 Invalid SSL Certificate"
 	SSLHandshakeMessage       = "525 SSL Handshake Failed"
+	ServiceIsOverloaded       = "529 The Service is Overloaded"
 	SSLCertRequiredMessage    = "496 SSL Certificate Required"
 	ContextCancelledMessage   = "499 Request Cancelled"
 	HTTP2Protocol             = "http2"
@@ -369,6 +370,11 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	if err != nil {
 		cancel()
 		return nil, err
+	}
+	if resp.StatusCode == 529 {
+		// special case: the backend says it's overloaded
+		cancel()
+		return nil, fails.BackendOverloadedError
 	}
 
 	return resp, err

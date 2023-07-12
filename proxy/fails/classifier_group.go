@@ -21,6 +21,7 @@ var RetriableClassifiers = ClassifierGroup{
 	ExpiredOrNotYetValidCertFailure,
 	IdempotentRequestEOF,
 	IncompleteRequest,
+	BackendOverloaded,
 }
 
 var FailableClassifiers = ClassifierGroup{

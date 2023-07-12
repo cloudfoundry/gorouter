@@ -13,6 +13,8 @@ var IdempotentRequestEOFError = errors.New("EOF (via idempotent request)")
 
 var IncompleteRequestError = errors.New("incomplete request")
 
+var BackendOverloadedError = errors.New("backend overloaded")
+
 var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
 	return errors.As(err, &tls.RecordHeaderError{})
 })
@@ -85,4 +87,8 @@ var IdempotentRequestEOF = ClassifierFunc(func(err error) bool {
 
 var IncompleteRequest = ClassifierFunc(func(err error) bool {
 	return errors.Is(err, IncompleteRequestError)
+})
+
+var BackendOverloaded = ClassifierFunc(func(err error) bool {
+	return errors.Is(err, BackendOverloadedError)
 })
