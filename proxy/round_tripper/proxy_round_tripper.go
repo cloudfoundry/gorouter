@@ -150,6 +150,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		maxAttempts = rt.maxRouteServiceAttempts
 	}
 
+	// Make request rewindable if possible.
+	body, err := tryPreBufferBody(request)
+	if err != nil {
+		return nil, err
+	}
+
 	reqInfo.AppRequestStartedAt = time.Now()
 
 	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
@@ -157,6 +163,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 		// Reset the trace to prepare for new times and prevent old data from polluting our results.
 		trace.Reset()
+
+		// Rewind the request body if possible
+		if body != nil {
+			body.rewindRequest(request)
+		}
 
 		if reqInfo.RouteServiceURL == nil {
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
@@ -178,7 +189,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable, err := rt.isRetriable(request, err, trace, body)
 
 				logger.Error("backend-endpoint-failed",
 					zap.Error(err),
@@ -227,7 +238,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable, err := rt.isRetriable(request, err, trace, body)
 
 				logger.Error(
 					"route-service-connection-failed",
@@ -374,6 +385,7 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	if resp.StatusCode == 529 {
 		// special case: the backend says it's overloaded
 		cancel()
+		_ = resp.Body.Close()
 		return nil, fails.BackendOverloadedError
 	}
 
@@ -488,7 +500,7 @@ func isIdempotent(request *http.Request) bool {
 	return false
 }
 
-func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer) (bool, error) {
+func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer, rwndRequest *rewindableBody) (bool, error) {
 	// if the context has been cancelled we do not perform further retries
 	if request.Context().Err() != nil {
 		return false, fmt.Errorf("%w (%w)", request.Context().Err(), err)
@@ -504,6 +516,11 @@ func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *req
 	// be written in full, the request should also be safe to retry.
 	if !trace.GotConn() || !trace.WroteHeaders() {
 		err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, err)
+	}
+
+	// If the backend was overloaded and the request had a body but was too large to buffer, we can't retry.
+	if err == fails.BackendOverloadedError && !isIdempotent(request) && rwndRequest == nil {
+		err = fails.BackendOverloadedNotRetriableError
 	}
 
 	retriable := rt.retriableClassifier.Classify(err)

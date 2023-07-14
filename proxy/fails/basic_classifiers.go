@@ -15,6 +15,8 @@ var IncompleteRequestError = errors.New("incomplete request")
 
 var BackendOverloadedError = errors.New("backend overloaded")
 
+var BackendOverloadedNotRetriableError = errors.New("backend overloaded (retry failed, request too large)")
+
 var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
 	return errors.As(err, &tls.RecordHeaderError{})
 })
