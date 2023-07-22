@@ -3,7 +3,6 @@ package round_tripper
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -177,7 +176,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable := rt.isRetriable(request, err, trace)
 
 				logger.Error("backend-endpoint-failed",
 					zap.Error(err),
@@ -226,7 +225,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable := rt.isRetriable(request, err, trace)
 
 				logger.Error(
 					"route-service-connection-failed",
@@ -482,24 +481,23 @@ func isIdempotent(request *http.Request) bool {
 	return false
 }
 
-func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer) (bool, error) {
+func (rt *roundTripper) isRetriable(request *http.Request, err error, trace *requestTracer) bool {
 	// if the context has been cancelled we do not perform further retries
 	if request.Context().Err() != nil {
-		return false, fmt.Errorf("%w (%w)", request.Context().Err(), err)
+		return false
 	}
 
 	// io.EOF errors are considered safe to retry for certain requests
 	// Replace the error here to track this state when classifying later.
 	if err == io.EOF && isIdempotent(request) {
-		err = fails.IdempotentRequestEOFError
+		return true
 	}
 	// We can retry for sure if we never obtained a connection
 	// since there is no way any data was transmitted. If headers could not
 	// be written in full, the request should also be safe to retry.
 	if !trace.GotConn() || !trace.WroteHeaders() {
-		err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, err)
+		return true
 	}
 
-	retriable := rt.retriableClassifier.Classify(err)
-	return retriable, err
+	return rt.retriableClassifier.Classify(err)
 }

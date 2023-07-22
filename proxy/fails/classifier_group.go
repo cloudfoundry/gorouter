@@ -10,6 +10,11 @@ type ClassifierGroup []Classifier
 //
 // Otherwise, there’s risk of a mutating non-idempotent request (e.g. send
 // payment) being silently retried without the client knowing.
+//
+// IMPORTANT: to truly determine whether a request is retry-able the function
+// round_tripper.isRetrieable must be used. It includes additional checks that
+// allow requests to be retried more often than it is allowed by the
+// classifiers.
 var RetriableClassifiers = ClassifierGroup{
 	Dial,
 	AttemptedTLSWithNonTLSBackend,
@@ -19,18 +24,42 @@ var RetriableClassifiers = ClassifierGroup{
 	RemoteHandshakeTimeout,
 	UntrustedCert,
 	ExpiredOrNotYetValidCertFailure,
-	IdempotentRequestEOF,
-	IncompleteRequest,
 }
 
+// FailableClassifiers match all errors that should result in the endpoint
+// being marked as failed and taken out of the available pool. These endpoints
+// will be cleaned up automatically by the route-pruning in case they have
+// become stale, therefore there is no need to prune those endpoints
+// proactively.
 var FailableClassifiers = ClassifierGroup{
-	RetriableClassifiers,
+	Dial,
+	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
+	RemoteFailedCertCheck,
+	RemoteHandshakeFailure,
+	RemoteHandshakeTimeout,
+	UntrustedCert,
+	ExpiredOrNotYetValidCertFailure,
 	ConnectionResetOnRead,
 }
 
-var PrunableClassifiers = RetriableClassifiers
+// PrunableClassifiers match all errors that should result in the endpoint
+// being pruned. This applies only if the connection to the backend is using
+// TLS since the route-integrity prevents routes from being pruned
+// automatically if they are configured with TLS.
+var PrunableClassifiers = ClassifierGroup{
+	Dial,
+	AttemptedTLSWithNonTLSBackend,
+	HostnameMismatch,
+	RemoteFailedCertCheck,
+	RemoteHandshakeFailure,
+	RemoteHandshakeTimeout,
+	UntrustedCert,
+	ExpiredOrNotYetValidCertFailure,
+}
 
-// Classify returns true on errors that are retryable
+// Classify returns true on errors that match the at least one Classifier from
+// the ClassifierGroup it is called on.
 func (cg ClassifierGroup) Classify(err error) bool {
 	for _, classifier := range cg {
 		if classifier.Classify(err) {

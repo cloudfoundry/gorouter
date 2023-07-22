@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"net"
 	"net/http/httptest"
 
@@ -137,41 +136,9 @@ var _ = Describe("HandleError", func() {
 			})
 		})
 
-		Context("HostnameMismatch wrapped in IncompleteRequestError", func() {
-			BeforeEach(func() {
-				wrappedErr := x509.HostnameError{Host: "the wrong one"}
-				err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, wrappedErr)
-				errorHandler.HandleError(responseWriter, err)
-			})
-
-			It("has a 503 Status Code", func() {
-				Expect(responseWriter.Status()).To(Equal(503))
-			})
-
-			It("emits a backend_invalid_id metric", func() {
-				Expect(metricReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
-			})
-		})
-
 		Context("Untrusted Cert", func() {
 			BeforeEach(func() {
 				err = x509.UnknownAuthorityError{}
-				errorHandler.HandleError(responseWriter, err)
-			})
-
-			It("has a 526 Status Code", func() {
-				Expect(responseWriter.Status()).To(Equal(526))
-			})
-
-			It("emits a backend_invalid_tls_cert metric", func() {
-				Expect(metricReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
-			})
-		})
-
-		Context("Untrusted Cert wrapped in IncompleteRequestError", func() {
-			BeforeEach(func() {
-				wrappedErr := x509.UnknownAuthorityError{}
-				err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, wrappedErr)
 				errorHandler.HandleError(responseWriter, err)
 			})
 
@@ -199,41 +166,9 @@ var _ = Describe("HandleError", func() {
 			})
 		})
 
-		Context("Attempted TLS with non-TLS backend error wrapped in IncompleteRequestError", func() {
-			BeforeEach(func() {
-				wrappedErr := tls.RecordHeaderError{Msg: "bad handshake"}
-				err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, wrappedErr)
-				errorHandler.HandleError(responseWriter, err)
-			})
-
-			It("has a 525 Status Code", func() {
-				Expect(responseWriter.Status()).To(Equal(525))
-			})
-
-			It("emits a backend_tls_handshake_failed metric", func() {
-				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
-			})
-		})
-
 		Context("Remote handshake failure", func() {
 			BeforeEach(func() {
 				err = &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")}
-				errorHandler.HandleError(responseWriter, err)
-			})
-
-			It("has a 525 Status Code", func() {
-				Expect(responseWriter.Status()).To(Equal(525))
-			})
-
-			It("emits a backend_tls_handshake_failed metric", func() {
-				Expect(metricReporter.CaptureBackendTLSHandshakeFailedCallCount()).To(Equal(1))
-			})
-		})
-
-		Context("Remote handshake failure wrapped in IncompleteRequestError", func() {
-			BeforeEach(func() {
-				wrappedErr := &net.OpError{Op: "remote error", Err: errors.New("tls: handshake failure")}
-				err = fmt.Errorf("%w (%w)", fails.IncompleteRequestError, wrappedErr)
 				errorHandler.HandleError(responseWriter, err)
 			})
 

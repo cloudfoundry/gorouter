@@ -9,10 +9,6 @@ import (
 	"strings"
 )
 
-var IdempotentRequestEOFError = errors.New("EOF (via idempotent request)")
-
-var IncompleteRequestError = errors.New("incomplete request")
-
 var AttemptedTLSWithNonTLSBackend = ClassifierFunc(func(err error) bool {
 	return errors.As(err, &tls.RecordHeaderError{})
 })
@@ -77,12 +73,4 @@ var UntrustedCert = ClassifierFunc(func(err error) bool {
 	default:
 		return false
 	}
-})
-
-var IdempotentRequestEOF = ClassifierFunc(func(err error) bool {
-	return errors.Is(err, IdempotentRequestEOFError)
-})
-
-var IncompleteRequest = ClassifierFunc(func(err error) bool {
-	return errors.Is(err, IncompleteRequestError)
 })
