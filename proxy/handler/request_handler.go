@@ -165,6 +165,40 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 	h.reporter.CaptureWebSocketUpdate()
 }
 
+func (h *RequestHandler) SanitizeRequestConnection() {
+	connections := h.request.Header.Values("Connection")
+	for index, connection := range connections {
+		if connection != "" {
+			values := strings.Split(connection, ",")
+			connectionHeader := []string{}
+			bannedList := []string{
+				"X-Forwarded-For",
+				"X-Forwarded-Proto",
+				"B3",
+				"X-B3",
+				"X-B3-SpanID",
+				"X-B3-TraceID",
+				"X-Request-Start",
+				"X-Forwarded-Client-Cert",
+			}
+			for i := range values {
+				trimmedValue := strings.TrimSpace(values[i])
+				found := false
+				for _, item := range bannedList {
+					if strings.ToLower(item) == strings.ToLower(trimmedValue) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					connectionHeader = append(connectionHeader, trimmedValue)
+				}
+			}
+			h.request.Header[http.CanonicalHeaderKey("Connection")][index] = strings.Join(connectionHeader, ", ")
+		}
+	}
+}
+
 type connSuccessCB func(net.Conn, *route.Endpoint) error
 type connFailureCB func(error)
 

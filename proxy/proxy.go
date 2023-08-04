@@ -277,6 +277,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		},
 	}
 
+	handler.SanitizeRequestConnection()
 	if handlers.IsWebSocketUpgrade(request) {
 		handler.HandleWebSocketRequest(endpointIterator)
 		return

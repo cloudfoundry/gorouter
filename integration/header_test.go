@@ -2,7 +2,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -29,7 +29,7 @@ var _ = Describe("Headers", func() {
 		testApp = NewUnstartedTestApp(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				defer GinkgoRecover()
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				Expect(err).NotTo(HaveOccurred())
 				w.Header().Set(testHeader, testHeaderValue)
 				w.WriteHeader(200)
@@ -56,9 +56,38 @@ var _ = Describe("Headers", func() {
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Header.Get(testHeader)).To(Equal(testHeaderValue))
+			resp.Body.Close()
+		})
+	})
+
+	Context("Keeps relevant headers", func() {
+		BeforeEach(func() {
+			testApp = NewUnstartedTestApp(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					_, err := io.ReadAll(r.Body)
+					Expect(err).NotTo(HaveOccurred())
+					w.Header().Set("X-Forwarded-Proto", r.Header.Get("X-Forwarded-Proto"))
+					w.WriteHeader(200)
+				}))
+			testState.StartGorouterOrFail()
+			testApp.Start()
+			testState.register(testApp.Server, testAppRoute)
+		})
+
+		It("returns a header that was set by the gorouter", func() {
+			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req.Header.Set("Connection", "X-Forwarded-Proto")
+			resp, err := testState.client.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(200))
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).NotTo(HaveOccurred())
+			headers := fmt.Sprintf("Headers: %+v", resp.Header)
+			Expect(resp.Header.Get("X-Forwarded-Proto")).To(Equal("http"), headers)
 			resp.Body.Close()
 		})
 	})
@@ -82,7 +111,7 @@ var _ = Describe("Headers", func() {
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Header.Get(testHeader)).To(BeEmpty())
 			resp.Body.Close()
@@ -114,7 +143,7 @@ var _ = Describe("Headers", func() {
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Header.Get(newHeader)).To(Equal(newHeaderValue))
 			resp.Body.Close()
