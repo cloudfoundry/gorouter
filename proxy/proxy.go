@@ -60,6 +60,7 @@ type proxy struct {
 	disableXFFLogging        bool
 	disableSourceIPLogging   bool
 	stickySessionCookieNames config.StringSet
+	hopByHopHeadersToFilter  []string
 }
 
 func NewProxy(
@@ -102,6 +103,7 @@ func NewProxy(
 		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
 		disableSourceIPLogging:   cfg.Logging.DisableLogSourceIP,
 		stickySessionCookieNames: cfg.StickySessionCookieNames,
+		hopByHopHeadersToFilter:  cfg.HopByHopHeadersToFilter,
 	}
 
 	dialer := &net.Dialer{
@@ -253,6 +255,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.websocketDialTimeout,
 		p.maxAttempts,
 		p.backendTLSConfig,
+		p.hopByHopHeadersToFilter,
 		handler.DisableXFFLogging(p.disableXFFLogging),
 		handler.DisableSourceIPLogging(p.disableSourceIPLogging),
 	)

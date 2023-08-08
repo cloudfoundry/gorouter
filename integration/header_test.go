@@ -65,6 +65,7 @@ var _ = Describe("Headers", func() {
 
 	Context("Keeps relevant headers", func() {
 		BeforeEach(func() {
+			testState.cfg.HopByHopHeadersToFilter = []string{"X-Forwarded-Proto"}
 			testApp = NewUnstartedTestApp(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					defer GinkgoRecover()

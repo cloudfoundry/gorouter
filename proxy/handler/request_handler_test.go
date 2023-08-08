@@ -50,6 +50,7 @@ var _ = Describe("RequestHandler", func() {
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, time.Second*2, 3, &tls.Config{},
+				nil,
 				handler.DisableXFFLogging(true),
 			)
 		})
@@ -98,6 +99,7 @@ var _ = Describe("RequestHandler", func() {
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, time.Second*2, 3, &tls.Config{},
+				nil,
 				handler.DisableSourceIPLogging(true),
 			)
 		})
@@ -134,6 +136,19 @@ var _ = Describe("RequestHandler", func() {
 	})
 
 	Context("when connection header has forbidden values", func() {
+		var hopByHopHeadersToFilter []string
+		BeforeEach(func() {
+			hopByHopHeadersToFilter = []string{
+				"X-Forwarded-For",
+				"X-Forwarded-Proto",
+				"B3",
+				"X-B3",
+				"X-B3-SpanID",
+				"X-B3-TraceID",
+				"X-Request-Start",
+				"X-Forwarded-Client-Cert",
+			}
+		})
 		Context("For a single Connection header", func() {
 			BeforeEach(func() {
 				req = &http.Request{
@@ -164,6 +179,7 @@ var _ = Describe("RequestHandler", func() {
 					req, pr,
 					&metric.FakeProxyReporter{}, logger, ew,
 					time.Second*2, time.Second*2, 3, &tls.Config{},
+					hopByHopHeadersToFilter,
 					handler.DisableSourceIPLogging(true),
 				)
 			})
@@ -206,6 +222,7 @@ var _ = Describe("RequestHandler", func() {
 					req, pr,
 					&metric.FakeProxyReporter{}, logger, ew,
 					time.Second*2, time.Second*2, 3, &tls.Config{},
+					hopByHopHeadersToFilter,
 					handler.DisableSourceIPLogging(true),
 				)
 			})

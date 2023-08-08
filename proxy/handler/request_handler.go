@@ -37,9 +37,10 @@ type RequestHandler struct {
 
 	tlsConfigTemplate *tls.Config
 
-	forwarder              *Forwarder
-	disableXFFLogging      bool
-	disableSourceIPLogging bool
+	forwarder               *Forwarder
+	disableXFFLogging       bool
+	disableSourceIPLogging  bool
+	hopByHopHeadersToFilter []string
 }
 
 func NewRequestHandler(
@@ -52,17 +53,19 @@ func NewRequestHandler(
 	websocketDialTimeout time.Duration,
 	maxAttempts int,
 	tlsConfig *tls.Config,
+	hopByHopHeadersToFilter []string,
 	opts ...func(*RequestHandler),
 ) *RequestHandler {
 	reqHandler := &RequestHandler{
-		errorWriter:          errorWriter,
-		reporter:             r,
-		request:              request,
-		response:             response,
-		endpointDialTimeout:  endpointDialTimeout,
-		websocketDialTimeout: websocketDialTimeout,
-		maxAttempts:          maxAttempts,
-		tlsConfigTemplate:    tlsConfig,
+		errorWriter:             errorWriter,
+		reporter:                r,
+		request:                 request,
+		response:                response,
+		endpointDialTimeout:     endpointDialTimeout,
+		websocketDialTimeout:    websocketDialTimeout,
+		maxAttempts:             maxAttempts,
+		tlsConfigTemplate:       tlsConfig,
+		hopByHopHeadersToFilter: hopByHopHeadersToFilter,
 	}
 
 	for _, option := range opts {
@@ -171,20 +174,10 @@ func (h *RequestHandler) SanitizeRequestConnection() {
 		if connection != "" {
 			values := strings.Split(connection, ",")
 			connectionHeader := []string{}
-			bannedList := []string{
-				"X-Forwarded-For",
-				"X-Forwarded-Proto",
-				"B3",
-				"X-B3",
-				"X-B3-SpanID",
-				"X-B3-TraceID",
-				"X-Request-Start",
-				"X-Forwarded-Client-Cert",
-			}
 			for i := range values {
 				trimmedValue := strings.TrimSpace(values[i])
 				found := false
-				for _, item := range bannedList {
+				for _, item := range h.hopByHopHeadersToFilter {
 					if strings.ToLower(item) == strings.ToLower(trimmedValue) {
 						found = true
 						break
