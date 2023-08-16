@@ -169,6 +169,9 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 }
 
 func (h *RequestHandler) SanitizeRequestConnection() {
+	if len(h.hopByHopHeadersToFilter) == 0 {
+		return
+	}
 	connections := h.request.Header.Values("Connection")
 	for index, connection := range connections {
 		if connection != "" {
