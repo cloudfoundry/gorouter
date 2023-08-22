@@ -1545,6 +1545,18 @@ enable_http2: false
 			})
 		})
 
+		Context("hop_by_hop_headers_to_filter", func() {
+			It("setting hop_by_hop_headers_to_filter succeeds", func() {
+				var b = []byte(fmt.Sprintf(`
+hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
+`))
+				err := config.Initialize(b)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config.Process()).To(Succeed())
+				Expect(config.HopByHopHeadersToFilter).To(Equal([]string{"X-ME", "X-Foo"}))
+			})
+		})
+
 		Context("When given a routing_table_sharding_mode that is supported ", func() {
 			Context("sharding mode `all`", func() {
 				It("succeeds", func() {

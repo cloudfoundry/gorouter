@@ -37,9 +37,10 @@ type RequestHandler struct {
 
 	tlsConfigTemplate *tls.Config
 
-	forwarder              *Forwarder
-	disableXFFLogging      bool
-	disableSourceIPLogging bool
+	forwarder               *Forwarder
+	disableXFFLogging       bool
+	disableSourceIPLogging  bool
+	hopByHopHeadersToFilter []string
 }
 
 func NewRequestHandler(
@@ -52,17 +53,19 @@ func NewRequestHandler(
 	websocketDialTimeout time.Duration,
 	maxAttempts int,
 	tlsConfig *tls.Config,
+	hopByHopHeadersToFilter []string,
 	opts ...func(*RequestHandler),
 ) *RequestHandler {
 	reqHandler := &RequestHandler{
-		errorWriter:          errorWriter,
-		reporter:             r,
-		request:              request,
-		response:             response,
-		endpointDialTimeout:  endpointDialTimeout,
-		websocketDialTimeout: websocketDialTimeout,
-		maxAttempts:          maxAttempts,
-		tlsConfigTemplate:    tlsConfig,
+		errorWriter:             errorWriter,
+		reporter:                r,
+		request:                 request,
+		response:                response,
+		endpointDialTimeout:     endpointDialTimeout,
+		websocketDialTimeout:    websocketDialTimeout,
+		maxAttempts:             maxAttempts,
+		tlsConfigTemplate:       tlsConfig,
+		hopByHopHeadersToFilter: hopByHopHeadersToFilter,
 	}
 
 	for _, option := range opts {
@@ -163,6 +166,33 @@ func (h *RequestHandler) HandleWebSocketRequest(iter route.EndpointIterator) {
 
 	h.response.SetStatus(backendStatusCode)
 	h.reporter.CaptureWebSocketUpdate()
+}
+
+func (h *RequestHandler) SanitizeRequestConnection() {
+	if len(h.hopByHopHeadersToFilter) == 0 {
+		return
+	}
+	connections := h.request.Header.Values("Connection")
+	for index, connection := range connections {
+		if connection != "" {
+			values := strings.Split(connection, ",")
+			connectionHeader := []string{}
+			for i := range values {
+				trimmedValue := strings.TrimSpace(values[i])
+				found := false
+				for _, item := range h.hopByHopHeadersToFilter {
+					if strings.ToLower(item) == strings.ToLower(trimmedValue) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					connectionHeader = append(connectionHeader, trimmedValue)
+				}
+			}
+			h.request.Header[http.CanonicalHeaderKey("Connection")][index] = strings.Join(connectionHeader, ", ")
+		}
+	}
 }
 
 type connSuccessCB func(net.Conn, *route.Endpoint) error

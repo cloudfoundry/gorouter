@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -49,6 +50,7 @@ var _ = Describe("RequestHandler", func() {
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, time.Second*2, 3, &tls.Config{},
+				nil,
 				handler.DisableXFFLogging(true),
 			)
 		})
@@ -97,6 +99,7 @@ var _ = Describe("RequestHandler", func() {
 				req, pr,
 				&metric.FakeProxyReporter{}, logger, ew,
 				time.Second*2, time.Second*2, 3, &tls.Config{},
+				nil,
 				handler.DisableSourceIPLogging(true),
 			)
 		})
@@ -128,6 +131,109 @@ var _ = Describe("RequestHandler", func() {
 			It("does not include the RemoteAddr header in log output", func() {
 				rh.HandleWebSocketRequest(&iter.FakeEndpointIterator{})
 				Eventually(logger.Buffer()).Should(gbytes.Say(`"RemoteAddr":"-"`))
+			})
+		})
+	})
+
+	Context("when connection header has forbidden values", func() {
+		var hopByHopHeadersToFilter []string
+		BeforeEach(func() {
+			hopByHopHeadersToFilter = []string{
+				"X-Forwarded-For",
+				"X-Forwarded-Proto",
+				"B3",
+				"X-B3",
+				"X-B3-SpanID",
+				"X-B3-TraceID",
+				"X-Request-Start",
+				"X-Forwarded-Client-Cert",
+			}
+		})
+		Context("For a single Connection header", func() {
+			BeforeEach(func() {
+				req = &http.Request{
+					RemoteAddr: "downtown-nino-brown",
+					Host:       "gersh",
+					URL: &url.URL{
+						Path: "/foo",
+					},
+					Header: http.Header{},
+				}
+				values := []string{
+					"Content-Type",
+					"User-Agent",
+					"X-Forwarded-Proto",
+					"Accept",
+					"X-B3-Spanid",
+					"X-B3-Traceid",
+					"B3",
+					"X-Request-Start",
+					"Cookie",
+					"X-Cf-Applicationid",
+					"X-Cf-Instanceid",
+					"X-Cf-Instanceindex",
+					"X-Vcap-Request-Id",
+				}
+				req.Header.Add("Connection", strings.Join(values, ", "))
+				rh = handler.NewRequestHandler(
+					req, pr,
+					&metric.FakeProxyReporter{}, logger, ew,
+					time.Second*2, time.Second*2, 3, &tls.Config{},
+					hopByHopHeadersToFilter,
+					handler.DisableSourceIPLogging(true),
+				)
+			})
+			Describe("SanitizeRequestConnection", func() {
+				It("Filters hop-by-hop headers", func() {
+					rh.SanitizeRequestConnection()
+					Expect(req.Header.Get("Connection")).To(Equal("Content-Type, User-Agent, Accept, Cookie, X-Cf-Applicationid, X-Cf-Instanceid, X-Cf-Instanceindex, X-Vcap-Request-Id"))
+				})
+			})
+		})
+		Context("For multiple Connection headers", func() {
+			BeforeEach(func() {
+				req = &http.Request{
+					RemoteAddr: "downtown-nino-brown",
+					Host:       "gersh",
+					URL: &url.URL{
+						Path: "/foo",
+					},
+					Header: http.Header{},
+				}
+				req.Header.Add("Connection", strings.Join([]string{
+					"Content-Type",
+					"X-B3-Spanid",
+					"X-B3-Traceid",
+					"X-Request-Start",
+					"Cookie",
+					"X-Cf-Instanceid",
+					"X-Vcap-Request-Id",
+				}, ", "))
+				req.Header.Add("Connection", strings.Join([]string{
+					"Content-Type",
+					"User-Agent",
+					"X-Forwarded-Proto",
+					"Accept",
+					"X-B3-Spanid",
+					"X-Cf-Applicationid",
+					"X-Cf-Instanceindex",
+				}, ", "))
+				rh = handler.NewRequestHandler(
+					req, pr,
+					&metric.FakeProxyReporter{}, logger, ew,
+					time.Second*2, time.Second*2, 3, &tls.Config{},
+					hopByHopHeadersToFilter,
+					handler.DisableSourceIPLogging(true),
+				)
+			})
+			Describe("SanitizeRequestConnection", func() {
+				It("Filters hop-by-hop headers", func() {
+					rh.SanitizeRequestConnection()
+					headers := req.Header.Values("Connection")
+					Expect(len(headers)).To(Equal(2))
+					Expect(headers[0]).To(Equal("Content-Type, Cookie, X-Cf-Instanceid, X-Vcap-Request-Id"))
+					Expect(headers[1]).To(Equal("Content-Type, User-Agent, Accept, X-Cf-Applicationid, X-Cf-Instanceindex"))
+				})
 			})
 		})
 	})
