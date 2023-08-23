@@ -31,8 +31,8 @@ func (p *proxy) modifyResponse(res *http.Response) error {
 		return errors.New("reqInfo.RoutePool is empty on a successful response")
 	}
 
-	if p.traceKey != "" && req.Header.Get(router_http.VcapTraceHeader) == p.traceKey {
-		res.Header.Set(router_http.VcapRouterHeader, p.ip)
+	if p.config.TraceKey != "" && req.Header.Get(router_http.VcapTraceHeader) == p.config.TraceKey {
+		res.Header.Set(router_http.VcapRouterHeader, p.config.Ip)
 		res.Header.Set(router_http.VcapBackendHeader, endpoint.CanonicalAddr())
 		res.Header.Set(router_http.CfRouteEndpointHeader, endpoint.CanonicalAddr())
 	}

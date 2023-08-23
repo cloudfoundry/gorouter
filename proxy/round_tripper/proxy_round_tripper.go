@@ -72,36 +72,24 @@ func NewProxyRoundTripper(
 ) ProxyRoundTripper {
 
 	return &roundTripper{
-		logger:                   logger,
-		defaultLoadBalance:       cfg.LoadBalance,
-		combinedReporter:         combinedReporter,
-		secureCookies:            cfg.SecureCookies,
-		roundTripperFactory:      roundTripperFactory,
-		retriableClassifier:      retriableClassifiers,
-		maxAttempts:              cfg.Backends.MaxAttempts,
-		maxRouteServiceAttempts:  cfg.RouteServiceConfig.MaxAttempts,
-		errorHandler:             errHandler,
-		routeServicesTransport:   routeServicesTransport,
-		endpointTimeout:          cfg.EndpointTimeout,
-		stickySessionCookieNames: cfg.StickySessionCookieNames,
-		http2Enabled:             cfg.EnableHTTP2,
+		logger:                 logger,
+		combinedReporter:       combinedReporter,
+		roundTripperFactory:    roundTripperFactory,
+		retriableClassifier:    retriableClassifiers,
+		errorHandler:           errHandler,
+		routeServicesTransport: routeServicesTransport,
+		config:                 cfg,
 	}
 }
 
 type roundTripper struct {
-	logger                   logger.Logger
-	defaultLoadBalance       string
-	combinedReporter         metrics.ProxyReporter
-	secureCookies            bool
-	roundTripperFactory      RoundTripperFactory
-	retriableClassifier      fails.Classifier
-	maxAttempts              int
-	maxRouteServiceAttempts  int
-	errorHandler             errorHandler
-	routeServicesTransport   http.RoundTripper
-	endpointTimeout          time.Duration
-	stickySessionCookieNames config.StringSet
-	http2Enabled             bool
+	logger                 logger.Logger
+	combinedReporter       metrics.ProxyReporter
+	roundTripperFactory    RoundTripperFactory
+	retriableClassifier    fails.Classifier
+	errorHandler           errorHandler
+	routeServicesTransport http.RoundTripper
+	config                 *config.Config
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
@@ -132,9 +120,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	stickyEndpointID := getStickySession(request, rt.stickySessionCookieNames)
+	stickyEndpointID := getStickySession(request, rt.config.StickySessionCookieNames)
 	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
-	iter := reqInfo.RoutePool.Endpoints(rt.defaultLoadBalance, stickyEndpointID)
+	iter := reqInfo.RoutePool.Endpoints(rt.config.LoadBalance, stickyEndpointID)
 
 	// The selectEndpointErr needs to be tracked separately. If we get an error
 	// while selecting an endpoint we might just have run out of routes. In
@@ -144,9 +132,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	var selectEndpointErr error
 	var maxAttempts int
 	if reqInfo.RouteServiceURL == nil {
-		maxAttempts = rt.maxAttempts
+		maxAttempts = rt.config.Backends.MaxAttempts
 	} else {
-		maxAttempts = rt.maxRouteServiceAttempts
+		maxAttempts = rt.config.RouteServiceConfig.MaxAttempts
 	}
 
 	reqInfo.AppRequestStartedAt = time.Now()
@@ -217,7 +205,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			*request.URL = *reqInfo.RouteServiceURL
 
 			var roundTripper http.RoundTripper
-			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory, true, rt.http2Enabled)
+			roundTripper = GetRoundTripper(endpoint, rt.roundTripperFactory, true, rt.config.EnableHTTP2)
 			if reqInfo.ShouldRouteToInternalRouteService {
 				roundTripper = rt.routeServicesTransport
 			}
@@ -308,8 +296,8 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
-			res, endpoint, stickyEndpointID, rt.secureCookies,
-			reqInfo.RoutePool.ContextPath(), rt.stickySessionCookieNames,
+			res, endpoint, stickyEndpointID, rt.config.SecureCookies,
+			reqInfo.RoutePool.ContextPath(), rt.config.StickySessionCookieNames,
 		)
 	}
 
@@ -322,7 +310,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 		return
 	}
 
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.config.EnableHTTP2)
 	tr.CancelRequest(request)
 }
 
@@ -336,7 +324,7 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 	iter.PreRequest(endpoint)
 
 	rt.combinedReporter.CaptureRoutingRequest(endpoint)
-	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.http2Enabled)
+	tr := GetRoundTripper(endpoint, rt.roundTripperFactory, false, rt.config.EnableHTTP2)
 	res, err := rt.timedRoundTrip(tr, request, logger)
 
 	// decrement connection stats
@@ -345,11 +333,11 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 }
 
 func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
-	if rt.endpointTimeout <= 0 {
+	if rt.config.EndpointTimeout <= 0 {
 		return tr.RoundTrip(request)
 	}
 
-	reqCtx, cancel := context.WithTimeout(request.Context(), rt.endpointTimeout)
+	reqCtx, cancel := context.WithTimeout(request.Context(), rt.config.EndpointTimeout)
 	request = request.WithContext(reqCtx)
 
 	// unfortunately if the cancel function above is not called that

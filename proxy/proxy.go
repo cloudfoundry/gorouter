@@ -36,31 +36,17 @@ var (
 )
 
 type proxy struct {
-	ip                       string
-	traceKey                 string
-	logger                   logger.Logger
-	errorWriter              errorwriter.ErrorWriter
-	reporter                 metrics.ProxyReporter
-	accessLogger             accesslog.AccessLogger
-	promRegistry             handlers.Registry
-	secureCookies            bool
-	health                   *health.Health
-	routeServiceConfig       *routeservice.RouteServiceConfig
-	healthCheckUserAgent     string
-	forceForwardedProtoHttps bool
-	sanitizeForwardedProto   bool
-	defaultLoadBalance       string
-	endpointDialTimeout      time.Duration
-	websocketDialTimeout     time.Duration
-	endpointTimeout          time.Duration
-	maxAttempts              int
-	bufferPool               httputil.BufferPool
-	backendTLSConfig         *tls.Config
-	routeServiceTLSConfig    *tls.Config
-	disableXFFLogging        bool
-	disableSourceIPLogging   bool
-	stickySessionCookieNames config.StringSet
-	hopByHopHeadersToFilter  []string
+	logger                logger.Logger
+	errorWriter           errorwriter.ErrorWriter
+	reporter              metrics.ProxyReporter
+	accessLogger          accesslog.AccessLogger
+	promRegistry          handlers.Registry
+	health                *health.Health
+	routeServiceConfig    *routeservice.RouteServiceConfig
+	bufferPool            httputil.BufferPool
+	backendTLSConfig      *tls.Config
+	routeServiceTLSConfig *tls.Config
+	config                *config.Config
 }
 
 func NewProxy(
@@ -79,31 +65,17 @@ func NewProxy(
 ) http.Handler {
 
 	p := &proxy{
-		accessLogger:             accessLogger,
-		promRegistry:             promRegistry,
-		traceKey:                 cfg.TraceKey,
-		ip:                       cfg.Ip,
-		logger:                   logger,
-		errorWriter:              errorWriter,
-		reporter:                 reporter,
-		secureCookies:            cfg.SecureCookies,
-		health:                   health,
-		routeServiceConfig:       routeServiceConfig,
-		healthCheckUserAgent:     cfg.HealthCheckUserAgent,
-		forceForwardedProtoHttps: cfg.ForceForwardedProtoHttps,
-		sanitizeForwardedProto:   cfg.SanitizeForwardedProto,
-		defaultLoadBalance:       cfg.LoadBalance,
-		endpointDialTimeout:      cfg.EndpointDialTimeout,
-		websocketDialTimeout:     cfg.WebsocketDialTimeout,
-		endpointTimeout:          cfg.EndpointTimeout,
-		maxAttempts:              cfg.Backends.MaxAttempts,
-		bufferPool:               NewBufferPool(),
-		backendTLSConfig:         backendTLSConfig,
-		routeServiceTLSConfig:    routeServiceTLSConfig,
-		disableXFFLogging:        cfg.Logging.DisableLogForwardedFor,
-		disableSourceIPLogging:   cfg.Logging.DisableLogSourceIP,
-		stickySessionCookieNames: cfg.StickySessionCookieNames,
-		hopByHopHeadersToFilter:  cfg.HopByHopHeadersToFilter,
+		accessLogger:          accessLogger,
+		promRegistry:          promRegistry,
+		logger:                logger,
+		errorWriter:           errorWriter,
+		reporter:              reporter,
+		health:                health,
+		routeServiceConfig:    routeServiceConfig,
+		bufferPool:            NewBufferPool(),
+		backendTLSConfig:      backendTLSConfig,
+		routeServiceTLSConfig: routeServiceTLSConfig,
+		config:                cfg,
 	}
 
 	dialer := &net.Dialer{
@@ -200,8 +172,8 @@ func NewProxy(
 	))
 	n.Use(&handlers.XForwardedProto{
 		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),
-		ForceForwardedProtoHttps: p.forceForwardedProtoHttps,
-		SanitizeForwardedProto:   p.sanitizeForwardedProto,
+		ForceForwardedProtoHttps: p.config.ForceForwardedProtoHttps,
+		SanitizeForwardedProto:   p.config.SanitizeForwardedProto,
 	})
 	n.Use(routeServiceHandler)
 	n.Use(p)
@@ -251,20 +223,20 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		p.reporter,
 		p.logger,
 		p.errorWriter,
-		p.endpointDialTimeout,
-		p.websocketDialTimeout,
-		p.maxAttempts,
+		p.config.EndpointDialTimeout,
+		p.config.WebsocketDialTimeout,
+		p.config.Backends.MaxAttempts,
 		p.backendTLSConfig,
-		p.hopByHopHeadersToFilter,
-		handler.DisableXFFLogging(p.disableXFFLogging),
-		handler.DisableSourceIPLogging(p.disableSourceIPLogging),
+		p.config.HopByHopHeadersToFilter,
+		handler.DisableXFFLogging(p.config.Logging.DisableLogForwardedFor),
+		handler.DisableSourceIPLogging(p.config.Logging.DisableLogSourceIP),
 	)
 
 	if reqInfo.RoutePool == nil {
 		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
 
-	nestedIterator, err := handlers.EndpointIteratorForRequest(request, p.defaultLoadBalance, p.stickySessionCookieNames)
+	nestedIterator, err := handlers.EndpointIteratorForRequest(request, p.config.LoadBalance, p.config.StickySessionCookieNames)
 	if err != nil {
 		logger.Panic("request-info-err", zap.Error(err))
 	}
