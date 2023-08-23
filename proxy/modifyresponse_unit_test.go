@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"code.cloudfoundry.org/gorouter/config"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +21,7 @@ var _ = Describe("modifyResponse", func() {
 		reqInfo *handlers.RequestInfo
 	)
 	BeforeEach(func() {
-		p = &proxy{}
+		p = &proxy{config: &config.Config{}}
 		rw := httptest.NewRecorder()
 		rw.WriteHeader(http.StatusOK)
 		resp = rw.Result()
@@ -111,7 +112,7 @@ var _ = Describe("modifyResponse", func() {
 		Context("when trace key is provided", func() {
 			Context("when X-Vcap-Trace does not match", func() {
 				BeforeEach(func() {
-					p.traceKey = "other-key"
+					p.config.TraceKey = "other-key"
 				})
 				It("does not add any headers", func() {
 					err := p.modifyResponse(resp)
@@ -123,8 +124,8 @@ var _ = Describe("modifyResponse", func() {
 			})
 			Context("when X-Vcap-Trace does match", func() {
 				BeforeEach(func() {
-					p.traceKey = "trace-key"
-					p.ip = "1.1.1.1"
+					p.config.TraceKey = "trace-key"
+					p.config.Ip = "1.1.1.1"
 				})
 				It("adds the Vcap Trace headers", func() {
 					err := p.modifyResponse(resp)
