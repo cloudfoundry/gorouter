@@ -40,7 +40,13 @@ var ConnectionResetOnRead = ClassifierFunc(func(err error) bool {
 var RemoteFailedCertCheck = ClassifierFunc(func(err error) bool {
 	var opErr *net.OpError
 	if errors.As(err, &opErr) {
-		return opErr.Op == "remote error" && opErr.Err.Error() == "tls: bad certificate"
+		if opErr.Op == "remote error" {
+			if opErr.Err.Error() == "tls: bad certificate" ||
+				opErr.Err.Error() == "tls: unknown certificate authority" ||
+				opErr.Err.Error() == "tls: certificate required" {
+				return true
+			}
+		}
 	}
 	return false
 })
