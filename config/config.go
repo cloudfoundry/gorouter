@@ -3,8 +3,14 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
+	"go.step.sm/crypto/pemutil"
 	"net/url"
+
+	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
+	"gopkg.in/yaml.v2"
 
 	"io/ioutil"
 	"runtime"
@@ -12,7 +18,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/localip"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -198,6 +203,130 @@ type HTTPRewriteResponses struct {
 	RemoveHeaders          []HeaderNameValue `yaml:"remove_headers,omitempty"`
 }
 
+// VerifyClientCertificateMetadata defines verification rules for client certificates, which allow additional checks
+// for the certificates' subject.
+//
+// A rule is applied based on the CA certificate's subject. The CA certificate is defined as part of `client_ca_certs`
+// and identified via its subject. See VerifyClientCertMetadata() for the implementation of checks.
+//
+// For client certificates issued by a CA that matches CASubject, the valid client certificate subjects are defined in
+// ValidSubjects.
+type VerifyClientCertificateMetadataRule struct {
+	// The issuer DN , for which the subject validation should apply
+	CASubject CertSubject `yaml:"ca_subject"`
+	// The subject DNs	 that are allowed to be used for mTLS connections to Gorouter
+	ValidSubjects []CertSubject `yaml:"valid_subjects"`
+}
+
+// CertSubject defines the same fields as pkix.Name and allows YAML declaration of said fields. This is used to
+// express distinguished names for certificate subjects in a comparable manner.
+type CertSubject struct {
+	Country            []string `yaml:"country"`
+	Organization       []string `yaml:"organisations"`
+	OrganizationalUnit []string `yaml:"organisation_units"`
+	CommonName         string   `yaml:"common_name"`
+	SerialNumber       string   `yaml:"serial_number"`
+	Locality           []string `yaml:"locality"`
+	Province           []string `yaml:"province"`
+	StreetAddress      []string `yaml:"street_address"`
+	PostalCode         []string `yaml:"postal_code"`
+}
+
+// ToName converts this CertSubject  to a pkix.Name.
+func (c CertSubject) ToName() pkix.Name {
+	return pkix.Name{
+		Country:            c.Country,
+		Organization:       c.Organization,
+		OrganizationalUnit: c.OrganizationalUnit,
+		CommonName:         c.CommonName,
+		SerialNumber:       c.SerialNumber,
+		Locality:           c.Locality,
+		Province:           c.Province,
+		StreetAddress:      c.StreetAddress,
+		PostalCode:         c.PostalCode,
+	}
+}
+
+// VerifyClientCertMetadata checks for th certificate chain received from the tls.Config.VerifyPeerCertificate
+// function callback, whether any configured VerifyClientCertificateMetadataRule applies.
+//
+// If a rule does apply, it is evaluated.
+//
+// Returns an error if there is an applicable rule which does not find a valid client certificate subject.
+func VerifyClientCertMetadata(rules []VerifyClientCertificateMetadataRule, chains [][]*x509.Certificate, logger logger.Logger) error {
+	for _, rule := range rules {
+		for _, chain := range chains {
+			requiredSubject := rule.CASubject.ToName()
+			if !checkIfRuleAppliesToChain(chain, logger, requiredSubject) {
+				continue
+			}
+			err := checkClientCertificateMetadataRule(chain, logger, rule)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// checkIfRuleAppliesToChain checks, whether the provided certificate chain contains a CA certificate
+// whose subject matches the requiredCASubject name.
+//
+// Returns true, if a CA certificate in the chain (cert.IsCA == true) matches the requiredCASubject name.
+func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger logger.Logger, requiredCASubject pkix.Name) bool {
+	for i, cert := range chain {
+		logger.Debug("cert", zap.Int("index", i), zap.Bool("ca", cert.IsCA), zap.String("subject", cert.Subject.String()), zap.String("issuer", cert.Issuer.String()))
+		if cert.IsCA && requiredCASubject.ToRDNSequence().String() == cert.Subject.ToRDNSequence().String() {
+			return true
+		}
+	}
+	return false
+}
+
+// checkClientCertificateMetadataRule is called by checkIfRuleAppliesToChain. When the CA subject matches, the subject
+// of the client certificate is compared agains the subjects defined in rule.
+//
+// Returns an error when:
+// * the certificate does not match any of the ValidSubjects in rule.
+// * the chain does not contain a client certificate (i.e. IsCA == false).
+func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger.Logger, rule VerifyClientCertificateMetadataRule) error {
+	for _, cert := range chain {
+		if !cert.IsCA {
+			subject := cert.Subject
+			for _, validSubject := range rule.ValidSubjects {
+				vaildCertSubject := validSubject.ToName()
+				if vaildCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
+					logger.Debug("chain", zap.String("issuer", cert.Issuer.String()), zap.Bool("CA", cert.IsCA), zap.String("subject", cert.Subject.String()))
+					return nil
+				}
+			}
+			logger.Warn("invalid-subject", zap.String("issuer", cert.Issuer.String()), zap.String("subject", cert.Subject.String()), zap.Object("allowed", rule.ValidSubjects))
+			return fmt.Errorf("subject not in the list of allowed subjects for CA Subject %q: %q", rule.CASubject, subject)
+		}
+	}
+	return fmt.Errorf("incomplete chain")
+}
+
+// InitClientCertMetadataRules compares the defined rules against client CAs set in `client_ca_certs`. When a rule
+// is found that does not have a corresponding client CA (based on the CA's subject) that matches the rule, startup will fail.
+//
+// This is to avoid defining a rule with a minor typo that would then not apply at all and would make the whole
+// additional metadata check moot.
+func InitClientCertMetadataRules(rules []VerifyClientCertificateMetadataRule, certs []*x509.Certificate) error {
+	for _, rule := range rules {
+		found := false
+		for _, cert := range certs {
+			if cert.Subject.ToRDNSequence().String() == rule.CASubject.ToName().ToRDNSequence().String() {
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("no CA certificate found for rule with ca subject %s", rule.CASubject.ToName().String())
+		}
+	}
+	return nil
+}
+
 type Config struct {
 	Status          StatusConfig      `yaml:"status,omitempty"`
 	Nats            NatsConfig        `yaml:"nats,omitempty"`
@@ -231,16 +360,17 @@ type Config struct {
 	IsolationSegments        []string `yaml:"isolation_segments,omitempty"`
 	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode,omitempty"`
 
-	CipherString                      string             `yaml:"cipher_suites,omitempty"`
-	CipherSuites                      []uint16           `yaml:"-"`
-	MinTLSVersionString               string             `yaml:"min_tls_version,omitempty"`
-	MaxTLSVersionString               string             `yaml:"max_tls_version,omitempty"`
-	MinTLSVersion                     uint16             `yaml:"-"`
-	MaxTLSVersion                     uint16             `yaml:"-"`
-	ClientCertificateValidationString string             `yaml:"client_cert_validation,omitempty"`
-	ClientCertificateValidation       tls.ClientAuthType `yaml:"-"`
-	OnlyTrustClientCACerts            bool               `yaml:"only_trust_client_ca_certs"`
-	TLSHandshakeTimeout               time.Duration      `yaml:"tls_handshake_timeout"`
+	CipherString                      string                                `yaml:"cipher_suites,omitempty"`
+	CipherSuites                      []uint16                              `yaml:"-"`
+	MinTLSVersionString               string                                `yaml:"min_tls_version,omitempty"`
+	MaxTLSVersionString               string                                `yaml:"max_tls_version,omitempty"`
+	MinTLSVersion                     uint16                                `yaml:"-"`
+	MaxTLSVersion                     uint16                                `yaml:"-"`
+	ClientCertificateValidationString string                                `yaml:"client_cert_validation,omitempty"`
+	ClientCertificateValidation       tls.ClientAuthType                    `yaml:"-"`
+	OnlyTrustClientCACerts            bool                                  `yaml:"only_trust_client_ca_certs"`
+	TLSHandshakeTimeout               time.Duration                         `yaml:"tls_handshake_timeout"`
+	VerifyClientCertificateMetadata   []VerifyClientCertificateMetadataRule `yaml:"verify_client_certificate_metadata,omitempty"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
 	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval,omitempty"`
@@ -337,6 +467,7 @@ var defaultConfig = Config{
 	RouteServiceTimeout:            60 * time.Second,
 	TLSHandshakeTimeout:            10 * time.Second,
 
+	ClientCertificateValidation:               tls.RequireAndVerifyClientCert,
 	PublishStartMessageInterval:               30 * time.Second,
 	PruneStaleDropletsInterval:                30 * time.Second,
 	DropletStaleThreshold:                     120 * time.Second,
@@ -688,6 +819,18 @@ func (c *Config) buildClientCertPool() error {
 		}
 	}
 	c.ClientCAPool = certPool
+
+	if c.VerifyClientCertificateMetadata != nil {
+		bundle, err := pemutil.ParseCertificateBundle([]byte(c.ClientCACerts))
+		if err != nil {
+			return err
+		}
+
+		err = InitClientCertMetadataRules(c.VerifyClientCertificateMetadata, bundle)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
