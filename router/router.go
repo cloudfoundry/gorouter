@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -239,6 +240,10 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		ClientAuth:   r.config.ClientCertificateValidation,
 	}
 
+	if r.config.VerifyClientCertificateMetadata != nil {
+		tlsConfig.VerifyPeerCertificate = r.verifyMtlsMetadata
+	}
+
 	if r.config.EnableHTTP2 {
 		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
 	}
@@ -271,6 +276,17 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		r.stopLock.Unlock()
 		close(r.tlsServeDone)
 	}()
+	return nil
+}
+
+// verifyMtlsMetadata checks the Config.VerifyClientCertificateMetadata rules, if any are defined.
+//
+// Returns an error if one of the applicable verification rules fails.
+func (r *Router) verifyMtlsMetadata(_ [][]byte, chains [][]*x509.Certificate) error {
+	if chains != nil {
+		return config.VerifyClientCertMetadata(r.config.VerifyClientCertificateMetadata, chains, r.logger)
+	}
+	fmt.Printf("Chains length %d", len(chains))
 	return nil
 }
 
