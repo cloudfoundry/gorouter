@@ -1,6 +1,8 @@
 package test_util
 
 import (
+	"os"
+
 	. "github.com/onsi/gomega"
 
 	"errors"
@@ -29,7 +31,12 @@ func (n *Nats) Port() uint16 {
 }
 
 func (n *Nats) Start() {
-	cmd := exec.Command("nats-server", "-p", strconv.Itoa(int(n.port)), "--user", "nats", "--pass", "nats")
+	natsServer, exists := os.LookupEnv("NATS_SERVER_BINARY")
+	if !exists {
+		fmt.Println("You need nats-server installed and set NATS_SERVER_BINARY env variable")
+		os.Exit(1)
+	}
+	cmd := exec.Command(natsServer, "-p", strconv.Itoa(int(n.port)), "--user", "nats", "--pass", "nats")
 	err := cmd.Start()
 	Expect(err).ToNot(HaveOccurred())
 	n.cmd = cmd
