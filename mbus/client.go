@@ -24,9 +24,10 @@ type Client interface {
 func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats.Conn {
 	var natsClient *nats.Conn
 	var natsHost atomic.Value
+	var natsAddr atomic.Value
 	var err error
 
-	options := natsOptions(l, c, &natsHost, reconnected)
+	options := natsOptions(l, c, &natsHost, &natsAddr, reconnected)
 	attempts := 3
 	for attempts > 0 {
 		natsClient, err = options.Connect()
@@ -47,14 +48,16 @@ func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats
 	if err == nil {
 		natsHostStr = natsURL.Host
 	}
+	natsAddrStr := natsClient.ConnectedAddr()
 
-	l.Info("Successfully-connected-to-nats", zap.String("host", natsHostStr))
+	l.Info("Successfully-connected-to-nats", zap.String("host", natsHostStr), zap.String("addr", natsAddrStr))
 
 	natsHost.Store(natsHostStr)
+	natsAddr.Store(natsAddrStr)
 	return natsClient
 }
 
-func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, reconnected chan<- Signal) nats.Options {
+func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, natsAddr *atomic.Value, reconnected chan<- Signal) nats.Options {
 	options := nats.DefaultOptions
 	options.Servers = c.NatsServers()
 	if c.Nats.TLSEnabled {
@@ -83,7 +86,8 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, reco
 
 	options.DisconnectedCB = func(conn *nats.Conn) {
 		hostStr := natsHost.Load().(string)
-		l.Info("nats-connection-disconnected", zap.String("nats-host", hostStr))
+		addrStr := natsAddr.Load().(string)
+		l.Info("nats-connection-disconnected", zap.String("host", hostStr), zap.String("addr", addrStr))
 
 		go func() {
 			ticker := time.NewTicker(c.NatsClientPingInterval)
@@ -109,9 +113,11 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, reco
 		} else {
 			natsHostStr = natsURL.Host
 		}
+		natsAddrStr := conn.ConnectedAddr()
 		natsHost.Store(natsHostStr)
+		natsAddr.Store(natsAddrStr)
 
-		l.Info("nats-connection-reconnected", zap.String("nats-host", natsHostStr))
+		l.Info("nats-connection-reconnected", zap.String("host", natsHostStr), zap.String("addr", natsAddrStr))
 		reconnected <- Signal{}
 	}
 
