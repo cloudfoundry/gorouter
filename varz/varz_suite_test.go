@@ -1,7 +1,6 @@
 package varz_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -10,5 +9,5 @@ import (
 
 func TestVarz(t *testing.T) {
 	RegisterFailHandler(Fail)
-	test_util.RunSpecWithHoneyCombReporter(t, "Varz Suite")
+	RunSpecs(t, "Varz Suite")
 }

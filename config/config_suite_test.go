@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagertest"
 	. "github.com/onsi/ginkgo/v2"
@@ -16,7 +15,7 @@ var (
 
 func TestConfig(t *testing.T) {
 	RegisterFailHandler(Fail)
-	test_util.RunSpecWithHoneyCombReporter(t, "Config Suite")
+	RunSpecs(t, "Config Suite")
 }
 
 var _ = BeforeEach(func() {

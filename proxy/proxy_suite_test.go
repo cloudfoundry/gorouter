@@ -60,7 +60,7 @@ var (
 
 func TestProxy(t *testing.T) {
 	RegisterFailHandler(Fail)
-	test_util.RunSpecWithHoneyCombReporter(t, "Proxy Suite")
+	RunSpecs(t, "Proxy Suite")
 }
 
 var _ = BeforeEach(func() {
