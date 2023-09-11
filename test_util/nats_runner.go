@@ -31,13 +31,13 @@ func (runner *NATSRunner) Start() {
 		panic("starting an already started NATS runner!!!")
 	}
 
-	_, err := exec.LookPath("nats-server")
-	if err != nil {
-		fmt.Println("You need nats-server installed!")
+	natsServer, exists := os.LookupEnv("NATS_SERVER_BINARY")
+	if !exists {
+		fmt.Println("You need nats-server installed and set NATS_SERVER_BINARY env variable")
 		os.Exit(1)
 	}
 
-	cmd := exec.Command("nats-server", "-p", strconv.Itoa(runner.port))
+	cmd := exec.Command(natsServer, "-p", strconv.Itoa(runner.port))
 	sess, err := gexec.Start(
 		cmd,
 		gexec.NewPrefixedWriter("\x1b[32m[o]\x1b[34m[nats-server]\x1b[0m ", ginkgo.GinkgoWriter),
