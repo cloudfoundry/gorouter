@@ -1,7 +1,6 @@
 package health_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -10,5 +9,5 @@ import (
 
 func TestHealth(t *testing.T) {
 	RegisterFailHandler(Fail)
-	test_util.RunSpecWithHoneyCombReporter(t, "Health Suite")
+	RunSpecs(t, "Health Suite")
 }

@@ -5,8 +5,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"fmt"
-	"math/rand"
 	"time"
 )
 
@@ -64,26 +62,4 @@ var _ = Describe("ActiveApps", func() {
 		Expect(activeApps.ActiveSince(time.Unix(3, 0))).To(Equal([]string{"b"}))
 		Expect(activeApps.ActiveSince(time.Unix(5, 0))).To(Equal([]string{}))
 	})
-
-	benchmarkMark := func(b Benchmarker, apps int) {
-		var i int
-
-		x := make([]string, 0)
-		for i = 0; i < apps; i++ {
-			x = append(x, fmt.Sprintf("%d", i))
-		}
-
-		b.Time(fmt.Sprintf("Mark %d application ids", apps), func() {
-			for i = 0; i < apps; i++ {
-				activeApps.Mark(x[rand.Intn(len(x))], time.Unix(int64(i), 0))
-			}
-		})
-	}
-
-	Measure("Mark performance", func(b Benchmarker) {
-		benchmarkMark(b, 10)
-		benchmarkMark(b, 100)
-		benchmarkMark(b, 1000)
-		benchmarkMark(b, 10000)
-	}, 5)
 })

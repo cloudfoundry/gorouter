@@ -335,18 +335,6 @@ var _ = Describe("AccessLog", func() {
 			})
 
 		})
-
-		Measure("log write speed", func(b Benchmarker) {
-			w := nullWriter{}
-
-			b.Time("writeTime", func() {
-				for i := 0; i < 500; i++ {
-					r := CreateAccessLogRecord()
-					r.WriteTo(w)
-					r.WriteTo(w)
-				}
-			})
-		}, 500)
 	})
 
 	Describe("FileLogger", func() {

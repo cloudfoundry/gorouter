@@ -1,7 +1,6 @@
 package container_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -10,5 +9,5 @@ import (
 
 func TestContainer(t *testing.T) {
 	RegisterFailHandler(Fail)
-	test_util.RunSpecWithHoneyCombReporter(t, "Container Suite")
+	RunSpecs(t, "Container Suite")
 }

@@ -1,7 +1,6 @@
 package router_test
 
 import (
-	"code.cloudfoundry.org/gorouter/test_util"
 	"log"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 func TestRouter(t *testing.T) {
 	RegisterFailHandler(Fail)
 	log.SetOutput(GinkgoWriter)
-	test_util.RunSpecWithHoneyCombReporter(t, "Router Suite")
+	RunSpecs(t, "Router Suite")
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
