@@ -104,22 +104,20 @@ func (r *RequestInfo) ProvideTraceInfo() (TraceInfo, error) {
 }
 
 func (r *RequestInfo) SetTraceInfo(traceID, spanID string) error {
-	guid := traceID[0:8] + "-" + traceID[8:12] + "-" + traceID[12:16] + "-" + traceID[16:20] + "-" + traceID[20:]
-	_, err := gouuid.ParseHex(guid)
-	if err == nil {
-		r.TraceInfo = TraceInfo{
-			TraceID: traceID,
-			SpanID:  spanID,
-			UUID:    guid,
+	if len(traceID) >= 20 {
+		guid := traceID[0:8] + "-" + traceID[8:12] + "-" + traceID[12:16] + "-" + traceID[16:20] + "-" + traceID[20:]
+		_, err := gouuid.ParseHex(guid)
+		if err == nil {
+			r.TraceInfo = TraceInfo{
+				TraceID: traceID,
+				SpanID:  spanID,
+				UUID:    guid,
+			}
+			return nil
 		}
-		return nil
 	}
 
-	guid, err = uuid.GenerateUUID()
-	if err != nil {
-		return err
-	}
-	traceID, spanID, err = generateTraceAndSpanIDFromGUID(guid)
+	guid, err := uuid.GenerateUUID()
 	if err != nil {
 		return err
 	}

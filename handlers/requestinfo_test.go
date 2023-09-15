@@ -179,14 +179,22 @@ var _ = Describe("RequestInfo", func() {
 			})
 		})
 
-		Context("when traceID that can not be converted to UUID and spanID are provided", func() {
-			It("generates new UUID, trace and span ID", func() {
+		Context("when traceID that can not be converted to UUID provided", func() {
+			It("generates new UUID, reuses provided trace and span ID", func() {
 				requestInfo.SetTraceInfo("111111111111d1111111111111111111", "2222222222222222")
-				Expect(requestInfo.TraceInfo.TraceID).NotTo(Equal("111111111111d1111111111111111111"))
-				Expect(requestInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
-				Expect(requestInfo.TraceInfo.SpanID).NotTo(Equal("2222222222222222"))
-				Expect(requestInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(requestInfo.TraceInfo.TraceID).To(Equal("111111111111d1111111111111111111"))
+				Expect(requestInfo.TraceInfo.SpanID).To(Equal("2222222222222222"))
 				Expect(requestInfo.TraceInfo.UUID).ToNot(Equal("11111111-1111-d111-1111-111111111111"))
+				Expect(requestInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
+			})
+		})
+
+		Context("when traceID is not UUID length", func() {
+			It("generates new UUID, reuses provided trace and span ID", func() {
+				err := requestInfo.SetTraceInfo("12345", "2222222222222222")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(requestInfo.TraceInfo.TraceID).To(Equal("12345"))
+				Expect(requestInfo.TraceInfo.SpanID).To(Equal("2222222222222222"))
 				Expect(requestInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 			})
 		})
