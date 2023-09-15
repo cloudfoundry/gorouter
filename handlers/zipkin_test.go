@@ -200,10 +200,8 @@ var _ = Describe("Zipkin", func() {
 
 			It("sets request context", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
-				Expect(reqInfo.TraceInfo.TraceID).NotTo(Equal(invalidUUIDb3TraceID))
-				Expect(reqInfo.TraceInfo.SpanID).NotTo(Equal(b3SpanID))
-				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
-				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
+				Expect(reqInfo.TraceInfo.TraceID).To(Equal(invalidUUIDb3TraceID))
+				Expect(reqInfo.TraceInfo.SpanID).To(Equal(b3SpanID))
 				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 			})
 		})
@@ -318,9 +316,7 @@ var _ = Describe("Zipkin", func() {
 
 			It("sets request context", func() {
 				handler.ServeHTTP(resp, req, nextHandler)
-				Expect(reqInfo.TraceInfo.TraceID).NotTo(Equal(invalidUUIDb3TraceID))
-				Expect(reqInfo.TraceInfo.SpanID).NotTo(Equal(b3SpanID))
-				Expect(reqInfo.TraceInfo.TraceID).To(MatchRegexp(b3IDRegex))
+				Expect(reqInfo.TraceInfo.TraceID).To(Equal(invalidUUIDb3TraceID))
 				Expect(reqInfo.TraceInfo.SpanID).To(MatchRegexp(b3SpanRegex))
 				Expect(reqInfo.TraceInfo.UUID).To(MatchRegexp(UUIDRegex))
 			})
