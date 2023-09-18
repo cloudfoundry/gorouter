@@ -68,6 +68,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.StatusCode = proxyWriter.Status()
 	alr.RouterError = proxyWriter.Header().Get(router_http.CfRouterError)
 	alr.FailedAttempts = reqInfo.FailedAttempts
+	alr.RoundTripSuccessful = reqInfo.RoundTripSuccessful
 
 	alr.ReceivedAt = reqInfo.ReceivedAt
 	alr.AppRequestStartedAt = reqInfo.AppRequestStartedAt

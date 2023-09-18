@@ -137,8 +137,6 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		maxAttempts = rt.config.RouteServiceConfig.MaxAttempts
 	}
 
-	reqInfo.AppRequestStartedAt = time.Now()
-
 	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
 		logger := rt.logger
 
@@ -249,24 +247,6 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		}
 	}
 
-	// three possible cases:
-	// err == nil && selectEndpointErr == nil
-	//   => all good, separate LastFailedAttemptFinishedAt and
-	//      AppRequestFinishedAt (else case)
-	// err == nil && selectEndpointErr != nil
-	//   => we failed on the first attempt to find an endpoint so 404 it is,
-	//      no LastFailedAttemptFinishedAt, AppRequestFinishedAt is set for
-	//      completeness (else case)
-	// err != nil
-	//   => unable to complete round trip (possibly after multiple tries)
-	//      so 502 and AppRequestFinishedAt and LastFailedAttemptFinishedAt
-	//      must be identical (first if-branch).
-	if err != nil {
-		reqInfo.AppRequestFinishedAt = reqInfo.LastFailedAttemptFinishedAt
-	} else {
-		reqInfo.AppRequestFinishedAt = time.Now()
-	}
-
 	// if the client disconnects before response is sent then return context.Canceled (499) instead of the gateway error
 	if err != nil && originalRequest.Context().Err() == context.Canceled && err != context.Canceled {
 		rt.logger.Error("gateway-error-and-original-request-context-cancelled", zap.Error(err))
@@ -285,6 +265,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
 		return nil, err
 	}
+
+	// Round trip was successful at this point
+	reqInfo.RoundTripSuccessful = true
 
 	// Record the times from the last attempt, but only if it succeeded.
 	reqInfo.DnsStartedAt = trace.DnsStart()

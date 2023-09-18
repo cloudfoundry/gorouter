@@ -42,8 +42,7 @@ type RequestInfo struct {
 	AppRequestStartedAt time.Time
 	// LastFailedAttemptFinishedAt is the end of the last failed request,
 	// if any. If there was at least one failed attempt this will be set, if
-	// there was no successful attempt this value will equal
-	// AppRequestFinishedAt.
+	// there was no successful attempt the RequestFailed flag will be set.
 	LastFailedAttemptFinishedAt time.Time
 
 	// These times document at which timestamps the individual phases of the
@@ -72,6 +71,9 @@ type RequestInfo struct {
 	RouteServiceURL                   *url.URL
 	ShouldRouteToInternalRouteService bool
 	FailedAttempts                    int
+
+	// RoundTripSuccessful will be set once a request has successfully reached a backend instance.
+	RoundTripSuccessful bool
 
 	TraceInfo TraceInfo
 

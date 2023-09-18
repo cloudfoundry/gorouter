@@ -52,6 +52,7 @@ var _ = Describe("AccessLogRecord", func() {
 			},
 			BodyBytesSent:        23,
 			StatusCode:           200,
+			RoundTripSuccessful:  true,
 			RouteEndpoint:        endpoint,
 			ReceivedAt:           time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			FinishedAt:           time.Date(2000, time.January, 1, 0, 1, 0, 0, time.UTC),
@@ -490,7 +491,7 @@ var _ = Describe("AccessLogRecord", func() {
 		It("adds a '-' if there was no successful attempt", func() {
 			record.LogAttemptsDetails = true
 			record.FailedAttempts = 1
-			record.LastFailedAttemptFinishedAt = record.AppRequestFinishedAt
+			record.RoundTripSuccessful = false
 
 			var b bytes.Buffer
 			_, err := record.WriteTo(&b)

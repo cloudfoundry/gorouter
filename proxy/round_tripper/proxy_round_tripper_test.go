@@ -235,7 +235,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(retriableClassifier.ClassifyCallCount()).To(Equal(2))
 
 					Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
-					Expect(reqInfo.AppRequestFinishedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+					Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 				})
 
@@ -344,7 +344,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
 
 						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
-						Expect(reqInfo.AppRequestFinishedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
 					})
 				})
 
@@ -360,7 +360,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
 
 						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
-						Expect(reqInfo.AppRequestFinishedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+						Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
 						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 					})
 				})
@@ -382,7 +382,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(transport.RoundTripCallCount()).To(Equal(1))
 
 					Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
-					Expect(reqInfo.AppRequestFinishedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+					Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
 				})
 
 				It("captures each routing request to the backend", func() {
@@ -534,7 +534,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).To(Equal(handler.NoEndpointsAvailable))
 
 					Expect(reqInfo.RouteEndpoint).To(BeNil())
-					Expect(reqInfo.AppRequestFinishedAt).To(BeTemporally("~", time.Now(), 50*time.Millisecond))
+					Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
 				})
 
 				It("calls the error handler", func() {
