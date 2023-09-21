@@ -1332,6 +1332,289 @@ var _ = Describe("Proxy", func() {
 			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
+		Context("A slow response body", func() {
+			BeforeEach(func() {
+				conf.EndpointTimeout = 5 * time.Second
+			})
+
+			It("shows in response_time, not gorouter_time", func() {
+				ln := test_util.RegisterConnHandler(r, "slow-response-app", func(conn *test_util.HttpConn) {
+					_, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+
+					body := "this body took two seconds."
+					conn.WriteLines([]string{
+						"HTTP/1.1 200 OK",
+						fmt.Sprintf("Content-Length: %d", len(body)),
+					})
+
+					time.Sleep(2 * time.Second)
+
+					conn.WriteLine(body)
+					conn.Close()
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "slow-response-app", "/", nil)
+
+				started := time.Now()
+				conn.WriteRequest(req)
+
+				resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}, "5s").ShouldNot(BeZero())
+
+				b, err := os.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(strings.HasPrefix(string(b), "slow-response-app - [")).To(BeTrue())
+				Expect(string(b)).To(ContainSubstring("response_time:"))
+				Expect(string(b)).To(ContainSubstring("gorouter_time:"))
+				Expect(string(b)).To(MatchRegexp("response_time:2"))
+				Expect(string(b)).To(MatchRegexp("gorouter_time:0"))
+			})
+
+			Context("A slow app with multiple broken endpoints and attempt details logging enabled", func() {
+				BeforeEach(func() {
+					conf.EndpointDialTimeout = 1 * time.Second
+					conf.Logging.EnableAttemptsDetails = true
+					conf.DropletStaleThreshold = 1
+				})
+
+				It("shows in failed_attempts_time and backend_time, not gorouter_time", func() {
+
+					// Register some broken endpoints to cause retries
+					test_util.RegisterAddr(r, "partially-broken-app", "10.255.255.1:1234", test_util.RegisterConfig{InstanceIndex: "1"})
+					test_util.RegisterAddr(r, "partially-broken-app", "10.255.255.1:1235", test_util.RegisterConfig{InstanceIndex: "2"})
+
+					ln := test_util.RegisterConnHandler(r, "partially-broken-app", func(conn *test_util.HttpConn) {
+						_, err := http.ReadRequest(conn.Reader)
+						Expect(err).NotTo(HaveOccurred())
+
+						body := "this body took two seconds."
+						conn.WriteLines([]string{
+							"HTTP/1.1 200 OK",
+							fmt.Sprintf("Content-Length: %d", len(body)),
+						})
+
+						time.Sleep(2 * time.Second)
+
+						conn.WriteLine(body)
+						conn.Close()
+					}, test_util.RegisterConfig{InstanceIndex: "3"})
+					defer ln.Close()
+
+					Eventually(func(g Gomega) {
+						conn := dialProxy(proxyServer)
+						req := test_util.NewRequest("GET", "partially-broken-app", "/", nil)
+
+						started := time.Now()
+						conn.WriteRequest(req)
+
+						resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+						g.Expect(err).NotTo(HaveOccurred())
+
+						g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
+						g.Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+						g.Eventually(func() (int64, error) {
+							fi, err := f.Stat()
+							if err != nil {
+								return 0, err
+							}
+							return fi.Size(), nil
+						}, "10s").ShouldNot(BeZero())
+
+						logBytes, err := os.ReadFile(f.Name())
+						g.Expect(err).NotTo(HaveOccurred())
+						logStr := string(logBytes)
+						g.Expect(strings.HasPrefix(logStr, "partially-broken-app - [")).To(BeTrue())
+						g.Expect(logStr).To(ContainSubstring("response_time:"))
+						g.Expect(logStr).To(ContainSubstring("gorouter_time:"))
+						g.Expect(logStr).To(MatchRegexp("backend_time:2"))         // 2 seconds delay from slow backend app
+						g.Expect(logStr).To(MatchRegexp("failed_attempts_time:2")) // plus 2 seconds from dial attempts
+						g.Expect(logStr).To(MatchRegexp("response_time:4"))        // makes 4 seconds total response time
+						g.Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+						g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
+						g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
+
+					}, "20s").Should(Succeed()) // we don't know which endpoint will be chosen first, so we have to try until sequence 1,2,3 has been hit
+				})
+			})
+		})
+
+		Context("lookup errors when attempt details logging is enabled", func() {
+			BeforeEach(func() {
+				conf.Logging.EnableAttemptsDetails = true
+			})
+
+			It("logs no backend_time on missing app route", func() {
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "does-not-exist", "/", nil)
+
+				started := time.Now()
+				conn.WriteRequest(req)
+
+				resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}, "5s").ShouldNot(BeZero())
+
+				logBytes, err := os.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				logStr := string(logBytes)
+				Expect(strings.HasPrefix(logStr, "does-not-exist - [")).To(BeTrue())
+				Expect(logStr).To(ContainSubstring("response_time:"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:"))
+				Expect(logStr).To(MatchRegexp("response_time:0"))
+				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+			})
+			It("logs no backend_time on invalid X-CF-App-Instance header", func() {
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "invalid-app-instance-header", "/", nil)
+				req.Header.Set("X-CF-App-Instance", "invalid-instance")
+				started := time.Now()
+				conn.WriteRequest(req)
+
+				resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+				Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}, "5s").ShouldNot(BeZero())
+
+				logBytes, err := os.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				logStr := string(logBytes)
+				Expect(strings.HasPrefix(logStr, "invalid-app-instance-header - [")).To(BeTrue())
+				Expect(logStr).To(ContainSubstring("response_time:"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:"))
+				Expect(logStr).To(MatchRegexp("response_time:0"))
+				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+			})
+			It("logs no backend_time on empty pools (404 status)", func() {
+				test_util.RegisterAddr(r, "empty-pool-app", "10.255.255.1:1234", test_util.RegisterConfig{StaleThreshold: 1})
+
+				// Wait 1s for the endpoint to become stale
+				time.Sleep(1 * time.Second)
+
+				pool := r.Lookup("empty-pool-app")
+				pruned := pool.PruneEndpoints()
+
+				Expect(pruned).NotTo(BeEmpty())
+				Expect(pool.IsEmpty()).To(BeTrue())
+
+				conn := dialProxy(proxyServer)
+
+				req := test_util.NewRequest("GET", "empty-pool-app", "/", nil)
+				started := time.Now()
+				conn.WriteRequest(req)
+
+				resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}, "5s").ShouldNot(BeZero())
+
+				logBytes, err := os.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				logStr := string(logBytes)
+				Expect(strings.HasPrefix(logStr, "empty-pool-app - [")).To(BeTrue())
+				Expect(logStr).To(ContainSubstring("response_time:"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:"))
+				Expect(logStr).To(MatchRegexp("response_time:0"))
+				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+			})
+			Context("when EmptyPoolResponseCode503 is enabled", func() {
+				BeforeEach(func() {
+					conf.EmptyPoolResponseCode503 = true
+					conf.EmptyPoolTimeout = 30 * time.Second
+				})
+				It("logs no backend_time on empty pools (503 status)", func() {
+					test_util.RegisterAddr(r, "empty-pool-app", "10.255.255.1:1234", test_util.RegisterConfig{StaleThreshold: 1})
+
+					// Wait 1s for the endpoint to become stale
+					time.Sleep(1 * time.Second)
+
+					pool := r.Lookup("empty-pool-app")
+					pruned := pool.PruneEndpoints()
+
+					Expect(pruned).NotTo(BeEmpty())
+					Expect(pool.IsEmpty()).To(BeTrue())
+
+					conn := dialProxy(proxyServer)
+
+					req := test_util.NewRequest("GET", "empty-pool-app", "/", nil)
+					started := time.Now()
+					conn.WriteRequest(req)
+
+					resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+					Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+					Eventually(func() (int64, error) {
+						fi, err := f.Stat()
+						if err != nil {
+							return 0, err
+						}
+						return fi.Size(), nil
+					}, "5s").ShouldNot(BeZero())
+
+					logBytes, err := os.ReadFile(f.Name())
+					Expect(err).NotTo(HaveOccurred())
+					logStr := string(logBytes)
+					Expect(strings.HasPrefix(logStr, "empty-pool-app - [")).To(BeTrue())
+					Expect(logStr).To(ContainSubstring("response_time:"))
+					Expect(logStr).To(ContainSubstring("gorouter_time:"))
+					Expect(logStr).To(MatchRegexp("response_time:0"))
+					Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+					Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+				})
+			})
+		})
+
 		Context("when an HTTP 100 continue response is sent first", func() {
 			It("logs the data for the final response", func() {
 				ln := test_util.RegisterConnHandler(r, "test", func(conn *test_util.HttpConn) {

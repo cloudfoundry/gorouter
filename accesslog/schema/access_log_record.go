@@ -110,6 +110,7 @@ type AccessLogRecord struct {
 	RouterError            string
 	LogAttemptsDetails     bool
 	FailedAttempts         int
+	RoundTripSuccessful    bool
 	record                 []byte
 
 	// See the handlers.RequestInfo struct for details on these timings.
@@ -139,7 +140,7 @@ func (r *AccessLogRecord) gorouterTime() float64 {
 	at := r.appTime()
 
 	if rt >= 0 && at >= 0 {
-		return r.roundtripTime() - r.appTime()
+		return rt - at
 	} else {
 		return -1
 	}
@@ -182,7 +183,7 @@ func (r *AccessLogRecord) failedAttemptsTime() float64 {
 // successful. If there was a successful attempt the returned time indicates
 // how long it took.
 func (r *AccessLogRecord) successfulAttemptTime() float64 {
-	if r.AppRequestFinishedAt.Equal(r.LastFailedAttemptFinishedAt) {
+	if !r.RoundTripSuccessful {
 		return -1
 	}
 
