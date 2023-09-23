@@ -254,7 +254,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 	handler.SanitizeRequestConnection()
 	if handlers.IsWebSocketUpgrade(request) {
+		reqInfo.AppRequestStartedAt = time.Now()
 		handler.HandleWebSocketRequest(endpointIterator)
+		reqInfo.AppRequestFinishedAt = time.Now()
 		return
 	}
 

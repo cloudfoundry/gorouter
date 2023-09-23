@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"golang.org/x/net/websocket"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -85,6 +86,25 @@ func RegisterHTTPHandler(reg *registry.RouteRegistry, path string, handler http.
 	return ln
 }
 
+func RegisterWSHandler(reg *registry.RouteRegistry, path string, handler websocket.Handler, cfg ...RegisterConfig) net.Listener {
+	var rcfg RegisterConfig
+	if len(cfg) > 0 {
+		rcfg = cfg[0]
+	}
+	ln, err := startBackendListener(rcfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	// We don't want to check the origin header here, our clients aren't browsers.
+	nilHandshake := func(c *websocket.Config, request *http.Request) error { return nil }
+	wsServer := websocket.Server{Handler: handler, Handshake: nilHandshake}
+
+	server := http.Server{Handler: wsServer}
+	go server.Serve(ln)
+
+	RegisterAddr(reg, path, ln.Addr().String(), prepareConfig(rcfg))
+
+	return ln
+}
 func startBackendListener(rcfg RegisterConfig) (net.Listener, error) {
 	if rcfg.TLSConfig != nil && !rcfg.IgnoreTLSConfig {
 		return tls.Listen("tcp", "127.0.0.1:0", rcfg.TLSConfig)
