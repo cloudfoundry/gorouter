@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+	"golang.org/x/net/websocket"
 
 	"code.cloudfoundry.org/gorouter/common/health"
 
@@ -1332,6 +1333,50 @@ var _ = Describe("Proxy", func() {
 			Expect(b[len(b)-1]).To(Equal(byte('\n')))
 		})
 
+		It("logs a websocket request", func() {
+			ln := test_util.RegisterWSHandler(r, "ws-test", func(conn *websocket.Conn) {
+				msgBuf := make([]byte, 100)
+				n, err := conn.Read(msgBuf)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(msgBuf[:n])).To(Equal("HELLO WEBSOCKET"))
+
+				_, _ = conn.Write([]byte("WEBSOCKET OK"))
+				conn.Close()
+			})
+			defer ln.Close()
+
+			conn := dialProxy(proxyServer)
+			wsConn := wsClient(conn, "ws://ws-test")
+
+			_, err := wsConn.Write([]byte("HELLO WEBSOCKET"))
+			Expect(err).NotTo(HaveOccurred())
+
+			msgBuf := make([]byte, 100)
+			n, err := wsConn.Read(msgBuf)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(msgBuf[:n])).To(Equal("WEBSOCKET OK"))
+
+			Eventually(func() (int64, error) {
+				fi, err := f.Stat()
+				if err != nil {
+					return 0, err
+				}
+				return fi.Size(), nil
+			}).ShouldNot(BeZero())
+
+			//make sure the record includes all the data
+			//since the building of the log record happens throughout the life of the request
+			logBytes, err := os.ReadFile(f.Name())
+			Expect(err).NotTo(HaveOccurred())
+			logStr := string(logBytes)
+			Expect(strings.HasPrefix(logStr, "ws-test - [")).To(BeTrue())
+			Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
+			Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+			Expect(logStr).To(ContainSubstring(`response_time:`))
+			Expect(logStr).To(ContainSubstring(`gorouter_time:`))
+		})
+
 		Context("A slow response body", func() {
 			BeforeEach(func() {
 				conf.EndpointTimeout = 5 * time.Second
@@ -1383,6 +1428,54 @@ var _ = Describe("Proxy", func() {
 				Expect(string(b)).To(ContainSubstring("gorouter_time:"))
 				Expect(string(b)).To(MatchRegexp("response_time:2"))
 				Expect(string(b)).To(MatchRegexp("gorouter_time:0"))
+			})
+
+			Context("in websocket requests", func() {
+				It("shows slowness in response_time, not gorouter_time", func() {
+					ln := test_util.RegisterWSHandler(r, "slow-ws-test", func(conn *websocket.Conn) {
+						msgBuf := make([]byte, 100)
+						n, err := conn.Read(msgBuf)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(string(msgBuf[:n])).To(Equal("HELLO WEBSOCKET"))
+
+						time.Sleep(time.Second)
+
+						_, _ = conn.Write([]byte("WEBSOCKET OK"))
+						conn.Close()
+					})
+					defer ln.Close()
+
+					conn := dialProxy(proxyServer)
+					wsConn := wsClient(conn, "ws://slow-ws-test")
+
+					_, err := wsConn.Write([]byte("HELLO WEBSOCKET"))
+					Expect(err).NotTo(HaveOccurred())
+
+					msgBuf := make([]byte, 100)
+					n, err := wsConn.Read(msgBuf)
+
+					Expect(err).NotTo(HaveOccurred())
+					Expect(string(msgBuf[:n])).To(Equal("WEBSOCKET OK"))
+
+					Eventually(func() (int64, error) {
+						fi, err := f.Stat()
+						if err != nil {
+							return 0, err
+						}
+						return fi.Size(), nil
+					}).ShouldNot(BeZero())
+
+					//make sure the record includes all the data
+					//since the building of the log record happens throughout the life of the request
+					logBytes, err := os.ReadFile(f.Name())
+					Expect(err).NotTo(HaveOccurred())
+					logStr := string(logBytes)
+					Expect(strings.HasPrefix(logStr, "slow-ws-test - [")).To(BeTrue())
+					Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
+					Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+					Expect(logStr).To(MatchRegexp(`response_time:1`))
+					Expect(logStr).To(MatchRegexp(`gorouter_time:0`))
+				})
 			})
 
 			Context("A slow app with multiple broken endpoints and attempt details logging enabled", func() {
@@ -2330,7 +2423,7 @@ var _ = Describe("Proxy", func() {
 			Eventually(fakeReporter.CaptureWebSocketUpdateCallCount).Should(Equal(2))
 		})
 
-		It("does not emit a latency metric", func() {
+		It("does emit a latency metric", func() {
 			var wg sync.WaitGroup
 			ln := test_util.RegisterConnHandler(r, "ws-cs-header", func(conn *test_util.HttpConn) {
 				defer conn.Close()
@@ -2368,7 +2461,7 @@ var _ = Describe("Proxy", func() {
 			conn.Close()
 			wg.Wait()
 
-			Consistently(fakeReporter.CaptureRoutingResponseLatencyCallCount, 1).Should(Equal(0))
+			Consistently(fakeReporter.CaptureRoutingResponseLatencyCallCount, 1).Should(Equal(1))
 		})
 
 		Context("when the connection to the backend fails", func() {
@@ -2602,6 +2695,21 @@ func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
 	Expect(err).NotTo(HaveOccurred())
 
 	return test_util.NewHttpConn(conn)
+}
+
+func wsClient(conn net.Conn, urlStr string) *websocket.Conn {
+	wsUrl, err := url.ParseRequestURI(urlStr)
+	Expect(err).NotTo(HaveOccurred())
+
+	config := &websocket.Config{
+		Location: wsUrl,
+		Origin:   wsUrl,
+		Version:  websocket.ProtocolVersionHybi13,
+	}
+
+	wsConn, err := websocket.NewClient(config, conn)
+	Expect(err).NotTo(HaveOccurred())
+	return wsConn
 }
 
 func parseResponseTimeFromLog(log string) float64 {
