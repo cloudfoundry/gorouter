@@ -1408,7 +1408,25 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 					configSnippet.CACerts = []string{string(rootRSAPEM), string(rootECDSAPEM)}
 				})
-
+				Context("when verify_client_certificate_metadata is provided and one of the CA subjects is not in the ClientCAPool", func() {
+					BeforeEach(func() {
+						configSnippet.ClientCACerts = string(clientRSAPEM)
+						configSnippet.VerifyClientCertificateMetadata = []VerifyClientCertificateMetadataRule{
+							{
+								CASubject:     CertSubject{CommonName: "abc.com"},
+								ValidSubjects: []CertSubject{CertSubject{Organization: []string{"abc, Inc."}}},
+							},
+						}
+					})
+					It("fails to validate", func() {
+						configBytes := createYMLSnippet(configSnippet)
+						err := config.Initialize(configBytes)
+						Expect(err).ToNot(HaveOccurred())
+						err = config.Process()
+						Expect(err).To(HaveOccurred())
+						Expect(err).Should(MatchError(ContainSubstring("no CA certificate found for rule with ca subject")))
+					})
+				})
 				Context("When only_trust_client_ca_certs is true", func() {
 					BeforeEach(func() {
 						configSnippet.OnlyTrustClientCACerts = true
