@@ -217,9 +217,12 @@ func (h *RequestHandler) serveTcp(
 		onConnectionFailed = nilConnFailureCB
 	}
 
-	dialer := &net.Dialer{
-		Timeout: h.endpointDialTimeout, // untested
+	reqInfo, err := handlers.ContextRequestInfo(h.request)
+	if err != nil {
+		return 0, err
 	}
+	// httptrace.ClientTrace only works for Transports, so we have to do the tracing manually
+	var dialStartedAt, dialFinishedAt, tlsHandshakeStartedAt, tlsHandshakeFinishedAt time.Time
 
 	retry := 0
 	for {
@@ -232,11 +235,16 @@ func (h *RequestHandler) serveTcp(
 
 		iter.PreRequest(endpoint)
 
+		dialStartedAt = time.Now()
+		backendConnection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
+		dialFinishedAt = time.Now()
 		if endpoint.IsTLS() {
 			tlsConfigLocal := utils.TLSConfigWithServerName(endpoint.ServerCertDomainSAN, h.tlsConfigTemplate, false)
-			backendConnection, err = tls.DialWithDialer(dialer, "tcp", endpoint.CanonicalAddr(), tlsConfigLocal)
-		} else {
-			backendConnection, err = net.DialTimeout("tcp", endpoint.CanonicalAddr(), h.endpointDialTimeout)
+			tlsBackendConnection := tls.Client(backendConnection, tlsConfigLocal)
+			tlsHandshakeStartedAt = time.Now()
+			err = tlsBackendConnection.Handshake()
+			tlsHandshakeFinishedAt = time.Now()
+			backendConnection = tlsBackendConnection
 		}
 
 		if err == nil {
@@ -245,6 +253,9 @@ func (h *RequestHandler) serveTcp(
 		} else {
 			iter.PostRequest(endpoint)
 		}
+
+		reqInfo.FailedAttempts++
+		reqInfo.LastFailedAttemptFinishedAt = time.Now()
 
 		iter.EndpointFailed(err)
 		onConnectionFailed(err)
@@ -269,6 +280,15 @@ func (h *RequestHandler) serveTcp(
 		return 0, err
 	}
 	defer client.Close()
+
+	// Round trip was successful at this point
+	reqInfo.RoundTripSuccessful = true
+
+	// Record the times from the last attempt, but only if it succeeded.
+	reqInfo.DialStartedAt = dialStartedAt
+	reqInfo.DialFinishedAt = dialFinishedAt
+	reqInfo.TlsHandshakeStartedAt = tlsHandshakeStartedAt
+	reqInfo.TlsHandshakeFinishedAt = tlsHandshakeFinishedAt
 
 	// Any status code has already been sent to the client,
 	// but this is the value that gets written to the access logs

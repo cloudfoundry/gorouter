@@ -1346,9 +1346,10 @@ var _ = Describe("Proxy", func() {
 			defer ln.Close()
 
 			conn := dialProxy(proxyServer)
-			wsConn := wsClient(conn, "ws://ws-test")
+			wsConn, err := wsClient(conn, "ws://ws-test")
+			Expect(err).NotTo(HaveOccurred())
 
-			_, err := wsConn.Write([]byte("HELLO WEBSOCKET"))
+			_, err = wsConn.Write([]byte("HELLO WEBSOCKET"))
 			Expect(err).NotTo(HaveOccurred())
 
 			msgBuf := make([]byte, 100)
@@ -1387,13 +1388,13 @@ var _ = Describe("Proxy", func() {
 					_, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
-					body := "this body took two seconds."
+					body := "this body took some time."
 					conn.WriteLines([]string{
 						"HTTP/1.1 200 OK",
 						fmt.Sprintf("Content-Length: %d", len(body)),
 					})
 
-					time.Sleep(2 * time.Second)
+					time.Sleep(100 * time.Millisecond)
 
 					conn.WriteLine(body)
 					conn.Close()
@@ -1426,8 +1427,8 @@ var _ = Describe("Proxy", func() {
 				Expect(strings.HasPrefix(string(b), "slow-response-app - [")).To(BeTrue())
 				Expect(string(b)).To(ContainSubstring("response_time:"))
 				Expect(string(b)).To(ContainSubstring("gorouter_time:"))
-				Expect(string(b)).To(MatchRegexp("response_time:2"))
-				Expect(string(b)).To(MatchRegexp("gorouter_time:0"))
+				Expect(string(b)).To(MatchRegexp("response_time:0.1"))
+				Expect(string(b)).To(MatchRegexp("gorouter_time:0.00"))
 			})
 
 			Context("in websocket requests", func() {
@@ -1438,7 +1439,7 @@ var _ = Describe("Proxy", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(string(msgBuf[:n])).To(Equal("HELLO WEBSOCKET"))
 
-						time.Sleep(time.Second)
+						time.Sleep(100 * time.Millisecond)
 
 						_, _ = conn.Write([]byte("WEBSOCKET OK"))
 						conn.Close()
@@ -1446,9 +1447,10 @@ var _ = Describe("Proxy", func() {
 					defer ln.Close()
 
 					conn := dialProxy(proxyServer)
-					wsConn := wsClient(conn, "ws://slow-ws-test")
+					wsConn, err := wsClient(conn, "ws://slow-ws-test")
+					Expect(err).NotTo(HaveOccurred())
 
-					_, err := wsConn.Write([]byte("HELLO WEBSOCKET"))
+					_, err = wsConn.Write([]byte("HELLO WEBSOCKET"))
 					Expect(err).NotTo(HaveOccurred())
 
 					msgBuf := make([]byte, 100)
@@ -1473,14 +1475,14 @@ var _ = Describe("Proxy", func() {
 					Expect(strings.HasPrefix(logStr, "slow-ws-test - [")).To(BeTrue())
 					Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
 					Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
-					Expect(logStr).To(MatchRegexp(`response_time:1`))
-					Expect(logStr).To(MatchRegexp(`gorouter_time:0`))
+					Expect(logStr).To(MatchRegexp(`response_time:0.1`))
+					Expect(logStr).To(MatchRegexp(`gorouter_time:0.00`))
 				})
 			})
 
 			Context("A slow app with multiple broken endpoints and attempt details logging enabled", func() {
 				BeforeEach(func() {
-					conf.EndpointDialTimeout = 1 * time.Second
+					conf.EndpointDialTimeout = 100 * time.Millisecond
 					conf.Logging.EnableAttemptsDetails = true
 					conf.DropletStaleThreshold = 1
 				})
@@ -1495,13 +1497,13 @@ var _ = Describe("Proxy", func() {
 						_, err := http.ReadRequest(conn.Reader)
 						Expect(err).NotTo(HaveOccurred())
 
-						body := "this body took two seconds."
+						body := "this body took some time."
 						conn.WriteLines([]string{
 							"HTTP/1.1 200 OK",
 							fmt.Sprintf("Content-Length: %d", len(body)),
 						})
 
-						time.Sleep(2 * time.Second)
+						time.Sleep(100 * time.Millisecond)
 
 						conn.WriteLine(body)
 						conn.Close()
@@ -1535,14 +1537,153 @@ var _ = Describe("Proxy", func() {
 						g.Expect(strings.HasPrefix(logStr, "partially-broken-app - [")).To(BeTrue())
 						g.Expect(logStr).To(ContainSubstring("response_time:"))
 						g.Expect(logStr).To(ContainSubstring("gorouter_time:"))
-						g.Expect(logStr).To(MatchRegexp("backend_time:2"))         // 2 seconds delay from slow backend app
-						g.Expect(logStr).To(MatchRegexp("failed_attempts_time:2")) // plus 2 seconds from dial attempts
-						g.Expect(logStr).To(MatchRegexp("response_time:4"))        // makes 4 seconds total response time
-						g.Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+						g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
+						g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
+						g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
+						g.Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
 						g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
 						g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
 
 					}, "20s").Should(Succeed()) // we don't know which endpoint will be chosen first, so we have to try until sequence 1,2,3 has been hit
+				})
+				It("shows no backend_time or other attempt details if all endpoints are broken", func() {
+
+					// Register some broken endpoints to cause retries
+					test_util.RegisterAddr(r, "fully-broken-app", "10.255.255.1:1234", test_util.RegisterConfig{InstanceIndex: "1"})
+					test_util.RegisterAddr(r, "fully-broken-app", "10.255.255.1:1235", test_util.RegisterConfig{InstanceIndex: "2"})
+					test_util.RegisterAddr(r, "fully-broken-app", "10.255.255.1:1236", test_util.RegisterConfig{InstanceIndex: "3"})
+
+					conn := dialProxy(proxyServer)
+					req := test_util.NewRequest("GET", "fully-broken-app", "/", nil)
+
+					started := time.Now()
+					conn.WriteRequest(req)
+
+					resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+					Expect(time.Since(started)).To(BeNumerically("<", 5*time.Second))
+
+					Eventually(func() (int64, error) {
+						fi, err := f.Stat()
+						if err != nil {
+							return 0, err
+						}
+						return fi.Size(), nil
+					}, "10s").ShouldNot(BeZero())
+
+					logBytes, err := os.ReadFile(f.Name())
+					Expect(err).NotTo(HaveOccurred())
+					logStr := string(logBytes)
+					Expect(strings.HasPrefix(logStr, "fully-broken-app - [")).To(BeTrue())
+					Expect(logStr).To(ContainSubstring("response_time:"))
+					Expect(logStr).To(ContainSubstring("gorouter_time:"))
+					Expect(logStr).To(MatchRegexp("failed_attempts:3"))
+					Expect(logStr).To(MatchRegexp("failed_attempts_time:0.3"))
+					Expect(logStr).To(MatchRegexp("response_time:0.3"))
+					Expect(logStr).To(MatchRegexp("gorouter_time:0"))
+					Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+					Expect(logStr).To(MatchRegexp(`dns_time:"-"`))
+					Expect(logStr).To(MatchRegexp(`dial_time:"-"`))
+					Expect(logStr).To(MatchRegexp(`tls_time:"-"`))
+				})
+				Context("in websocket requests", func() {
+					BeforeEach(func() {
+						conf.WebsocketDialTimeout = 100 * time.Millisecond
+					})
+					It("shows slowness in failed_attempts_time and backend_time, not gorouter_time", func() {
+
+						// Register some broken endpoints to cause retries
+						test_util.RegisterAddr(r, "partially-broken-ws-app", "10.255.255.1:1234", test_util.RegisterConfig{InstanceIndex: "1"})
+						test_util.RegisterAddr(r, "partially-broken-ws-app", "10.255.255.1:1235", test_util.RegisterConfig{InstanceIndex: "2"})
+
+						ln := test_util.RegisterWSHandler(r, "partially-broken-ws-app", func(conn *websocket.Conn) {
+							msgBuf := make([]byte, 100)
+							n, err := conn.Read(msgBuf)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(string(msgBuf[:n])).To(Equal("HELLO WEBSOCKET"))
+
+							time.Sleep(100 * time.Millisecond)
+
+							_, _ = conn.Write([]byte("WEBSOCKET OK"))
+							conn.Close()
+						}, test_util.RegisterConfig{InstanceIndex: "3"})
+						defer ln.Close()
+
+						Eventually(func(g Gomega) {
+							conn := dialProxy(proxyServer)
+							wsConn, err := wsClient(conn, "ws://partially-broken-ws-app")
+							g.Expect(err).NotTo(HaveOccurred())
+
+							_, err = wsConn.Write([]byte("HELLO WEBSOCKET"))
+							g.Expect(err).NotTo(HaveOccurred())
+
+							msgBuf := make([]byte, 100)
+							n, err := wsConn.Read(msgBuf)
+
+							g.Expect(err).NotTo(HaveOccurred())
+							g.Expect(string(msgBuf[:n])).To(Equal("WEBSOCKET OK"))
+
+							g.Eventually(func() (int64, error) {
+								fi, err := f.Stat()
+								if err != nil {
+									return 0, err
+								}
+								return fi.Size(), nil
+							}).ShouldNot(BeZero())
+
+							//make sure the record includes all the data
+							//since the building of the log record happens throughout the life of the request
+							logBytes, err := os.ReadFile(f.Name())
+							g.Expect(err).NotTo(HaveOccurred())
+							logStr := string(logBytes)
+							g.Expect(strings.HasPrefix(logStr, "partially-broken-ws-app - [")).To(BeTrue())
+							g.Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
+							g.Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+							g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
+							g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
+							g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
+							g.Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
+							g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
+							g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
+						}, "20s").Should(Succeed())
+					})
+					It("shows no backend_time or other attempt details if all endpoints are broken", func() {
+
+						// Register some broken endpoints to cause retries
+						test_util.RegisterAddr(r, "fully-broken-ws-app", "10.255.255.1:1234", test_util.RegisterConfig{InstanceIndex: "1"})
+						test_util.RegisterAddr(r, "fully-broken-ws-app", "10.255.255.1:1235", test_util.RegisterConfig{InstanceIndex: "2"})
+						test_util.RegisterAddr(r, "fully-broken-ws-app", "10.255.255.1:1236", test_util.RegisterConfig{InstanceIndex: "3"})
+
+						conn := dialProxy(proxyServer)
+						wsConn, err := wsClient(conn, "ws://fully-broken-ws-app")
+						Expect(err).To(HaveOccurred())
+						Expect(wsConn).To(BeNil())
+
+						Eventually(func() (int64, error) {
+							fi, err := f.Stat()
+							if err != nil {
+								return 0, err
+							}
+							return fi.Size(), nil
+						}, "10s").ShouldNot(BeZero())
+
+						logBytes, err := os.ReadFile(f.Name())
+						Expect(err).NotTo(HaveOccurred())
+						logStr := string(logBytes)
+						Expect(strings.HasPrefix(logStr, "fully-broken-ws-app - [")).To(BeTrue())
+						Expect(logStr).To(ContainSubstring("response_time:"))
+						Expect(logStr).To(ContainSubstring("gorouter_time:"))
+						Expect(logStr).To(MatchRegexp("failed_attempts:3"))
+						Expect(logStr).To(MatchRegexp("failed_attempts_time:0.3"))
+						Expect(logStr).To(MatchRegexp("response_time:0.3"))
+						Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
+						Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+						Expect(logStr).To(MatchRegexp(`dns_time:"-"`))
+						Expect(logStr).To(MatchRegexp(`dial_time:"-"`))
+						Expect(logStr).To(MatchRegexp(`tls_time:"-"`))
+					})
 				})
 			})
 		})
@@ -2697,19 +2838,18 @@ func dialProxy(proxyServer net.Listener) *test_util.HttpConn {
 	return test_util.NewHttpConn(conn)
 }
 
-func wsClient(conn net.Conn, urlStr string) *websocket.Conn {
+func wsClient(conn net.Conn, urlStr string) (*websocket.Conn, error) {
 	wsUrl, err := url.ParseRequestURI(urlStr)
 	Expect(err).NotTo(HaveOccurred())
 
-	config := &websocket.Config{
+	cfg := &websocket.Config{
 		Location: wsUrl,
 		Origin:   wsUrl,
 		Version:  websocket.ProtocolVersionHybi13,
 	}
 
-	wsConn, err := websocket.NewClient(config, conn)
-	Expect(err).NotTo(HaveOccurred())
-	return wsConn
+	wsConn, err := websocket.NewClient(cfg, conn)
+	return wsConn, err
 }
 
 func parseResponseTimeFromLog(log string) float64 {
