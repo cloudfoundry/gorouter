@@ -1408,10 +1408,11 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 					configSnippet.CACerts = []string{string(rootRSAPEM), string(rootECDSAPEM)}
 				})
-				Context("when verify_client_certificate_metadata is provided and one of the CA subjects is not in the ClientCAPool", func() {
+				Context("when verify_client_certificate_metadata is enabled, and one of the provided CA subjects is not in the ClientCAPool", func() {
 					BeforeEach(func() {
 						configSnippet.ClientCACerts = string(clientRSAPEM)
-						configSnippet.VerifyClientCertificateMetadata = []VerifyClientCertificateMetadataRule{
+						configSnippet.VerifyClientCertificatesBasedOnProvidedMetadata = true
+						configSnippet.VerifyClientCertificateMetadataRules = []VerifyClientCertificateMetadataRule{
 							{
 								CASubject:     CertSubject{CommonName: "abc.com"},
 								ValidSubjects: []CertSubject{CertSubject{Organization: []string{"abc, Inc."}}},

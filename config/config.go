@@ -222,8 +222,8 @@ type VerifyClientCertificateMetadataRule struct {
 // express distinguished names for certificate subjects in a comparable manner.
 type CertSubject struct {
 	Country            []string `yaml:"country"`
-	Organization       []string `yaml:"organisations"`
-	OrganizationalUnit []string `yaml:"organisation_units"`
+	Organization       []string `yaml:"organisation"`
+	OrganizationalUnit []string `yaml:"organisation_unit"`
 	CommonName         string   `yaml:"common_name"`
 	SerialNumber       string   `yaml:"serial_number"`
 	Locality           []string `yaml:"locality"`
@@ -291,20 +291,23 @@ func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger logger.Logger, 
 // * the chain does not contain any client certificates (i.e. IsCA == false).
 func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger.Logger, rule VerifyClientCertificateMetadataRule) error {
 	for _, cert := range chain {
-		if !cert.IsCA {
-			subject := cert.Subject
-			for _, validSubject := range rule.ValidSubjects {
-				vaildCertSubject := validSubject.ToName()
-				if vaildCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
-					logger.Debug("chain", zap.String("issuer", cert.Issuer.String()), zap.Bool("CA", cert.IsCA), zap.String("subject", cert.Subject.String()))
-					return nil
-				}
-			}
-			logger.Warn("invalid-subject", zap.String("issuer", cert.Issuer.String()), zap.String("subject", cert.Subject.String()), zap.Object("allowed", rule.ValidSubjects))
-			return fmt.Errorf("subject not in the list of allowed subjects for CA Subject %q: %q", rule.CASubject, subject)
+		if cert.IsCA {
+			continue
 		}
+		subject := cert.Subject
+		for _, validSubject := range rule.ValidSubjects {
+			vaildCertSubject := validSubject.ToName()
+			if vaildCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
+				logger.Debug("chain", zap.String("issuer", cert.Issuer.String()), zap.Bool("CA", cert.IsCA), zap.String("subject", cert.Subject.String()))
+				return nil
+			}
+		}
+		logger.Warn("invalid-subject", zap.String("issuer", cert.Issuer.String()), zap.String("subject", cert.Subject.String()), zap.Object("allowed", rule.ValidSubjects))
+		return fmt.Errorf("subject not in the list of allowed subjects for CA Subject %q: %q", rule.CASubject, subject)
 	}
-	return fmt.Errorf("incomplete chain")
+	// this should never happen as the function is only called on successful client certificate verification as callback
+	// to tls.Config.VerifyPeerCertificate.
+	return fmt.Errorf("cert chain provided to client certificate metadata verification did not contain a leaf certificate; this should never happen")
 }
 
 // InitClientCertMetadataRules compares the defined rules against client CAs set in `client_ca_certs`. When a rule
@@ -370,7 +373,8 @@ type Config struct {
 	ClientCertificateValidation                     tls.ClientAuthType                    `yaml:"-"`
 	OnlyTrustClientCACerts                          bool                                  `yaml:"only_trust_client_ca_certs"`
 	TLSHandshakeTimeout                             time.Duration                         `yaml:"tls_handshake_timeout"`
-	VerifyClientCertificateMetadata   []VerifyClientCertificateMetadataRule `yaml:"verify_client_certificate_metadata,omitempty"`
+	VerifyClientCertificatesBasedOnProvidedMetadata bool                                  `yaml:"enable_verify_client_certificate_metadata,omitempty"`
+	VerifyClientCertificateMetadataRules            []VerifyClientCertificateMetadataRule `yaml:"verify_client_certificate_metadata,omitempty"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
 	PublishStartMessageInterval     time.Duration `yaml:"publish_start_message_interval,omitempty"`
@@ -467,7 +471,6 @@ var defaultConfig = Config{
 	RouteServiceTimeout:            60 * time.Second,
 	TLSHandshakeTimeout:            10 * time.Second,
 
-	ClientCertificateValidation:               tls.RequireAndVerifyClientCert,
 	PublishStartMessageInterval:               30 * time.Second,
 	PruneStaleDropletsInterval:                30 * time.Second,
 	DropletStaleThreshold:                     120 * time.Second,
@@ -820,13 +823,13 @@ func (c *Config) buildClientCertPool() error {
 	}
 	c.ClientCAPool = certPool
 
-	if c.VerifyClientCertificateMetadata != nil {
+	if c.VerifyClientCertificatesBasedOnProvidedMetadata && c.VerifyClientCertificateMetadataRules != nil {
 		bundle, err := pemutil.ParseCertificateBundle([]byte(c.ClientCACerts))
 		if err != nil {
 			return err
 		}
 
-		err = InitClientCertMetadataRules(c.VerifyClientCertificateMetadata, bundle)
+		err = InitClientCertMetadataRules(c.VerifyClientCertificateMetadataRules, bundle)
 		if err != nil {
 			return err
 		}
