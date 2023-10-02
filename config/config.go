@@ -203,7 +203,7 @@ type HTTPRewriteResponses struct {
 	RemoveHeaders          []HeaderNameValue `yaml:"remove_headers,omitempty"`
 }
 
-// VerifyClientCertificateMetadata defines verification rules for client certificates, which allow additional checks
+// VerifyClientCertificateMetadataRules defines verification rules for client certificates, which allow additional checks
 // for the certificates' subject.
 //
 // A rule is applied based on the CA certificate's subject. The CA certificate is defined as part of `client_ca_certs`
@@ -247,7 +247,7 @@ func (c CertSubject) ToName() pkix.Name {
 	}
 }
 
-// VerifyClientCertMetadata checks for th certificate chain received from the tls.Config.VerifyPeerCertificate
+// VerifyClientCertMetadata checks for the certificate chain received from the tls.Config.VerifyPeerCertificate
 // function callback, whether any configured VerifyClientCertificateMetadataRule applies.
 //
 // If a rule does apply, it is evaluated.
@@ -288,7 +288,7 @@ func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger logger.Logger, 
 //
 // Returns an error when:
 // * the certificate does not match any of the ValidSubjects in rule.
-// * the chain does not contain a client certificate (i.e. IsCA == false).
+// * the chain does not contain any client certificates (i.e. IsCA == false).
 func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger.Logger, rule VerifyClientCertificateMetadataRule) error {
 	for _, cert := range chain {
 		if !cert.IsCA {
@@ -360,16 +360,16 @@ type Config struct {
 	IsolationSegments        []string `yaml:"isolation_segments,omitempty"`
 	RoutingTableShardingMode string   `yaml:"routing_table_sharding_mode,omitempty"`
 
-	CipherString                      string                                `yaml:"cipher_suites,omitempty"`
-	CipherSuites                      []uint16                              `yaml:"-"`
-	MinTLSVersionString               string                                `yaml:"min_tls_version,omitempty"`
-	MaxTLSVersionString               string                                `yaml:"max_tls_version,omitempty"`
-	MinTLSVersion                     uint16                                `yaml:"-"`
-	MaxTLSVersion                     uint16                                `yaml:"-"`
-	ClientCertificateValidationString string                                `yaml:"client_cert_validation,omitempty"`
-	ClientCertificateValidation       tls.ClientAuthType                    `yaml:"-"`
-	OnlyTrustClientCACerts            bool                                  `yaml:"only_trust_client_ca_certs"`
-	TLSHandshakeTimeout               time.Duration                         `yaml:"tls_handshake_timeout"`
+	CipherString                                    string                                `yaml:"cipher_suites,omitempty"`
+	CipherSuites                                    []uint16                              `yaml:"-"`
+	MinTLSVersionString                             string                                `yaml:"min_tls_version,omitempty"`
+	MaxTLSVersionString                             string                                `yaml:"max_tls_version,omitempty"`
+	MinTLSVersion                                   uint16                                `yaml:"-"`
+	MaxTLSVersion                                   uint16                                `yaml:"-"`
+	ClientCertificateValidationString               string                                `yaml:"client_cert_validation,omitempty"`
+	ClientCertificateValidation                     tls.ClientAuthType                    `yaml:"-"`
+	OnlyTrustClientCACerts                          bool                                  `yaml:"only_trust_client_ca_certs"`
+	TLSHandshakeTimeout                             time.Duration                         `yaml:"tls_handshake_timeout"`
 	VerifyClientCertificateMetadata   []VerifyClientCertificateMetadataRule `yaml:"verify_client_certificate_metadata,omitempty"`
 
 	LoadBalancerHealthyThreshold    time.Duration `yaml:"load_balancer_healthy_threshold,omitempty"`
