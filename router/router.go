@@ -286,7 +286,6 @@ func (r *Router) verifyMtlsMetadata(_ [][]byte, chains [][]*x509.Certificate) er
 	if chains != nil {
 		return config.VerifyClientCertMetadata(r.config.VerifyClientCertificateMetadata, chains, r.logger)
 	}
-	fmt.Printf("Chains length %d", len(chains))
 	return nil
 }
 

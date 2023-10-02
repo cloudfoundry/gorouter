@@ -1874,7 +1874,6 @@ var _ = Describe("Router", func() {
 									}
 								})
 								It("successfully serves SSL traffic", func() {
-
 									expectSuccessfulConnection()
 								})
 							})
@@ -1915,7 +1914,6 @@ var _ = Describe("Router", func() {
 									}
 								})
 								It("successfully serves SSL traffic", func() {
-
 									expectSuccessfulConnection()
 								})
 							})

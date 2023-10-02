@@ -1418,7 +1418,7 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 							},
 						}
 					})
-					It("fails to validate", func() {
+					It("returns a meaningful error", func() {
 						configBytes := createYMLSnippet(configSnippet)
 						err := config.Initialize(configBytes)
 						Expect(err).ToNot(HaveOccurred())
