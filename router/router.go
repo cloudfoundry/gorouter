@@ -240,7 +240,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		ClientAuth:   r.config.ClientCertificateValidation,
 	}
 
-	if r.config.VerifyClientCertificateMetadata != nil {
+	if r.config.VerifyClientCertificatesBasedOnProvidedMetadata && r.config.VerifyClientCertificateMetadataRules != nil {
 		tlsConfig.VerifyPeerCertificate = r.verifyMtlsMetadata
 	}
 
@@ -279,12 +279,12 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 	return nil
 }
 
-// verifyMtlsMetadata checks the Config.VerifyClientCertificateMetadata rules, if any are defined.
+// verifyMtlsMetadata checks the Config.VerifyClientCertificateMetadataRules rules, if any are defined.
 //
 // Returns an error if one of the applicable verification rules fails.
 func (r *Router) verifyMtlsMetadata(_ [][]byte, chains [][]*x509.Certificate) error {
 	if chains != nil {
-		return config.VerifyClientCertMetadata(r.config.VerifyClientCertificateMetadata, chains, r.logger)
+		return config.VerifyClientCertMetadata(r.config.VerifyClientCertificateMetadataRules, chains, r.logger)
 	}
 	return nil
 }

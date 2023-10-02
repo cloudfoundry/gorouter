@@ -1866,7 +1866,8 @@ var _ = Describe("Router", func() {
 						Context("when verify_client_certificate_metadata is provided ", func() {
 							Context("when the client cert subject is one of the valid subjects for the specified CA subject", func() {
 								BeforeEach(func() {
-									config.VerifyClientCertificateMetadata = []cfg.VerifyClientCertificateMetadataRule{
+									config.VerifyClientCertificatesBasedOnProvidedMetadata = true
+									config.VerifyClientCertificateMetadataRules = []cfg.VerifyClientCertificateMetadataRule{
 										{
 											CASubject:     cfg.CertSubject{CommonName: "xyz.com", Organization: []string{"xyz, Inc."}},
 											ValidSubjects: []cfg.CertSubject{cfg.CertSubject{Organization: []string{"xyz, Inc."}, CommonName: "xyz.com"}},
@@ -1879,7 +1880,8 @@ var _ = Describe("Router", func() {
 							})
 							Context("when the client cert subject is not in the valid subjects for the specified CA subject", func() {
 								BeforeEach(func() {
-									config.VerifyClientCertificateMetadata = []cfg.VerifyClientCertificateMetadataRule{
+									config.VerifyClientCertificatesBasedOnProvidedMetadata = true
+									config.VerifyClientCertificateMetadataRules = []cfg.VerifyClientCertificateMetadataRule{
 										{
 											CASubject:     cfg.CertSubject{CommonName: "xyz.com", Organization: []string{"xyz, Inc."}},
 											ValidSubjects: []cfg.CertSubject{cfg.CertSubject{Organization: []string{"invalid."}}},
@@ -1904,9 +1906,40 @@ var _ = Describe("Router", func() {
 									Expect(resp).To(BeNil())
 								})
 							})
+							Context("when the client cert subject is not an exact match for the valid subjects for the specified CA subject", func() {
+								BeforeEach(func() {
+									config.VerifyClientCertificatesBasedOnProvidedMetadata = true
+									config.VerifyClientCertificateMetadataRules = []cfg.VerifyClientCertificateMetadataRule{
+										{
+											CASubject: cfg.CertSubject{CommonName: "xyz.com", Organization: []string{"xyz, Inc."}},
+											ValidSubjects: []cfg.CertSubject{
+												{CommonName: "xyz.com"},
+											},
+										},
+									}
+								})
+								It("unsuccessfully serves SSL traffic", func() {
+									app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+									app.RegisterAndListen()
+									Eventually(func() bool {
+										return appRegistered(registry, app)
+									}).Should(BeTrue())
+
+									uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
+									req, _ := http.NewRequest("GET", uri, nil)
+									tlsClientConfig.Certificates = []tls.Certificate{*clientCert}
+
+									resp, err := client.Do(req)
+									println("Error", err.Error())
+									Expect(err).To(HaveOccurred())
+									Expect(err).To(MatchError(ContainSubstring("remote error: tls: bad certificate")))
+									Expect(resp).To(BeNil())
+								})
+							})
 							Context("when the CA subject doesn't match to any of the CA subjects in the rules", func() {
 								BeforeEach(func() {
-									config.VerifyClientCertificateMetadata = []cfg.VerifyClientCertificateMetadataRule{
+									config.VerifyClientCertificatesBasedOnProvidedMetadata = true
+									config.VerifyClientCertificateMetadataRules = []cfg.VerifyClientCertificateMetadataRule{
 										{
 											CASubject:     cfg.CertSubject{CommonName: "abc.com"},
 											ValidSubjects: []cfg.CertSubject{cfg.CertSubject{Organization: []string{"abc, Inc."}}},
