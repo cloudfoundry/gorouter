@@ -213,9 +213,9 @@ type HTTPRewriteResponses struct {
 // ValidSubjects.
 type VerifyClientCertificateMetadataRule struct {
 	// The issuer DN , for which the subject validation should apply
-	CASubject CertSubject `yaml:"ca_subject"`
+	CASubject CertSubject `yaml:"issuer_in_chain"`
 	// The subject DNs	 that are allowed to be used for mTLS connections to Gorouter
-	ValidSubjects []CertSubject `yaml:"valid_subjects"`
+	ValidSubjects []CertSubject `yaml:"valid_cert_subjects"`
 }
 
 // CertSubject defines the same fields as pkix.Name and allows YAML declaration of said fields. This is used to
