@@ -222,8 +222,8 @@ type VerifyClientCertificateMetadataRule struct {
 // express distinguished names for certificate subjects in a comparable manner.
 type CertSubject struct {
 	Country            []string `yaml:"country"`
-	Organization       []string `yaml:"organisation"`
-	OrganizationalUnit []string `yaml:"organisation_unit"`
+	Organization       []string `yaml:"organization"`
+	OrganizationalUnit []string `yaml:"organizational_unit"`
 	CommonName         string   `yaml:"common_name"`
 	SerialNumber       string   `yaml:"serial_number"`
 	Locality           []string `yaml:"locality"`
@@ -296,8 +296,8 @@ func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger
 		}
 		subject := cert.Subject
 		for _, validSubject := range rule.ValidSubjects {
-			vaildCertSubject := validSubject.ToName()
-			if vaildCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
+			validCertSubject := validSubject.ToName()
+			if validCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
 				logger.Debug("chain", zap.String("issuer", cert.Issuer.String()), zap.Bool("CA", cert.IsCA), zap.String("subject", cert.Subject.String()))
 				return nil
 			}
