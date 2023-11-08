@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 	"time"
 
@@ -279,12 +280,29 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 	target.URL.Opaque = target.RequestURI
 
 	if strings.HasPrefix(target.RequestURI, "//") {
-		target.URL.Opaque = "//" + target.Host + target.URL.Path + target.URL.Query().Encode()
+		path := escapePathAndPreserveSlashes(target.URL.Path)
+		target.URL.Opaque = "//" + target.Host + path
+
+		if len(target.URL.Query()) > 0 {
+			target.URL.Opaque = target.URL.Opaque + "?" + target.URL.Query().Encode()
+		}
 	}
 	target.URL.RawQuery = ""
 
 	handler.SetRequestXRequestStart(target)
 	target.Header.Del(router_http.CfAppInstance)
+}
+
+func escapePathAndPreserveSlashes(unescaped string) string {
+	parts := strings.Split(unescaped, "/")
+	escapedPath := ""
+	for _, part := range parts {
+		escapedPart := url.PathEscape(part)
+		escapedPath = escapedPath + escapedPart + "/"
+	}
+	escapedPath = strings.TrimSuffix(escapedPath, "/")
+
+	return escapedPath
 }
 
 type wrappedIterator struct {
