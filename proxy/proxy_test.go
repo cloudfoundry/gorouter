@@ -1482,7 +1482,7 @@ var _ = Describe("Proxy", func() {
 				Expect(string(b)).To(ContainSubstring("response_time:"))
 				Expect(string(b)).To(ContainSubstring("gorouter_time:"))
 				Expect(string(b)).To(MatchRegexp("response_time:0.1"))
-				Expect(string(b)).To(MatchRegexp("gorouter_time:0.00"))
+				Expect(string(b)).To(MatchRegexp("gorouter_time:0.0"))
 			})
 
 			Context("in websocket requests", func() {
@@ -1530,7 +1530,7 @@ var _ = Describe("Proxy", func() {
 					Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
 					Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
 					Expect(logStr).To(MatchRegexp(`response_time:0.1`))
-					Expect(logStr).To(MatchRegexp(`gorouter_time:0.00`))
+					Expect(logStr).To(MatchRegexp(`gorouter_time:0.0`))
 				})
 			})
 
@@ -1594,7 +1594,7 @@ var _ = Describe("Proxy", func() {
 						g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
 						g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
 						g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
-						g.Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
+						g.Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
 						g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
 						g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
 
@@ -1698,7 +1698,7 @@ var _ = Describe("Proxy", func() {
 							g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
 							g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
 							g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
-							g.Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
+							g.Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
 							g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
 							g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
 						}, "20s").Should(Succeed())
@@ -1732,7 +1732,7 @@ var _ = Describe("Proxy", func() {
 						Expect(logStr).To(MatchRegexp("failed_attempts:3"))
 						Expect(logStr).To(MatchRegexp("failed_attempts_time:0.3"))
 						Expect(logStr).To(MatchRegexp("response_time:0.3"))
-						Expect(logStr).To(MatchRegexp("gorouter_time:0.00"))
+						Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
 						Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
 						Expect(logStr).To(MatchRegexp(`dns_time:"-"`))
 						Expect(logStr).To(MatchRegexp(`dial_time:"-"`))
