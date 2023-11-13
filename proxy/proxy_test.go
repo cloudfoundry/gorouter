@@ -1481,8 +1481,8 @@ var _ = Describe("Proxy", func() {
 				Expect(strings.HasPrefix(string(b), "slow-response-app - [")).To(BeTrue())
 				Expect(string(b)).To(ContainSubstring("response_time:"))
 				Expect(string(b)).To(ContainSubstring("gorouter_time:"))
-				Expect(string(b)).To(MatchRegexp("response_time:0.1"))
-				Expect(string(b)).To(MatchRegexp("gorouter_time:0.0"))
+				Expect(string(b)).To(ContainSubstring("response_time:0.1"))
+				Expect(string(b)).To(ContainSubstring("gorouter_time:0.0"))
 			})
 
 			Context("in websocket requests", func() {
@@ -1529,8 +1529,8 @@ var _ = Describe("Proxy", func() {
 					Expect(strings.HasPrefix(logStr, "slow-ws-test - [")).To(BeTrue())
 					Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
 					Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
-					Expect(logStr).To(MatchRegexp(`response_time:0.1`))
-					Expect(logStr).To(MatchRegexp(`gorouter_time:0.0`))
+					Expect(logStr).To(ContainSubstring(`response_time:0.1`))
+					Expect(logStr).To(ContainSubstring(`gorouter_time:0.0`))
 				})
 			})
 
@@ -1591,12 +1591,12 @@ var _ = Describe("Proxy", func() {
 						g.Expect(strings.HasPrefix(logStr, "partially-broken-app - [")).To(BeTrue())
 						g.Expect(logStr).To(ContainSubstring("response_time:"))
 						g.Expect(logStr).To(ContainSubstring("gorouter_time:"))
-						g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
-						g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
-						g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
-						g.Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
-						g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
-						g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
+						g.Expect(logStr).To(ContainSubstring("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
+						g.Expect(logStr).To(ContainSubstring("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
+						g.Expect(logStr).To(ContainSubstring("response_time:0.3"))        // makes 0.3 seconds total response time
+						g.Expect(logStr).To(ContainSubstring("gorouter_time:0.0"))
+						g.Expect(logStr).To(ContainSubstring("failed_attempts:2"))
+						g.Expect(logStr).To(ContainSubstring(`app_index:"3"`))
 
 					}, "20s").Should(Succeed()) // we don't know which endpoint will be chosen first, so we have to try until sequence 1,2,3 has been hit
 				})
@@ -1633,14 +1633,14 @@ var _ = Describe("Proxy", func() {
 					Expect(strings.HasPrefix(logStr, "fully-broken-app - [")).To(BeTrue())
 					Expect(logStr).To(ContainSubstring("response_time:"))
 					Expect(logStr).To(ContainSubstring("gorouter_time:"))
-					Expect(logStr).To(MatchRegexp("failed_attempts:3"))
-					Expect(logStr).To(MatchRegexp("failed_attempts_time:0.3"))
-					Expect(logStr).To(MatchRegexp("response_time:0.3"))
-					Expect(logStr).To(MatchRegexp("gorouter_time:0"))
-					Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
-					Expect(logStr).To(MatchRegexp(`dns_time:"-"`))
-					Expect(logStr).To(MatchRegexp(`dial_time:"-"`))
-					Expect(logStr).To(MatchRegexp(`tls_time:"-"`))
+					Expect(logStr).To(ContainSubstring("failed_attempts:3"))
+					Expect(logStr).To(ContainSubstring("failed_attempts_time:0.3"))
+					Expect(logStr).To(ContainSubstring("response_time:0.3"))
+					Expect(logStr).To(ContainSubstring("gorouter_time:0"))
+					Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
+					Expect(logStr).To(ContainSubstring(`dns_time:"-"`))
+					Expect(logStr).To(ContainSubstring(`dial_time:"-"`))
+					Expect(logStr).To(ContainSubstring(`tls_time:"-"`))
 				})
 				Context("in websocket requests", func() {
 					BeforeEach(func() {
@@ -1695,12 +1695,12 @@ var _ = Describe("Proxy", func() {
 							g.Expect(strings.HasPrefix(logStr, "partially-broken-ws-app - [")).To(BeTrue())
 							g.Expect(logStr).To(ContainSubstring(`"GET / HTTP/1.1" 101`))
 							g.Expect(logStr).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
-							g.Expect(logStr).To(MatchRegexp("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
-							g.Expect(logStr).To(MatchRegexp("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
-							g.Expect(logStr).To(MatchRegexp("response_time:0.3"))        // makes 0.3 seconds total response time
-							g.Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
-							g.Expect(logStr).To(MatchRegexp("failed_attempts:2"))
-							g.Expect(logStr).To(MatchRegexp(`app_index:"3"`))
+							g.Expect(logStr).To(ContainSubstring("backend_time:0.1"))         // 0.1 seconds delay from slow backend app
+							g.Expect(logStr).To(ContainSubstring("failed_attempts_time:0.2")) // plus 0.2 seconds from dial attempts
+							g.Expect(logStr).To(ContainSubstring("response_time:0.3"))        // makes 0.3 seconds total response time
+							g.Expect(logStr).To(ContainSubstring("gorouter_time:0.0"))
+							g.Expect(logStr).To(ContainSubstring("failed_attempts:2"))
+							g.Expect(logStr).To(ContainSubstring(`app_index:"3"`))
 						}, "20s").Should(Succeed())
 					})
 					It("shows no backend_time or other attempt details if all endpoints are broken", func() {
@@ -1729,14 +1729,14 @@ var _ = Describe("Proxy", func() {
 						Expect(strings.HasPrefix(logStr, "fully-broken-ws-app - [")).To(BeTrue())
 						Expect(logStr).To(ContainSubstring("response_time:"))
 						Expect(logStr).To(ContainSubstring("gorouter_time:"))
-						Expect(logStr).To(MatchRegexp("failed_attempts:3"))
-						Expect(logStr).To(MatchRegexp("failed_attempts_time:0.3"))
-						Expect(logStr).To(MatchRegexp("response_time:0.3"))
-						Expect(logStr).To(MatchRegexp("gorouter_time:0.0"))
-						Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
-						Expect(logStr).To(MatchRegexp(`dns_time:"-"`))
-						Expect(logStr).To(MatchRegexp(`dial_time:"-"`))
-						Expect(logStr).To(MatchRegexp(`tls_time:"-"`))
+						Expect(logStr).To(ContainSubstring("failed_attempts:3"))
+						Expect(logStr).To(ContainSubstring("failed_attempts_time:0.3"))
+						Expect(logStr).To(ContainSubstring("response_time:0.3"))
+						Expect(logStr).To(ContainSubstring("gorouter_time:0.0"))
+						Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
+						Expect(logStr).To(ContainSubstring(`dns_time:"-"`))
+						Expect(logStr).To(ContainSubstring(`dial_time:"-"`))
+						Expect(logStr).To(ContainSubstring(`tls_time:"-"`))
 					})
 				})
 			})
@@ -1775,9 +1775,9 @@ var _ = Describe("Proxy", func() {
 				Expect(strings.HasPrefix(logStr, "does-not-exist - [")).To(BeTrue())
 				Expect(logStr).To(ContainSubstring("response_time:"))
 				Expect(logStr).To(ContainSubstring("gorouter_time:"))
-				Expect(logStr).To(MatchRegexp("response_time:0"))
-				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
-				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+				Expect(logStr).To(ContainSubstring("response_time:0"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:0"))
+				Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
 			})
 			It("logs no backend_time on invalid X-CF-App-Instance header", func() {
 				conn := dialProxy(proxyServer)
@@ -1807,9 +1807,9 @@ var _ = Describe("Proxy", func() {
 				Expect(strings.HasPrefix(logStr, "invalid-app-instance-header - [")).To(BeTrue())
 				Expect(logStr).To(ContainSubstring("response_time:"))
 				Expect(logStr).To(ContainSubstring("gorouter_time:"))
-				Expect(logStr).To(MatchRegexp("response_time:0"))
-				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
-				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+				Expect(logStr).To(ContainSubstring("response_time:0"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:0"))
+				Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
 			})
 			It("logs no backend_time on empty pools (404 status)", func() {
 				test_util.RegisterAddr(r, "empty-pool-app", "10.255.255.1:1234", test_util.RegisterConfig{StaleThreshold: 1})
@@ -1849,9 +1849,9 @@ var _ = Describe("Proxy", func() {
 				Expect(strings.HasPrefix(logStr, "empty-pool-app - [")).To(BeTrue())
 				Expect(logStr).To(ContainSubstring("response_time:"))
 				Expect(logStr).To(ContainSubstring("gorouter_time:"))
-				Expect(logStr).To(MatchRegexp("response_time:0"))
-				Expect(logStr).To(MatchRegexp("gorouter_time:0"))
-				Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+				Expect(logStr).To(ContainSubstring("response_time:0"))
+				Expect(logStr).To(ContainSubstring("gorouter_time:0"))
+				Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
 			})
 			Context("when EmptyPoolResponseCode503 is enabled", func() {
 				BeforeEach(func() {
@@ -1896,9 +1896,9 @@ var _ = Describe("Proxy", func() {
 					Expect(strings.HasPrefix(logStr, "empty-pool-app - [")).To(BeTrue())
 					Expect(logStr).To(ContainSubstring("response_time:"))
 					Expect(logStr).To(ContainSubstring("gorouter_time:"))
-					Expect(logStr).To(MatchRegexp("response_time:0"))
-					Expect(logStr).To(MatchRegexp("gorouter_time:0"))
-					Expect(logStr).To(MatchRegexp(`backend_time:"-"`))
+					Expect(logStr).To(ContainSubstring("response_time:0"))
+					Expect(logStr).To(ContainSubstring("gorouter_time:0"))
+					Expect(logStr).To(ContainSubstring(`backend_time:"-"`))
 				})
 			})
 		})
