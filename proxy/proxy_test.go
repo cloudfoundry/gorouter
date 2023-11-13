@@ -705,30 +705,15 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("transfers chunked encodings", func() {
-			ln := test_util.RegisterConnHandler(r, "chunk", func(conn *test_util.HttpConn) {
-				r, w := io.Pipe()
+			ln := test_util.RegisterHTTPHandler(r, "chunk", func(w http.ResponseWriter, r *http.Request) {
+				flusher, ok := w.(http.Flusher)
+				Expect(ok).To(BeTrue())
 
-				// Write 3 times on a 100ms interval
-				go func() {
-					defer GinkgoRecover()
-					t := time.NewTicker(100 * time.Millisecond)
-					defer t.Stop()
-					defer w.Close()
-
-					for i := 0; i < 3; i++ {
-						<-t.C
-						_, err := w.Write([]byte("hello"))
-						Expect(err).NotTo(HaveOccurred())
-					}
-				}()
-
-				_, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-
-				resp := test_util.NewResponse(http.StatusOK)
-				resp.TransferEncoding = []string{"chunked"}
-				resp.Body = r
-				resp.Write(conn)
+				for i := 0; i < 3; i++ {
+					_, err := w.Write([]byte("hello"))
+					Expect(err).NotTo(HaveOccurred())
+					flusher.Flush()
+				}
 			})
 			defer ln.Close()
 
