@@ -251,7 +251,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	if err != nil && errors.Is(originalRequest.Context().Err(), context.Canceled) && !errors.Is(err, context.Canceled) {
 		rt.logger.Error("gateway-error-and-original-request-context-cancelled", zap.Error(err))
 		err = originalRequest.Context().Err()
-		originalRequest.Body.Close()
+		if originalRequest.Body != nil {
+			_ = originalRequest.Body.Close()
+		}
 	}
 
 	// If we have an error from the round trip, we prefer it over errors
