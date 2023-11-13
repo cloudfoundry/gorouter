@@ -248,7 +248,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 
 	// if the client disconnects before response is sent then return context.Canceled (499) instead of the gateway error
-	if err != nil && originalRequest.Context().Err() == context.Canceled && err != context.Canceled {
+	if err != nil && errors.Is(originalRequest.Context().Err(), context.Canceled) && !errors.Is(err, context.Canceled) {
 		rt.logger.Error("gateway-error-and-original-request-context-cancelled", zap.Error(err))
 		err = originalRequest.Context().Err()
 		originalRequest.Body.Close()
