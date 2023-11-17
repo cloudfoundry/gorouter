@@ -44,12 +44,13 @@ type rss interface {
 	Stop()
 }
 type Router struct {
-	config     *config.Config
-	handler    http.Handler
-	mbusClient *nats.Conn
-	registry   *registry.RouteRegistry
-	varz       varz.Varz
-	component  *common.VcapComponent
+	config         *config.Config
+	handler        http.Handler
+	mbusClient     *nats.Conn
+	registry       *registry.RouteRegistry
+	varz           varz.Varz
+	component      *common.VcapComponent
+	routesListener *RoutesListener
 
 	listener            net.Listener
 	tlsListener         net.Listener
@@ -108,6 +109,14 @@ func NewRouter(
 		Logger: logger,
 	}
 
+	routesListener := &RoutesListener{
+		Config:        cfg,
+		RouteRegistry: r,
+	}
+	if err := routesListener.ListenAndServe(); err != nil {
+		return nil, err
+	}
+
 	routerErrChan := errChan
 	if routerErrChan == nil {
 		routerErrChan = make(chan error, 3)
@@ -120,6 +129,7 @@ func NewRouter(
 		registry:            r,
 		varz:                v,
 		component:           component,
+		routesListener:      routesListener,
 		serveDone:           make(chan struct{}),
 		tlsServeDone:        make(chan struct{}),
 		idleConns:           make(map[net.Conn]struct{}),
@@ -367,6 +377,7 @@ func (r *Router) Stop() {
 	r.connLock.Unlock()
 
 	r.component.Stop()
+	r.routesListener.Stop()
 	r.uptimeMonitor.Stop()
 	r.logger.Info(
 		"gorouter.stopped",

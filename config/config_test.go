@@ -61,6 +61,8 @@ status:
   port: 1234
   user: user
   pass: pass
+  routes:
+    port: 8082
 `)
 
 			err := config.Initialize(b)
@@ -69,7 +71,7 @@ status:
 			Expect(config.Status.Port).To(Equal(uint16(1234)))
 			Expect(config.Status.User).To(Equal("user"))
 			Expect(config.Status.Pass).To(Equal("pass"))
-
+			Expect(config.Status.Routes.Port).To(Equal(uint16(8082)))
 		})
 		It("sets MaxHeaderBytes", func() {
 			var b = []byte(`
