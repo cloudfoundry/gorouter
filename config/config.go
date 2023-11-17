@@ -5,8 +5,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
-	"go.step.sm/crypto/pemutil"
 	"net/url"
+
+	"go.step.sm/crypto/pemutil"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
@@ -69,17 +70,25 @@ func (ss StringSet) MarshalYAML() (interface{}, error) {
 }
 
 type StatusConfig struct {
-	Host string `yaml:"host"`
+	Host   string             `yaml:"host"`
+	Port   uint16             `yaml:"port"`
+	User   string             `yaml:"user"`
+	Pass   string             `yaml:"pass"`
+	Routes StatusRoutesConfig `yaml:"routes"`
+}
+
+type StatusRoutesConfig struct {
 	Port uint16 `yaml:"port"`
-	User string `yaml:"user"`
-	Pass string `yaml:"pass"`
 }
 
 var defaultStatusConfig = StatusConfig{
 	Host: "0.0.0.0",
-	Port: 8082,
+	Port: 8080,
 	User: "",
 	Pass: "",
+	Routes: StatusRoutesConfig{
+		Port: 8082,
+	},
 }
 
 type PrometheusConfig struct {

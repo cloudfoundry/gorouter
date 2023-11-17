@@ -65,7 +65,7 @@ func (s *testState) SetOnlyTrustClientCACertsTrue() {
 
 func NewTestState() *testState {
 	// TODO: don't hide so much behind these test_util methods
-	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
+	cfg, clientTLSConfig := test_util.SpecSSLConfig(test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort(), test_util.NextAvailPort())
 	cfg.SkipSSLValidation = false
 	cfg.RouteServicesHairpinning = false
 	cfg.CipherString = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"

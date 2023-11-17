@@ -158,13 +158,14 @@ var _ = Describe("Router", func() {
 
 		proxyPort := test_util.NextAvailPort()
 		statusPort := test_util.NextAvailPort()
+		statusRoutesPort := test_util.NextAvailPort()
 
 		sslPort := test_util.NextAvailPort()
 
 		defaultCert := test_util.CreateCert("default")
 		cert2 := test_util.CreateCert("default")
 
-		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
+		config = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
 		config.EnableSSL = true
 		config.SSLPort = sslPort
 		config.SSLCertificates = []tls.Certificate{defaultCert, cert2}
@@ -417,6 +418,7 @@ var _ = Describe("Router", func() {
 				h.SetHealth(health.Healthy)
 				config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 				config.Status.Port = test_util.NextAvailPort()
+				config.Status.Routes.Port = test_util.NextAvailPort()
 				rt := &sharedfakes.RoundTripper{}
 				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)

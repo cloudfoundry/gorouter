@@ -72,6 +72,7 @@ var _ = Describe("Router", func() {
 		router              *Router
 		logger              logger.Logger
 		statusPort          uint16
+		statusRoutesPort    uint16
 		natsPort            uint16
 		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
 		routeServicesServer *sharedfakes.RouteServicesServer
@@ -83,8 +84,9 @@ var _ = Describe("Router", func() {
 	BeforeEach(func() {
 		proxyPort := test_util.NextAvailPort()
 		statusPort = test_util.NextAvailPort()
+		statusRoutesPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
-		config = test_util.SpecConfig(statusPort, proxyPort, natsPort)
+		config = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
 		backendIdleTimeout = config.EndpointTimeout
 		requestTimeout = config.EndpointTimeout
 		config.EnableSSL = true
@@ -155,8 +157,9 @@ var _ = Describe("Router", func() {
 				natsPort := test_util.NextAvailPort()
 				proxyPort := test_util.NextAvailPort()
 				statusPort = test_util.NextAvailPort()
+				statusRoutesPort = test_util.NextAvailPort()
 
-				c := test_util.SpecConfig(statusPort, proxyPort, natsPort)
+				c := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
 				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
@@ -175,8 +178,9 @@ var _ = Describe("Router", func() {
 				natsPort := test_util.NextAvailPort()
 				proxyPort := test_util.NextAvailPort()
 				statusPort = test_util.NextAvailPort()
+				statusRoutesPort = test_util.NextAvailPort()
 
-				c := test_util.SpecConfig(statusPort, proxyPort, natsPort)
+				c := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
 				rss := &sharedfakes.RouteServicesServer{}
@@ -208,7 +212,8 @@ var _ = Describe("Router", func() {
 			natsPort := test_util.NextAvailPort()
 			proxyPort := test_util.NextAvailPort()
 			statusPort = test_util.NextAvailPort()
-			c = test_util.SpecConfig(statusPort, proxyPort, natsPort)
+			statusRoutesPort = test_util.NextAvailPort()
+			c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
 			c.StartResponseDelayInterval = 1 * time.Second
 
 			// Create a second router to test the health check in parallel to startup
@@ -416,8 +421,29 @@ var _ = Describe("Router", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("no longer responds to component requests", func() {
+		It("no longer responds to routes requests", func() {
 			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+
+			req, err := http.NewRequest("GET", host, nil)
+			Expect(err).ToNot(HaveOccurred())
+			req.SetBasicAuth("user", "pass")
+
+			sendAndReceive(req, http.StatusOK)
+
+			router.Stop()
+			router = nil
+
+			Eventually(func() error {
+				req, err = http.NewRequest("GET", host, nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = http.DefaultClient.Do(req)
+				return err
+			}).Should(HaveOccurred())
+		})
+
+		It("no longer responds to component requests", func() {
+			host := fmt.Sprintf("http://%s:%d/varz", config.Ip, config.Status.Port)
 
 			req, err := http.NewRequest("GET", host, nil)
 			Expect(err).ToNot(HaveOccurred())

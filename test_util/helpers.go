@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"golang.org/x/net/websocket"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -21,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/websocket"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -161,12 +162,12 @@ func runBackendInstance(ln net.Listener, handler connHandler) {
 	}
 }
 
-func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
-	return generateConfig(statusPort, proxyPort, natsPorts...)
+func SpecConfig(statusPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+	return generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, proxyPort, natsPorts...)
+func SpecSSLConfig(statusPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -203,8 +204,8 @@ const (
 	TLSConfigFromUnknownCA     = 3
 )
 
-func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, proxyPort, natsPorts...)
+func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -257,7 +258,7 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 	return c, clientTLSConfig
 }
 
-func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+func generateConfig(statusPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
 	c, err := config.DefaultConfig()
 	Expect(err).ToNot(HaveOccurred())
 
@@ -282,6 +283,9 @@ func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.C
 		Port: statusPort,
 		User: "user",
 		Pass: "pass",
+		Routes: config.StatusRoutesConfig{
+			Port: statusRoutesPort,
+		},
 	}
 
 	natsHosts := make([]config.NatsHost, len(natsPorts))
