@@ -208,40 +208,119 @@ var _ = Describe("Router", func() {
 			err error
 		)
 
-		It("does not immediately make the health check endpoint available", func() {
-			natsPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-			statusPort = test_util.NextAvailPort()
-			statusRoutesPort = test_util.NextAvailPort()
-			c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
-			c.StartResponseDelayInterval = 1 * time.Second
+		Context("and tls is disabled", func() {
+			It("does not immediately make the health check endpoint available", func() {
+				natsPort := test_util.NextAvailPort()
+				proxyPort := test_util.NextAvailPort()
+				statusPort = test_util.NextAvailPort()
+				statusRoutesPort = test_util.NextAvailPort()
+				c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
+				c.StartResponseDelayInterval = 1 * time.Second
 
-			// Create a second router to test the health check in parallel to startup
-			rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				// Create a second router to test the health check in parallel to startup
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
 
-			Expect(err).ToNot(HaveOccurred())
-			healthCheckWithEndpointReceives := func() int {
-				url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
-				req, _ := http.NewRequest("GET", url, nil)
-
-				client := http.Client{}
-				resp, err := client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
-				defer resp.Body.Close()
-				return resp.StatusCode
-			}
-			signals := make(chan os.Signal)
-			readyChan := make(chan struct{})
-			go rtr.Run(signals, readyChan)
+				healthCheckWithEndpointReceives := func() int {
+					url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
+					req, _ := http.NewRequest("GET", url, nil)
 
-			Consistently(func() int {
-				return healthCheckWithEndpointReceives()
-			}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
-			signals <- syscall.SIGUSR1
+					client := http.Client{}
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					defer resp.Body.Close()
+					return resp.StatusCode
+				}
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+				go rtr.Run(signals, readyChan)
+
+				Consistently(func() int {
+					return healthCheckWithEndpointReceives()
+				}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+				signals <- syscall.SIGUSR1
+			})
+
+			It("should log waiting delay value", func() {
+				Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
+			})
 		})
 
-		It("should log waiting delay value", func() {
-			Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
+		Context("and tls is enabled", func() {
+			BeforeEach(func() {
+				natsPort := test_util.NextAvailPort()
+				proxyPort := test_util.NextAvailPort()
+				statusPort = test_util.NextAvailPort()
+				statusRoutesPort = test_util.NextAvailPort()
+				c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
+				c.Status.TLS.Port = test_util.NextAvailPort()
+				c.Status.TLSCert = test_util.CreateCert("somestring")
+				c.StartResponseDelayInterval = 1 * time.Second
+			})
+
+			It("does not immediately make the health check endpoint available", func() {
+				// Create a second router to test the health check in parallel to startup
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+
+				Expect(err).ToNot(HaveOccurred())
+				healthCheckWithEndpointReceives := func() int {
+					url := fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port)
+					req, _ := http.NewRequest("GET", url, nil)
+
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client := http.Client{Transport: tr}
+					resp, err := client.Do(req)
+					Expect(err).ToNot(HaveOccurred())
+					defer resp.Body.Close()
+					return resp.StatusCode
+				}
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+				go rtr.Run(signals, readyChan)
+
+				Consistently(func() int {
+					return healthCheckWithEndpointReceives()
+				}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
+				signals <- syscall.SIGUSR1
+			})
+
+			It("should log waiting delay value", func() {
+				Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
+			})
+
+			Context("if tls cert is not provided", func() {
+				BeforeEach(func() {
+					c.Status.TLSCert = tls.Certificate{}
+				})
+				It("doesn't listen on the tls status port", func() {
+					// Create a second router to test the health check in parallel to startup
+					rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+
+					Expect(err).ToNot(HaveOccurred())
+					healthCheckWithEndpointReceives := func() error {
+						url := fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port)
+						req, _ := http.NewRequest("GET", url, nil)
+
+						tr := &http.Transport{
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+						}
+						client := http.Client{Transport: tr}
+						_, err := client.Do(req)
+						return err
+					}
+					signals := make(chan os.Signal)
+					readyChan := make(chan struct{})
+					go rtr.Run(signals, readyChan)
+
+					Consistently(func() error {
+						return healthCheckWithEndpointReceives()
+					}, 500*time.Millisecond).Should(MatchError(ContainSubstring("connection refused")))
+					signals <- syscall.SIGUSR1
+
+				})
+			})
 		})
 	})
 

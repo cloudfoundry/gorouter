@@ -44,13 +44,14 @@ type rss interface {
 	Stop()
 }
 type Router struct {
-	config         *config.Config
-	handler        http.Handler
-	mbusClient     *nats.Conn
-	registry       *registry.RouteRegistry
-	varz           varz.Varz
-	component      *common.VcapComponent
-	routesListener *RoutesListener
+	config            *config.Config
+	handler           http.Handler
+	mbusClient        *nats.Conn
+	registry          *registry.RouteRegistry
+	varz              varz.Varz
+	component         *common.VcapComponent
+	routesListener    *RoutesListener
+	healthTLSListener *HealthListener
 
 	listener            net.Listener
 	tlsListener         net.Listener
@@ -109,6 +110,27 @@ func NewRouter(
 		Logger: logger,
 	}
 
+	// TODO: once we can remove the varz/healthz endpoints in `VcapComponent`
+	//       we should add another healthListener here without TLS support,
+	//       and remove all of common/VcapComponent code
+	var healthTLSListener *HealthListener
+	if cfg.Status.TLS.Port != 0 && len(cfg.Status.TLSCert.Certificate) != 0 {
+		logger.Info("meow.healthtlslistener", zap.Int("status.tls.port", int(cfg.Status.TLS.Port)), zap.String("cert/key", string(cfg.Status.TLSCert.Certificate[0])))
+		healthTLSListener := &HealthListener{
+			Port: cfg.Status.TLS.Port,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cfg.Status.TLSCert},
+				CipherSuites: cfg.CipherSuites,
+				MinVersion:   cfg.MinTLSVersion,
+				MaxVersion:   cfg.MaxTLSVersion,
+			},
+			HealthCheck: healthCheck,
+		}
+		if err := healthTLSListener.ListenAndServe(); err != nil {
+			return nil, err
+		}
+	}
+
 	routesListener := &RoutesListener{
 		Config:        cfg,
 		RouteRegistry: r,
@@ -130,6 +152,7 @@ func NewRouter(
 		varz:                v,
 		component:           component,
 		routesListener:      routesListener,
+		healthTLSListener:   healthTLSListener,
 		serveDone:           make(chan struct{}),
 		tlsServeDone:        make(chan struct{}),
 		idleConns:           make(map[net.Conn]struct{}),
@@ -378,6 +401,9 @@ func (r *Router) Stop() {
 
 	r.component.Stop()
 	r.routesListener.Stop()
+	if r.healthTLSListener != nil {
+		r.healthTLSListener.Stop()
+	}
 	r.uptimeMonitor.Stop()
 	r.logger.Info(
 		"gorouter.stopped",
