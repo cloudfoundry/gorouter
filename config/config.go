@@ -70,11 +70,19 @@ func (ss StringSet) MarshalYAML() (interface{}, error) {
 }
 
 type StatusConfig struct {
-	Host   string             `yaml:"host"`
-	Port   uint16             `yaml:"port"`
-	User   string             `yaml:"user"`
-	Pass   string             `yaml:"pass"`
-	Routes StatusRoutesConfig `yaml:"routes"`
+	Host    string             `yaml:"host"`
+	Port    uint16             `yaml:"port"`
+	TLSCert tls.Certificate    `yaml:"-"`
+	TLS     StatusTLSConfig    `yaml:"tls"`
+	User    string             `yaml:"user"`
+	Pass    string             `yaml:"pass"`
+	Routes  StatusRoutesConfig `yaml:"routes"`
+}
+
+type StatusTLSConfig struct {
+	Port        uint16 `yaml:"port"`
+	Certificate string `yaml:"certificate"`
+	Key         string `yaml:"key"`
 }
 
 type StatusRoutesConfig struct {
@@ -599,6 +607,26 @@ func (c *Config) Process() error {
 			return fmt.Errorf("Error while adding CACerts to gorouter's routing-api cert pool: \n%s\n", c.Nats.CACerts)
 		}
 		c.Nats.CAPool = certPool
+	}
+
+	healthTLS := c.Status.TLS
+	if healthTLS.Port != 0 {
+		if healthTLS.Key == "" {
+			return fmt.Errorf("If router.status.tls.port is specified, key must be provided")
+		}
+		if healthTLS.Certificate == "" {
+			return fmt.Errorf("If router.status.tls.port is specified, certificate must be provided")
+		}
+	}
+	if healthTLS.Key != "" && healthTLS.Certificate != "" {
+		if healthTLS.Port == 0 {
+			return fmt.Errorf("If router.status.tls.certificate/key are specified, port must not be 0")
+		}
+		certificate, err := tls.X509KeyPair([]byte(healthTLS.Certificate), []byte(healthTLS.Key))
+		if err != nil {
+			return fmt.Errorf("Error loading router.status TLS key pair: %s", err.Error())
+		}
+		c.Status.TLSCert = certificate
 	}
 
 	if c.EnableSSL {

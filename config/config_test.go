@@ -69,9 +69,103 @@ status:
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.Status.Port).To(Equal(uint16(1234)))
+			Expect(config.Status.TLSCert).To(Equal(tls.Certificate{}))
 			Expect(config.Status.User).To(Equal("user"))
 			Expect(config.Status.Pass).To(Equal("pass"))
 			Expect(config.Status.Routes.Port).To(Equal(uint16(8082)))
+		})
+		Context("when tls is specified for the status config", func() {
+			var cfgBytes, certPEM, keyPEM []byte
+			var tlsPort uint16
+
+			createYMLSnippet := func(snippet *Config) []byte {
+				cfgBytes, err := yaml.Marshal(snippet)
+				Expect(err).ToNot(HaveOccurred())
+				return cfgBytes
+			}
+
+			BeforeEach(func() {
+				keyPEM, certPEM = test_util.CreateKeyPair("default")
+				tlsPort = 8443
+			})
+			JustBeforeEach(func() {
+				cfgSnippet := &Config{
+					Status: StatusConfig{
+						TLS: StatusTLSConfig{
+							Port:        tlsPort,
+							Certificate: string(certPEM),
+							Key:         string(keyPEM),
+						},
+					},
+				}
+				cfgBytes = createYMLSnippet(cfgSnippet)
+
+				err := config.Initialize(cfgBytes)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			It("parses the cert + key", func() {
+				err := config.Process()
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(config.Status.TLS.Port).To(Equal(tlsPort))
+				Expect(config.Status.TLS.Certificate).To(Equal(string(certPEM)))
+				Expect(config.Status.TLS.Key).To(Equal(string(keyPEM)))
+
+				cert, err := tls.X509KeyPair(certPEM, keyPEM)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(config.Status.TLSCert).To(Equal(cert))
+			})
+			Context("and the certificate is invalid", func() {
+				BeforeEach(func() {
+					certPEM = []byte("blarg")
+				})
+				It("throws an error", func() {
+					err := config.Process()
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(ContainSubstring("Error loading router.status TLS key pair")))
+				})
+			})
+			Context("and the key is invalid", func() {
+				BeforeEach(func() {
+					keyPEM = []byte("blarg")
+				})
+				It("throws an error", func() {
+					err := config.Process()
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(ContainSubstring("Error loading router.status TLS key pair")))
+				})
+			})
+			Context("and the cert is missing", func() {
+				BeforeEach(func() {
+					certPEM = []byte{}
+				})
+				It("throws an error", func() {
+					err := config.Process()
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.port is specified, certificate must be provided")))
+				})
+			})
+			Context("and the key is missing", func() {
+				BeforeEach(func() {
+					keyPEM = []byte{}
+				})
+				It("throws an error", func() {
+					err := config.Process()
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.port is specified, key must be provided")))
+				})
+			})
+			Context("and the port is missing", func() {
+				BeforeEach(func() {
+					tlsPort = 0
+				})
+				It("throws an error", func() {
+					err := config.Process()
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.certificate/key are specified, port must not be 0")))
+				})
+
+			})
 		})
 		It("sets MaxHeaderBytes", func() {
 			var b = []byte(`
