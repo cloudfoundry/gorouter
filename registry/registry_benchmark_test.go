@@ -69,7 +69,6 @@ func BenchmarkRegisterWith100KRoutes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Register("foo50000.example.com", fooEndpoint)
 	}
-	b.ReportAllocs()
 }
 
 func BenchmarkRegisterWithOneRoute(b *testing.B) {
@@ -82,5 +81,4 @@ func BenchmarkRegisterWithOneRoute(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Register("foo.example.com", fooEndpoint)
 	}
-	b.ReportAllocs()
 }

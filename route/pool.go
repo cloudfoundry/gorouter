@@ -3,7 +3,6 @@ package route
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -109,7 +108,7 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 	return e.ApplicationId == e2.ApplicationId &&
 		e.addr == e2.addr &&
 		e.Protocol == e2.Protocol &&
-		maps.Equal(e.Tags, e2.Tags) &&
+		fmt.Sprint(e.Tags) == fmt.Sprint(e2.Tags) &&
 		e.ServerCertDomainSAN == e2.ServerCertDomainSAN &&
 		e.PrivateInstanceId == e2.PrivateInstanceId &&
 		e.StaleThreshold == e2.StaleThreshold &&
