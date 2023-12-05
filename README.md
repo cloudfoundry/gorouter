@@ -262,11 +262,12 @@ pair will be unregistered. The reverse is also true.
 To scale Gorouter horizontally for high-availability or throughput capacity, you
 must deploy it behind a highly-available load balancer (F5, AWS ELB, etc).
 
-Gorouter has a health endpoint `/health` on port 8080 that returns a 200 OK
-which indicates the Gorouter instance is healthy; any other response indicates
-unhealthy.  This port can be configured via the `router.status.port` property in
-the BOSH deployment manifest or via the `status.port` property under
-`/var/vcap/jobs/gorouter/config/gorouter.yml`
+Gorouter has a health endpoint `/health` on port 8443 (with TLS) and
+on 8080 (without TLS) that returns a 200 OK which indicates the Gorouter instance
+is healthy; any other response indicates unhealthy.  These port can be configured
+via the `router.status.port` and `router.status.tls.port` properties in the BOSH
+deployment manifest or via the `status.port` and `status.tls.port` properties
+under `/var/vcap/jobs/gorouter/config/gorouter.yml`
 
 
 ```bash
@@ -328,11 +329,15 @@ to ensure backward compatibility.
 ### The Routing Table
 
 The `/routes` endpoint returns the entire routing table as JSON. This endpoint
-requires basic authentication and is served on port
-8080. Each route has an associated array of host:port entries.
+requires basic authentication and is served on port `8082`. This port is configurable
+via the `router.status.routes.port` property in the BOSH deployment manifest, or via
+the `status.routes.port` property in `/var/vcap/jobs/gorouter/config/gorouter.yml`.
+Route information is available via localhost only.
+
+Each route has an associated array of host:port entries, formatted as follows:
 
 ```bash
-$ curl "http://someuser:somepass@10.0.32.15:8080/routes"
+$ curl "http://someuser:somepass@localhost:8080/routes"
 {
   "api.catwoman.cf-app.com": [
     {
@@ -361,6 +366,9 @@ $ curl "http://someuser:somepass@10.0.32.15:8080/routes"
   ]
 }
 ```
+**NOTE:** This endpoint is internal only, and may change in the future. To safeguard
+against changes, rely on the `/var/vcap/jobs/gorouter/bin/retrieve-local-routes` script
+to get this information.
 
 Because of the nature of the data present in `/varz` and `/routes`, they require
 http basic authentication credentials. These credentials can be found the BOSH
