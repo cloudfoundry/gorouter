@@ -49,6 +49,7 @@ type RouteRegistry struct {
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
+	updateTimeLock   sync.RWMutex
 
 	routingTableShardingMode string
 	isolationSegments        []string
@@ -103,13 +104,37 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
+	r.RLock()
+	defer r.RUnlock()
+
+	t := time.Now()
+	routekey := uri.RouteKey()
+	pool := r.byURI.Find(routekey)
+
+	if pool == nil {
+		// release read lock, insertRouteKey() will acquire a write lock.
+		r.RUnlock()
+		pool = r.insertRouteKey(routekey, uri)
+		r.RLock()
+	}
+
+	if endpoint.StaleThreshold > r.dropletStaleThreshold || endpoint.StaleThreshold == 0 {
+		endpoint.StaleThreshold = r.dropletStaleThreshold
+	}
+
+	endpointAdded := pool.Put(endpoint)
+
+	r.SetTimeOfLastUpdate(t)
+
+	return endpointAdded
+}
+
+// insertRouteKey acquires a write lock, inserts the route key into the registry and releases the write lock.
+func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route.EndpointPool {
 	r.Lock()
 	defer r.Unlock()
 
-	t := time.Now()
-
-	routekey := uri.RouteKey()
-
+	// double check that the route key is still not found, now with the write lock.
 	pool := r.byURI.Find(routekey)
 	if pool == nil {
 		host, contextPath := splitHostAndContextPath(uri)
@@ -125,16 +150,7 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 		// for backward compatibility:
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 	}
-
-	if endpoint.StaleThreshold > r.dropletStaleThreshold || endpoint.StaleThreshold == 0 {
-		endpoint.StaleThreshold = r.dropletStaleThreshold
-	}
-
-	endpointAdded := pool.Put(endpoint)
-
-	r.timeOfLastUpdate = t
-
-	return endpointAdded
+	return pool
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
@@ -281,6 +297,8 @@ func (registry *RouteRegistry) NumUris() int {
 }
 
 func (r *RouteRegistry) MSSinceLastUpdate() int64 {
+	r.RLock()
+	defer r.RUnlock()
 	timeOfLastUpdate := r.TimeOfLastUpdate()
 	if (timeOfLastUpdate == time.Time{}) {
 		return -1
@@ -289,10 +307,16 @@ func (r *RouteRegistry) MSSinceLastUpdate() int64 {
 }
 
 func (r *RouteRegistry) TimeOfLastUpdate() time.Time {
-	r.RLock()
-	defer r.RUnlock()
+	r.updateTimeLock.RLock()
+	defer r.updateTimeLock.RUnlock()
 
 	return r.timeOfLastUpdate
+}
+
+func (r *RouteRegistry) SetTimeOfLastUpdate(t time.Time) {
+	r.updateTimeLock.Lock()
+	defer r.updateTimeLock.Unlock()
+	r.timeOfLastUpdate = t
 }
 
 func (r *RouteRegistry) NumEndpoints() int {
