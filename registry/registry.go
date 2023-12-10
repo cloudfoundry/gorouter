@@ -373,17 +373,18 @@ func (r *RouteRegistry) freshenRoutes() {
 
 func splitHostAndContextPath(uri route.Uri) (string, string) {
 	contextPath := "/"
-	split := strings.SplitN(strings.TrimPrefix(uri.String(), "/"), "/", 2)
+	trimmedUri := strings.TrimPrefix(uri.String(), "/")
+	before, after, found := strings.Cut(trimmedUri, "/")
 
-	if len(split) > 1 {
-		contextPath += split[1]
+	if found {
+		contextPath += after
 	}
 
-	if idx := strings.Index(string(contextPath), "?"); idx >= 0 {
+	if idx := strings.Index(contextPath, "?"); idx >= 0 {
 		contextPath = contextPath[0:idx]
 	}
 
-	return split[0], contextPath
+	return before, contextPath
 }
 
 func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
