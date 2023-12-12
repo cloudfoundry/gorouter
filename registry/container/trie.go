@@ -20,21 +20,20 @@ func (r *Trie) Find(uri route.Uri) *route.EndpointPool {
 	node := r
 
 	for {
-		pathParts := parts(key)
-		SegmentValue := pathParts[0]
+		segmentValue, nextKey, found := strings.Cut(key, "/")
 
-		matchingChild, ok := node.ChildNodes[SegmentValue]
+		matchingChild, ok := node.ChildNodes[segmentValue]
 		if !ok {
 			return nil
 		}
 
 		node = matchingChild
 
-		if len(pathParts) <= 1 {
+		if !found {
 			break
 		}
 
-		key = pathParts[1]
+		key = nextKey
 	}
 
 	if nil != node.Pool {
@@ -51,10 +50,9 @@ func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 	var lastPool *route.EndpointPool
 
 	for {
-		pathParts := parts(key)
-		SegmentValue := pathParts[0]
+		segmentValue, nextKey, found := strings.Cut(key, "/")
 
-		matchingChild, ok := node.ChildNodes[SegmentValue]
+		matchingChild, ok := node.ChildNodes[segmentValue]
 		if !ok {
 			break
 		}
@@ -66,11 +64,11 @@ func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 			lastPool = node.Pool
 		}
 
-		if len(pathParts) <= 1 {
+		if !found {
 			break
 		}
 
-		key = pathParts[1]
+		key = nextKey
 	}
 
 	// Prefer lastPool over node.Pool since we know it must have endpoints
@@ -86,25 +84,24 @@ func (r *Trie) Insert(uri route.Uri, value *route.EndpointPool) *Trie {
 	node := r
 
 	for {
-		pathParts := parts(key)
-		SegmentValue := pathParts[0]
+		segmentValue, nextKey, found := strings.Cut(key, "/")
 
-		matchingChild, ok := node.ChildNodes[SegmentValue]
+		matchingChild, ok := node.ChildNodes[segmentValue]
 
 		if !ok {
 			matchingChild = NewTrie()
-			matchingChild.Segment = SegmentValue
+			matchingChild.Segment = segmentValue
 			matchingChild.Parent = node
-			node.ChildNodes[SegmentValue] = matchingChild
+			node.ChildNodes[segmentValue] = matchingChild
 		}
 
 		node = matchingChild
 
-		if len(pathParts) != 2 {
+		if !found {
 			break
 		}
 
-		key = pathParts[1]
+		key = nextKey
 	}
 
 	node.Pool = value
@@ -117,20 +114,19 @@ func (r *Trie) Delete(uri route.Uri) bool {
 	initialKey := key
 
 	for {
-		pathParts := parts(key)
-		SegmentValue := pathParts[0]
+		segmentValue, nextKey, found := strings.Cut(key, "/")
 
 		// It is currently impossible to Delete a non-existent path. This invariant is
 		// provided by the fact that a call to Find is done before Delete in the registry.
-		matchingChild, _ := node.ChildNodes[SegmentValue]
+		matchingChild, _ := node.ChildNodes[segmentValue]
 
 		node = matchingChild
 
-		if len(pathParts) <= 1 {
+		if !found {
 			break
 		}
 
-		key = pathParts[1]
+		key = nextKey
 	}
 	node.Pool = nil
 	r.deleteEmptyNodes(initialKey)
@@ -144,10 +140,9 @@ func (r *Trie) deleteEmptyNodes(key string) {
 	var nodeToRemove *Trie
 
 	for {
-		pathParts := parts(key)
-		SegmentValue := pathParts[0]
+		segmentValue, nextKey, found := strings.Cut(key, "/")
 
-		matchingChild, _ := node.ChildNodes[SegmentValue]
+		matchingChild, _ := node.ChildNodes[segmentValue]
 
 		if nil == nodeToRemove && nil == matchingChild.Pool && len(matchingChild.ChildNodes) < 2 {
 			nodeToRemove = matchingChild
@@ -158,11 +153,11 @@ func (r *Trie) deleteEmptyNodes(key string) {
 
 		node = matchingChild
 
-		if len(pathParts) <= 1 {
+		if !found {
 			break
 		}
 
-		key = pathParts[1]
+		key = nextKey
 	}
 
 	if node.isLeaf() {
@@ -275,8 +270,4 @@ func (r *Trie) isRoot() bool {
 
 func (r *Trie) isLeaf() bool {
 	return len(r.ChildNodes) == 0
-}
-
-func parts(key string) []string {
-	return strings.SplitN(key, "/", 2)
 }

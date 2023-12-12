@@ -69,9 +69,9 @@ func ParseW3CTracestate(header string) W3CTracestate {
 	// We loop in reverse because the headers are oldest at the end
 	for i := 1; i <= len(states); i++ {
 		pair := states[len(states)-i]
-		split := strings.SplitN(strings.TrimSpace(pair), "=", 2)
-		if len(split) == 2 {
-			parsed = append(parsed, W3CTracestateEntry{Key: split[0], Val: split[1]})
+		traceKey, value, found := strings.Cut(strings.TrimSpace(pair), "=")
+		if found {
+			parsed = append(parsed, W3CTracestateEntry{Key: traceKey, Val: value})
 		}
 	}
 

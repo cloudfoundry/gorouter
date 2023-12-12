@@ -193,9 +193,9 @@ func CreateDomainAllowlist(allowlist []string) (map[string]struct{}, error) {
 
 // stripHostFromFQDN strips the first segment of an FQDN, for wildcards or host names.
 func stripFqdnHostname(entry string) string {
-	splitString := strings.SplitN(entry, ".", 2)
-	if len(splitString) > 1 {
-		return "." + splitString[1]
+	_, after, found := strings.Cut(entry, ".")
+	if found {
+		return "." + after
 	}
 	return entry
 }
