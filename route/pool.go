@@ -302,6 +302,7 @@ func (p *EndpointPool) RouteServiceUrl() string {
 
 func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 	p.Lock()
+	defer p.Unlock()
 
 	last := len(p.endpoints)
 	now := time.Now()
@@ -327,7 +328,6 @@ func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 		}
 	}
 
-	p.Unlock()
 	return prunedEndpoints
 }
 
@@ -418,10 +418,10 @@ func (p *EndpointPool) IsOverloaded() bool {
 
 func (p *EndpointPool) MarkUpdated(t time.Time) {
 	p.Lock()
+	defer p.Unlock()
 	for _, e := range p.endpoints {
 		e.updated = t
 	}
-	p.Unlock()
 }
 
 func (p *EndpointPool) EndpointFailed(endpoint *Endpoint, err error) {
