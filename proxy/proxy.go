@@ -214,6 +214,13 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	logger := handlers.LoggerWithTraceInfo(p.logger, request)
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 
+	rc := http.NewResponseController(responseWriter)
+
+	err := rc.EnableFullDuplex()
+	if err != nil {
+		logger.Panic("woopteedoo", zap.Error(err))
+	}
+
 	reqInfo, err := handlers.ContextRequestInfo(request)
 	if err != nil {
 		logger.Panic("request-info-err", zap.Error(err))
