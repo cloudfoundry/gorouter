@@ -109,25 +109,16 @@ var _ = Describe("Retries", func() {
 			badApp.SetHandlers(handlers)
 			badApp.Listen()
 
-			successSeen := false
-			// we need to retry the entire http request many times to get a success until https://github.com/golang/go/issues/31259
-			// is resolved.
-			for i := 0; i < 100; i++ {
-				req := testState.newPostRequest(
-					fmt.Sprintf("http://%s", appURL),
-					bytes.NewReader([]byte(payload)),
-				)
-				resp, err := testState.client.Do(req)
-				Expect(err).NotTo(HaveOccurred())
-				if resp.StatusCode == http.StatusOK {
-					successSeen = true
-					break
-				}
-				if resp.Body != nil {
-					resp.Body.Close()
-				}
+			req := testState.newPostRequest(
+				fmt.Sprintf("http://%s", appURL),
+				bytes.NewReader([]byte(payload)),
+			)
+			resp, err := testState.client.Do(req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(200))
+			if resp.Body != nil {
+				resp.Body.Close()
 			}
-			Expect(successSeen).To(BeTrue())
 		})
 	})
 })

@@ -793,7 +793,7 @@ var _ = Describe("Proxy", func() {
 			defer good.Close()
 
 			// FIXME: This used to be Consistently, but moved to eventually to work around flakiness in this test
-			Eventually(func() int {
+			Consistently(func() int {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("POST", "retry-test", "/", strings.NewReader("some body"))
