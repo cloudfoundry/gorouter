@@ -42,7 +42,7 @@ var _ = Describe("RoundRobin", func() {
 
 			loops := 50
 			for i := 0; i < len(endpoints)*loops; i += 1 {
-				n := iter.Next()
+				n := iter.Next(i)
 				for j, e := range endpoints {
 					if e == n {
 						counts[j]++
@@ -58,7 +58,7 @@ var _ = Describe("RoundRobin", func() {
 
 		It("returns nil when no endpoints exist", func() {
 			iter := route.NewRoundRobin(pool, "")
-			e := iter.Next()
+			e := iter.Next(1)
 			Expect(e).To(BeNil())
 		})
 
@@ -71,7 +71,7 @@ var _ = Describe("RoundRobin", func() {
 
 			for i := 0; i < 10; i++ {
 				iter := route.NewRoundRobin(pool, b.PrivateInstanceId)
-				e := iter.Next()
+				e := iter.Next(i)
 				Expect(e).ToNot(BeNil())
 				Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
 			}
@@ -86,7 +86,7 @@ var _ = Describe("RoundRobin", func() {
 
 			for i := 0; i < 10; i++ {
 				iter := route.NewRoundRobin(pool, b.CanonicalAddr())
-				e := iter.Next()
+				e := iter.Next(i)
 				Expect(e).ToNot(BeNil())
 				Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
 			}
@@ -100,12 +100,12 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(endpointBar)
 
 			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
-			foundEndpoint := iter.Next()
+			foundEndpoint := iter.Next(1)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
 
 			iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId)
-			foundEndpoint = iter.Next()
+			foundEndpoint = iter.Next(2)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
@@ -115,7 +115,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(endpointFoo)
 
 			iter := route.NewRoundRobin(pool, "bogus")
-			e := iter.Next()
+			e := iter.Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e).To(Equal(endpointFoo))
 		})
@@ -125,7 +125,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(endpointFoo)
 
 			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
-			foundEndpoint := iter.Next()
+			foundEndpoint := iter.Next(1)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
 
@@ -133,7 +133,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(endpointBar)
 
 			iter = route.NewRoundRobin(pool, "foo")
-			foundEndpoint = iter.Next()
+			foundEndpoint = iter.Next(2)
 			Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
 			iter = route.NewRoundRobin(pool, "bar")
@@ -152,7 +152,7 @@ var _ = Describe("RoundRobin", func() {
 				defer GinkgoRecover()
 				for j := 0; j < numReaders; j++ {
 					iter := route.NewRoundRobin(pool, "")
-					Expect(iter.Next()).NotTo(BeNil())
+					Expect(iter.Next(j)).NotTo(BeNil())
 				}
 				wg.Done()
 			}
@@ -201,10 +201,10 @@ var _ = Describe("RoundRobin", func() {
 					epTwo.Stats.NumberConnections.Increment()
 					iter := route.NewRoundRobin(pool, "")
 
-					foundEndpoint := iter.Next()
+					foundEndpoint := iter.Next(1)
 					Expect(foundEndpoint).To(Equal(epOne))
 
-					sameEndpoint := iter.Next()
+					sameEndpoint := iter.Next(2)
 					Expect(foundEndpoint).To(Equal(sameEndpoint))
 				})
 
@@ -217,7 +217,7 @@ var _ = Describe("RoundRobin", func() {
 						iter := route.NewRoundRobin(pool, "")
 
 						Consistently(func() *route.Endpoint {
-							return iter.Next()
+							return iter.Next(1)
 						}).Should(BeNil())
 					})
 				})
@@ -237,8 +237,8 @@ var _ = Describe("RoundRobin", func() {
 
 					Context("when there is an unencumbered endpoint", func() {
 						It("returns the unencumbered endpoint", func() {
-							Expect(iter.Next()).To(Equal(epTwo))
-							Expect(iter.Next()).To(Equal(epTwo))
+							Expect(iter.Next(1)).To(Equal(epTwo))
+							Expect(iter.Next(2)).To(Equal(epTwo))
 						})
 					})
 
@@ -250,7 +250,7 @@ var _ = Describe("RoundRobin", func() {
 
 						It("returns nil", func() {
 							Consistently(func() *route.Endpoint {
-								return iter.Next()
+								return iter.Next(1)
 							}).Should(BeNil())
 						})
 					})
@@ -268,13 +268,13 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e2)
 
 			iter := route.NewRoundRobin(pool, "")
-			n := iter.Next()
+			n := iter.Next(1)
 			Expect(n).ToNot(BeNil())
 
 			iter.EndpointFailed(&net.OpError{Op: "dial"})
 
-			nn1 := iter.Next()
-			nn2 := iter.Next()
+			nn1 := iter.Next(2)
+			nn2 := iter.Next(3)
 			Expect(nn1).ToNot(BeNil())
 			Expect(nn2).ToNot(BeNil())
 			Expect(nn1).ToNot(Equal(n))
@@ -288,14 +288,14 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e2)
 
 			iter := route.NewRoundRobin(pool, "")
-			n1 := iter.Next()
+			n1 := iter.Next(1)
 			iter.EndpointFailed(&net.OpError{Op: "dial"})
-			n2 := iter.Next()
+			n2 := iter.Next(2)
 			iter.EndpointFailed(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})
 			Expect(n1).ToNot(Equal(n2))
 
-			n1 = iter.Next()
-			n2 = iter.Next()
+			n1 = iter.Next(3)
+			n2 = iter.Next(4)
 			Expect(n1).ToNot(Equal(n2))
 		})
 
@@ -314,20 +314,20 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e2)
 
 			iter := route.NewRoundRobin(pool, "")
-			n1 := iter.Next()
-			n2 := iter.Next()
+			n1 := iter.Next(1)
+			n2 := iter.Next(2)
 			Expect(n1).ToNot(Equal(n2))
 
 			iter.EndpointFailed(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})
 
-			n1 = iter.Next()
-			n2 = iter.Next()
+			n1 = iter.Next(3)
+			n2 = iter.Next(4)
 			Expect(n1).To(Equal(n2))
 
 			time.Sleep(50 * time.Millisecond)
 
-			n1 = iter.Next()
-			n2 = iter.Next()
+			n1 = iter.Next(5)
+			n2 = iter.Next(6)
 			Expect(n1).ToNot(Equal(n2))
 		})
 	})

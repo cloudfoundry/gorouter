@@ -28,8 +28,8 @@ var _ = Describe("LeastConnection", func() {
 
 		Context("when pool is empty", func() {
 			It("does not select an endpoint", func() {
-				iter := route.NewLeastConnection(pool, "")
-				Expect(iter.Next()).To(BeNil())
+				iter := route.NewLeastConnection(pool, "", false, "meow-az")
+				Expect(iter.Next(1)).To(BeNil())
 			})
 		})
 
@@ -57,8 +57,8 @@ var _ = Describe("LeastConnection", func() {
 
 			Context("when all endpoints have no statistics", func() {
 				It("selects a random endpoint", func() {
-					iter := route.NewLeastConnection(pool, "")
-					n := iter.Next()
+					iter := route.NewLeastConnection(pool, "", false, "meow-az")
+					n := iter.Next(1)
 					Expect(n).NotTo(BeNil())
 				})
 			})
@@ -74,12 +74,12 @@ var _ = Describe("LeastConnection", func() {
 					for i := 0; i < 100; i++ {
 						wg.Add(1)
 						go func() {
-							iter := route.NewLeastConnection(pool, "")
-							n1 := iter.Next()
+							iter := route.NewLeastConnection(pool, "", false, "meow-az")
+							n1 := iter.Next(i)
 							Expect(n1).NotTo(BeNil())
 
 							Eventually(func() bool {
-								n2 := iter.Next()
+								n2 := iter.Next(i)
 								return n1.Equal(n2)
 							}).Should(BeFalse())
 							wg.Done()
@@ -93,36 +93,36 @@ var _ = Describe("LeastConnection", func() {
 
 				It("selects endpoint with least connection", func() {
 					setConnectionCount(endpoints, []int{0, 1, 1, 1, 1})
-					iter := route.NewLeastConnection(pool, "")
-					Expect(iter.Next()).To(Equal(endpoints[0]))
+					iter := route.NewLeastConnection(pool, "", false, "meow-az")
+					Expect(iter.Next(1)).To(Equal(endpoints[0]))
 
 					setConnectionCount(endpoints, []int{1, 0, 1, 1, 1})
-					Expect(iter.Next()).To(Equal(endpoints[1]))
+					Expect(iter.Next(2)).To(Equal(endpoints[1]))
 
 					setConnectionCount(endpoints, []int{1, 1, 0, 1, 1})
-					Expect(iter.Next()).To(Equal(endpoints[2]))
+					Expect(iter.Next(3)).To(Equal(endpoints[2]))
 
 					setConnectionCount(endpoints, []int{1, 1, 1, 0, 1})
-					Expect(iter.Next()).To(Equal(endpoints[3]))
+					Expect(iter.Next(4)).To(Equal(endpoints[3]))
 
 					setConnectionCount(endpoints, []int{1, 1, 1, 1, 0})
-					Expect(iter.Next()).To(Equal(endpoints[4]))
+					Expect(iter.Next(5)).To(Equal(endpoints[4]))
 
 					setConnectionCount(endpoints, []int{1, 4, 15, 8, 3})
-					Expect(iter.Next()).To(Equal(endpoints[0]))
+					Expect(iter.Next(6)).To(Equal(endpoints[0]))
 
 					setConnectionCount(endpoints, []int{5, 4, 15, 8, 3})
-					Expect(iter.Next()).To(Equal(endpoints[4]))
+					Expect(iter.Next(7)).To(Equal(endpoints[4]))
 
 					setConnectionCount(endpoints, []int{5, 4, 15, 8, 7})
-					Expect(iter.Next()).To(Equal(endpoints[1]))
+					Expect(iter.Next(8)).To(Equal(endpoints[1]))
 
 					setConnectionCount(endpoints, []int{5, 5, 15, 2, 7})
-					Expect(iter.Next()).To(Equal(endpoints[3]))
+					Expect(iter.Next(9)).To(Equal(endpoints[3]))
 				})
 
 				It("selects random endpoint from all with least connection", func() {
-					iter := route.NewLeastConnection(pool, "")
+					iter := route.NewLeastConnection(pool, "", false, "meow-az")
 
 					setConnectionCount(endpoints, []int{1, 0, 0, 0, 0})
 					okRandoms := []string{
@@ -131,7 +131,7 @@ var _ = Describe("LeastConnection", func() {
 						"10.0.1.3:60000",
 						"10.0.1.4:60000",
 					}
-					Expect(okRandoms).Should(ContainElement(iter.Next().CanonicalAddr()))
+					Expect(okRandoms).Should(ContainElement(iter.Next(1).CanonicalAddr()))
 
 					setConnectionCount(endpoints, []int{10, 10, 15, 10, 11})
 					okRandoms = []string{
@@ -139,7 +139,7 @@ var _ = Describe("LeastConnection", func() {
 						"10.0.1.1:60000",
 						"10.0.1.3:60000",
 					}
-					Expect(okRandoms).Should(ContainElement(iter.Next().CanonicalAddr()))
+					Expect(okRandoms).Should(ContainElement(iter.Next(2).CanonicalAddr()))
 				})
 			})
 
@@ -171,10 +171,10 @@ var _ = Describe("LeastConnection", func() {
 						It("returns nil", func() {
 							epOne.Stats.NumberConnections.Increment()
 							epOne.Stats.NumberConnections.Increment()
-							iter := route.NewLeastConnection(pool, "")
+							iter := route.NewLeastConnection(pool, "", false, "meow-az")
 
 							Consistently(func() *route.Endpoint {
-								return iter.Next()
+								return iter.Next(1)
 							}).Should(BeNil())
 						})
 					})
@@ -183,10 +183,10 @@ var _ = Describe("LeastConnection", func() {
 						Context("when that endpoint is overload", func() {
 							It("returns no endpoint", func() {
 								Expect(pool.Remove(epOne)).To(BeTrue())
-								iter := route.NewLeastConnection(pool, "")
+								iter := route.NewLeastConnection(pool, "", false, "meow-az")
 
 								Consistently(func() *route.Endpoint {
-									return iter.Next()
+									return iter.Next(1)
 								}).Should(BeNil())
 							})
 						})
@@ -196,14 +196,14 @@ var _ = Describe("LeastConnection", func() {
 				Context("when there is an initial endpoint", func() {
 					var iter route.EndpointIterator
 					BeforeEach(func() {
-						iter = route.NewLeastConnection(pool, "private-label-2")
+						iter = route.NewLeastConnection(pool, "private-label-2", false, "meow-az")
 					})
 
 					Context("when the initial endpoint is overloaded", func() {
 						Context("when there is an unencumbered endpoint", func() {
 							It("returns the unencumbered endpoint", func() {
-								Expect(iter.Next()).To(Equal(epOne))
-								Expect(iter.Next()).To(Equal(epOne))
+								Expect(iter.Next(1)).To(Equal(epOne))
+								Expect(iter.Next(2)).To(Equal(epOne))
 							})
 						})
 
@@ -214,10 +214,191 @@ var _ = Describe("LeastConnection", func() {
 							})
 							It("returns nil", func() {
 								Consistently(func() *route.Endpoint {
-									return iter.Next()
+									return iter.Next(1)
 								}).Should(BeNil())
 							})
 						})
+					})
+				})
+			})
+		})
+
+		Describe("when in locally-optimistic mode", func() {
+			var (
+				iter                                                         route.EndpointIterator
+				localAZ                                                      = "az-2"
+				otherAZEndpointOne, otherAZEndpointTwo, otherAZEndpointThree *route.Endpoint
+				localAZEndpointOne, localAZEndpointTwo, localAZEndpointThree *route.Endpoint
+			)
+
+			BeforeEach(func() {
+				pool = route.NewPool(&route.PoolOpts{
+					Logger:             new(fakes.FakeLogger),
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 2,
+				})
+
+				otherAZEndpointOne = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.0", Port: 60000, AvailabilityZone: "meow-az"})
+				otherAZEndpointTwo = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.1", Port: 60000, AvailabilityZone: "potato-az"})
+				otherAZEndpointThree = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.2", Port: 60000, AvailabilityZone: ""})
+				localAZEndpointOne = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.3", Port: 60000, AvailabilityZone: localAZ})
+				localAZEndpointTwo = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.4", Port: 60000, AvailabilityZone: localAZ})
+				localAZEndpointThree = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.5", Port: 60000, AvailabilityZone: localAZ})
+			})
+
+			JustBeforeEach(func() {
+				iter = route.NewLeastConnection(pool, "", true, localAZ)
+			})
+
+			Context("on the first attempt", func() {
+
+				Context("when the pool is empty", func() {
+					It("does not select an endpoint", func() {
+						Expect(iter.Next(1)).To(BeNil())
+					})
+				})
+
+				Context("when the pool has one endpoint in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+						pool.Put(otherAZEndpointTwo)
+						pool.Put(otherAZEndpointThree)
+						pool.Put(localAZEndpointOne)
+					})
+
+					It("selects the endpoint in the same az", func() {
+						chosen := iter.Next(1)
+						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+						Expect(chosen).To(Equal(localAZEndpointOne))
+					})
+
+					Context("and it is overloaded", func() {
+						BeforeEach(func() {
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+						})
+
+						It("selects a non-overloaded endpoint in a different az", func() {
+							chosen := iter.Next(1)
+							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						})
+					})
+				})
+
+				Context("when the pool has multiple in the same AZ as the router", func() {
+					Context("and the endpoints have the same number of connections", func() {
+						BeforeEach(func() {
+							pool.Put(otherAZEndpointOne)
+							pool.Put(otherAZEndpointTwo)
+							pool.Put(otherAZEndpointThree)
+
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							pool.Put(localAZEndpointOne)
+
+							localAZEndpointTwo.Stats.NumberConnections.Increment()
+							pool.Put(localAZEndpointTwo)
+
+							localAZEndpointThree.Stats.NumberConnections.Increment()
+							pool.Put(localAZEndpointThree)
+						})
+
+						It("selects a random one of the endpoints in the same AZ", func() {
+							okRandoms := []string{
+								"10.0.1.3:60000",
+								"10.0.1.4:60000",
+								"10.0.1.5:60000",
+							}
+							chosen := iter.Next(1)
+							Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+							Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+						})
+					})
+
+					Context("and the endpoints have different number of connections", func() {
+						BeforeEach(func() {
+							pool.Put(otherAZEndpointOne)
+							pool.Put(otherAZEndpointTwo)
+							pool.Put(otherAZEndpointThree)
+
+							localAZEndpointOne.Stats.NumberConnections.Increment() // 1 connection
+							pool.Put(localAZEndpointOne)
+
+							pool.Put(localAZEndpointTwo) // 0 connections
+
+							localAZEndpointThree.Stats.NumberConnections.Increment() // 1 connection
+							pool.Put(localAZEndpointThree)
+						})
+
+						It("selects the local endpoint with the lowest connections", func() {
+							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo))
+						})
+					})
+
+					Context("and one is overloaded but the other is not overloaded", func() {
+						BeforeEach(func() {
+							pool.Put(otherAZEndpointOne)
+							pool.Put(otherAZEndpointTwo)
+
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							localAZEndpointOne.Stats.NumberConnections.Increment() // overloaded
+							pool.Put(localAZEndpointOne)
+
+							pool.Put(localAZEndpointTwo) // 0 connections
+						})
+
+						It("selects the local endpoint with the lowest connections", func() {
+							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo))
+						})
+					})
+				})
+				Context("when the pool has none in the same AZ as the router", func() {
+					BeforeEach(func() {
+						otherAZEndpointOne.Stats.NumberConnections.Increment()
+						otherAZEndpointOne.Stats.NumberConnections.Increment()
+						pool.Put(otherAZEndpointOne) // 2 connections
+
+						pool.Put(otherAZEndpointTwo) // 0 connections
+
+						otherAZEndpointThree.Stats.NumberConnections.Increment()
+						pool.Put(otherAZEndpointThree) // 1 connections
+					})
+
+					It("selects the local endpoint with the lowest connections", func() {
+						Expect(iter.Next(1)).To(Equal(otherAZEndpointTwo))
+					})
+				})
+			})
+
+			Context("on a retry", func() {
+				var attempt = 2
+				Context("when the pool is empty", func() {
+					It("does not select an endpoint", func() {
+						Expect(iter.Next(attempt)).To(BeNil())
+					})
+				})
+
+				Context("when the pool has some in the same AZ as the router", func() {
+					BeforeEach(func() {
+						otherAZEndpointOne.Stats.NumberConnections.Increment()
+						pool.Put(otherAZEndpointOne) // 1 connection
+
+						pool.Put(otherAZEndpointTwo)   // 0 connections
+						pool.Put(otherAZEndpointThree) // 0 connections
+
+						localAZEndpointOne.Stats.NumberConnections.Increment()
+						pool.Put(localAZEndpointOne) // 1 connection
+					})
+
+					It("selects the endpoint with the least connections regardless of AZ", func() {
+						chosen := iter.Next(attempt)
+						okRandoms := []string{
+							"10.0.1.1:60000",
+							"10.0.1.2:60000",
+						}
+						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
 					})
 				})
 			})
@@ -230,7 +411,7 @@ var _ = Describe("LeastConnection", func() {
 
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
-			iter := route.NewLeastConnection(pool, "foo")
+			iter := route.NewLeastConnection(pool, "foo", false, "meow-az")
 			iter.PreRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 		})
@@ -245,7 +426,7 @@ var _ = Describe("LeastConnection", func() {
 			}
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 			pool.Put(endpointFoo)
-			iter := route.NewLeastConnection(pool, "foo")
+			iter := route.NewLeastConnection(pool, "foo", false, "meow-az")
 			iter.PostRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 		})
