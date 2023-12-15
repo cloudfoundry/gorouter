@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
@@ -38,7 +39,7 @@ var _ = Describe("RoundRobin", func() {
 
 			counts := make([]int, len(endpoints))
 
-			iter := route.NewRoundRobin(pool, "")
+			iter := route.NewRoundRobin(pool, "", false, "meow-az")
 
 			loops := 50
 			for i := 0; i < len(endpoints)*loops; i += 1 {
@@ -57,7 +58,7 @@ var _ = Describe("RoundRobin", func() {
 		})
 
 		It("returns nil when no endpoints exist", func() {
-			iter := route.NewRoundRobin(pool, "")
+			iter := route.NewRoundRobin(pool, "", false, "meow-az")
 			e := iter.Next(1)
 			Expect(e).To(BeNil())
 		})
@@ -70,7 +71,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
 
 			for i := 0; i < 10; i++ {
-				iter := route.NewRoundRobin(pool, b.PrivateInstanceId)
+				iter := route.NewRoundRobin(pool, b.PrivateInstanceId, false, "meow-az")
 				e := iter.Next(i)
 				Expect(e).ToNot(BeNil())
 				Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
@@ -85,7 +86,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
 
 			for i := 0; i < 10; i++ {
-				iter := route.NewRoundRobin(pool, b.CanonicalAddr())
+				iter := route.NewRoundRobin(pool, b.CanonicalAddr(), false, "meow-az")
 				e := iter.Next(i)
 				Expect(e).ToNot(BeNil())
 				Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
@@ -99,12 +100,12 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(endpointFoo)
 			pool.Put(endpointBar)
 
-			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
+			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
 			foundEndpoint := iter.Next(1)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
 
-			iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId)
+			iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId, false, "meow-az")
 			foundEndpoint = iter.Next(2)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointBar))
@@ -114,7 +115,7 @@ var _ = Describe("RoundRobin", func() {
 			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 			pool.Put(endpointFoo)
 
-			iter := route.NewRoundRobin(pool, "bogus")
+			iter := route.NewRoundRobin(pool, "bogus", false, "meow-az")
 			e := iter.Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e).To(Equal(endpointFoo))
@@ -124,7 +125,7 @@ var _ = Describe("RoundRobin", func() {
 			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 			pool.Put(endpointFoo)
 
-			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId)
+			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
 			foundEndpoint := iter.Next(1)
 			Expect(foundEndpoint).ToNot(BeNil())
 			Expect(foundEndpoint).To(Equal(endpointFoo))
@@ -132,11 +133,11 @@ var _ = Describe("RoundRobin", func() {
 			endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "bar"})
 			pool.Put(endpointBar)
 
-			iter = route.NewRoundRobin(pool, "foo")
+			iter = route.NewRoundRobin(pool, "foo", false, "meow-az")
 			foundEndpoint = iter.Next(2)
 			Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
-			iter = route.NewRoundRobin(pool, "bar")
+			iter = route.NewRoundRobin(pool, "bar", false, "meow-az")
 			Expect(foundEndpoint).To(Equal(endpointBar))
 		})
 
@@ -151,7 +152,7 @@ var _ = Describe("RoundRobin", func() {
 			iterateLoop := func(pool *route.EndpointPool) {
 				defer GinkgoRecover()
 				for j := 0; j < numReaders; j++ {
-					iter := route.NewRoundRobin(pool, "")
+					iter := route.NewRoundRobin(pool, "", false, "meow-az")
 					Expect(iter.Next(j)).NotTo(BeNil())
 				}
 				wg.Done()
@@ -199,7 +200,7 @@ var _ = Describe("RoundRobin", func() {
 				It("returns an unencumbered endpoint", func() {
 					epTwo.Stats.NumberConnections.Increment()
 					epTwo.Stats.NumberConnections.Increment()
-					iter := route.NewRoundRobin(pool, "")
+					iter := route.NewRoundRobin(pool, "", false, "meow-az")
 
 					foundEndpoint := iter.Next(1)
 					Expect(foundEndpoint).To(Equal(epOne))
@@ -214,7 +215,7 @@ var _ = Describe("RoundRobin", func() {
 						epOne.Stats.NumberConnections.Increment()
 						epTwo.Stats.NumberConnections.Increment()
 						epTwo.Stats.NumberConnections.Increment()
-						iter := route.NewRoundRobin(pool, "")
+						iter := route.NewRoundRobin(pool, "", false, "meow-az")
 
 						Consistently(func() *route.Endpoint {
 							return iter.Next(1)
@@ -226,7 +227,7 @@ var _ = Describe("RoundRobin", func() {
 			Context("when there is an initial endpoint", func() {
 				var iter route.EndpointIterator
 				BeforeEach(func() {
-					iter = route.NewRoundRobin(pool, "private-label-1")
+					iter = route.NewRoundRobin(pool, "private-label-1", false, "meow-az")
 				})
 
 				Context("when the initial endpoint is overloaded", func() {
@@ -257,6 +258,181 @@ var _ = Describe("RoundRobin", func() {
 				})
 			})
 		})
+
+		Describe("when locally-optimistic mode", func() {
+			var (
+				iter                                                         route.EndpointIterator
+				localAZ                                                      = "az-2"
+				otherAZEndpointOne, otherAZEndpointTwo, otherAZEndpointThree *route.Endpoint
+				localAZEndpointOne, localAZEndpointTwo, localAZEndpointThree *route.Endpoint
+			)
+
+			BeforeEach(func() {
+				pool = route.NewPool(&route.PoolOpts{
+					Logger:             new(fakes.FakeLogger),
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 2,
+				})
+
+				otherAZEndpointOne = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.0", Port: 60000, AvailabilityZone: "meow-az"})
+				otherAZEndpointTwo = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.1", Port: 60000, AvailabilityZone: "potato-az"})
+				otherAZEndpointThree = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.2", Port: 60000, AvailabilityZone: ""})
+				localAZEndpointOne = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.3", Port: 60000, AvailabilityZone: localAZ})
+				localAZEndpointTwo = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.4", Port: 60000, AvailabilityZone: localAZ})
+				localAZEndpointThree = route.NewEndpoint(&route.EndpointOpts{Host: "10.0.1.5", Port: 60000, AvailabilityZone: localAZ})
+			})
+
+			JustBeforeEach(func() {
+				iter = route.NewRoundRobin(pool, "", true, localAZ)
+			})
+
+			Context("on the first attempt", func() {
+
+				Context("when the pool is empty", func() {
+					It("does not select an endpoint", func() {
+						Expect(iter.Next(1)).To(BeNil())
+					})
+				})
+
+				Context("when the pool has one endpoint in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+						pool.Put(otherAZEndpointTwo)
+						pool.Put(otherAZEndpointThree)
+						pool.Put(localAZEndpointOne)
+					})
+
+					It("selects the endpoint in the same az", func() {
+						chosen := iter.Next(1)
+						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+						Expect(chosen).To(Equal(localAZEndpointOne))
+					})
+
+					Context("and it is overloaded", func() {
+						BeforeEach(func() {
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+						})
+
+						It("selects the next non-overloaded endpoint in a different az", func() {
+							chosen := iter.Next(1)
+							Expect(chosen).ToNot(BeNil())
+							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						})
+					})
+				})
+
+				Context("when the pool has multiple in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+						pool.Put(otherAZEndpointTwo)
+						pool.Put(otherAZEndpointThree)
+
+						pool.Put(localAZEndpointOne)
+						pool.Put(localAZEndpointTwo)
+						pool.Put(localAZEndpointThree)
+					})
+
+					It("selects the next endpoint in the same AZ", func() {
+						okRandoms := []string{
+							"10.0.1.3:60000",
+							"10.0.1.4:60000",
+							"10.0.1.5:60000",
+						}
+
+						chosen := iter.Next(1)
+						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+						Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+					})
+
+					Context("and one is overloaded but the other is not overloaded", func() {
+						BeforeEach(func() {
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							localAZEndpointOne.Stats.NumberConnections.Increment() // overloaded
+						})
+
+						It("selects the local endpoint that is not overloaded", func() {
+							okRandoms := []string{
+								"10.0.1.4:60000",
+								"10.0.1.5:60000",
+							}
+
+							chosen := iter.Next(1)
+							Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+							Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+						})
+					})
+				})
+
+				Context("when the pool has none in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+						pool.Put(otherAZEndpointTwo)
+						pool.Put(otherAZEndpointThree)
+					})
+
+					It("selects a local endpoint", func() {
+						chosen := iter.Next(1)
+						Expect(chosen).ToNot(BeNil())
+						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+					})
+				})
+			})
+
+			Context("on a retry", func() {
+				var attempt = 2
+				Context("when the pool is empty", func() {
+					It("does not select an endpoint", func() {
+						Expect(iter.Next(attempt)).To(BeNil())
+					})
+				})
+
+				Context("when the pool has some endpoints in the same AZ as the router", func() {
+					BeforeEach(func() {
+						otherAZEndpointOne.Stats.NumberConnections.Increment()
+						pool.Put(otherAZEndpointOne) // 1 connection
+
+						pool.Put(otherAZEndpointTwo)   // 0 connections
+						pool.Put(otherAZEndpointThree) // 0 connections
+
+						localAZEndpointOne.Stats.NumberConnections.Increment()
+						pool.Put(localAZEndpointOne) // 1 connection
+					})
+
+					It("performs round-robin through the endpoints regardless of AZ", func() {
+						endpoints := []*route.Endpoint{
+							otherAZEndpointOne, otherAZEndpointTwo, otherAZEndpointThree,
+							localAZEndpointOne, localAZEndpointTwo, localAZEndpointThree,
+						}
+
+						for _, e := range endpoints {
+							pool.Put(e)
+						}
+
+						counts := make([]int, len(endpoints))
+
+						iter := route.NewRoundRobin(pool, "", true, localAZ)
+
+						loops := 50
+						for i := 0; i < len(endpoints)*loops; i += 1 {
+							n := iter.Next(attempt)
+							for j, e := range endpoints {
+								if e == n {
+									counts[j]++
+									break
+								}
+							}
+						}
+
+						for i := 0; i < len(endpoints); i++ {
+							Expect(counts[i]).To(Equal(loops))
+						}
+					})
+				})
+			})
+		})
 	})
 
 	Describe("Failed", func() {
@@ -267,7 +443,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "")
+			iter := route.NewRoundRobin(pool, "", false, "meow-az")
 			n := iter.Next(1)
 			Expect(n).ToNot(BeNil())
 
@@ -287,7 +463,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "")
+			iter := route.NewRoundRobin(pool, "", false, "meow-az")
 			n1 := iter.Next(1)
 			iter.EndpointFailed(&net.OpError{Op: "dial"})
 			n2 := iter.Next(2)
@@ -313,7 +489,7 @@ var _ = Describe("RoundRobin", func() {
 			pool.Put(e1)
 			pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "")
+			iter := route.NewRoundRobin(pool, "", false, "meow-az")
 			n1 := iter.Next(1)
 			n2 := iter.Next(2)
 			Expect(n1).ToNot(Equal(n2))
@@ -337,7 +513,7 @@ var _ = Describe("RoundRobin", func() {
 			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
-			iter := route.NewRoundRobin(pool, "foo")
+			iter := route.NewRoundRobin(pool, "foo", false, "meow-az")
 			iter.PreRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 		})
@@ -351,7 +527,7 @@ var _ = Describe("RoundRobin", func() {
 			}
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 			pool.Put(endpointFoo)
-			iter := route.NewRoundRobin(pool, "foo")
+			iter := route.NewRoundRobin(pool, "foo", false, "meow-az")
 			iter.PostRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 		})

@@ -322,17 +322,17 @@ var _ = Describe("LeastConnection", func() {
 							pool.Put(otherAZEndpointTwo)
 							pool.Put(otherAZEndpointThree)
 
-							localAZEndpointOne.Stats.NumberConnections.Increment() // 1 connection
+							localAZEndpointOne.Stats.NumberConnections.Increment() // 1 connection <-- this one
 							pool.Put(localAZEndpointOne)
 
-							pool.Put(localAZEndpointTwo) // 0 connections
+							pool.Put(localAZEndpointTwo) // 0 connections <-- or this one 10.0.1.4
 
-							localAZEndpointThree.Stats.NumberConnections.Increment() // 1 connection
+							localAZEndpointThree.Stats.NumberConnections.Increment() // 1 connection <-- thisone2
 							pool.Put(localAZEndpointThree)
 						})
 
 						It("selects the local endpoint with the lowest connections", func() {
-							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo))
+							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo)) // FLAKEY
 						})
 					})
 
@@ -365,7 +365,7 @@ var _ = Describe("LeastConnection", func() {
 						pool.Put(otherAZEndpointThree) // 1 connections
 					})
 
-					It("selects the local endpoint with the lowest connections", func() {
+					It("selects the endpoint with the lowest connections", func() {
 						Expect(iter.Next(1)).To(Equal(otherAZEndpointTwo))
 					})
 				})

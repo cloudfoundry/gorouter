@@ -7,14 +7,18 @@ import (
 type RoundRobin struct {
 	pool *EndpointPool
 
-	initialEndpoint string
-	lastEndpoint    *Endpoint
+	initialEndpoint       string
+	lastEndpoint          *Endpoint
+	locallyOptimistic     bool
+	localAvailabilityZone string
 }
 
-func NewRoundRobin(p *EndpointPool, initial string) EndpointIterator {
+func NewRoundRobin(p *EndpointPool, initial string, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &RoundRobin{
-		pool:            p,
-		initialEndpoint: initial,
+		pool:                  p,
+		initialEndpoint:       initial,
+		locallyOptimistic:     locallyOptimistic,
+		localAvailabilityZone: localAvailabilityZone,
 	}
 }
 
@@ -36,7 +40,7 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 		return e.endpoint
 	}
 
-	e = r.next()
+	e = r.next(attempt)
 	if e != nil {
 		e.RLock()
 		defer e.RUnlock()
@@ -48,9 +52,11 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 	return nil
 }
 
-func (r *RoundRobin) next() *endpointElem {
+func (r *RoundRobin) next(attempt int) *endpointElem {
 	r.pool.Lock()
 	defer r.pool.Unlock()
+
+	localDesired := r.locallyOptimistic && attempt == 1
 
 	last := len(r.pool.endpoints)
 	if last == 0 {
@@ -65,8 +71,11 @@ func (r *RoundRobin) next() *endpointElem {
 
 	startIdx := r.pool.nextIdx
 	curIdx := startIdx
+
+	var curIsLocal bool
 	for {
 		e := r.pool.endpoints[curIdx]
+		curIsLocal = e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
 		curIdx++
 		if curIdx == last {
@@ -74,7 +83,12 @@ func (r *RoundRobin) next() *endpointElem {
 		}
 
 		if e.isOverloaded() {
+
 			if curIdx == startIdx {
+				if localDesired {
+					localDesired = false
+					continue
+				}
 				return nil
 			}
 			continue
@@ -88,12 +102,21 @@ func (r *RoundRobin) next() *endpointElem {
 			}
 		}
 
-		if e.failedAt == nil {
-			r.pool.nextIdx = curIdx
-			return e
+		if (localDesired && curIsLocal) || !localDesired {
+			if e.failedAt == nil {
+				r.pool.nextIdx = curIdx
+				return e
+			}
 		}
 
 		if curIdx == startIdx {
+
+			// could not find a valid route in the same AZ
+			// start again but consider all AZs
+			if localDesired {
+				localDesired = false
+				continue
+			}
 			// all endpoints are marked failed so reset everything to available
 			for _, e2 := range r.pool.endpoints {
 				e2.failedAt = nil

@@ -104,6 +104,13 @@ func (r *LeastConnection) next(attempt int) *endpointElem {
 			continue
 		}
 
+		// Initialize selectedLocal to the first non-overloaded local endpoint
+		if localDesired {
+			if curIsLocal && selectedLocal == nil {
+				selectedLocal = cur
+			}
+		}
+
 		// Initialize selected to the first non-overloaded endpoint
 		if i == 0 || selected == nil {
 			selected = cur
@@ -116,11 +123,6 @@ func (r *LeastConnection) next(attempt int) *endpointElem {
 		}
 
 		if localDesired {
-			// Initialize selectedLocal to the first non-overloaded local endpoint
-			if curIsLocal && selectedLocal == nil {
-				selectedLocal = cur
-			}
-
 			// If the current option is local and is better than the selectedLocal endpoint, then swap
 			if curIsLocal && cur.endpoint.Stats.NumberConnections.Count() < selectedLocal.endpoint.Stats.NumberConnections.Count() {
 				selectedLocal = cur
