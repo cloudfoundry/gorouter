@@ -697,6 +697,7 @@ var _ = Describe("EndpointPool", func() {
 
 	It("marshals json", func() {
 		e := route.NewEndpoint(&route.EndpointOpts{
+			AvailabilityZone:        "az-meow",
 			Host:                    "1.2.3.4",
 			Port:                    5678,
 			Protocol:                "http1",
@@ -720,7 +721,7 @@ var _ = Describe("EndpointPool", func() {
 		json, err := pool.MarshalJSON()
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"http1","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","protocol":"http2","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san"}]`))
+		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http1","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","availability_zone":"","protocol":"http2","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san"}]`))
 	})
 
 	Context("when endpoints do not have empty tags", func() {
@@ -729,6 +730,7 @@ var _ = Describe("EndpointPool", func() {
 			sample_tags := map[string]string{
 				"some-key": "some-value"}
 			e = route.NewEndpoint(&route.EndpointOpts{
+				AvailabilityZone:        "az-meow",
 				Host:                    "1.2.3.4",
 				Port:                    5678,
 				Protocol:                "http2",
@@ -742,7 +744,7 @@ var _ = Describe("EndpointPool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{"some-key":"some-value"}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{"some-key":"some-value"}}]`))
 		})
 	})
 
@@ -751,6 +753,7 @@ var _ = Describe("EndpointPool", func() {
 		BeforeEach(func() {
 			sample_tags := map[string]string{}
 			e = route.NewEndpoint(&route.EndpointOpts{
+				AvailabilityZone:        "az-meow",
 				Host:                    "1.2.3.4",
 				Port:                    5678,
 				Protocol:                "http2",
@@ -765,7 +768,7 @@ var _ = Describe("EndpointPool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
 		})
 	})
 })
