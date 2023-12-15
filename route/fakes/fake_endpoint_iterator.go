@@ -13,9 +13,10 @@ type FakeEndpointIterator struct {
 	endpointFailedArgsForCall []struct {
 		arg1 error
 	}
-	NextStub        func() *route.Endpoint
+	NextStub        func(int) *route.Endpoint
 	nextMutex       sync.RWMutex
 	nextArgsForCall []struct {
+		arg1 int
 	}
 	nextReturns struct {
 		result1 *route.Endpoint
@@ -69,17 +70,18 @@ func (fake *FakeEndpointIterator) EndpointFailedArgsForCall(i int) error {
 	return argsForCall.arg1
 }
 
-func (fake *FakeEndpointIterator) Next() *route.Endpoint {
+func (fake *FakeEndpointIterator) Next(arg1 int) *route.Endpoint {
 	fake.nextMutex.Lock()
 	ret, specificReturn := fake.nextReturnsOnCall[len(fake.nextArgsForCall)]
 	fake.nextArgsForCall = append(fake.nextArgsForCall, struct {
-	}{})
+		arg1 int
+	}{arg1})
 	stub := fake.NextStub
 	fakeReturns := fake.nextReturns
-	fake.recordInvocation("Next", []interface{}{})
+	fake.recordInvocation("Next", []interface{}{arg1})
 	fake.nextMutex.Unlock()
 	if stub != nil {
-		return stub()
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
@@ -93,10 +95,17 @@ func (fake *FakeEndpointIterator) NextCallCount() int {
 	return len(fake.nextArgsForCall)
 }
 
-func (fake *FakeEndpointIterator) NextCalls(stub func() *route.Endpoint) {
+func (fake *FakeEndpointIterator) NextCalls(stub func(int) *route.Endpoint) {
 	fake.nextMutex.Lock()
 	defer fake.nextMutex.Unlock()
 	fake.NextStub = stub
+}
+
+func (fake *FakeEndpointIterator) NextArgsForCall(i int) int {
+	fake.nextMutex.RLock()
+	defer fake.nextMutex.RUnlock()
+	argsForCall := fake.nextArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeEndpointIterator) NextReturns(result1 *route.Endpoint) {
