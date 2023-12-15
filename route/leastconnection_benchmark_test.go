@@ -37,7 +37,7 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	var lb route.EndpointIterator
 	switch strategy {
 	case "round-robin":
-		lb = route.NewRoundRobin(pool, "")
+		lb = route.NewRoundRobin(pool, "", false, "meow-az")
 	case "least-connection":
 		lb = route.NewLeastConnection(pool, "", false, "meow-az")
 	default:

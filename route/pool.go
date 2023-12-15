@@ -373,7 +373,7 @@ func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIte
 	case config.LOAD_BALANCE_LC:
 		return NewLeastConnection(p, initial, false, "meow")
 	default:
-		return NewRoundRobin(p, initial)
+		return NewRoundRobin(p, initial, false, "meow")
 	}
 }
 
