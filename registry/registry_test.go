@@ -370,7 +370,7 @@ var _ = Describe("RouteRegistry", func() {
 					Expect(r.NumEndpoints()).To(Equal(1))
 
 					p := r.Lookup("foo.com")
-					Expect(p.Endpoints("", "").Next().ModificationTag).To(Equal(modTag))
+					Expect(p.Endpoints("", "").Next(1).ModificationTag).To(Equal(modTag))
 				})
 			})
 
@@ -392,7 +392,7 @@ var _ = Describe("RouteRegistry", func() {
 						Expect(r.NumEndpoints()).To(Equal(1))
 
 						p := r.Lookup("foo.com")
-						Expect(p.Endpoints("", "").Next().ModificationTag).To(Equal(modTag))
+						Expect(p.Endpoints("", "").Next(1).ModificationTag).To(Equal(modTag))
 					})
 
 					Context("updating an existing route with an older modification tag", func() {
@@ -412,7 +412,7 @@ var _ = Describe("RouteRegistry", func() {
 							Expect(r.NumEndpoints()).To(Equal(1))
 
 							p := r.Lookup("foo.com")
-							ep := p.Endpoints("", "").Next()
+							ep := p.Endpoints("", "").Next(1)
 							Expect(ep.ModificationTag).To(Equal(modTag))
 							Expect(ep).To(Equal(endpoint2))
 						})
@@ -431,7 +431,7 @@ var _ = Describe("RouteRegistry", func() {
 						Expect(r.NumEndpoints()).To(Equal(1))
 
 						p := r.Lookup("foo.com")
-						Expect(p.Endpoints("", "").Next().ModificationTag).To(Equal(modTag))
+						Expect(p.Endpoints("", "").Next(1).ModificationTag).To(Equal(modTag))
 					})
 				})
 			})
@@ -700,7 +700,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p1 := r.Lookup("foo/bar")
 			iter := p1.Endpoints("", "")
-			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 
 			p2 := r.Lookup("foo")
 			Expect(p2).To(BeNil())
@@ -796,7 +796,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(p1).To(Equal(p2))
 
 			iter := p1.Endpoints("", "")
-			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
 		It("selects one of the routes", func() {
@@ -814,7 +814,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("bar")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints("", "").Next()
+			e := p.Endpoints("", "").Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:123[4|5]"))
 
@@ -829,13 +829,13 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("foo.wild.card")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints("", "").Next()
+			e := p.Endpoints("", "").Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
 
 			p = r.Lookup("foo.space.wild.card")
 			Expect(p).ToNot(BeNil())
-			e = p.Endpoints("", "").Next()
+			e = p.Endpoints("", "").Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
 		})
@@ -849,7 +849,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("not.wild.card")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints("", "").Next()
+			e := p.Endpoints("", "").Next(1)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
@@ -882,7 +882,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				Expect(p).ToNot(BeNil())
 				iter := p.Endpoints("", "")
-				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+				Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 			})
 
 			It("using nested context path and query string", func() {
@@ -891,7 +891,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				Expect(p).ToNot(BeNil())
 				iter := p.Endpoints("", "")
-				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+				Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 			})
 		})
 
@@ -911,7 +911,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(p1).ToNot(BeNil())
 
 			iter := p1.Endpoints("", "")
-			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
 		It("selects a route even with a query string in the lookup argument", func() {
@@ -923,7 +923,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(p1).ToNot(BeNil())
 
 			iter := p1.Endpoints("", "")
-			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			Expect(iter.Next(1).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
 		It("fails to lookup when there is a percent without two hexadecimals following in the url", func() {
@@ -958,7 +958,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(2))
 
 			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-			e := p.Endpoints("", "").Next()
+			e := p.Endpoints("", "").Next(1)
 
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:1234"))
@@ -972,7 +972,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(2))
 
 			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-			e := p.Endpoints("", "").Next()
+			e := p.Endpoints("", "").Next(1)
 
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:1234"))
@@ -1165,7 +1165,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("foo")
 			Expect(p).ToNot(BeNil())
-			Expect(p.Endpoints("", "").Next()).To(Equal(endpoint))
+			Expect(p.Endpoints("", "").Next(1)).To(Equal(endpoint))
 
 			p = r.Lookup("bar")
 			Expect(p).To(BeNil())

@@ -144,7 +144,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		trace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
-			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request)
+			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request, attempt)
 			if selectEndpointErr != nil {
 				logger.Error("select-endpoint-failed", zap.String("host", reqInfo.RoutePool.Host()), zap.Error(selectEndpointErr))
 				break
@@ -347,8 +347,8 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	return resp, err
 }
 
-func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request) (*route.Endpoint, error) {
-	endpoint := iter.Next()
+func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request, attempt int) (*route.Endpoint, error) {
+	endpoint := iter.Next(attempt)
 	if endpoint == nil {
 		return nil, handler.NoEndpointsAvailable
 	}

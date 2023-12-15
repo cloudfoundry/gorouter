@@ -226,7 +226,7 @@ func (h *RequestHandler) serveTcp(
 
 	retry := 0
 	for {
-		endpoint = iter.Next()
+		endpoint = iter.Next(retry)
 		if endpoint == nil {
 			err = NoEndpointsAvailable
 			h.HandleBadGateway(err, h.request)
