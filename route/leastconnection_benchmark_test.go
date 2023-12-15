@@ -10,7 +10,7 @@ import (
 )
 
 func loadBalance(lb route.EndpointIterator) {
-	e := lb.Next()
+	e := lb.Next(1)
 	lb.PreRequest(e)
 	lb.PostRequest(e)
 }
@@ -39,7 +39,7 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	case "round-robin":
 		lb = route.NewRoundRobin(pool, "")
 	case "least-connection":
-		lb = route.NewLeastConnection(pool, "")
+		lb = route.NewLeastConnection(pool, "", false, "meow-az")
 	default:
 		panic("invalid load balancing strategy")
 	}

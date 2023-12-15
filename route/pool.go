@@ -125,7 +125,7 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
-	Next() *Endpoint
+	Next(attempt int) *Endpoint
 	EndpointFailed(err error)
 	PreRequest(e *Endpoint)
 	PostRequest(e *Endpoint)
@@ -371,7 +371,7 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 	switch defaultLoadBalance {
 	case config.LOAD_BALANCE_LC:
-		return NewLeastConnection(p, initial)
+		return NewLeastConnection(p, initial, false, "meow")
 	default:
 		return NewRoundRobin(p, initial)
 	}

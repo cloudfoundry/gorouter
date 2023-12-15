@@ -6,21 +6,25 @@ import (
 )
 
 type LeastConnection struct {
-	pool            *EndpointPool
-	initialEndpoint string
-	lastEndpoint    *Endpoint
-	randomize       *rand.Rand
+	pool                  *EndpointPool
+	initialEndpoint       string
+	lastEndpoint          *Endpoint
+	randomize             *rand.Rand
+	locallyOptimistic     bool
+	localAvailabilityZone string
 }
 
-func NewLeastConnection(p *EndpointPool, initial string) EndpointIterator {
+func NewLeastConnection(p *EndpointPool, initial string, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &LeastConnection{
-		pool:            p,
-		initialEndpoint: initial,
-		randomize:       rand.New(rand.NewSource(time.Now().UnixNano())),
+		pool:                  p,
+		initialEndpoint:       initial,
+		randomize:             rand.New(rand.NewSource(time.Now().UnixNano())),
+		locallyOptimistic:     locallyOptimistic,
+		localAvailabilityZone: localAvailabilityZone,
 	}
 }
 
-func (r *LeastConnection) Next() *Endpoint {
+func (r *LeastConnection) Next(attempt int) *Endpoint {
 	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
@@ -38,7 +42,7 @@ func (r *LeastConnection) Next() *Endpoint {
 		return e.endpoint
 	}
 
-	e = r.next()
+	e = r.next(attempt)
 	if e != nil {
 		e.RLock()
 		defer e.RUnlock()
@@ -58,11 +62,12 @@ func (r *LeastConnection) PostRequest(e *Endpoint) {
 	e.Stats.NumberConnections.Decrement()
 }
 
-func (r *LeastConnection) next() *endpointElem {
+func (r *LeastConnection) next(attempt int) *endpointElem {
 	r.pool.Lock()
 	defer r.pool.Unlock()
 
-	var selected *endpointElem
+	var selected, selectedLocal *endpointElem
+	localDesired := r.locallyOptimistic && attempt == 1
 
 	// none
 	total := len(r.pool.endpoints)
@@ -83,25 +88,50 @@ func (r *LeastConnection) next() *endpointElem {
 	// more than 1 endpoint
 	// select the least connection endpoint OR
 	// random one within the least connection endpoints
-	randIndices := r.randomize.Perm(total)
 
+	var cur *endpointElem
+	var curIsLocal bool
+	var randIdx int
+
+	randIndices := r.randomize.Perm(total)
 	for i := 0; i < total; i++ {
-		randIdx := randIndices[i]
-		cur := r.pool.endpoints[randIdx]
+		randIdx = randIndices[i]
+		cur = r.pool.endpoints[randIdx]
+		curIsLocal = cur.endpoint.AvailabilityZone == r.localAvailabilityZone
+
+		// Never select an endpoint that is overloaded
 		if cur.isOverloaded() {
 			continue
 		}
 
-		// our first is the least
+		// Initialize selected to the first non-overloaded endpoint
 		if i == 0 || selected == nil {
 			selected = cur
 			continue
 		}
 
+		// If the current option is better than the selected option, select the current
 		if cur.endpoint.Stats.NumberConnections.Count() < selected.endpoint.Stats.NumberConnections.Count() {
 			selected = cur
 		}
+
+		if localDesired {
+			// Initialize selectedLocal to the first non-overloaded local endpoint
+			if curIsLocal && selectedLocal == nil {
+				selectedLocal = cur
+			}
+
+			// If the current option is local and is better than the selectedLocal endpoint, then swap
+			if curIsLocal && cur.endpoint.Stats.NumberConnections.Count() < selectedLocal.endpoint.Stats.NumberConnections.Count() {
+				selectedLocal = cur
+			}
+		}
 	}
+
+	if localDesired && selectedLocal != nil {
+		return selectedLocal
+	}
+
 	return selected
 }
 
