@@ -17,30 +17,26 @@ import (
 	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
 
-	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
 	"github.com/uber-go/zap"
 )
 
-// RegistryMessage defines the format of a route registration/unregistration
-// easyjson:json
-//
-//go:generate easyjson --all subscriber.go
 type RegistryMessage struct {
-	Host                    string            `json:"host"`
-	Port                    uint16            `json:"port"`
-	Protocol                string            `json:"protocol"`
-	TLSPort                 uint16            `json:"tls_port"`
-	Uris                    []route.Uri       `json:"uris"`
-	Tags                    map[string]string `json:"tags"`
 	App                     string            `json:"app"`
-	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
-	RouteServiceURL         string            `json:"route_service_url"`
-	PrivateInstanceID       string            `json:"private_instance_id"`
-	ServerCertDomainSAN     string            `json:"server_cert_domain_san"`
-	PrivateInstanceIndex    string            `json:"private_instance_index"`
-	IsolationSegment        string            `json:"isolation_segment"`
+	AvailabilityZone        string            `json:"availability_zone"`
 	EndpointUpdatedAtNs     int64             `json:"endpoint_updated_at_ns"`
+	Host                    string            `json:"host"`
+	IsolationSegment        string            `json:"isolation_segment"`
+	Port                    uint16            `json:"port"`
+	PrivateInstanceID       string            `json:"private_instance_id"`
+	PrivateInstanceIndex    string            `json:"private_instance_index"`
+	Protocol                string            `json:"protocol"`
+	RouteServiceURL         string            `json:"route_service_url"`
+	ServerCertDomainSAN     string            `json:"server_cert_domain_san"`
+	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
+	TLSPort                 uint16            `json:"tls_port"`
+	Tags                    map[string]string `json:"tags"`
+	Uris                    []route.Uri       `json:"uris"`
 }
 
 func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, error) {
@@ -60,6 +56,7 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 
 	return route.NewEndpoint(&route.EndpointOpts{
 		AppId:                   rm.App,
+		AvailabilityZone:        rm.AvailabilityZone,
 		Host:                    rm.Host,
 		Port:                    port,
 		Protocol:                protocol,
@@ -296,7 +293,7 @@ func (s *Subscriber) sendStartMessage() error {
 func createRegistryMessage(data []byte) (*RegistryMessage, error) {
 	var msg RegistryMessage
 
-	jsonErr := easyjson.Unmarshal(data, &msg)
+	jsonErr := json.Unmarshal(data, &msg)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}

@@ -349,6 +349,72 @@ var _ = Describe("Subscriber", func() {
 		})
 	})
 
+	Context("when the message contains an availability_zone", func() {
+		BeforeEach(func() {
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
+
+		It("endpoint is constructed with an availability_zone", func() {
+			msg := mbus.RegistryMessage{
+				Host:             "host",
+				App:              "app",
+				Uris:             []route.Uri{"test.example.com"},
+				AvailabilityZone: "zone-meow",
+			}
+
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host:             "host",
+				AppId:            "app",
+				Protocol:         "http1",
+				AvailabilityZone: "zone-meow",
+			})
+
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
+		})
+	})
+
+	Context("when the message does not contain an availability_zone", func() {
+		BeforeEach(func() {
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			process = ifrit.Invoke(sub)
+			Eventually(process.Ready()).Should(BeClosed())
+		})
+
+		It("endpoint is constructed without an availability_zone", func() {
+			msg := mbus.RegistryMessage{
+				Host: "host",
+				App:  "app",
+				Uris: []route.Uri{"test.example.com"},
+			}
+
+			data, err := json.Marshal(msg)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = natsClient.Publish("router.register", data)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(registry.RegisterCallCount).Should(Equal(1))
+			_, originalEndpoint := registry.RegisterArgsForCall(0)
+			expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host:     "host",
+				AppId:    "app",
+				Protocol: "http1",
+			})
+
+			Expect(originalEndpoint).To(Equal(expectedEndpoint))
+		})
+	})
+
 	Context("when the message does not contain a protocol", func() {
 		BeforeEach(func() {
 			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)

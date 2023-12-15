@@ -1353,7 +1353,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		marshalled, err := json.Marshal(r)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-routeService.com","tags":null}]}`))
+		Expect(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234","availability_zone":"","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-routeService.com","tags":null}]}`))
 		r.Unregister("foo", m)
 		marshalled, err = json.Marshal(r)
 		Expect(err).NotTo(HaveOccurred())
