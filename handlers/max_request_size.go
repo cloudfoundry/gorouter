@@ -58,7 +58,7 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 			if err != nil {
 				logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
 			} else {
-				reqInfo.RouteEndpoint = endpointIterator.Next()
+				reqInfo.RouteEndpoint = endpointIterator.Next(1)
 			}
 		}
 		rw.Header().Set(router_http.CfRouterError, "max-request-size-exceeded")

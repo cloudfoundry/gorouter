@@ -73,17 +73,17 @@ var _ = Describe("LeastConnection", func() {
 					var wg sync.WaitGroup
 					for i := 0; i < 100; i++ {
 						wg.Add(1)
-						go func() {
+						go func(attempt int) {
 							iter := route.NewLeastConnection(pool, "", false, "meow-az")
-							n1 := iter.Next(i)
+							n1 := iter.Next(attempt)
 							Expect(n1).NotTo(BeNil())
 
 							Eventually(func() bool {
-								n2 := iter.Next(i)
+								n2 := iter.Next(attempt)
 								return n1.Equal(n2)
 							}).Should(BeFalse())
 							wg.Done()
-						}()
+						}(i)
 					}
 					wg.Wait()
 				})

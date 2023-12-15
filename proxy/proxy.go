@@ -310,8 +310,8 @@ type wrappedIterator struct {
 	afterNext func(*route.Endpoint)
 }
 
-func (i *wrappedIterator) Next() *route.Endpoint {
-	e := i.nested.Next()
+func (i *wrappedIterator) Next(attempt int) *route.Endpoint {
+	e := i.nested.Next(attempt)
 	if i.afterNext != nil {
 		i.afterNext(e)
 	}
