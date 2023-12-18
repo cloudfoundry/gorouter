@@ -24,6 +24,8 @@ import (
 const (
 	LOAD_BALANCE_RR           string = "round-robin"
 	LOAD_BALANCE_LC           string = "least-connection"
+	AZ_PREF_NONE              string = "none"
+	AZ_PREF_LOCAL             string = "locally-optimistic"
 	SHARD_ALL                 string = "all"
 	SHARD_SEGMENTS            string = "segments"
 	SHARD_SHARED_AND_SEGMENTS string = "shared-and-segments"
@@ -36,6 +38,7 @@ const (
 )
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
+var AZPreferences = []string{AZ_PREF_NONE, AZ_PREF_LOCAL}
 var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
 var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
 var AllowedQueryParmRedactionModes = []string{REDACT_QUERY_PARMS_NONE, REDACT_QUERY_PARMS_ALL, REDACT_QUERY_PARMS_HASH}
@@ -442,8 +445,9 @@ type Config struct {
 	TokenFetcherRetryInterval                 time.Duration `yaml:"token_fetcher_retry_interval,omitempty"`
 	TokenFetcherExpirationBufferTimeInSeconds int64         `yaml:"token_fetcher_expiration_buffer_time,omitempty"`
 
-	PidFile     string `yaml:"pid_file,omitempty"`
-	LoadBalance string `yaml:"balancing_algorithm,omitempty"`
+	PidFile                 string `yaml:"pid_file,omitempty"`
+	LoadBalance             string `yaml:"balancing_algorithm,omitempty"`
+	LoadBalanceAZPreference string `yaml:"balancing_algorithm_az_preference,omitempty"`
 
 	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
 	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
@@ -514,8 +518,9 @@ var defaultConfig = Config{
 	// This is set to twice the defaults from the NATS library
 	NatsClientMessageBufferSize: 131072,
 
-	HealthCheckUserAgent: "HTTP-Monitor/1.1",
-	LoadBalance:          LOAD_BALANCE_RR,
+	HealthCheckUserAgent:    "HTTP-Monitor/1.1",
+	LoadBalance:             LOAD_BALANCE_RR,
+	LoadBalanceAZPreference: AZ_PREF_NONE,
 
 	ForwardedClientCert:      "always_forward",
 	RoutingTableShardingMode: "all",
@@ -710,6 +715,19 @@ func (c *Config) Process() error {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
 		return fmt.Errorf(errMsg)
 	}
+
+	validAZPref := false
+	for _, p := range AZPreferences {
+		if c.LoadBalanceAZPreference == p {
+			validAZPref = true
+			break
+		}
+	}
+	if !validAZPref {
+		errMsg := fmt.Sprintf("Invalid load balancing AZ preference %s. Allowed values are %s", c.LoadBalanceAZPreference, AZPreferences)
+		return fmt.Errorf(errMsg)
+	}
+
 	if c.LoadBalancerHealthyThreshold < 0 {
 		errMsg := fmt.Sprintf("Invalid load balancer healthy threshold: %s", c.LoadBalancerHealthyThreshold)
 		return fmt.Errorf(errMsg)
