@@ -55,6 +55,33 @@ balancing_algorithm: foo-bar
 			})
 		})
 
+		FContext("load balance az preference config", func() {
+			It("sets default load balance az preference", func() {
+				Expect(config.LoadBalanceAZPreference).To(Equal(AZ_PREF_NONE))
+			})
+
+			It("can override the load balance az preference", func() {
+				cfg, err := DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
+				var b = []byte(`
+balancing_algorithm_az_preference: locally-optimistic
+`)
+				cfg.Initialize(b)
+				cfg.Process()
+				Expect(cfg.LoadBalanceAZPreference).To(Equal(AZ_PREF_LOCAL))
+			})
+
+			It("does not allow an invalid load balance strategy", func() {
+				cfg, err := DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
+				var b = []byte(`
+balancing_algorithm_az_preference: meow-only
+`)
+				cfg.Initialize(b)
+				Expect(cfg.Process()).To(MatchError("Invalid load balancing AZ preference meow-only. Allowed values are [none locally-optimistic]"))
+			})
+		})
+
 		It("sets status config", func() {
 			var b = []byte(`
 status:
