@@ -75,6 +75,7 @@ func main() {
 	}
 	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.Format.Timestamp)
 	logger.Info("starting")
+	logger.Debug("local-az-set", zap.String("AvailabilityZone", c.Zone))
 
 	var ew errorwriter.ErrorWriter
 	if c.HTMLErrorTemplateFile != "" {

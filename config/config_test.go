@@ -28,6 +28,19 @@ var _ = Describe("Config", func() {
 
 	Describe("Initialize", func() {
 
+		Context("zone", func() {
+			It("can set the zone", func() {
+				cfg, err := DefaultConfig()
+				Expect(err).ToNot(HaveOccurred())
+				var b = []byte(`
+zone: meow-zone
+`)
+				cfg.Initialize(b)
+				cfg.Process()
+				Expect(cfg.Zone).To(Equal("meow-zone"))
+			})
+		})
+
 		Context("load balance config", func() {
 			It("sets default load balance strategy", func() {
 				Expect(config.LoadBalance).To(Equal(LOAD_BALANCE_RR))
@@ -55,7 +68,7 @@ balancing_algorithm: foo-bar
 			})
 		})
 
-		FContext("load balance az preference config", func() {
+		Context("load balance az preference config", func() {
 			It("sets default load balance az preference", func() {
 				Expect(config.LoadBalanceAZPreference).To(Equal(AZ_PREF_NONE))
 			})
