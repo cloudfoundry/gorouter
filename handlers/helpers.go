@@ -62,12 +62,12 @@ func upgradeHeader(request *http.Request) string {
 	return ""
 }
 
-func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet) (route.EndpointIterator, error) {
+func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference, az string) (route.EndpointIterator, error) {
 	reqInfo, err := ContextRequestInfo(request)
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")
 	}
-	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, getStickySession(request, stickySessionCookieNames)), nil
+	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, getStickySession(request, stickySessionCookieNames), azPreference, az), nil
 }
 
 func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {

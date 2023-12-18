@@ -368,12 +368,12 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	p.Update()
 }
 
-func (p *EndpointPool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
+func (p *EndpointPool) Endpoints(defaultLoadBalance, initial, azPreference, az string) EndpointIterator {
 	switch defaultLoadBalance {
 	case config.LOAD_BALANCE_LC:
-		return NewLeastConnection(p, initial, false, "meow")
+		return NewLeastConnection(p, initial, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
-		return NewRoundRobin(p, initial, false, "meow")
+		return NewRoundRobin(p, initial, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }
 

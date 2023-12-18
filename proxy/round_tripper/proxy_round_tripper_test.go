@@ -37,6 +37,8 @@ import (
 )
 
 const StickyCookieKey = "JSESSIONID"
+const AZ = "meow-zone"
+const AZPreference = "none"
 
 type testBody struct {
 	bytes.Buffer
@@ -265,7 +267,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
 
-					iter := routePool.Endpoints("", "")
+					iter := routePool.Endpoints("", "", AZPreference, AZ)
 					ep1 := iter.Next(1)
 					ep2 := iter.Next(2)
 					Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
@@ -423,7 +425,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
-					iter := routePool.Endpoints("", "")
+					iter := routePool.Endpoints("", "", AZPreference, AZ)
 					ep1 := iter.Next(1)
 					ep2 := iter.Next(2)
 					Expect(ep1).To(Equal(ep2))
