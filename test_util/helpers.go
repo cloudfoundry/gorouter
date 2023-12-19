@@ -162,12 +162,12 @@ func runBackendInstance(ln net.Listener, handler connHandler) {
 	}
 }
 
-func SpecConfig(statusPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
-	return generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
+func SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+	return generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
+func SpecSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -204,8 +204,8 @@ const (
 	TLSConfigFromUnknownCA     = 3
 )
 
-func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
+func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -258,7 +258,7 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 	return c, clientTLSConfig
 }
 
-func generateConfig(statusPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+func generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
 	c, err := config.DefaultConfig()
 	Expect(err).ToNot(HaveOccurred())
 
@@ -279,12 +279,20 @@ func generateConfig(statusPort, statusRoutesPort, proxyPort uint16, natsPorts ..
 	c.EndpointTimeout = 500 * time.Millisecond
 	c.WebsocketDialTimeout = c.EndpointDialTimeout
 
+	key, cert := CreateKeyPair("healthTLSendpoint")
 	c.Status = config.StatusConfig{
-		Port: statusPort,
-		User: "user",
-		Pass: "pass",
+		Port:                     statusPort,
+		User:                     "user",
+		Pass:                     "pass",
+		EnableNonTLSHealthChecks: true,
 		Routes: config.StatusRoutesConfig{
 			Port: statusRoutesPort,
+		},
+		TLSCert: CreateCert("default"),
+		TLS: config.StatusTLSConfig{
+			Port:        statusTLSPort,
+			Key:         string(key),
+			Certificate: string(cert),
 		},
 	}
 

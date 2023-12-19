@@ -100,32 +100,36 @@ func NewRouter(
 	}
 
 	healthCheck := handlers.NewHealthcheck(h, logger)
-	component := &common.VcapComponent{
-		Config: cfg,
-		Varz:   varz,
-		Health: healthCheck,
-		InfoRoutes: map[string]json.Marshaler{
-			"/routes": r,
-		},
-		Logger: logger,
+	var component *common.VcapComponent
+	if cfg.Status.EnableNonTLSHealthChecks {
+		component = &common.VcapComponent{
+			Config: cfg,
+			Varz:   varz,
+			Health: healthCheck,
+			InfoRoutes: map[string]json.Marshaler{
+				"/routes": r,
+			},
+			Logger: logger,
+		}
 	}
 
 	// TODO: once we can remove the varz/healthz endpoints in `VcapComponent`
 	//       we should add another healthListener here without TLS support,
 	//       and remove all of common/VcapComponent code
-	var healthTLSListener *HealthListener
-	if cfg.Status.TLS.Port != 0 && len(cfg.Status.TLSCert.Certificate) != 0 {
-		logger.Info("meow.healthtlslistener", zap.Int("status.tls.port", int(cfg.Status.TLS.Port)), zap.String("cert/key", string(cfg.Status.TLSCert.Certificate[0])))
-		healthTLSListener := &HealthListener{
-			Port: cfg.Status.TLS.Port,
-			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{cfg.Status.TLSCert},
-				CipherSuites: cfg.CipherSuites,
-				MinVersion:   cfg.MinTLSVersion,
-				MaxVersion:   cfg.MaxTLSVersion,
-			},
-			HealthCheck: healthCheck,
-		}
+	healthTLSListener := &HealthListener{
+		Port: cfg.Status.TLS.Port,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cfg.Status.TLSCert},
+			CipherSuites: cfg.CipherSuites,
+			MinVersion:   cfg.MinTLSVersion,
+			MaxVersion:   cfg.MaxTLSVersion,
+		},
+		HealthCheck: healthCheck,
+	}
+
+	if cfg.Status.TLSCert.PrivateKey == nil {
+		return nil, fmt.Errorf("No TLS certificates provided. Health Listener cannot start. This is a bug in gorouter. This error should have been caught when parsing the config")
+	} else {
 		if err := healthTLSListener.ListenAndServe(); err != nil {
 			return nil, err
 		}
@@ -164,8 +168,10 @@ func NewRouter(
 		routeServicesServer: routeServicesServer,
 	}
 
-	if err := router.component.Start(); err != nil {
-		return nil, err
+	if router.component != nil {
+		if err := router.component.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	router.uptimeMonitor = monitor.NewUptime(emitInterval)
@@ -399,7 +405,9 @@ func (r *Router) Stop() {
 	r.closeIdleConns()
 	r.connLock.Unlock()
 
-	r.component.Stop()
+	if r.component != nil {
+		r.component.Stop()
+	}
 	r.routesListener.Stop()
 	if r.healthTLSListener != nil {
 		r.healthTLSListener.Stop()
@@ -439,7 +447,9 @@ func (r *Router) stopListening() {
 }
 
 func (r *Router) RegisterComponent() {
-	r.component.Register(r.mbusClient)
+	if r.component != nil {
+		r.component.Register(r.mbusClient)
+	}
 }
 
 func (r *Router) ScheduleFlushApps() {
