@@ -24,12 +24,12 @@ import (
 var _ = Describe("NATS Integration", func() {
 
 	var (
-		cfg                                               *config.Config
-		cfgFile                                           string
-		tmpdir                                            string
-		natsPort, statusPort, statusRoutesPort, proxyPort uint16
-		natsRunner                                        *test_util.NATSRunner
-		gorouterSession                                   *Session
+		cfg                                                              *config.Config
+		cfgFile                                                          string
+		tmpdir                                                           string
+		natsPort, statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16
+		natsRunner                                                       *test_util.NATSRunner
+		gorouterSession                                                  *Session
 	)
 
 	BeforeEach(func() {
@@ -39,6 +39,7 @@ var _ = Describe("NATS Integration", func() {
 		cfgFile = filepath.Join(tmpdir, "config.yml")
 
 		statusPort = test_util.NextAvailPort()
+		statusTLSPort = test_util.NextAvailPort()
 		proxyPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
 
@@ -62,7 +63,7 @@ var _ = Describe("NATS Integration", func() {
 		SetDefaultEventuallyTimeout(5 * time.Second)
 		defer SetDefaultEventuallyTimeout(1 * time.Second)
 
-		tempCfg := createConfig(statusPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+		tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
@@ -138,7 +139,7 @@ var _ = Describe("NATS Integration", func() {
 
 	Context("when nats server shuts down and comes back up", func() {
 		It("should not panic, log the disconnection, and reconnect", func() {
-			tempCfg := createConfig(statusPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			tempCfg.NatsClientPingInterval = 100 * time.Millisecond
 			writeConfig(tempCfg, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
@@ -166,7 +167,7 @@ var _ = Describe("NATS Integration", func() {
 
 			pruneInterval = 2 * time.Second
 			pruneThreshold = 10 * time.Second
-			cfg = createConfig(statusPort, statusRoutesPort, proxyPort, cfgFile, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
+			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, pruneInterval, pruneThreshold, 0, false, 0, natsPort, natsPort2)
 		})
 
 		AfterEach(func() {
@@ -232,7 +233,7 @@ var _ = Describe("NATS Integration", func() {
 				pruneInterval = 200 * time.Millisecond
 				pruneThreshold = 1000 * time.Millisecond
 				suspendPruningIfNatsUnavailable := true
-				cfg = createConfig(statusPort, statusRoutesPort, proxyPort, cfgFile, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, 0, natsPort, natsPort2)
+				cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, 0, natsPort, natsPort2)
 				cfg.NatsClientPingInterval = 200 * time.Millisecond
 			})
 
