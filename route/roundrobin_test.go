@@ -366,14 +366,27 @@ var _ = Describe("RoundRobin", func() {
 					})
 				})
 
-				Context("when the pool has none in the same AZ as the router", func() {
+				Context("when the pool has one endpoint, and it is not in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+					})
+
+					It("selects a non-local endpoint", func() {
+						chosen := iter.Next(1)
+						Expect(chosen).ToNot(BeNil())
+						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						Expect(chosen).To(Equal(otherAZEndpointOne))
+					})
+				})
+
+				Context("when the pool has multiple endpoints, none in the same AZ as the router", func() {
 					BeforeEach(func() {
 						pool.Put(otherAZEndpointOne)
 						pool.Put(otherAZEndpointTwo)
 						pool.Put(otherAZEndpointThree)
 					})
 
-					It("selects a local endpoint", func() {
+					It("selects a non-local endpoint", func() {
 						chosen := iter.Next(1)
 						Expect(chosen).ToNot(BeNil())
 						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
