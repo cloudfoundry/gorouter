@@ -353,7 +353,20 @@ var _ = Describe("LeastConnection", func() {
 						})
 					})
 				})
-				Context("when the pool has none in the same AZ as the router", func() {
+
+				Context("when the pool has one endpoint, and it is not in the same AZ as the router", func() {
+					BeforeEach(func() {
+						pool.Put(otherAZEndpointOne)
+					})
+
+					It("selects the non-local endpoint", func() {
+						chosen := iter.Next(1)
+						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						Expect(chosen).To(Equal(otherAZEndpointOne))
+					})
+				})
+
+				Context("when the pool has multiple endpoints, none in the same AZ as the router", func() {
 					BeforeEach(func() {
 						otherAZEndpointOne.Stats.NumberConnections.Increment()
 						otherAZEndpointOne.Stats.NumberConnections.Increment()
@@ -365,7 +378,7 @@ var _ = Describe("LeastConnection", func() {
 						pool.Put(otherAZEndpointThree) // 1 connections
 					})
 
-					It("selects the endpoint with the lowest connections", func() {
+					It("selects the non-local endpoint", func() {
 						Expect(iter.Next(1)).To(Equal(otherAZEndpointTwo))
 					})
 				})
