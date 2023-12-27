@@ -27,119 +27,164 @@ var _ = Describe("RoundRobin", func() {
 	})
 
 	Describe("Next", func() {
-		It("performs round-robin through the endpoints", func() {
-			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
-			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 1234})
-			e3 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.7.8", Port: 1234})
-			endpoints := []*route.Endpoint{e1, e2, e3}
+		DescribeTable("it performs round-robin through the endpoints",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 1234})
+				e3 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.7.8", Port: 1234})
+				endpoints := []*route.Endpoint{e1, e2, e3}
 
-			for _, e := range endpoints {
-				pool.Put(e)
-			}
+				for _, e := range endpoints {
+					pool.Put(e)
+				}
 
-			counts := make([]int, len(endpoints))
+				counts := make([]int, len(endpoints))
 
-			iter := route.NewRoundRobin(pool, "", false, "meow-az")
+				iter := route.NewRoundRobin(pool, "", false, "meow-az")
 
-			loops := 50
-			for i := 0; i < len(endpoints)*loops; i += 1 {
-				n := iter.Next(i)
-				for j, e := range endpoints {
-					if e == n {
-						counts[j]++
-						break
+				loops := 50
+				for i := 0; i < len(endpoints)*loops; i += 1 {
+					n := iter.Next(i)
+					for j, e := range endpoints {
+						if e == n {
+							counts[j]++
+							break
+						}
 					}
 				}
-			}
 
-			for i := 0; i < len(endpoints); i++ {
-				Expect(counts[i]).To(Equal(loops))
-			}
-		})
+				for i := 0; i < len(endpoints); i++ {
+					Expect(counts[i]).To(Equal(loops))
+				}
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+			Entry("When the next index is 2", 2),
+		)
 
-		It("returns nil when no endpoints exist", func() {
-			iter := route.NewRoundRobin(pool, "", false, "meow-az")
-			e := iter.Next(1)
-			Expect(e).To(BeNil())
-		})
+		DescribeTable("it returns nil when no endpoints exist",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				iter := route.NewRoundRobin(pool, "", false, "meow-az")
+				e := iter.Next(1)
+				Expect(e).To(BeNil())
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+		)
 
-		It("finds the initial endpoint by private id", func() {
-			b := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1235})
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234}))
-			pool.Put(b)
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1236}))
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
+		DescribeTable("it finds the initial endpoint by private id",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				b := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1235})
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234}))
+				pool.Put(b)
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1236}))
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
 
-			for i := 0; i < 10; i++ {
-				iter := route.NewRoundRobin(pool, b.PrivateInstanceId, false, "meow-az")
-				e := iter.Next(i)
+				for i := 0; i < 10; i++ {
+					iter := route.NewRoundRobin(pool, b.PrivateInstanceId, false, "meow-az")
+					e := iter.Next(i)
+					Expect(e).ToNot(BeNil())
+					Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
+				}
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+			Entry("When the next index is 2", 2),
+			Entry("When the next index is 3", 3),
+		)
+
+		DescribeTable("it finds the initial endpoint by canonical addr",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				b := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1235})
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234}))
+				pool.Put(b)
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1236}))
+				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
+
+				for i := 0; i < 10; i++ {
+					iter := route.NewRoundRobin(pool, b.CanonicalAddr(), false, "meow-az")
+					e := iter.Next(i)
+					Expect(e).ToNot(BeNil())
+					Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
+				}
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+			Entry("When the next index is 2", 2),
+			Entry("When the next index is 3", 3),
+		)
+
+		DescribeTable("it finds when there are multiple private ids",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
+				endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"})
+
+				pool.Put(endpointFoo)
+				pool.Put(endpointBar)
+
+				iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
+				foundEndpoint := iter.Next(1)
+				Expect(foundEndpoint).ToNot(BeNil())
+				Expect(foundEndpoint).To(Equal(endpointFoo))
+
+				iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId, false, "meow-az")
+				foundEndpoint = iter.Next(2)
+				Expect(foundEndpoint).ToNot(BeNil())
+				Expect(foundEndpoint).To(Equal(endpointBar))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
+
+		DescribeTable("it returns the next available endpoint when the initial is not found",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
+				pool.Put(endpointFoo)
+
+				iter := route.NewRoundRobin(pool, "bogus", false, "meow-az")
+				e := iter.Next(1)
 				Expect(e).ToNot(BeNil())
-				Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
-			}
-		})
+				Expect(e).To(Equal(endpointFoo))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+		)
 
-		It("finds the initial endpoint by canonical addr", func() {
-			b := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1235})
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234}))
-			pool.Put(b)
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1236}))
-			pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
+		DescribeTable("it finds the correct endpoint when private ids change",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
+				pool.Put(endpointFoo)
 
-			for i := 0; i < 10; i++ {
-				iter := route.NewRoundRobin(pool, b.CanonicalAddr(), false, "meow-az")
-				e := iter.Next(i)
-				Expect(e).ToNot(BeNil())
-				Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
-			}
-		})
+				iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
+				foundEndpoint := iter.Next(1)
+				Expect(foundEndpoint).ToNot(BeNil())
+				Expect(foundEndpoint).To(Equal(endpointFoo))
 
-		It("finds when there are multiple private ids", func() {
-			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
-			endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678, PrivateInstanceId: "bar"})
+				endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "bar"})
+				pool.Put(endpointBar)
 
-			pool.Put(endpointFoo)
-			pool.Put(endpointBar)
+				iter = route.NewRoundRobin(pool, "foo", false, "meow-az")
+				foundEndpoint = iter.Next(2)
+				Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
-			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
-			foundEndpoint := iter.Next(1)
-			Expect(foundEndpoint).ToNot(BeNil())
-			Expect(foundEndpoint).To(Equal(endpointFoo))
-
-			iter = route.NewRoundRobin(pool, endpointBar.PrivateInstanceId, false, "meow-az")
-			foundEndpoint = iter.Next(2)
-			Expect(foundEndpoint).ToNot(BeNil())
-			Expect(foundEndpoint).To(Equal(endpointBar))
-		})
-
-		It("returns the next available endpoint when the initial is not found", func() {
-			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
-			pool.Put(endpointFoo)
-
-			iter := route.NewRoundRobin(pool, "bogus", false, "meow-az")
-			e := iter.Next(1)
-			Expect(e).ToNot(BeNil())
-			Expect(e).To(Equal(endpointFoo))
-		})
-
-		It("finds the correct endpoint when private ids change", func() {
-			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
-			pool.Put(endpointFoo)
-
-			iter := route.NewRoundRobin(pool, endpointFoo.PrivateInstanceId, false, "meow-az")
-			foundEndpoint := iter.Next(1)
-			Expect(foundEndpoint).ToNot(BeNil())
-			Expect(foundEndpoint).To(Equal(endpointFoo))
-
-			endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "bar"})
-			pool.Put(endpointBar)
-
-			iter = route.NewRoundRobin(pool, "foo", false, "meow-az")
-			foundEndpoint = iter.Next(2)
-			Expect(foundEndpoint).ToNot(Equal(endpointFoo))
-
-			iter = route.NewRoundRobin(pool, "bar", false, "meow-az")
-			Expect(foundEndpoint).To(Equal(endpointBar))
-		})
+				iter = route.NewRoundRobin(pool, "bar", false, "meow-az")
+				Expect(foundEndpoint).To(Equal(endpointBar))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
 
 		It("is safe for concurrent use", func() {
 			var wg sync.WaitGroup
@@ -197,30 +242,42 @@ var _ = Describe("RoundRobin", func() {
 			})
 
 			Context("when there is no initial endpoint", func() {
-				It("returns an unencumbered endpoint", func() {
-					epTwo.Stats.NumberConnections.Increment()
-					epTwo.Stats.NumberConnections.Increment()
-					iter := route.NewRoundRobin(pool, "", false, "meow-az")
-
-					foundEndpoint := iter.Next(1)
-					Expect(foundEndpoint).To(Equal(epOne))
-
-					sameEndpoint := iter.Next(2)
-					Expect(foundEndpoint).To(Equal(sameEndpoint))
-				})
-
-				Context("when all endpoints are overloaded", func() {
-					It("returns nil", func() {
-						epOne.Stats.NumberConnections.Increment()
-						epOne.Stats.NumberConnections.Increment()
+				DescribeTable("it returns an unencumbered endpoint",
+					func(nextIdx int) {
+						pool.NextIdx = nextIdx
 						epTwo.Stats.NumberConnections.Increment()
 						epTwo.Stats.NumberConnections.Increment()
 						iter := route.NewRoundRobin(pool, "", false, "meow-az")
 
-						Consistently(func() *route.Endpoint {
-							return iter.Next(1)
-						}).Should(BeNil())
-					})
+						foundEndpoint := iter.Next(1)
+						Expect(foundEndpoint).To(Equal(epOne))
+
+						sameEndpoint := iter.Next(2)
+						Expect(foundEndpoint).To(Equal(sameEndpoint))
+					},
+					Entry("When the next index is -1", -1),
+					Entry("When the next index is 0", 0),
+					Entry("When the next index is 1", 1),
+				)
+
+				Context("when all endpoints are overloaded", func() {
+					DescribeTable("it returns nil",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+							epOne.Stats.NumberConnections.Increment()
+							epOne.Stats.NumberConnections.Increment()
+							epTwo.Stats.NumberConnections.Increment()
+							epTwo.Stats.NumberConnections.Increment()
+							iter := route.NewRoundRobin(pool, "", false, "meow-az")
+
+							Consistently(func() *route.Endpoint {
+								return iter.Next(1)
+							}).Should(BeNil())
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+					)
 				})
 			})
 
@@ -237,10 +294,16 @@ var _ = Describe("RoundRobin", func() {
 					})
 
 					Context("when there is an unencumbered endpoint", func() {
-						It("returns the unencumbered endpoint", func() {
-							Expect(iter.Next(1)).To(Equal(epTwo))
-							Expect(iter.Next(2)).To(Equal(epTwo))
-						})
+						DescribeTable("it returns the unencumbered endpoint",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+								Expect(iter.Next(1)).To(Equal(epTwo))
+								Expect(iter.Next(2)).To(Equal(epTwo))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+						)
 					})
 
 					Context("when there isn't an unencumbered endpoint", func() {
@@ -249,11 +312,17 @@ var _ = Describe("RoundRobin", func() {
 							epTwo.Stats.NumberConnections.Increment()
 						})
 
-						It("returns nil", func() {
-							Consistently(func() *route.Endpoint {
-								return iter.Next(1)
-							}).Should(BeNil())
-						})
+						DescribeTable("it returns nil",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+								Consistently(func() *route.Endpoint {
+									return iter.Next(1)
+								}).Should(BeNil())
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+						)
 					})
 				})
 			})
@@ -291,6 +360,16 @@ var _ = Describe("RoundRobin", func() {
 			Context("on the first attempt", func() {
 
 				Context("when the pool is empty", func() {
+					DescribeTable("it ",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+						Entry("When the next index is 2", 2),
+						Entry("When the next index is 3", 3),
+					)
 					It("does not select an endpoint", func() {
 						Expect(iter.Next(1)).To(BeNil())
 					})
@@ -304,11 +383,19 @@ var _ = Describe("RoundRobin", func() {
 						pool.Put(localAZEndpointOne)
 					})
 
-					It("selects the endpoint in the same az", func() {
-						chosen := iter.Next(1)
-						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
-						Expect(chosen).To(Equal(localAZEndpointOne))
-					})
+					DescribeTable("it when the pool has one endpoint in the same AZ as the router",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+							chosen := iter.Next(1)
+							Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+							Expect(chosen).To(Equal(localAZEndpointOne))
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+						Entry("When the next index is 2", 2),
+						Entry("When the next index is 3", 3),
+					)
 
 					Context("and it is overloaded", func() {
 						BeforeEach(func() {
@@ -316,11 +403,19 @@ var _ = Describe("RoundRobin", func() {
 							localAZEndpointOne.Stats.NumberConnections.Increment()
 						})
 
-						It("selects the next non-overloaded endpoint in a different az", func() {
-							chosen := iter.Next(1)
-							Expect(chosen).ToNot(BeNil())
-							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
-						})
+						DescribeTable("it selects the next non-overloaded endpoint in a different az",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+								chosen := iter.Next(1)
+								Expect(chosen).ToNot(BeNil())
+								Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+							Entry("When the next index is 2", 2),
+							Entry("When the next index is 3", 3),
+						)
 					})
 				})
 
@@ -335,26 +430,11 @@ var _ = Describe("RoundRobin", func() {
 						pool.Put(localAZEndpointThree)
 					})
 
-					It("selects the next endpoint in the same AZ", func() {
-						okRandoms := []string{
-							"10.0.1.3:60000",
-							"10.0.1.4:60000",
-							"10.0.1.5:60000",
-						}
-
-						chosen := iter.Next(1)
-						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
-						Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
-					})
-
-					Context("and one is overloaded but the other is not overloaded", func() {
-						BeforeEach(func() {
-							localAZEndpointOne.Stats.NumberConnections.Increment()
-							localAZEndpointOne.Stats.NumberConnections.Increment() // overloaded
-						})
-
-						It("selects the local endpoint that is not overloaded", func() {
+					DescribeTable("it selects the next endpoint in the same AZ",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
 							okRandoms := []string{
+								"10.0.1.3:60000",
 								"10.0.1.4:60000",
 								"10.0.1.5:60000",
 							}
@@ -362,7 +442,42 @@ var _ = Describe("RoundRobin", func() {
 							chosen := iter.Next(1)
 							Expect(chosen.AvailabilityZone).To(Equal(localAZ))
 							Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+						Entry("When the next index is 2", 2),
+						Entry("When the next index is 3", 3),
+						Entry("When the next index is 4", 4),
+						Entry("When the next index is 5", 5),
+					)
+
+					Context("and one is overloaded but the other is not overloaded", func() {
+						BeforeEach(func() {
+							localAZEndpointOne.Stats.NumberConnections.Increment()
+							localAZEndpointOne.Stats.NumberConnections.Increment() // overloaded
 						})
+
+						DescribeTable("it selects the local endpoint that is not overloaded",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+								okRandoms := []string{
+									"10.0.1.4:60000",
+									"10.0.1.5:60000",
+								}
+
+								chosen := iter.Next(1)
+								Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+								Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+							Entry("When the next index is 2", 2),
+							Entry("When the next index is 3", 3),
+							Entry("When the next index is 4", 4),
+							Entry("When the next index is 5", 5),
+						)
 					})
 				})
 
@@ -371,12 +486,17 @@ var _ = Describe("RoundRobin", func() {
 						pool.Put(otherAZEndpointOne)
 					})
 
-					It("selects a non-local endpoint", func() {
-						chosen := iter.Next(1)
-						Expect(chosen).ToNot(BeNil())
-						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
-						Expect(chosen).To(Equal(otherAZEndpointOne))
-					})
+					DescribeTable("it selects a non-local endpoint",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+							chosen := iter.Next(1)
+							Expect(chosen).ToNot(BeNil())
+							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+							Expect(chosen).To(Equal(otherAZEndpointOne))
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+					)
 				})
 
 				Context("when the pool has multiple endpoints, none in the same AZ as the router", func() {
@@ -386,11 +506,18 @@ var _ = Describe("RoundRobin", func() {
 						pool.Put(otherAZEndpointThree)
 					})
 
-					It("selects a non-local endpoint", func() {
-						chosen := iter.Next(1)
-						Expect(chosen).ToNot(BeNil())
-						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
-					})
+					DescribeTable("it selects a non-local endpoint",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+							chosen := iter.Next(1)
+							Expect(chosen).ToNot(BeNil())
+							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+						Entry("When the next index is 2", 2),
+					)
 				})
 			})
 
@@ -403,122 +530,139 @@ var _ = Describe("RoundRobin", func() {
 				})
 
 				Context("when the pool has some endpoints in the same AZ as the router", func() {
-					BeforeEach(func() {
-						otherAZEndpointOne.Stats.NumberConnections.Increment()
-						pool.Put(otherAZEndpointOne) // 1 connection
+					DescribeTable("it selects a non-local endpoint",
+						func(nextIdx int) {
+							pool.NextIdx = nextIdx
+							endpoints := []*route.Endpoint{
+								otherAZEndpointOne, otherAZEndpointTwo, otherAZEndpointThree,
+								localAZEndpointOne, localAZEndpointTwo, localAZEndpointThree,
+							}
 
-						pool.Put(otherAZEndpointTwo)   // 0 connections
-						pool.Put(otherAZEndpointThree) // 0 connections
+							for _, e := range endpoints {
+								pool.Put(e)
+							}
 
-						localAZEndpointOne.Stats.NumberConnections.Increment()
-						pool.Put(localAZEndpointOne) // 1 connection
-					})
+							counts := make([]int, len(endpoints))
 
-					It("performs round-robin through the endpoints regardless of AZ", func() {
-						endpoints := []*route.Endpoint{
-							otherAZEndpointOne, otherAZEndpointTwo, otherAZEndpointThree,
-							localAZEndpointOne, localAZEndpointTwo, localAZEndpointThree,
-						}
+							iter := route.NewRoundRobin(pool, "", true, localAZ)
 
-						for _, e := range endpoints {
-							pool.Put(e)
-						}
-
-						counts := make([]int, len(endpoints))
-
-						iter := route.NewRoundRobin(pool, "", true, localAZ)
-
-						loops := 50
-						for i := 0; i < len(endpoints)*loops; i += 1 {
-							n := iter.Next(attempt)
-							for j, e := range endpoints {
-								if e == n {
-									counts[j]++
-									break
+							loops := 50
+							for i := 0; i < len(endpoints)*loops; i += 1 {
+								n := iter.Next(attempt)
+								for j, e := range endpoints {
+									if e == n {
+										counts[j]++
+										break
+									}
 								}
 							}
-						}
 
-						for i := 0; i < len(endpoints); i++ {
-							Expect(counts[i]).To(Equal(loops))
-						}
-					})
+							for i := 0; i < len(endpoints); i++ {
+								Expect(counts[i]).To(Equal(loops))
+							}
+						},
+						Entry("When the next index is -1", -1),
+						Entry("When the next index is 0", 0),
+						Entry("When the next index is 1", 1),
+						Entry("When the next index is 2", 2),
+						Entry("When the next index is 3", 3),
+						Entry("When the next index is 4", 4),
+						Entry("When the next index is 5", 5),
+					)
 				})
 			})
 		})
 	})
 
 	Describe("Failed", func() {
-		It("skips failed endpoints", func() {
-			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
-			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
+		DescribeTable("it skips failed endpoints",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
 
-			pool.Put(e1)
-			pool.Put(e2)
+				pool.Put(e1)
+				pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "", false, "meow-az")
-			n := iter.Next(1)
-			Expect(n).ToNot(BeNil())
+				iter := route.NewRoundRobin(pool, "", false, "meow-az")
+				n := iter.Next(1)
+				Expect(n).ToNot(BeNil())
 
-			iter.EndpointFailed(&net.OpError{Op: "dial"})
+				iter.EndpointFailed(&net.OpError{Op: "dial"})
 
-			nn1 := iter.Next(2)
-			nn2 := iter.Next(3)
-			Expect(nn1).ToNot(BeNil())
-			Expect(nn2).ToNot(BeNil())
-			Expect(nn1).ToNot(Equal(n))
-			Expect(nn1).To(Equal(nn2))
-		})
+				nn1 := iter.Next(2)
+				nn2 := iter.Next(3)
+				Expect(nn1).ToNot(BeNil())
+				Expect(nn2).ToNot(BeNil())
+				Expect(nn1).ToNot(Equal(n))
+				Expect(nn1).To(Equal(nn2))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
 
-		It("resets when all endpoints are failed", func() {
-			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
-			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
-			pool.Put(e1)
-			pool.Put(e2)
+		DescribeTable("it resets when all endpoints are failed",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
+				pool.Put(e1)
+				pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "", false, "meow-az")
-			n1 := iter.Next(1)
-			iter.EndpointFailed(&net.OpError{Op: "dial"})
-			n2 := iter.Next(2)
-			iter.EndpointFailed(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})
-			Expect(n1).ToNot(Equal(n2))
+				iter := route.NewRoundRobin(pool, "", false, "meow-az")
+				n1 := iter.Next(1)
+				iter.EndpointFailed(&net.OpError{Op: "dial"})
+				n2 := iter.Next(2)
+				iter.EndpointFailed(&net.OpError{Op: "remote error", Err: errors.New("tls: bad certificate")})
+				Expect(n1).ToNot(Equal(n2))
 
-			n1 = iter.Next(3)
-			n2 = iter.Next(4)
-			Expect(n1).ToNot(Equal(n2))
-		})
+				n1 = iter.Next(3)
+				n2 = iter.Next(4)
+				Expect(n1).ToNot(Equal(n2))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
 
-		It("resets failed endpoints after exceeding failure duration", func() {
-			pool = route.NewPool(&route.PoolOpts{
-				Logger:             test_util.NewTestZapLogger("test"),
-				RetryAfterFailure:  50 * time.Millisecond,
-				Host:               "",
-				ContextPath:        "",
-				MaxConnsPerBackend: 0,
-			})
+		DescribeTable("it resets failed endpoints after exceeding failure duration",
+			func(nextIdx int) {
+				pool = route.NewPool(&route.PoolOpts{
+					Logger:             test_util.NewTestZapLogger("test"),
+					RetryAfterFailure:  50 * time.Millisecond,
+					Host:               "",
+					ContextPath:        "",
+					MaxConnsPerBackend: 0,
+				})
+				pool.NextIdx = nextIdx
 
-			e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
-			e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
-			pool.Put(e1)
-			pool.Put(e2)
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 5678})
+				pool.Put(e1)
+				pool.Put(e2)
 
-			iter := route.NewRoundRobin(pool, "", false, "meow-az")
-			n1 := iter.Next(1)
-			n2 := iter.Next(2)
-			Expect(n1).ToNot(Equal(n2))
+				iter := route.NewRoundRobin(pool, "", false, "meow-az")
+				n1 := iter.Next(1)
+				n2 := iter.Next(2)
+				Expect(n1).ToNot(Equal(n2))
 
-			iter.EndpointFailed(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})
+				iter.EndpointFailed(&net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")})
 
-			n1 = iter.Next(3)
-			n2 = iter.Next(4)
-			Expect(n1).To(Equal(n2))
+				n1 = iter.Next(3)
+				n2 = iter.Next(4)
+				Expect(n1).To(Equal(n2))
 
-			time.Sleep(50 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 
-			n1 = iter.Next(5)
-			n2 = iter.Next(6)
-			Expect(n1).ToNot(Equal(n2))
-		})
+				n1 = iter.Next(5)
+				n2 = iter.Next(6)
+				Expect(n1).ToNot(Equal(n2))
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
 	})
 
 	Context("PreRequest", func() {

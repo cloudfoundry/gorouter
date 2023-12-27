@@ -63,13 +63,13 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 		return nil
 	}
 
-	if r.pool.nextIdx == -1 {
-		r.pool.nextIdx = r.pool.random.Intn(last)
-	} else if r.pool.nextIdx >= last {
-		r.pool.nextIdx = 0
+	if r.pool.NextIdx == -1 {
+		r.pool.NextIdx = r.pool.random.Intn(last)
+	} else if r.pool.NextIdx >= last {
+		r.pool.NextIdx = 0
 	}
 
-	startIdx := r.pool.nextIdx
+	startIdx := r.pool.NextIdx
 	curIdx := startIdx
 
 	var curIsLocal bool
@@ -104,7 +104,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 		if (localDesired && curIsLocal) || !localDesired {
 			if e.failedAt == nil {
-				r.pool.nextIdx = curIdx
+				r.pool.NextIdx = curIdx
 				return e
 			}
 		}

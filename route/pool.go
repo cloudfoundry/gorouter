@@ -150,7 +150,7 @@ type EndpointPool struct {
 	RouteSvcUrl string
 
 	retryAfterFailure  time.Duration
-	nextIdx            int
+	NextIdx            int
 	maxConnsPerBackend int64
 
 	random    *rand.Rand
@@ -213,7 +213,7 @@ func NewPool(opts *PoolOpts) *EndpointPool {
 		endpoints:          make([]*endpointElem, 0, 1),
 		index:              make(map[string]*endpointElem),
 		retryAfterFailure:  opts.RetryAfterFailure,
-		nextIdx:            -1,
+		NextIdx:            -1,
 		maxConnsPerBackend: opts.MaxConnsPerBackend,
 		host:               opts.Host,
 		contextPath:        opts.ContextPath,
