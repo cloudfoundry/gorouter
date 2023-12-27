@@ -29,7 +29,7 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	endpoints := make([]*route.Endpoint, 0)
 	for i := 0; i < total; i++ {
 		ip := fmt.Sprintf("10.0.1.%d", i)
-		e := route.NewEndpoint(&route.EndpointOpts{Host: ip})
+		e := route.NewEndpoint(&route.EndpointOpts{Host: ip, AvailabilityZone: fmt.Sprintf("az-%d", i)})
 		endpoints = append(endpoints, e)
 		pool.Put(e)
 	}
@@ -38,8 +38,12 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	switch strategy {
 	case "round-robin":
 		lb = route.NewRoundRobin(pool, "", false, "meow-az")
+	case "round-robin-locally-optimistic":
+		lb = route.NewRoundRobin(pool, "", true, "az-1")
 	case "least-connection":
 		lb = route.NewLeastConnection(pool, "", false, "meow-az")
+	case "least-connection-locally-optimistic":
+		lb = route.NewLeastConnection(pool, "", true, "az-2")
 	default:
 		panic("invalid load balancing strategy")
 	}
@@ -49,10 +53,18 @@ func loadBalanceFor(strategy string, b *testing.B) {
 	}
 }
 
+func BenchmarkLeastConnectionLocallyOptimistic(b *testing.B) {
+	loadBalanceFor("least-connection-locally-optimistic", b)
+}
+
 func BenchmarkLeastConnection(b *testing.B) {
 	loadBalanceFor("least-connection", b)
 }
 
 func BenchmarkRoundRobin(b *testing.B) {
 	loadBalanceFor("round-robin", b)
+}
+
+func BenchmarkRoundRobinLocallyOptimistic(b *testing.B) {
+	loadBalanceFor("round-robin-locally-optimistic", b)
 }
