@@ -64,7 +64,7 @@ var _ = Describe("GDPR", func() {
 		It("omits x-forwarded-for from stdout", func() {
 			testState.cfg.Status.Pass = "pass"
 			testState.cfg.Status.User = "user"
-			testState.cfg.Status.Port = 6705
+			testState.cfg.Status.Routes.Port = 6705
 			testState.cfg.Logging.DisableLogForwardedFor = true
 			testState.StartGorouterOrFail()
 
@@ -73,7 +73,7 @@ var _ = Describe("GDPR", func() {
 			wsApp.Listen()
 			wsApp.WaitUntilReady()
 
-			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
 
@@ -130,7 +130,7 @@ var _ = Describe("GDPR", func() {
 		It("omits RemoteAddr from stdout", func() {
 			testState.cfg.Status.Pass = "pass"
 			testState.cfg.Status.User = "user"
-			testState.cfg.Status.Port = 6706
+			testState.cfg.Status.Routes.Port = 6706
 			testState.cfg.Logging.DisableLogSourceIP = true
 			testState.StartGorouterOrFail()
 
@@ -139,7 +139,7 @@ var _ = Describe("GDPR", func() {
 			wsApp.Listen()
 			wsApp.WaitUntilReady()
 
-			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
 

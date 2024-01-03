@@ -248,7 +248,7 @@ func (s *testState) registerAndWait(rm mbus.RegistryMessage) {
 	b, _ := json.Marshal(rm)
 	s.mbusClient.Publish("router.register", b)
 
-	routesUri := fmt.Sprintf("http://%s:%s@127.0.0.1:%d/routes", s.cfg.Status.User, s.cfg.Status.Pass, s.cfg.Status.Port)
+	routesUri := fmt.Sprintf("http://%s:%s@127.0.0.1:%d/routes", s.cfg.Status.User, s.cfg.Status.Pass, s.cfg.Status.Routes.Port)
 	Eventually(func() (bool, error) {
 		return routeExists(routesUri, string(rm.Uris[0]))
 	}).Should(BeTrue())

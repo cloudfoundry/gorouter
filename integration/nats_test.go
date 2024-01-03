@@ -12,7 +12,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/localip"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +39,7 @@ var _ = Describe("NATS Integration", func() {
 
 		statusPort = test_util.NextAvailPort()
 		statusTLSPort = test_util.NextAvailPort()
+		statusRoutesPort = test_util.NextAvailPort()
 		proxyPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
 
@@ -86,7 +86,7 @@ var _ = Describe("NATS Integration", func() {
 		runningApp.Register()
 		runningApp.Listen()
 
-		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", tempCfg.Status.User, tempCfg.Status.Pass, localIP, statusPort)
+		routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", tempCfg.Status.User, tempCfg.Status.Pass, "localhost", statusRoutesPort)
 
 		Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
 		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
@@ -179,9 +179,6 @@ var _ = Describe("NATS Integration", func() {
 		})
 
 		It("fails over to second nats server before pruning", func() {
-			localIP, err := localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
 			mbusClient, err := newMessageBus(cfg)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -189,7 +186,7 @@ var _ = Describe("NATS Integration", func() {
 			runningApp.Register()
 			runningApp.Listen()
 
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, "localhost", statusRoutesPort)
 
 			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
@@ -238,9 +235,6 @@ var _ = Describe("NATS Integration", func() {
 			})
 
 			It("does not prune routes when nats is unavailable", func() {
-				localIP, err := localip.LocalIP()
-				Expect(err).ToNot(HaveOccurred())
-
 				mbusClient, err := newMessageBus(cfg)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -248,7 +242,7 @@ var _ = Describe("NATS Integration", func() {
 				runningApp.Register()
 				runningApp.Listen()
 
-				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusPort)
+				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, "localhost", statusRoutesPort)
 
 				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
