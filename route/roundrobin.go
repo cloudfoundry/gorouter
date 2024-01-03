@@ -84,13 +84,19 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 		if e.isOverloaded() {
 
+			// We've checked every endpoint in the pool
 			if curIdx == startIdx {
 				if localDesired {
+					// Search the pool again without the localDesired constraint
 					localDesired = false
 					continue
 				}
+
+				// No endpoints are available
 				return nil
 			}
+
+			// Move on to the next endpoint in the pool
 			continue
 		}
 
