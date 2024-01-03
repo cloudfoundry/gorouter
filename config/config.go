@@ -73,13 +73,14 @@ func (ss StringSet) MarshalYAML() (interface{}, error) {
 }
 
 type StatusConfig struct {
-	Host    string             `yaml:"host"`
-	Port    uint16             `yaml:"port"`
-	TLSCert tls.Certificate    `yaml:"-"`
-	TLS     StatusTLSConfig    `yaml:"tls"`
-	User    string             `yaml:"user"`
-	Pass    string             `yaml:"pass"`
-	Routes  StatusRoutesConfig `yaml:"routes"`
+	Host                     string             `yaml:"host"`
+	Port                     uint16             `yaml:"port"`
+	EnableNonTLSHealthChecks bool               `yaml:"enable_nontls_health_checks"`
+	TLSCert                  tls.Certificate    `yaml:"-"`
+	TLS                      StatusTLSConfig    `yaml:"tls"`
+	User                     string             `yaml:"user"`
+	Pass                     string             `yaml:"pass"`
+	Routes                   StatusRoutesConfig `yaml:"routes"`
 }
 
 type StatusTLSConfig struct {
@@ -93,10 +94,14 @@ type StatusRoutesConfig struct {
 }
 
 var defaultStatusConfig = StatusConfig{
-	Host: "0.0.0.0",
-	Port: 8080,
-	User: "",
-	Pass: "",
+	Host:                     "0.0.0.0",
+	Port:                     8080,
+	User:                     "",
+	Pass:                     "",
+	EnableNonTLSHealthChecks: true,
+	TLS: StatusTLSConfig{
+		Port: 8443,
+	},
 	Routes: StatusRoutesConfig{
 		Port: 8082,
 	},
@@ -615,24 +620,20 @@ func (c *Config) Process() error {
 	}
 
 	healthTLS := c.Status.TLS
-	if healthTLS.Port != 0 {
-		if healthTLS.Key == "" {
-			return fmt.Errorf("If router.status.tls.port is specified, key must be provided")
-		}
-		if healthTLS.Certificate == "" {
-			return fmt.Errorf("If router.status.tls.port is specified, certificate must be provided")
-		}
+	if healthTLS.Key == "" {
+		return fmt.Errorf("router.status.tls.key must be provided")
 	}
-	if healthTLS.Key != "" && healthTLS.Certificate != "" {
-		if healthTLS.Port == 0 {
-			return fmt.Errorf("If router.status.tls.certificate/key are specified, port must not be 0")
-		}
-		certificate, err := tls.X509KeyPair([]byte(healthTLS.Certificate), []byte(healthTLS.Key))
-		if err != nil {
-			return fmt.Errorf("Error loading router.status TLS key pair: %s", err.Error())
-		}
-		c.Status.TLSCert = certificate
+	if healthTLS.Certificate == "" {
+		return fmt.Errorf("router.status.tls.certificate must be provided")
 	}
+	if healthTLS.Port == 0 {
+		return fmt.Errorf("router.status.tls.port must not be 0")
+	}
+	certificate, err := tls.X509KeyPair([]byte(healthTLS.Certificate), []byte(healthTLS.Key))
+	if err != nil {
+		return fmt.Errorf("Error loading router.status.tls certificate/key pair: %s", err.Error())
+	}
+	c.Status.TLSCert = certificate
 
 	if c.EnableSSL {
 		switch c.ClientCertificateValidationString {

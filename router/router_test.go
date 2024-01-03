@@ -72,6 +72,7 @@ var _ = Describe("Router", func() {
 		router              *Router
 		logger              logger.Logger
 		statusPort          uint16
+		statusTLSPort       uint16
 		statusRoutesPort    uint16
 		natsPort            uint16
 		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
@@ -84,9 +85,10 @@ var _ = Describe("Router", func() {
 	BeforeEach(func() {
 		proxyPort := test_util.NextAvailPort()
 		statusPort = test_util.NextAvailPort()
+		statusTLSPort = test_util.NextAvailPort()
 		statusRoutesPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
-		config = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
+		config = test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPort)
 		backendIdleTimeout = config.EndpointTimeout
 		requestTimeout = config.EndpointTimeout
 		config.EnableSSL = true
@@ -157,9 +159,10 @@ var _ = Describe("Router", func() {
 				natsPort := test_util.NextAvailPort()
 				proxyPort := test_util.NextAvailPort()
 				statusPort = test_util.NextAvailPort()
+				statusTLSPort = test_util.NextAvailPort()
 				statusRoutesPort = test_util.NextAvailPort()
 
-				c := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
+				c := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
 				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
@@ -178,9 +181,10 @@ var _ = Describe("Router", func() {
 				natsPort := test_util.NextAvailPort()
 				proxyPort := test_util.NextAvailPort()
 				statusPort = test_util.NextAvailPort()
+				statusTLSPort = test_util.NextAvailPort()
 				statusRoutesPort = test_util.NextAvailPort()
 
-				c := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
+				c := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
 				rss := &sharedfakes.RouteServicesServer{}
@@ -207,36 +211,46 @@ var _ = Describe("Router", func() {
 			c   *cfg.Config
 			err error
 		)
+		BeforeEach(func() {
+			natsPort := test_util.NextAvailPort()
+			proxyPort := test_util.NextAvailPort()
+			statusPort = test_util.NextAvailPort()
+			statusTLSPort = test_util.NextAvailPort()
+			statusRoutesPort = test_util.NextAvailPort()
+			c = test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPort)
+			c.StartResponseDelayInterval = 1 * time.Second
+		})
 
-		Context("and tls is disabled", func() {
+		testHealthCheckEndpoint := func(endpoint string) (int, error) {
+			url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
+			req, _ := http.NewRequest("GET", url, nil)
+
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := http.Client{Transport: tr}
+			resp, err := client.Do(req)
+			if err != nil {
+				return 0, err
+			}
+			defer resp.Body.Close()
+			return resp.StatusCode, nil
+		}
+
+		Context("and nontls is ensabled", func() {
 			It("does not immediately make the health check endpoint available", func() {
-				natsPort := test_util.NextAvailPort()
-				proxyPort := test_util.NextAvailPort()
-				statusPort = test_util.NextAvailPort()
-				statusRoutesPort = test_util.NextAvailPort()
-				c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
-				c.StartResponseDelayInterval = 1 * time.Second
-
 				// Create a second router to test the health check in parallel to startup
 				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
 
 				Expect(err).ToNot(HaveOccurred())
-				healthCheckWithEndpointReceives := func() int {
-					url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
-					req, _ := http.NewRequest("GET", url, nil)
-
-					client := http.Client{}
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					defer resp.Body.Close()
-					return resp.StatusCode
-				}
 				signals := make(chan os.Signal)
 				readyChan := make(chan struct{})
 				go rtr.Run(signals, readyChan)
 
 				Consistently(func() int {
-					return healthCheckWithEndpointReceives()
+					code, err := testHealthCheckEndpoint(fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port))
+					Expect(err).ToNot(HaveOccurred())
+					return code
 				}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
 				signals <- syscall.SIGUSR1
 			})
@@ -245,17 +259,30 @@ var _ = Describe("Router", func() {
 				Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
 			})
 		})
-
-		Context("and tls is enabled", func() {
+		Context("and nontls is disabled", func() {
 			BeforeEach(func() {
-				natsPort := test_util.NextAvailPort()
-				proxyPort := test_util.NextAvailPort()
-				statusPort = test_util.NextAvailPort()
-				statusRoutesPort = test_util.NextAvailPort()
-				c = test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPort)
-				c.Status.TLS.Port = test_util.NextAvailPort()
+				c.Status.EnableNonTLSHealthChecks = false
+			})
+			It("never listen on the nontls status port", func() {
+				// Create a second router to test the health check in parallel to startup
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+
+				Expect(err).ToNot(HaveOccurred())
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+				go rtr.Run(signals, readyChan)
+
+				Consistently(func() error {
+					_, err := testHealthCheckEndpoint(fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port))
+					return err
+				}, 500*time.Millisecond).Should(MatchError(ContainSubstring("connection refused")))
+				signals <- syscall.SIGUSR1
+			})
+		})
+
+		Context("tls is always enabled", func() {
+			BeforeEach(func() {
 				c.Status.TLSCert = test_util.CreateCert("somestring")
-				c.StartResponseDelayInterval = 1 * time.Second
 			})
 
 			It("does not immediately make the health check endpoint available", func() {
@@ -263,25 +290,14 @@ var _ = Describe("Router", func() {
 				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
 
 				Expect(err).ToNot(HaveOccurred())
-				healthCheckWithEndpointReceives := func() int {
-					url := fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port)
-					req, _ := http.NewRequest("GET", url, nil)
-
-					tr := &http.Transport{
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					}
-					client := http.Client{Transport: tr}
-					resp, err := client.Do(req)
-					Expect(err).ToNot(HaveOccurred())
-					defer resp.Body.Close()
-					return resp.StatusCode
-				}
 				signals := make(chan os.Signal)
 				readyChan := make(chan struct{})
 				go rtr.Run(signals, readyChan)
 
 				Consistently(func() int {
-					return healthCheckWithEndpointReceives()
+					code, err := testHealthCheckEndpoint(fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port))
+					Expect(err).ToNot(HaveOccurred())
+					return code
 				}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
 				signals <- syscall.SIGUSR1
 			})
@@ -294,31 +310,11 @@ var _ = Describe("Router", func() {
 				BeforeEach(func() {
 					c.Status.TLSCert = tls.Certificate{}
 				})
-				It("doesn't listen on the tls status port", func() {
+				It("returns an error, and the router cannot be started", func() {
 					// Create a second router to test the health check in parallel to startup
 					rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
-
-					Expect(err).ToNot(HaveOccurred())
-					healthCheckWithEndpointReceives := func() error {
-						url := fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port)
-						req, _ := http.NewRequest("GET", url, nil)
-
-						tr := &http.Transport{
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-						}
-						client := http.Client{Transport: tr}
-						_, err := client.Do(req)
-						return err
-					}
-					signals := make(chan os.Signal)
-					readyChan := make(chan struct{})
-					go rtr.Run(signals, readyChan)
-
-					Consistently(func() error {
-						return healthCheckWithEndpointReceives()
-					}, 500*time.Millisecond).Should(MatchError(ContainSubstring("connection refused")))
-					signals <- syscall.SIGUSR1
-
+					Expect(err).To(HaveOccurred())
+					Expect(rtr).To(BeNil())
 				})
 			})
 		})

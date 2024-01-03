@@ -22,8 +22,8 @@ const defaultPruneInterval = 50 * time.Millisecond
 const defaultPruneThreshold = 100 * time.Millisecond
 const localIP = "127.0.0.1"
 
-func createConfig(statusPort, statusRoutesPort, proxyPort uint16, cfgFile string, pruneInterval time.Duration, pruneThreshold time.Duration, drainWait int, suspendPruning bool, maxBackendConns int64, natsPorts ...uint16) *config.Config {
-	tempCfg := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
+func createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, cfgFile string, pruneInterval time.Duration, pruneThreshold time.Duration, drainWait int, suspendPruning bool, maxBackendConns int64, natsPorts ...uint16) *config.Config {
+	tempCfg := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
@@ -89,22 +89,22 @@ func stopGorouter(gorouterSession *Session) {
 	Eventually(gorouterSession, 5).Should(Exit(0))
 }
 
-func createCustomSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusRoutesPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	tempCfg, clientTLSConfig := test_util.CustomSpecSSLConfig(onlyTrustClientCACerts, TLSClientConfigOption, statusPort, statusRoutesPort, proxyPort, sslPort, natsPorts...)
+func createCustomSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	tempCfg, clientTLSConfig := test_util.CustomSpecSSLConfig(onlyTrustClientCACerts, TLSClientConfigOption, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPorts...)
 
 	configDrainSetup(tempCfg, defaultPruneInterval, defaultPruneThreshold, 0)
 	return tempCfg, clientTLSConfig
 }
 
-func createSSLConfig(statusPort, statusRoutesPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	tempCfg, clientTLSConfig := test_util.SpecSSLConfig(statusPort, statusRoutesPort, proxyPort, sslPort, natsPorts...)
+func createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	tempCfg, clientTLSConfig := test_util.SpecSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPorts...)
 
 	configDrainSetup(tempCfg, defaultPruneInterval, defaultPruneThreshold, 0)
 	return tempCfg, clientTLSConfig
 }
 
-func createIsoSegConfig(statusPort, statusRoutesPort, proxyPort uint16, cfgFile string, pruneInterval, pruneThreshold time.Duration, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
-	tempCfg := test_util.SpecConfig(statusPort, statusRoutesPort, proxyPort, natsPorts...)
+func createIsoSegConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, cfgFile string, pruneInterval, pruneThreshold time.Duration, drainWait int, suspendPruning bool, isoSegs []string, natsPorts ...uint16) *config.Config {
+	tempCfg := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
 
 	configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 

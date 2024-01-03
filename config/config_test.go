@@ -18,13 +18,20 @@ import (
 )
 
 var _ = Describe("Config", func() {
-	var config *Config
+	var config, cfgForSnippet *Config
 
 	BeforeEach(func() {
 		var err error
 		config, err = DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
+		cfgForSnippet = baseConfigFixture()
 	})
+
+	createYMLSnippet := func(snippet *Config) []byte {
+		cfgBytes, err := yaml.Marshal(snippet)
+		Expect(err).ToNot(HaveOccurred())
+		return cfgBytes
+	}
 
 	Describe("Initialize", func() {
 
@@ -60,10 +67,8 @@ balancing_algorithm: least-connection
 			It("does not allow an invalid load balance strategy", func() {
 				cfg, err := DefaultConfig()
 				Expect(err).ToNot(HaveOccurred())
-				var b = []byte(`
-balancing_algorithm: foo-bar
-`)
-				cfg.Initialize(b)
+				cfgForSnippet.LoadBalance = "foo-bar"
+				cfg.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(cfg.Process()).To(MatchError("Invalid load balancing algorithm foo-bar. Allowed values are [round-robin least-connection]"))
 			})
 		})
@@ -115,32 +120,21 @@ status:
 			Expect(config.Status.Routes.Port).To(Equal(uint16(8082)))
 		})
 		Context("when tls is specified for the status config", func() {
-			var cfgBytes, certPEM, keyPEM []byte
+			var certPEM, keyPEM []byte
 			var tlsPort uint16
-
-			createYMLSnippet := func(snippet *Config) []byte {
-				cfgBytes, err := yaml.Marshal(snippet)
-				Expect(err).ToNot(HaveOccurred())
-				return cfgBytes
-			}
 
 			BeforeEach(func() {
 				keyPEM, certPEM = test_util.CreateKeyPair("default")
 				tlsPort = 8443
 			})
 			JustBeforeEach(func() {
-				cfgSnippet := &Config{
-					Status: StatusConfig{
-						TLS: StatusTLSConfig{
-							Port:        tlsPort,
-							Certificate: string(certPEM),
-							Key:         string(keyPEM),
-						},
-					},
+				cfgForSnippet.Status.TLS = StatusTLSConfig{
+					Port:        tlsPort,
+					Certificate: string(certPEM),
+					Key:         string(keyPEM),
 				}
-				cfgBytes = createYMLSnippet(cfgSnippet)
 
-				err := config.Initialize(cfgBytes)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("parses the cert + key", func() {
@@ -162,7 +156,7 @@ status:
 				It("throws an error", func() {
 					err := config.Process()
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(ContainSubstring("Error loading router.status TLS key pair")))
+					Expect(err).To(MatchError(ContainSubstring("Error loading router.status.tls certificate/key pair")))
 				})
 			})
 			Context("and the key is invalid", func() {
@@ -172,7 +166,7 @@ status:
 				It("throws an error", func() {
 					err := config.Process()
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(ContainSubstring("Error loading router.status TLS key pair")))
+					Expect(err).To(MatchError(ContainSubstring("Error loading router.status.tls certificate/key pair")))
 				})
 			})
 			Context("and the cert is missing", func() {
@@ -182,7 +176,7 @@ status:
 				It("throws an error", func() {
 					err := config.Process()
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.port is specified, certificate must be provided")))
+					Expect(err).To(MatchError(ContainSubstring("router.status.tls.certificate must be provided")))
 				})
 			})
 			Context("and the key is missing", func() {
@@ -192,19 +186,8 @@ status:
 				It("throws an error", func() {
 					err := config.Process()
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.port is specified, key must be provided")))
+					Expect(err).To(MatchError(ContainSubstring("router.status.tls.key must be provided")))
 				})
-			})
-			Context("and the port is missing", func() {
-				BeforeEach(func() {
-					tlsPort = 0
-				})
-				It("throws an error", func() {
-					err := config.Process()
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(ContainSubstring("If router.status.tls.certificate/key are specified, port must not be 0")))
-				})
-
 			})
 		})
 		It("sets MaxHeaderBytes", func() {
@@ -285,10 +268,10 @@ websocket_dial_timeout: 6s
 		})
 
 		It("defaults websocket dial timeout to endpoint dial timeout if not set", func() {
-			var b = []byte(`
+			b := createYMLSnippet(cfgForSnippet)
+			b = append(b, []byte(`
 endpoint_dial_timeout: 6s
-`)
-
+`)...)
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -365,6 +348,13 @@ nats:
 							TLSPem: TLSPem{
 								CertChain:  string(clientCertPEM),
 								PrivateKey: string(clientKeyPEM),
+							},
+						},
+						Status: StatusConfig{
+							TLS: StatusTLSConfig{
+								Port:        8443,
+								Certificate: string(clientCertPEM),
+								Key:         string(clientKeyPEM),
 							},
 						},
 					}
@@ -544,6 +534,13 @@ routing_table_sharding_mode: "segments"
 								PrivateKey: string(certChain.PrivKeyPEM),
 							},
 							CACerts: string(certChain.CACertPEM),
+						},
+						Status: StatusConfig{
+							TLS: StatusTLSConfig{
+								Port:        8443,
+								Certificate: string(certChain.CertPEM),
+								Key:         string(certChain.PrivKeyPEM),
+							},
 						},
 					}
 				})
@@ -912,7 +909,8 @@ backends:
 
 	Describe("Process", func() {
 		It("converts intervals to durations", func() {
-			var b = []byte(`
+			b := createYMLSnippet(cfgForSnippet)
+			b = append(b, []byte(`
 publish_start_message_interval: 1s
 prune_stale_droplets_interval: 2s
 droplet_stale_threshold: 30s
@@ -920,7 +918,7 @@ publish_active_apps_interval: 4s
 start_response_delay_interval: 15s
 secure_cookies: true
 token_fetcher_retry_interval: 10s
-`)
+`)...)
 
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
@@ -938,8 +936,14 @@ token_fetcher_retry_interval: 10s
 		})
 
 		Context("When LoadBalancerHealthyThreshold is provided", func() {
+			var b []byte
+			BeforeEach(func() {
+				b = createYMLSnippet(cfgForSnippet)
+			})
 			It("returns a meaningful error when an invalid duration string is given", func() {
-				var b = []byte("load_balancer_healthy_threshold: -5s")
+				b = append(b, []byte(`
+load_balancer_healthy_threshold: -5s
+`)...)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -947,26 +951,25 @@ token_fetcher_retry_interval: 10s
 			})
 
 			It("fails to initialize a non time string", func() {
-				var b = []byte("load_balancer_healthy_threshold: test")
+				b = append(b, []byte(`
+load_balancer_healthy_threshold: test
+`)...)
+
 				Expect(config.Initialize(b)).To(MatchError(ContainSubstring("cannot unmarshal")))
 			})
 
 			It("process the string into a valid duration", func() {
-				var b = []byte("load_balancer_healthy_threshold: 10s")
+				b = append(b, []byte(`
+load_balancer_healthy_threshold: 10s
+`)...)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
 		It("converts extra headers to log into a map", func() {
-			var b = []byte(`
-extra_headers_to_log:
-  - x-b3-trace-id
-  - something
-  - something
-`)
-
-			err := config.Initialize(b)
+			cfgForSnippet.ExtraHeadersToLog = []string{"x-b3-trace-id", "something", "something"}
+			err := config.Initialize(createYMLSnippet(cfgForSnippet))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(config.Process()).To(Succeed())
 
@@ -975,14 +978,12 @@ extra_headers_to_log:
 		})
 
 		Describe("StickySessionCookieNames", func() {
+			BeforeEach(func() {
+				cfgForSnippet.StickySessionCookieNames = StringSet{"someName": struct{}{}, "anotherName": struct{}{}}
+			})
 			It("converts the provided list to a set of StickySessionCookieNames", func() {
-				var b = []byte(`
-sticky_session_cookie_names:
-  - someName
-  - anotherName
-`)
 
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(config.Process()).To(Succeed())
 
@@ -992,12 +993,12 @@ sticky_session_cookie_names:
 		})
 
 		Context("When secure cookies is set to false", func() {
+			BeforeEach(func() {
+				cfgForSnippet.SecureCookies = false
+			})
 			It("set DropletStaleThreshold equal to StartResponseDelayInterval", func() {
-				var b = []byte(`
-secure_cookies: false
-`)
 
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(config.Process()).To(Succeed())
@@ -1008,19 +1009,22 @@ secure_cookies: false
 		})
 
 		Describe("NatsServers", func() {
-			var b = []byte(`
-nats:
-  user: user
-  pass: pass
-  hosts:
-  - hostname: remotehost
-    port: 4223
-  - hostname: remotehost2
-    port: 4224
-`)
+			BeforeEach(func() {
+				cfgForSnippet.Nats = NatsConfig{
+					User: "user",
+					Pass: "pass",
+					Hosts: []NatsHost{{
+						Hostname: "remotehost",
+						Port:     4223,
+					}, {
+						Hostname: "remotehost2",
+						Port:     4224,
+					}},
+				}
+			})
 
 			It("returns a slice of the configured NATS servers", func() {
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 
 				natsServers := config.NatsServers()
@@ -1030,13 +1034,13 @@ nats:
 		})
 
 		Describe("RouteServiceEnabled", func() {
-			var configYaml []byte
 			Context("when the route service secrets is not configured", func() {
 				BeforeEach(func() {
-					configYaml = []byte(`other_key: other_value`)
+					cfgForSnippet.RouteServiceSecret = ""
+					cfgForSnippet.RouteServiceSecretPrev = ""
 				})
 				It("disables route services", func() {
-					err := config.Initialize(configYaml)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(config.Process()).To(Succeed())
 					Expect(config.RouteServiceEnabled).To(BeFalse())
@@ -1046,10 +1050,8 @@ nats:
 			Context("when the route service secret is configured", func() {
 				Context("when the route service secret is set", func() {
 					BeforeEach(func() {
-						configYaml = []byte(`
-route_services_secret: my-route-service-secret
-`)
-						err := config.Initialize(configYaml)
+						cfgForSnippet.RouteServiceSecret = "my-route-service-secret"
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 						Expect(config.Process()).To(Succeed())
 					})
@@ -1065,11 +1067,9 @@ route_services_secret: my-route-service-secret
 
 				Context("when the route service secret and the decrypt only route service secret are set", func() {
 					BeforeEach(func() {
-						configYaml = []byte(`
-route_services_secret: my-route-service-secret
-route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
-`)
-						err := config.Initialize(configYaml)
+						cfgForSnippet.RouteServiceSecret = "my-route-service-secret"
+						cfgForSnippet.RouteServiceSecretPrev = "my-decrypt-only-route-service-secret"
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 						Expect(config.Process()).To(Succeed())
 					})
@@ -1089,10 +1089,8 @@ route_services_secret_decrypt_only: my-decrypt-only-route-service-secret
 
 				Context("when only the decrypt only route service secret is set", func() {
 					BeforeEach(func() {
-						configYaml = []byte(`
-route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
-`)
-						err := config.Initialize(configYaml)
+						cfgForSnippet.RouteServiceSecretPrev = "1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y="
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 						Expect(config.Process()).To(Succeed())
 					})
@@ -1162,6 +1160,13 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 					ClientCertificateValidationString: "none",
 					CipherString:                      "ECDHE-RSA-AES128-GCM-SHA256",
 					TLSPEM:                            expectedTLSPEMs,
+					Status: StatusConfig{
+						TLS: StatusTLSConfig{
+							Port:        8443,
+							Certificate: string(certPEM1),
+							Key:         string(keyPEM1),
+						},
+					},
 				}
 
 			})
@@ -1659,24 +1664,24 @@ route_services_secret_decrypt_only: 1PfbARmvIn6cgyKorA1rqR2d34rBOo+z3qJGz17pi8Y=
 
 		Context("When enable_ssl is set to false", func() {
 			Context("When disable_http is set to false", func() {
+				BeforeEach(func() {
+					cfgForSnippet.EnableSSL = false
+					cfgForSnippet.DisableHTTP = false
+				})
 				It("succeeds", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: false
-disable_http: false
-`))
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).NotTo(HaveOccurred())
 					Expect(config.Process()).To(Succeed())
 					Expect(config.DisableHTTP).To(BeFalse())
 				})
 			})
 			Context("When disable_http is set to true", func() {
+				BeforeEach(func() {
+					cfgForSnippet.EnableSSL = false
+					cfgForSnippet.DisableHTTP = true
+				})
 				It("returns a meaningful error", func() {
-					var b = []byte(fmt.Sprintf(`
-enable_ssl: false
-disable_http: true
-`))
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).NotTo(HaveOccurred())
 					Expect(config.Process()).To(MatchError(HavePrefix("neither http nor https listener is enabled")))
 				})
@@ -1685,15 +1690,14 @@ disable_http: true
 
 		Context("enable_http2", func() {
 			It("defaults to true", func() {
+				config.Status.TLS = cfgForSnippet.Status.TLS
 				Expect(config.Process()).To(Succeed())
 				Expect(config.EnableHTTP2).To(BeTrue())
 			})
 
 			It("setting enable_http2 succeeds", func() {
-				var b = []byte(fmt.Sprintf(`
-enable_http2: false
-`))
-				err := config.Initialize(b)
+				cfgForSnippet.EnableHTTP2 = false
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(config.Process()).To(Succeed())
 				Expect(config.EnableHTTP2).To(BeFalse())
@@ -1701,11 +1705,11 @@ enable_http2: false
 		})
 
 		Context("hop_by_hop_headers_to_filter", func() {
+			BeforeEach(func() {
+				cfgForSnippet.HopByHopHeadersToFilter = []string{"X-ME", "X-Foo"}
+			})
 			It("setting hop_by_hop_headers_to_filter succeeds", func() {
-				var b = []byte(fmt.Sprintf(`
-hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
-`))
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(config.Process()).To(Succeed())
 				Expect(config.HopByHopHeadersToFilter).To(Equal([]string{"X-ME", "X-Foo"}))
@@ -1714,26 +1718,27 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 
 		Context("When given a routing_table_sharding_mode that is supported ", func() {
 			Context("sharding mode `all`", func() {
+				BeforeEach(func() {
+					cfgForSnippet.RoutingTableShardingMode = "all"
+				})
 				It("succeeds", func() {
-					var b = []byte(`routing_table_sharding_mode: all`)
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.Process()).To(Succeed())
 				})
 			})
 			Context("sharding mode `segments`", func() {
-				var b []byte
 				BeforeEach(func() {
-					b = []byte("routing_table_sharding_mode: segments")
+					cfgForSnippet.RoutingTableShardingMode = "segments"
 				})
 
 				Context("with isolation segments provided", func() {
 					BeforeEach(func() {
-						b = append(b, []byte("\nisolation_segments: [is1, is2]")...)
+						cfgForSnippet.IsolationSegments = []string{"is1", "is2"}
 					})
 					It("succeeds", func() {
-						err := config.Initialize(b)
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 
 						Expect(config.Process()).To(Succeed())
@@ -1742,7 +1747,7 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 
 				Context("without isolation segments provided", func() {
 					It("returns a meaningful error", func() {
-						err := config.Initialize(b)
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 
 						Expect(config.Process()).To(MatchError("Expected isolation segments; routing table sharding mode set to segments and none provided."))
@@ -1750,17 +1755,16 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 				})
 			})
 			Context("sharding mode `shared-and-segments`", func() {
-				var b []byte
 				BeforeEach(func() {
-					b = []byte("routing_table_sharding_mode: shared-and-segments")
+					cfgForSnippet.RoutingTableShardingMode = "shared-and-segments"
 				})
 
 				Context("with isolation segments provided", func() {
 					BeforeEach(func() {
-						b = append(b, []byte("\nisolation_segments: [is1, is2]")...)
+						cfgForSnippet.IsolationSegments = []string{"is1", "is2"}
 					})
 					It("succeeds", func() {
-						err := config.Initialize(b)
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 
 						Expect(config.Process()).To(Succeed())
@@ -1770,10 +1774,12 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 		})
 
 		Context("When given a routing_table_sharding_mode that is not supported ", func() {
-			var b = []byte(`routing_table_sharding_mode: foo`)
+			BeforeEach(func() {
+				cfgForSnippet.RoutingTableShardingMode = "foo"
+			})
 
 			It("returns a meaningful error", func() {
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(config.Process()).To(MatchError("Invalid sharding mode: foo. Allowed values are [all segments shared-and-segments]"))
@@ -1788,27 +1794,33 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 
 		Context("When given a forwarded_client_cert value that is supported", func() {
 			Context("when forwarded_client_cert is always_forward", func() {
+				BeforeEach(func() {
+					cfgForSnippet.ForwardedClientCert = "always_forward"
+				})
 				It("correctly sets the value", func() {
-					var b = []byte(`forwarded_client_cert: always_forward`)
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.ForwardedClientCert).To(Equal("always_forward"))
 				})
 			})
 			Context("when forwarded_client_cert is forward", func() {
+				BeforeEach(func() {
+					cfgForSnippet.ForwardedClientCert = "forward"
+				})
 				It("correctly sets the value", func() {
-					var b = []byte(`forwarded_client_cert: forward`)
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.ForwardedClientCert).To(Equal("forward"))
 				})
 			})
 			Context("when forwarded_client_cert is sanitize_set", func() {
+				BeforeEach(func() {
+					cfgForSnippet.ForwardedClientCert = "sanitize_set"
+				})
 				It("correctly sets the value", func() {
-					var b = []byte(`forwarded_client_cert: sanitize_set`)
-					err := config.Initialize(b)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(config.ForwardedClientCert).To(Equal("sanitize_set"))
@@ -1817,10 +1829,12 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 		})
 
 		Context("When given a forwarded_client_cert value that is not supported ", func() {
-			var b = []byte(`forwarded_client_cert: foo`)
+			BeforeEach(func() {
+				cfgForSnippet.ForwardedClientCert = "foo"
+			})
 
 			It("returns a meaningful error", func() {
-				err := config.Initialize(b)
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(config.Process()).To(MatchError("Invalid forwarded client cert mode: foo. Allowed values are [always_forward forward sanitize_set]"))
@@ -1828,16 +1842,19 @@ hop_by_hop_headers_to_filter: [ "X-ME", "X-Foo" ]
 		})
 
 		Describe("Timeout", func() {
+			var b []byte
+			BeforeEach(func() {
+				b = createYMLSnippet((cfgForSnippet))
+			})
 			It("converts timeouts to a duration", func() {
-				var b = []byte(`
+				b = append(b, []byte(`
 endpoint_timeout: 10s
 endpoint_dial_timeout: 6s
 websocket_dial_timeout: 8s
 route_services_timeout: 10s
 drain_timeout: 15s
 tls_handshake_timeout: 9s
-`)
-
+`)...)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1852,10 +1869,9 @@ tls_handshake_timeout: 9s
 			})
 
 			It("defaults to the EndpointTimeout when not set", func() {
-				var b = []byte(`
+				b = append(b, []byte(`
 endpoint_timeout: 10s
-`)
-
+`)...)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1867,11 +1883,11 @@ endpoint_timeout: 10s
 			})
 
 			It("lets drain_timeout be 60 if it wants", func() {
-				var b = []byte(`
+				b = append(b, []byte(`
 endpoint_timeout: 10s
 route_services_timeout: 11s
 drain_timeout: 60s
-`)
+`)...)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1885,7 +1901,6 @@ drain_timeout: 60s
 			Context("when provided PEM for backends cert_chain and private_key", func() {
 				var expectedTLSPEM TLSPem
 				var certChain test_util.CertChain
-				var cfgYaml []byte
 
 				BeforeEach(func() {
 					certChain = test_util.CreateSignedCertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "spinach.com"}})
@@ -1893,14 +1908,13 @@ drain_timeout: 60s
 						CertChain:  string(certChain.CertPEM),
 						PrivateKey: string(certChain.PrivKeyPEM),
 					}
-					cfg := map[string]interface{}{
-						"backends": expectedTLSPEM,
+					cfgForSnippet.Backends = BackendConfig{
+						TLSPem: expectedTLSPEM,
 					}
-					cfgYaml, _ = yaml.Marshal(cfg)
 				})
 
 				It("populates the ClientAuthCertificates", func() {
-					err := config.Initialize(cfgYaml)
+					err := config.Initialize(createYMLSnippet(cfgForSnippet))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(config.Backends.TLSPem).To(Equal(expectedTLSPEM))
 
@@ -1910,16 +1924,16 @@ drain_timeout: 60s
 
 				Context("cert or key are invalid", func() {
 					BeforeEach(func() {
-						cfgYaml, _ = yaml.Marshal(map[string]interface{}{
-							"backends": map[string]string{
-								"cert_chain":  "invalid-cert",
-								"private_key": "invalid-key",
+						cfgForSnippet.Backends = BackendConfig{
+							TLSPem: TLSPem{
+								CertChain:  "invalid-cert",
+								PrivateKey: "invalid-key",
 							},
-						})
+						}
 					})
 
 					It("returns a meaningful error", func() {
-						err := config.Initialize(cfgYaml)
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
 						Expect(err).ToNot(HaveOccurred())
 
 						Expect(config.Process()).To(MatchError("Error loading key pair: tls: failed to find any PEM data in certificate input"))
@@ -1930,3 +1944,17 @@ drain_timeout: 60s
 
 	})
 })
+
+func baseConfigFixture() *Config {
+	key, cert := test_util.CreateKeyPair("healthTLSEndpoint")
+	cfg := &Config{
+		Status: StatusConfig{
+			TLS: StatusTLSConfig{
+				Port:        8443,
+				Certificate: string(cert),
+				Key:         string(key),
+			},
+		},
+	}
+	return cfg
+}
