@@ -40,7 +40,7 @@ var _ = Describe("TLS to backends", func() {
 
 	Context("websockets and TLS interaction", func() {
 		assertWebsocketSuccess := func(wsApp *common.TestApp) {
-			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s", "500ms").Should(BeTrue())
 
@@ -86,7 +86,7 @@ var _ = Describe("TLS to backends", func() {
 			wsApp.Register()
 			wsApp.Listen()
 
-			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, localIP, testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, localIP, testState.cfg.Status.Routes.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s").Should(BeTrue())
 
@@ -126,7 +126,7 @@ var _ = Describe("TLS to backends", func() {
 		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
 		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
 
-		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)
@@ -137,7 +137,7 @@ var _ = Describe("TLS to backends", func() {
 		runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, nil)
 		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
 		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
-		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)
 
