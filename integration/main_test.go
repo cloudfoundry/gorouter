@@ -608,12 +608,15 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	It("logs component logs", func() {
+	It("no longer logs component logs as that disabled by default", func() {
 		createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
-		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Router registered successfully"))
+		contentsFunc := func() string {
+			return string(gorouterSession.Out.Contents())
+		}
+		Consistently(contentsFunc).ShouldNot(ContainSubstring("Component Router registered successfully"))
 	})
 
 	Describe("loggregator metrics emitted", func() {

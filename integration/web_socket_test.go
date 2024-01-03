@@ -32,7 +32,7 @@ var _ = Describe("Websockets", func() {
 
 	Context("When gorouter attempts to connect to a websocket app that fails", func() {
 		assertWebsocketFailure := func(wsApp *common.TestApp) {
-			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Port)
+			routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
 			Eventually(func() bool { return appRegistered(routesURI, wsApp) }, "2s", "500ms").Should(BeTrue())
 

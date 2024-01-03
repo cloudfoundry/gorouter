@@ -496,29 +496,55 @@ var _ = Describe("Router", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("no longer responds to routes requests", func() {
-			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+		Context("when legacy component endpoints are enabled", func() {
+			BeforeEach(func() {
+				config.Status.EnableDeprecatedVarzHealthzEndpoints = true
+			})
+			It("no longer responds to routes requests on the legacy port", func() {
+				host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
 
-			req, err := http.NewRequest("GET", host, nil)
-			Expect(err).ToNot(HaveOccurred())
-			req.SetBasicAuth("user", "pass")
-
-			sendAndReceive(req, http.StatusOK)
-
-			router.Stop()
-			router = nil
-
-			Eventually(func() error {
-				req, err = http.NewRequest("GET", host, nil)
+				req, err := http.NewRequest("GET", host, nil)
 				Expect(err).ToNot(HaveOccurred())
+				req.SetBasicAuth("user", "pass")
 
-				_, err = http.DefaultClient.Do(req)
-				return err
-			}).Should(HaveOccurred())
+				sendAndReceive(req, http.StatusOK)
+
+				router.Stop()
+				router = nil
+
+				Eventually(func() error {
+					req, err = http.NewRequest("GET", host, nil)
+					Expect(err).ToNot(HaveOccurred())
+
+					_, err = http.DefaultClient.Do(req)
+					return err
+				}).Should(HaveOccurred())
+			})
+
+			It("no longer responds to component requests", func() {
+				host := fmt.Sprintf("http://%s:%d/varz", config.Ip, config.Status.Port)
+
+				req, err := http.NewRequest("GET", host, nil)
+				Expect(err).ToNot(HaveOccurred())
+				req.SetBasicAuth("user", "pass")
+
+				sendAndReceive(req, http.StatusOK)
+
+				router.Stop()
+				router = nil
+
+				Eventually(func() error {
+					req, err = http.NewRequest("GET", host, nil)
+					Expect(err).ToNot(HaveOccurred())
+
+					_, err = http.DefaultClient.Do(req)
+					return err
+				}).Should(HaveOccurred())
+			})
 		})
 
-		It("no longer responds to component requests", func() {
-			host := fmt.Sprintf("http://%s:%d/varz", config.Ip, config.Status.Port)
+		It("no longer responds to routes requests", func() {
+			host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Routes.Port)
 
 			req, err := http.NewRequest("GET", host, nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -2326,13 +2352,13 @@ func fetchRecursively(x interface{}, s ...string) interface{} {
 func sendAndReceive(req *http.Request, statusCode int) []byte {
 	var client http.Client
 	resp, err := client.Do(req)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(resp).ToNot(BeNil())
-	Expect(resp.StatusCode).To(Equal(statusCode))
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, resp).ToNot(BeNil())
+	ExpectWithOffset(1, resp.StatusCode).To(Equal(statusCode))
 	defer resp.Body.Close()
 
 	bytes, err := ioutil.ReadAll(resp.Body)
-	Expect(err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
 	return bytes
 }
@@ -2416,7 +2442,7 @@ func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
 }
 
 func routeExists(config *config.Config, routeName string) (bool, error) {
-	host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Port)
+	host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Routes.Port)
 	req, err := http.NewRequest("GET", host, nil)
 	Expect(err).ToNot(HaveOccurred())
 	req.SetBasicAuth("user", "pass")

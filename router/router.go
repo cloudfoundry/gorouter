@@ -51,6 +51,7 @@ type Router struct {
 	varz              varz.Varz
 	component         *common.VcapComponent
 	routesListener    *RoutesListener
+	healthListener    *HealthListener
 	healthTLSListener *HealthListener
 
 	listener            net.Listener
@@ -88,34 +89,43 @@ func NewRouter(
 		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
 	}
 
-	varz := &health.Varz{
-		UniqueVarz: v,
-		GenericVarz: health.GenericVarz{
-			Type:        "Router",
-			Index:       cfg.Index,
-			Host:        host,
-			Credentials: []string{cfg.Status.User, cfg.Status.Pass},
-			LogCounts:   logCounter,
-		},
-	}
-
 	healthCheck := handlers.NewHealthcheck(h, logger)
 	var component *common.VcapComponent
+	var healthListener *HealthListener
 	if cfg.Status.EnableNonTLSHealthChecks {
-		component = &common.VcapComponent{
-			Config: cfg,
-			Varz:   varz,
-			Health: healthCheck,
-			InfoRoutes: map[string]json.Marshaler{
-				"/routes": r,
-			},
-			Logger: logger,
+		// TODO: remove all vcapcomponent logic in Summer 2026
+		if cfg.Status.EnableDeprecatedVarzHealthzEndpoints {
+			varz := &health.Varz{
+				UniqueVarz: v,
+				GenericVarz: health.GenericVarz{
+					Type:        "Router",
+					Index:       cfg.Index,
+					Host:        host,
+					Credentials: []string{cfg.Status.User, cfg.Status.Pass},
+					LogCounts:   logCounter,
+				},
+			}
+
+			component = &common.VcapComponent{
+				Config: cfg,
+				Varz:   varz,
+				Health: healthCheck,
+				InfoRoutes: map[string]json.Marshaler{
+					"/routes": r,
+				},
+				Logger: logger,
+			}
+		} else {
+			healthListener = &HealthListener{
+				Port:        cfg.Status.Port,
+				HealthCheck: healthCheck,
+			}
+			if err := healthListener.ListenAndServe(); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// TODO: once we can remove the varz/healthz endpoints in `VcapComponent`
-	//       we should add another healthListener here without TLS support,
-	//       and remove all of common/VcapComponent code
 	healthTLSListener := &HealthListener{
 		Port: cfg.Status.TLS.Port,
 		TLSConfig: &tls.Config{
@@ -156,6 +166,7 @@ func NewRouter(
 		varz:                v,
 		component:           component,
 		routesListener:      routesListener,
+		healthListener:      healthListener,
 		healthTLSListener:   healthTLSListener,
 		serveDone:           make(chan struct{}),
 		tlsServeDone:        make(chan struct{}),
@@ -407,6 +418,9 @@ func (r *Router) Stop() {
 
 	if r.component != nil {
 		r.component.Stop()
+	}
+	if r.healthListener != nil {
+		r.healthListener.Stop()
 	}
 	r.routesListener.Stop()
 	if r.healthTLSListener != nil {

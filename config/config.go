@@ -73,14 +73,15 @@ func (ss StringSet) MarshalYAML() (interface{}, error) {
 }
 
 type StatusConfig struct {
-	Host                     string             `yaml:"host"`
-	Port                     uint16             `yaml:"port"`
-	EnableNonTLSHealthChecks bool               `yaml:"enable_nontls_health_checks"`
-	TLSCert                  tls.Certificate    `yaml:"-"`
-	TLS                      StatusTLSConfig    `yaml:"tls"`
-	User                     string             `yaml:"user"`
-	Pass                     string             `yaml:"pass"`
-	Routes                   StatusRoutesConfig `yaml:"routes"`
+	Host                                 string             `yaml:"host"`
+	Port                                 uint16             `yaml:"port"`
+	EnableNonTLSHealthChecks             bool               `yaml:"enable_nontls_health_checks"`
+	EnableDeprecatedVarzHealthzEndpoints bool               `yaml:"enable_deprecated_varz_healthz_endpoints"`
+	TLSCert                              tls.Certificate    `yaml:"-"`
+	TLS                                  StatusTLSConfig    `yaml:"tls"`
+	User                                 string             `yaml:"user"`
+	Pass                                 string             `yaml:"pass"`
+	Routes                               StatusRoutesConfig `yaml:"routes"`
 }
 
 type StatusTLSConfig struct {
