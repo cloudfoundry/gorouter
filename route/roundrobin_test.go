@@ -358,11 +358,11 @@ var _ = Describe("RoundRobin", func() {
 			})
 
 			Context("on the first attempt", func() {
-
 				Context("when the pool is empty", func() {
-					DescribeTable("it ",
+					DescribeTable("it does not select an endpoint",
 						func(nextIdx int) {
 							pool.NextIdx = nextIdx
+							Expect(iter.Next(1)).To(BeNil())
 						},
 						Entry("When the next index is -1", -1),
 						Entry("When the next index is 0", 0),
@@ -370,9 +370,6 @@ var _ = Describe("RoundRobin", func() {
 						Entry("When the next index is 2", 2),
 						Entry("When the next index is 3", 3),
 					)
-					It("does not select an endpoint", func() {
-						Expect(iter.Next(1)).To(BeNil())
-					})
 				})
 
 				Context("when the pool has one endpoint in the same AZ as the router", func() {
