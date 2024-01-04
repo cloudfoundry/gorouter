@@ -92,10 +92,8 @@ balancing_algorithm_az_preference: locally-optimistic
 			It("does not allow an invalid load balance strategy", func() {
 				cfg, err := DefaultConfig()
 				Expect(err).ToNot(HaveOccurred())
-				var b = []byte(`
-balancing_algorithm_az_preference: meow-only
-`)
-				cfg.Initialize(b)
+				cfgForSnippet.LoadBalanceAZPreference = "meow-only"
+				cfg.Initialize(createYMLSnippet(cfgForSnippet))
 				Expect(cfg.Process()).To(MatchError("Invalid load balancing AZ preference meow-only. Allowed values are [none locally-optimistic]"))
 			})
 		})
