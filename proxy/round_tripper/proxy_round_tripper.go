@@ -144,7 +144,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		trace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
-			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request, attempt)
+			// Because this for-loop is 1-indexed, we substract one from the attempt value passed to selectEndpoint,
+			// which expects a 0-indexed value
+			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request, attempt-1)
 			if selectEndpointErr != nil {
 				logger.Error("select-endpoint-failed", zap.String("host", reqInfo.RoutePool.Host()), zap.Error(selectEndpointErr))
 				break

@@ -67,7 +67,7 @@ func (r *LeastConnection) next(attempt int) *endpointElem {
 	defer r.pool.Unlock()
 
 	var selected, selectedLocal *endpointElem
-	localDesired := r.locallyOptimistic && attempt == 1
+	localDesired := r.locallyOptimistic && attempt == 0
 
 	// none
 	total := len(r.pool.endpoints)

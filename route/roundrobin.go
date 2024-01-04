@@ -56,7 +56,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 	r.pool.Lock()
 	defer r.pool.Unlock()
 
-	localDesired := r.locallyOptimistic && attempt == 1
+	localDesired := r.locallyOptimistic && attempt == 0
 
 	last := len(r.pool.endpoints)
 	if last == 0 {

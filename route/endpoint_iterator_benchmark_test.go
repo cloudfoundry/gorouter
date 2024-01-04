@@ -13,7 +13,7 @@ import (
 func testLoadBalance(lb route.EndpointIterator, b *testing.B) {
 	b.ResetTimer() // don't include setup in time
 	for n := 0; n < b.N; n++ {
-		e := lb.Next(1)
+		e := lb.Next(0)
 		lb.PreRequest(e)
 		lb.PostRequest(e)
 	}
