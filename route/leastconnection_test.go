@@ -29,7 +29,7 @@ var _ = Describe("LeastConnection", func() {
 		Context("when pool is empty", func() {
 			It("does not select an endpoint", func() {
 				iter := route.NewLeastConnection(pool, "", false, "meow-az")
-				Expect(iter.Next(1)).To(BeNil())
+				Expect(iter.Next(0)).To(BeNil())
 			})
 		})
 
@@ -58,7 +58,7 @@ var _ = Describe("LeastConnection", func() {
 			Context("when all endpoints have no statistics", func() {
 				It("selects a random endpoint", func() {
 					iter := route.NewLeastConnection(pool, "", false, "meow-az")
-					n := iter.Next(1)
+					n := iter.Next(0)
 					Expect(n).NotTo(BeNil())
 				})
 			})
@@ -94,31 +94,31 @@ var _ = Describe("LeastConnection", func() {
 				It("selects endpoint with least connection", func() {
 					setConnectionCount(endpoints, []int{0, 1, 1, 1, 1})
 					iter := route.NewLeastConnection(pool, "", false, "meow-az")
-					Expect(iter.Next(1)).To(Equal(endpoints[0]))
+					Expect(iter.Next(0)).To(Equal(endpoints[0]))
 
 					setConnectionCount(endpoints, []int{1, 0, 1, 1, 1})
-					Expect(iter.Next(2)).To(Equal(endpoints[1]))
+					Expect(iter.Next(1)).To(Equal(endpoints[1]))
 
 					setConnectionCount(endpoints, []int{1, 1, 0, 1, 1})
-					Expect(iter.Next(3)).To(Equal(endpoints[2]))
+					Expect(iter.Next(2)).To(Equal(endpoints[2]))
 
 					setConnectionCount(endpoints, []int{1, 1, 1, 0, 1})
-					Expect(iter.Next(4)).To(Equal(endpoints[3]))
+					Expect(iter.Next(3)).To(Equal(endpoints[3]))
 
 					setConnectionCount(endpoints, []int{1, 1, 1, 1, 0})
-					Expect(iter.Next(5)).To(Equal(endpoints[4]))
+					Expect(iter.Next(4)).To(Equal(endpoints[4]))
 
 					setConnectionCount(endpoints, []int{1, 4, 15, 8, 3})
-					Expect(iter.Next(6)).To(Equal(endpoints[0]))
+					Expect(iter.Next(5)).To(Equal(endpoints[0]))
 
 					setConnectionCount(endpoints, []int{5, 4, 15, 8, 3})
-					Expect(iter.Next(7)).To(Equal(endpoints[4]))
+					Expect(iter.Next(6)).To(Equal(endpoints[4]))
 
 					setConnectionCount(endpoints, []int{5, 4, 15, 8, 7})
-					Expect(iter.Next(8)).To(Equal(endpoints[1]))
+					Expect(iter.Next(7)).To(Equal(endpoints[1]))
 
 					setConnectionCount(endpoints, []int{5, 5, 15, 2, 7})
-					Expect(iter.Next(9)).To(Equal(endpoints[3]))
+					Expect(iter.Next(8)).To(Equal(endpoints[3]))
 				})
 
 				It("selects random endpoint from all with least connection", func() {
@@ -131,7 +131,7 @@ var _ = Describe("LeastConnection", func() {
 						"10.0.1.3:60000",
 						"10.0.1.4:60000",
 					}
-					Expect(okRandoms).Should(ContainElement(iter.Next(1).CanonicalAddr()))
+					Expect(okRandoms).Should(ContainElement(iter.Next(0).CanonicalAddr()))
 
 					setConnectionCount(endpoints, []int{10, 10, 15, 10, 11})
 					okRandoms = []string{
@@ -139,7 +139,7 @@ var _ = Describe("LeastConnection", func() {
 						"10.0.1.1:60000",
 						"10.0.1.3:60000",
 					}
-					Expect(okRandoms).Should(ContainElement(iter.Next(2).CanonicalAddr()))
+					Expect(okRandoms).Should(ContainElement(iter.Next(1).CanonicalAddr()))
 				})
 			})
 
@@ -174,7 +174,7 @@ var _ = Describe("LeastConnection", func() {
 							iter := route.NewLeastConnection(pool, "", false, "meow-az")
 
 							Consistently(func() *route.Endpoint {
-								return iter.Next(1)
+								return iter.Next(0)
 							}).Should(BeNil())
 						})
 					})
@@ -186,7 +186,7 @@ var _ = Describe("LeastConnection", func() {
 								iter := route.NewLeastConnection(pool, "", false, "meow-az")
 
 								Consistently(func() *route.Endpoint {
-									return iter.Next(1)
+									return iter.Next(0)
 								}).Should(BeNil())
 							})
 						})
@@ -202,8 +202,8 @@ var _ = Describe("LeastConnection", func() {
 					Context("when the initial endpoint is overloaded", func() {
 						Context("when there is an unencumbered endpoint", func() {
 							It("returns the unencumbered endpoint", func() {
+								Expect(iter.Next(0)).To(Equal(epOne))
 								Expect(iter.Next(1)).To(Equal(epOne))
-								Expect(iter.Next(2)).To(Equal(epOne))
 							})
 						})
 
@@ -214,7 +214,7 @@ var _ = Describe("LeastConnection", func() {
 							})
 							It("returns nil", func() {
 								Consistently(func() *route.Endpoint {
-									return iter.Next(1)
+									return iter.Next(0)
 								}).Should(BeNil())
 							})
 						})
@@ -256,7 +256,7 @@ var _ = Describe("LeastConnection", func() {
 
 				Context("when the pool is empty", func() {
 					It("does not select an endpoint", func() {
-						Expect(iter.Next(1)).To(BeNil())
+						Expect(iter.Next(0)).To(BeNil())
 					})
 				})
 
@@ -269,7 +269,7 @@ var _ = Describe("LeastConnection", func() {
 					})
 
 					It("selects the endpoint in the same az", func() {
-						chosen := iter.Next(1)
+						chosen := iter.Next(0)
 						Expect(chosen.AvailabilityZone).To(Equal(localAZ))
 						Expect(chosen).To(Equal(localAZEndpointOne))
 					})
@@ -281,7 +281,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 
 						It("selects a non-overloaded endpoint in a different az", func() {
-							chosen := iter.Next(1)
+							chosen := iter.Next(0)
 							Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
 						})
 					})
@@ -310,7 +310,7 @@ var _ = Describe("LeastConnection", func() {
 								"10.0.1.4:60000",
 								"10.0.1.5:60000",
 							}
-							chosen := iter.Next(1)
+							chosen := iter.Next(0)
 							Expect(chosen.AvailabilityZone).To(Equal(localAZ))
 							Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
 						})
@@ -332,7 +332,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 
 						It("selects the local endpoint with the lowest connections", func() {
-							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo)) // FLAKEY
+							Expect(iter.Next(0)).To(Equal(localAZEndpointTwo)) // FLAKEY
 						})
 					})
 
@@ -349,7 +349,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 
 						It("selects the local endpoint with the lowest connections", func() {
-							Expect(iter.Next(1)).To(Equal(localAZEndpointTwo))
+							Expect(iter.Next(0)).To(Equal(localAZEndpointTwo))
 						})
 					})
 				})
@@ -360,7 +360,7 @@ var _ = Describe("LeastConnection", func() {
 					})
 
 					It("selects the non-local endpoint", func() {
-						chosen := iter.Next(1)
+						chosen := iter.Next(0)
 						Expect(chosen.AvailabilityZone).ToNot(Equal(localAZ))
 						Expect(chosen).To(Equal(otherAZEndpointOne))
 					})
@@ -379,7 +379,7 @@ var _ = Describe("LeastConnection", func() {
 					})
 
 					It("selects the non-local endpoint", func() {
-						Expect(iter.Next(1)).To(Equal(otherAZEndpointTwo))
+						Expect(iter.Next(0)).To(Equal(otherAZEndpointTwo))
 					})
 				})
 			})
