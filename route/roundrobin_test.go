@@ -279,6 +279,33 @@ var _ = Describe("RoundRobin", func() {
 						Entry("When the next index is 1", 1),
 					)
 				})
+
+				Context("when only the last endpoint is overloaded, but the others have failed", func() {
+					It("returns nil", func() {
+						pool.NextIdx = 0
+
+						epThree := route.NewEndpoint(&route.EndpointOpts{Host: "3.3.3.3", Port: 2222, PrivateInstanceId: "private-label-2"})
+						pool.Put(epThree)
+
+						iter := route.NewRoundRobin(pool, "", false, "meow-az")
+
+						Expect(iter.Next(0)).To(Equal(epOne))
+						iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+						Expect(iter.Next(0)).To(Equal(epTwo))
+						iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+						Expect(iter.Next(0)).To(Equal(epThree))
+						epThree.Stats.NumberConnections.Increment()
+
+						Expect(iter.Next(0)).To(Equal(epThree))
+						epThree.Stats.NumberConnections.Increment()
+
+						Consistently(func() *route.Endpoint {
+							return iter.Next(0)
+						}).Should(BeNil())
+					})
+				})
 			})
 
 			Context("when there is an initial endpoint", func() {
