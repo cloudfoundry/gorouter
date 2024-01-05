@@ -406,7 +406,7 @@ var _ = Describe("RoundRobin", func() {
 						pool.Put(localAZEndpointOne)
 					})
 
-					DescribeTable("when the pool has one endpoint in the same AZ as the router",
+					DescribeTable("it returns that endpoint",
 						func(nextIdx int) {
 							pool.NextIdx = nextIdx
 							chosen := iter.Next(0)
