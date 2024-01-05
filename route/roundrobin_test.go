@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
@@ -365,7 +364,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             new(fakes.FakeLogger),
+					Logger:             test_util.NewTestZapLogger("test"),
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
