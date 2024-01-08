@@ -121,7 +121,6 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 			// start again but consider all AZs
 			if localDesired {
 				localDesired = false
-				continue
 			}
 			// all endpoints are marked failed so reset everything to available
 			for _, e2 := range r.pool.endpoints {
