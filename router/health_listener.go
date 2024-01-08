@@ -21,6 +21,11 @@ func (hl *HealthListener) ListenAndServe() error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		hl.HealthCheck.ServeHTTP(w, req)
 	})
+	mux.HandleFunc("/is-process-alive-do-not-use-for-loadbalancing", func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok\n"))
+		req.Close = true
+	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", hl.Port)
 	s := &http.Server{
