@@ -502,6 +502,123 @@ var _ = Describe("RoundRobin", func() {
 							Entry("When the next index is 5", 5),
 						)
 					})
+
+					Context("when one has an error and the other does not", func() {
+						JustBeforeEach(func() {
+							pool.NextIdx = 3
+							Expect(iter.Next(0)).To(Equal(localAZEndpointOne))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+						})
+
+						DescribeTable("it returns the endpoint without an error in the same AZ",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+								okRandoms := []string{
+									"10.0.1.4:60000",
+									"10.0.1.5:60000",
+								}
+
+								chosen := iter.Next(0)
+								Expect(chosen.AvailabilityZone).To(Equal(localAZ))
+								Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+							Entry("When the next index is 2", 2),
+							Entry("When the next index is 3", 3),
+							Entry("When the next index is 4", 4),
+							Entry("When the next index is 5", 5),
+						)
+					})
+
+					Context("when all AZ-local endpoints have errors", func() {
+						JustBeforeEach(func() {
+							pool.NextIdx = 3
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointOne))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointTwo))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointThree))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+						})
+
+						DescribeTable("it returns an endpoint in a different AZ",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+
+								okRandoms := []string{
+									"10.0.1.0:60000",
+									"10.0.1.1:60000",
+									"10.0.1.2:60000",
+								}
+
+								chosen := iter.Next(0)
+								Expect(chosen.AvailabilityZone).NotTo(Equal(localAZ))
+								Expect(okRandoms).Should(ContainElement(chosen.CanonicalAddr()))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+							Entry("When the next index is 2", 2),
+							Entry("When the next index is 3", 3),
+							Entry("When the next index is 4", 4),
+							Entry("When the next index is 5", 5),
+						)
+					})
+
+					Context("when all endpoints have errors", func() {
+						JustBeforeEach(func() {
+							pool.NextIdx = 0
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointOne))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointTwo))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(localAZEndpointThree))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(otherAZEndpointOne))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(otherAZEndpointTwo))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+
+							Expect(iter.Next(0)).To(Equal(otherAZEndpointThree))
+							iter.EndpointFailed(&net.OpError{Op: "dial"})
+						})
+
+						DescribeTable("it resets the errors and returns one of the endpoints regardless of AZ",
+							func(nextIdx int) {
+								pool.NextIdx = nextIdx
+
+								okRandoms := []string{
+									"10.0.1.0:60000",
+									"10.0.1.1:60000",
+									"10.0.1.2:60000",
+									"10.0.1.3:60000",
+									"10.0.1.4:60000",
+									"10.0.1.5:60000",
+								}
+
+								chosen := iter.Next(0)
+								Expect(okRandoms).To(ContainElement(chosen.CanonicalAddr()))
+							},
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
+							Entry("When the next index is 1", 1),
+							Entry("When the next index is 2", 2),
+							Entry("When the next index is 3", 3),
+							Entry("When the next index is 4", 4),
+							Entry("When the next index is 5", 5),
+						)
+
+					})
 				})
 
 				Context("when the pool has one endpoint, and it is not in the same AZ as the router", func() {
