@@ -16,11 +16,12 @@ import (
 
 var _ = Describe("HealthListener", func() {
 	var (
-		healthListener *HealthListener
-		addr           string
-		req            *http.Request
-		port           uint16
-		h              *health.Health
+		healthListener  *HealthListener
+		addr            string
+		healthcheckPath string
+		req             *http.Request
+		port            uint16
+		h               *health.Health
 	)
 
 	BeforeEach(func() {
@@ -33,6 +34,7 @@ var _ = Describe("HealthListener", func() {
 			Port:        port,
 			HealthCheck: handlers.NewHealthcheck(h, test_util.NewTestZapLogger("test")),
 		}
+		healthcheckPath = "health"
 	})
 
 	AfterEach(func() {
@@ -43,37 +45,57 @@ var _ = Describe("HealthListener", func() {
 		err := healthListener.ListenAndServe()
 		Expect(err).ToNot(HaveOccurred())
 
-		req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%d/health", addr, port), nil)
+		req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%d/%s", addr, port, healthcheckPath), nil)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("returns the LB healthiness", func() {
-		resp, err := http.DefaultClient.Do(req)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(resp).ToNot(BeNil())
-
-		Expect(resp.StatusCode).To(Equal(200))
-
-		body, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
-		Expect(err).ToNot(HaveOccurred())
-		Expect(string(body)).To(Equal("ok\n"))
-	})
-	Context("when the health should be down", func() {
+	Context("the always-healthy process healthcheck", func() {
 		BeforeEach(func() {
-			h.SetHealth(health.Degraded)
+			healthcheckPath = "is-process-alive-do-not-use-for-loadbalancing"
 		})
-		It("returns unhealthiness of endpoint", func() {
+		It("returns healthy", func() {
 			resp, err := http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
 
-			Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+			Expect(resp.StatusCode).To(Equal(200))
 
 			body, err := io.ReadAll(resp.Body)
 			defer resp.Body.Close()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(body)).To(BeEmpty())
+			Expect(string(body)).To(Equal("ok\n"))
+		})
+	})
+
+	Context("the healthcheck used by LBs to delay service for request draining + route table population", func() {
+		It("returns the LB healthiness", func() {
+			resp, err := http.DefaultClient.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp).ToNot(BeNil())
+
+			Expect(resp.StatusCode).To(Equal(200))
+
+			body, err := io.ReadAll(resp.Body)
+			defer resp.Body.Close()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(body)).To(Equal("ok\n"))
+		})
+		Context("when the health should be down", func() {
+			BeforeEach(func() {
+				h.SetHealth(health.Degraded)
+			})
+			It("returns unhealthiness of endpoint", func() {
+				resp, err := http.DefaultClient.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+
+				body, err := io.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(body)).To(BeEmpty())
+			})
 		})
 	})
 	It("stops listening", func() {
