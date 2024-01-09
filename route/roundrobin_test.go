@@ -174,10 +174,11 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(endpointBar)
 
 				iter = route.NewRoundRobin(pool, "foo", false, "meow-az")
-				foundEndpoint = iter.Next(1)
+				foundEndpoint = iter.Next(0)
 				Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
 				iter = route.NewRoundRobin(pool, "bar", false, "meow-az")
+				foundEndpoint = iter.Next(0)
 				Expect(foundEndpoint).To(Equal(endpointBar))
 			},
 			Entry("When the next index is -1", -1),
