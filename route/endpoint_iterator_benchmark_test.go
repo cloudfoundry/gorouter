@@ -61,7 +61,6 @@ func setupEndpointIterator(total int, azDistribution int, strategy string) route
 	}
 
 	// Shuffle the endpoints, then add them to the pool
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(total, func(i, j int) { endpoints[i], endpoints[j] = endpoints[j], endpoints[i] })
 	for _, e := range endpoints {
 		pool.Put(e)
