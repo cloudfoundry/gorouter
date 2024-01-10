@@ -58,76 +58,74 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 	localDesired := r.locallyOptimistic && attempt == 0
 
-	last := len(r.pool.endpoints)
-	if last == 0 {
+	poolSize := len(r.pool.endpoints)
+	if poolSize == 0 {
 		return nil
 	}
 
 	if r.pool.NextIdx == -1 {
-		r.pool.NextIdx = r.pool.random.Intn(last)
-	} else if r.pool.NextIdx >= last {
+		r.pool.NextIdx = r.pool.random.Intn(poolSize)
+	} else if r.pool.NextIdx >= poolSize {
 		r.pool.NextIdx = 0
 	}
 
 	startIdx := r.pool.NextIdx
 	curIdx := startIdx
 
-	var curIsLocal bool
 	for {
 		e := r.pool.endpoints[curIdx]
-		curIsLocal = e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
+		// Increment index, modulo poolSize
+		// We tried using the actual modulo operator, but it has a 10x performance penalty
 		curIdx++
-		if curIdx == last {
+		if curIdx == poolSize {
 			curIdx = 0
 		}
 
-		if e.isOverloaded() {
+		curIsLocal := e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
-			// We've checked every endpoint in the pool
-			if curIdx == startIdx {
-				if localDesired {
-					// Search the pool again without the localDesired constraint
-					localDesired = false
-					continue
-				}
+		r.clearExpiredFailures(e)
 
-				// No endpoints are available
-				return nil
-			}
-
-			// Move on to the next endpoint in the pool
-			continue
-		}
-
-		if e.failedAt != nil {
-			curTime := time.Now()
-			if curTime.Sub(*e.failedAt) > r.pool.retryAfterFailure {
-				// exipired failure window
-				e.failedAt = nil
-			}
-		}
-
-		if (localDesired && curIsLocal) || !localDesired {
-			if e.failedAt == nil {
+		if !localDesired || (localDesired && curIsLocal) {
+			if e.failedAt == nil && !e.isOverloaded() {
 				r.pool.NextIdx = curIdx
 				return e
 			}
 		}
 
 		if curIdx == startIdx {
+			if r.allEndpointsAreOverloaded() {
+				return nil
+			}
 
 			// could not find a valid route in the same AZ
 			// start again but consider all AZs
-			if localDesired {
-				localDesired = false
-			}
+			localDesired = false
+
 			// all endpoints are marked failed so reset everything to available
 			for _, e2 := range r.pool.endpoints {
 				e2.failedAt = nil
 			}
+
 		}
 	}
+}
+
+func (r *RoundRobin) clearExpiredFailures(e *endpointElem) {
+	if e.failedAt != nil {
+		curTime := time.Now()
+		if curTime.Sub(*e.failedAt) > r.pool.retryAfterFailure {
+			e.failedAt = nil
+		}
+	}
+}
+
+func (r *RoundRobin) allEndpointsAreOverloaded() bool {
+	allEndpointsAreOverloaded := true
+	for _, e2 := range r.pool.endpoints {
+		allEndpointsAreOverloaded = allEndpointsAreOverloaded && e2.isOverloaded()
+	}
+	return allEndpointsAreOverloaded
 }
 
 func (r *RoundRobin) EndpointFailed(err error) {

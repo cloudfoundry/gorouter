@@ -281,7 +281,7 @@ var _ = Describe("RoundRobin", func() {
 				})
 
 				Context("when only the last endpoint is overloaded, but the others have failed", func() {
-					It("returns nil", func() {
+					It("resets the errors on the non-overloaded enpoints and returns one of them", func() {
 						pool.NextIdx = 0
 
 						epThree := route.NewEndpoint(&route.EndpointOpts{Host: "3.3.3.3", Port: 2222, PrivateInstanceId: "private-label-2"})
@@ -302,8 +302,11 @@ var _ = Describe("RoundRobin", func() {
 						epThree.Stats.NumberConnections.Increment()
 
 						Consistently(func() *route.Endpoint {
-							return iter.Next(0)
-						}).Should(BeNil())
+							selectedEndpoint := iter.Next(0)
+							Expect(selectedEndpoint).NotTo(BeNil())
+
+							return selectedEndpoint
+						}).ShouldNot(Equal(epThree))
 					})
 				})
 			})
