@@ -75,7 +75,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 	for {
 		e := r.pool.endpoints[curIdx]
 
-		// Increment index, modulo poolSize
+		// Pre-Increment the index, then modulo with the poolSize
 		// We tried using the actual modulo operator, but it has a 10x performance penalty
 		curIdx++
 		if curIdx == poolSize {
@@ -93,6 +93,9 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 			}
 		}
 
+		// If we've cycled through all of the indices and we WILL be back where we started.
+		//   Note that curIdx is technically the index of the NEXT endpoint in
+		//   the for loop execution because curIdx has already been incremented.
 		if curIdx == startIdx {
 			if r.allEndpointsAreOverloaded() {
 				return nil
