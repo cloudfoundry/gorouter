@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -217,5 +219,22 @@ var _ = Describe("ProxyWriter", func() {
 		Expect(r1.rewriteHeaderHeader).To(HaveKey("Foo"))
 		Expect(r2.rewriteHeaderCalled).To(BeTrue())
 		Expect(r2.rewriteHeaderHeader).To(HaveKey("Foo"))
+	})
+
+	FIt("is not racy", func() {
+		rw := httptest.NewRecorder()
+		proxy := NewProxyResponseWriter(rw)
+
+		Expect(func() {
+			wg := sync.WaitGroup{}
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func(wg sync.WaitGroup) {
+					defer wg.Done()
+					proxy.Write([]byte("foo"))
+				}(wg)
+			}
+			wg.Wait()
+		}).NotTo(Panic())
 	})
 })
