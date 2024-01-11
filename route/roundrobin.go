@@ -74,6 +74,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 	for {
 		e := r.pool.endpoints[curIdx]
+		curIsLocal := e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
 		// Pre-Increment the index, then modulo with the poolSize
 		// We tried using the actual modulo operator, but it has a 10x performance penalty
@@ -81,8 +82,6 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 		if curIdx == poolSize {
 			curIdx = 0
 		}
-
-		curIsLocal := e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
 		r.clearExpiredFailures(e)
 
