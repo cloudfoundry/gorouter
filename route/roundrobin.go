@@ -69,33 +69,31 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 		r.pool.NextIdx = 0
 	}
 
-	startIdx := r.pool.NextIdx
-	curIdx := startIdx
+	startingIndex := r.pool.NextIdx
+	currentIndex := startingIndex
+	var nextIndex int
 
 	for {
-		e := r.pool.endpoints[curIdx]
-		curIsLocal := e.endpoint.AvailabilityZone == r.localAvailabilityZone
+		e := r.pool.endpoints[currentIndex]
+		currentEndpointIsLocal := e.endpoint.AvailabilityZone == r.localAvailabilityZone
 
-		// Pre-Increment the index, then modulo with the poolSize
 		// We tried using the actual modulo operator, but it has a 10x performance penalty
-		curIdx++
-		if curIdx == poolSize {
-			curIdx = 0
+		nextIndex = currentIndex + 1
+		if nextIndex == poolSize {
+			nextIndex = 0
 		}
 
 		r.clearExpiredFailures(e)
 
-		if !localDesired || (localDesired && curIsLocal) {
+		if !localDesired || (localDesired && currentEndpointIsLocal) {
 			if e.failedAt == nil && !e.isOverloaded() {
-				r.pool.NextIdx = curIdx
+				r.pool.NextIdx = nextIndex
 				return e
 			}
 		}
 
 		// If we've cycled through all of the indices and we WILL be back where we started.
-		//   Note that curIdx is technically the index of the NEXT endpoint in
-		//   the for loop execution because curIdx has already been incremented.
-		if curIdx == startIdx {
+		if nextIndex == startingIndex {
 			if r.allEndpointsAreOverloaded() {
 				return nil
 			}
@@ -110,6 +108,8 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 			}
 
 		}
+
+		currentIndex = nextIndex
 	}
 }
 
