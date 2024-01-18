@@ -89,15 +89,11 @@ func (r *LeastConnection) next(attempt int) *endpointElem {
 	// select the least connection endpoint OR
 	// random one within the least connection endpoints
 
-	var cur *endpointElem
-	var curIsLocal bool
-	var randIdx int
-
 	randIndices := r.randomize.Perm(total)
 	for i := 0; i < total; i++ {
-		randIdx = randIndices[i]
-		cur = r.pool.endpoints[randIdx]
-		curIsLocal = cur.endpoint.AvailabilityZone == r.localAvailabilityZone
+		randIdx := randIndices[i]
+		cur := r.pool.endpoints[randIdx]
+		curIsLocal := cur.endpoint.AvailabilityZone == r.localAvailabilityZone
 
 		// Never select an endpoint that is overloaded
 		if cur.isOverloaded() {
