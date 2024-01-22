@@ -91,15 +91,17 @@ type StatusRoutesConfig struct {
 	Port uint16 `yaml:"port"`
 }
 
+var defaultStatusTLSConfig = StatusTLSConfig{
+	Port: 8443,
+}
+
 var defaultStatusConfig = StatusConfig{
 	Host:                     "0.0.0.0",
 	Port:                     8080,
 	User:                     "",
 	Pass:                     "",
 	EnableNonTLSHealthChecks: true,
-	TLS: StatusTLSConfig{
-		Port: 8443,
-	},
+	TLS:                      defaultStatusTLSConfig,
 	Routes: StatusRoutesConfig{
 		Port: 8082,
 	},
@@ -616,20 +618,26 @@ func (c *Config) Process() error {
 	}
 
 	healthTLS := c.Status.TLS
-	if healthTLS.Key == "" {
-		return fmt.Errorf("router.status.tls.key must be provided")
+	if healthTLS == defaultStatusTLSConfig && c.Status.EnableNonTLSHealthChecks == false {
+		return fmt.Errorf("Neither TLS nor non-TLS health endpoints are enabled. Refusing to start gorouter.")
 	}
-	if healthTLS.Certificate == "" {
-		return fmt.Errorf("router.status.tls.certificate must be provided")
+
+	if healthTLS != defaultStatusTLSConfig {
+		if healthTLS.Key == "" {
+			return fmt.Errorf("router.status.tls.key must be provided")
+		}
+		if healthTLS.Certificate == "" {
+			return fmt.Errorf("router.status.tls.certificate must be provided")
+		}
+		if healthTLS.Port == 0 {
+			return fmt.Errorf("router.status.tls.port must not be 0")
+		}
+		certificate, err := tls.X509KeyPair([]byte(healthTLS.Certificate), []byte(healthTLS.Key))
+		if err != nil {
+			return fmt.Errorf("Error loading router.status.tls certificate/key pair: %s", err.Error())
+		}
+		c.Status.TLSCert = certificate
 	}
-	if healthTLS.Port == 0 {
-		return fmt.Errorf("router.status.tls.port must not be 0")
-	}
-	certificate, err := tls.X509KeyPair([]byte(healthTLS.Certificate), []byte(healthTLS.Key))
-	if err != nil {
-		return fmt.Errorf("Error loading router.status.tls certificate/key pair: %s", err.Error())
-	}
-	c.Status.TLSCert = certificate
 
 	if c.EnableSSL {
 		switch c.ClientCertificateValidationString {
