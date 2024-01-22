@@ -43,13 +43,13 @@ import (
 var _ = Describe("Router Integration", func() {
 
 	var (
-		cfg                                                                       *config.Config
-		cfgFile                                                                   string
-		tmpdir                                                                    string
-		natsPort, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort uint16
-		natsRunner                                                                *test_util.NATSRunner
-		gorouterSession                                                           *Session
-		oauthServerURL                                                            string
+		cfg                                                                                               *config.Config
+		cfgFile                                                                                           string
+		tmpdir                                                                                            string
+		natsPort, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort uint16
+		natsRunner                                                                                        *test_util.NATSRunner
+		gorouterSession                                                                                   *Session
+		oauthServerURL                                                                                    string
 	)
 
 	BeforeEach(func() {
@@ -64,6 +64,7 @@ var _ = Describe("Router Integration", func() {
 		proxyPort = test_util.NextAvailPort()
 		natsPort = test_util.NextAvailPort()
 		sslPort = test_util.NextAvailPort()
+		routeServiceServerPort = test_util.NextAvailPort()
 
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
@@ -97,7 +98,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("IsolationSegments", func() {
 		BeforeEach(func() {
-			createIsoSegConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, []string{"is1", "is2"}, natsPort)
+			createIsoSegConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, []string{"is1", "is2"}, natsPort)
 		})
 
 		It("logs retrieved IsolationSegments", func() {
@@ -121,7 +122,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient      *nats.Conn
 		)
 		BeforeEach(func() {
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 
 		})
 		JustBeforeEach(func() {
@@ -207,7 +208,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the client knows about a CA in the ClientCACerts", func() {
 					BeforeEach(func() {
-						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 					})
 					It("can reach the gorouter successfully", func() {
 						curlAppWithCustomClientTLSConfig(http.StatusOK)
@@ -216,7 +217,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the client knows about a CA in the CACerts", func() {
 					BeforeEach(func() {
-						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 					})
 					It("can reach the gorouter succ", func() {
 						curlAppWithCustomClientTLSConfig(http.StatusOK)
@@ -231,7 +232,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the client presents a cert signed by a CA in ClientCACerts", func() {
 					BeforeEach(func() {
-						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromClientCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 					})
 
 					It("can reach the gorouter successfully", func() {
@@ -241,7 +242,7 @@ var _ = Describe("Router Integration", func() {
 
 				Context("when the client presents a cert signed by a CA in CACerts", func() {
 					BeforeEach(func() {
-						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+						cfg, clientTLSConfig = createCustomSSLConfig(onlyTrustClientCACerts, test_util.TLSConfigFromCACerts, statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 					})
 
 					It("cannot reach the gorouter", func() {
@@ -258,7 +259,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient      *nats.Conn
 		)
 		BeforeEach(func() {
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 			clientTLSConfig.InsecureSkipVerify = true
 		})
 
@@ -312,7 +313,7 @@ var _ = Describe("Router Integration", func() {
 		)
 
 		BeforeEach(func() {
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 		})
 
 		JustBeforeEach(func() {
@@ -400,7 +401,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("Drain", func() {
 		BeforeEach(func() {
-			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
+			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 1, false, 0, natsPort)
 		})
 
 		JustBeforeEach(func() {
@@ -563,7 +564,7 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when ssl is enabled", func() {
 			BeforeEach(func() {
-				tempCfg, _ := createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+				tempCfg, _ := createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 				writeConfig(tempCfg, cfgFile)
 			})
 
@@ -598,7 +599,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("When Dropsonde is misconfigured", func() {
 		It("fails to start", func() {
-			tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			tempCfg.Logging.MetronAddress = ""
 			writeConfig(tempCfg, cfgFile)
 
@@ -609,7 +610,7 @@ var _ = Describe("Router Integration", func() {
 	})
 
 	It("no longer logs component logs as that disabled by default", func() {
-		createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+		createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
@@ -632,7 +633,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("emits route registration latency metrics, but only after a waiting period", func() {
-			tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			tempCfg.Logging.MetronAddress = fakeMetron.Address()
 			tempCfg.RouteLatencyMetricMuzzleDuration = 2 * time.Second
 			writeConfig(tempCfg, cfgFile)
@@ -700,7 +701,7 @@ var _ = Describe("Router Integration", func() {
 
 	Describe("prometheus metrics", func() {
 		It("starts a prometheus https server", func() {
-			c := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			c := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			metricsPort := test_util.NextAvailPort()
 			serverCAPath, serverCertPath, serverKeyPath, clientCert := tls_helpers.GenerateCaAndMutualTlsCerts()
 
@@ -748,7 +749,7 @@ var _ = Describe("Router Integration", func() {
 
 		BeforeEach(func() {
 
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 			cfg.RouteServiceSecret = "route-service-secret"
 			cfg.RouteServiceSecretPrev = "my-previous-route-service-secret"
 
@@ -920,7 +921,7 @@ var _ = Describe("Router Integration", func() {
 	Context("when no oauth config is specified", func() {
 		Context("and routing api is disabled", func() {
 			It("is able to start up", func() {
-				tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+				tempCfg := createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 				tempCfg.OAuth = config.OAuthConfig{}
 				writeConfig(tempCfg, cfgFile)
 
@@ -933,7 +934,7 @@ var _ = Describe("Router Integration", func() {
 
 	Context("when routing api is disabled", func() {
 		BeforeEach(func() {
-			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 			writeConfig(cfg, cfgFile)
 		})
 
@@ -952,7 +953,7 @@ var _ = Describe("Router Integration", func() {
 		)
 
 		BeforeEach(func() {
-			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
+			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 0, natsPort)
 
 			responseBytes = []byte(`[{
 				"guid": "abc123",
@@ -1141,7 +1142,7 @@ var _ = Describe("Router Integration", func() {
 
 		BeforeEach(func() {
 			var clientTLSConfig *tls.Config
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 			writeConfig(cfg, cfgFile)
 			var err error
 			mbusClient, err = newMessageBus(cfg)
@@ -1223,7 +1224,7 @@ var _ = Describe("Router Integration", func() {
 		)
 
 		BeforeEach(func() {
-			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, natsPort)
+			cfg, clientTLSConfig = createSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, sslPort, routeServiceServerPort, natsPort)
 			writeConfig(cfg, cfgFile)
 			var err error
 			mbusClient, err = newMessageBus(cfg)

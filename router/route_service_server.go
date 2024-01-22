@@ -1,6 +1,7 @@
 package router
 
 import (
+	"code.cloudfoundry.org/gorouter/config"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -32,7 +33,7 @@ type RouteServicesServer struct {
 	servers    []*http.Server
 }
 
-func NewRouteServicesServer() (*RouteServicesServer, error) {
+func NewRouteServicesServer(cfg *config.Config) (*RouteServicesServer, error) {
 	caCert, caPriv, err := createCA()
 	if err != nil {
 		return nil, fmt.Errorf("create ca: %s", err)
@@ -50,7 +51,7 @@ func NewRouteServicesServer() (*RouteServicesServer, error) {
 		return nil, fmt.Errorf("create server certificate: %s", err)
 	}
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", cfg.RouteServicesServerPort))
 	if err != nil {
 		return nil, fmt.Errorf("starting local listener: %s", err)
 	}

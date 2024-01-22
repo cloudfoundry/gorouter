@@ -43,10 +43,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	pathStruct := Path{path, test}
 	reqBodyBytes := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes).Encode(pathStruct)
-	return []byte(reqBodyBytes.Bytes())
+	return reqBodyBytes.Bytes()
 }, func(data []byte) {
 	res := Path{}
-	json.Unmarshal([]byte(string(data)), &res)
+	json.Unmarshal(data, &res)
 	gorouterPath = res.Gorouter
 	testAssets = res.Test
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)

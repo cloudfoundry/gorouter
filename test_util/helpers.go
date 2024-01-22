@@ -162,12 +162,12 @@ func runBackendInstance(ln net.Listener, handler connHandler) {
 	}
 }
 
-func SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
-	return generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
+func SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort uint16, natsPorts ...uint16) *config.Config {
+	return generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
+func SpecSSLConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort, routeServiceServerPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -204,8 +204,8 @@ const (
 	TLSConfigFromUnknownCA     = 3
 )
 
-func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
-	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPorts...)
+func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int, statusPort, statusTLSPort, statusRoutesPort, proxyPort, SSLPort, routeServiceServerPort uint16, natsPorts ...uint16) (*config.Config, *tls.Config) {
+	c := generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, natsPorts...)
 
 	c.EnableSSL = true
 
@@ -258,7 +258,7 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 	return c, clientTLSConfig
 }
 
-func generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+func generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort uint16, natsPorts ...uint16) *config.Config {
 	c, err := config.DefaultConfig()
 	Expect(err).ToNot(HaveOccurred())
 
@@ -325,6 +325,7 @@ func generateConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort uint1
 
 	c.Backends.MaxAttempts = 3
 	c.RouteServiceConfig.MaxAttempts = 3
+	c.RouteServicesServerPort = routeServiceServerPort
 
 	return c
 }

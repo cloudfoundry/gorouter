@@ -3,6 +3,7 @@ package router_test
 import (
 	"net/http"
 
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/router"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -15,6 +16,7 @@ var _ = Describe("RouteServicesServer", func() {
 		handler http.Handler
 		errChan chan error
 		req     *http.Request
+		cfg     *config.Config
 	)
 
 	BeforeEach(func() {
@@ -23,7 +25,9 @@ var _ = Describe("RouteServicesServer", func() {
 		})
 
 		var err error
-		rss, err = router.NewRouteServicesServer()
+		cfg, err = config.DefaultConfig()
+		Expect(err).NotTo(HaveOccurred())
+		rss, err = router.NewRouteServicesServer(cfg)
 		Expect(err).NotTo(HaveOccurred())
 
 		errChan = make(chan error)
