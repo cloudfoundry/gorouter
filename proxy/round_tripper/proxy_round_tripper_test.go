@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"sync"
@@ -433,6 +435,54 @@ var _ = Describe("ProxyRoundTripper", func() {
 					logOutput := logger.Buffer()
 					Expect(logOutput).To(gbytes.Say(`backend-endpoint-failed`))
 					Expect(logOutput).To(gbytes.Say(`vcap_request_id`))
+				})
+			})
+
+			Context("when backend writes 1xx response but fails eventually", func() {
+				var done chan struct{}
+				// This situation is causing data race in ReverseProxy
+				// See an issue https://github.com/golang/go/issues/65123
+				BeforeEach(func() {
+					done = make(chan struct{})
+					trace := &httptrace.ClientTrace{
+						Got1xxResponse: func(code int, header textproto.MIMEHeader) error {
+							for i := 0; i < 10000000; i++ {
+								resp.Header().Set("X-Something", "Hello")
+							}
+							return nil
+						},
+					}
+					req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+					transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+						go func() {
+							defer close(done)
+							// emulating readLoop running after the RoundTrip and modifying response headers
+							trace := httptrace.ContextClientTrace(req.Context())
+							if trace != nil && trace.Got1xxResponse != nil {
+								trace.Got1xxResponse(http.StatusContinue, textproto.MIMEHeader{})
+							}
+						}()
+						return nil, errors.New("failed-roundtrip")
+					}
+				})
+
+				JustBeforeEach(func() {
+					realErrorHandler := &round_tripper.ErrorHandler{MetricReporter: combinedReporter}
+					proxyRoundTripper = round_tripper.NewProxyRoundTripper(
+						roundTripperFactory,
+						retriableClassifier,
+						logger,
+						combinedReporter,
+						realErrorHandler,
+						routeServicesTransport,
+						cfg,
+					)
+				})
+
+				It("handles error without data race", func() {
+					_, err := proxyRoundTripper.RoundTrip(req)
+					Expect(err).To(HaveOccurred())
+					Eventually(done).Should(BeClosed())
 				})
 			})
 

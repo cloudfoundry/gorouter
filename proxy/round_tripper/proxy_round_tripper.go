@@ -7,7 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
+	"net/textproto"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/uber-go/zap"
@@ -99,6 +102,17 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 	request := originalRequest.Clone(originalRequest.Context())
 	request, trace := traceRequest(request)
+	responseWriterMu := &sync.Mutex{}
+	requestClientTrace := httptrace.ContextClientTrace(request.Context())
+	originalGot1xxResponse := requestClientTrace.Got1xxResponse
+	requestClientTrace.Got1xxResponse = func(code int, header textproto.MIMEHeader) error {
+		if originalGot1xxResponse == nil {
+			return nil
+		}
+		responseWriterMu.Lock()
+		defer responseWriterMu.Unlock()
+		return originalGot1xxResponse(code, header)
+	}
 
 	if request.Body != nil {
 		// Temporarily disable closing of the body while in the RoundTrip function, since
@@ -266,6 +280,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	}
 
 	if err != nil {
+		// When roundtrip returns an error, transport readLoop might still be running.
+		// Protect access to response headers map which can be handled in Got1xxResponse hook in readLoop
+		// See an issue https://github.com/golang/go/issues/65123
+		responseWriterMu.Lock()
+		defer responseWriterMu.Unlock()
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
 		return nil, err
 	}
