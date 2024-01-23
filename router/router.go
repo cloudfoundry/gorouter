@@ -144,7 +144,7 @@ func NewRouter(
 	}
 
 	if healthListener == nil && component == nil && healthTLSListener == nil {
-		return nil, fmt.Errorf("No TLS certificates provided and non-tls health listner disabled. No health listener can start. This is a bug in gorouter. This error should have been caught when parsing the config")
+		return nil, fmt.Errorf("No TLS certificates provided and non-tls health listener disabled. No health listener can start. This is a bug in gorouter. This error should have been caught when parsing the config")
 	}
 
 	routesListener := &RoutesListener{
