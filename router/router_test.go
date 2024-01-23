@@ -221,8 +221,7 @@ var _ = Describe("Router", func() {
 			c.StartResponseDelayInterval = 1 * time.Second
 		})
 
-		testHealthCheckEndpoint := func(endpoint string) (int, error) {
-			url := fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port)
+		testHealthCheckEndpoint := func(url string) (int, error) {
 			req, _ := http.NewRequest("GET", url, nil)
 
 			tr := &http.Transport{
@@ -237,7 +236,7 @@ var _ = Describe("Router", func() {
 			return resp.StatusCode, nil
 		}
 
-		Context("and nontls is ensabled", func() {
+		Context("and the nontls health listener is enabled", func() {
 			It("does not immediately make the health check endpoint available", func() {
 				// Create a second router to test the health check in parallel to startup
 				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
@@ -259,9 +258,10 @@ var _ = Describe("Router", func() {
 				Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
 			})
 		})
-		Context("and nontls is disabled", func() {
+		Context("and the nontls health listener is disabled", func() {
 			BeforeEach(func() {
 				c.Status.EnableNonTLSHealthChecks = false
+				c.Status.TLSCert = test_util.CreateCert("somestring")
 			})
 			It("never listen on the nontls status port", func() {
 				// Create a second router to test the health check in parallel to startup
@@ -280,7 +280,7 @@ var _ = Describe("Router", func() {
 			})
 		})
 
-		Context("tls is always enabled", func() {
+		Context("when a tls health listener cert is configured", func() {
 			BeforeEach(func() {
 				c.Status.TLSCert = test_util.CreateCert("somestring")
 			})
@@ -295,7 +295,7 @@ var _ = Describe("Router", func() {
 				go rtr.Run(signals, readyChan)
 
 				Consistently(func() int {
-					code, err := testHealthCheckEndpoint(fmt.Sprintf("http://%s:%d/health", c.Ip, c.Status.Port))
+					code, err := testHealthCheckEndpoint(fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port))
 					Expect(err).ToNot(HaveOccurred())
 					return code
 				}, 500*time.Millisecond).Should(Equal(http.StatusServiceUnavailable))
@@ -305,17 +305,39 @@ var _ = Describe("Router", func() {
 			It("should log waiting delay value", func() {
 				Eventually(logger).Should(gbytes.Say("Sleeping before returning success on /health endpoint to preload routing table"))
 			})
+		})
 
-			Context("if tls cert is not provided", func() {
-				BeforeEach(func() {
-					c.Status.TLSCert = tls.Certificate{}
-				})
-				It("returns an error, and the router cannot be started", func() {
-					// Create a second router to test the health check in parallel to startup
-					rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
-					Expect(err).To(HaveOccurred())
-					Expect(rtr).To(BeNil())
-				})
+		Context("when a tls health listener cert is not configured", func() {
+			BeforeEach(func() {
+				c.Status.TLSCert = tls.Certificate{}
+				Expect(len(c.Status.TLSCert.Certificate)).To(Equal(0))
+			})
+			It("does not start the TLS health listener", func() {
+				// Create a second router to test the health check in parallel to startup
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				Expect(err).ToNot(HaveOccurred())
+				signals := make(chan os.Signal)
+				readyChan := make(chan struct{})
+				go rtr.Run(signals, readyChan)
+
+				Consistently(func() error {
+					_, err := testHealthCheckEndpoint(fmt.Sprintf("https://%s:%d/health", c.Ip, c.Status.TLS.Port))
+					return err
+				}, 500*time.Millisecond).Should(MatchError(ContainSubstring("connection refused")))
+				signals <- syscall.SIGUSR1
+			})
+		})
+
+		Context("neither TLS nor non-TLS health listeners are configured", func() {
+			BeforeEach(func() {
+				c.Status.TLSCert = tls.Certificate{}
+				c.Status.EnableNonTLSHealthChecks = false
+			})
+			It("throws an error initalizing the router", func() {
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(ContainSubstring("bug in gorouter")))
+				Expect(rtr).To(BeNil())
 			})
 		})
 	})

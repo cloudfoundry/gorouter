@@ -126,23 +126,25 @@ func NewRouter(
 		}
 	}
 
-	healthTLSListener := &HealthListener{
-		Port: cfg.Status.TLS.Port,
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{cfg.Status.TLSCert},
-			CipherSuites: cfg.CipherSuites,
-			MinVersion:   cfg.MinTLSVersion,
-			MaxVersion:   cfg.MaxTLSVersion,
-		},
-		HealthCheck: healthCheck,
-	}
-
-	if cfg.Status.TLSCert.PrivateKey == nil {
-		return nil, fmt.Errorf("No TLS certificates provided. Health Listener cannot start. This is a bug in gorouter. This error should have been caught when parsing the config")
-	} else {
+	var healthTLSListener *HealthListener
+	if len(cfg.Status.TLSCert.Certificate) != 0 {
+		healthTLSListener = &HealthListener{
+			Port: cfg.Status.TLS.Port,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cfg.Status.TLSCert},
+				CipherSuites: cfg.CipherSuites,
+				MinVersion:   cfg.MinTLSVersion,
+				MaxVersion:   cfg.MaxTLSVersion,
+			},
+			HealthCheck: healthCheck,
+		}
 		if err := healthTLSListener.ListenAndServe(); err != nil {
 			return nil, err
 		}
+	}
+
+	if healthListener == nil && component == nil && healthTLSListener == nil {
+		return nil, fmt.Errorf("No TLS certificates provided and non-tls health listener disabled. No health listener can start. This is a bug in gorouter. This error should have been caught when parsing the config")
 	}
 
 	routesListener := &RoutesListener{

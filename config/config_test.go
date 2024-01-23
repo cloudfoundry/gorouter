@@ -117,6 +117,20 @@ status:
 			Expect(config.Status.Pass).To(Equal("pass"))
 			Expect(config.Status.Routes.Port).To(Equal(uint16(8082)))
 		})
+		Context("when neither tls nor nontls health endpoints are enabled", func() {
+			JustBeforeEach(func() {
+				cfgForSnippet.Status.EnableNonTLSHealthChecks = false
+				cfgForSnippet.Status.TLS.Certificate = ""
+				cfgForSnippet.Status.TLS.Key = ""
+				err := config.Initialize(createYMLSnippet(cfgForSnippet))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			It("throws an error", func() {
+				err := config.Process()
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError("Neither TLS nor non-TLS health endpoints are enabled. Refusing to start gorouter."))
+			})
+		})
 		Context("when tls is specified for the status config", func() {
 			var certPEM, keyPEM []byte
 			var tlsPort uint16
