@@ -181,7 +181,7 @@ func main() {
 		MaxVersion:         c.MaxTLSVersion,
 	}
 
-	rss, err := router.NewRouteServicesServer()
+	rss, err := router.NewRouteServicesServer(c)
 	if err != nil {
 		logger.Fatal("new-route-services-server", zap.Error(err))
 	}

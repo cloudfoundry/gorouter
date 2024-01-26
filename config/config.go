@@ -433,6 +433,7 @@ type Config struct {
 	RouteServiceRecommendHttps        bool             `yaml:"route_services_recommend_https,omitempty"`
 	RouteServicesHairpinning          bool             `yaml:"route_services_hairpinning"`
 	RouteServicesHairpinningAllowlist []string         `yaml:"route_services_hairpinning_allowlist,omitempty"`
+	RouteServicesServerPort           uint16           `yaml:"route_services_internal_server_port"`
 	// These fields are populated by the `Process` function.
 	Ip                          string        `yaml:"-"`
 	RouteServiceEnabled         bool          `yaml:"-"`
@@ -480,19 +481,20 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	Status:        defaultStatusConfig,
-	Nats:          defaultNatsConfig,
-	Logging:       defaultLoggingConfig,
-	Port:          8081,
-	Index:         0,
-	GoMaxProcs:    -1,
-	EnablePROXY:   false,
-	EnableSSL:     false,
-	SSLPort:       443,
-	DisableHTTP:   false,
-	EnableHTTP2:   true,
-	MinTLSVersion: tls.VersionTLS12,
-	MaxTLSVersion: tls.VersionTLS12,
+	Status:                  defaultStatusConfig,
+	Nats:                    defaultNatsConfig,
+	Logging:                 defaultLoggingConfig,
+	Port:                    8081,
+	Index:                   0,
+	GoMaxProcs:              -1,
+	EnablePROXY:             false,
+	EnableSSL:               false,
+	SSLPort:                 443,
+	DisableHTTP:             false,
+	EnableHTTP2:             true,
+	MinTLSVersion:           tls.VersionTLS12,
+	MaxTLSVersion:           tls.VersionTLS12,
+	RouteServicesServerPort: 7070,
 
 	EndpointTimeout:                60 * time.Second,
 	EndpointDialTimeout:            5 * time.Second,

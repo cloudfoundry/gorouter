@@ -1111,6 +1111,25 @@ load_balancer_healthy_threshold: 10s
 						Expect(config.RouteServiceEnabled).To(BeFalse())
 					})
 				})
+
+				Context("when the route service server port is not set", func() {
+					It("uses the default route service server port", func() {
+						Expect(config.RouteServicesServerPort).To(Equal(uint16(7070)))
+					})
+				})
+
+				Context("when the route service server port is set", func() {
+					BeforeEach(func() {
+						cfgForSnippet.RouteServicesServerPort = 7878
+						err := config.Initialize(createYMLSnippet(cfgForSnippet))
+						Expect(err).ToNot(HaveOccurred())
+						Expect(config.Process()).To(Succeed())
+					})
+
+					It("uses the route service server port", func() {
+						Expect(config.RouteServicesServerPort).To(Equal(uint16(7878)))
+					})
+				})
 			})
 		})
 
