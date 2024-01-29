@@ -838,6 +838,9 @@ func (c *Config) processCipherSuites() ([]uint16, error) {
 		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": 0xc02c,
 		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":    0xcca8,
 		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
+		"TLS_AES_128_GCM_SHA256":                  0x1301,
+		"TLS_AES_256_GCM_SHA384":                  0x1302,
+		"TLS_CHACHA20_POLY1305_SHA256":            0x1303,
 	}
 
 	var ciphers []string
