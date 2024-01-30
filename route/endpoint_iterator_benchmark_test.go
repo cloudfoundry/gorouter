@@ -69,13 +69,13 @@ func setupEndpointIterator(total int, azDistribution int, strategy string) route
 	var lb route.EndpointIterator
 	switch strategy {
 	case "round-robin":
-		lb = route.NewRoundRobin(pool, "", false, localAZ)
+		lb = route.NewRoundRobin(pool, "", false, false, localAZ)
 	case "round-robin-locally-optimistic":
-		lb = route.NewRoundRobin(pool, "", true, localAZ)
+		lb = route.NewRoundRobin(pool, "", false, true, localAZ)
 	case "least-connection":
-		lb = route.NewLeastConnection(pool, "", false, localAZ)
+		lb = route.NewLeastConnection(pool, "", false, false, localAZ)
 	case "least-connection-locally-optimistic":
-		lb = route.NewLeastConnection(pool, "", true, localAZ)
+		lb = route.NewLeastConnection(pool, "", false, true, localAZ)
 	default:
 		panic("invalid load balancing strategy")
 	}

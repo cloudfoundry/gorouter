@@ -10,6 +10,7 @@ import (
 	"net/http/httptrace"
 	"net/textproto"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -134,9 +135,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	stickyEndpointID := getStickySession(request, rt.config.StickySessionCookieNames)
+	stickyEndpointID, mustBeSticky := handlers.GetStickySession(request, rt.config.StickySessionCookieNames)
 	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
-	iter := reqInfo.RoutePool.Endpoints(rt.config.LoadBalance, stickyEndpointID, rt.config.LoadBalanceAZPreference, rt.config.Zone)
+	iter := reqInfo.RoutePool.Endpoints(rt.config.LoadBalance, stickyEndpointID, mustBeSticky, rt.config.LoadBalanceAZPreference, rt.config.Zone)
 
 	// The selectEndpointErr needs to be tracked separately. If we get an error
 	// while selecting an endpoint we might just have run out of routes. In
@@ -388,7 +389,8 @@ func setupStickySession(
 
 	requestContainsStickySessionCookies := originalEndpointId != ""
 	requestNotSentToRequestedApp := originalEndpointId != endpoint.PrivateInstanceId
-	shouldSetVCAPID := requestContainsStickySessionCookies && requestNotSentToRequestedApp
+	containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(response.Header.Get("WWW-Authenticate")), "negotiate")
+	shouldSetVCAPID := (containsAuthNegotiateHeader || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
 
 	secure := false
 	maxAge := 0
@@ -438,18 +440,6 @@ func setupStickySession(
 			response.Header.Add(CookieHeader, v)
 		}
 	}
-}
-
-func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
-	// Try choosing a backend using sticky session
-	for stickyCookieName, _ := range stickySessionCookieNames {
-		if _, err := request.Cookie(stickyCookieName); err == nil {
-			if sticky, err := request.Cookie(VcapCookieId); err == nil {
-				return sticky.Value
-			}
-		}
-	}
-	return ""
 }
 
 func requestSentToRouteService(request *http.Request) bool {

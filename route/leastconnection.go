@@ -8,16 +8,18 @@ import (
 type LeastConnection struct {
 	pool                  *EndpointPool
 	initialEndpoint       string
+	mustBeSticky          bool
 	lastEndpoint          *Endpoint
 	randomize             *rand.Rand
 	locallyOptimistic     bool
 	localAvailabilityZone string
 }
 
-func NewLeastConnection(p *EndpointPool, initial string, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
+func NewLeastConnection(p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &LeastConnection{
 		pool:                  p,
 		initialEndpoint:       initial,
+		mustBeSticky:          mustBeSticky,
 		randomize:             rand.New(rand.NewSource(time.Now().UnixNano())),
 		locallyOptimistic:     locallyOptimistic,
 		localAvailabilityZone: localAvailabilityZone,
@@ -28,10 +30,16 @@ func (r *LeastConnection) Next(attempt int) *Endpoint {
 	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
-		r.initialEndpoint = ""
-
 		if e != nil && e.isOverloaded() {
 			e = nil
+		}
+
+		if e == nil && r.mustBeSticky {
+			return nil
+		}
+
+		if !r.mustBeSticky {
+			r.initialEndpoint = ""
 		}
 	}
 

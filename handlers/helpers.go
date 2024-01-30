@@ -67,17 +67,24 @@ func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string,
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")
 	}
-	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, getStickySession(request, stickySessionCookieNames), azPreference, az), nil
+	stickyEndpointID, mustBeSticky := GetStickySession(request, stickySessionCookieNames)
+	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, stickyEndpointID, mustBeSticky, azPreference, az), nil
 }
 
-func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
+func GetStickySession(request *http.Request, stickySessionCookieNames config.StringSet) (string, bool) {
+	containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(request.Header.Get("Authorization")), "negotiate")
+	if containsAuthNegotiateHeader {
+		if sticky, err := request.Cookie(VcapCookieId); err == nil {
+			return sticky.Value, true
+		}
+	}
 	// Try choosing a backend using sticky session
 	for stickyCookieName, _ := range stickySessionCookieNames {
 		if _, err := request.Cookie(stickyCookieName); err == nil {
 			if sticky, err := request.Cookie(VcapCookieId); err == nil {
-				return sticky.Value
+				return sticky.Value, false
 			}
 		}
 	}
-	return ""
+	return "", false
 }

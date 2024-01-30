@@ -13,7 +13,7 @@ import (
 
 const StickyCookieKey = "JSESSIONID"
 
-var _ = Describe("Session Affinity", func() {
+var _ = Describe("Session Affinity with JSESSIONID", func() {
 	var done chan bool
 	var jSessionIdCookie *http.Cookie
 
