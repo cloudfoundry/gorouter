@@ -269,7 +269,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
 
-					iter := routePool.Endpoints("", "", false, AZPreference, AZ)
+					iter := routePool.Endpoints(logger, "", "", false, AZPreference, AZ)
 					ep1 := iter.Next(0)
 					ep2 := iter.Next(1)
 					Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
@@ -427,7 +427,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
-					iter := routePool.Endpoints("", "", false, AZPreference, AZ)
+					iter := routePool.Endpoints(logger, "", "", false, AZPreference, AZ)
 					ep1 := iter.Next(0)
 					ep2 := iter.Next(1)
 					Expect(ep1).To(Equal(ep2))

@@ -7,6 +7,7 @@ import (
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -62,13 +63,13 @@ func upgradeHeader(request *http.Request) string {
 	return ""
 }
 
-func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference string, az string) (route.EndpointIterator, error) {
+func EndpointIteratorForRequest(logger logger.Logger, request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference string, az string) (route.EndpointIterator, error) {
 	reqInfo, err := ContextRequestInfo(request)
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")
 	}
 	stickyEndpointID, mustBeSticky := GetStickySession(request, stickySessionCookieNames)
-	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, stickyEndpointID, mustBeSticky, azPreference, az), nil
+	return reqInfo.RoutePool.Endpoints(logger, loadBalanceMethod, stickyEndpointID, mustBeSticky, azPreference, az), nil
 }
 
 func GetStickySession(request *http.Request, stickySessionCookieNames config.StringSet) (string, bool) {
