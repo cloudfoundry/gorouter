@@ -1180,6 +1180,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Expect(cookies[0].Value).To(SatisfyAny(
 								Equal("id-1"),
 								Equal("id-2")))
+							Expect(cookies[0].MaxAge).To(Equal(60))
+							Expect(cookies[0].Expires).To(Equal(time.Time{}))
+							Expect(cookies[0].Secure).To(Equal(cfg.SecureCookies))
+							Expect(cookies[0].SameSite).To(Equal(http.SameSiteStrictMode))
 						})
 
 						Context("when there is also a VCAP_ID set on the response", func() {
@@ -1236,7 +1240,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 								}
 							})
 
-							It("sets the same properties on the VCAP_ID", func() {
+							It("sets the auth negotiate default properties on the VCAP_ID", func() {
 								resp, err := proxyRoundTripper.RoundTrip(req)
 								Expect(err).ToNot(HaveOccurred())
 
@@ -1249,7 +1253,29 @@ var _ = Describe("ProxyRoundTripper", func() {
 								Expect(cookies[1].Value).To(SatisfyAny(
 									Equal("id-1"),
 									Equal("id-2")))
-								Expect(cookies[1].Raw).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
+								Expect(cookies[1].Raw).To(ContainSubstring("Max-Age=60; HttpOnly; SameSite=Strict"))
+							})
+
+							Context("when config requires secure cookies", func() {
+								BeforeEach(func() {
+									cfg.SecureCookies = true
+								})
+
+								It("sets the auth negotiate default properties with Secure on the VCAP_ID", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									cookies := resp.Cookies()
+									Expect(cookies).To(HaveLen(2))
+									Expect(cookies[0].Raw).To(Equal(sessionCookie.String()))
+									Expect(sessionCookie.String()).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
+
+									Expect(cookies[1].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(cookies[1].Value).To(SatisfyAny(
+										Equal("id-1"),
+										Equal("id-2")))
+									Expect(cookies[1].Raw).To(ContainSubstring("Max-Age=60; HttpOnly; Secure; SameSite=Strict"))
+								})
 							})
 						})
 					})
@@ -1393,6 +1419,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 									Expect(newCookies).To(HaveLen(1))
 									Expect(newCookies[0].Name).To(Equal(round_tripper.VcapCookieId))
 									Expect(newCookies[0].Value).To(Equal("id-5"))
+									Expect(cookies[0].MaxAge).To(Equal(0))
+									Expect(cookies[0].Expires).To(Equal(time.Time{}))
+									Expect(cookies[0].Secure).To(Equal(cfg.SecureCookies))
+									Expect(cookies[0].SameSite).To(Equal(http.SameSite(0)))
 								})
 							})
 

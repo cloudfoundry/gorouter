@@ -28,15 +28,16 @@ import (
 )
 
 const (
-	VcapCookieId              = "__VCAP_ID__"
-	CookieHeader              = "Set-Cookie"
-	BadGatewayMessage         = "502 Bad Gateway: Registered endpoint failed to handle the request."
-	HostnameErrorMessage      = "503 Service Unavailable"
-	InvalidCertificateMessage = "526 Invalid SSL Certificate"
-	SSLHandshakeMessage       = "525 SSL Handshake Failed"
-	SSLCertRequiredMessage    = "496 SSL Certificate Required"
-	ContextCancelledMessage   = "499 Request Cancelled"
-	HTTP2Protocol             = "http2"
+	VcapCookieId                             = "__VCAP_ID__"
+	CookieHeader                             = "Set-Cookie"
+	BadGatewayMessage                        = "502 Bad Gateway: Registered endpoint failed to handle the request."
+	HostnameErrorMessage                     = "503 Service Unavailable"
+	InvalidCertificateMessage                = "526 Invalid SSL Certificate"
+	SSLHandshakeMessage                      = "525 SSL Handshake Failed"
+	SSLCertRequiredMessage                   = "496 SSL Certificate Required"
+	ContextCancelledMessage                  = "499 Request Cancelled"
+	HTTP2Protocol                            = "http2"
+	AuthNegotiateHeaderCookieMaxAgeInSeconds = 60
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -389,25 +390,30 @@ func setupStickySession(
 
 	requestContainsStickySessionCookies := originalEndpointId != ""
 	requestNotSentToRequestedApp := originalEndpointId != endpoint.PrivateInstanceId
-	containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(response.Header.Get("WWW-Authenticate")), "negotiate")
-	shouldSetVCAPID := (containsAuthNegotiateHeader || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
+	responseContainsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(response.Header.Get("WWW-Authenticate")), "negotiate")
+	shouldSetVCAPID := (responseContainsAuthNegotiateHeader || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
 
 	secure := false
 	maxAge := 0
 	sameSite := http.SameSite(0)
 	expiry := time.Time{}
 
-	for _, v := range response.Cookies() {
-		if _, ok := stickySessionCookieNames[v.Name]; ok {
-			shouldSetVCAPID = true
+	if responseContainsAuthNegotiateHeader {
+		maxAge = AuthNegotiateHeaderCookieMaxAgeInSeconds
+		sameSite = http.SameSiteStrictMode
+	} else {
+		for _, v := range response.Cookies() {
+			if _, ok := stickySessionCookieNames[v.Name]; ok {
+				shouldSetVCAPID = true
 
-			if v.MaxAge < 0 {
-				maxAge = v.MaxAge
+				if v.MaxAge < 0 {
+					maxAge = v.MaxAge
+				}
+				secure = v.Secure
+				sameSite = v.SameSite
+				expiry = v.Expires
+				break
 			}
-			secure = v.Secure
-			sameSite = v.SameSite
-			expiry = v.Expires
-			break
 		}
 	}
 
