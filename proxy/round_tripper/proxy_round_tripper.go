@@ -136,7 +136,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	stickyEndpointID, mustBeSticky := handlers.GetStickySession(request, rt.config.StickySessionCookieNames)
+	stickyEndpointID, mustBeSticky := handlers.GetStickySession(request, rt.config.StickySessionCookieNames, rt.config.StickySessionsForAuthNegotiate)
 	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
 	iter := reqInfo.RoutePool.Endpoints(rt.logger, rt.config.LoadBalance, stickyEndpointID, mustBeSticky, rt.config.LoadBalanceAZPreference, rt.config.Zone)
 
@@ -306,6 +306,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		setupStickySession(
 			res, endpoint, stickyEndpointID, rt.config.SecureCookies,
 			reqInfo.RoutePool.ContextPath(), rt.config.StickySessionCookieNames,
+			rt.config.StickySessionsForAuthNegotiate,
 		)
 	}
 
@@ -386,19 +387,20 @@ func setupStickySession(
 	secureCookies bool,
 	path string,
 	stickySessionCookieNames config.StringSet,
+	authNegotiateSticky bool,
 ) {
 
 	requestContainsStickySessionCookies := originalEndpointId != ""
 	requestNotSentToRequestedApp := originalEndpointId != endpoint.PrivateInstanceId
 	responseContainsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(response.Header.Get("WWW-Authenticate")), "negotiate")
-	shouldSetVCAPID := (responseContainsAuthNegotiateHeader || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
+	shouldSetVCAPID := ((authNegotiateSticky && responseContainsAuthNegotiateHeader) || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
 
 	secure := false
 	maxAge := 0
 	sameSite := http.SameSite(0)
 	expiry := time.Time{}
 
-	if responseContainsAuthNegotiateHeader {
+	if responseContainsAuthNegotiateHeader && authNegotiateSticky {
 		maxAge = AuthNegotiateHeaderCookieMaxAgeInSeconds
 		sameSite = http.SameSiteStrictMode
 	} else {

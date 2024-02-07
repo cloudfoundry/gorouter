@@ -150,6 +150,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			cfg.EndpointTimeout = 0 * time.Millisecond
 			cfg.Backends.MaxAttempts = 3
 			cfg.RouteServiceConfig.MaxAttempts = 3
+			cfg.StickySessionsForAuthNegotiate = true
 		})
 
 		JustBeforeEach(func() {
@@ -1275,6 +1276,43 @@ var _ = Describe("ProxyRoundTripper", func() {
 										Equal("id-1"),
 										Equal("id-2")))
 									Expect(cookies[1].Raw).To(ContainSubstring("Max-Age=60; HttpOnly; Secure; SameSite=Strict"))
+								})
+							})
+						})
+						Context("when sticky sessions for 'Authorization: Negotiate' is disabled", func() {
+							BeforeEach(func() {
+								cfg.StickySessionsForAuthNegotiate = false
+							})
+							It("does not set the VCAP_ID cookie", func() {
+								resp, err := proxyRoundTripper.RoundTrip(req)
+								Expect(err).ToNot(HaveOccurred())
+
+								cookies := resp.Cookies()
+								Expect(cookies).To(HaveLen(0))
+							})
+							Context("when there is also a JSESSIONID cookie with extra properties", func() {
+								BeforeEach(func() {
+									transport.RoundTripStub = func(req *http.Request) (*http.Response, error) {
+										resp := &http.Response{StatusCode: http.StatusTeapot, Header: make(map[string][]string)}
+										setAuthorizationNegotiateHeader(resp)
+										setJSESSIONID(req, resp, true)
+										return resp, nil
+									}
+								})
+								It("sets the VCAP_ID cookie with JSESSION_ID properties", func() {
+									resp, err := proxyRoundTripper.RoundTrip(req)
+									Expect(err).ToNot(HaveOccurred())
+
+									cookies := resp.Cookies()
+									Expect(cookies).To(HaveLen(2))
+									Expect(cookies[0].Raw).To(Equal(sessionCookie.String()))
+									Expect(sessionCookie.String()).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
+
+									Expect(cookies[1].Name).To(Equal(round_tripper.VcapCookieId))
+									Expect(cookies[1].Value).To(SatisfyAny(
+										Equal("id-1"),
+										Equal("id-2")))
+									Expect(cookies[1].Raw).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
 								})
 							})
 						})
