@@ -237,7 +237,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
 	}
 
-	nestedIterator, err := handlers.EndpointIteratorForRequest(request, p.config.LoadBalance, p.config.StickySessionCookieNames, p.config.LoadBalanceAZPreference, p.config.Zone)
+	nestedIterator, err := handlers.EndpointIteratorForRequest(logger, request, p.config.LoadBalance, p.config.StickySessionCookieNames, p.config.LoadBalanceAZPreference, p.config.Zone)
 	if err != nil {
 		logger.Panic("request-info-err", zap.Error(err))
 	}

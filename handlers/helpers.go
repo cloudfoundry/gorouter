@@ -7,6 +7,7 @@ import (
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -62,22 +63,29 @@ func upgradeHeader(request *http.Request) string {
 	return ""
 }
 
-func EndpointIteratorForRequest(request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference string, az string) (route.EndpointIterator, error) {
+func EndpointIteratorForRequest(logger logger.Logger, request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference string, az string) (route.EndpointIterator, error) {
 	reqInfo, err := ContextRequestInfo(request)
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")
 	}
-	return reqInfo.RoutePool.Endpoints(loadBalanceMethod, getStickySession(request, stickySessionCookieNames), azPreference, az), nil
+	stickyEndpointID, mustBeSticky := GetStickySession(request, stickySessionCookieNames)
+	return reqInfo.RoutePool.Endpoints(logger, loadBalanceMethod, stickyEndpointID, mustBeSticky, azPreference, az), nil
 }
 
-func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
+func GetStickySession(request *http.Request, stickySessionCookieNames config.StringSet) (string, bool) {
+	containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(request.Header.Get("Authorization")), "negotiate")
+	if containsAuthNegotiateHeader {
+		if sticky, err := request.Cookie(VcapCookieId); err == nil {
+			return sticky.Value, true
+		}
+	}
 	// Try choosing a backend using sticky session
 	for stickyCookieName, _ := range stickySessionCookieNames {
 		if _, err := request.Cookie(stickyCookieName); err == nil {
 			if sticky, err := request.Cookie(VcapCookieId); err == nil {
-				return sticky.Value
+				return sticky.Value, false
 			}
 		}
 	}
-	return ""
+	return "", false
 }

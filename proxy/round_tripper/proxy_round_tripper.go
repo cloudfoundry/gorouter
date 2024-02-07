@@ -10,6 +10,7 @@ import (
 	"net/http/httptrace"
 	"net/textproto"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,15 +28,16 @@ import (
 )
 
 const (
-	VcapCookieId              = "__VCAP_ID__"
-	CookieHeader              = "Set-Cookie"
-	BadGatewayMessage         = "502 Bad Gateway: Registered endpoint failed to handle the request."
-	HostnameErrorMessage      = "503 Service Unavailable"
-	InvalidCertificateMessage = "526 Invalid SSL Certificate"
-	SSLHandshakeMessage       = "525 SSL Handshake Failed"
-	SSLCertRequiredMessage    = "496 SSL Certificate Required"
-	ContextCancelledMessage   = "499 Request Cancelled"
-	HTTP2Protocol             = "http2"
+	VcapCookieId                             = "__VCAP_ID__"
+	CookieHeader                             = "Set-Cookie"
+	BadGatewayMessage                        = "502 Bad Gateway: Registered endpoint failed to handle the request."
+	HostnameErrorMessage                     = "503 Service Unavailable"
+	InvalidCertificateMessage                = "526 Invalid SSL Certificate"
+	SSLHandshakeMessage                      = "525 SSL Handshake Failed"
+	SSLCertRequiredMessage                   = "496 SSL Certificate Required"
+	ContextCancelledMessage                  = "499 Request Cancelled"
+	HTTP2Protocol                            = "http2"
+	AuthNegotiateHeaderCookieMaxAgeInSeconds = 60
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
@@ -134,9 +136,9 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		return nil, errors.New("ProxyResponseWriter not set on context")
 	}
 
-	stickyEndpointID := getStickySession(request, rt.config.StickySessionCookieNames)
+	stickyEndpointID, mustBeSticky := handlers.GetStickySession(request, rt.config.StickySessionCookieNames)
 	numberOfEndpoints := reqInfo.RoutePool.NumEndpoints()
-	iter := reqInfo.RoutePool.Endpoints(rt.config.LoadBalance, stickyEndpointID, rt.config.LoadBalanceAZPreference, rt.config.Zone)
+	iter := reqInfo.RoutePool.Endpoints(rt.logger, rt.config.LoadBalance, stickyEndpointID, mustBeSticky, rt.config.LoadBalanceAZPreference, rt.config.Zone)
 
 	// The selectEndpointErr needs to be tracked separately. If we get an error
 	// while selecting an endpoint we might just have run out of routes. In
@@ -388,24 +390,30 @@ func setupStickySession(
 
 	requestContainsStickySessionCookies := originalEndpointId != ""
 	requestNotSentToRequestedApp := originalEndpointId != endpoint.PrivateInstanceId
-	shouldSetVCAPID := requestContainsStickySessionCookies && requestNotSentToRequestedApp
+	responseContainsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(response.Header.Get("WWW-Authenticate")), "negotiate")
+	shouldSetVCAPID := (responseContainsAuthNegotiateHeader || requestContainsStickySessionCookies) && requestNotSentToRequestedApp
 
 	secure := false
 	maxAge := 0
 	sameSite := http.SameSite(0)
 	expiry := time.Time{}
 
-	for _, v := range response.Cookies() {
-		if _, ok := stickySessionCookieNames[v.Name]; ok {
-			shouldSetVCAPID = true
+	if responseContainsAuthNegotiateHeader {
+		maxAge = AuthNegotiateHeaderCookieMaxAgeInSeconds
+		sameSite = http.SameSiteStrictMode
+	} else {
+		for _, v := range response.Cookies() {
+			if _, ok := stickySessionCookieNames[v.Name]; ok {
+				shouldSetVCAPID = true
 
-			if v.MaxAge < 0 {
-				maxAge = v.MaxAge
+				if v.MaxAge < 0 {
+					maxAge = v.MaxAge
+				}
+				secure = v.Secure
+				sameSite = v.SameSite
+				expiry = v.Expires
+				break
 			}
-			secure = v.Secure
-			sameSite = v.SameSite
-			expiry = v.Expires
-			break
 		}
 	}
 
@@ -438,18 +446,6 @@ func setupStickySession(
 			response.Header.Add(CookieHeader, v)
 		}
 	}
-}
-
-func getStickySession(request *http.Request, stickySessionCookieNames config.StringSet) string {
-	// Try choosing a backend using sticky session
-	for stickyCookieName, _ := range stickySessionCookieNames {
-		if _, err := request.Cookie(stickyCookieName); err == nil {
-			if sticky, err := request.Cookie(VcapCookieId); err == nil {
-				return sticky.Value
-			}
-		}
-	}
-	return ""
 }
 
 func requestSentToRouteService(request *http.Request) bool {

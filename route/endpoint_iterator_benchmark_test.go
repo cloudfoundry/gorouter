@@ -8,6 +8,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 func testLoadBalance(lb route.EndpointIterator, b *testing.B) {
@@ -36,6 +37,7 @@ func setupEndpointIterator(total int, azDistribution int, strategy string) route
 		ContextPath:        "",
 		MaxConnsPerBackend: 0,
 	})
+	logger := test_util.NewTestZapLogger("test")
 
 	// Create endpoints with desired AZ distribution
 	endpoints := make([]*route.Endpoint, 0)
@@ -69,13 +71,13 @@ func setupEndpointIterator(total int, azDistribution int, strategy string) route
 	var lb route.EndpointIterator
 	switch strategy {
 	case "round-robin":
-		lb = route.NewRoundRobin(pool, "", false, localAZ)
+		lb = route.NewRoundRobin(logger, pool, "", false, false, localAZ)
 	case "round-robin-locally-optimistic":
-		lb = route.NewRoundRobin(pool, "", true, localAZ)
+		lb = route.NewRoundRobin(logger, pool, "", false, true, localAZ)
 	case "least-connection":
-		lb = route.NewLeastConnection(pool, "", false, localAZ)
+		lb = route.NewLeastConnection(logger, pool, "", false, false, localAZ)
 	case "least-connection-locally-optimistic":
-		lb = route.NewLeastConnection(pool, "", true, localAZ)
+		lb = route.NewLeastConnection(logger, pool, "", false, true, localAZ)
 	default:
 		panic("invalid load balancing strategy")
 	}

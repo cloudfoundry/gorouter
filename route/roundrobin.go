@@ -2,21 +2,28 @@ package route
 
 import (
 	"time"
+
+	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
 )
 
 type RoundRobin struct {
-	pool *EndpointPool
+	logger logger.Logger
+	pool   *EndpointPool
 
 	initialEndpoint       string
+	mustBeSticky          bool
 	lastEndpoint          *Endpoint
 	locallyOptimistic     bool
 	localAvailabilityZone string
 }
 
-func NewRoundRobin(p *EndpointPool, initial string, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
+func NewRoundRobin(logger logger.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &RoundRobin{
+		logger:                logger,
 		pool:                  p,
 		initialEndpoint:       initial,
+		mustBeSticky:          mustBeSticky,
 		locallyOptimistic:     locallyOptimistic,
 		localAvailabilityZone: localAvailabilityZone,
 	}
@@ -26,10 +33,22 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
-		r.initialEndpoint = ""
-
 		if e != nil && e.isOverloaded() {
+			if r.mustBeSticky {
+				r.logger.Debug("endpoint-overloaded-but-request-must-be-sticky", e.endpoint.ToLogData()...)
+				return nil
+			}
 			e = nil
+		}
+
+		if e == nil && r.mustBeSticky {
+			r.logger.Debug("endpoint-missing-but-request-must-be-sticky", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			return nil
+		}
+
+		if !r.mustBeSticky {
+			r.logger.Debug("endpoint-missing-choosing-alternate", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			r.initialEndpoint = ""
 		}
 	}
 
