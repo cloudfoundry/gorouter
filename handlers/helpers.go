@@ -63,20 +63,22 @@ func upgradeHeader(request *http.Request) string {
 	return ""
 }
 
-func EndpointIteratorForRequest(logger logger.Logger, request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, azPreference string, az string) (route.EndpointIterator, error) {
+func EndpointIteratorForRequest(logger logger.Logger, request *http.Request, loadBalanceMethod string, stickySessionCookieNames config.StringSet, authNegotiateSticky bool, azPreference string, az string) (route.EndpointIterator, error) {
 	reqInfo, err := ContextRequestInfo(request)
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")
 	}
-	stickyEndpointID, mustBeSticky := GetStickySession(request, stickySessionCookieNames)
+	stickyEndpointID, mustBeSticky := GetStickySession(request, stickySessionCookieNames, authNegotiateSticky)
 	return reqInfo.RoutePool.Endpoints(logger, loadBalanceMethod, stickyEndpointID, mustBeSticky, azPreference, az), nil
 }
 
-func GetStickySession(request *http.Request, stickySessionCookieNames config.StringSet) (string, bool) {
-	containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(request.Header.Get("Authorization")), "negotiate")
-	if containsAuthNegotiateHeader {
-		if sticky, err := request.Cookie(VcapCookieId); err == nil {
-			return sticky.Value, true
+func GetStickySession(request *http.Request, stickySessionCookieNames config.StringSet, authNegotiateSticky bool) (string, bool) {
+	if authNegotiateSticky {
+		containsAuthNegotiateHeader := strings.HasPrefix(strings.ToLower(request.Header.Get("Authorization")), "negotiate")
+		if containsAuthNegotiateHeader {
+			if sticky, err := request.Cookie(VcapCookieId); err == nil {
+				return sticky.Value, true
+			}
 		}
 	}
 	// Try choosing a backend using sticky session

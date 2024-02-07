@@ -420,11 +420,12 @@ type Config struct {
 
 	RouteLatencyMetricMuzzleDuration time.Duration `yaml:"route_latency_metric_muzzle_duration,omitempty"`
 
-	DrainWait                time.Duration `yaml:"drain_wait,omitempty"`
-	DrainTimeout             time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies            bool          `yaml:"secure_cookies,omitempty"`
-	StickySessionCookieNames StringSet     `yaml:"sticky_session_cookie_names"`
-	HealthCheckUserAgent     string        `yaml:"healthcheck_user_agent,omitempty"`
+	DrainWait                      time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout                   time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies                  bool          `yaml:"secure_cookies,omitempty"`
+	StickySessionCookieNames       StringSet     `yaml:"sticky_session_cookie_names"`
+	StickySessionsForAuthNegotiate bool          `yaml:"sticky_sessions_for_auth_negotiate"`
+	HealthCheckUserAgent           string        `yaml:"healthcheck_user_agent,omitempty"`
 
 	OAuth                             OAuthConfig      `yaml:"oauth,omitempty"`
 	RoutingApi                        RoutingApiConfig `yaml:"routing_api,omitempty"`
@@ -533,7 +534,8 @@ var defaultConfig = Config{
 	MaxIdleConns:        100,
 	MaxIdleConnsPerHost: 2,
 
-	StickySessionCookieNames: StringSet{"JSESSIONID": struct{}{}},
+	StickySessionCookieNames:       StringSet{"JSESSIONID": struct{}{}},
+	StickySessionsForAuthNegotiate: false,
 
 	PerRequestMetricsReporting: true,
 
