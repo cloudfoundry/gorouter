@@ -515,8 +515,8 @@ func (e *Endpoint) CanonicalAddr() string {
 	return e.addr
 }
 
-func (rm *Endpoint) Component() string {
-	return rm.Tags["component"]
+func (e *Endpoint) Component() string {
+	return e.Tags["component"]
 }
 
 func (e *Endpoint) ToLogData() []zap.Field {
@@ -525,6 +525,7 @@ func (e *Endpoint) ToLogData() []zap.Field {
 		zap.String("Addr", e.addr),
 		zap.Object("Tags", e.Tags),
 		zap.String("RouteServiceUrl", e.RouteServiceUrl),
+		zap.String("AZ", e.AvailabilityZone),
 	}
 }
 

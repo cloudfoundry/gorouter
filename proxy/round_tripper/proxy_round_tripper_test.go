@@ -131,6 +131,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Port:                 9090,
 				PrivateInstanceId:    "instanceId",
 				PrivateInstanceIndex: "1",
+				AvailabilityZone:     AZ,
 			})
 
 			added := routePool.Put(endpoint)
@@ -262,6 +263,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 							Port:                 9090,
 							PrivateInstanceId:    fmt.Sprintf("instanceID%d", i),
 							PrivateInstanceIndex: fmt.Sprintf("%d", i),
+							AvailabilityZone:     AZ,
 						})
 
 						Expect(routePool.Put(endpoint)).To(Equal(route.ADDED))
@@ -282,6 +284,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						if strings.Contains(errorLogs[i], "backend-endpoint-failed") {
 							count++
 						}
+						Expect(errorLogs[i]).To(ContainSubstring(AZ))
 					}
 					Expect(count).To(Equal(2))
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
