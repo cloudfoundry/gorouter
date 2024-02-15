@@ -83,6 +83,7 @@ var _ = BeforeEach(func() {
 	conf.EnableHTTP2 = false
 	conf.Backends.MaxAttempts = 3
 	conf.RouteServiceConfig.MaxAttempts = 3
+	conf.DisableKeepAlives = false
 	fakeReporter = &fakes.FakeCombinedReporter{}
 	fakeRegistry = fake_registry.NewMetricsRegistry()
 	skipSanitization = func(*http.Request) bool { return false }

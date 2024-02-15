@@ -10,7 +10,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 type protocolCheck struct {

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	metrics "code.cloudfoundry.org/go-metric-registry"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 type Registry interface {

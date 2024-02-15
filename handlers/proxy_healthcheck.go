@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/common/health"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 type proxyHealthcheck struct {

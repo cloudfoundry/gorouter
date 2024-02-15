@@ -14,7 +14,7 @@ import (
 
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -213,6 +213,15 @@ func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwarde
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
 	logger := handlers.LoggerWithTraceInfo(p.logger, request)
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
+
+	if request.ProtoMajor < 2 {
+		rc := http.NewResponseController(proxyWriter)
+
+		err := rc.EnableFullDuplex()
+		if err != nil {
+			logger.Panic("enable-full-duplex-err", zap.Error(err))
+		}
+	}
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
 	if err != nil {
