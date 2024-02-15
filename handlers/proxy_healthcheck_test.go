@@ -11,7 +11,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 var _ = Describe("Proxy Healthcheck", func() {

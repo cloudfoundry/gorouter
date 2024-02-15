@@ -39,6 +39,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		rt                 *sharedfakes.RoundTripper
 		tlsConfig          *tls.Config
 		ew                 = errorwriter.NewPlaintextErrorWriter()
+		responseRecorder   *ResponseRecorderWithFullDuplex
 	)
 
 	Describe("ServeHTTP", func() {
@@ -78,7 +79,8 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
 
-			resp = utils.NewProxyResponseWriter(httptest.NewRecorder())
+			responseRecorder = &ResponseRecorderWithFullDuplex{httptest.NewRecorder(), nil, 0}
+			resp = utils.NewProxyResponseWriter(responseRecorder)
 		})
 
 		Context("when backend fails to respond", func() {
@@ -90,6 +92,35 @@ var _ = Describe("Proxy Unit tests", func() {
 
 				Eventually(fakeLogger).Should(Say("route-endpoint"))
 				Eventually(fakeLogger).Should(Say("error"))
+			})
+		})
+
+		Describe("full duplex", func() {
+			Context("for HTTP/1.1 requests", func() {
+				It("enables full duplex", func() {
+					req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
+					proxyObj.ServeHTTP(resp, req)
+					Expect(responseRecorder.EnableFullDuplexCallCount).To(Equal(1))
+				})
+
+				Context("when enabling duplex fails", func() {
+					It("fails", func() {
+						responseRecorder.EnableFullDuplexErr = errors.New("unsupported")
+						req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
+						proxyObj.ServeHTTP(resp, req)
+
+						Eventually(fakeLogger).Should(Say("enable-full-duplex-err"))
+					})
+				})
+			})
+
+			Context("for HTTP/2 requests", func() {
+				It("does not enable full duplex", func() {
+					req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
+					req.ProtoMajor = 2
+					proxyObj.ServeHTTP(resp, req)
+					Expect(responseRecorder.EnableFullDuplexCallCount).To(Equal(0))
+				})
 			})
 		})
 
@@ -249,4 +280,16 @@ func (h *hasBeenToRouteServiceValidatorFake) ArrivedViaRouteService(req *http.Re
 
 func (h *hasBeenToRouteServiceValidatorFake) IsRouteServiceTraffic(req *http.Request) bool {
 	return h.ValidatedIsRouteServiceTrafficCall.Returns.Value
+}
+
+type ResponseRecorderWithFullDuplex struct {
+	*httptest.ResponseRecorder
+
+	EnableFullDuplexErr       error
+	EnableFullDuplexCallCount int
+}
+
+func (r *ResponseRecorderWithFullDuplex) EnableFullDuplex() error {
+	r.EnableFullDuplexCallCount++
+	return r.EnableFullDuplexErr
 }

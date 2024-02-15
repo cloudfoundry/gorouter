@@ -218,4 +218,11 @@ var _ = Describe("ProxyWriter", func() {
 		Expect(r2.rewriteHeaderCalled).To(BeTrue())
 		Expect(r2.rewriteHeaderHeader).To(HaveKey("Foo"))
 	})
+
+	Describe("Unwrap", func() {
+		It("returns the underlying ResponseWriter", func() {
+			responseWriter := proxy.Unwrap()
+			Expect(responseWriter).To(Equal(fake))
+		})
+	})
 })

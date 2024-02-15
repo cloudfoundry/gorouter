@@ -17,7 +17,7 @@ import (
 
 	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/openzipkin/zipkin-go/model"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 type key string

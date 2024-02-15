@@ -9,7 +9,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 type reporterHandler struct {

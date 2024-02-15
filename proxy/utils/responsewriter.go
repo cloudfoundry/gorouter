@@ -118,6 +118,11 @@ func (p *proxyResponseWriter) Size() int {
 	return p.size
 }
 
+// Satisfy http.ResponseController support (Go 1.20+)
+func (p *proxyResponseWriter) Unwrap() http.ResponseWriter {
+	return p.w
+}
+
 func (p *proxyResponseWriter) AddHeaderRewriter(r HeaderRewriter) {
 	p.headerRewriters = append(p.headerRewriters, r)
 }

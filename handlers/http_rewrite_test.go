@@ -8,7 +8,7 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

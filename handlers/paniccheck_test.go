@@ -16,7 +16,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/urfave/negroni"
+	"github.com/urfave/negroni/v3"
 )
 
 var _ = Describe("Paniccheck", func() {
