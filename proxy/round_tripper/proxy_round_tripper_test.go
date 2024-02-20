@@ -993,7 +993,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("when using sticky sessions", func() {
 				var (
-					sessionCookie *http.Cookie
+					sessionCookie *round_tripper.Cookie
 					endpoint1     *route.Endpoint
 					endpoint2     *route.Endpoint
 
@@ -1018,6 +1018,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						sessionCookie.Expires = time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
 						sessionCookie.Secure = true
 						sessionCookie.HttpOnly = true
+						sessionCookie.Partitioned = true
 					}
 
 					sessionCookie.Value, _ = uuid.GenerateUUID()
@@ -1026,9 +1027,11 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 
 				setVCAPID := func(resp *http.Response) (response *http.Response) {
-					vcapCookie := http.Cookie{
-						Name:  round_tripper.VcapCookieId,
-						Value: "vcap-id-property-already-on-the-response",
+					vcapCookie := round_tripper.Cookie{
+						Cookie: http.Cookie{
+							Name:  round_tripper.VcapCookieId,
+							Value: "vcap-id-property-already-on-the-response",
+						},
 					}
 
 					if c := vcapCookie.String(); c != "" {
@@ -1072,8 +1075,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 				}
 
 				BeforeEach(func() {
-					sessionCookie = &http.Cookie{
-						Name: StickyCookieKey, //JSESSIONID
+					sessionCookie = &round_tripper.Cookie{
+						Cookie: http.Cookie{
+							Name: StickyCookieKey, //JSESSIONID
+						},
 					}
 
 					endpoint1 = route.NewEndpoint(&route.EndpointOpts{
@@ -1365,10 +1370,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 								newCookies := resp.Cookies()
 								Expect(newCookies).To(HaveLen(2))
 								Expect(newCookies[0].Raw).To(Equal(sessionCookie.String()))
+
+								// This should fail when Golang introduces parsing for the Partitioned flag on cookies.
+								// see https://github.com/golang/go/issues/62490
+								Expect(newCookies[0].Unparsed).To(Equal([]string{"Partitioned"}))
+
 								Expect(newCookies[1].Name).To(Equal(round_tripper.VcapCookieId))
 								Expect(newCookies[1].Value).To(Equal(cookies[1].Value)) // still pointing to the same app
-								Expect(sessionCookie.String()).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
-								Expect(newCookies[1].Raw).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict"))
+								Expect(sessionCookie.String()).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict; Partitioned"))
+								Expect(newCookies[1].Raw).To(ContainSubstring("Expires=Wed, 01 Jan 2020 01:00:00 GMT; HttpOnly; Secure; SameSite=Strict; Partitioned"))
 							})
 						})
 
