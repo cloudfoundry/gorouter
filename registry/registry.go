@@ -1,7 +1,9 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"time"
@@ -81,11 +83,18 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 }
 
 func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
+	ctx := context.Background()
+
+	ctx, t := trace.NewTask(ctx, uri.RouteKey().String())
+	defer t.End()
+	defer trace.StartRegion(ctx, "RouteRegistry.Register").End()
+
 	if !r.endpointInRouterShard(endpoint) {
+		trace.Log(ctx, "", "route not in shard")
 		return
 	}
 
-	endpointAdded := r.register(uri, endpoint)
+	endpointAdded := r.registerCtx(ctx, uri, endpoint)
 
 	r.reporter.CaptureRegistryMessage(endpoint)
 
@@ -104,17 +113,21 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
+	return r.registerCtx(context.Background(), uri, endpoint)
+}
+
+func (r *RouteRegistry) registerCtx(ctx context.Context, uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
 	r.RLock()
 	defer r.RUnlock()
 
 	t := time.Now()
 	routekey := uri.RouteKey()
-	pool := r.byURI.Find(routekey)
+	pool := r.byURI.FindCtx(ctx, routekey)
 
 	if pool == nil {
 		// release read lock, insertRouteKey() will acquire a write lock.
 		r.RUnlock()
-		pool = r.insertRouteKey(routekey, uri)
+		pool = r.insertRouteKeyCtx(ctx, routekey, uri)
 		r.RLock()
 	}
 
@@ -131,11 +144,17 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 
 // insertRouteKey acquires a write lock, inserts the route key into the registry and releases the write lock.
 func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route.EndpointPool {
+	return r.insertRouteKeyCtx(context.Background(), routekey, uri)
+}
+
+func (r *RouteRegistry) insertRouteKeyCtx(ctx context.Context, routekey route.Uri, uri route.Uri) *route.EndpointPool {
+	defer trace.StartRegion(ctx, "RouteRegistry.insertRouteKey").End()
+
 	r.Lock()
 	defer r.Unlock()
 
 	// double check that the route key is still not found, now with the write lock.
-	pool := r.byURI.Find(routekey)
+	pool := r.byURI.FindCtx(ctx, routekey)
 	if pool == nil {
 		host, contextPath := splitHostAndContextPath(uri)
 		pool = route.NewPool(&route.PoolOpts{
@@ -145,7 +164,7 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 			ContextPath:        contextPath,
 			MaxConnsPerBackend: r.maxConnsPerBackend,
 		})
-		r.byURI.Insert(routekey, pool)
+		r.byURI.InsertCtx(ctx, routekey, pool)
 		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
 		// for backward compatibility:
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
@@ -154,24 +173,34 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 }
 
 func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
+	ctx := context.Background()
+
+	ctx, t := trace.NewTask(ctx, uri.RouteKey().String())
+	defer t.End()
+	defer trace.StartRegion(ctx, "RouteRegistry.Unregister").End()
+
 	if !r.endpointInRouterShard(endpoint) {
 		return
 	}
 
-	r.unregister(uri, endpoint)
+	r.unregisterCtx(ctx, uri, endpoint)
 
 	r.reporter.CaptureUnregistryMessage(endpoint)
 }
 
 func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
+	r.unregisterCtx(context.Background(), uri, endpoint)
+}
+
+func (r *RouteRegistry) unregisterCtx(ctx context.Context, uri route.Uri, endpoint *route.Endpoint) {
 	r.Lock()
 	defer r.Unlock()
 
 	uri = uri.RouteKey()
 
-	pool := r.byURI.Find(uri)
+	pool := r.byURI.FindCtx(ctx, uri)
 	if pool != nil {
-		endpointRemoved := pool.Remove(endpoint)
+		endpointRemoved := pool.RemoveCtx(ctx, endpoint)
 		if endpointRemoved {
 			r.logger.Info("endpoint-unregistered", zapData(uri, endpoint)...)
 		} else {
@@ -181,11 +210,11 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 		if pool.IsEmpty() {
 			if r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 {
 				if time.Since(pool.LastUpdated()) > r.EmptyPoolTimeout {
-					r.byURI.Delete(uri)
+					r.byURI.DeleteCtx(ctx, uri)
 					r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
 				}
 			} else {
-				r.byURI.Delete(uri)
+				r.byURI.DeleteCtx(ctx, uri)
 				r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
 			}
 		}

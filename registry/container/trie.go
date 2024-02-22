@@ -1,6 +1,8 @@
 package container
 
 import (
+	"context"
+	"runtime/trace"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -16,6 +18,11 @@ type Trie struct {
 
 // Find returns a *route.EndpointPool that matches exactly the URI parameter, nil if no match was found.
 func (r *Trie) Find(uri route.Uri) *route.EndpointPool {
+	return r.FindCtx(context.Background(), uri)
+}
+func (r *Trie) FindCtx(ctx context.Context, uri route.Uri) *route.EndpointPool {
+	defer trace.StartRegion(ctx, "Trie.Find").End()
+
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 
@@ -80,6 +87,12 @@ func (r *Trie) MatchUri(uri route.Uri) *route.EndpointPool {
 }
 
 func (r *Trie) Insert(uri route.Uri, value *route.EndpointPool) *Trie {
+	return r.InsertCtx(context.Background(), uri, value)
+}
+
+func (r *Trie) InsertCtx(ctx context.Context, uri route.Uri, value *route.EndpointPool) *Trie {
+	defer trace.StartRegion(ctx, "Trie.Insert").End()
+
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 
@@ -109,6 +122,12 @@ func (r *Trie) Insert(uri route.Uri, value *route.EndpointPool) *Trie {
 }
 
 func (r *Trie) Delete(uri route.Uri) bool {
+	return r.DeleteCtx(context.Background(), uri)
+}
+
+func (r *Trie) DeleteCtx(ctx context.Context, uri route.Uri) bool {
+	defer trace.StartRegion(ctx, "Trie.Delete").End()
+
 	key := strings.TrimPrefix(uri.String(), "/")
 	node := r
 	initialKey := key
@@ -129,12 +148,18 @@ func (r *Trie) Delete(uri route.Uri) bool {
 		key = nextKey
 	}
 	node.Pool = nil
-	r.deleteEmptyNodes(initialKey)
+	r.deleteEmptyNodesCtx(ctx, initialKey)
 
 	return true
 }
 
 func (r *Trie) deleteEmptyNodes(key string) {
+	r.deleteEmptyNodesCtx(context.Background(), key)
+}
+
+func (r *Trie) deleteEmptyNodesCtx(ctx context.Context, key string) {
+	defer trace.StartRegion(ctx, "Trie.deleteEmptyNodes").End()
+
 	node := r
 	nodeToKeep := r
 	var nodeToRemove *Trie

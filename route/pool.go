@@ -1,11 +1,13 @@
 package route
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"math/rand"
 	"net/http"
+	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -251,6 +253,11 @@ func (p *EndpointPool) Update() {
 }
 
 func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
+	return p.PutCtx(context.Background(), endpoint)
+}
+
+func (p *EndpointPool) PutCtx(ctx context.Context, endpoint *Endpoint) PoolPutResult {
+	defer trace.StartRegion(ctx, "EndpointPool.Put").End()
 	p.Lock()
 	defer p.Unlock()
 
@@ -337,8 +344,13 @@ func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 	return prunedEndpoints
 }
 
-// Returns true if the endpoint was removed from the EndpointPool, false otherwise.
 func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
+	return p.RemoveCtx(context.Background(), endpoint)
+}
+
+// Returns true if the endpoint was removed from the EndpointPool, false otherwise.
+func (p *EndpointPool) RemoveCtx(ctx context.Context, endpoint *Endpoint) bool {
+	defer trace.StartRegion(ctx, "EndpointPool.Remove").End()
 	var e *endpointElem
 
 	p.Lock()
