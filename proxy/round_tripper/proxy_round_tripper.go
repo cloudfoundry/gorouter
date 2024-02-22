@@ -163,12 +163,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	var selectEndpointErr error
 	var maxAttempts int
 	if reqInfo.RouteServiceURL == nil {
-		maxAttempts = rt.config.Backends.MaxAttempts
+		maxAttempts = max(min(rt.config.Backends.MaxAttempts, reqInfo.RoutePool.NumEndpoints()), 1)
 	} else {
 		maxAttempts = rt.config.RouteServiceConfig.MaxAttempts
 	}
 
-	for attempt := 1; attempt <= maxAttempts || maxAttempts == 0; attempt++ {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		logger := rt.logger
 
 		// Reset the trace to prepare for new times and prevent old data from polluting our results.

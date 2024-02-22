@@ -125,6 +125,9 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
+	// Next MUST either return the next endpoint available or nil. It MUST NOT return the same endpoint.
+	// All available endpoints MUST have been used before any can be used again.
+	// ProxyRoundTripper will not retry more often than endpoints available.
 	Next(attempt int) *Endpoint
 	EndpointFailed(err error)
 	PreRequest(e *Endpoint)
