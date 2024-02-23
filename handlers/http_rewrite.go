@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"runtime/trace"
 
 	"github.com/urfave/negroni/v3"
 
@@ -43,6 +44,8 @@ func NewHTTPRewriteHandler(cfg config.HTTPRewrite, headersToAlwaysRemove []strin
 }
 
 func (p *httpRewriteHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "httpRewriteHandler.ServerHTTP").End()
+
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 	for _, rewriter := range p.responseHeaderRewriters {
 		proxyWriter.AddHeaderRewriter(rewriter)

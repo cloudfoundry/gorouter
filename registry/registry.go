@@ -22,6 +22,7 @@ type Registry interface {
 	Register(uri route.Uri, endpoint *route.Endpoint)
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
 	Lookup(uri route.Uri) *route.EndpointPool
+	LookupCtx(ctx context.Context, uri route.Uri) *route.EndpointPool
 	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.EndpointPool
 }
 
@@ -222,6 +223,12 @@ func (r *RouteRegistry) unregisterCtx(ctx context.Context, uri route.Uri, endpoi
 }
 
 func (r *RouteRegistry) Lookup(uri route.Uri) *route.EndpointPool {
+	return r.LookupCtx(context.Background(), uri)
+}
+
+func (r *RouteRegistry) LookupCtx(ctx context.Context, uri route.Uri) *route.EndpointPool {
+	defer trace.StartRegion(ctx, "RouteRegistry.Lookup").End()
+
 	started := time.Now()
 
 	pool := r.lookup(uri)

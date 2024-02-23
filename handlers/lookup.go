@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
+	"runtime/trace"
 	"strings"
-
-	"fmt"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -13,6 +13,7 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 )
@@ -53,6 +54,8 @@ func NewLookup(
 }
 
 func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "lookupHandler.ServeHTTP").End()
+
 	logger := LoggerWithTraceInfo(l.logger, r)
 	// gorouter requires the Host header to know to which backend to proxy to.
 	//
@@ -106,6 +109,7 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		return
 	}
 	requestInfo.RoutePool = pool
+
 	next(rw, r)
 }
 
@@ -203,7 +207,7 @@ func (l *lookupHandler) lookup(r *http.Request, logger logger.Logger) (*route.En
 		return l.registry.LookupWithInstance(uri, appID, appIndex), nil
 	}
 
-	return l.registry.Lookup(uri), nil
+	return l.registry.LookupCtx(r.Context(), uri), nil
 }
 
 func validateInstanceHeader(appInstanceHeader string) error {

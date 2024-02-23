@@ -9,6 +9,7 @@ import (
 	"net/http/httptrace"
 	"net/textproto"
 	"net/url"
+	"runtime/trace"
 	"slices"
 	"strings"
 	"sync"
@@ -112,12 +113,14 @@ type roundTripper struct {
 }
 
 func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response, error) {
+	defer trace.StartRegion(originalRequest.Context(), "roundTripper.RoundTrip").End()
+
 	var err error
 	var res *http.Response
 	var endpoint *route.Endpoint
 
 	request := originalRequest.Clone(originalRequest.Context())
-	request, trace := traceRequest(request)
+	request, reqTrace := traceRequest(request)
 	responseWriterMu := &sync.Mutex{}
 	requestClientTrace := httptrace.ContextClientTrace(request.Context())
 	originalGot1xxResponse := requestClientTrace.Got1xxResponse
@@ -171,7 +174,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		logger := rt.logger
 
 		// Reset the trace to prepare for new times and prevent old data from polluting our results.
-		trace.Reset()
+		reqTrace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
 			// Because this for-loop is 1-indexed, we substract one from the attempt value passed to selectEndpoint,
@@ -195,7 +198,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable, err := rt.isRetriable(request, err, reqTrace)
 
 				logger.Error("backend-endpoint-failed",
 					zap.Error(err),
@@ -203,12 +206,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					zap.Bool("retriable", retriable),
 					zap.Int("num-endpoints", numberOfEndpoints),
-					zap.Bool("got-connection", trace.GotConn()),
-					zap.Bool("wrote-headers", trace.WroteHeaders()),
-					zap.Bool("conn-reused", trace.ConnReused()),
-					zap.Float64("dns-lookup-time", trace.DnsTime()),
-					zap.Float64("dial-time", trace.DialTime()),
-					zap.Float64("tls-handshake-time", trace.TlsTime()),
+					zap.Bool("got-connection", reqTrace.GotConn()),
+					zap.Bool("wrote-headers", reqTrace.WroteHeaders()),
+					zap.Bool("conn-reused", reqTrace.ConnReused()),
+					zap.Float64("dns-lookup-time", reqTrace.DnsTime()),
+					zap.Float64("dial-time", reqTrace.DialTime()),
+					zap.Float64("tls-handshake-time", reqTrace.TlsTime()),
 				)
 
 				iter.EndpointFailed(err)
@@ -244,7 +247,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
-				retriable, err := rt.isRetriable(request, err, trace)
+				retriable, err := rt.isRetriable(request, err, reqTrace)
 
 				logger.Error(
 					"route-service-connection-failed",
@@ -254,12 +257,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					zap.Bool("retriable", retriable),
 					zap.Int("num-endpoints", numberOfEndpoints),
-					zap.Bool("got-connection", trace.GotConn()),
-					zap.Bool("wrote-headers", trace.WroteHeaders()),
-					zap.Bool("conn-reused", trace.ConnReused()),
-					zap.Float64("dns-lookup-time", trace.DnsTime()),
-					zap.Float64("dial-time", trace.DialTime()),
-					zap.Float64("tls-handshake-time", trace.TlsTime()),
+					zap.Bool("got-connection", reqTrace.GotConn()),
+					zap.Bool("wrote-headers", reqTrace.WroteHeaders()),
+					zap.Bool("conn-reused", reqTrace.ConnReused()),
+					zap.Float64("dns-lookup-time", reqTrace.DnsTime()),
+					zap.Float64("dial-time", reqTrace.DialTime()),
+					zap.Float64("tls-handshake-time", reqTrace.TlsTime()),
 				)
 
 				if retriable {
@@ -309,12 +312,12 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	reqInfo.RoundTripSuccessful = true
 
 	// Record the times from the last attempt, but only if it succeeded.
-	reqInfo.DnsStartedAt = trace.DnsStart()
-	reqInfo.DnsFinishedAt = trace.DnsDone()
-	reqInfo.DialStartedAt = trace.DialStart()
-	reqInfo.DialFinishedAt = trace.DialDone()
-	reqInfo.TlsHandshakeStartedAt = trace.TlsStart()
-	reqInfo.TlsHandshakeFinishedAt = trace.TlsDone()
+	reqInfo.DnsStartedAt = reqTrace.DnsStart()
+	reqInfo.DnsFinishedAt = reqTrace.DnsDone()
+	reqInfo.DialStartedAt = reqTrace.DialStart()
+	reqInfo.DialFinishedAt = reqTrace.DialDone()
+	reqInfo.TlsHandshakeStartedAt = reqTrace.TlsStart()
+	reqInfo.TlsHandshakeFinishedAt = reqTrace.TlsDone()
 
 	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
@@ -338,6 +341,8 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 }
 
 func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.Endpoint, iter route.EndpointIterator, logger logger.Logger) (*http.Response, error) {
+	defer trace.StartRegion(request.Context(), "roundTripper.backendRoundTrip").End()
+
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)

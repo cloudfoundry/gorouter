@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"runtime/trace"
 
 	"code.cloudfoundry.org/gorouter/logger"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 )
@@ -42,6 +44,10 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 
 	r.Header.Set(VcapRequestIdHeader, traceInfo.UUID)
 	logger.Debug("vcap-request-id-header-set", zap.String("VcapRequestIdHeader", traceInfo.UUID))
+
+	ctx, task := trace.NewTask(r.Context(), "request: "+traceInfo.UUID)
+	defer task.End()
+	r = r.WithContext(ctx)
 
 	next(rw, r)
 }

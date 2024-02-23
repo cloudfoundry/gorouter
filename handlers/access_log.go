@@ -3,6 +3,7 @@ package handlers
 import (
 	"io"
 	"net/http"
+	"runtime/trace"
 	"sync/atomic"
 	"time"
 
@@ -40,6 +41,8 @@ func NewAccessLog(
 }
 
 func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "accessLog.ServeHTTP").End()
+
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 
 	alr := &schema.AccessLogRecord{

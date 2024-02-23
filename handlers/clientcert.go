@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime/trace"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
@@ -42,6 +43,8 @@ func NewClientCert(
 }
 
 func (c *clientCert) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "clientCert.ServeHTTP").End()
+
 	logger := LoggerWithTraceInfo(c.logger, r)
 	skip := c.skipSanitization(r)
 	if !skip {

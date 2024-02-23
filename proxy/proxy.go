@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"runtime/trace"
 	"strings"
 	"time"
 
@@ -211,6 +212,8 @@ func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwarde
 }
 
 func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(request.Context(), "proxy.ServeHTTP").End()
+
 	logger := handlers.LoggerWithTraceInfo(p.logger, request)
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 

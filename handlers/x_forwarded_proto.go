@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"runtime/trace"
 )
 
 type XForwardedProto struct {
@@ -11,6 +12,8 @@ type XForwardedProto struct {
 }
 
 func (h *XForwardedProto) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "XForwardedProto.ServeHTTP").End()
+
 	newReq := new(http.Request)
 	*newReq = *r
 	skip := h.SkipSanitization(r)

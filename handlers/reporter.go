@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"runtime/trace"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -28,6 +29,8 @@ func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.H
 
 // ServeHTTP handles reporting the response after the request has been completed
 func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "reporterHandler.ServeHTTP").End()
+
 	logger := LoggerWithTraceInfo(rh.logger, r)
 	next(rw, r)
 

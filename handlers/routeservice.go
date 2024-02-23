@@ -6,16 +6,17 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime/trace"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
-
-	"code.cloudfoundry.org/gorouter/route"
 )
 
 type RouteService struct {
@@ -48,6 +49,8 @@ func NewRouteService(
 }
 
 func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(req.Context(), "RouteService.ServeHTTP").End()
+
 	logger := LoggerWithTraceInfo(r.logger, req)
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {

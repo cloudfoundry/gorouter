@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"runtime/trace"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
@@ -40,6 +41,8 @@ func NewMaxRequestSize(cfg *config.Config, logger logger.Logger) *MaxRequestSize
 }
 
 func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	defer trace.StartRegion(r.Context(), "MaxRequestSize.ServeHTTP").End()
+
 	logger := LoggerWithTraceInfo(m.logger, r)
 	reqSize := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 5 // add 5 bytes for space-separation of method, URI, protocol, and /r/n
 
