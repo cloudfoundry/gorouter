@@ -118,7 +118,7 @@ func (r *Trie) Delete(uri route.Uri) bool {
 
 		// It is currently impossible to Delete a non-existent path. This invariant is
 		// provided by the fact that a call to Find is done before Delete in the registry.
-		matchingChild, _ := node.ChildNodes[segmentValue]
+		matchingChild := node.ChildNodes[segmentValue]
 
 		node = matchingChild
 
@@ -142,7 +142,7 @@ func (r *Trie) deleteEmptyNodes(key string) {
 	for {
 		segmentValue, nextKey, found := strings.Cut(key, "/")
 
-		matchingChild, _ := node.ChildNodes[segmentValue]
+		matchingChild := node.ChildNodes[segmentValue]
 
 		if nil == nodeToRemove && nil == matchingChild.Pool && len(matchingChild.ChildNodes) < 2 {
 			nodeToRemove = matchingChild
