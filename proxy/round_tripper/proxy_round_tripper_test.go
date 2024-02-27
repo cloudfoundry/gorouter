@@ -89,7 +89,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			reqInfo *handlers.RequestInfo
 
-			endpoint *route.Endpoint
+			numEndpoints int
+			endpoint     *route.Endpoint
 
 			dialError = &net.OpError{
 				Err: errors.New("error"),
@@ -106,6 +107,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				ContextPath:        "",
 				MaxConnsPerBackend: 0,
 			})
+			numEndpoints = 1
 			resp = httptest.NewRecorder()
 			proxyWriter := utils.NewProxyResponseWriter(resp)
 			reqBody = new(testBody)
@@ -124,23 +126,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			reqInfo.ProxyResponseWriter = proxyWriter
 
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
-
-			endpoint = route.NewEndpoint(&route.EndpointOpts{
-				AppId:                "appId",
-				Host:                 "1.1.1.1",
-				Port:                 9090,
-				PrivateInstanceId:    "instanceId",
-				PrivateInstanceIndex: "1",
-				AvailabilityZone:     AZ,
-			})
-
-			added := routePool.Put(endpoint)
-			Expect(added).To(Equal(route.ADDED))
-
 			combinedReporter = new(fakes.FakeCombinedReporter)
-
 			errorHandler = &roundtripperfakes.ErrorHandler{}
-
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			retriableClassifier = &errorClassifierFakes.Classifier{}
 			retriableClassifier.ClassifyReturns(false)
@@ -155,6 +142,20 @@ var _ = Describe("ProxyRoundTripper", func() {
 		})
 
 		JustBeforeEach(func() {
+			for i := 1; i <= numEndpoints; i++ {
+				endpoint = route.NewEndpoint(&route.EndpointOpts{
+					AppId:                fmt.Sprintf("appID%d", i),
+					Host:                 fmt.Sprintf("%d.%d.%d.%d", i, i, i, i),
+					Port:                 9090,
+					PrivateInstanceId:    fmt.Sprintf("instanceID%d", i),
+					PrivateInstanceIndex: fmt.Sprintf("%d", i),
+					AvailabilityZone:     AZ,
+				})
+
+				added := routePool.Put(endpoint)
+				Expect(added).To(Equal(route.ADDED))
+			}
+
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
 				roundTripperFactory,
 				retriableClassifier,
@@ -210,14 +211,15 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(transport.RoundTripCallCount()).To(Equal(1))
 					outreq := transport.RoundTripArgsForCall(0)
-					Expect(outreq.Header.Get("X-CF-ApplicationID")).To(Equal("appId"))
-					Expect(outreq.Header.Get("X-CF-InstanceID")).To(Equal("instanceId"))
+					Expect(outreq.Header.Get("X-CF-ApplicationID")).To(Equal("appID1"))
+					Expect(outreq.Header.Get("X-CF-InstanceID")).To(Equal("instanceID1"))
 					Expect(outreq.Header.Get("X-CF-InstanceIndex")).To(Equal("1"))
 				})
 			})
 
 			Context("when some backends fail", func() {
 				BeforeEach(func() {
+					numEndpoints = 3
 					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
 						switch transport.RoundTripCallCount() {
 						case 1:
@@ -240,7 +242,6 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(transport.RoundTripCallCount()).To(Equal(3))
 					Expect(retriableClassifier.ClassifyCallCount()).To(Equal(2))
 
-					Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 					Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 				})
@@ -250,25 +251,19 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(3))
-					for i := 0; i < 3; i++ {
-						Expect(combinedReporter.CaptureRoutingRequestArgsForCall(i)).To(Equal(endpoint))
-					}
+					// Test if each endpoint has been used
+					routePool.Each(func(endpoint *route.Endpoint) {
+						found := false
+						for i := 0; i < 3; i++ {
+							if combinedReporter.CaptureRoutingRequestArgsForCall(i) == endpoint {
+								found = true
+							}
+						}
+						Expect(found).To(BeTrue())
+					})
 				})
 
 				It("logs the error and removes offending backend", func() {
-					for i := 0; i < 2; i++ {
-						endpoint = route.NewEndpoint(&route.EndpointOpts{
-							AppId:                fmt.Sprintf("appID%d", i),
-							Host:                 fmt.Sprintf("%d, %d, %d, %d", i, i, i, i),
-							Port:                 9090,
-							PrivateInstanceId:    fmt.Sprintf("instanceID%d", i),
-							PrivateInstanceIndex: fmt.Sprintf("%d", i),
-							AvailabilityZone:     AZ,
-						})
-
-						Expect(routePool.Put(endpoint)).To(Equal(route.ADDED))
-					}
-
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -320,6 +315,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 			Context("with 5 backends, 4 of them failing", func() {
 				BeforeEach(func() {
+					numEndpoints = 5
 					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
 						switch transport.RoundTripCallCount() {
 						case 1:
@@ -350,15 +346,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(err).To(MatchError(ContainSubstring("connection refused")))
 						Expect(transport.RoundTripCallCount()).To(Equal(4))
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
-
-						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
 					})
 				})
 
-				Context("when MaxAttempts is set to 0 (unlimited)", func() {
+				Context("when MaxAttempts is set to 10", func() {
 					BeforeEach(func() {
-						cfg.Backends.MaxAttempts = 0
+						cfg.Backends.MaxAttempts = 10
 					})
 
 					It("retries until success", func() {
@@ -366,10 +360,75 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(transport.RoundTripCallCount()).To(Equal(5))
 						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
-
-						Expect(reqInfo.RouteEndpoint).To(Equal(endpoint))
 						Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
 						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+					})
+				})
+			})
+
+			Context("with 5 backends, all of them failing", func() {
+				BeforeEach(func() {
+					numEndpoints = 5
+					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+						return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+					}
+
+					retriableClassifier.ClassifyReturns(true)
+				})
+
+				Context("when MaxAttempts is set to 4", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxAttempts = 4
+					})
+
+					It("stops after 4 tries, returning an error", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(MatchError(ContainSubstring("connection refused")))
+						Expect(transport.RoundTripCallCount()).To(Equal(4))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
+						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+					})
+				})
+
+				Context("when MaxAttempts is set to 10", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxAttempts = 10
+					})
+
+					It("still stops after 5 tries when all backends have been tried, returning an error", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(MatchError(ContainSubstring("connection refused")))
+						Expect(transport.RoundTripCallCount()).To(Equal(5))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(5))
+						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+					})
+				})
+
+				Context("when MaxAttempts is set to 0 (illegal value)", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxAttempts = 0
+					})
+
+					It("still tries once, returning an error", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(MatchError(ContainSubstring("connection refused")))
+						Expect(transport.RoundTripCallCount()).To(Equal(1))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+					})
+				})
+
+				Context("when MaxAttempts is set to < 0 (illegal value)", func() {
+					BeforeEach(func() {
+						cfg.Backends.MaxAttempts = -1
+					})
+
+					It("still tries once, returning an error", func() {
+						_, err := proxyRoundTripper.RoundTrip(req)
+						Expect(err).To(MatchError(ContainSubstring("connection refused")))
+						Expect(transport.RoundTripCallCount()).To(Equal(1))
+						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
 					})
 				})
 			})
@@ -503,96 +562,102 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 			})
 
-			DescribeTable("when the backend fails with an empty response error (io.EOF)",
-				func(reqBody io.ReadCloser, getBodyIsNil bool, reqMethod string, headers map[string]string, classify fails.ClassifierFunc, expectRetry bool) {
-					badResponse := &http.Response{
-						Header: make(map[string][]string),
-					}
-					badResponse.Header.Add(handlers.VcapRequestIdHeader, "some-request-id")
+			Context("with two endpoints, one of them failing", func() {
+				BeforeEach(func() {
+					numEndpoints = 2
+				})
 
-					// The first request fails with io.EOF, the second (if retried) succeeds
-					transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
-						switch transport.RoundTripCallCount() {
-						case 1:
-							return nil, io.EOF
-						case 2:
-							return &http.Response{StatusCode: http.StatusTeapot}, nil
-						default:
-							return nil, nil
+				DescribeTable("when the backend fails with an empty response error (io.EOF)",
+					func(reqBody io.ReadCloser, getBodyIsNil bool, reqMethod string, headers map[string]string, classify fails.ClassifierFunc, expectRetry bool) {
+						badResponse := &http.Response{
+							Header: make(map[string][]string),
 						}
-					}
+						badResponse.Header.Add(handlers.VcapRequestIdHeader, "some-request-id")
 
-					retriableClassifier.ClassifyStub = classify
-					req.Method = reqMethod
-					req.Body = reqBody
-					if !getBodyIsNil {
-						req.GetBody = func() (io.ReadCloser, error) {
-							return new(testBody), nil
+						// The first request fails with io.EOF, the second (if retried) succeeds
+						transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+							switch transport.RoundTripCallCount() {
+							case 1:
+								return nil, io.EOF
+							case 2:
+								return &http.Response{StatusCode: http.StatusTeapot}, nil
+							default:
+								return nil, nil
+							}
 						}
-					}
-					if headers != nil {
-						for key, value := range headers {
-							req.Header.Add(key, value)
+
+						retriableClassifier.ClassifyStub = classify
+						req.Method = reqMethod
+						req.Body = reqBody
+						if !getBodyIsNil {
+							req.GetBody = func() (io.ReadCloser, error) {
+								return new(testBody), nil
+							}
 						}
-					}
+						if headers != nil {
+							for key, value := range headers {
+								req.Header.Add(key, value)
+							}
+						}
 
-					res, err := proxyRoundTripper.RoundTrip(req)
+						res, err := proxyRoundTripper.RoundTrip(req)
 
-					if expectRetry {
-						Expect(err).NotTo(HaveOccurred())
-						Expect(transport.RoundTripCallCount()).To(Equal(2))
-						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
-						Expect(res.StatusCode).To(Equal(http.StatusTeapot))
-					} else {
-						Expect(errors.Is(err, io.EOF)).To(BeTrue())
-						Expect(transport.RoundTripCallCount()).To(Equal(1))
-						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
-					}
-				},
+						if expectRetry {
+							Expect(err).NotTo(HaveOccurred())
+							Expect(transport.RoundTripCallCount()).To(Equal(2))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+							Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+						} else {
+							Expect(errors.Is(err, io.EOF)).To(BeTrue())
+							Expect(transport.RoundTripCallCount()).To(Equal(1))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(1))
+						}
+					},
 
-				Entry("POST, body is empty: does not retry", nil, true, "POST", nil, fails.IdempotentRequestEOF, false),
-				Entry("POST, body is not empty and GetBody is non-nil: does not retry", reqBody, false, "POST", nil, fails.IdempotentRequestEOF, false),
-				Entry("POST, body is not empty: does not retry", reqBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
-				Entry("POST, body is http.NoBody: does not retry", http.NoBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is empty: does not retry", nil, true, "POST", nil, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is not empty and GetBody is non-nil: does not retry", reqBody, false, "POST", nil, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is not empty: does not retry", reqBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is http.NoBody: does not retry", http.NoBody, true, "POST", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("POST, body is empty, X-Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
-				Entry("POST, body is not empty and GetBody is non-nil, X-Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
-				Entry("POST, body is not empty, X-Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
-				Entry("POST, body is http.NoBody, X-Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is empty, X-Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+					Entry("POST, body is not empty and GetBody is non-nil, X-Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+					Entry("POST, body is not empty, X-Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is http.NoBody, X-Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"X-Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
 
-				Entry("POST, body is empty, Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
-				Entry("POST, body is not empty and GetBody is non-nil, Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
-				Entry("POST, body is not empty, Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
-				Entry("POST, body is http.NoBody, Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is empty, Idempotency-Key header: attempts retry", nil, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+					Entry("POST, body is not empty and GetBody is non-nil, Idempotency-Key header: attempts retry", reqBody, false, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IncompleteRequest, true),
+					Entry("POST, body is not empty, Idempotency-Key header: does not retry", reqBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
+					Entry("POST, body is http.NoBody, Idempotency-Key header: does not retry", http.NoBody, true, "POST", map[string]string{"Idempotency-Key": "abc123"}, fails.IdempotentRequestEOF, false),
 
-				Entry("GET, body is empty: attempts retry", nil, true, "GET", nil, fails.IncompleteRequest, true),
-				Entry("GET, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "GET", nil, fails.IncompleteRequest, true),
-				Entry("GET, body is not empty: does not retry", reqBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
-				Entry("GET, body is http.NoBody: does not retry", http.NoBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
+					Entry("GET, body is empty: attempts retry", nil, true, "GET", nil, fails.IncompleteRequest, true),
+					Entry("GET, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "GET", nil, fails.IncompleteRequest, true),
+					Entry("GET, body is not empty: does not retry", reqBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
+					Entry("GET, body is http.NoBody: does not retry", http.NoBody, true, "GET", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("TRACE, body is empty: attempts retry", nil, true, "TRACE", nil, fails.IncompleteRequest, true),
-				Entry("TRACE, body is not empty: does not retry", reqBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
-				Entry("TRACE, body is http.NoBody: does not retry", http.NoBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
-				Entry("TRACE, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "TRACE", nil, fails.IncompleteRequest, true),
+					Entry("TRACE, body is empty: attempts retry", nil, true, "TRACE", nil, fails.IncompleteRequest, true),
+					Entry("TRACE, body is not empty: does not retry", reqBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
+					Entry("TRACE, body is http.NoBody: does not retry", http.NoBody, true, "TRACE", nil, fails.IdempotentRequestEOF, false),
+					Entry("TRACE, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "TRACE", nil, fails.IncompleteRequest, true),
 
-				Entry("HEAD, body is empty: attempts retry", nil, true, "HEAD", nil, fails.IncompleteRequest, true),
-				Entry("HEAD, body is not empty: does not retry", reqBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
-				Entry("HEAD, body is http.NoBody: does not retry", http.NoBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
-				Entry("HEAD, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "HEAD", nil, fails.IncompleteRequest, true),
+					Entry("HEAD, body is empty: attempts retry", nil, true, "HEAD", nil, fails.IncompleteRequest, true),
+					Entry("HEAD, body is not empty: does not retry", reqBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
+					Entry("HEAD, body is http.NoBody: does not retry", http.NoBody, true, "HEAD", nil, fails.IdempotentRequestEOF, false),
+					Entry("HEAD, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "HEAD", nil, fails.IncompleteRequest, true),
 
-				Entry("OPTIONS, body is empty: attempts retry", nil, true, "OPTIONS", nil, fails.IncompleteRequest, true),
-				Entry("OPTIONS, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "OPTIONS", nil, fails.IncompleteRequest, true),
-				Entry("OPTIONS, body is not empty: does not retry", reqBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
-				Entry("OPTIONS, body is http.NoBody: does not retry", http.NoBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
+					Entry("OPTIONS, body is empty: attempts retry", nil, true, "OPTIONS", nil, fails.IncompleteRequest, true),
+					Entry("OPTIONS, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "OPTIONS", nil, fails.IncompleteRequest, true),
+					Entry("OPTIONS, body is not empty: does not retry", reqBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
+					Entry("OPTIONS, body is http.NoBody: does not retry", http.NoBody, true, "OPTIONS", nil, fails.IdempotentRequestEOF, false),
 
-				Entry("<empty method>, body is empty: attempts retry", nil, true, "", nil, fails.IncompleteRequest, true),
-				Entry("<empty method>, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "", nil, fails.IncompleteRequest, true),
-				Entry("<empty method>, body is not empty: does not retry", reqBody, true, "", nil, fails.IdempotentRequestEOF, false),
-				Entry("<empty method>, body is http.NoBody: does not retry", http.NoBody, true, "", nil, fails.IdempotentRequestEOF, false),
-			)
+					Entry("<empty method>, body is empty: attempts retry", nil, true, "", nil, fails.IncompleteRequest, true),
+					Entry("<empty method>, body is not empty and GetBody is non-nil: attempts retry", reqBody, false, "", nil, fails.IncompleteRequest, true),
+					Entry("<empty method>, body is not empty: does not retry", reqBody, true, "", nil, fails.IdempotentRequestEOF, false),
+					Entry("<empty method>, body is http.NoBody: does not retry", http.NoBody, true, "", nil, fails.IdempotentRequestEOF, false),
+				)
+			})
 
 			Context("when there are no more endpoints available", func() {
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					removed := routePool.Remove(endpoint)
 					Expect(removed).To(BeTrue())
 				})
@@ -721,7 +786,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			})
 
 			Context("when backend is registered with a tls port", func() {
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					var oldEndpoints []*route.Endpoint
 					routePool.Each(func(endpoint *route.Endpoint) {
 						oldEndpoints = append(oldEndpoints, endpoint)
@@ -755,7 +820,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				Context("when the backend is registered with a non-tls port", func() {
-					BeforeEach(func() {
+					JustBeforeEach(func() {
 						endpoint = route.NewEndpoint(&route.EndpointOpts{
 							Host: "1.1.1.1",
 							Port: 9090,
@@ -1074,7 +1139,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					return resp, nil
 				}
 
-				BeforeEach(func() {
+				JustBeforeEach(func() {
 					sessionCookie = &round_tripper.Cookie{
 						Cookie: http.Cookie{
 							Name: StickyCookieKey, //JSESSIONID
