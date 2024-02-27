@@ -127,10 +127,8 @@ func NewTopApps() *TopApps {
 
 	go func() {
 		for {
-			select {
-			case <-x.C:
-				x.Trim(time.Now().Add(-TopAppsEntryLifetime))
-			}
+			<-x.C
+			x.Trim(time.Now().Add(-TopAppsEntryLifetime))
 		}
 	}()
 

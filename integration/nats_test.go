@@ -196,10 +196,8 @@ var _ = Describe("NATS Integration", func() {
 
 			go func() {
 				for {
-					select {
-					case <-runningTicker.C:
-						runningApp.Register()
-					}
+					<-runningTicker.C
+					runningApp.Register()
 				}
 			}()
 
@@ -252,10 +250,8 @@ var _ = Describe("NATS Integration", func() {
 
 				go func() {
 					for {
-						select {
-						case <-runningTicker.C:
-							runningApp.Register()
-						}
+						<-runningTicker.C
+						runningApp.Register()
 					}
 				}()
 				runningApp.VerifyAppStatus(200)
