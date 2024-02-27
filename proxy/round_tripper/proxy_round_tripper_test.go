@@ -594,10 +594,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 								return new(testBody), nil
 							}
 						}
-						if headers != nil {
-							for key, value := range headers {
-								req.Header.Add(key, value)
-							}
+						for key, value := range headers {
+							req.Header.Add(key, value)
 						}
 
 						res, err := proxyRoundTripper.RoundTrip(req)
