@@ -452,7 +452,6 @@ func (p *EndpointPool) EndpointFailed(endpoint *Endpoint, err error) {
 		return
 	}
 
-	return
 }
 
 func (p *EndpointPool) Each(f func(endpoint *Endpoint)) {
