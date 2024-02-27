@@ -2,7 +2,6 @@ package routeservice_test
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"time"
 
@@ -99,7 +98,7 @@ var _ = Describe("Route Service Config", func() {
 
 			Expect(args.ParsedUrl).To(Equal(rsURL))
 			Expect(args.URLString).To(Equal(rsUrl))
-			Expect(args.ForwardedURL).To(Equal(fmt.Sprintf("%s", forwardedUrl)))
+			Expect(args.ForwardedURL).To(Equal(forwardedUrl))
 		})
 	})
 
