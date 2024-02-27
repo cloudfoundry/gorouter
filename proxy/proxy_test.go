@@ -3007,7 +3007,7 @@ func wsClient(conn net.Conn, urlStr string) (*websocket.Conn, error) {
 }
 
 func parseResponseTimeFromLog(log string) float64 {
-	r, err := regexp.Compile("response_time:(\\d+.\\d+)")
+	r, err := regexp.Compile(`response_time:(\d+.\d+)`)
 	Expect(err).ToNot(HaveOccurred())
 
 	responseTimeStr := r.FindStringSubmatch(log)
