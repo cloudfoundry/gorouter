@@ -2339,7 +2339,7 @@ var _ = Describe("Proxy", func() {
 				req := test_util.NewRequest("GET", "nil-endpoint", "/", nil)
 				conn.WriteRequest(req)
 
-				b := make([]byte, 0, 0)
+				b := make([]byte, 0)
 				buf := bytes.NewBuffer(b)
 				log.SetOutput(buf)
 				res, _ := conn.ReadResponse()
