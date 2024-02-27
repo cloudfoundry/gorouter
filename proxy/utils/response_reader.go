@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 )
@@ -16,7 +15,7 @@ type ReadResponseResult struct {
 type TimeoutError struct{}
 
 func (t TimeoutError) Error() string {
-	return fmt.Sprintf("timeout waiting for http response from backend")
+	return "timeout waiting for http response from backend"
 }
 
 // ReadResponseWithTimeout extends http.ReadResponse but it utilizes a timeout

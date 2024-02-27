@@ -95,7 +95,7 @@ var _ = Describe("AccessLogRecord", func() {
 			})
 			Context("when the extra request headers are too large", func() {
 				It("truncates the log", func() {
-					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-headers"))
+					record.Request.URL, _ = url.Parse("http://meow.com/long-headers")
 					record.Request.Method = http.MethodGet
 					for i := 0; i < 30000; i++ {
 						record.Request.Header.Add(fmt.Sprintf("%d", i), fmt.Sprintf("%d", i))
@@ -352,7 +352,7 @@ var _ = Describe("AccessLogRecord", func() {
 			})
 			Context("when the extra request headers are too large", func() {
 				It("does not truncate the log", func() {
-					record.Request.URL, _ = url.Parse(fmt.Sprintf("http://meow.com/long-headers"))
+					record.Request.URL, _ = url.Parse("http://meow.com/long-headers")
 					record.Request.Method = http.MethodGet
 					for i := 0; i < 2000; i++ {
 						record.Request.Header.Add(fmt.Sprintf("%d", i), fmt.Sprintf("%d", i))
