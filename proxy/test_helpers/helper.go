@@ -12,13 +12,13 @@ import (
 
 type NullVarz struct{}
 
-func (_ NullVarz) MarshalJSON() ([]byte, error)            { return json.Marshal(nil) }
-func (_ NullVarz) ActiveApps() *stats.ActiveApps           { return stats.NewActiveApps() }
-func (_ NullVarz) CaptureBadRequest()                      {}
-func (_ NullVarz) CaptureBadGateway()                      {}
-func (_ NullVarz) CaptureRoutingRequest(b *route.Endpoint) {}
-func (_ NullVarz) CaptureRoutingResponse(int)              {}
-func (_ NullVarz) CaptureRoutingResponseLatency(*route.Endpoint, int, time.Time, time.Duration) {
+func (NullVarz) MarshalJSON() ([]byte, error)            { return json.Marshal(nil) }
+func (NullVarz) ActiveApps() *stats.ActiveApps           { return stats.NewActiveApps() }
+func (NullVarz) CaptureBadRequest()                      {}
+func (NullVarz) CaptureBadGateway()                      {}
+func (NullVarz) CaptureRoutingRequest(b *route.Endpoint) {}
+func (NullVarz) CaptureRoutingResponse(int)              {}
+func (NullVarz) CaptureRoutingResponseLatency(*route.Endpoint, int, time.Time, time.Duration) {
 }
-func (_ NullVarz) CaptureRouteServiceResponse(*http.Response)         {}
-func (_ NullVarz) CaptureRegistryMessage(msg metrics.ComponentTagged) {}
+func (NullVarz) CaptureRouteServiceResponse(*http.Response)         {}
+func (NullVarz) CaptureRegistryMessage(msg metrics.ComponentTagged) {}

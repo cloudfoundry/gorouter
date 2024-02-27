@@ -20,7 +20,6 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	rregistry "code.cloudfoundry.org/gorouter/registry"
@@ -174,7 +173,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 1 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakes.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
 		logcounter := schema.NewLogCounter()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
