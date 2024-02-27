@@ -31,7 +31,6 @@ import (
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
-	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -41,7 +40,6 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
-	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"github.com/nats-io/nats.go"
 	"github.com/onsi/gomega/gbytes"
@@ -2463,7 +2461,7 @@ func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 }
 
-func routeExists(config *config.Config, routeName string) (bool, error) {
+func routeExists(config *cfg.Config, routeName string) (bool, error) {
 	host := fmt.Sprintf("http://%s:%d/routes", config.Ip, config.Status.Routes.Port)
 	req, err := http.NewRequest("GET", host, nil)
 	Expect(err).ToNot(HaveOccurred())
@@ -2491,8 +2489,8 @@ func routeExists(config *config.Config, routeName string) (bool, error) {
 	}
 }
 
-func newSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {
-	app := common.NewTestApp(urls, rPort, mbusClient, nil, "")
+func newSlowApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *testcommon.TestApp {
+	app := testcommon.NewTestApp(urls, rPort, mbusClient, nil, "")
 
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(delay)
