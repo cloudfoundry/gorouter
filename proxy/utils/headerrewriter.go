@@ -30,7 +30,7 @@ type RemoveHeaderRewriter struct {
 }
 
 func (i *RemoveHeaderRewriter) RewriteHeader(header http.Header) {
-	for h, _ := range i.Header {
+	for h := range i.Header {
 		header.Del(h)
 	}
 }

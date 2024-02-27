@@ -82,7 +82,7 @@ func GetStickySession(request *http.Request, stickySessionCookieNames config.Str
 		}
 	}
 	// Try choosing a backend using sticky session
-	for stickyCookieName, _ := range stickySessionCookieNames {
+	for stickyCookieName := range stickySessionCookieNames {
 		if _, err := request.Cookie(stickyCookieName); err == nil {
 			if sticky, err := request.Cookie(VcapCookieId); err == nil {
 				return sticky.Value, false

@@ -439,7 +439,7 @@ func (r *Router) Stop() {
 func (r *Router) closeIdleConns() {
 	r.closeConnections = true
 
-	for conn, _ := range r.idleConns {
+	for conn := range r.idleConns {
 		conn.Close()
 	}
 }

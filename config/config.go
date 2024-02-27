@@ -900,7 +900,7 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 			ciphers = append(ciphers, val)
 		} else {
 			var supportedCipherSuites = []string{}
-			for key, _ := range cipherMap {
+			for key := range cipherMap {
 				supportedCipherSuites = append(supportedCipherSuites, key)
 			}
 			errMsg := fmt.Sprintf("Invalid cipher string configuration: %s, please choose from %v", cipher, supportedCipherSuites)
