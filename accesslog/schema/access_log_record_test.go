@@ -431,7 +431,7 @@ var _ = Describe("AccessLogRecord", func() {
 			_, err := record.WriteTo(&b)
 			Expect(err).ToNot(HaveOccurred())
 
-			r := string(b.Bytes())
+			r := b.String()
 
 			Expect(r).ToNot(ContainSubstring("failed_attempts"))
 			Expect(r).ToNot(ContainSubstring("failed_attempts_time"))
@@ -461,7 +461,7 @@ var _ = Describe("AccessLogRecord", func() {
 			_, err := record.WriteTo(&b)
 			Expect(err).ToNot(HaveOccurred())
 
-			r := string(b.Bytes())
+			r := b.String()
 
 			Expect(r).To(ContainSubstring("failed_attempts:4"))
 			Expect(r).To(ContainSubstring("failed_attempts_time:1.0"))
@@ -479,7 +479,7 @@ var _ = Describe("AccessLogRecord", func() {
 			_, err := record.WriteTo(&b)
 			Expect(err).ToNot(HaveOccurred())
 
-			r := string(b.Bytes())
+			r := b.String()
 
 			Expect(r).To(ContainSubstring(`failed_attempts:0`))
 			Expect(r).To(ContainSubstring(`failed_attempts_time:"-"`))
@@ -497,7 +497,7 @@ var _ = Describe("AccessLogRecord", func() {
 			_, err := record.WriteTo(&b)
 			Expect(err).ToNot(HaveOccurred())
 
-			r := string(b.Bytes())
+			r := b.String()
 
 			Expect(r).To(ContainSubstring(`backend_time:"-"`))
 		})
