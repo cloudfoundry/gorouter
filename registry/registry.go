@@ -269,13 +269,11 @@ func (r *RouteRegistry) StartPruningCycle() {
 
 		go func() {
 			for {
-				select {
-				case <-r.ticker.C:
-					r.logger.Debug("start-pruning-routes")
-					r.pruneStaleDroplets()
-					r.logger.Debug("finished-pruning-routes")
-					r.reporter.CaptureRouteStats(r.NumUris(), r.MSSinceLastUpdate())
-				}
+				<-r.ticker.C
+				r.logger.Debug("start-pruning-routes")
+				r.pruneStaleDroplets()
+				r.logger.Debug("finished-pruning-routes")
+				r.reporter.CaptureRouteStats(r.NumUris(), r.MSSinceLastUpdate())
 			}
 		}()
 	}

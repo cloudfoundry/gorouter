@@ -478,12 +478,10 @@ func (r *Router) ScheduleFlushApps() {
 		x := time.Now()
 
 		for {
-			select {
-			case <-t.C:
-				y := time.Now()
-				r.flushApps(x)
-				x = y
-			}
+			<-t.C
+			y := time.Now()
+			r.flushApps(x)
+			x = y
 		}
 	}()
 }

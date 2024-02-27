@@ -92,10 +92,8 @@ func NewActiveApps() *ActiveApps {
 
 	go func() {
 		for {
-			select {
-			case <-x.t.C:
-				x.Trim(time.Now().Add(-ActiveAppsEntryLifetime))
-			}
+			<-x.t.C
+			x.Trim(time.Now().Add(-ActiveAppsEntryLifetime))
 		}
 	}()
 

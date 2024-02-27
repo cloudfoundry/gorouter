@@ -368,13 +368,11 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	// results in a vet error
 	vrid := request.Header.Get(handlers.VcapRequestIdHeader)
 	go func() {
-		select {
-		case <-reqCtx.Done():
-			if reqCtx.Err() == context.DeadlineExceeded {
-				logger.Error("backend-request-timeout", zap.Error(reqCtx.Err()), zap.String("vcap_request_id", vrid))
-			}
-			cancel()
+		<-reqCtx.Done()
+		if reqCtx.Err() == context.DeadlineExceeded {
+			logger.Error("backend-request-timeout", zap.Error(reqCtx.Err()), zap.String("vcap_request_id", vrid))
 		}
+		cancel()
 	}()
 
 	resp, err := tr.RoundTrip(request)
