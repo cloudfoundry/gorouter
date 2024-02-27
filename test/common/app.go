@@ -3,7 +3,6 @@ package common
 import (
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -202,7 +201,7 @@ func (a *TestApp) CheckAppStatusWithPath(status int, path string) error {
 		}
 
 		if resp.StatusCode != status {
-			return errors.New(fmt.Sprintf("expected status code %d, got %d", status, resp.StatusCode))
+			return fmt.Errorf("expected status code %d, got %d", status, resp.StatusCode)
 		}
 	}
 
@@ -218,7 +217,7 @@ func (a *TestApp) CheckAppStatus(status int) error {
 		}
 
 		if resp.StatusCode != status {
-			return errors.New(fmt.Sprintf("expected status code %d, got %d", status, resp.StatusCode))
+			return fmt.Errorf("expected status code %d, got %d", status, resp.StatusCode)
 		}
 	}
 
