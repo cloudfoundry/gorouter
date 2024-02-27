@@ -229,7 +229,7 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 	c.CACerts = []string{string(rootCertChain.CACertPEM)}
 	c.ClientCACerts = string(clientCaCertChain.CACertPEM)
 
-	if onlyTrustClientCACerts == false {
+	if !onlyTrustClientCACerts {
 		clientTrustedCertPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
 		clientTrustedCertPool.AppendCertsFromPEM(secondaryCertChain.CACertPEM)
 		c.ClientCACerts += strings.Join(c.CACerts, "")

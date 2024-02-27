@@ -629,7 +629,7 @@ func (c *Config) Process() error {
 	}
 
 	healthTLS := c.Status.TLS
-	if healthTLS == defaultStatusTLSConfig && c.Status.EnableNonTLSHealthChecks == false {
+	if healthTLS == defaultStatusTLSConfig && !c.Status.EnableNonTLSHealthChecks {
 		return fmt.Errorf("Neither TLS nor non-TLS health endpoints are enabled. Refusing to start gorouter.")
 	}
 
