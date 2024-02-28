@@ -181,7 +181,7 @@ func (h *RequestHandler) SanitizeRequestConnection() {
 				trimmedValue := strings.TrimSpace(values[i])
 				found := false
 				for _, item := range h.hopByHopHeadersToFilter {
-					if strings.ToLower(item) == strings.ToLower(trimmedValue) {
+					if strings.EqualFold(item, trimmedValue) {
 						found = true
 						break
 					}
