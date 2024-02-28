@@ -29,8 +29,6 @@ type RouteFetcher struct {
 	logger          logger.Logger
 	endpoints       []models.Route
 	endpointsMutex  sync.Mutex
-	uaaToken        *oauth2.Token
-	uaaTokenMutex   sync.Mutex
 	client          routing_api.Client
 	stopEventSource int32
 	eventSource     atomic.Value

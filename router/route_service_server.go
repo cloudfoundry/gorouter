@@ -1,7 +1,6 @@
 package router
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +13,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/config"
 )
 
 type CertType int
@@ -30,7 +31,6 @@ type RouteServicesServer struct {
 	rootCA     *x509.CertPool
 	clientCert tls.Certificate
 	serverCert tls.Certificate
-	servers    []*http.Server
 }
 
 func NewRouteServicesServer(cfg *config.Config) (*RouteServicesServer, error) {

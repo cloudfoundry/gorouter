@@ -159,12 +159,6 @@ func (a *TcpApp) Unregister() {
 	a.Stop()
 }
 
-func (a *TcpApp) start() {
-	a.mutex.Lock()
-	a.stopped = false
-	a.mutex.Unlock()
-}
-
 func (a *TcpApp) Stop() {
 	a.mutex.Lock()
 	a.stopped = true

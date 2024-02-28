@@ -11,10 +11,9 @@ import (
 )
 
 type MaxRequestSize struct {
-	cfg                 *config.Config
-	MaxSize             int
-	logger              logger.Logger
-	loadBalancingMethod string
+	cfg     *config.Config
+	MaxSize int
+	logger  logger.Logger
 }
 
 const ONE_MB = 1024 * 1024 // bytes * kb
