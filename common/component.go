@@ -42,10 +42,10 @@ func NewProcessStatus() *ProcessStatus {
 	p.rusage = new(syscall.Rusage)
 
 	go func() {
-		timer := time.Tick(RefreshInterval)
+		timer := time.NewTicker(RefreshInterval)
 		for {
 			select {
-			case <-timer:
+			case <-timer.C:
 				p.Update()
 			case <-p.stopSignal:
 				return
