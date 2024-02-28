@@ -486,9 +486,3 @@ func CreateAccessLogRecord() *schema.AccessLogRecord {
 
 	return &r
 }
-
-type nullWriter struct{}
-
-func (n nullWriter) Write(b []byte) (int, error) {
-	return len(b), nil
-}

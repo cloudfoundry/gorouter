@@ -36,8 +36,6 @@ const (
 	proxyProtocolHeaderTimeout = 100 * time.Millisecond
 )
 
-var noDeadline = time.Time{}
-
 //go:generate counterfeiter -o ../fakes/route_services_server.go --fake-name RouteServicesServer . rss
 type rss interface {
 	Serve(handler http.Handler, errChan chan error) error

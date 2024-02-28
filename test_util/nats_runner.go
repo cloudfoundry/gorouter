@@ -16,7 +16,6 @@ import (
 type NATSRunner struct {
 	port        int
 	natsSession *gexec.Session
-	natsUrls    []string
 	MessageBus  *nats.Conn
 }
 
