@@ -400,7 +400,7 @@ var _ = Describe("Router", func() {
 				// drain in progress, continue with current request
 				<-appRequestComplete
 
-				Eventually(drainDone, drainWait+drainTimeout*(9/10)).Should(BeClosed())
+				Eventually(drainDone, drainWait+time.Duration(float64(drainTimeout)*0.9)).Should(BeClosed())
 				Eventually(clientDone).Should(BeClosed())
 			})
 		})
