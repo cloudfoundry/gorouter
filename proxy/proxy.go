@@ -214,7 +214,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	logger := handlers.LoggerWithTraceInfo(p.logger, request)
 	proxyWriter := responseWriter.(utils.ProxyResponseWriter)
 
-	if request.ProtoMajor < 2 {
+	if p.config.EnableHTTP1ConcurrentReadWrite && request.ProtoMajor == 1 {
 		rc := http.NewResponseController(proxyWriter)
 
 		err := rc.EnableFullDuplex()

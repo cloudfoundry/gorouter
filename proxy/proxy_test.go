@@ -765,61 +765,119 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 
-		It("can simultaneously read request and write response", func() {
-			contentLength := len("message 0\n") * 10
-			ln := test_util.RegisterConnHandler(r, "read-write", func(conn *test_util.HttpConn) {
-				defer conn.Close()
+		Context("when concurrent read write is not enabled", func() {
+			BeforeEach(func() {
+				conf.EnableHTTP1ConcurrentReadWrite = false
+			})
 
-				req, err := http.ReadRequest(conn.Reader)
-				Expect(err).NotTo(HaveOccurred())
-				defer req.Body.Close()
+			It("can not simultaneously read request and write response", func() {
+				contentLength := len("message 0\n") * 10
+				ln := test_util.RegisterConnHandler(r, "read-write", func(conn *test_util.HttpConn) {
+					defer conn.Close()
 
-				conn.Writer.WriteString("HTTP/1.1 200 OK\r\n" +
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+					defer req.Body.Close()
+
+					conn.Writer.WriteString("HTTP/1.1 200 OK\r\n" +
+						"Connection: keep-alive\r\n" +
+						"Content-Type: text/plain\r\n" +
+						fmt.Sprintf("Content-Length: %d\r\n", contentLength) +
+						"\r\n")
+					conn.Writer.Flush()
+					reader := bufio.NewReader(req.Body)
+
+					for i := 0; i < 10; i++ {
+						// send back the received message
+						line, err := reader.ReadString('\n')
+						if err != nil {
+							break
+						}
+						conn.Writer.Write([]byte(line))
+						conn.Writer.Flush()
+					}
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+				// the test is hanging when fix is not implemented
+				conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+				conn.Writer.Write([]byte("GET / HTTP/1.1\r\n" +
+					"Host: read-write\r\n" +
 					"Connection: keep-alive\r\n" +
 					"Content-Type: text/plain\r\n" +
 					fmt.Sprintf("Content-Length: %d\r\n", contentLength) +
-					"\r\n")
+					"\r\n",
+				))
 				conn.Writer.Flush()
-				reader := bufio.NewReader(req.Body)
+
+				_, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("when concurrent read write is enabled", func() {
+			BeforeEach(func() {
+				conf.EnableHTTP1ConcurrentReadWrite = true
+			})
+
+			It("can simultaneously read request and write response", func() {
+				contentLength := len("message 0\n") * 10
+				ln := test_util.RegisterConnHandler(r, "read-write", func(conn *test_util.HttpConn) {
+					defer conn.Close()
+
+					req, err := http.ReadRequest(conn.Reader)
+					Expect(err).NotTo(HaveOccurred())
+					defer req.Body.Close()
+
+					conn.Writer.WriteString("HTTP/1.1 200 OK\r\n" +
+						"Connection: keep-alive\r\n" +
+						"Content-Type: text/plain\r\n" +
+						fmt.Sprintf("Content-Length: %d\r\n", contentLength) +
+						"\r\n")
+					conn.Writer.Flush()
+					reader := bufio.NewReader(req.Body)
+
+					for i := 0; i < 10; i++ {
+						// send back the received message
+						line, err := reader.ReadString('\n')
+						if err != nil {
+							break
+						}
+						conn.Writer.Write([]byte(line))
+						conn.Writer.Flush()
+					}
+				})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+				// the test is hanging when fix is not implemented
+				conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+				conn.Writer.Write([]byte("GET / HTTP/1.1\r\n" +
+					"Host: read-write\r\n" +
+					"Connection: keep-alive\r\n" +
+					"Content-Type: text/plain\r\n" +
+					fmt.Sprintf("Content-Length: %d\r\n", contentLength) +
+					"\r\n",
+				))
+				conn.Writer.Flush()
+
+				resp, err := http.ReadResponse(conn.Reader, &http.Request{})
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+				reader := bufio.NewReader(resp.Body)
 
 				for i := 0; i < 10; i++ {
-					// send back the received message
-					line, err := reader.ReadString('\n')
-					if err != nil {
-						break
-					}
-					conn.Writer.Write([]byte(line))
+					message := fmt.Sprintf("message %d\n", i)
+					conn.Writer.Write([]byte(message))
 					conn.Writer.Flush()
+					line, err := reader.ReadString('\n')
+					Expect(err).NotTo(HaveOccurred())
+					Expect(line).To(Equal(message))
 				}
 			})
-			defer ln.Close()
-
-			conn := dialProxy(proxyServer)
-			// the test is hanging when fix is not implemented
-			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-			conn.Writer.Write([]byte("GET / HTTP/1.1\r\n" +
-				"Host: read-write\r\n" +
-				"Connection: keep-alive\r\n" +
-				"Content-Type: text/plain\r\n" +
-				fmt.Sprintf("Content-Length: %d\r\n", contentLength) +
-				"\r\n",
-			))
-			conn.Writer.Flush()
-
-			resp, err := http.ReadResponse(conn.Reader, &http.Request{})
-			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
-			reader := bufio.NewReader(resp.Body)
-
-			for i := 0; i < 10; i++ {
-				message := fmt.Sprintf("message %d\n", i)
-				conn.Writer.Write([]byte(message))
-				conn.Writer.Flush()
-				line, err := reader.ReadString('\n')
-				Expect(err).NotTo(HaveOccurred())
-				Expect(line).To(Equal(message))
-			}
 		})
 
 		It("retries on POST requests if nothing was written", func() {

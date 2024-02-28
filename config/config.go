@@ -359,29 +359,30 @@ func InitClientCertMetadataRules(rules []VerifyClientCertificateMetadataRule, ce
 }
 
 type Config struct {
-	Status          StatusConfig      `yaml:"status,omitempty"`
-	Nats            NatsConfig        `yaml:"nats,omitempty"`
-	Logging         LoggingConfig     `yaml:"logging,omitempty"`
-	Port            uint16            `yaml:"port,omitempty"`
-	Prometheus      PrometheusConfig  `yaml:"prometheus,omitempty"`
-	Index           uint              `yaml:"index,omitempty"`
-	Zone            string            `yaml:"zone,omitempty"`
-	GoMaxProcs      int               `yaml:"go_max_procs,omitempty"`
-	Tracing         Tracing           `yaml:"tracing,omitempty"`
-	TraceKey        string            `yaml:"trace_key,omitempty"`
-	AccessLog       AccessLog         `yaml:"access_log,omitempty"`
-	DebugAddr       string            `yaml:"debug_addr,omitempty"`
-	EnablePROXY     bool              `yaml:"enable_proxy,omitempty"`
-	EnableSSL       bool              `yaml:"enable_ssl,omitempty"`
-	SSLPort         uint16            `yaml:"ssl_port,omitempty"`
-	DisableHTTP     bool              `yaml:"disable_http,omitempty"`
-	EnableHTTP2     bool              `yaml:"enable_http2"`
-	SSLCertificates []tls.Certificate `yaml:"-"`
-	TLSPEM          []TLSPem          `yaml:"tls_pem,omitempty"`
-	CACerts         []string          `yaml:"ca_certs,omitempty"`
-	CAPool          *x509.CertPool    `yaml:"-"`
-	ClientCACerts   string            `yaml:"client_ca_certs,omitempty"`
-	ClientCAPool    *x509.CertPool    `yaml:"-"`
+	Status                         StatusConfig      `yaml:"status,omitempty"`
+	Nats                           NatsConfig        `yaml:"nats,omitempty"`
+	Logging                        LoggingConfig     `yaml:"logging,omitempty"`
+	Port                           uint16            `yaml:"port,omitempty"`
+	Prometheus                     PrometheusConfig  `yaml:"prometheus,omitempty"`
+	Index                          uint              `yaml:"index,omitempty"`
+	Zone                           string            `yaml:"zone,omitempty"`
+	GoMaxProcs                     int               `yaml:"go_max_procs,omitempty"`
+	Tracing                        Tracing           `yaml:"tracing,omitempty"`
+	TraceKey                       string            `yaml:"trace_key,omitempty"`
+	AccessLog                      AccessLog         `yaml:"access_log,omitempty"`
+	DebugAddr                      string            `yaml:"debug_addr,omitempty"`
+	EnablePROXY                    bool              `yaml:"enable_proxy,omitempty"`
+	EnableSSL                      bool              `yaml:"enable_ssl,omitempty"`
+	SSLPort                        uint16            `yaml:"ssl_port,omitempty"`
+	DisableHTTP                    bool              `yaml:"disable_http,omitempty"`
+	EnableHTTP2                    bool              `yaml:"enable_http2"`
+	EnableHTTP1ConcurrentReadWrite bool              `yaml:"enable_http1_concurrent_read_write"`
+	SSLCertificates                []tls.Certificate `yaml:"-"`
+	TLSPEM                         []TLSPem          `yaml:"tls_pem,omitempty"`
+	CACerts                        []string          `yaml:"ca_certs,omitempty"`
+	CAPool                         *x509.CertPool    `yaml:"-"`
+	ClientCACerts                  string            `yaml:"client_ca_certs,omitempty"`
+	ClientCAPool                   *x509.CertPool    `yaml:"-"`
 
 	SkipSSLValidation        bool     `yaml:"skip_ssl_validation,omitempty"`
 	ForwardedClientCert      string   `yaml:"forwarded_client_cert,omitempty"`
@@ -482,20 +483,21 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	Status:                  defaultStatusConfig,
-	Nats:                    defaultNatsConfig,
-	Logging:                 defaultLoggingConfig,
-	Port:                    8081,
-	Index:                   0,
-	GoMaxProcs:              -1,
-	EnablePROXY:             false,
-	EnableSSL:               false,
-	SSLPort:                 443,
-	DisableHTTP:             false,
-	EnableHTTP2:             true,
-	MinTLSVersion:           tls.VersionTLS12,
-	MaxTLSVersion:           tls.VersionTLS12,
-	RouteServicesServerPort: 7070,
+	Status:                         defaultStatusConfig,
+	Nats:                           defaultNatsConfig,
+	Logging:                        defaultLoggingConfig,
+	Port:                           8081,
+	Index:                          0,
+	GoMaxProcs:                     -1,
+	EnablePROXY:                    false,
+	EnableSSL:                      false,
+	SSLPort:                        443,
+	DisableHTTP:                    false,
+	EnableHTTP2:                    true,
+	EnableHTTP1ConcurrentReadWrite: false,
+	MinTLSVersion:                  tls.VersionTLS12,
+	MaxTLSVersion:                  tls.VersionTLS12,
+	RouteServicesServerPort:        7070,
 
 	EndpointTimeout:                60 * time.Second,
 	EndpointDialTimeout:            5 * time.Second,
