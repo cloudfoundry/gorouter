@@ -20,9 +20,9 @@ func (b *bufferPool) Get() []byte {
 	if buf == nil {
 		return make([]byte, 8192)
 	}
-	return buf.([]byte)
+	return *buf.(*[]byte)
 }
 
 func (b *bufferPool) Put(buf []byte) {
-	b.pool.Put(buf)
+	b.pool.Put(&buf)
 }
