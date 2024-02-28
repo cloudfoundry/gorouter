@@ -62,8 +62,8 @@ var _ = Describe("Protocolcheck", func() {
 
 			It("passes the request through", func() {
 				conn, err := net.Dial("tcp", server.Addr())
-				defer conn.Close()
 				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close()
 				respReader := bufio.NewReader(conn)
 
 				conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
@@ -82,8 +82,8 @@ var _ = Describe("Protocolcheck", func() {
 
 			It("returns a 400 with a helpful error ", func() {
 				conn, err := net.Dial("tcp", server.Addr())
-				defer conn.Close()
 				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close()
 				respReader := bufio.NewReader(conn)
 
 				conn.Write([]byte("PRI * HTTP/2.0\r\nHost: example.com\r\n\r\n"))
@@ -99,8 +99,8 @@ var _ = Describe("Protocolcheck", func() {
 	Context("http 1.1", func() {
 		It("passes the request through", func() {
 			conn, err := net.Dial("tcp", server.Addr())
-			defer conn.Close()
 			Expect(err).ToNot(HaveOccurred())
+			defer conn.Close()
 			respReader := bufio.NewReader(conn)
 
 			conn.Write([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
@@ -115,8 +115,8 @@ var _ = Describe("Protocolcheck", func() {
 	Context("http 1.0", func() {
 		It("passes the request through", func() {
 			conn, err := net.Dial("tcp", server.Addr())
-			defer conn.Close()
 			Expect(err).ToNot(HaveOccurred())
+			defer conn.Close()
 			respReader := bufio.NewReader(conn)
 
 			conn.Write([]byte("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"))
