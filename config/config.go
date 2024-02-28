@@ -172,9 +172,9 @@ type RouteServiceConfig struct {
 }
 
 type LoggingConfig struct {
-	Syslog                 string `yaml:"syslog"`
-	SyslogAddr             string
-	SyslogNetwork          string
+	Syslog                 string       `yaml:"syslog"`
+	SyslogAddr             string       `yaml:"syslog_addr"`
+	SyslogNetwork          string       `yaml:"syslog_network"`
 	Level                  string       `yaml:"level"`
 	LoggregatorEnabled     bool         `yaml:"loggregator_enabled"`
 	MetronAddress          string       `yaml:"metron_address"`
