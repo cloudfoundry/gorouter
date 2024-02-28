@@ -133,7 +133,7 @@ var _ = Describe("Varz", func() {
 	})
 
 	It("updates responses", func() {
-		var b *route.Endpoint = &route.Endpoint{}
+		b := &route.Endpoint{}
 		var t time.Time
 		var d time.Duration
 
@@ -178,7 +178,7 @@ var _ = Describe("Varz", func() {
 	})
 
 	It("updates response latency", func() {
-		var routeEndpoint *route.Endpoint = &route.Endpoint{}
+		routeEndpoint := &route.Endpoint{}
 		var startedAt = time.Now()
 		var duration = 1 * time.Millisecond
 
