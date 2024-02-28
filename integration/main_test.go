@@ -300,7 +300,7 @@ var _ = Describe("Router Integration", func() {
 			Expect(resp.Proto).To(Equal("HTTP/1.1"))
 
 			h2_client := &http.Client{Transport: &http2.Transport{TLSClientConfig: clientTLSConfig}}
-			resp, err = h2_client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
+			_, err = h2_client.Get(fmt.Sprintf("https://test.%s:%d", test_util.LocalhostDNS, cfg.SSLPort))
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unexpected ALPN protocol"))
 		})
