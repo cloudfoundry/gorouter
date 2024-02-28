@@ -2270,8 +2270,8 @@ var _ = Describe("Proxy", func() {
 
 		It("responds to host with malicious script with 400", func() {
 			conn, err := net.Dial("tcp", proxyServer.Addr().String())
-			defer conn.Close()
 			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
 
 			rawReq := "GET / HTTP/1.1\nHost: <html><header><script>alert(document.cookie);</script></header><body/></html>\n\n\n"
 
