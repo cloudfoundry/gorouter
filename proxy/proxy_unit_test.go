@@ -97,19 +97,37 @@ var _ = Describe("Proxy Unit tests", func() {
 
 		Describe("full duplex", func() {
 			Context("for HTTP/1.1 requests", func() {
-				It("enables full duplex", func() {
-					req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
-					proxyObj.ServeHTTP(resp, req)
-					Expect(responseRecorder.EnableFullDuplexCallCount).To(Equal(1))
-				})
+				Context("when concurrent read write is enabled", func() {
+					BeforeEach(func() {
+						conf.EnableHTTP1ConcurrentReadWrite = true
+					})
 
-				Context("when enabling duplex fails", func() {
-					It("fails", func() {
-						responseRecorder.EnableFullDuplexErr = errors.New("unsupported")
+					It("enables full duplex", func() {
 						req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
 						proxyObj.ServeHTTP(resp, req)
+						Expect(responseRecorder.EnableFullDuplexCallCount).To(Equal(1))
+					})
 
-						Eventually(fakeLogger).Should(Say("enable-full-duplex-err"))
+					Context("when enabling duplex fails", func() {
+						It("fails", func() {
+							responseRecorder.EnableFullDuplexErr = errors.New("unsupported")
+							req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
+							proxyObj.ServeHTTP(resp, req)
+
+							Eventually(fakeLogger).Should(Say("enable-full-duplex-err"))
+						})
+					})
+				})
+
+				Context("when concurrent read write is not enabled", func() {
+					BeforeEach(func() {
+						conf.EnableHTTP1ConcurrentReadWrite = false
+					})
+
+					It("does not enable full duplex", func() {
+						req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
+						proxyObj.ServeHTTP(resp, req)
+						Expect(responseRecorder.EnableFullDuplexCallCount).To(Equal(0))
 					})
 				})
 			})
