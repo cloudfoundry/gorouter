@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"net/url"
+	"os"
 
 	"go.step.sm/crypto/pemutil"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/uber-go/zap"
 	"gopkg.in/yaml.v2"
 
-	"io/ioutil"
 	"runtime"
 	"strings"
 	"time"
@@ -939,7 +939,7 @@ func InitConfigFromFile(path string) (*Config, error) {
 		return nil, err
 	}
 
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

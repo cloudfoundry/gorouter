@@ -3,7 +3,6 @@ package proxy_test
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -96,7 +95,7 @@ var _ = JustBeforeEach(func() {
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 
-	f, err = ioutil.TempFile("", "fakeFile")
+	f, err = os.CreateTemp("", "fakeFile")
 	Expect(err).NotTo(HaveOccurred())
 	conf.AccessLog.File = f.Name()
 	ls = &fakelogsender.FakeLogSender{}

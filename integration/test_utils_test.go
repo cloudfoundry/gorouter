@@ -2,7 +2,7 @@ package integration
 
 import (
 	"crypto/tls"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"syscall"
@@ -58,7 +58,7 @@ func configDrainSetup(cfg *config.Config, pruneInterval, pruneThreshold time.Dur
 func writeConfig(cfg *config.Config, cfgFile string) {
 	cfgBytes, err := yaml.Marshal(cfg)
 	Expect(err).ToNot(HaveOccurred())
-	_ = ioutil.WriteFile(cfgFile, cfgBytes, os.ModePerm)
+	_ = os.WriteFile(cfgFile, cfgBytes, os.ModePerm)
 }
 
 func startGorouterSession(cfgFile string) *Session {
@@ -67,7 +67,7 @@ func startGorouterSession(cfgFile string) *Session {
 	Expect(err).ToNot(HaveOccurred())
 	var eventsSessionLogs []byte
 	Eventually(func() string {
-		logAdd, err := ioutil.ReadAll(session.Out)
+		logAdd, err := io.ReadAll(session.Out)
 		if err != nil {
 			if session.ExitCode() >= 0 {
 				Fail("gorouter quit early!")

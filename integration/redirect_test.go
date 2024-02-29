@@ -2,7 +2,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,7 +22,7 @@ var _ = Describe("Headers", func() {
 		testApp = NewUnstartedTestApp(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				defer GinkgoRecover()
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				Expect(err).NotTo(HaveOccurred())
 				w.Header().Set("Location", "redirect.com")
 				w.WriteHeader(http.StatusFound)
@@ -57,7 +57,7 @@ var _ = Describe("Headers", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusFound))
 
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			resp.Body.Close()
 		})

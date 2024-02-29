@@ -2,10 +2,10 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -53,10 +53,10 @@ var _ = Describe("GDPR", func() {
 			defer resp.Body.Close()
 
 			Eventually(func() ([]byte, error) {
-				return ioutil.ReadFile(testState.AccessLogFilePath())
+				return os.ReadFile(testState.AccessLogFilePath())
 			}).Should(ContainSubstring(`x_forwarded_for:"-"`))
 
-			f, err := ioutil.ReadFile(testState.AccessLogFilePath())
+			f, err := os.ReadFile(testState.AccessLogFilePath())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(f).NotTo(ContainSubstring("192.168.0.1"))
 		})
@@ -123,7 +123,7 @@ var _ = Describe("GDPR", func() {
 			defer resp.Body.Close()
 
 			Eventually(func() ([]byte, error) {
-				return ioutil.ReadFile(testState.AccessLogFilePath())
+				return os.ReadFile(testState.AccessLogFilePath())
 			}).Should(ContainSubstring(`"foo-agent" "-"`))
 		})
 

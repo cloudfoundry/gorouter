@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -54,7 +54,7 @@ var _ = Describe("Router Integration", func() {
 
 	BeforeEach(func() {
 		var err error
-		tmpdir, err = ioutil.TempDir("", "gorouter")
+		tmpdir, err = os.MkdirTemp("", "gorouter")
 		Expect(err).ToNot(HaveOccurred())
 		cfgFile = filepath.Join(tmpdir, "config.yml")
 
@@ -432,7 +432,7 @@ var _ = Describe("Router Integration", func() {
 			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				requestMade <- true
 				<-requestProcessing
-				_, ioErr := ioutil.ReadAll(r.Body)
+				_, ioErr := io.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(ioErr).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusOK)
@@ -462,7 +462,7 @@ var _ = Describe("Router Integration", func() {
 				resp, httpErr := http.Get(longApp.Endpoint())
 				Expect(httpErr).ShouldNot(HaveOccurred())
 				Expect(resp.StatusCode).Should(Equal(http.StatusOK))
-				bytes, httpErr := ioutil.ReadAll(resp.Body)
+				bytes, httpErr := io.ReadAll(resp.Body)
 				resp.Body.Close()
 				Expect(httpErr).ShouldNot(HaveOccurred())
 				Expect(bytes).Should(Equal([]byte{'b'}))
@@ -732,7 +732,7 @@ var _ = Describe("Router Integration", func() {
 			r, err := client.Get(metricsURL)
 			Expect(err).ToNot(HaveOccurred())
 
-			response, err := ioutil.ReadAll(r.Body)
+			response, err := io.ReadAll(r.Body)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(string(response)).To(ContainSubstring("promhttp_metric_handler_errors_total"))
@@ -1014,15 +1014,15 @@ var _ = Describe("Router Integration", func() {
 			routingApiServer.HTTPTestServer.StartTLS()
 
 			cfg.RoutingApi.Uri, cfg.RoutingApi.Port = uriAndPort(routingApiServer.URL())
-			caCerts, err := ioutil.ReadFile(serverCAPath)
+			caCerts, err := os.ReadFile(serverCAPath)
 			Expect(err).NotTo(HaveOccurred())
 			cfg.RoutingApi.CACerts = string(caCerts)
 
-			clientCert, err := ioutil.ReadFile(clientCertPath)
+			clientCert, err := os.ReadFile(clientCertPath)
 			Expect(err).NotTo(HaveOccurred())
 			cfg.RoutingApi.CertChain = string(clientCert)
 
-			clientKey, err := ioutil.ReadFile(clientKeyPath)
+			clientKey, err := os.ReadFile(clientKeyPath)
 			Expect(err).NotTo(HaveOccurred())
 			cfg.RoutingApi.PrivateKey = string(clientKey)
 		})
@@ -1342,7 +1342,7 @@ func routeExists(routesEndpoint, routeName string) (bool, error) {
 	}
 	switch resp.StatusCode {
 	case http.StatusOK:
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		Expect(err).ToNot(HaveOccurred())
 		routes := make(map[string]interface{})

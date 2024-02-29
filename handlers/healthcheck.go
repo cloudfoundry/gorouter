@@ -1,9 +1,10 @@
 package handlers
 
 import (
+	"net/http"
+
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/logger"
-	"net/http"
 )
 
 type healthcheck struct {

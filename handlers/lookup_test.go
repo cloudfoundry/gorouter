@@ -1,7 +1,7 @@
 package handlers_test
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -396,7 +396,7 @@ var _ = Describe("Lookup", func() {
 			})
 
 			It("responds with an error in the body", func() {
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(body)).To(Equal("400 Bad Request: Invalid X-CF-App-Instance Header\n"))
 			})

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
+	"os"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
@@ -64,7 +64,7 @@ type htmlErrorWriterContext struct {
 func NewHTMLErrorWriterFromFile(path string) (ErrorWriter, error) {
 	ew := &htmlErrorWriter{}
 
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("Could not read HTML error template file: %s", err)
 	}

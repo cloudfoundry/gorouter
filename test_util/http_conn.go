@@ -2,7 +2,6 @@ package test_util
 
 import (
 	"io"
-	"io/ioutil"
 	"strings"
 
 	. "github.com/onsi/gomega"
@@ -33,7 +32,7 @@ func (x *HttpConn) ReadRequest() (*http.Request, string) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	defer req.Body.Close()
 
-	b, err := ioutil.ReadAll(req.Body)
+	b, err := io.ReadAll(req.Body)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	return req, string(b)
@@ -50,7 +49,7 @@ func (x *HttpConn) ReadResponse() (*http.Response, string) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	return resp, string(b)

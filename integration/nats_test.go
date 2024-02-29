@@ -2,7 +2,6 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -33,7 +32,7 @@ var _ = Describe("NATS Integration", func() {
 
 	BeforeEach(func() {
 		var err error
-		tmpdir, err = ioutil.TempDir("", "gorouter")
+		tmpdir, err = os.MkdirTemp("", "gorouter")
 		Expect(err).ToNot(HaveOccurred())
 		cfgFile = filepath.Join(tmpdir, "config.yml")
 

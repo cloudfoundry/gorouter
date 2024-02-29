@@ -2,7 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -44,7 +44,7 @@ var _ = Describe("AccessLog", func() {
 	}
 
 	nextHandler := negroni.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
-		_, err := ioutil.ReadAll(req.Body)
+		_, err := io.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
 		rw.WriteHeader(http.StatusTeapot)

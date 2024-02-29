@@ -3,7 +3,7 @@ package handlers_test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,7 +34,7 @@ var _ = Describe("RequestInfoHandler", func() {
 	)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := ioutil.ReadAll(req.Body)
+		_, err := io.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
 		rw.WriteHeader(http.StatusTeapot)

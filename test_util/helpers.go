@@ -12,10 +12,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -347,9 +347,9 @@ func (cc *CertChain) AsTLSConfig() *tls.Config {
 }
 
 func (cc *CertChain) WriteCACertToDir(dir string) string {
-	file, err := ioutil.TempFile(dir, "certs")
+	file, err := os.CreateTemp(dir, "certs")
 	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(file.Name(), cc.CACertPEM, 0644)
+	err = os.WriteFile(file.Name(), cc.CACertPEM, 0644)
 	Expect(err).ToNot(HaveOccurred())
 
 	return file.Name()

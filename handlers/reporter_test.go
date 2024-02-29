@@ -2,7 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -43,7 +43,7 @@ var _ = Describe("Reporter Handler", func() {
 		logger = test_util.NewTestZapLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			_, err := ioutil.ReadAll(req.Body)
+			_, err := io.ReadAll(req.Body)
 			Expect(err).NotTo(HaveOccurred())
 
 			rw.WriteHeader(http.StatusTeapot)
@@ -94,7 +94,7 @@ var _ = Describe("Reporter Handler", func() {
 	Context("when reqInfo.StoppedAt is 0", func() {
 		BeforeEach(func() {
 			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-				_, err := ioutil.ReadAll(req.Body)
+				_, err := io.ReadAll(req.Body)
 				Expect(err).NotTo(HaveOccurred())
 
 				rw.WriteHeader(http.StatusTeapot)
@@ -123,7 +123,7 @@ var _ = Describe("Reporter Handler", func() {
 	Context("when endpoint is nil", func() {
 		BeforeEach(func() {
 			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-				_, err := ioutil.ReadAll(req.Body)
+				_, err := io.ReadAll(req.Body)
 				Expect(err).NotTo(HaveOccurred())
 
 				rw.WriteHeader(http.StatusTeapot)

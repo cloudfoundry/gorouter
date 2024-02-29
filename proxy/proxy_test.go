@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -1244,7 +1243,7 @@ var _ = Describe("Proxy", func() {
 
 				conn := dialProxy(proxyServer)
 
-				req := test_util.NewRequest("GET", "retries", "/", ioutil.NopCloser(body))
+				req := test_util.NewRequest("GET", "retries", "/", io.NopCloser(body))
 				conn.WriteRequest(req)
 				resp, _ := conn.ReadResponse()
 
@@ -1297,7 +1296,7 @@ var _ = Describe("Proxy", func() {
 							body := &bytes.Buffer{}
 							body.WriteString("use an actual body")
 							conn := dialProxy(proxyServer)
-							req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", ioutil.NopCloser(body))
+							req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", io.NopCloser(body))
 							conn.WriteRequest(req)
 							resp, _ := conn.ReadResponse()
 							Expect(resp.StatusCode).To(Equal(status))
@@ -1314,7 +1313,7 @@ var _ = Describe("Proxy", func() {
 								body := &bytes.Buffer{}
 								body.WriteString("use an actual body")
 								conn := dialProxy(proxyServer)
-								req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", ioutil.NopCloser(body))
+								req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", io.NopCloser(body))
 								conn.WriteRequest(req)
 								resp, _ := conn.ReadResponse()
 								Expect(resp.StatusCode).To(Equal(status))
@@ -1333,7 +1332,7 @@ var _ = Describe("Proxy", func() {
 							body := &bytes.Buffer{}
 							body.WriteString("use an actual body")
 							conn := dialProxy(proxyServer)
-							req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", ioutil.NopCloser(body))
+							req := test_util.NewRequest("GET", "backend-with-different-instance-id", "/", io.NopCloser(body))
 							conn.WriteRequest(req)
 							resp, _ := conn.ReadResponse()
 							Expect(resp.StatusCode).To(Equal(status))
@@ -1405,7 +1404,7 @@ var _ = Describe("Proxy", func() {
 					body := &bytes.Buffer{}
 					body.WriteString("use an actual body")
 					conn := dialProxy(proxyServer)
-					req := test_util.NewRequest("GET", "backend-with-tcp-only", "/", ioutil.NopCloser(body))
+					req := test_util.NewRequest("GET", "backend-with-tcp-only", "/", io.NopCloser(body))
 					conn.WriteRequest(req)
 					resp, _ := conn.ReadResponse()
 					Expect(resp.StatusCode).To(Equal(status))
@@ -1449,7 +1448,7 @@ var _ = Describe("Proxy", func() {
 				Expect(body).To(Equal("ABCD"))
 
 				rsp := test_util.NewResponse(200)
-				rsp.Body = ioutil.NopCloser(strings.NewReader("DEFG"))
+				rsp.Body = io.NopCloser(strings.NewReader("DEFG"))
 				conn.WriteResponse(rsp)
 
 				conn.Close()
@@ -1476,7 +1475,7 @@ var _ = Describe("Proxy", func() {
 
 			//make sure the record includes all the data
 			//since the building of the log record happens throughout the life of the request
-			b, err := ioutil.ReadFile(f.Name())
+			b, err := os.ReadFile(f.Name())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
 			Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 4 "-"`))
@@ -2018,7 +2017,7 @@ var _ = Describe("Proxy", func() {
 					conn.WriteResponse(expectRsp)
 
 					rsp := test_util.NewResponse(200)
-					rsp.Body = ioutil.NopCloser(strings.NewReader("DEFGHI"))
+					rsp.Body = io.NopCloser(strings.NewReader("DEFGHI"))
 					conn.WriteResponse(rsp)
 
 					conn.Close()
@@ -2048,7 +2047,7 @@ var _ = Describe("Proxy", func() {
 
 				//make sure the record includes all the data
 				//since the building of the log record happens throughout the life of the request
-				b, err := ioutil.ReadFile(f.Name())
+				b, err := os.ReadFile(f.Name())
 				Expect(err).NotTo(HaveOccurred())
 				Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
 				Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 6 "-"`))
@@ -2087,7 +2086,7 @@ var _ = Describe("Proxy", func() {
 
 			//make sure the record includes all the data
 			//since the building of the log record happens throughout the life of the request
-			b, err := ioutil.ReadFile(f.Name())
+			b, err := os.ReadFile(f.Name())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
 			Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 0 0 "-"`))
@@ -2101,7 +2100,7 @@ var _ = Describe("Proxy", func() {
 
 			body := &bytes.Buffer{}
 			body.WriteString("ABCD")
-			req := test_util.NewRequest("POST", "test", "/", ioutil.NopCloser(body))
+			req := test_util.NewRequest("POST", "test", "/", io.NopCloser(body))
 			conn.WriteRequest(req)
 
 			resp, _ := conn.ReadResponse()
@@ -2115,7 +2114,7 @@ var _ = Describe("Proxy", func() {
 				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
-			b, err := ioutil.ReadFile(f.Name())
+			b, err := os.ReadFile(f.Name())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(b)).To(MatchRegexp("^test.*\n"))
 		})
@@ -2145,7 +2144,7 @@ var _ = Describe("Proxy", func() {
 					Expect(req.Header.Get(router_http.CfAppInstance)).To(BeEmpty())
 
 					resp := test_util.NewResponse(http.StatusOK)
-					resp.Body = ioutil.NopCloser(strings.NewReader("Hellow World: App2"))
+					resp.Body = io.NopCloser(strings.NewReader("Hellow World: App2"))
 					conn.WriteResponse(resp)
 
 					conn.Close()
@@ -2216,7 +2215,7 @@ var _ = Describe("Proxy", func() {
 					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				b, err := ioutil.ReadFile(f.Name())
+				b, err := os.ReadFile(f.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(string(b)).To(ContainSubstring(fmt.Sprintf(`x_b3_traceid:"%s"`, answer)))
@@ -2277,7 +2276,7 @@ var _ = Describe("Proxy", func() {
 
 			conn.Write([]byte(rawReq))
 
-			resp, err := ioutil.ReadAll(conn)
+			resp, err := io.ReadAll(conn)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(string(resp)).To(ContainSubstring("HTTP/1.1 400 Bad Request"))               // status header
@@ -2382,7 +2381,7 @@ var _ = Describe("Proxy", func() {
 					Expect(req.URL.Path).To(Equal("/"))
 					Expect(req.ProtoMajor).To(Equal(1))
 					Expect(req.ProtoMinor).To(Equal(1))
-					ioutil.ReadAll(req.Body)
+					io.ReadAll(req.Body)
 					rsp := test_util.NewResponse(200)
 					conn.WriteResponse(rsp)
 					conn.Close()
@@ -2431,7 +2430,7 @@ var _ = Describe("Proxy", func() {
 					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				b, err := ioutil.ReadFile(f.Name())
+				b, err := os.ReadFile(f.Name())
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(b)).To(ContainSubstring("HTTP/1.1\" 499"))
 				Expect(string(b)).ToNot(ContainSubstring("HTTP/1.1\" 502"))
@@ -2677,7 +2676,7 @@ var _ = Describe("Proxy", func() {
 				return fi.Size(), nil
 			}).ShouldNot(BeZero())
 
-			b, err := ioutil.ReadFile(f.Name())
+			b, err := os.ReadFile(f.Name())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(string(b)).To(ContainSubstring(`response_time:`))
@@ -2786,7 +2785,7 @@ var _ = Describe("Proxy", func() {
 					return fi.Size(), nil
 				}).ShouldNot(BeZero())
 
-				b, err := ioutil.ReadFile(f.Name())
+				b, err := os.ReadFile(f.Name())
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(string(b)).To(ContainSubstring(`response_time:`))
@@ -2978,7 +2977,7 @@ var _ = Describe("Proxy", func() {
 // HACK: this is used to silence any http warnings in logs
 // that clutter stdout/stderr when running unit tests
 func readResponseNoErrorCheck(conn *test_util.HttpConn) *http.Response {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	resp, err := http.ReadResponse(conn.Reader, &http.Request{})
 	Expect(err).ToNot(HaveOccurred())
 	log.SetOutput(os.Stderr)

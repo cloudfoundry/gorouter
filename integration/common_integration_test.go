@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -261,14 +260,14 @@ func (s *testState) StartGorouter() *Session {
 	s.natsRunner.Start()
 
 	var err error
-	s.tmpdir, err = ioutil.TempDir("", "gorouter")
+	s.tmpdir, err = os.MkdirTemp("", "gorouter")
 	Expect(err).ToNot(HaveOccurred())
 
 	cfgFile := filepath.Join(s.tmpdir, "config.yml")
 
 	cfgBytes, err := yaml.Marshal(s.cfg)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(ioutil.WriteFile(cfgFile, cfgBytes, 0644)).To(Succeed())
+	Expect(os.WriteFile(cfgFile, cfgBytes, 0644)).To(Succeed())
 
 	cmd := exec.Command(gorouterPath, "-c", cfgFile)
 	s.gorouterSession, err = Start(cmd, GinkgoWriter, GinkgoWriter)
@@ -350,7 +349,7 @@ func assertRequestSucceeds(client *http.Client, req *http.Request) {
 	resp, err := client.Do(req)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(200))
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	Expect(err).NotTo(HaveOccurred())
 	resp.Body.Close()
 }

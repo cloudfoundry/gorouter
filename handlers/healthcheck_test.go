@@ -1,10 +1,11 @@
 package handlers_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/health"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -40,7 +41,7 @@ var _ = Describe("Healthcheck", func() {
 	It("responds with 200 OK", func() {
 		handler.ServeHTTP(resp, req)
 		Expect(resp.Code).To(Equal(200))
-		bodyString, err := ioutil.ReadAll(resp.Body)
+		bodyString, err := io.ReadAll(resp.Body)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(bodyString).To(ContainSubstring("ok\n"))
 	})

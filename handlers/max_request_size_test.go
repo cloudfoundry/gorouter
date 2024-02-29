@@ -3,7 +3,7 @@ package handlers_test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -37,7 +37,7 @@ var _ = Describe("MaxRequestSize", func() {
 	)
 
 	nextHandler := negroni.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
-		_, err := ioutil.ReadAll(req.Body)
+		_, err := io.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
 		rw.WriteHeader(http.StatusTeapot)
@@ -55,7 +55,7 @@ var _ = Describe("MaxRequestSize", func() {
 		handler.ServeHTTP(resp, req)
 
 		result = resp.(*httptest.ResponseRecorder).Result()
-		responseBody, err = ioutil.ReadAll(result.Body)
+		responseBody, err = io.ReadAll(result.Body)
 		Expect(err).NotTo(HaveOccurred())
 		result.Body.Close()
 	}

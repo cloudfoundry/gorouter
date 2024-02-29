@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -71,7 +70,7 @@ func isDirExist(dir string) bool {
 }
 
 func copyFile(src, dest string) {
-	data, err := ioutil.ReadFile(src)
+	data, err := os.ReadFile(src)
 	Expect(err).NotTo(HaveOccurred())
 	writeToFile(data, dest)
 }

@@ -8,7 +8,6 @@ import (
 	"encoding/asn1"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -37,7 +36,7 @@ type Path struct {
 var _ = SynchronizedBeforeSuite(func() []byte {
 	path, err := gexec.Build("code.cloudfoundry.org/gorouter", "-race")
 	Expect(err).ToNot(HaveOccurred())
-	test, err := ioutil.TempDir("", "test")
+	test, err := os.MkdirTemp("", "test")
 	Expect(err).ToNot(HaveOccurred())
 
 	pathStruct := Path{path, test}

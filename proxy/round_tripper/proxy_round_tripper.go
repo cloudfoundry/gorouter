@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"net/textproto"
@@ -136,7 +135,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		// the underlying Transport will close the client request body.
 		// https://github.com/golang/go/blob/ab5d9f5831cd267e0d8e8954cfe9987b737aec9c/src/net/http/request.go#L179-L182
 
-		request.Body = ioutil.NopCloser(request.Body)
+		request.Body = io.NopCloser(request.Body)
 	}
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
