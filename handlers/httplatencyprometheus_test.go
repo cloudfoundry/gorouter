@@ -2,7 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -38,7 +38,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		fakeRegistry = fake_registry.NewMetricsRegistry()
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			_, err := ioutil.ReadAll(req.Body)
+			_, err := io.ReadAll(req.Body)
 			Expect(err).NotTo(HaveOccurred())
 
 			rw.WriteHeader(http.StatusTeapot)
@@ -104,7 +104,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 
 		It("sets source id to gorouter", func() {
 			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-				_, err := ioutil.ReadAll(req.Body)
+				_, err := io.ReadAll(req.Body)
 				Expect(err).NotTo(HaveOccurred())
 
 				rw.WriteHeader(http.StatusTeapot)

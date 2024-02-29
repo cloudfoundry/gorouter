@@ -1,10 +1,11 @@
 package proxy
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
 	"context"
 	"net/http"
 	"net/http/httptest"
+
+	"code.cloudfoundry.org/gorouter/config"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/handlers"

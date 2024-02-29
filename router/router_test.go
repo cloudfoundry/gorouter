@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -491,7 +490,7 @@ var _ = Describe("Router", func() {
 			app := testcommon.NewTestApp([]route.Uri{"greet." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
@@ -588,7 +587,7 @@ var _ = Describe("Router", func() {
 			app := testcommon.NewTestApp([]route.Uri{"greet." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
 				w.WriteHeader(http.StatusNoContent)
@@ -631,7 +630,7 @@ var _ = Describe("Router", func() {
 		var msg string
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			rr = r
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				return
@@ -664,7 +663,7 @@ var _ = Describe("Router", func() {
 		app := testcommon.NewTestApp([]route.Uri{"foo." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		rCh := make(chan *http.Request)
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-			_, err := ioutil.ReadAll(r.Body)
+			_, err := io.ReadAll(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 			}
@@ -706,7 +705,7 @@ var _ = Describe("Router", func() {
 		done := make(chan string)
 		app := testcommon.NewTestApp([]route.Uri{"foo." + test_util.LocalhostDNS}, config.Port, mbusClient, nil, "")
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-			_, err := ioutil.ReadAll(r.Body)
+			_, err := io.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())
 			w.WriteHeader(http.StatusOK)
 			done <- r.Header.Get(handlers.VcapRequestIdHeader)
@@ -827,7 +826,7 @@ var _ = Describe("Router", func() {
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(bytes)).To(Equal("https"))
 			resp.Body.Close()
@@ -982,7 +981,7 @@ var _ = Describe("Router", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
 			defer resp.Body.Close()
 
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -996,7 +995,7 @@ var _ = Describe("Router", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			defer resp.Body.Close()
 
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -1041,7 +1040,7 @@ var _ = Describe("Router", func() {
 					Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
 					defer resp.Body.Close()
 
-					_, err = ioutil.ReadAll(resp.Body)
+					_, err = io.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
 					Expect(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
@@ -1061,7 +1060,7 @@ var _ = Describe("Router", func() {
 					Expect(resp.StatusCode).To(Equal(http.StatusTeapot))
 					defer resp.Body.Close()
 
-					_, err = ioutil.ReadAll(resp.Body)
+					_, err = io.ReadAll(resp.Body)
 					Expect(err).To(MatchError("unexpected EOF"))
 					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
 				})
@@ -1098,7 +1097,7 @@ var _ = Describe("Router", func() {
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 				defer resp.Body.Close()
 
-				_, err = ioutil.ReadAll(resp.Body)
+				_, err = io.ReadAll(resp.Body)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -1586,7 +1585,7 @@ var _ = Describe("Router", func() {
 			Expect(resp.Proto).To(Equal("HTTP/1.1"))
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(bytes).To(ContainSubstring("Hello"))
 			defer resp.Body.Close()
@@ -1632,7 +1631,7 @@ var _ = Describe("Router", func() {
 
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(bytes).To(ContainSubstring("Hello"))
 			defer resp.Body.Close()
@@ -1671,7 +1670,7 @@ var _ = Describe("Router", func() {
 			Expect(resp).ToNot(BeNil())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(bytes)).To(Equal("https"))
 			resp.Body.Close()
@@ -1733,7 +1732,7 @@ var _ = Describe("Router", func() {
 				Expect(resp).ToNot(BeNil())
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				bytes, err := ioutil.ReadAll(resp.Body)
+				bytes, err := io.ReadAll(resp.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(string(bytes)).To(ContainSubstring("Hello"))
 				resp.Body.Close()
@@ -1946,7 +1945,7 @@ var _ = Describe("Router", func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				bytes, err := ioutil.ReadAll(resp.Body)
+				bytes, err := io.ReadAll(resp.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(bytes).To(ContainSubstring("Hello"))
 				defer resp.Body.Close()
@@ -2377,7 +2376,7 @@ func sendAndReceive(req *http.Request, statusCode int) []byte {
 	ExpectWithOffset(1, resp.StatusCode).To(Equal(statusCode))
 	defer resp.Body.Close()
 
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
 	return bytes
@@ -2411,7 +2410,7 @@ func getSessionAndAppPort(url string, rPort uint16) (*http.Response, string) {
 	resp, err = client.Do(req)
 	Expect(err).ToNot(HaveOccurred())
 
-	port, err = ioutil.ReadAll(resp.Body)
+	port, err = io.ReadAll(resp.Body)
 	Expect(err).ToNot(HaveOccurred())
 
 	return resp, string(port)
@@ -2436,7 +2435,7 @@ func getAppPortWithSticky(url string, rPort uint16, respCookies []*http.Cookie) 
 	resp, err = client.Do(req)
 	Expect(err).ToNot(HaveOccurred())
 
-	port, err = ioutil.ReadAll(resp.Body)
+	port, err = io.ReadAll(resp.Body)
 	Expect(err).ToNot(HaveOccurred())
 
 	return string(port)
@@ -2474,7 +2473,7 @@ func routeExists(config *cfg.Config, routeName string) (bool, error) {
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		Expect(err).ToNot(HaveOccurred())
 		routes := make(map[string]interface{})

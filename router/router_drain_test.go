@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"syscall"
@@ -61,7 +61,7 @@ var _ = Describe("Router", func() {
 		app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 			blocker <- true
 
-			_, err := ioutil.ReadAll(r.Body)
+			_, err := io.ReadAll(r.Body)
 			defer r.Body.Close()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -231,7 +231,7 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				blocker <- true
 
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
 
@@ -258,7 +258,7 @@ var _ = Describe("Router", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(resp).ToNot(BeNil())
 				defer resp.Body.Close()
-				_, err = ioutil.ReadAll(resp.Body)
+				_, err = io.ReadAll(resp.Body)
 				Expect(err).ToNot(HaveOccurred())
 				close(clientDone)
 			}()
@@ -289,7 +289,7 @@ var _ = Describe("Router", func() {
 			app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 				appRequestReceived <- struct{}{}
 
-				_, err := ioutil.ReadAll(r.Body)
+				_, err := io.ReadAll(r.Body)
 				defer r.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
 
@@ -338,7 +338,7 @@ var _ = Describe("Router", func() {
 				app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 					appRequestReceived <- struct{}{}
 
-					_, err := ioutil.ReadAll(r.Body)
+					_, err := io.ReadAll(r.Body)
 					defer r.Body.Close()
 					Expect(err).ToNot(HaveOccurred())
 
@@ -372,7 +372,7 @@ var _ = Describe("Router", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(resp).ToNot(BeNil())
 					defer resp.Body.Close()
-					_, err = ioutil.ReadAll(resp.Body)
+					_, err = io.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
 					close(clientDone)
 				}()

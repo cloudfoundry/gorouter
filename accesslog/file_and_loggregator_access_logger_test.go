@@ -2,7 +2,6 @@ package accesslog_test
 
 import (
 	"bufio"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -115,7 +114,7 @@ var _ = Describe("AccessLog", func() {
 			})
 
 			It("writes to the log file and Stdout", func() {
-				stdout, err := ioutil.TempFile("", "stdout")
+				stdout, err := os.CreateTemp("", "stdout")
 				Expect(err).NotTo(HaveOccurred())
 				defer os.Remove(stdout.Name())
 
@@ -126,7 +125,7 @@ var _ = Describe("AccessLog", func() {
 				accessLogger.Log(*CreateAccessLogRecord())
 
 				Eventually(func() (string, error) {
-					b, err := ioutil.ReadFile(stdout.Name())
+					b, err := os.ReadFile(stdout.Name())
 					return string(b), err
 				}).Should(ContainSubstring("foo.bar"))
 

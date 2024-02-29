@@ -2,7 +2,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,7 +30,7 @@ var _ = Describe("Error Writers", func() {
 
 			statusCode = resp.StatusCode
 
-			body, err = ioutil.ReadAll(resp.Body)
+			body, err = io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 
 			resp.Body.Close()
@@ -95,7 +95,7 @@ var _ = Describe("Error Writers", func() {
 				tpl := `<html><body>{{ .Message }}</body></html>`
 
 				var err error
-				tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
+				tmpFile, err = os.CreateTemp(os.TempDir(), "html-err-tpl")
 				Expect(err).NotTo(HaveOccurred())
 
 				testState.cfg.HTMLErrorTemplateFile = tmpFile.Name()
@@ -133,7 +133,7 @@ var _ = Describe("Error Writers", func() {
 				tpl := `<html><body>Code: {{ .Status }} ; Cause: {{ .Header.Get "X-Cf-RouterError" }}</body></html>`
 
 				var err error
-				tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
+				tmpFile, err = os.CreateTemp(os.TempDir(), "html-err-tpl")
 				Expect(err).NotTo(HaveOccurred())
 
 				testState.cfg.HTMLErrorTemplateFile = tmpFile.Name()

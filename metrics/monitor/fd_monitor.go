@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"runtime"
@@ -38,14 +37,14 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 		case <-f.ticker.C:
 			numFds := 0
 			if runtime.GOOS == "linux" {
-				fdInfo, err := ioutil.ReadDir(f.path)
+				fdInfo, err := os.ReadDir(f.path)
 				if err != nil {
 					f.logger.Error("error-reading-filedescriptor-path", zap.Error(err))
 					break
 				}
 				numFds = symlinks(fdInfo)
 			} else if runtime.GOOS == "darwin" {
-				fdInfo, err := ioutil.ReadDir(f.path)
+				fdInfo, err := os.ReadDir(f.path)
 				if err != nil {
 					// no /proc on MacOS, falling back to lsof
 					out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("lsof -p %v", os.Getpid())).Output()

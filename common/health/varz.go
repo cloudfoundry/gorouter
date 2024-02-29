@@ -1,9 +1,10 @@
 package health
 
 import (
-	"code.cloudfoundry.org/gorouter/common/schema"
 	"encoding/json"
 	"sync"
+
+	"code.cloudfoundry.org/gorouter/common/schema"
 )
 
 type GenericVarz struct {

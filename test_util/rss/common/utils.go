@@ -3,7 +3,7 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/user"
 
 	"code.cloudfoundry.org/gorouter/common/secure"
@@ -21,7 +21,7 @@ func CreateCrypto(c *cli.Context) (*secure.AesGCM, error) {
 		keyPath = usr.HomeDir + "/.rss/key"
 	}
 
-	key, err := ioutil.ReadFile(keyPath)
+	key, err := os.ReadFile(keyPath)
 	if err != nil {
 		fmt.Printf("Unable to read key file: %s\n%s\n", keyPath, err.Error())
 		return nil, err

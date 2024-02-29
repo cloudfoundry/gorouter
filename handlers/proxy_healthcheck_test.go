@@ -1,7 +1,7 @@
 package handlers_test
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -54,7 +54,7 @@ var _ = Describe("Proxy Healthcheck", func() {
 		It("responds with 200 OK", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Code).To(Equal(200))
-			bodyString, err := ioutil.ReadAll(resp.Body)
+			bodyString, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(bodyString).To(ContainSubstring("ok\n"))
 		})
@@ -98,7 +98,7 @@ var _ = Describe("Proxy Healthcheck", func() {
 			handler.ServeHTTP(resp, req, nextHandler)
 			Expect(resp.Header().Get("Cache-Control")).To(BeEmpty())
 			Expect(resp.Header().Get("Expires")).To(BeEmpty())
-			bodyString, err := ioutil.ReadAll(resp.Body)
+			bodyString, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(bodyString).To(BeEmpty())
 		})

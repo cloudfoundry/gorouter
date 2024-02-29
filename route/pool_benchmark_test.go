@@ -1,10 +1,11 @@
 package route_test
 
 import (
-	"code.cloudfoundry.org/gorouter/route"
 	"sync"
 	"testing"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 var (

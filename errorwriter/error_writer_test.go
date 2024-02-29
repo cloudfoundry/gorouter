@@ -2,7 +2,6 @@ package errorwriter_test
 
 import (
 	_ "html/template"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -100,7 +99,7 @@ var _ = Describe("HTML ErrorWriter", func() {
 
 	BeforeEach(func() {
 		var err error
-		tmpFile, err = ioutil.TempFile(os.TempDir(), "html-err-tpl")
+		tmpFile, err = os.CreateTemp(os.TempDir(), "html-err-tpl")
 		Expect(err).NotTo(HaveOccurred())
 
 		recorder = httptest.NewRecorder()

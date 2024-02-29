@@ -3,7 +3,7 @@ package integration
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,7 +58,7 @@ var _ = Describe("Route services", func() {
 					defer res.Body.Close()
 					Expect(res.StatusCode).To(Equal(http.StatusOK))
 
-					body, err := ioutil.ReadAll(res.Body)
+					body, err := io.ReadAll(res.Body)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(body).To(Equal([]byte("I'm the app")))
 
@@ -105,7 +105,7 @@ var _ = Describe("Route services", func() {
 				res, err := testState.client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				body, err := ioutil.ReadAll(res.Body)
+				body, err := io.ReadAll(res.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
 			})
@@ -118,7 +118,7 @@ var _ = Describe("Route services", func() {
 				res, err := testState.client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				body, err := ioutil.ReadAll(res.Body)
+				body, err := io.ReadAll(res.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
 			})
@@ -217,7 +217,7 @@ var _ = Describe("Route services", func() {
 							defer res.Body.Close()
 							Expect(res.StatusCode).To(Equal(http.StatusOK))
 
-							body, err := ioutil.ReadAll(res.Body)
+							body, err := io.ReadAll(res.Body)
 							Expect(err).ToNot(HaveOccurred())
 							Expect(body).To(Equal([]byte("I'm the app")))
 
@@ -302,7 +302,7 @@ var _ = Describe("Route services", func() {
 				res, err := testState.client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				body, err := ioutil.ReadAll(res.Body)
+				body, err := io.ReadAll(res.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
 			})
@@ -361,7 +361,7 @@ var _ = Describe("Route services", func() {
 				res, err := testState.client.Do(req)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.StatusCode).To(Equal(http.StatusOK))
-				body, err := ioutil.ReadAll(res.Body)
+				body, err := io.ReadAll(res.Body)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(body).To(Equal([]byte("I'm the route service")))
 			})

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -50,7 +50,7 @@ var _ = Describe("Route Service Handler", func() {
 	)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := ioutil.ReadAll(req.Body)
+		_, err := io.ReadAll(req.Body)
 		Expect(err).NotTo(HaveOccurred())
 
 		reqChan <- req

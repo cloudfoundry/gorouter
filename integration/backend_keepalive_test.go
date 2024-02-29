@@ -2,7 +2,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +26,7 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 
 		testApp = NewUnstartedTestApp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
-			_, err := ioutil.ReadAll(r.Body)
+			_, err := io.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())
 			w.WriteHeader(200)
 		}))

@@ -1,6 +1,8 @@
 package common_test
 
 import (
+	"io"
+
 	. "code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/logger"
@@ -13,7 +15,6 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
@@ -335,7 +336,7 @@ func doGetRequest(req *http.Request) (int, http.Header, string) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp).ToNot(BeNil())
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	Expect(err).ToNot(HaveOccurred())
 

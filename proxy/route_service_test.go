@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -203,7 +203,7 @@ var _ = Describe("Route Services", func() {
 					out.WriteString("backend instance")
 					res := &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(out),
+						Body:       io.NopCloser(out),
 					}
 					conn.WriteResponse(res)
 					conn.Close()
@@ -233,7 +233,7 @@ var _ = Describe("Route Services", func() {
 						out.WriteString("backend instance")
 						res := &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       ioutil.NopCloser(out),
+							Body:       io.NopCloser(out),
 						}
 						conn.WriteResponse(res)
 						conn.Close()
@@ -267,7 +267,7 @@ var _ = Describe("Route Services", func() {
 						out.WriteString("route service instance")
 						res := &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       ioutil.NopCloser(out),
+							Body:       io.NopCloser(out),
 						}
 						conn.WriteResponse(res)
 						conn.Close()
@@ -433,7 +433,7 @@ var _ = Describe("Route Services", func() {
 				fakeRouteServicesClient.RoundTripStub = func(r *http.Request) (*http.Response, error) {
 					return &http.Response{
 						Request:    r,
-						Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
+						Body:       io.NopCloser(bytes.NewBufferString("{}")),
 						StatusCode: http.StatusOK,
 						Header:     make(map[string][]string),
 					}, nil
@@ -500,7 +500,7 @@ var _ = Describe("Route Services", func() {
 				fakeRouteServicesClient.RoundTripStub = func(r *http.Request) (*http.Response, error) {
 					return &http.Response{
 						Request:    r,
-						Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
+						Body:       io.NopCloser(bytes.NewBufferString("{}")),
 						StatusCode: http.StatusOK,
 						Header:     make(map[string][]string),
 					}, nil

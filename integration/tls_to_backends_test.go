@@ -3,9 +3,9 @@ package integration
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -142,10 +142,10 @@ var _ = Describe("TLS to backends", func() {
 		runningApp1.VerifyAppStatus(200)
 
 		Eventually(func() ([]byte, error) {
-			return ioutil.ReadFile(testState.AccessLogFilePath())
+			return os.ReadFile(testState.AccessLogFilePath())
 		}).Should(ContainSubstring(`response_time`))
 
-		f, err := ioutil.ReadFile(testState.AccessLogFilePath())
+		f, err := os.ReadFile(testState.AccessLogFilePath())
 		Expect(err).NotTo(HaveOccurred())
 		fmt.Printf("contents %s", f)
 

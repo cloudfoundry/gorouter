@@ -1,7 +1,6 @@
 package monitor_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -74,7 +73,7 @@ var _ = Describe("FileDescriptor", func() {
 func createTestPath(path string, symlink int) string {
 	// Create symlink structure similar to /proc/pid/fd in linux file system
 	createSymlink := func(dir string, n int) {
-		fd, err := ioutil.TempFile(dir, "socket")
+		fd, err := os.CreateTemp(dir, "socket")
 		Expect(err).NotTo(HaveOccurred())
 		for i := 0; i < n; i++ {
 			fdId := strconv.Itoa(i)
@@ -87,7 +86,7 @@ func createTestPath(path string, symlink int) string {
 		createSymlink(path, symlink)
 		return path
 	}
-	procPath, err := ioutil.TempDir("", "proc")
+	procPath, err := os.MkdirTemp("", "proc")
 	Expect(err).NotTo(HaveOccurred())
 	createSymlink(procPath, symlink)
 	return procPath

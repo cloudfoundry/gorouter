@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -71,7 +71,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		logger = test_util.NewTestZapLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			_, err := ioutil.ReadAll(req.Body)
+			_, err := io.ReadAll(req.Body)
 			Expect(err).NotTo(HaveOccurred())
 
 			rw.WriteHeader(http.StatusTeapot)
@@ -182,7 +182,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 	Context("when there is no RouteEndpoint", func() {
 		BeforeEach(func() {
 			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-				_, err := ioutil.ReadAll(req.Body)
+				_, err := io.ReadAll(req.Body)
 				Expect(err).NotTo(HaveOccurred())
 
 				rw.WriteHeader(http.StatusTeapot)
