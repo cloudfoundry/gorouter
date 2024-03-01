@@ -380,6 +380,7 @@ nats:
 					Expect(err).NotTo(HaveOccurred())
 
 					Expect(config.Nats.CAPool).ToNot(BeNil())
+					//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 					poolSubjects := config.Nats.CAPool.Subjects()
 					parsedCert, err := x509.ParseCertificate(caCert.Certificate[0])
 					Expect(err).NotTo(HaveOccurred())
@@ -574,6 +575,7 @@ routing_table_sharding_mode: "segments"
 						Expect(config.RoutingApi.Port).To(Equal(1234))
 						Expect(config.RoutingApi.AuthDisabled).To(BeTrue())
 
+						//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 						Expect(config.RoutingApi.CAPool.Subjects()).To(ContainElement(certChain.CACert.RawSubject))
 						Expect(config.RoutingApi.ClientAuthCertificate).To(Equal(certChain.AsTLSConfig().Certificates[0]))
 					})
@@ -1325,6 +1327,7 @@ load_balancer_healthy_threshold: 10s
 						Expect(err).NotTo(HaveOccurred())
 						c, err := x509.ParseCertificate(certDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
+						//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 						Expect(config.CAPool.Subjects()).To(ContainElement(c.RawSubject))
 					}
 				})
@@ -1623,19 +1626,23 @@ load_balancer_healthy_threshold: 10s
 							Expect(err).NotTo(HaveOccurred())
 							c, err := x509.ParseCertificate(caCertDER.Bytes)
 							Expect(err).NotTo(HaveOccurred())
+							//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 							Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(c.Subject.CommonName))
 
 							clientCACertDER, _ := pem.Decode([]byte(config.ClientCACerts))
 							Expect(err).NotTo(HaveOccurred())
 							c, err = x509.ParseCertificate(clientCACertDER.Bytes)
 							Expect(err).NotTo(HaveOccurred())
+							//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 							Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 						}
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
 
+						//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 						for _, subj := range certPool.Subjects() {
+							//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 							Expect(config.ClientCAPool.Subjects()).NotTo(ContainElement(subj))
 						}
 					})
@@ -1675,6 +1682,7 @@ load_balancer_healthy_threshold: 10s
 						Expect(err).NotTo(HaveOccurred())
 						c, err := x509.ParseCertificate(clientCACertDER.Bytes)
 						Expect(err).NotTo(HaveOccurred())
+						//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 						Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 
 						for _, caCert := range config.CACerts {
@@ -1682,13 +1690,16 @@ load_balancer_healthy_threshold: 10s
 							Expect(err).NotTo(HaveOccurred())
 							c, err = x509.ParseCertificate(caCertDER.Bytes)
 							Expect(err).NotTo(HaveOccurred())
+							//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 							Expect(config.ClientCAPool.Subjects()).To(ContainElement(c.RawSubject))
 						}
 
 						certPool, err := x509.SystemCertPool()
 						Expect(err).NotTo(HaveOccurred())
 
+						//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 						for _, subj := range certPool.Subjects() {
+							//lint:ignore SA1019 - ignoring tlsCert.RootCAs.Subjects is deprecated ERR because cert does not come from SystemCertPool.
 							Expect(config.ClientCAPool.Subjects()).To(ContainElement(subj))
 						}
 					})
