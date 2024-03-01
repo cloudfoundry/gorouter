@@ -37,14 +37,14 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 		case <-f.ticker.C:
 			numFds := 0
 			if runtime.GOOS == "linux" {
-				fdInfo, err := os.ReadDir(f.path)
+				dirEntries, err := os.ReadDir(f.path)
 				if err != nil {
 					f.logger.Error("error-reading-filedescriptor-path", zap.Error(err))
 					break
 				}
-				numFds = symlinks(fdInfo)
+				numFds = symlinks(dirEntries)
 			} else if runtime.GOOS == "darwin" {
-				fdInfo, err := os.ReadDir(f.path)
+				dirEntries, err := os.ReadDir(f.path)
 				if err != nil {
 					// no /proc on MacOS, falling back to lsof
 					out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("lsof -p %v", os.Getpid())).Output()
@@ -55,7 +55,7 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 					lines := strings.Split(string(out), "\n")
 					numFds = len(lines) - 1 //cut the table header
 				} else {
-					numFds = symlinks(fdInfo)
+					numFds = symlinks(dirEntries)
 				}
 			}
 			if err := f.sender.SendValue("file_descriptors", float64(numFds), "file"); err != nil {
@@ -69,9 +69,9 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 	}
 }
 
-func symlinks(fileInfos []os.FileInfo) (count int) {
+func symlinks(fileInfos []os.DirEntry) (count int) {
 	for i := 0; i < len(fileInfos); i++ {
-		if fileInfos[i].Mode()&os.ModeSymlink == os.ModeSymlink {
+		if fileInfos[i].Type()&os.ModeSymlink == os.ModeSymlink {
 			count++
 		}
 	}
