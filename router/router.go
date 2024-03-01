@@ -298,8 +298,6 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
 	}
 
-	tlsConfig.BuildNameToCertificate()
-
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 	if err != nil {
 		r.logger.Fatal("tls-listener-error", zap.Error(err))
