@@ -3,6 +3,7 @@ package router_test
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -17,7 +18,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
-	"net/http/httputil"
+	"net/http/httptrace"
 	"os"
 	"strings"
 	"syscall"
@@ -844,25 +845,35 @@ var _ = Describe("Router", func() {
 			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
-			conn, err := net.Dial("tcp", host)
+			connections := []httptrace.GotConnInfo{}
+			clientTrace := httptrace.ClientTrace{
+				GotConn: func(info httptrace.GotConnInfo) {
+					connections = append(connections, info)
+				},
+			}
+			traceCtx := httptrace.WithClientTrace(context.Background(), &clientTrace)
+			req, err := http.NewRequestWithContext(traceCtx, "GET", uri, nil)
 			Expect(err).ToNot(HaveOccurred())
-
-			client := httputil.NewClientConn(conn, nil)
-			req, _ := http.NewRequest("GET", uri, nil)
-			Expect(req.Close).To(BeFalse())
-
-			resp, err := client.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
 			resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			//make second request without errors
-			resp, err = client.Do(req)
+			resp, err = http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
 			resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(connections).To(HaveLen(2))
+			Expect(connections[0].Reused).To(BeFalse())
+			Expect(connections[1].Reused).To(BeTrue())
+			Expect(connections[0].Conn.LocalAddr()).To(Equal(connections[1].Conn.LocalAddr()))
 		})
 
 		It("resets the idle timeout on activity", func() {
@@ -875,23 +886,29 @@ var _ = Describe("Router", func() {
 			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
-			conn, err := net.Dial("tcp", host)
+			connections := []httptrace.GotConnInfo{}
+			clientTrace := httptrace.ClientTrace{
+				GotConn: func(info httptrace.GotConnInfo) {
+					connections = append(connections, info)
+				},
+			}
+			traceCtx := httptrace.WithClientTrace(context.Background(), &clientTrace)
+			req, err := http.NewRequestWithContext(traceCtx, "GET", uri, nil)
 			Expect(err).ToNot(HaveOccurred())
-
-			client := httputil.NewClientConn(conn, nil)
-			req, _ := http.NewRequest("GET", uri, nil)
 			Expect(req.Close).To(BeFalse())
 
 			// initiate idle timeout
-			assertServerResponse(client, req)
+			assertServerResponse(req)
 
 			// use 3/4 of the idle timeout
 			time.Sleep((config.EndpointTimeout * 3) / 4)
 
 			//make second request without errors
-			resp, err := client.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
 			resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
@@ -901,11 +918,19 @@ var _ = Describe("Router", func() {
 			// make third request without errors
 			// even though initial idle timeout was exceeded because
 			// it will have been reset
-			resp, err = client.Do(req)
+			resp, err = http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
 			resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(connections).To(HaveLen(3))
+			Expect(connections[0].Reused).To(BeFalse())
+			Expect(connections[1].Reused).To(BeTrue())
+			Expect(connections[2].Reused).To(BeTrue())
+			Expect(connections[0].Conn.LocalAddr()).To(Equal(connections[1].Conn.LocalAddr()))
+			Expect(connections[0].Conn.LocalAddr()).To(Equal(connections[2].Conn.LocalAddr()))
 		})
 
 		It("removes the idle timeout during an active connection", func() {
@@ -925,15 +950,19 @@ var _ = Describe("Router", func() {
 			host := fmt.Sprintf("keepalive.%s:%d", test_util.LocalhostDNS, config.Port)
 			uri := fmt.Sprintf("http://%s", host)
 
-			conn, err := net.Dial("tcp", host)
+			connections := []httptrace.GotConnInfo{}
+			clientTrace := httptrace.ClientTrace{
+				GotConn: func(info httptrace.GotConnInfo) {
+					connections = append(connections, info)
+				},
+			}
+			traceCtx := httptrace.WithClientTrace(context.Background(), &clientTrace)
+			req, err := http.NewRequestWithContext(traceCtx, "GET", uri, nil)
 			Expect(err).ToNot(HaveOccurred())
-
-			client := httputil.NewClientConn(conn, nil)
-			req, _ := http.NewRequest("GET", uri, nil)
 			Expect(req.Close).To(BeFalse())
 
 			// initiate idle timeout
-			assertServerResponse(client, req)
+			assertServerResponse(req)
 
 			// use 3/4 of the idle timeout
 			time.Sleep((config.EndpointTimeout * 3) / 4)
@@ -942,11 +971,17 @@ var _ = Describe("Router", func() {
 			// making a request that will last 3/4 of the timeout
 			// that does not disconnect will show that the idle timeout
 			// was removed during the active connection
-			resp, err := client.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).ToNot(BeNil())
+			_, err = io.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
 			resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(connections).To(HaveLen(2))
+			Expect(connections[0].Reused).To(BeFalse())
+			Expect(connections[1].Reused).To(BeTrue())
+			Expect(connections[0].Conn.LocalAddr()).To(Equal(connections[1].Conn.LocalAddr()))
 		})
 	})
 
@@ -2441,14 +2476,16 @@ func getAppPortWithSticky(url string, rPort uint16, respCookies []*http.Cookie) 
 	return string(port)
 }
 
-func assertServerResponse(client *httputil.ClientConn, req *http.Request) {
+func assertServerResponse(req *http.Request) {
 	var resp *http.Response
 	var err error
 
 	for i := 0; i < 3; i++ {
-		resp, err = client.Do(req)
+		resp, err = http.DefaultClient.Do(req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp).ToNot(BeNil())
+		_, err = io.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			break

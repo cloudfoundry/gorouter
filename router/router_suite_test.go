@@ -2,6 +2,7 @@ package router_test
 
 import (
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
@@ -18,7 +19,10 @@ func TestRouter(t *testing.T) {
 	RunSpecs(t, "Router Suite")
 }
 
+var originalDefaultTransport *http.Transport
+
 var _ = SynchronizedBeforeSuite(func() []byte {
+	originalDefaultTransport = http.DefaultTransport.(*http.Transport)
 	fakeEmitter := fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
 	return nil
