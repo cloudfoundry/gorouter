@@ -1360,11 +1360,6 @@ var _ = Describe("Proxy", func() {
 					for {
 						conn, err := nl.Accept()
 						if err != nil {
-							if ne, ok := err.(net.Error); ok && ne.Temporary() {
-								fmt.Printf("http: Accept error: %v; retrying in %v\n", err, 5*time.Second)
-								time.Sleep(5 * time.Second)
-								continue
-							}
 							break
 						}
 						go func() {
