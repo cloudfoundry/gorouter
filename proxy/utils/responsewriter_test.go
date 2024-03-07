@@ -44,15 +44,6 @@ func (f *fakeResponseWriter) Flush() {
 	f.flushCalled = true
 }
 
-type fakeCloseNotifierResponseWriter struct {
-	fakeResponseWriter
-	c <-chan bool
-}
-
-func (f *fakeCloseNotifierResponseWriter) CloseNotify() <-chan bool {
-	return f.c
-}
-
 type fakeHijackerResponseWriter struct {
 	fakeResponseWriter
 	hijackCalled bool
@@ -75,9 +66,8 @@ func (f *fakeHeaderRewriter) RewriteHeader(h http.Header) {
 
 var _ = Describe("ProxyWriter", func() {
 	var (
-		closeNotifier chan bool
-		fake          *fakeResponseWriter
-		proxy         *proxyResponseWriter
+		fake  *fakeResponseWriter
+		proxy *proxyResponseWriter
 	)
 
 	BeforeEach(func() {
@@ -93,22 +83,6 @@ var _ = Describe("ProxyWriter", func() {
 	It("delegates the call to Flush", func() {
 		proxy.Flush()
 		Expect(fake.flushCalled).To(BeTrue())
-	})
-
-	It("delegates CloseNotify() if the writer is a http.CloseNotifier", func() {
-		closeNotifier = make(chan bool, 1)
-		fake := &fakeCloseNotifierResponseWriter{
-			fakeResponseWriter: *newFakeResponseWriter(),
-			c:                  closeNotifier,
-		}
-		proxy = NewProxyResponseWriter(fake)
-
-		closeNotifier <- true
-		Expect(proxy.CloseNotify()).To(Receive())
-	})
-
-	It("returns a channel if the writer is not http.CloseNotifier", func() {
-		Expect(proxy.CloseNotify()).To(BeAssignableToTypeOf(make(<-chan bool)))
 	})
 
 	It("delegates Hijack() if the writer is a http.Hijacker", func() {
