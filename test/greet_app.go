@@ -22,5 +22,5 @@ func headerHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf("%+v", r.Header.Get("X-Forwarded-Proto")))
 }
 func greetHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, world")
+	io.WriteString(w, fmt.Sprintf("Hello, %s", r.RemoteAddr))
 }
