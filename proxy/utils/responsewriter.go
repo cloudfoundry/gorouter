@@ -17,7 +17,6 @@ type ProxyResponseWriter interface {
 	Status() int
 	SetStatus(status int)
 	Size() int
-	CloseNotify() <-chan bool
 	AddHeaderRewriter(HeaderRewriter)
 }
 
@@ -39,13 +38,6 @@ func NewProxyResponseWriter(w http.ResponseWriter) *proxyResponseWriter {
 	}
 
 	return proxyWriter
-}
-
-func (p *proxyResponseWriter) CloseNotify() <-chan bool {
-	if closeNotifier, ok := p.w.(http.CloseNotifier); ok {
-		return closeNotifier.CloseNotify()
-	}
-	return make(chan bool)
 }
 
 func (p *proxyResponseWriter) Header() http.Header {
