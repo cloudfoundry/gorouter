@@ -136,23 +136,9 @@ type RegisterConfig struct {
 }
 
 func runBackendInstance(ln net.Listener, handler connHandler) {
-	var tempDelay time.Duration // how long to sleep on accept failure
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-				fmt.Printf("http: Accept error: %v; retrying in %v\n", err, tempDelay)
-				time.Sleep(tempDelay)
-				continue
-			}
 			break
 		}
 		go func() {
