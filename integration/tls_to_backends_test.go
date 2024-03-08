@@ -81,8 +81,13 @@ var _ = Describe("TLS to backends", func() {
 			assertWebsocketSuccess(wsApp)
 		})
 
-		It("closes connections with backends that respond with non 101-status code", func() {
-			wsApp := test.NewHangingWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, "")
+		// this test mandates RFC 6455 - https://datatracker.ietf.org/doc/html/rfc6455#section-4
+		// where it is stated that:
+		// "(...) If the status code received from the server is not 101, the
+		//       client handles the response per HTTP [RFC2616] procedures."
+		// Which means the proxy must treat non-101 responses as regular HTTP [ and not close the connection per se ]
+		It("does not close connections with backends that respond with non 101-status code", func() {
+			wsApp := test.NewNotUpgradingWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, "")
 			wsApp.Register()
 			wsApp.Listen()
 
@@ -104,18 +109,12 @@ var _ = Describe("TLS to backends", func() {
 
 			resp, err := http.ReadResponse(x.Reader, &http.Request{})
 			Expect(err).NotTo(HaveOccurred())
-			resp.Body.Close()
-
 			Expect(resp.StatusCode).To(Equal(404))
 
-			// client-side conn should have been closed
-			// we verify this by trying to read from it, and checking that
-			//  - the read does not block
-			//  - the read returns no data
-			//  - the read returns an error EOF
-			n, err := conn.Read(make([]byte, 100))
-			Expect(n).To(Equal(0))
-			Expect(err).To(Equal(io.EOF))
+			data, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			Expect(string(data)).To(ContainSubstring("beginning of the response body goes here"))
 
 			x.Close()
 		})

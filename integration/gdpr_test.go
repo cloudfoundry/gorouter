@@ -13,7 +13,6 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 )
 
 // Involves scrubbing client IPs, for more info on GDPR: https://www.eugdpr.org/
@@ -61,7 +60,8 @@ var _ = Describe("GDPR", func() {
 			Expect(f).NotTo(ContainSubstring("192.168.0.1"))
 		})
 
-		It("omits x-forwarded-for from stdout", func() {
+		It("omits x-forwarded-for headers for websockets", func() {
+			testState.EnableAccessLog()
 			testState.cfg.Status.Pass = "pass"
 			testState.cfg.Status.User = "user"
 			testState.cfg.Status.Routes.Port = 6705
@@ -96,8 +96,12 @@ var _ = Describe("GDPR", func() {
 
 			x.Close()
 
-			Eventually(gbytes.BufferReader(testState.gorouterSession.Out)).Should(gbytes.Say(`"X-Forwarded-For":"-"`))
-			Expect(testState.gorouterSession.Out.Contents()).ToNot(ContainSubstring("192.168.0.1"))
+			Eventually(func() ([]byte, error) {
+				return os.ReadFile(testState.AccessLogFilePath())
+			}).Should(ContainSubstring(`x_forwarded_for:"-"`))
+			f, err := os.ReadFile(testState.AccessLogFilePath())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(f).NotTo(ContainSubstring("192.168.0.1"))
 		})
 	})
 
@@ -127,7 +131,8 @@ var _ = Describe("GDPR", func() {
 			}).Should(ContainSubstring(`"foo-agent" "-"`))
 		})
 
-		It("omits RemoteAddr from stdout", func() {
+		It("omits RemoteAddr in log for websockets", func() {
+			testState.EnableAccessLog()
 			testState.cfg.Status.Pass = "pass"
 			testState.cfg.Status.User = "user"
 			testState.cfg.Status.Routes.Port = 6706
@@ -151,6 +156,7 @@ var _ = Describe("GDPR", func() {
 			req := test_util.NewRequest("GET", "ws-app."+test_util.LocalhostDNS, "", nil)
 			req.Header.Set("Upgrade", "websocket")
 			req.Header.Set("Connection", "upgrade")
+			req.Header.Set("User-Agent", "foo-agent")
 			x.WriteRequest(req)
 
 			resp, _ := x.ReadResponse()
@@ -161,7 +167,9 @@ var _ = Describe("GDPR", func() {
 
 			x.Close()
 
-			Eventually(gbytes.BufferReader(testState.gorouterSession.Out)).Should(gbytes.Say(`"RemoteAddr":"-"`))
+			Eventually(func() ([]byte, error) {
+				return os.ReadFile(testState.AccessLogFilePath())
+			}).Should(ContainSubstring(`"foo-agent" "-"`))
 		})
 	})
 })

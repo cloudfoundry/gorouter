@@ -304,11 +304,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		responseWriterMu.Lock()
 		defer responseWriterMu.Unlock()
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
+		if handlers.IsWebSocketUpgrade(request) {
+			rt.combinedReporter.CaptureWebSocketFailure()
+		}
 		return nil, err
 	}
 
 	// Round trip was successful at this point
 	reqInfo.RoundTripSuccessful = true
+
+	// Set status code for access log
+	if res != nil {
+		reqInfo.ProxyResponseWriter.SetStatus(res.StatusCode)
+	}
+
+	// Write metric for ws upgrades
+	if handlers.IsWebSocketUpgrade(request) {
+		rt.combinedReporter.CaptureWebSocketUpdate()
+	}
 
 	// Record the times from the last attempt, but only if it succeeded.
 	reqInfo.DnsStartedAt = trace.DnsStart()
@@ -358,7 +371,7 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 }
 
 func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
-	if rt.config.EndpointTimeout <= 0 {
+	if rt.config.EndpointTimeout <= 0 || handlers.IsWebSocketUpgrade(request) {
 		return tr.RoundTrip(request)
 	}
 

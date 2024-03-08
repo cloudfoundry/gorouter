@@ -21,7 +21,7 @@ type httpStartStopHandler struct {
 	logger  logger.Logger
 }
 
-// NewHTTPStartStop creates a new handler that handles emitting frontent
+// NewHTTPStartStop creates a new handler that handles emitting frontend
 // HTTP StartStop events
 func NewHTTPStartStop(emitter dropsonde.EventEmitter, logger logger.Logger) negroni.Handler {
 	return &httpStartStopHandler{
@@ -61,6 +61,7 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 	envelope, err := emitter.Wrap(startStopEvent, hh.emitter.Origin())
 	if err != nil {
 		logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
+		return
 	}
 
 	endpoint, _ := GetEndpoint(r.Context())

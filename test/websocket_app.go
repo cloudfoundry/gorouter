@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	nats "github.com/nats-io/nats.go"
@@ -22,7 +23,7 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, dela
 		defer ginkgo.GinkgoRecover()
 
 		Expect(r.Header.Get("Upgrade")).To(Equal("websocket"))
-		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
+		Expect(strings.ToLower(r.Header.Get("Connection"))).To(Equal("upgrade"))
 
 		conn, _, err := w.(http.Hijacker).Hijack()
 		Expect(err).ToNot(HaveOccurred())
@@ -49,7 +50,7 @@ func NewFailingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Con
 		defer ginkgo.GinkgoRecover()
 
 		Expect(r.Header.Get("Upgrade")).To(Equal("websocket"))
-		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
+		Expect(strings.ToLower(r.Header.Get("Connection"))).To(Equal("upgrade"))
 
 		conn, _, err := w.(http.Hijacker).Hijack()
 		Expect(err).ToNot(HaveOccurred())
@@ -60,13 +61,13 @@ func NewFailingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Con
 	return app
 }
 
-func NewHangingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, routeServiceUrl string) *common.TestApp {
+func NewNotUpgradingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, routeServiceUrl string) *common.TestApp {
 	app := common.NewTestApp(urls, rPort, mbusClient, nil, routeServiceUrl)
 	app.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		defer ginkgo.GinkgoRecover()
 
 		Expect(r.Header.Get("Upgrade")).To(Equal("websocket"))
-		Expect(r.Header.Get("Connection")).To(Equal("upgrade"))
+		Expect(strings.ToLower(r.Header.Get("Connection"))).To(Equal("upgrade"))
 
 		conn, _, err := w.(http.Hijacker).Hijack()
 		Expect(err).ToNot(HaveOccurred())
@@ -81,10 +82,9 @@ func NewHangingWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Con
 			bytes.NewBufferString("\r\nbeginning of the response body goes here\r\n\r\n"),
 			bytes.NewBuffer(make([]byte, 10024)), // bigger than the internal buffer of the http stdlib
 			bytes.NewBufferString("\r\nmore response here, probably won't be seen by client\r\n"),
-			&test_util.HangingReadCloser{}),
+		),
 		)
 		x.WriteResponse(resp)
-		panic("you won't get here in a test")
 	})
 
 	return app
