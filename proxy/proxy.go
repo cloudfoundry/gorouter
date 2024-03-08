@@ -170,6 +170,7 @@ func NewProxy(
 		logger,
 		errorWriter,
 	))
+	n.Use(handlers.NewHopByHop(cfg, logger))
 	n.Use(&handlers.XForwardedProto{
 		SkipSanitization:         SkipSanitizeXFP(routeServiceHandler.(*handlers.RouteService)),
 		ForceForwardedProtoHttps: p.config.ForceForwardedProtoHttps,
