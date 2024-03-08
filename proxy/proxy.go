@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,11 +25,9 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
-	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 )
 
@@ -227,47 +226,9 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	if err != nil {
 		logger.Panic("request-info-err", zap.Error(err))
 	}
-	handler := handler.NewRequestHandler(
-		request,
-		proxyWriter,
-		p.reporter,
-		p.logger,
-		p.errorWriter,
-		p.config.EndpointDialTimeout,
-		p.config.WebsocketDialTimeout,
-		p.config.Backends.MaxAttempts,
-		p.backendTLSConfig,
-		p.config.HopByHopHeadersToFilter,
-		handler.DisableXFFLogging(p.config.Logging.DisableLogForwardedFor),
-		handler.DisableSourceIPLogging(p.config.Logging.DisableLogSourceIP),
-	)
 
 	if reqInfo.RoutePool == nil {
 		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
-	}
-
-	nestedIterator, err := handlers.EndpointIteratorForRequest(logger, request, p.config.LoadBalance, p.config.StickySessionCookieNames, p.config.StickySessionsForAuthNegotiate, p.config.LoadBalanceAZPreference, p.config.Zone)
-	if err != nil {
-		logger.Panic("request-info-err", zap.Error(err))
-	}
-
-	endpointIterator := &wrappedIterator{
-		nested: nestedIterator,
-
-		afterNext: func(endpoint *route.Endpoint) {
-			if endpoint != nil {
-				reqInfo.RouteEndpoint = endpoint
-				p.reporter.CaptureRoutingRequest(endpoint)
-			}
-		},
-	}
-
-	handler.SanitizeRequestConnection()
-	if handlers.IsWebSocketUpgrade(request) {
-		reqInfo.AppRequestStartedAt = time.Now()
-		handler.HandleWebSocketRequest(endpointIterator)
-		reqInfo.AppRequestFinishedAt = time.Now()
-		return
 	}
 
 	reqInfo.AppRequestStartedAt = time.Now()
@@ -298,8 +259,14 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 	}
 	target.URL.RawQuery = ""
 
-	handler.SetRequestXRequestStart(target)
+	setRequestXRequestStart(target)
 	target.Header.Del(router_http.CfAppInstance)
+}
+
+func setRequestXRequestStart(request *http.Request) {
+	if _, ok := request.Header[http.CanonicalHeaderKey("X-Request-Start")]; !ok {
+		request.Header.Set("X-Request-Start", strconv.FormatInt(time.Now().UnixNano()/1e6, 10))
+	}
 }
 
 func escapePathAndPreserveSlashes(unescaped string) string {
@@ -312,27 +279,4 @@ func escapePathAndPreserveSlashes(unescaped string) string {
 	escapedPath = strings.TrimSuffix(escapedPath, "/")
 
 	return escapedPath
-}
-
-type wrappedIterator struct {
-	nested    route.EndpointIterator
-	afterNext func(*route.Endpoint)
-}
-
-func (i *wrappedIterator) Next(attempt int) *route.Endpoint {
-	e := i.nested.Next(attempt)
-	if i.afterNext != nil {
-		i.afterNext(e)
-	}
-	return e
-}
-
-func (i *wrappedIterator) EndpointFailed(err error) {
-	i.nested.EndpointFailed(err)
-}
-func (i *wrappedIterator) PreRequest(e *route.Endpoint) {
-	i.nested.PreRequest(e)
-}
-func (i *wrappedIterator) PostRequest(e *route.Endpoint) {
-	i.nested.PostRequest(e)
 }
