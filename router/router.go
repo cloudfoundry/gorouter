@@ -311,7 +311,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.tlsListener = tls.NewListener(listener, tlsConfig)
+	r.tlsListener = NewListener(listener, tlsConfig, r.logger)
 
 	r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
 
