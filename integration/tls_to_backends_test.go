@@ -112,6 +112,7 @@ var _ = Describe("TLS to backends", func() {
 			Expect(resp.StatusCode).To(Equal(404))
 
 			data, err := io.ReadAll(resp.Body)
+			Expect(err).To(Not(HaveOccurred()))
 			resp.Body.Close()
 
 			Expect(string(data)).To(ContainSubstring("beginning of the response body goes here"))
