@@ -11,9 +11,9 @@ import (
 
 // A listener implements a network listener (net.Listener) for TLS connections.
 // It is a modified version from the go standard library implementation found
-// in src/crypto/tls/tls.go. It performs the handshake upon accepting the
-// connection and takes care of emitting a proper error log should the
-// handshake fail.
+// in [crypto/tls]. After accepting a new connection it starts a dedicated go
+// routing to perform the TLS handshake in parallel. If an error is encountered
+// it takes care of logging it together with the metadata available.
 type listener struct {
 	net.Listener
 	config *tls.Config
@@ -36,8 +36,8 @@ func (l *listener) Accept() (net.Conn, error) {
 		if err != nil {
 			logTlsHandshakeErr(err, c, log)
 			// The error is stored in the tls.Conn and will be re-used once the
-			// [http.Server] tries to do its TLS handshake. While this is not optimal
-			// since there is quite some setup done by http.Server it shouldn't be too
+			// [net/http.Server] tries to do its TLS handshake. While this is not optimal
+			// since there is quite some setup done by the server it shouldn't be too
 			// bad as the behaviour remains the same (e.g. we previously did the setup
 			// as well and had to abort relatively late).
 		}
@@ -70,6 +70,9 @@ func logTlsHandshakeErr(err error, c *tls.Conn, log logger.Logger) {
 	}
 
 	if len(s.PeerCertificates) > 0 {
+		// Note: this will only trigger in cases where the initial verification of
+		// of the certificate succeeded and the handshake failed at a later stage.
+		// One example is custom validation via [tls.Config.VerifyPeerCertificate].
 		fields = append(fields,
 			zap.String("client_cert_subject", s.PeerCertificates[0].Subject.String()),
 			zap.String("client_cert_issuer", s.PeerCertificates[0].Issuer.String()),
