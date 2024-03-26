@@ -29,17 +29,19 @@ func (l *listener) Accept() (net.Conn, error) {
 	}
 	tlsC := tls.Server(c, l.config)
 
-	// TODO: Suppress the log from http.Server, see: golang/go#56183
-	err = tlsC.Handshake()
-	if err != nil {
-		logTlsHandshakeErr(err, tlsC, l.logger)
-		// We do not return the error as returning an error from accept causes the
-		// http.Server to think that the listener went bad. This would terminate the
-		// gorouter which we must prevent. The error is stored in the tls.Conn and
-		// will be re-used once the http.Server tries to do its TLS handshake. While
-		// this is not optimal since there is quite some setup done by http.Server it
-		// shouldn't be too bad as the behaviour remains the same.
-	}
+	go func(c *tls.Conn, log logger.Logger) {
+		// TODO: Suppress the log from http.Server, see: golang/go#56183
+		// TODO: Are deadlines already set on this connection? Probably not.
+		err = c.Handshake()
+		if err != nil {
+			logTlsHandshakeErr(err, c, log)
+			// The error is stored in the tls.Conn and will be re-used once the
+			// [http.Server] tries to do its TLS handshake. While this is not optimal
+			// since there is quite some setup done by http.Server it shouldn't be too
+			// bad as the behaviour remains the same (e.g. we previously did the setup
+			// as well and had to abort relatively late).
+		}
+	}(tlsC, l.logger)
 
 	return tlsC, nil
 }
