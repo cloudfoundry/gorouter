@@ -1,6 +1,7 @@
 package round_tripper
 
 import (
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"context"
 	"errors"
 	"fmt"
@@ -21,7 +22,6 @@ import (
 	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
-	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
@@ -39,6 +39,8 @@ const (
 	HTTP2Protocol                            = "http2"
 	AuthNegotiateHeaderCookieMaxAgeInSeconds = 60
 )
+
+var NoEndpointsAvailable = errors.New("No endpoints available")
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
 type ProxyRoundTripper interface {
@@ -302,11 +304,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		responseWriterMu.Lock()
 		defer responseWriterMu.Unlock()
 		rt.errorHandler.HandleError(reqInfo.ProxyResponseWriter, err)
+		if handlers.IsWebSocketUpgrade(request) {
+			rt.combinedReporter.CaptureWebSocketFailure()
+		}
 		return nil, err
 	}
 
 	// Round trip was successful at this point
 	reqInfo.RoundTripSuccessful = true
+
+	// Set status code for access log
+	if res != nil {
+		reqInfo.ProxyResponseWriter.SetStatus(res.StatusCode)
+	}
+
+	// Write metric for ws upgrades
+	if handlers.IsWebSocketUpgrade(request) {
+		rt.combinedReporter.CaptureWebSocketUpdate()
+	}
 
 	// Record the times from the last attempt, but only if it succeeded.
 	reqInfo.DnsStartedAt = trace.DnsStart()
@@ -341,7 +356,7 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)
-	handler.SetRequestXCfInstanceId(request, endpoint)
+	setRequestXCfInstanceId(request, endpoint)
 
 	// increment connection stats
 	iter.PreRequest(endpoint)
@@ -356,7 +371,7 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 }
 
 func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
-	if rt.config.EndpointTimeout <= 0 {
+	if rt.config.EndpointTimeout <= 0 || handlers.IsWebSocketUpgrade(request) {
 		return tr.RoundTrip(request)
 	}
 
@@ -368,7 +383,7 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	vrid := request.Header.Get(handlers.VcapRequestIdHeader)
 	go func() {
 		<-reqCtx.Done()
-		if reqCtx.Err() == context.DeadlineExceeded {
+		if errors.Is(reqCtx.Err(), context.DeadlineExceeded) {
 			logger.Error("backend-request-timeout", zap.Error(reqCtx.Err()), zap.String("vcap_request_id", vrid))
 		}
 		cancel()
@@ -386,10 +401,19 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request, attempt int) (*route.Endpoint, error) {
 	endpoint := iter.Next(attempt)
 	if endpoint == nil {
-		return nil, handler.NoEndpointsAvailable
+		return nil, NoEndpointsAvailable
 	}
 
 	return endpoint, nil
+}
+
+func setRequestXCfInstanceId(request *http.Request, endpoint *route.Endpoint) {
+	value := endpoint.PrivateInstanceId
+	if value == "" {
+		value = endpoint.CanonicalAddr()
+	}
+
+	request.Header.Set(router_http.CfInstanceIdHeader, value)
 }
 
 func setupStickySession(

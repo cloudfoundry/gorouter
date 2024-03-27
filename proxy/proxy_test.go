@@ -2444,12 +2444,12 @@ var _ = Describe("Proxy", func() {
 					req, err := http.ReadRequest(conn.Reader)
 					Expect(err).NotTo(HaveOccurred())
 
-					done <- req.Header.Get("Upgrade") == "WebsockeT" &&
-						req.Header.Get("Connection") == "UpgradE"
+					done <- req.Header.Get("Upgrade") == "Websocket" &&
+						req.Header.Get("Connection") == "Upgrade"
 
 					resp := test_util.NewResponse(http.StatusSwitchingProtocols)
-					resp.Header.Set("Upgrade", "WebsockeT")
-					resp.Header.Set("Connection", "UpgradE")
+					resp.Header.Set("Upgrade", "Websocket")
+					resp.Header.Set("Connection", "Upgrade")
 
 					conn.WriteResponse(resp)
 
@@ -2462,8 +2462,8 @@ var _ = Describe("Proxy", func() {
 				conn := dialProxy(proxyServer)
 
 				req := test_util.NewRequest("GET", "ws", "/chat", nil)
-				req.Header.Set("Upgrade", "WebsockeT")
-				req.Header.Set("Connection", "UpgradE")
+				req.Header.Set("Upgrade", "Websocket")
+				req.Header.Set("Connection", "Upgrade")
 
 				conn.WriteRequest(req)
 
@@ -2473,8 +2473,8 @@ var _ = Describe("Proxy", func() {
 
 				resp, _ := conn.ReadResponse()
 				Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
-				Expect(resp.Header.Get("Upgrade")).To(Equal("WebsockeT"))
-				Expect(resp.Header.Get("Connection")).To(Equal("UpgradE"))
+				Expect(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+				Expect(resp.Header.Get("Connection")).To(Equal("Upgrade"))
 
 				conn.WriteLine("hello from client")
 				conn.CheckLine("hello from server")
@@ -2490,12 +2490,12 @@ var _ = Describe("Proxy", func() {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
-				done <- req.Header.Get("Upgrade") == "WebsockeT" &&
-					req.Header.Get("Connection") == "UpgradE"
+				done <- req.Header.Get("Upgrade") == "Websocket" &&
+					req.Header.Get("Connection") == "Upgrade"
 
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
-				resp.Header.Set("Upgrade", "WebsockeT")
-				resp.Header.Set("Connection", "UpgradE")
+				resp.Header.Set("Upgrade", "Websocket")
+				resp.Header.Set("Connection", "Upgrade")
 
 				conn.WriteResponse(resp)
 
@@ -2508,8 +2508,8 @@ var _ = Describe("Proxy", func() {
 			conn := dialProxy(proxyServer)
 
 			req := test_util.NewRequest("GET", "ws", "/chat", nil)
-			req.Header.Set("Upgrade", "WebsockeT")
-			req.Header.Set("Connection", "UpgradE")
+			req.Header.Set("Upgrade", "Websocket")
+			req.Header.Set("Connection", "Upgrade")
 
 			conn.WriteRequest(req)
 
@@ -2519,8 +2519,8 @@ var _ = Describe("Proxy", func() {
 
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusSwitchingProtocols))
-			Expect(resp.Header.Get("Upgrade")).To(Equal("WebsockeT"))
-			Expect(resp.Header.Get("Connection")).To(Equal("UpgradE"))
+			Expect(resp.Header.Get("Upgrade")).To(Equal("Websocket"))
+			Expect(resp.Header.Get("Connection")).To(Equal("Upgrade"))
 
 			conn.WriteLine("hello from client")
 			conn.CheckLine("hello from server")
@@ -2535,8 +2535,10 @@ var _ = Describe("Proxy", func() {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
+				// RFC 7230, section 6.1: Remove headers listed in the "Connection" header.
+				// Only "Upgrade" will be added again by httputil.ReverseProxy
 				done <- req.Header.Get("Upgrade") == "Websocket" &&
-					req.Header.Get("Connection") == "keep-alive, Upgrade"
+					req.Header.Get("Connection") == "Upgrade"
 
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
 				resp.Header.Set("Upgrade", "Websocket")
@@ -2581,9 +2583,10 @@ var _ = Describe("Proxy", func() {
 				req, err := http.ReadRequest(conn.Reader)
 				Expect(err).NotTo(HaveOccurred())
 
+				// RFC 7230, section 6.1: Remove headers listed in the "Connection" header.
+				// Only "Upgrade" will be added again by httputil.ReverseProxy
 				done <- req.Header.Get("Upgrade") == "Websocket" &&
-					req.Header[http.CanonicalHeaderKey("Connection")][0] == "keep-alive" &&
-					req.Header[http.CanonicalHeaderKey("Connection")][1] == "Upgrade"
+					req.Header.Get("Connection") == "Upgrade"
 
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
 				resp.Header.Set("Upgrade", "Websocket")

@@ -54,7 +54,7 @@ func IsWebSocketUpgrade(request *http.Request) bool {
 func upgradeHeader(request *http.Request) string {
 	// handle multiple Connection field-values, either in a comma-separated string or multiple field-headers
 	for _, v := range request.Header[http.CanonicalHeaderKey("Connection")] {
-		// upgrade should be case insensitive per RFC6455 4.2.1
+		// upgrade should be case-insensitive per RFC6455 4.2.1
 		if strings.Contains(strings.ToLower(v), "upgrade") {
 			return request.Header.Get("Upgrade")
 		}

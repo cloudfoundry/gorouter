@@ -1137,7 +1137,7 @@ var _ = Describe("Router", func() {
 			})
 		})
 
-		It("websockets do not terminate", func() {
+		It("websocket connections are not affected by EndpointTimeout", func() {
 			app := test.NewWebSocketApp(
 				[]route.Uri{"ws-app." + test_util.LocalhostDNS},
 				config.Port,

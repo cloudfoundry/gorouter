@@ -26,7 +26,6 @@ import (
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
-	"code.cloudfoundry.org/gorouter/proxy/handler"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
@@ -663,7 +662,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("returns a 502 Bad Gateway response", func() {
 					backendRes, err := proxyRoundTripper.RoundTrip(req)
 					Expect(backendRes).To(BeNil())
-					Expect(err).To(Equal(handler.NoEndpointsAvailable))
+					Expect(err).To(Equal(round_tripper.NoEndpointsAvailable))
 
 					Expect(reqInfo.RouteEndpoint).To(BeNil())
 					Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
@@ -673,7 +672,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					proxyRoundTripper.RoundTrip(req)
 					Expect(errorHandler.HandleErrorCallCount()).To(Equal(1))
 					_, err := errorHandler.HandleErrorArgsForCall(0)
-					Expect(err).To(Equal(handler.NoEndpointsAvailable))
+					Expect(err).To(Equal(round_tripper.NoEndpointsAvailable))
 				})
 
 				It("logs a message with `select-endpoint-failed`", func() {
@@ -685,21 +684,21 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				It("does not capture any routing requests to the backend", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(Equal(handler.NoEndpointsAvailable))
+					Expect(err).To(Equal(round_tripper.NoEndpointsAvailable))
 
 					Expect(combinedReporter.CaptureRoutingRequestCallCount()).To(Equal(0))
 				})
 
 				It("does not log anything about route services", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(Equal(handler.NoEndpointsAvailable))
+					Expect(err).To(Equal(round_tripper.NoEndpointsAvailable))
 
 					Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
 				})
 
 				It("does not report the endpoint failure", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
-					Expect(err).To(MatchError(handler.NoEndpointsAvailable))
+					Expect(err).To(MatchError(round_tripper.NoEndpointsAvailable))
 
 					Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
 				})
