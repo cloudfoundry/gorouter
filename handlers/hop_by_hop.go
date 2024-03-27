@@ -39,7 +39,7 @@ func (h *HopByHop) SanitizeRequestConnection(r *http.Request) {
 				trimmedValue := strings.TrimSpace(values[i])
 				found := false
 				for _, item := range h.cfg.HopByHopHeadersToFilter {
-					if strings.ToLower(item) == strings.ToLower(trimmedValue) {
+					if strings.EqualFold(item, trimmedValue) {
 						found = true
 						break
 					}
