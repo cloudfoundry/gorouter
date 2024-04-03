@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -47,6 +48,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		handler     *negroni.Negroni
 		nextHandler http.HandlerFunc
 		prevHandler negroni.Handler
+		requestInfo *handlers.RequestInfo
 
 		resp http.ResponseWriter
 		req  *http.Request
@@ -77,7 +79,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			rw.WriteHeader(http.StatusTeapot)
 			rw.Write([]byte("I'm a little teapot, short and stout."))
 
-			requestInfo, err := handlers.ContextRequestInfo(req)
+			requestInfo, err = handlers.ContextRequestInfo(req)
 			Expect(err).ToNot(HaveOccurred())
 			appID := "11111111-1111-1111-1111-111111111111"
 			requestInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{
@@ -91,6 +93,10 @@ var _ = Describe("HTTPStartStop Handler", func() {
 					"source_id":           "some-source-id",
 				},
 			})
+			requestInfo.TraceInfo = handlers.TraceInfo{
+				SpanID:  "12345678",
+				TraceID: "1234567890123456",
+			}
 
 			nextCalled = true
 		})
@@ -132,13 +138,22 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
 		Expect(envelope).ToNot(BeNil())
 
-		Expect(envelope.Tags).To(HaveLen(6))
+		Expect(envelope.Tags).To(HaveLen(8))
 		Expect(envelope.Tags["component"]).To(Equal("some-component"))
 		Expect(envelope.Tags["instance_id"]).To(Equal("some-instance-id"))
 		Expect(envelope.Tags["process_id"]).To(Equal("some-proc-id"))
 		Expect(envelope.Tags["process_instance_id"]).To(Equal("some-proc-instance-id"))
 		Expect(envelope.Tags["process_type"]).To(Equal("some-proc-type"))
 		Expect(envelope.Tags["source_id"]).To(Equal("some-source-id"))
+		Expect(envelope.Tags["trace_id"]).To(Equal("1234567890123456"))
+		Expect(envelope.Tags["span_id"]).To(Equal("12345678"))
+	})
+
+	It("does not modify the endpoint tags", func() {
+		handler.ServeHTTP(resp, req)
+
+		Expect(requestInfo.RouteEndpoint.Tags).ToNot(HaveKey("trace_id"))
+		Expect(requestInfo.RouteEndpoint.Tags).ToNot(HaveKey("span_id"))
 	})
 
 	Context("when x-cf-instanceindex is present", func() {
@@ -185,6 +200,14 @@ var _ = Describe("HTTPStartStop Handler", func() {
 				_, err := io.ReadAll(req.Body)
 				Expect(err).NotTo(HaveOccurred())
 
+				requestInfo, err = handlers.ContextRequestInfo(req)
+				Expect(err).ToNot(HaveOccurred())
+
+				requestInfo.TraceInfo = handlers.TraceInfo{
+					SpanID:  "12345678",
+					TraceID: "1234567890123456",
+				}
+
 				rw.WriteHeader(http.StatusTeapot)
 				rw.Write([]byte("I'm a little teapot, short and stout."))
 
@@ -193,13 +216,31 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			nextCalled = false
 		})
 
-		It("emits an HTTP StartStop without tags", func() {
+		It("emits an HTTP StartStop without RouteEndpoint tags", func() {
 			handler.ServeHTTP(resp, req)
 
 			envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
 			Expect(envelope).ToNot(BeNil())
 
-			Expect(envelope.Tags).To(HaveLen(0))
+			Expect(envelope.Tags).To(Equal(map[string]string{"span_id": "12345678", "trace_id": "1234567890123456"}))
+		})
+	})
+
+	Context("when ContextRequestInfo returns an error", func() {
+		It("calls Error on the logger, but does not fail the request", func() {
+			handler = negroni.New()
+			handler.Use(prevHandler)
+			handler.Use(handlers.NewRequestInfo())
+			handler.Use(handlers.NewProxyWriter(logger))
+			handler.Use(&removeRequestInfoHandler{})
+			handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
+			handler.Use(handlers.NewRequestInfo())
+			handler.UseHandlerFunc(nextHandler)
+			handler.ServeHTTP(resp, req)
+
+			Expect(logger).To(gbytes.Say(`"message":"request-info-err"`))
+
+			Expect(nextCalled).To(BeTrue())
 		})
 	})
 
@@ -269,4 +310,50 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			Expect(nextCalled).To(BeTrue())
 		})
 	})
+
+	Context("when TraceInfo is unpopulated", func() {
+		BeforeEach(func() {
+			nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				_, err := io.ReadAll(req.Body)
+				Expect(err).NotTo(HaveOccurred())
+
+				rw.WriteHeader(http.StatusTeapot)
+				rw.Write([]byte("I'm a little teapot, short and stout."))
+
+				requestInfo, err = handlers.ContextRequestInfo(req)
+				Expect(err).ToNot(HaveOccurred())
+				appID := "11111111-1111-1111-1111-111111111111"
+				requestInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{
+					AppId: appID,
+					Tags: map[string]string{
+						"component":           "some-component",
+						"instance_id":         "some-instance-id",
+						"process_id":          "some-proc-id",
+						"process_instance_id": "some-proc-instance-id",
+						"process_type":        "some-proc-type",
+						"source_id":           "some-source-id",
+					},
+				})
+
+				nextCalled = true
+			})
+		})
+
+		It("emits an HTTP StartStop without span_id and trace_id tags", func() {
+			handler.ServeHTTP(resp, req)
+
+			envelope := findEnvelope(fakeEmitter, events.Envelope_HttpStartStop)
+			Expect(envelope).ToNot(BeNil())
+
+			Expect(envelope.Tags).ToNot(HaveKey("span_id"))
+			Expect(envelope.Tags).ToNot(HaveKey("trace_id"))
+		})
+	})
 })
+
+type removeRequestInfoHandler struct{}
+
+func (p *removeRequestInfoHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	r = r.WithContext(context.Background())
+	next(rw, r)
+}

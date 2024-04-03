@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"maps"
 	"net/http"
 	"time"
 
@@ -63,13 +64,28 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 		logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
 	}
 
-	endpoint, _ := GetEndpoint(r.Context())
-	if endpoint != nil {
-		envelope.Tags = endpoint.Tags
+	info, err := ContextRequestInfo(r)
+	if err != nil {
+		logger.Error("request-info-err", zap.Error(err))
+	} else {
+		envelope.Tags = hh.envelopeTags(info)
 	}
 
 	err = hh.emitter.EmitEnvelope(envelope)
 	if err != nil {
 		logger.Info("failed-to-emit-startstop-event", zap.Error(err))
 	}
+}
+
+func (hh *httpStartStopHandler) envelopeTags(ri *RequestInfo) map[string]string {
+	tags := make(map[string]string)
+	endpoint := ri.RouteEndpoint
+	if endpoint != nil {
+		maps.Copy(tags, endpoint.Tags)
+	}
+	if ri.TraceInfo.SpanID != "" && ri.TraceInfo.TraceID != "" {
+		tags["span_id"] = ri.TraceInfo.SpanID
+		tags["trace_id"] = ri.TraceInfo.TraceID
+	}
+	return tags
 }
