@@ -64,8 +64,8 @@ When inside docker container:
 - `/repo/scripts/docker/test.bash`: This will run all tests in this repo.
 - `/repo/scripts/docker/test.bash <package>`: This will only run a package's tests
 - `/repo/scripts/docker/test.bash <package> <sub-package>`: This will only run sub-package tests for package
-- `/repo/scripts/docker/tests-template.bash <package>`: This will test bosh-spec templates.
-- `/repo/scripts/docker/lint.bash <package>`: This will run required linters.
+- `/repo/scripts/docker/tests-template.bash`: This will test bosh-spec templates.
+- `/repo/scripts/docker/lint.bash`: This will run required linters.
 
 > [!IMPORTANT]
 > If you are about to submit a PR, please make sure to run `./scripts/test-in-docker.bash` for MySQL and Postgres to ensure everything is tested in clean container. If you are developing, you can create create a docker container first, then the only required script to run before testing your specific component is `build-binaries.bash`.
