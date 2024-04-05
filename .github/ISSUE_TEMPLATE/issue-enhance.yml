@@ -1,0 +1,50 @@
+name: Enhance
+description: Propose an enhancement or new feature.
+title: "Start the title with a verb (e.g. Change header styles). Use the imperative mood in the title (e.g. Fix, not Fixed or Fixes header styles)"
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed Change
+    validations:
+      required: true
+  - type: markdown
+    id: change_md
+    attributes:
+      value: |
+        Briefly explain why this feature is necessary in the following format
+
+        **As a** *developer/operator/whatever*
+        **I want** *this ability to do X*
+        **So that** *I can do Y*
+
+        - Provide details of where this request is coming from including links, GitHub Issues, etc..
+        - Provide details of prior work (if applicable) including links to commits, github issues, etc...
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: markdown
+    id: acceptance_md
+    attributes:
+      value: |
+        Detail the exact work that is required to accept this story in the following format
+
+        **Scenario:** *describe scenario*
+        **Given** *I have some sort of configuration*
+        **When** *I do X*
+        **And** *do Y*
+        **Then** *I see the desired behavior*
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related links
+      description: Please list related links for this issue
+      placeholder: |
+        - [ ] code.cloudfoundry.org/bbs for links
+        - [x] cloudfoundry/rep#123 for issues/prs

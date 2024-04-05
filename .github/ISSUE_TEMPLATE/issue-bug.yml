@@ -1,0 +1,42 @@
+name: Bug
+description: Report a defect, such as a bug or regression.
+title: "Start the title with a verb (e.g. Change header styles). Use the imperative mood in the title (e.g. Fix, not Fixed or Fixes header styles)"
+labels:
+  - bug
+body:
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+    validations:
+      required: true
+  - type: markdown
+    id: current_md
+    attributes:
+      value: |
+        - Explain, in detail, what the current state of the world is
+        - Include code snippets, log output, and analysis as necessary to explain the whole problem
+        - Include links to logs, GitHub issues, slack conversations, etc.. to tell us where the problem came from
+        - Steps to reproduce
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired behavior
+    validations:
+      required: true
+  - type: markdown
+    id: desired_md
+    attributes:
+      value: |
+        - Describe how the problem should be fixed 
+        - Does this require a new bosh release?
+        - Does it require configuration changes in cf-deployment?
+        - Do we need to have a special release note?
+        - Do we need to update repo documentation?
+  - type: input
+    id: version
+    attributes:
+      label: Affected Version
+      description: Please enter the version
+    validations:
+      required: true
