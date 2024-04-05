@@ -54,7 +54,7 @@ Running Tests
 > Running tests for this repo requires a DB flavor. The following scripts will default to mysql DB. Set DB environment variable for alternate DBs. Valid Options: mysql-8.0(or mysql),mysql-5.7,postgres
 
 - `./scripts/create-docker-container.bash`: This will create a docker container with appropriate mounts. This
-scripts can be used for interactive development with a long running container. 
+script can be used for interactive development with a long running container. 
 - `./scripts/test-in-docker.bash`: Create docker container and run all tests and setup in a single script.
   - `./scripts/test-in-docker.bash <package> <sub-package>`: For running tests under a specific package and/or sub-package
 
