@@ -31,9 +31,10 @@ func (fake *FakeAccessLogger) Log(arg1 schema.AccessLogRecord) {
 	fake.logArgsForCall = append(fake.logArgsForCall, struct {
 		arg1 schema.AccessLogRecord
 	}{arg1})
+	stub := fake.LogStub
 	fake.recordInvocation("Log", []interface{}{arg1})
 	fake.logMutex.Unlock()
-	if fake.LogStub != nil {
+	if stub != nil {
 		fake.LogStub(arg1)
 	}
 }
@@ -61,9 +62,10 @@ func (fake *FakeAccessLogger) Run() {
 	fake.runMutex.Lock()
 	fake.runArgsForCall = append(fake.runArgsForCall, struct {
 	}{})
+	stub := fake.RunStub
 	fake.recordInvocation("Run", []interface{}{})
 	fake.runMutex.Unlock()
-	if fake.RunStub != nil {
+	if stub != nil {
 		fake.RunStub()
 	}
 }
@@ -84,9 +86,10 @@ func (fake *FakeAccessLogger) Stop() {
 	fake.stopMutex.Lock()
 	fake.stopArgsForCall = append(fake.stopArgsForCall, struct {
 	}{})
+	stub := fake.StopStub
 	fake.recordInvocation("Stop", []interface{}{})
 	fake.stopMutex.Unlock()
-	if fake.StopStub != nil {
+	if stub != nil {
 		fake.StopStub()
 	}
 }

@@ -35,6 +35,10 @@ type FakeProxyReporter struct {
 	captureBadRequestMutex       sync.RWMutex
 	captureBadRequestArgsForCall []struct {
 	}
+	CaptureMissingContentLengthHeaderStub        func()
+	captureMissingContentLengthHeaderMutex       sync.RWMutex
+	captureMissingContentLengthHeaderArgsForCall []struct {
+	}
 	CaptureRouteServiceResponseStub        func(*http.Response)
 	captureRouteServiceResponseMutex       sync.RWMutex
 	captureRouteServiceResponseArgsForCall []struct {
@@ -74,9 +78,10 @@ func (fake *FakeProxyReporter) CaptureBackendExhaustedConns() {
 	fake.captureBackendExhaustedConnsMutex.Lock()
 	fake.captureBackendExhaustedConnsArgsForCall = append(fake.captureBackendExhaustedConnsArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBackendExhaustedConnsStub
 	fake.recordInvocation("CaptureBackendExhaustedConns", []interface{}{})
 	fake.captureBackendExhaustedConnsMutex.Unlock()
-	if fake.CaptureBackendExhaustedConnsStub != nil {
+	if stub != nil {
 		fake.CaptureBackendExhaustedConnsStub()
 	}
 }
@@ -97,9 +102,10 @@ func (fake *FakeProxyReporter) CaptureBackendInvalidID() {
 	fake.captureBackendInvalidIDMutex.Lock()
 	fake.captureBackendInvalidIDArgsForCall = append(fake.captureBackendInvalidIDArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBackendInvalidIDStub
 	fake.recordInvocation("CaptureBackendInvalidID", []interface{}{})
 	fake.captureBackendInvalidIDMutex.Unlock()
-	if fake.CaptureBackendInvalidIDStub != nil {
+	if stub != nil {
 		fake.CaptureBackendInvalidIDStub()
 	}
 }
@@ -120,9 +126,10 @@ func (fake *FakeProxyReporter) CaptureBackendInvalidTLSCert() {
 	fake.captureBackendInvalidTLSCertMutex.Lock()
 	fake.captureBackendInvalidTLSCertArgsForCall = append(fake.captureBackendInvalidTLSCertArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBackendInvalidTLSCertStub
 	fake.recordInvocation("CaptureBackendInvalidTLSCert", []interface{}{})
 	fake.captureBackendInvalidTLSCertMutex.Unlock()
-	if fake.CaptureBackendInvalidTLSCertStub != nil {
+	if stub != nil {
 		fake.CaptureBackendInvalidTLSCertStub()
 	}
 }
@@ -143,9 +150,10 @@ func (fake *FakeProxyReporter) CaptureBackendTLSHandshakeFailed() {
 	fake.captureBackendTLSHandshakeFailedMutex.Lock()
 	fake.captureBackendTLSHandshakeFailedArgsForCall = append(fake.captureBackendTLSHandshakeFailedArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBackendTLSHandshakeFailedStub
 	fake.recordInvocation("CaptureBackendTLSHandshakeFailed", []interface{}{})
 	fake.captureBackendTLSHandshakeFailedMutex.Unlock()
-	if fake.CaptureBackendTLSHandshakeFailedStub != nil {
+	if stub != nil {
 		fake.CaptureBackendTLSHandshakeFailedStub()
 	}
 }
@@ -166,9 +174,10 @@ func (fake *FakeProxyReporter) CaptureBadGateway() {
 	fake.captureBadGatewayMutex.Lock()
 	fake.captureBadGatewayArgsForCall = append(fake.captureBadGatewayArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBadGatewayStub
 	fake.recordInvocation("CaptureBadGateway", []interface{}{})
 	fake.captureBadGatewayMutex.Unlock()
-	if fake.CaptureBadGatewayStub != nil {
+	if stub != nil {
 		fake.CaptureBadGatewayStub()
 	}
 }
@@ -189,9 +198,10 @@ func (fake *FakeProxyReporter) CaptureBadRequest() {
 	fake.captureBadRequestMutex.Lock()
 	fake.captureBadRequestArgsForCall = append(fake.captureBadRequestArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBadRequestStub
 	fake.recordInvocation("CaptureBadRequest", []interface{}{})
 	fake.captureBadRequestMutex.Unlock()
-	if fake.CaptureBadRequestStub != nil {
+	if stub != nil {
 		fake.CaptureBadRequestStub()
 	}
 }
@@ -208,14 +218,39 @@ func (fake *FakeProxyReporter) CaptureBadRequestCalls(stub func()) {
 	fake.CaptureBadRequestStub = stub
 }
 
+func (fake *FakeProxyReporter) CaptureMissingContentLengthHeader() {
+	fake.captureMissingContentLengthHeaderMutex.Lock()
+	fake.captureMissingContentLengthHeaderArgsForCall = append(fake.captureMissingContentLengthHeaderArgsForCall, struct {
+	}{})
+	stub := fake.CaptureMissingContentLengthHeaderStub
+	fake.recordInvocation("CaptureMissingContentLengthHeader", []interface{}{})
+	fake.captureMissingContentLengthHeaderMutex.Unlock()
+	if stub != nil {
+		fake.CaptureMissingContentLengthHeaderStub()
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureMissingContentLengthHeaderCallCount() int {
+	fake.captureMissingContentLengthHeaderMutex.RLock()
+	defer fake.captureMissingContentLengthHeaderMutex.RUnlock()
+	return len(fake.captureMissingContentLengthHeaderArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureMissingContentLengthHeaderCalls(stub func()) {
+	fake.captureMissingContentLengthHeaderMutex.Lock()
+	defer fake.captureMissingContentLengthHeaderMutex.Unlock()
+	fake.CaptureMissingContentLengthHeaderStub = stub
+}
+
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(arg1 *http.Response) {
 	fake.captureRouteServiceResponseMutex.Lock()
 	fake.captureRouteServiceResponseArgsForCall = append(fake.captureRouteServiceResponseArgsForCall, struct {
 		arg1 *http.Response
 	}{arg1})
+	stub := fake.CaptureRouteServiceResponseStub
 	fake.recordInvocation("CaptureRouteServiceResponse", []interface{}{arg1})
 	fake.captureRouteServiceResponseMutex.Unlock()
-	if fake.CaptureRouteServiceResponseStub != nil {
+	if stub != nil {
 		fake.CaptureRouteServiceResponseStub(arg1)
 	}
 }
@@ -244,9 +279,10 @@ func (fake *FakeProxyReporter) CaptureRoutingRequest(arg1 *route.Endpoint) {
 	fake.captureRoutingRequestArgsForCall = append(fake.captureRoutingRequestArgsForCall, struct {
 		arg1 *route.Endpoint
 	}{arg1})
+	stub := fake.CaptureRoutingRequestStub
 	fake.recordInvocation("CaptureRoutingRequest", []interface{}{arg1})
 	fake.captureRoutingRequestMutex.Unlock()
-	if fake.CaptureRoutingRequestStub != nil {
+	if stub != nil {
 		fake.CaptureRoutingRequestStub(arg1)
 	}
 }
@@ -275,9 +311,10 @@ func (fake *FakeProxyReporter) CaptureRoutingResponse(arg1 int) {
 	fake.captureRoutingResponseArgsForCall = append(fake.captureRoutingResponseArgsForCall, struct {
 		arg1 int
 	}{arg1})
+	stub := fake.CaptureRoutingResponseStub
 	fake.recordInvocation("CaptureRoutingResponse", []interface{}{arg1})
 	fake.captureRoutingResponseMutex.Unlock()
-	if fake.CaptureRoutingResponseStub != nil {
+	if stub != nil {
 		fake.CaptureRoutingResponseStub(arg1)
 	}
 }
@@ -309,9 +346,10 @@ func (fake *FakeProxyReporter) CaptureRoutingResponseLatency(arg1 *route.Endpoin
 		arg3 time.Time
 		arg4 time.Duration
 	}{arg1, arg2, arg3, arg4})
+	stub := fake.CaptureRoutingResponseLatencyStub
 	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{arg1, arg2, arg3, arg4})
 	fake.captureRoutingResponseLatencyMutex.Unlock()
-	if fake.CaptureRoutingResponseLatencyStub != nil {
+	if stub != nil {
 		fake.CaptureRoutingResponseLatencyStub(arg1, arg2, arg3, arg4)
 	}
 }
@@ -339,9 +377,10 @@ func (fake *FakeProxyReporter) CaptureWebSocketFailure() {
 	fake.captureWebSocketFailureMutex.Lock()
 	fake.captureWebSocketFailureArgsForCall = append(fake.captureWebSocketFailureArgsForCall, struct {
 	}{})
+	stub := fake.CaptureWebSocketFailureStub
 	fake.recordInvocation("CaptureWebSocketFailure", []interface{}{})
 	fake.captureWebSocketFailureMutex.Unlock()
-	if fake.CaptureWebSocketFailureStub != nil {
+	if stub != nil {
 		fake.CaptureWebSocketFailureStub()
 	}
 }
@@ -362,9 +401,10 @@ func (fake *FakeProxyReporter) CaptureWebSocketUpdate() {
 	fake.captureWebSocketUpdateMutex.Lock()
 	fake.captureWebSocketUpdateArgsForCall = append(fake.captureWebSocketUpdateArgsForCall, struct {
 	}{})
+	stub := fake.CaptureWebSocketUpdateStub
 	fake.recordInvocation("CaptureWebSocketUpdate", []interface{}{})
 	fake.captureWebSocketUpdateMutex.Unlock()
-	if fake.CaptureWebSocketUpdateStub != nil {
+	if stub != nil {
 		fake.CaptureWebSocketUpdateStub()
 	}
 }
@@ -396,6 +436,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureBadGatewayMutex.RUnlock()
 	fake.captureBadRequestMutex.RLock()
 	defer fake.captureBadRequestMutex.RUnlock()
+	fake.captureMissingContentLengthHeaderMutex.RLock()
+	defer fake.captureMissingContentLengthHeaderMutex.RUnlock()
 	fake.captureRouteServiceResponseMutex.RLock()
 	defer fake.captureRouteServiceResponseMutex.RUnlock()
 	fake.captureRoutingRequestMutex.RLock()

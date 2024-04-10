@@ -18,7 +18,7 @@ type reporterHandler struct {
 }
 
 // NewReporter creates a new handler that handles reporting backend
-// responses to metrics
+// responses to metrics and missing Content-Length header
 func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.Handler {
 	return &reporterHandler{
 		reporter: reporter,
@@ -29,8 +29,6 @@ func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.H
 // ServeHTTP handles reporting the response after the request has been completed
 func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	logger := LoggerWithTraceInfo(rh.logger, r)
-	next(rw, r)
-
 	requestInfo, err := ContextRequestInfo(r)
 	// logger.Panic does not cause gorouter to exit 1 but rather throw panic with
 	// stacktrace in error log
@@ -38,6 +36,11 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
+	if r.Header.Get("Content-Length") == "" {
+		rh.reporter.CaptureMissingContentLengthHeader()
+	}
+
+	next(rw, r)
 
 	if requestInfo.RouteEndpoint == nil {
 		return

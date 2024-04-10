@@ -55,15 +55,16 @@ func (fake *FakeRegistry) Lookup(arg1 route.Uri) *route.EndpointPool {
 	fake.lookupArgsForCall = append(fake.lookupArgsForCall, struct {
 		arg1 route.Uri
 	}{arg1})
+	stub := fake.LookupStub
+	fakeReturns := fake.lookupReturns
 	fake.recordInvocation("Lookup", []interface{}{arg1})
 	fake.lookupMutex.Unlock()
-	if fake.LookupStub != nil {
-		return fake.LookupStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.lookupReturns
 	return fakeReturns.result1
 }
 
@@ -117,15 +118,16 @@ func (fake *FakeRegistry) LookupWithInstance(arg1 route.Uri, arg2 string, arg3 s
 		arg2 string
 		arg3 string
 	}{arg1, arg2, arg3})
+	stub := fake.LookupWithInstanceStub
+	fakeReturns := fake.lookupWithInstanceReturns
 	fake.recordInvocation("LookupWithInstance", []interface{}{arg1, arg2, arg3})
 	fake.lookupWithInstanceMutex.Unlock()
-	if fake.LookupWithInstanceStub != nil {
-		return fake.LookupWithInstanceStub(arg1, arg2, arg3)
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.lookupWithInstanceReturns
 	return fakeReturns.result1
 }
 
@@ -177,9 +179,10 @@ func (fake *FakeRegistry) Register(arg1 route.Uri, arg2 *route.Endpoint) {
 		arg1 route.Uri
 		arg2 *route.Endpoint
 	}{arg1, arg2})
+	stub := fake.RegisterStub
 	fake.recordInvocation("Register", []interface{}{arg1, arg2})
 	fake.registerMutex.Unlock()
-	if fake.RegisterStub != nil {
+	if stub != nil {
 		fake.RegisterStub(arg1, arg2)
 	}
 }
@@ -209,9 +212,10 @@ func (fake *FakeRegistry) Unregister(arg1 route.Uri, arg2 *route.Endpoint) {
 		arg1 route.Uri
 		arg2 *route.Endpoint
 	}{arg1, arg2})
+	stub := fake.UnregisterStub
 	fake.recordInvocation("Unregister", []interface{}{arg1, arg2})
 	fake.unregisterMutex.Unlock()
-	if fake.UnregisterStub != nil {
+	if stub != nil {
 		fake.UnregisterStub(arg1, arg2)
 	}
 }

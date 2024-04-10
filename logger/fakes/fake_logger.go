@@ -113,15 +113,16 @@ func (fake *FakeLogger) Check(arg1 zap.Level, arg2 string) *zap.CheckedMessage {
 		arg1 zap.Level
 		arg2 string
 	}{arg1, arg2})
+	stub := fake.CheckStub
+	fakeReturns := fake.checkReturns
 	fake.recordInvocation("Check", []interface{}{arg1, arg2})
 	fake.checkMutex.Unlock()
-	if fake.CheckStub != nil {
-		return fake.CheckStub(arg1, arg2)
+	if stub != nil {
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.checkReturns
 	return fakeReturns.result1
 }
 
@@ -173,9 +174,10 @@ func (fake *FakeLogger) DPanic(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.DPanicStub
 	fake.recordInvocation("DPanic", []interface{}{arg1, arg2})
 	fake.dPanicMutex.Unlock()
-	if fake.DPanicStub != nil {
+	if stub != nil {
 		fake.DPanicStub(arg1, arg2...)
 	}
 }
@@ -205,9 +207,10 @@ func (fake *FakeLogger) Debug(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.DebugStub
 	fake.recordInvocation("Debug", []interface{}{arg1, arg2})
 	fake.debugMutex.Unlock()
-	if fake.DebugStub != nil {
+	if stub != nil {
 		fake.DebugStub(arg1, arg2...)
 	}
 }
@@ -237,9 +240,10 @@ func (fake *FakeLogger) Error(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.ErrorStub
 	fake.recordInvocation("Error", []interface{}{arg1, arg2})
 	fake.errorMutex.Unlock()
-	if fake.ErrorStub != nil {
+	if stub != nil {
 		fake.ErrorStub(arg1, arg2...)
 	}
 }
@@ -269,9 +273,10 @@ func (fake *FakeLogger) Fatal(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.FatalStub
 	fake.recordInvocation("Fatal", []interface{}{arg1, arg2})
 	fake.fatalMutex.Unlock()
-	if fake.FatalStub != nil {
+	if stub != nil {
 		fake.FatalStub(arg1, arg2...)
 	}
 }
@@ -301,9 +306,10 @@ func (fake *FakeLogger) Info(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.InfoStub
 	fake.recordInvocation("Info", []interface{}{arg1, arg2})
 	fake.infoMutex.Unlock()
-	if fake.InfoStub != nil {
+	if stub != nil {
 		fake.InfoStub(arg1, arg2...)
 	}
 }
@@ -334,9 +340,10 @@ func (fake *FakeLogger) Log(arg1 zap.Level, arg2 string, arg3 ...zap.Field) {
 		arg2 string
 		arg3 []zap.Field
 	}{arg1, arg2, arg3})
+	stub := fake.LogStub
 	fake.recordInvocation("Log", []interface{}{arg1, arg2, arg3})
 	fake.logMutex.Unlock()
-	if fake.LogStub != nil {
+	if stub != nil {
 		fake.LogStub(arg1, arg2, arg3...)
 	}
 }
@@ -366,9 +373,10 @@ func (fake *FakeLogger) Panic(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.PanicStub
 	fake.recordInvocation("Panic", []interface{}{arg1, arg2})
 	fake.panicMutex.Unlock()
-	if fake.PanicStub != nil {
+	if stub != nil {
 		fake.PanicStub(arg1, arg2...)
 	}
 }
@@ -398,15 +406,16 @@ func (fake *FakeLogger) Session(arg1 string) logger.Logger {
 	fake.sessionArgsForCall = append(fake.sessionArgsForCall, struct {
 		arg1 string
 	}{arg1})
+	stub := fake.SessionStub
+	fakeReturns := fake.sessionReturns
 	fake.recordInvocation("Session", []interface{}{arg1})
 	fake.sessionMutex.Unlock()
-	if fake.SessionStub != nil {
-		return fake.SessionStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.sessionReturns
 	return fakeReturns.result1
 }
 
@@ -457,15 +466,16 @@ func (fake *FakeLogger) SessionName() string {
 	ret, specificReturn := fake.sessionNameReturnsOnCall[len(fake.sessionNameArgsForCall)]
 	fake.sessionNameArgsForCall = append(fake.sessionNameArgsForCall, struct {
 	}{})
+	stub := fake.SessionNameStub
+	fakeReturns := fake.sessionNameReturns
 	fake.recordInvocation("SessionName", []interface{}{})
 	fake.sessionNameMutex.Unlock()
-	if fake.SessionNameStub != nil {
-		return fake.SessionNameStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.sessionNameReturns
 	return fakeReturns.result1
 }
 
@@ -510,9 +520,10 @@ func (fake *FakeLogger) Warn(arg1 string, arg2 ...zap.Field) {
 		arg1 string
 		arg2 []zap.Field
 	}{arg1, arg2})
+	stub := fake.WarnStub
 	fake.recordInvocation("Warn", []interface{}{arg1, arg2})
 	fake.warnMutex.Unlock()
-	if fake.WarnStub != nil {
+	if stub != nil {
 		fake.WarnStub(arg1, arg2...)
 	}
 }
@@ -542,15 +553,16 @@ func (fake *FakeLogger) With(arg1 ...zap.Field) logger.Logger {
 	fake.withArgsForCall = append(fake.withArgsForCall, struct {
 		arg1 []zap.Field
 	}{arg1})
+	stub := fake.WithStub
+	fakeReturns := fake.withReturns
 	fake.recordInvocation("With", []interface{}{arg1})
 	fake.withMutex.Unlock()
-	if fake.WithStub != nil {
-		return fake.WithStub(arg1...)
+	if stub != nil {
+		return stub(arg1...)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.withReturns
 	return fakeReturns.result1
 }
 

@@ -80,7 +80,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			req                    *http.Request
 			reqBody                *testBody
 			resp                   *httptest.ResponseRecorder
-			combinedReporter       *fakes.FakeCombinedReporter
+			combinedReporter       *fakes.FakeProxyReporter
 			roundTripperFactory    *FakeRoundTripperFactory
 			routeServicesTransport *sharedfakes.RoundTripper
 			retriableClassifier    *errorClassifierFakes.Classifier
@@ -126,7 +126,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			reqInfo.ProxyResponseWriter = proxyWriter
 
 			transport = new(roundtripperfakes.FakeProxyRoundTripper)
-			combinedReporter = new(fakes.FakeCombinedReporter)
+			combinedReporter = new(fakes.FakeProxyReporter)
 			errorHandler = &roundtripperfakes.ErrorHandler{}
 			roundTripperFactory = &FakeRoundTripperFactory{ReturnValue: transport}
 			retriableClassifier = &errorClassifierFakes.Classifier{}
