@@ -272,8 +272,14 @@ func (r *RouteRegistry) endpointInRouterShard(endpoint *route.Endpoint) bool {
 }
 
 func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.EndpointPool {
+	return r.LookupWithInstanceCtx(context.Background(), uri, appID, appIndex)
+}
+
+func (r *RouteRegistry) LookupWithInstanceCtx(ctx context.Context, uri route.Uri, appID string, appIndex string) *route.EndpointPool {
+	defer trace.StartRegion(ctx, "RouteRegistry.LookupWithInstance").End()
+
 	uri = uri.RouteKey()
-	p := r.Lookup(uri)
+	p := r.LookupCtx(ctx, uri)
 
 	if p == nil {
 		return nil

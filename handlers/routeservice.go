@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -146,7 +147,7 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 
 	hostWithoutPort := hostWithoutPort(routeServiceArgs.ParsedUrl.Host)
 	escapedPath := routeServiceArgs.ParsedUrl.EscapedPath()
-	if r.config.RouteServiceHairpinning() && r.AllowRouteServiceHairpinningRequest(route.Uri(hostWithoutPort+escapedPath)) {
+	if r.config.RouteServiceHairpinning() && r.AllowRouteServiceHairpinningRequest(req.Context(), route.Uri(hostWithoutPort+escapedPath)) {
 		reqInfo.ShouldRouteToInternalRouteService = true
 	}
 
@@ -233,8 +234,8 @@ func (r *RouteService) MatchAllowlistHostname(host string) bool {
 // that can be resolved via the gorouter's route registry.
 //
 // returns true to use internal resolution via this gorouter, false for external resolution via route service URL call.
-func (r *RouteService) AllowRouteServiceHairpinningRequest(uri route.Uri) bool {
-	pool := r.registry.Lookup(uri)
+func (r *RouteService) AllowRouteServiceHairpinningRequest(ctx context.Context, uri route.Uri) bool {
+	pool := r.registry.LookupCtx(ctx, uri)
 	if pool == nil {
 		// route is not known to the route registry, resolve externally
 		return false
@@ -293,7 +294,7 @@ func (r *RouteService) ArrivedViaRouteService(req *http.Request, logger logger.L
 		if err != nil {
 			return false, err
 		}
-		err = r.validateRouteServicePool(validatedSig, reqInfo.RoutePool)
+		err = r.validateRouteServicePool(req.Context(), validatedSig, reqInfo.RoutePool)
 		if err != nil {
 			return false, err
 		}
@@ -311,6 +312,7 @@ func newRequestReceivedFromRouteService(appUrl string, requestHeaders http.Heade
 }
 
 func (r *RouteService) validateRouteServicePool(
+	ctx context.Context,
 	validatedSig *routeservice.SignatureContents,
 	requestPool *route.EndpointPool,
 ) error {
@@ -320,7 +322,7 @@ func (r *RouteService) validateRouteServicePool(
 		return err
 	}
 	uri := route.Uri(hostWithoutPort(forwardedURL.Host) + forwardedURL.EscapedPath())
-	forwardedPool := r.registry.Lookup(uri)
+	forwardedPool := r.registry.LookupCtx(ctx, uri)
 	if forwardedPool == nil {
 		return fmt.Errorf(
 			"original request URL %s does not exist in the routing table",
