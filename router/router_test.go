@@ -2240,6 +2240,34 @@ var _ = Describe("Router", func() {
 			})
 		})
 	})
+
+	FDescribe("cert selection", func() {
+		Context("when multiple overlapping certs are provided to the router", func() {
+			var certPool *x509.CertPool
+			BeforeEach(func() {
+				certPool = x509.NewCertPool()
+				wildcardCert := test_util.CreateCert(fmt.Sprintf("*.%s", test_util.LocalhostDNS))
+				specificCert := test_util.CreateCert(fmt.Sprintf("myapp.%s", test_util.LocalhostDNS))
+				x509Cert, err := x509.ParseCertificate(specificCert.Certificate[0])
+				Expect(err).NotTo(HaveOccurred())
+				certPool.AddCert(x509Cert)
+				config.SSLCertificates = []tls.Certificate{wildcardCert, specificCert}
+			})
+			It("Chooses the most correct cert, rather than the first cert listed", func() {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs: certPool,
+					},
+				}
+				client := http.Client{Transport: tr}
+				req, err := http.NewRequest("GET", fmt.Sprintf("https://myapp.%s:%d/", test_util.LocalhostDNS, config.SSLPort), nil)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+
+			})
+		})
+	})
 })
 
 func createClientCert(clientCertTmpl *x509.Certificate, rootCert *x509.Certificate, rootKey *rsa.PrivateKey) (*tls.Certificate, error) {
