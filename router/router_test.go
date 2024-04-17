@@ -2241,7 +2241,7 @@ var _ = Describe("Router", func() {
 		})
 	})
 
-	FDescribe("cert selection", func() {
+	Describe("cert selection", func() {
 		Context("when multiple overlapping certs are provided to the router", func() {
 			var certPool *x509.CertPool
 			BeforeEach(func() {
