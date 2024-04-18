@@ -192,8 +192,8 @@ func (s *Subscriber) Dropped() (int, error) {
 
 func (s *Subscriber) subscribeToGreetMessage() error {
 	_, err := s.mbusClient.Subscribe("router.greet", func(msg *nats.Msg) {
-		response, _ := s.startMessage()
-		_ = s.mbusClient.Publish(msg.Reply, response)
+		// _, _ := s.startMessage()
+		_ = s.mbusClient.Publish(msg.Reply, []byte("meow"))
 	})
 
 	return err
