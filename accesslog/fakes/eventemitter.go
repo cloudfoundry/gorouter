@@ -51,15 +51,16 @@ func (fake *FakeEventEmitter) Emit(arg1 events.Event) error {
 	fake.emitArgsForCall = append(fake.emitArgsForCall, struct {
 		arg1 events.Event
 	}{arg1})
+	stub := fake.EmitStub
+	fakeReturns := fake.emitReturns
 	fake.recordInvocation("Emit", []interface{}{arg1})
 	fake.emitMutex.Unlock()
-	if fake.EmitStub != nil {
-		return fake.EmitStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.emitReturns
 	return fakeReturns.result1
 }
 
@@ -111,15 +112,16 @@ func (fake *FakeEventEmitter) EmitEnvelope(arg1 *events.Envelope) error {
 	fake.emitEnvelopeArgsForCall = append(fake.emitEnvelopeArgsForCall, struct {
 		arg1 *events.Envelope
 	}{arg1})
+	stub := fake.EmitEnvelopeStub
+	fakeReturns := fake.emitEnvelopeReturns
 	fake.recordInvocation("EmitEnvelope", []interface{}{arg1})
 	fake.emitEnvelopeMutex.Unlock()
-	if fake.EmitEnvelopeStub != nil {
-		return fake.EmitEnvelopeStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.emitEnvelopeReturns
 	return fakeReturns.result1
 }
 
@@ -170,15 +172,16 @@ func (fake *FakeEventEmitter) Origin() string {
 	ret, specificReturn := fake.originReturnsOnCall[len(fake.originArgsForCall)]
 	fake.originArgsForCall = append(fake.originArgsForCall, struct {
 	}{})
+	stub := fake.OriginStub
+	fakeReturns := fake.originReturns
 	fake.recordInvocation("Origin", []interface{}{})
 	fake.originMutex.Unlock()
-	if fake.OriginStub != nil {
-		return fake.OriginStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.originReturns
 	return fakeReturns.result1
 }
 

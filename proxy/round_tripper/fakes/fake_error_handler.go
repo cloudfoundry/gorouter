@@ -24,9 +24,10 @@ func (fake *ErrorHandler) HandleError(arg1 utils.ProxyResponseWriter, arg2 error
 		arg1 utils.ProxyResponseWriter
 		arg2 error
 	}{arg1, arg2})
+	stub := fake.HandleErrorStub
 	fake.recordInvocation("HandleError", []interface{}{arg1, arg2})
 	fake.handleErrorMutex.Unlock()
-	if fake.HandleErrorStub != nil {
+	if stub != nil {
 		fake.HandleErrorStub(arg1, arg2)
 	}
 }

@@ -40,7 +40,7 @@ var (
 	r                       *registry.RouteRegistry
 	p                       http.Handler
 	f                       *os.File
-	fakeReporter            *fakes.FakeCombinedReporter
+	fakeReporter            *fakes.FakeProxyReporter
 	conf                    *config.Config
 	proxyServer             net.Listener
 	al                      accesslog.AccessLogger
@@ -83,7 +83,7 @@ var _ = BeforeEach(func() {
 	conf.Backends.MaxAttempts = 3
 	conf.RouteServiceConfig.MaxAttempts = 3
 	conf.DisableKeepAlives = false
-	fakeReporter = &fakes.FakeCombinedReporter{}
+	fakeReporter = &fakes.FakeProxyReporter{}
 	fakeRegistry = fake_registry.NewMetricsRegistry()
 	skipSanitization = func(*http.Request) bool { return false }
 })

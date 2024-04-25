@@ -51,15 +51,16 @@ func (fake *FakeClient) Publish(arg1 string, arg2 []byte) error {
 		arg1 string
 		arg2 []byte
 	}{arg1, arg2Copy})
+	stub := fake.PublishStub
+	fakeReturns := fake.publishReturns
 	fake.recordInvocation("Publish", []interface{}{arg1, arg2Copy})
 	fake.publishMutex.Unlock()
-	if fake.PublishStub != nil {
-		return fake.PublishStub(arg1, arg2)
+	if stub != nil {
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.publishReturns
 	return fakeReturns.result1
 }
 
@@ -112,15 +113,16 @@ func (fake *FakeClient) Subscribe(arg1 string, arg2 nats.MsgHandler) (*nats.Subs
 		arg1 string
 		arg2 nats.MsgHandler
 	}{arg1, arg2})
+	stub := fake.SubscribeStub
+	fakeReturns := fake.subscribeReturns
 	fake.recordInvocation("Subscribe", []interface{}{arg1, arg2})
 	fake.subscribeMutex.Unlock()
-	if fake.SubscribeStub != nil {
-		return fake.SubscribeStub(arg1, arg2)
+	if stub != nil {
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.subscribeReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 

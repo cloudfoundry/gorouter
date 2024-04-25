@@ -27,7 +27,7 @@ var _ = Describe("Reporter Handler", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeReporter *metrics_fakes.FakeCombinedReporter
+		fakeReporter *metrics_fakes.FakeProxyReporter
 		logger       logger.Logger
 		prevHandler  negroni.Handler
 
@@ -39,7 +39,7 @@ var _ = Describe("Reporter Handler", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		fakeReporter = new(metrics_fakes.FakeCombinedReporter)
+		fakeReporter = new(metrics_fakes.FakeProxyReporter)
 		logger = test_util.NewTestZapLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -67,6 +67,22 @@ var _ = Describe("Reporter Handler", func() {
 		handler.Use(prevHandler)
 		handler.Use(handlers.NewReporter(fakeReporter, logger))
 		handler.UseHandlerFunc(nextHandler)
+	})
+
+	Context("when request doesn't contain Content-Length header", func() {
+		It("emits metric for missing content length header", func() {
+			req.Header.Add("Content-Length", "")
+			handler.ServeHTTP(resp, req)
+			Expect(fakeReporter.CaptureMissingContentLengthHeaderCallCount()).To(Equal(1))
+		})
+	})
+
+	Context("when request contains Content-Length header", func() {
+		It("does not emit metric for missing content length header", func() {
+			req.Header.Add("Content-Length", "10")
+			handler.ServeHTTP(resp, req)
+			Expect(fakeReporter.CaptureMissingContentLengthHeaderCallCount()).To(Equal(0))
+		})
 	})
 
 	It("emits routing response metrics", func() {

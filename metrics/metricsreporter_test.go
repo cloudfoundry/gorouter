@@ -1,7 +1,12 @@
 package metrics_test
 
 import (
+	"bufio"
+	"fmt"
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
@@ -317,6 +322,27 @@ var _ = Describe("MetricsReporter", func() {
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(4))
 			Expect(batcher.BatchIncrementCounterArgsForCall(3)).To(Equal("responses"))
 		})
+	})
+
+	It("sends the missing content length header requests", func() {
+		testApp := httptest.NewServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				metricReporter.CaptureMissingContentLengthHeader()
+				w.WriteHeader(200)
+			}),
+		)
+
+		u, err := url.Parse(testApp.URL)
+		Expect(err).NotTo(HaveOccurred())
+		conn, err := net.Dial("tcp", u.Host)
+		Expect(err).NotTo(HaveOccurred())
+		defer conn.Close()
+		fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: sample.com\r\nContent-Length: \r\n\r\n")
+		_, err = bufio.NewReader(conn).ReadString('\n')
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("missing_content_length_header"))
 	})
 
 	It("sends the latency", func() {

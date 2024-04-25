@@ -43,6 +43,10 @@ func (m *MetricsReporter) CaptureBadGateway() {
 	m.Batcher.BatchIncrementCounter("bad_gateways")
 }
 
+func (m *MetricsReporter) CaptureMissingContentLengthHeader() {
+	m.Batcher.BatchIncrementCounter("missing_content_length_header")
+}
+
 func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint) {
 	m.Batcher.BatchIncrementCounter("total_requests")
 

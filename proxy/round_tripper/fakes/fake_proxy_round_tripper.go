@@ -36,9 +36,10 @@ func (fake *FakeProxyRoundTripper) CancelRequest(arg1 *http.Request) {
 	fake.cancelRequestArgsForCall = append(fake.cancelRequestArgsForCall, struct {
 		arg1 *http.Request
 	}{arg1})
+	stub := fake.CancelRequestStub
 	fake.recordInvocation("CancelRequest", []interface{}{arg1})
 	fake.cancelRequestMutex.Unlock()
-	if fake.CancelRequestStub != nil {
+	if stub != nil {
 		fake.CancelRequestStub(arg1)
 	}
 }
@@ -68,15 +69,16 @@ func (fake *FakeProxyRoundTripper) RoundTrip(arg1 *http.Request) (*http.Response
 	fake.roundTripArgsForCall = append(fake.roundTripArgsForCall, struct {
 		arg1 *http.Request
 	}{arg1})
+	stub := fake.RoundTripStub
+	fakeReturns := fake.roundTripReturns
 	fake.recordInvocation("RoundTrip", []interface{}{arg1})
 	fake.roundTripMutex.Unlock()
-	if fake.RoundTripStub != nil {
-		return fake.RoundTripStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.roundTripReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 

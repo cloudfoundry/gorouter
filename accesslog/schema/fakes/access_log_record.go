@@ -26,9 +26,10 @@ func (fake *FakeLogSender) SendAppLog(arg1 string, arg2 string, arg3 map[string]
 		arg2 string
 		arg3 map[string]string
 	}{arg1, arg2, arg3})
+	stub := fake.SendAppLogStub
 	fake.recordInvocation("SendAppLog", []interface{}{arg1, arg2, arg3})
 	fake.sendAppLogMutex.Unlock()
-	if fake.SendAppLogStub != nil {
+	if stub != nil {
 		fake.SendAppLogStub(arg1, arg2, arg3)
 	}
 }

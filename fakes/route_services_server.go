@@ -34,15 +34,16 @@ func (fake *RouteServicesServer) Serve(arg1 http.Handler, arg2 chan error) error
 		arg1 http.Handler
 		arg2 chan error
 	}{arg1, arg2})
+	stub := fake.ServeStub
+	fakeReturns := fake.serveReturns
 	fake.recordInvocation("Serve", []interface{}{arg1, arg2})
 	fake.serveMutex.Unlock()
-	if fake.ServeStub != nil {
-		return fake.ServeStub(arg1, arg2)
+	if stub != nil {
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.serveReturns
 	return fakeReturns.result1
 }
 
@@ -92,9 +93,10 @@ func (fake *RouteServicesServer) Stop() {
 	fake.stopMutex.Lock()
 	fake.stopArgsForCall = append(fake.stopArgsForCall, struct {
 	}{})
+	stub := fake.StopStub
 	fake.recordInvocation("Stop", []interface{}{})
 	fake.stopMutex.Unlock()
-	if fake.StopStub != nil {
+	if stub != nil {
 		fake.StopStub()
 	}
 }

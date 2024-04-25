@@ -41,15 +41,16 @@ func (fake *FakeSubscriber) Dropped() (int, error) {
 	ret, specificReturn := fake.droppedReturnsOnCall[len(fake.droppedArgsForCall)]
 	fake.droppedArgsForCall = append(fake.droppedArgsForCall, struct {
 	}{})
+	stub := fake.DroppedStub
+	fakeReturns := fake.droppedReturns
 	fake.recordInvocation("Dropped", []interface{}{})
 	fake.droppedMutex.Unlock()
-	if fake.DroppedStub != nil {
-		return fake.DroppedStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.droppedReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 
@@ -96,15 +97,16 @@ func (fake *FakeSubscriber) Pending() (int, error) {
 	ret, specificReturn := fake.pendingReturnsOnCall[len(fake.pendingArgsForCall)]
 	fake.pendingArgsForCall = append(fake.pendingArgsForCall, struct {
 	}{})
+	stub := fake.PendingStub
+	fakeReturns := fake.pendingReturns
 	fake.recordInvocation("Pending", []interface{}{})
 	fake.pendingMutex.Unlock()
-	if fake.PendingStub != nil {
-		return fake.PendingStub()
+	if stub != nil {
+		return stub()
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
 	}
-	fakeReturns := fake.pendingReturns
 	return fakeReturns.result1, fakeReturns.result2
 }
 

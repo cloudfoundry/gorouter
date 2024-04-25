@@ -29,15 +29,16 @@ func (fake *Classifier) Classify(arg1 error) bool {
 	fake.classifyArgsForCall = append(fake.classifyArgsForCall, struct {
 		arg1 error
 	}{arg1})
+	stub := fake.ClassifyStub
+	fakeReturns := fake.classifyReturns
 	fake.recordInvocation("Classify", []interface{}{arg1})
 	fake.classifyMutex.Unlock()
-	if fake.ClassifyStub != nil {
-		return fake.ClassifyStub(arg1)
+	if stub != nil {
+		return stub(arg1)
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	fakeReturns := fake.classifyReturns
 	return fakeReturns.result1
 }
 

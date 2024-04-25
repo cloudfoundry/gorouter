@@ -25,7 +25,7 @@ var _ = Describe("Lookup", func() {
 		nextHandler    http.HandlerFunc
 		logger         *loggerfakes.FakeLogger
 		reg            *fakeRegistry.FakeRegistry
-		rep            *fakes.FakeCombinedReporter
+		rep            *fakes.FakeProxyReporter
 		resp           *httptest.ResponseRecorder
 		req            *http.Request
 		nextCalled     bool
@@ -46,7 +46,7 @@ var _ = Describe("Lookup", func() {
 		nextRequest = &http.Request{}
 		maxConnections = 2
 		logger = new(loggerfakes.FakeLogger)
-		rep = &fakes.FakeCombinedReporter{}
+		rep = &fakes.FakeProxyReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
