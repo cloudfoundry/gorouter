@@ -79,7 +79,7 @@ func (w *FileWriter) Write(b []byte) (int, error) {
 }
 
 func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender, config *config.Config) (AccessLogger, error) {
-	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
+	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled && !config.AccessLog.EnableStreaming {
 		return &NullAccessLogger{}, nil
 	}
 
