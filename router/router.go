@@ -136,6 +136,10 @@ func NewRouter(
 			},
 			HealthCheck: healthCheck,
 		}
+		if cfg.EnableHTTP2 {
+			healthTLSListener.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+		}
+
 		if err := healthTLSListener.ListenAndServe(); err != nil {
 			return nil, err
 		}

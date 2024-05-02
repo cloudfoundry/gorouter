@@ -13,7 +13,8 @@ type HealthListener struct {
 	TLSConfig   *tls.Config
 	Port        uint16
 
-	listener net.Listener
+	listener    net.Listener
+	tlsListener net.Listener
 }
 
 func (hl *HealthListener) ListenAndServe() error {
@@ -36,17 +37,18 @@ func (hl *HealthListener) ListenAndServe() error {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	l, err := net.Listen("tcp", addr)
+	var err error
+	hl.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	hl.listener = l
 
 	go func() {
 		if hl.TLSConfig != nil {
-			err = s.ServeTLS(l, "", "")
+			hl.tlsListener = tls.NewListener(hl.listener, hl.TLSConfig)
+			err = s.Serve(hl.tlsListener)
 		} else {
-			err = s.Serve(l)
+			err = s.Serve(hl.listener)
 		}
 	}()
 	return nil
@@ -55,5 +57,8 @@ func (hl *HealthListener) ListenAndServe() error {
 func (hl *HealthListener) Stop() {
 	if hl.listener != nil {
 		hl.listener.Close()
+	}
+	if hl.tlsListener != nil {
+		hl.tlsListener.Close()
 	}
 }
