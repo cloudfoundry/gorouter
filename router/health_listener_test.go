@@ -133,5 +133,30 @@ var _ = Describe("HealthListener", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(body)).To(Equal("ok\n"))
 		})
+		Context("when using non-standard TLS Ciphers", func() {
+			BeforeEach(func() {
+				healthListener.TLSConfig = &tls.Config{
+					Certificates: []tls.Certificate{test_util.CreateCert("default")},
+					CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384},
+				}
+			})
+
+			It("handles different ciphers gracefully", func() {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				client := http.Client{Transport: tr}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+
+				Expect(resp.StatusCode).To(Equal(200))
+
+				body, err := io.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(body)).To(Equal("ok\n"))
+			})
+		})
 	})
 })
