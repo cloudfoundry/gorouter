@@ -87,9 +87,38 @@ func NewRouter(
 		host = fmt.Sprintf("%s:%d", cfg.Status.Host, cfg.Status.Port)
 	}
 
+	routerErrChan := errChan
+	if routerErrChan == nil {
+		routerErrChan = make(chan error, 3)
+	}
+
+	routesListener := &RoutesListener{
+		Config:        cfg,
+		RouteRegistry: r,
+	}
+	if err := routesListener.ListenAndServe(); err != nil {
+		return nil, err
+	}
+
+	router := &Router{
+		config:              cfg,
+		handler:             handler,
+		mbusClient:          mbusClient,
+		registry:            r,
+		varz:                v,
+		routesListener:      routesListener,
+		serveDone:           make(chan struct{}),
+		tlsServeDone:        make(chan struct{}),
+		idleConns:           make(map[net.Conn]struct{}),
+		activeConns:         make(map[net.Conn]struct{}),
+		logger:              logger,
+		errChan:             routerErrChan,
+		health:              h,
+		stopping:            false,
+		routeServicesServer: routeServicesServer,
+	}
+
 	healthCheck := handlers.NewHealthcheck(h, logger)
-	var component *common.VcapComponent
-	var healthListener *HealthListener
 	if cfg.Status.EnableNonTLSHealthChecks {
 		// TODO: remove all vcapcomponent logic in Summer 2026
 		if cfg.Status.EnableDeprecatedVarzHealthzEndpoints {
@@ -104,7 +133,7 @@ func NewRouter(
 				},
 			}
 
-			component = &common.VcapComponent{
+			router.component = &common.VcapComponent{
 				Config: cfg,
 				Varz:   varz,
 				Health: healthCheck,
@@ -114,19 +143,20 @@ func NewRouter(
 				Logger: logger,
 			}
 		} else {
-			healthListener = &HealthListener{
+			router.healthListener = &HealthListener{
 				Port:        cfg.Status.Port,
 				HealthCheck: healthCheck,
+				Router:      router,
+				Logger:      logger.Session("nontls-health-listener"),
 			}
-			if err := healthListener.ListenAndServe(); err != nil {
+			if err := router.healthListener.ListenAndServe(); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	var healthTLSListener *HealthListener
 	if len(cfg.Status.TLSCert.Certificate) != 0 {
-		healthTLSListener = &HealthListener{
+		router.healthTLSListener = &HealthListener{
 			Port: cfg.Status.TLS.Port,
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{cfg.Status.TLSCert},
@@ -135,52 +165,20 @@ func NewRouter(
 				MaxVersion:   cfg.MaxTLSVersion,
 			},
 			HealthCheck: healthCheck,
+			Router:      router,
+			Logger:      logger.Session("tls-health-listener"),
 		}
 		if cfg.EnableHTTP2 {
-			healthTLSListener.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+			router.healthTLSListener.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 		}
 
-		if err := healthTLSListener.ListenAndServe(); err != nil {
+		if err := router.healthTLSListener.ListenAndServe(); err != nil {
 			return nil, err
 		}
 	}
 
-	if healthListener == nil && component == nil && healthTLSListener == nil {
+	if router.healthListener == nil && router.component == nil && router.healthTLSListener == nil {
 		return nil, fmt.Errorf("No TLS certificates provided and non-tls health listener disabled. No health listener can start. This is a bug in gorouter. This error should have been caught when parsing the config")
-	}
-
-	routesListener := &RoutesListener{
-		Config:        cfg,
-		RouteRegistry: r,
-	}
-	if err := routesListener.ListenAndServe(); err != nil {
-		return nil, err
-	}
-
-	routerErrChan := errChan
-	if routerErrChan == nil {
-		routerErrChan = make(chan error, 3)
-	}
-
-	router := &Router{
-		config:              cfg,
-		handler:             handler,
-		mbusClient:          mbusClient,
-		registry:            r,
-		varz:                v,
-		component:           component,
-		routesListener:      routesListener,
-		healthListener:      healthListener,
-		healthTLSListener:   healthTLSListener,
-		serveDone:           make(chan struct{}),
-		tlsServeDone:        make(chan struct{}),
-		idleConns:           make(map[net.Conn]struct{}),
-		activeConns:         make(map[net.Conn]struct{}),
-		logger:              logger,
-		errChan:             routerErrChan,
-		health:              h,
-		stopping:            false,
-		routeServicesServer: routeServicesServer,
 	}
 
 	if router.component != nil {
@@ -411,6 +409,12 @@ func (r *Router) Drain(drainWait, drainTimeout time.Duration) error {
 	}
 
 	return nil
+}
+
+func (r *Router) IsStopping() bool {
+	r.stopLock.Lock()
+	defer r.stopLock.Unlock()
+	return r.stopping
 }
 
 func (r *Router) Stop() {

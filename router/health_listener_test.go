@@ -8,10 +8,12 @@ import (
 
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("HealthListener", func() {
@@ -22,9 +24,13 @@ var _ = Describe("HealthListener", func() {
 		req             *http.Request
 		port            uint16
 		h               *health.Health
+		router          *Router
+		logger          logger.Logger
 	)
 
 	BeforeEach(func() {
+		logger = test_util.NewTestZapLogger("health-listener-test")
+		router = &Router{}
 		port = test_util.NextAvailPort()
 		addr = "127.0.0.1"
 		h = &health.Health{}
@@ -33,6 +39,8 @@ var _ = Describe("HealthListener", func() {
 		healthListener = &HealthListener{
 			Port:        port,
 			HealthCheck: handlers.NewHealthcheck(h, test_util.NewTestZapLogger("test")),
+			Router:      router,
+			Logger:      logger,
 		}
 		healthcheckPath = "health"
 	})
@@ -133,15 +141,16 @@ var _ = Describe("HealthListener", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(body)).To(Equal("ok\n"))
 		})
-		Context("when using non-standard TLS Ciphers", func() {
+		Context("when not using H2 ciphers with an H2 server", func() {
 			BeforeEach(func() {
 				healthListener.TLSConfig = &tls.Config{
 					Certificates: []tls.Certificate{test_util.CreateCert("default")},
 					CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384},
+					NextProtos:   []string{"h2", "http/1.1"},
 				}
 			})
 
-			It("handles different ciphers gracefully", func() {
+			It("behaves the way the main gorouter listener does", func() {
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
@@ -156,6 +165,24 @@ var _ = Describe("HealthListener", func() {
 				defer resp.Body.Close()
 				Expect(err).ToNot(HaveOccurred())
 				Expect(string(body)).To(Equal("ok\n"))
+			})
+		})
+	})
+	Context("when it fails to start", func() {
+		JustBeforeEach(func() {
+			healthListener.Stop()
+		})
+		Context("and the router is not already stopping", func() {
+			It("logs an error message", func() {
+				Eventually(logger).Should(gbytes.Say("health-listener-failed"))
+			})
+		})
+		Context("and the router is already stopping", func() {
+			BeforeEach(func() {
+				router.stopping = true
+			})
+			It("does not log an error message", func() {
+				Eventually(logger).ShouldNot(gbytes.Say("health-listener-failed"))
 			})
 		})
 	})

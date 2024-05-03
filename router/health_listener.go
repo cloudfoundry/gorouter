@@ -6,12 +6,17 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
 )
 
 type HealthListener struct {
 	HealthCheck http.Handler
 	TLSConfig   *tls.Config
 	Port        uint16
+	Router      *Router
+	Logger      logger.Logger
 
 	listener    net.Listener
 	tlsListener net.Listener
@@ -32,7 +37,6 @@ func (hl *HealthListener) ListenAndServe() error {
 	s := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
-		TLSConfig:    hl.TLSConfig,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
@@ -43,12 +47,15 @@ func (hl *HealthListener) ListenAndServe() error {
 		return err
 	}
 
+	healthListener := hl.listener
+	if hl.TLSConfig != nil {
+		hl.tlsListener = tls.NewListener(hl.listener, hl.TLSConfig)
+		healthListener = hl.tlsListener
+	}
 	go func() {
-		if hl.TLSConfig != nil {
-			hl.tlsListener = tls.NewListener(hl.listener, hl.TLSConfig)
-			err = s.Serve(hl.tlsListener)
-		} else {
-			err = s.Serve(hl.listener)
+		err := s.Serve(healthListener)
+		if !hl.Router.IsStopping() {
+			hl.Logger.Error("health-listener-failed", zap.Error(err))
 		}
 	}()
 	return nil
