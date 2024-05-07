@@ -2691,6 +2691,9 @@ var _ = Describe("Proxy", func() {
 				resp.Header.Set("Upgrade", "Websocket")
 				resp.Header.Set("Connection", "Upgrade")
 
+				req, _ := conn.ReadRequest()
+				Expect(req.Header.Values("Connection")).To(ContainElement("Upgrade"))
+				Expect(req.Header.Get("Upgrade")).To(Equal("Websocket"))
 				conn.WriteResponse(resp)
 				conn.Close()
 			})
@@ -2723,6 +2726,10 @@ var _ = Describe("Proxy", func() {
 				resp := test_util.NewResponse(http.StatusSwitchingProtocols)
 				resp.Header.Set("Upgrade", "Websocket")
 				resp.Header.Set("Connection", "Upgrade")
+
+				req, _ := conn.ReadRequest()
+				Expect(req.Header.Values("Connection")).To(ContainElement("Upgrade"))
+				Expect(req.Header.Get("Upgrade")).To(Equal("Websocket"))
 
 				conn.WriteResponse(resp)
 
