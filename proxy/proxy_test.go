@@ -2012,7 +2012,7 @@ var _ = Describe("Proxy", func() {
 					conn.WriteResponse(expectRsp)
 
 					rsp := test_util.NewResponse(200)
-					rsp.Body = io.NopCloser(strings.NewReader("DEFGHI"))
+					rsp.Body = io.NopCloser(strings.NewReader("valid-but-unimportant-response-data"))
 					conn.WriteResponse(rsp)
 
 					conn.Close()
@@ -2044,13 +2044,69 @@ var _ = Describe("Proxy", func() {
 				//since the building of the log record happens throughout the life of the request
 				b, err := os.ReadFile(f.Name())
 				Expect(err).NotTo(HaveOccurred())
-				Expect(strings.HasPrefix(string(b), "test - [")).To(BeTrue())
-				Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 6 "-"`))
+				Expect(string(b)).To(HavePrefix("test - ["))
+				Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 200 4 35 "-"`))
 				Expect(string(b)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
 				Expect(string(b)).To(ContainSubstring(`response_time:`))
 				Expect(string(b)).To(ContainSubstring(`app_id:"456"`))
 				Expect(string(b)).To(ContainSubstring(`app_index:"2"`))
-				Expect(b[len(b)-1]).To(Equal(byte('\n')))
+				Expect(string(b)).To(HaveSuffix("\n"))
+			})
+
+			It("returns the correct status code to the client", func() {
+				ln := test_util.RegisterConnHandler(r, "statusTest", func(conn *test_util.HttpConn) {
+					req, body := conn.ReadRequest()
+					Expect(req.Method).To(Equal("POST"))
+					Expect(req.URL.Path).To(Equal("/"))
+					Expect(req.ProtoMajor).To(Equal(1))
+					Expect(req.ProtoMinor).To(Equal(1))
+
+					Expect(body).To(Equal("ABCD"))
+
+					expectRsp := test_util.NewResponse(100)
+					conn.WriteResponse(expectRsp)
+
+					rsp := test_util.NewResponse(201)
+					rsp.Body = io.NopCloser(strings.NewReader("valid-but-unimportant-response-data"))
+					conn.WriteResponse(rsp)
+
+					conn.Close()
+				}, test_util.RegisterConfig{InstanceId: "123", AppId: "456"})
+				defer ln.Close()
+
+				conn := dialProxy(proxyServer)
+
+				body := &bytes.Buffer{}
+				body.WriteString("ABCD")
+				req := test_util.NewRequest("POST", "statusTest", "/", body)
+				conn.WriteRequest(req)
+
+				resp, _ := conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusContinue))
+
+				resp, _ = conn.ReadResponse()
+				Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+				Eventually(func() (int64, error) {
+					fi, err := f.Stat()
+					if err != nil {
+						return 0, err
+					}
+					return fi.Size(), nil
+				}).ShouldNot(BeZero())
+
+				//make sure the record includes all the data
+				//since the building of the log record happens throughout the life of the request
+				b, err := os.ReadFile(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(b)).To(HavePrefix("statusTest - ["))
+				Expect(string(b)).To(ContainSubstring(`"POST / HTTP/1.1" 201 4 35 "-"`))
+				Expect(string(b)).To(ContainSubstring(`x_forwarded_for:"127.0.0.1" x_forwarded_proto:"http" vcap_request_id:`))
+				Expect(string(b)).To(ContainSubstring(`response_time:`))
+				Expect(string(b)).To(ContainSubstring(`app_id:"456"`))
+				Expect(string(b)).To(ContainSubstring(`app_index:"2"`))
+				Expect(string(b)).To(HaveSuffix("\n"))
+
 			})
 		})
 
