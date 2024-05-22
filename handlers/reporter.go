@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/textproto"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/metrics"
@@ -36,7 +37,7 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
-	if r.Header.Get("Content-Length") == "" {
+	if !validContentLength(r.Header) {
 		rh.reporter.CaptureMissingContentLengthHeader()
 	}
 
@@ -56,4 +57,22 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		requestInfo.RouteEndpoint, proxyWriter.Status(),
 		requestInfo.ReceivedAt, requestInfo.AppRequestFinishedAt.Sub(requestInfo.ReceivedAt),
 	)
+}
+
+// validContentLength ensures that if the `Content-Length` header is set, it is not empty.
+// Request that don't have a `Content-Length` header are OK.
+//
+// Based on https://github.com/golang/go/blob/33496c2dd310aad1d56bae9febcbd2f02b4985cb/src/net/http/transfer.go#L1051
+// http.Header.Get() will return "" for empty headers, or when the header is not set at all.
+func validContentLength(header http.Header) bool {
+	clHeaders := header["Content-Length"]
+
+	if len(clHeaders) == 0 {
+		return true
+	}
+	cl := textproto.TrimString(clHeaders[0])
+
+	// The Content-Length must be a valid numeric value.
+	// See: https://datatracker.ietf.org/doc/html/rfc2616/#section-14.13
+	return cl != ""
 }
