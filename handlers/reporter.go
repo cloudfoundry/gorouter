@@ -38,7 +38,7 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		return
 	}
 	if !validContentLength(r.Header) {
-		rh.reporter.CaptureMissingContentLengthHeader()
+		rh.reporter.CaptureEmptyContentLengthHeader()
 	}
 
 	next(rw, r)
