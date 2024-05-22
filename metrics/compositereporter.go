@@ -26,7 +26,7 @@ type ProxyReporter interface {
 	CaptureBackendTLSHandshakeFailed()
 	CaptureBadRequest()
 	CaptureBadGateway()
-	CaptureMissingContentLengthHeader()
+	CaptureEmptyContentLengthHeader()
 	CaptureRoutingRequest(b *route.Endpoint)
 	CaptureRoutingResponse(statusCode int)
 	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
@@ -65,8 +65,8 @@ func (c *CompositeReporter) CaptureBadGateway() {
 	c.ProxyReporter.CaptureBadGateway()
 }
 
-func (c *CompositeReporter) CaptureMissingContentLengthHeader() {
-	c.ProxyReporter.CaptureMissingContentLengthHeader()
+func (c *CompositeReporter) CaptureEmptyContentLengthHeader() {
+	c.ProxyReporter.CaptureEmptyContentLengthHeader()
 }
 
 func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint) {

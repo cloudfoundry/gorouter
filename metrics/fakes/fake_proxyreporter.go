@@ -218,12 +218,12 @@ func (fake *FakeProxyReporter) CaptureBadRequestCalls(stub func()) {
 	fake.CaptureBadRequestStub = stub
 }
 
-func (fake *FakeProxyReporter) CaptureMissingContentLengthHeader() {
+func (fake *FakeProxyReporter) CaptureEmptyContentLengthHeader() {
 	fake.captureMissingContentLengthHeaderMutex.Lock()
 	fake.captureMissingContentLengthHeaderArgsForCall = append(fake.captureMissingContentLengthHeaderArgsForCall, struct {
 	}{})
 	stub := fake.CaptureMissingContentLengthHeaderStub
-	fake.recordInvocation("CaptureMissingContentLengthHeader", []interface{}{})
+	fake.recordInvocation("CaptureEmptyContentLengthHeader", []interface{}{})
 	fake.captureMissingContentLengthHeaderMutex.Unlock()
 	if stub != nil {
 		fake.CaptureMissingContentLengthHeaderStub()
