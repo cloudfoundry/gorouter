@@ -2,14 +2,20 @@ package metrics_test
 
 import (
 	"bufio"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
 	"fmt"
+	"github.com/uber-go/zap"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
+
+	"github.com/urfave/negroni/v3"
 
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -324,25 +330,57 @@ var _ = Describe("MetricsReporter", func() {
 		})
 	})
 
-	It("sends the missing content length header requests", func() {
-		testApp := httptest.NewServer(
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				metricReporter.CaptureMissingContentLengthHeader()
-				w.WriteHeader(200)
-			}),
-		)
+	Context("metric empty_content_length_header", func() {
+		var testApp *httptest.Server
 
-		u, err := url.Parse(testApp.URL)
-		Expect(err).NotTo(HaveOccurred())
-		conn, err := net.Dial("tcp", u.Host)
-		Expect(err).NotTo(HaveOccurred())
-		defer conn.Close()
-		fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: sample.com\r\nContent-Length: \r\n\r\n")
-		_, err = bufio.NewReader(conn).ReadString('\n')
-		Expect(err).NotTo(HaveOccurred())
+		BeforeEach(func() {
+			logger := logger.NewLogger("gorouter.test", "unix-epoch", zap.Output(os.Stdout))
+			negroni := negroni.New()
+			negroni.Use(handlers.NewRequestInfo())
+			negroni.Use(handlers.NewReporter(metricReporter, logger))
 
-		Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
-		Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("missing_content_length_header"))
+			testApp = httptest.NewServer(negroni)
+		})
+
+		It("counts request with empty content-length header correctly", func() {
+			u, err := url.Parse(testApp.URL)
+			Expect(err).NotTo(HaveOccurred())
+			conn, err := net.Dial("tcp", u.Host)
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+			fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: sample.com\r\nContent-Length: \r\n\r\n")
+			_, err = bufio.NewReader(conn).ReadString('\n')
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("empty_content_length_header"))
+		})
+
+		It("does not count request without content-length header", func() {
+			u, err := url.Parse(testApp.URL)
+			Expect(err).NotTo(HaveOccurred())
+			conn, err := net.Dial("tcp", u.Host)
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+			fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: sample.com\r\n\r\n")
+			_, err = bufio.NewReader(conn).ReadString('\n')
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(0))
+		})
+
+		It("does not count request with correct content-length header", func() {
+			u, err := url.Parse(testApp.URL)
+			Expect(err).NotTo(HaveOccurred())
+			conn, err := net.Dial("tcp", u.Host)
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+			fmt.Fprintf(conn, "POST / HTTP/1.1\r\nHost: sample.com\r\nContent-Length: 5\r\n\r\n12345")
+			_, err = bufio.NewReader(conn).ReadString('\n')
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(0))
+		})
 	})
 
 	It("sends the latency", func() {
