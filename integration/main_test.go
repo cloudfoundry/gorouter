@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -1126,6 +1127,96 @@ var _ = Describe("Router Integration", func() {
 				Eventually(session, 30*time.Second).Should(Say("UAA client requires TLS enabled"))
 				Eventually(session, 5*time.Second).Should(Exit(1))
 			})
+		})
+	})
+
+	Describe("100-continue", func() {
+		var (
+			// goRouterClient *http.Client
+			mbusClient *nats.Conn
+			done       chan bool
+			appRoute   string
+			goRoutine  sync.WaitGroup
+		)
+
+		BeforeEach(func() {
+			cfg = createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, cfgFile, defaultPruneInterval, defaultPruneThreshold, 0, false, 100, natsPort)
+			var err error
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			gorouterSession = startGorouterSession(cfgFile)
+			// goRouterClient = &http.Client{}
+
+			appRoute = "test." + test_util.LocalhostDNS
+			runningApp1 := test.NewGreetApp([]route.Uri{route.Uri(appRoute)}, proxyPort, mbusClient, nil)
+			runningApp1.Register()
+			runningApp1.Listen()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusRoutesPort)
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done = make(chan bool, 1)
+			goRoutine.Add(1)
+			go func() {
+				defer goRoutine.Done()
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp1.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp1) }).Should(BeTrue())
+		})
+
+		AfterEach(func() {
+			goRoutine.Wait()
+		})
+
+		FIt("resets response for new request", func() {
+			defer func() { done <- true }()
+
+			conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", proxyPort))
+			Expect(err).ToNot(HaveOccurred())
+			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+			connWriter := bufio.NewWriter(conn)
+
+			connWriter.Write([]byte("POST /continue HTTP/1.1\r\n" +
+				fmt.Sprintf("Host: %s\r\n", appRoute) +
+				"Connection: keep-alive\r\n" +
+				"Expect: 100-Continue\r\n" +
+				"Content-Type: text/plain\r\n" +
+				fmt.Sprintf("Content-Length: %d\r\n", 6) +
+				"\r\n",
+			))
+			connWriter.Write([]byte("hello1"))
+			connWriter.Flush()
+
+			connReader := bufio.NewReader(conn)
+			resp, err := http.ReadResponse(connReader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusMethodNotAllowed))
+
+			// resp, err := http.ReadResponse(connReader, &http.Request{})
+			// Expect(err).NotTo(HaveOccurred())
+			// Expect(resp.StatusCode).To(Equal(http.StatusContinue))
+
+			connWriter.Write([]byte("GET /continue HTTP/1.1\r\n" +
+				fmt.Sprintf("Host: %s\r\n", appRoute) +
+				"Connection: keep-alive\r\n" +
+				"Content-Type: text/plain\r\n" +
+				fmt.Sprintf("Content-Length: %d\r\n", 2) +
+				"\r\n",
+			))
+			connWriter.Write([]byte("hello2"))
+			connWriter.Flush()
+
+			resp, err = http.ReadResponse(connReader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		})
 	})
 

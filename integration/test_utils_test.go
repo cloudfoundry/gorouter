@@ -28,6 +28,9 @@ func createConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeS
 	configDrainSetup(tempCfg, pruneInterval, pruneThreshold, drainWait)
 
 	tempCfg.SuspendPruningIfNatsUnavailable = suspendPruning
+	tempCfg.MaxIdleConns = 100
+	tempCfg.MaxIdleConnsPerHost = 100
+	tempCfg.DisableKeepAlives = false
 	tempCfg.LoadBalancerHealthyThreshold = 0
 	tempCfg.OAuth = config.OAuthConfig{
 		TokenEndpoint: "127.0.0.1",

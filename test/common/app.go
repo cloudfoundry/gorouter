@@ -148,7 +148,7 @@ func (a *TestApp) Register() {
 	id, _ := uuid.GenerateUUID()
 	rm := registerMessage{
 		Host:                    "127.0.0.1",
-		Port:                    a.port,
+		Port:                    5555,
 		Uris:                    a.urls,
 		Tags:                    a.tags,
 		Dea:                     "dea",
