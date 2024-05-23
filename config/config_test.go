@@ -848,6 +848,14 @@ backends:
 			Expect(config.DisableKeepAlives).To(BeFalse())
 		})
 
+		It("sets KeepAlive100ContinueRequests", func() {
+			var b = []byte("keep_alive_100_continue_requests: true")
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.KeepAlive100ContinueRequests).To(BeTrue())
+		})
+
 		It("sets MaxIdleConns", func() {
 			var b = []byte("max_idle_conns: 200")
 			err := config.Initialize(b)

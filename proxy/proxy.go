@@ -122,7 +122,7 @@ func NewProxy(
 	)
 
 	rproxy := &httputil.ReverseProxy{
-		Director:       p.setupProxyRequest,
+		Rewrite:        p.setupProxyRequest,
 		Transport:      prt,
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
@@ -237,31 +237,40 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	reqInfo.AppRequestFinishedAt = time.Now()
 }
 
-func (p *proxy) setupProxyRequest(target *http.Request) {
-	reqInfo, err := handlers.ContextRequestInfo(target)
+func (p *proxy) setupProxyRequest(target *httputil.ProxyRequest) {
+	reqInfo, err := handlers.ContextRequestInfo(target.In)
 	if err != nil {
 		p.logger.Panic("request-info-err", zap.Error(err))
 		return
 	}
-	reqInfo.BackendReqHeaders = target.Header
+	reqInfo.BackendReqHeaders = target.Out.Header
 
-	target.URL.Scheme = "http"
-	target.URL.Host = target.Host
-	target.URL.ForceQuery = false
-	target.URL.Opaque = target.RequestURI
+	target.Out.URL.Scheme = "http"
+	target.Out.URL.Host = target.In.Host
+	target.Out.URL.ForceQuery = false
+	target.Out.URL.Opaque = target.In.RequestURI
 
-	if strings.HasPrefix(target.RequestURI, "//") {
-		path := escapePathAndPreserveSlashes(target.URL.Path)
-		target.URL.Opaque = "//" + target.Host + path
+	if strings.HasPrefix(target.In.RequestURI, "//") {
+		path := escapePathAndPreserveSlashes(target.In.URL.Path)
+		target.Out.URL.Opaque = "//" + target.In.Host + path
 
-		if len(target.URL.Query()) > 0 {
-			target.URL.Opaque = target.URL.Opaque + "?" + target.URL.Query().Encode()
+		if len(target.In.URL.Query()) > 0 {
+			target.Out.URL.Opaque = target.Out.URL.Opaque + "?" + target.In.URL.Query().Encode()
 		}
 	}
-	target.URL.RawQuery = ""
+	target.Out.URL.RawQuery = ""
 
-	setRequestXRequestStart(target)
-	target.Header.Del(router_http.CfAppInstance)
+	setRequestXRequestStart(target.Out)
+	target.Out.Header.Del(router_http.CfAppInstance)
+
+	if target.In.Header.Get("Expect") == "100-Continue" && !p.config.KeepAlive100ContinueRequests {
+		target.Out.Header.Set("Connection", "close")
+	}
+
+	target.Out.Header["X-Forwarded-For"] = target.In.Header["X-Forwarded-For"]
+	target.Out.Header["Forwarded"] = target.In.Header["Forwarded"]
+	target.SetXForwarded()
+	target.Out.Header["X-Forwarded-Proto"] = target.In.Header["X-Forwarded-Proto"]
 }
 
 func setRequestXRequestStart(request *http.Request) {

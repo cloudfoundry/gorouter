@@ -552,6 +552,36 @@ var _ = Describe("Proxy", func() {
 			})
 		})
 
+		Describe("100-Continue", func() {
+			Context("when the request contains 'Expect: 100-Continue' header", func() {
+				JustBeforeEach(func() {
+					req.Header.Set("Expect", "100-Continue")
+				})
+
+				Context("when config has KeepAlive100ContinueRequests set to true", func() {
+					BeforeEach(func() {
+						conf.KeepAlive100ContinueRequests = true
+					})
+
+					It("should not set 'Connection: close'", func() {
+						Expect(getProxiedHeaders(req).Get("Connection")).To(BeEmpty())
+					})
+				})
+
+				Context("when config has KeepAlive100ContinueRequests set to false", func() {
+					It("should set 'Connection: close'", func() {
+						Expect(getProxiedHeaders(req).Get("Connection")).To(Equal("close"))
+					})
+				})
+			})
+
+			Context("when the request does not contain 'Expect: 100-Continue' header", func() {
+				It("should not set 'Connection: close'", func() {
+					Expect(getProxiedHeaders(req).Get("Connection")).To(BeEmpty())
+				})
+			})
+		})
+
 		Describe("X-Forwarded-Client-Cert", func() {
 			Context("when gorouter is configured with ForwardedClientCert == sanitize_set", func() {
 				BeforeEach(func() {
