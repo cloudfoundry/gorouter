@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
@@ -19,8 +18,6 @@ import (
 )
 
 type NginxApp struct {
-	mutex sync.Mutex
-
 	port         uint16      // app listening port
 	rPort        uint16      // router listening port
 	urls         []route.Uri // host registered host name
