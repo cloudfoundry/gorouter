@@ -23,7 +23,6 @@ type NginxApp struct {
 	urls         []route.Uri // host registered host name
 	mbusClient   *nats.Conn
 	tags         map[string]string
-	stopped      bool
 	routeService string
 	session      *gexec.Session
 	configFile   *os.File
@@ -52,10 +51,11 @@ func NewNginxApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map
 	t, err := template.ParseFiles(filepath.Join(nginxAppDir, "nginx.conf"))
 	Expect(err).NotTo(HaveOccurred())
 
-	t.Execute(app.configFile, map[string]interface{}{
+	err = t.Execute(app.configFile, map[string]interface{}{
 		"Port":       port,
 		"ServerRoot": filepath.Join(nginxAppDir, "public"),
 	})
+	Expect(err).NotTo(HaveOccurred())
 	app.session, err = gexec.Start(exec.Command("nginx", "-c", app.configFile.Name()), GinkgoWriter, GinkgoWriter)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -83,11 +83,13 @@ func (a *NginxApp) Register() {
 	}
 
 	b, _ := json.Marshal(rm)
-	a.mbusClient.Publish("router.register", b)
+	err := a.mbusClient.Publish("router.register", b)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func (a *NginxApp) Stop() {
 	a.session.Terminate()
 	Eventually(a.session).Should(gexec.Exit())
-	os.Remove(a.configFile.Name())
+	err := os.Remove(a.configFile.Name())
+	Expect(err).NotTo(HaveOccurred())
 }
