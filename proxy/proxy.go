@@ -122,11 +122,28 @@ func NewProxy(
 	)
 
 	rproxy := &httputil.ReverseProxy{
-		Rewrite:        p.setupProxyRequest,
+		Director:       p.setupProxyRequest,
 		Transport:      prt,
 		FlushInterval:  50 * time.Millisecond,
 		BufferPool:     p.bufferPool,
 		ModifyResponse: p.modifyResponse,
+	}
+
+	// by default, we should close 100-continue requests for safety
+	// this requires a second proxy because Director and Rewrite cannot coexist
+	// additionally, Director() is called before hop-by-hop headers are sanitized
+	// whereas Rewrite is after, and this is where `Connection: close` can be added
+	expect100ContinueRProxy := &httputil.ReverseProxy{
+		Rewrite:        p.setupProxyRequestClose100Continue,
+		Transport:      prt,
+		FlushInterval:  50 * time.Millisecond,
+		BufferPool:     p.bufferPool,
+		ModifyResponse: p.modifyResponse,
+	}
+
+	// if we want to not force close 100-continue requests, use the normal rproxy
+	if cfg.KeepAlive100ContinueRequests {
+		expect100ContinueRProxy = rproxy
 	}
 
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, errorWriter)
@@ -178,7 +195,7 @@ func NewProxy(
 	})
 	n.Use(routeServiceHandler)
 	n.Use(p)
-	n.UseHandler(rproxy)
+	n.Use(handlers.NewProxyPicker(rproxy, expect100ContinueRProxy))
 
 	return n
 }
@@ -237,7 +254,34 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 	reqInfo.AppRequestFinishedAt = time.Now()
 }
 
-func (p *proxy) setupProxyRequest(target *httputil.ProxyRequest) {
+func (p *proxy) setupProxyRequest(target *http.Request) {
+	reqInfo, err := handlers.ContextRequestInfo(target)
+	if err != nil {
+		p.logger.Panic("request-info-err", zap.Error(err))
+		return
+	}
+	reqInfo.BackendReqHeaders = target.Header
+
+	target.URL.Scheme = "http"
+	target.URL.Host = target.Host
+	target.URL.ForceQuery = false
+	target.URL.Opaque = target.RequestURI
+
+	if strings.HasPrefix(target.RequestURI, "//") {
+		path := escapePathAndPreserveSlashes(target.URL.Path)
+		target.URL.Opaque = "//" + target.Host + path
+
+		if len(target.URL.Query()) > 0 {
+			target.URL.Opaque = target.URL.Opaque + "?" + target.URL.Query().Encode()
+		}
+	}
+	target.URL.RawQuery = ""
+
+	setRequestXRequestStart(target)
+	target.Header.Del(router_http.CfAppInstance)
+}
+
+func (p *proxy) setupProxyRequestClose100Continue(target *httputil.ProxyRequest) {
 	reqInfo, err := handlers.ContextRequestInfo(target.In)
 	if err != nil {
 		p.logger.Panic("request-info-err", zap.Error(err))
@@ -263,9 +307,8 @@ func (p *proxy) setupProxyRequest(target *httputil.ProxyRequest) {
 	setRequestXRequestStart(target.Out)
 	target.Out.Header.Del(router_http.CfAppInstance)
 
-	if target.In.Header.Get("Expect") == "100-Continue" && !p.config.KeepAlive100ContinueRequests {
-		target.Out.Header.Set("Connection", "close")
-	}
+	// always set connection close on 100-continue requests
+	target.Out.Header.Set("Connection", "close")
 
 	target.Out.Header["X-Forwarded-For"] = target.In.Header["X-Forwarded-For"]
 	target.Out.Header["Forwarded"] = target.In.Header["Forwarded"]

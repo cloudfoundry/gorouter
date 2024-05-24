@@ -569,8 +569,112 @@ var _ = Describe("Proxy", func() {
 				})
 
 				Context("when config has KeepAlive100ContinueRequests set to false", func() {
+					BeforeEach(func() {
+						conf.KeepAlive100ContinueRequests = false
+					})
+
 					It("should set 'Connection: close'", func() {
 						Expect(getProxiedHeaders(req).Get("Connection")).To(Equal("close"))
+					})
+					Describe("X-Forwarded-For", func() {
+						It("sets X-Forwarded-For", func() {
+							Expect(getProxiedHeaders(req).Get("X-Forwarded-For")).To(Equal("127.0.0.1"))
+						})
+						Context("when the header is already set", func() {
+							It("appends the client IP", func() {
+								req.Header.Add("X-Forwarded-For", "1.2.3.4")
+								Expect(getProxiedHeaders(req).Get("X-Forwarded-For")).To(Equal("1.2.3.4, 127.0.0.1"))
+							})
+						})
+					})
+
+					Describe("X-Request-Start", func() {
+						It("appends X-Request-Start", func() {
+							Expect(getProxiedHeaders(req).Get("X-Request-Start")).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
+						})
+
+						Context("when the header is already set", func() {
+							It("does not modify the header", func() {
+								req.Header.Add("X-Request-Start", "") // impl cannot just check for empty string
+								req.Header.Add("X-Request-Start", "user-set2")
+								Expect(getProxiedHeaders(req)["X-Request-Start"]).To(Equal([]string{"", "user-set2"}))
+							})
+						})
+					})
+
+					Describe("X-CF-InstanceID", func() {
+						Context("when the instance is registered with an instance id", func() {
+							BeforeEach(func() {
+								extraRegisterCfg = []test_util.RegisterConfig{{InstanceId: "fake-instance-id"}}
+							})
+							It("sets the X-CF-InstanceID header", func() {
+								Expect(getProxiedHeaders(req).Get(router_http.CfInstanceIdHeader)).To(Equal("fake-instance-id"))
+							})
+						})
+
+						Context("when the instance is not registered with an explicit instance id", func() {
+							It("sets the X-CF-InstanceID header with the backend host:port", func() {
+								Expect(getProxiedHeaders(req).Get(router_http.CfInstanceIdHeader)).To(MatchRegexp(`^\d+(\.\d+){3}:\d+$`))
+							})
+						})
+					})
+
+					Describe("Content-type", func() {
+						It("does not set the Content-Type header", func() {
+							Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+						})
+
+						Context("when the response body is XML", func() {
+							BeforeEach(func() {
+								fakeResponseBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+							})
+							It("still does not set the Content-Type header", func() {
+								Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+							})
+						})
+
+						Context("when the response code is 204", func() {
+							BeforeEach(func() {
+								fakeResponseCode = http.StatusNoContent
+							})
+							It("still does not set the Content-Type header", func() {
+								Expect(getProxiedHeaders(req)).NotTo(HaveKey("Content-Type"))
+							})
+						})
+					})
+					Describe("X-Forwarded-Client-Cert", func() {
+						Context("when gorouter is configured with ForwardedClientCert == sanitize_set", func() {
+							BeforeEach(func() {
+								conf.ForwardedClientCert = config.SANITIZE_SET
+							})
+							It("removes xfcc header", func() {
+								req.Header.Add("X-Forwarded-Client-Cert", "foo")
+								req.Header.Add("X-Forwarded-Client-Cert", "bar")
+								Expect(getProxiedHeaders(req).Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+							})
+						})
+
+						Context("when ForwardedClientCert is set to forward but the request is not mTLS", func() {
+							BeforeEach(func() {
+								conf.ForwardedClientCert = config.FORWARD
+							})
+							It("removes xfcc header", func() {
+								req.Header.Add("X-Forwarded-Client-Cert", "foo")
+								req.Header.Add("X-Forwarded-Client-Cert", "bar")
+								Expect(getProxiedHeaders(req).Get("X-Forwarded-Client-Cert")).To(BeEmpty())
+							})
+						})
+
+						Context("when ForwardedClientCert is set to always_forward", func() {
+							BeforeEach(func() {
+								conf.ForwardedClientCert = config.ALWAYS_FORWARD
+							})
+							It("leaves the xfcc header intact", func() {
+								req.Header.Add("X-Forwarded-Client-Cert", "foo")
+								req.Header.Add("X-Forwarded-Client-Cert", "bar")
+								Expect(getProxiedHeaders(req)).To(HaveKeyWithValue("X-Forwarded-Client-Cert", []string{"foo", "bar"}))
+							})
+						})
 					})
 				})
 			})
