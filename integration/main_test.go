@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -1129,6 +1130,135 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
+	Describe("100-continue", func() {
+		var (
+			runningApp *common.NginxApp
+			mbusClient *nats.Conn
+			done       chan bool
+			appRoute   string
+			goRoutine  sync.WaitGroup
+		)
+
+		BeforeEach(func() {
+			cfg := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, routeServiceServerPort, natsPort)
+
+			configDrainSetup(cfg, 0, 0, 0)
+
+			cfg.SuspendPruningIfNatsUnavailable = false
+			cfg.LoadBalancerHealthyThreshold = 0
+			cfg.OAuth = config.OAuthConfig{
+				TokenEndpoint: "127.0.0.1",
+				Port:          8443,
+				ClientName:    "client-id",
+				ClientSecret:  "client-secret",
+				CACerts:       caCertsPath,
+			}
+			cfg.Backends.MaxConns = 100
+			cfg.MaxIdleConns = 100
+			cfg.MaxIdleConnsPerHost = 100
+			cfg.DisableKeepAlives = false
+
+			writeConfig(cfg, cfgFile)
+			var err error
+			mbusClient, err = newMessageBus(cfg)
+			Expect(err).ToNot(HaveOccurred())
+			gorouterSession = startGorouterSession(cfgFile)
+
+			appRoute = "test." + test_util.LocalhostDNS
+			runningApp = common.NewNginxApp([]route.Uri{route.Uri(appRoute)}, proxyPort, mbusClient, nil, "")
+			runningApp.Register()
+			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", cfg.Status.User, cfg.Status.Pass, localIP, statusRoutesPort)
+
+			heartbeatInterval := 200 * time.Millisecond
+			runningTicker := time.NewTicker(heartbeatInterval)
+			done = make(chan bool, 1)
+			goRoutine.Add(1)
+			go func() {
+				defer goRoutine.Done()
+				for {
+					select {
+					case <-runningTicker.C:
+						runningApp.Register()
+					case <-done:
+						return
+					}
+				}
+			}()
+			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+		})
+
+		AfterEach(func() {
+			goRoutine.Wait()
+			runningApp.Stop()
+		})
+
+		var testRequest = func(body string) int {
+			conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", proxyPort))
+			Expect(err).ToNot(HaveOccurred())
+			conn.SetReadDeadline(time.Now().Add(20 * time.Second))
+
+			connWriter := bufio.NewWriter(conn)
+
+			connWriter.Write([]byte(body))
+			connWriter.Flush()
+
+			connReader := bufio.NewReader(conn)
+			resp, err := http.ReadResponse(connReader, &http.Request{})
+			Expect(err).NotTo(HaveOccurred())
+			return resp.StatusCode
+		}
+
+		It("resets response for new request", func() {
+			defer func() { done <- true }()
+
+			// Nginx app doesn't accept OPTIONS method
+			badRequestsDone := make(chan bool, 1)
+			badRequestsStarted := make(chan bool, 1)
+			defer func() { <-badRequestsDone }()
+			go func() {
+				defer close(badRequestsDone)
+				defer GinkgoRecover()
+				for i := 0; i < 100; i++ {
+					statusCode := testRequest(
+						"OPTIONS / HTTP/1.1\r\n" +
+							fmt.Sprintf("Host: %s\r\n", appRoute) +
+							"Expect: 100-Continue\r\n" +
+							"Content-Type: text/plain\r\n" +
+							fmt.Sprintf("Content-Length: %d\r\n", 5) +
+							"\r\n" +
+							"hello",
+					)
+					Expect(statusCode).To(Equal(http.StatusMethodNotAllowed))
+					time.Sleep(50 * time.Millisecond)
+					if i == 0 {
+						close(badRequestsStarted)
+					}
+				}
+			}()
+
+			Eventually(badRequestsStarted).Should(BeClosed())
+
+			goodRequestsDone := make(chan bool, 1)
+			defer func() { <-badRequestsDone }()
+			go func() {
+				defer close(goodRequestsDone)
+				defer GinkgoRecover()
+				for i := 0; i < 10; i++ {
+					statusCode := testRequest(
+						"GET / HTTP/1.1\r\n" +
+							fmt.Sprintf("Host: %s\r\n", appRoute) +
+							"\r\n",
+					)
+					Expect(statusCode).To(Equal(http.StatusOK))
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			Eventually(goodRequestsDone, "10s", "1s").Should(BeClosed())
+			Eventually(badRequestsDone, "10s", "1s").Should(BeClosed())
+		})
+	})
+
 	Describe("caching", func() {
 		var (
 			goRouterClient    *http.Client
@@ -1328,7 +1458,11 @@ func newMessageBus(c *config.Config) (*nats.Conn, error) {
 	return options.Connect()
 }
 
-func appRegistered(routesUri string, app *common.TestApp) bool {
+type registeredApp interface {
+	Urls() []route.Uri
+}
+
+func appRegistered(routesUri string, app registeredApp) bool {
 	routeFound, err := routeExists(routesUri, string(app.Urls()[0]))
 	return err == nil && routeFound
 }

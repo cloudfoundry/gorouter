@@ -454,10 +454,11 @@ type Config struct {
 	LoadBalance             string `yaml:"balancing_algorithm,omitempty"`
 	LoadBalanceAZPreference string `yaml:"balancing_algorithm_az_preference,omitempty"`
 
-	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
-	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
-	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
-	MaxHeaderBytes      int  `yaml:"max_header_bytes"`
+	DisableKeepAlives            bool `yaml:"disable_keep_alives"`
+	MaxIdleConns                 int  `yaml:"max_idle_conns,omitempty"`
+	MaxIdleConnsPerHost          int  `yaml:"max_idle_conns_per_host,omitempty"`
+	MaxHeaderBytes               int  `yaml:"max_header_bytes"`
+	KeepAlive100ContinueRequests bool `yaml:"keep_alive_100_continue_requests"`
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 
