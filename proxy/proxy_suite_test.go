@@ -36,25 +36,26 @@ import (
 //go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper
 
 var (
-	fakeRegistry            *fake_registry.SpyMetricsRegistry
-	r                       *registry.RouteRegistry
-	p                       http.Handler
-	f                       *os.File
-	fakeReporter            *fakes.FakeProxyReporter
-	conf                    *config.Config
-	proxyServer             net.Listener
-	al                      accesslog.AccessLogger
-	ls                      *fakelogsender.FakeLogSender
-	crypto                  secure.Crypto
-	testLogger              logger.Logger
-	cryptoPrev              secure.Crypto
-	caCertPool              *x509.CertPool
-	recommendHTTPS          bool
-	healthStatus            *health.Health
-	fakeEmitter             *fake.FakeEventEmitter
-	fakeRouteServicesClient *sharedfakes.RoundTripper
-	skipSanitization        func(req *http.Request) bool
-	ew                      = errorwriter.NewPlaintextErrorWriter()
+	fakeRegistry              *fake_registry.SpyMetricsRegistry
+	r                         *registry.RouteRegistry
+	p                         http.Handler
+	f                         *os.File
+	fakeReporter              *fakes.FakeProxyReporter
+	conf                      *config.Config
+	proxyServer               net.Listener
+	al                        accesslog.AccessLogger
+	ls                        *fakelogsender.FakeLogSender
+	crypto                    secure.Crypto
+	testLogger                logger.Logger
+	cryptoPrev                secure.Crypto
+	caCertPool                *x509.CertPool
+	recommendHTTPS            bool
+	strictSignatureValidation bool
+	healthStatus              *health.Health
+	fakeEmitter               *fake.FakeEventEmitter
+	fakeRouteServicesClient   *sharedfakes.RoundTripper
+	skipSanitization          func(req *http.Request) bool
+	ew                        = errorwriter.NewPlaintextErrorWriter()
 )
 
 func TestProxy(t *testing.T) {
@@ -85,6 +86,7 @@ var _ = BeforeEach(func() {
 	conf.DisableKeepAlives = false
 	fakeReporter = &fakes.FakeProxyReporter{}
 	fakeRegistry = fake_registry.NewMetricsRegistry()
+	strictSignatureValidation = false
 	skipSanitization = func(*http.Request) bool { return false }
 })
 
@@ -124,6 +126,7 @@ var _ = JustBeforeEach(func() {
 		crypto,
 		cryptoPrev,
 		recommendHTTPS,
+		strictSignatureValidation,
 	)
 
 	proxyServer, err = net.Listen("tcp", "127.0.0.1:0")

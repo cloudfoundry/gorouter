@@ -28,6 +28,7 @@ type RouteServiceConfig struct {
 	cryptoPrev                       secure.Crypto
 	logger                           logger.Logger
 	recommendHttps                   bool
+	strictSignatureValidation        bool
 }
 
 type RequestToSendToRouteService struct {
@@ -54,6 +55,7 @@ func NewRouteServiceConfig(
 	crypto secure.Crypto,
 	cryptoPrev secure.Crypto,
 	recommendHttps bool,
+	strictSignatureValidation bool,
 ) *RouteServiceConfig {
 	return &RouteServiceConfig{
 		routeServiceEnabled:              enabled,
@@ -64,6 +66,7 @@ func NewRouteServiceConfig(
 		cryptoPrev:                       cryptoPrev,
 		logger:                           logger,
 		recommendHttps:                   recommendHttps,
+		strictSignatureValidation:        strictSignatureValidation,
 	}
 }
 
@@ -73,6 +76,10 @@ func (rs *RouteServiceConfig) RouteServiceEnabled() bool {
 
 func (rs *RouteServiceConfig) RouteServiceRecommendHttps() bool {
 	return rs.recommendHttps
+}
+
+func (rs *RouteServiceConfig) StrictSignatureValidation() bool {
+	return rs.strictSignatureValidation
 }
 
 func (rs *RouteServiceConfig) RouteServiceHairpinning() bool {

@@ -162,6 +162,7 @@ func main() {
 		crypto,
 		cryptoPrev,
 		c.RouteServiceRecommendHttps,
+		c.RouteServiceConfig.StrictSignatureValidation,
 	)
 
 	// These TLS configs are just tempaltes. If you add other keys you will
