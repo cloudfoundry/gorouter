@@ -80,6 +80,7 @@ var _ = Describe("Route Services", func() {
 			crypto,
 			nil,
 			recommendHTTPS,
+			strictSignatureValidation,
 		)
 		reqArgs, err := config.CreateRequest("", forwardedUrl)
 		Expect(err).ToNot(HaveOccurred())

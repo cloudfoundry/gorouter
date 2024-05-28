@@ -63,6 +63,7 @@ var _ = Describe("Proxy Unit tests", func() {
 				crypto,
 				cryptoPrev,
 				false,
+				false,
 			)
 			varz := test_helpers.NullVarz{}
 			sender := new(fakes.MetricSender)

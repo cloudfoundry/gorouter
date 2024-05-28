@@ -62,6 +62,33 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	routeServiceURL := reqInfo.RoutePool.RouteServiceUrl()
 	if routeServiceURL == "" {
 		// No route service is associated with this request
+		if r.config.StrictSignatureValidation() && len(req.Header.Values(routeservice.HeaderKeySignature)) > 0 {
+			// Someone is still setting the header, possibly trying to impersonate a route service
+			// request. We will validate the request to ensure the header is valid.
+			rreq := newRequestReceivedFromRouteService("", req.Header)
+			_, err := r.config.ValidateRequest(rreq)
+			if err != nil {
+				if errors.Is(err, routeservice.ErrExpired) {
+					AddRouterErrorHeader(rw, "expired_route_service_signature")
+					r.errorWriter.WriteError(
+						rw,
+						http.StatusGatewayTimeout,
+						fmt.Sprintf("Failed to validate Route Service Signature: %s", err.Error()),
+						logger,
+					)
+				} else {
+					AddRouterErrorHeader(rw, "invalid_route_service_signature")
+					r.errorWriter.WriteError(
+						rw,
+						http.StatusBadRequest,
+						"invalid route service signature detected",
+						logger,
+					)
+				}
+				return
+			}
+		}
+
 		next(rw, req)
 		return
 	}

@@ -166,9 +166,10 @@ type BackendConfig struct {
 }
 
 type RouteServiceConfig struct {
-	ClientAuthCertificate tls.Certificate
-	MaxAttempts           int              `yaml:"max_attempts"`
-	TLSPem                `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
+	ClientAuthCertificate     tls.Certificate
+	MaxAttempts               int              `yaml:"max_attempts"`
+	StrictSignatureValidation bool             `yaml:"strict_signature_validation"`
+	TLSPem                    `yaml:",inline"` // embed to get cert_chain and private_key for client authentication
 }
 
 type LoggingConfig struct {
