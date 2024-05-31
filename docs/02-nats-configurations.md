@@ -1,3 +1,20 @@
+---
+title: NATS Configuration
+expires_at: never
+tags: [routing-release,gorouter]
+---
+
+<!-- vim-markdown-toc GFM -->
+
+* [NATS Configuration](#nats-configuration)
+  * [Consistency over Availability:](#consistency-over-availability)
+  * [Relation between DropletStaleThreshold, NATs PingInterval and MinimumRegistrationInterval](#relation-between-dropletstalethreshold-nats-pinginterval-and-minimumregistrationinterval)
+    * [Definitions:](#definitions)
+
+<!-- vim-markdown-toc -->
+
+# NATS Configuration
+
 ## Consistency over Availability:
 
 In the context of Cloud Foundry, when an application instance crashes or is stopped as a result of the app being stopped or scaled down, the allocated IP and port are released to the pool. The same IP and port may then be assigned to a new instance of another application, as when a new app is started, scaled up, or a crashed instance is recreated. Under normal operation, each of these events will result in a change to Gorouter's routing table. Updates to the routing table depend on a message being sent by a client to NATS (e.g. Route Emitter is responsible for sending changes to routing data for apps running on Diego), and on Gorouter fetching the message from NATS. 
@@ -8,7 +25,9 @@ To prevent stale routes, Gorouter is by default optimized for consistency over a
 
 If an operator would prefer to favor availability over consistency, the configuration property [`suspend_pruning_if_nats_unavailable`](../config/config.go#L203) can be used to ignore route TTL and prevent pruning in the event that Gorouter cannot connect to NATS. This config option will also set max reconnect in the NATS client to -1 (no limit) which prevents Gorouter from crashing and losing its in-memory routing table. This configuration option is set to false by default. 
 
->**Warning**: There is a significant probability of routing to an incorrect backend endpoint in the case of port re-use. Suspending route pruning should be used with caution.
+> [!WARNING]
+>
+> There is a significant probability of routing to an incorrect backend endpoint in the case of port re-use. Suspending route pruning should be used with caution.
 
 ## Relation between DropletStaleThreshold, NATs PingInterval and MinimumRegistrationInterval
 
@@ -44,4 +63,4 @@ minimumRegistrationInterval) - (NATS Timeout * NumberOfNatsServers))/3
  Currently we do not allow the operator to set the value for
  DropletStaleThreshold and StartResponseDelayInterval, hence there is no real
  need for the above equation to calculate the ping interval yet. After long
- consideration of different scenarios we have decided configure interval with value [`20` seconds](https://github.com/cloudfoundry/gorouter/blob/master/config/config.go#L199).
+ consideration of different scenarios we have decided configure interval with value [`20` seconds](https://github.com/cloudfoundry/gorouter/blob/main/config/config.go#L199).

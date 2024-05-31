@@ -1,4 +1,23 @@
-# Development Guide for Gorouter
+---
+title: Development Guide
+expires_at: never
+tags: [routing-release,gorouter]
+---
+
+<!-- vim-markdown-toc GFM -->
+
+* [Development Guide](#development-guide)
+  * [Golang TCP Networking Basics](#golang-tcp-networking-basics)
+  * [General Gorouter Architecture](#general-gorouter-architecture)
+  * [Ifrit processes](#ifrit-processes)
+  * [What does Gorouter do?](#what-does-gorouter-do)
+  * [What are all these extra components in the Gorouter request flow?](#what-are-all-these-extra-components-in-the-gorouter-request-flow)
+    * [Negroni Handlers](#negroni-handlers)
+    * [ProxyRoundTripper](#proxyroundtripper)
+
+<!-- vim-markdown-toc -->
+
+# Development Guide
 
 Recommended reading before diving into Gorouter code:
 - [Hypertext Transfer Protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Message_format)
