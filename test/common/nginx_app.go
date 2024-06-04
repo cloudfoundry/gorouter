@@ -2,11 +2,15 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"html/template"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
@@ -59,7 +63,22 @@ func NewNginxApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map
 	app.session, err = gexec.Start(exec.Command("nginx", "-c", app.configFile.Name()), GinkgoWriter, GinkgoWriter)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = app.waitUntilNginxUp()
+	Expect(err).NotTo(HaveOccurred())
 	return app
+}
+
+func (a *NginxApp) waitUntilNginxUp() error {
+	maxWait := 10
+	for i := 0; i < maxWait; i++ {
+		time.Sleep(500 * time.Millisecond)
+		_, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", a.port))
+		if err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("Waited too long for Nginx to start")
 }
 
 func (a *NginxApp) Urls() []route.Uri {
