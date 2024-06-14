@@ -497,6 +497,16 @@ var _ = Describe("Proxy", func() {
 			})
 		})
 
+		Describe("X-Forwarded-Host", func() {
+			Context("for expect-100-continue requests", func() {
+				It("preserves the X-Forwarded-Host header", func() {
+					req.Header.Add("X-Forwarded-Host", "foobar.com")
+					req.Header.Add("Expect", "100-continue")
+					Expect(getProxiedHeaders(req).Get("X-Forwarded-Host")).To(Equal("foobar.com"))
+				})
+			})
+		})
+
 		Describe("X-Request-Start", func() {
 			It("appends X-Request-Start", func() {
 				Expect(getProxiedHeaders(req).Get("X-Request-Start")).To(MatchRegexp("^\\d{10}\\d{3}$")) // unix timestamp millis
