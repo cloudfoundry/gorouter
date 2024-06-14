@@ -312,8 +312,11 @@ func (p *proxy) setupProxyRequestClose100Continue(target *httputil.ProxyRequest)
 
 	target.Out.Header["X-Forwarded-For"] = target.In.Header["X-Forwarded-For"]
 	target.Out.Header["Forwarded"] = target.In.Header["Forwarded"]
+	// Takes care of setting the X-Forwarded-For header properly. Also sets the X-Forwarded-Proto
+	// which we overwrite again.
 	target.SetXForwarded()
 	target.Out.Header["X-Forwarded-Proto"] = target.In.Header["X-Forwarded-Proto"]
+	target.Out.Header["X-Forwarded-Host"] = target.In.Header["X-Forwarded-Host"]
 }
 
 func setRequestXRequestStart(request *http.Request) {
