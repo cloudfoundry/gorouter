@@ -21,7 +21,7 @@ tags: [routing-release,gorouter]
 
 Recommended reading before diving into Gorouter code:
 - [Hypertext Transfer Protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Message_format)
-- [How to use interfaces in Go](http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go)
+- [How to use interfaces in Go](https://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go)
 - [Golang Concurrency](http://www.golangbootcamp.com/book/concurrency)
 - [http.Transport.RoundTrip](https://golang.org/pkg/net/http/#Transport.RoundTrip)
 - [http.RoundTripper](https://golang.org/pkg/net/http/#RoundTripper)
