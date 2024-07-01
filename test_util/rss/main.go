@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"code.cloudfoundry.org/gorouter/test_util/rss/commands"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 var keyFlag = cli.StringFlag{

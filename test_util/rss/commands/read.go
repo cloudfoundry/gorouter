@@ -7,7 +7,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util/rss/common"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 func ReadSignature(c *cli.Context) {
