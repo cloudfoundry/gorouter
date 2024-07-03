@@ -7,16 +7,15 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"runtime"
+	"strings"
+	"time"
 
 	"go.step.sm/crypto/pemutil"
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
 	"gopkg.in/yaml.v2"
-
-	"runtime"
-	"strings"
-	"time"
 
 	"code.cloudfoundry.org/localip"
 )
@@ -37,11 +36,13 @@ const (
 	REDACT_QUERY_PARMS_HASH   string = "hash"
 )
 
-var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
-var AZPreferences = []string{AZ_PREF_NONE, AZ_PREF_LOCAL}
-var AllowedShardingModes = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
-var AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
-var AllowedQueryParmRedactionModes = []string{REDACT_QUERY_PARMS_NONE, REDACT_QUERY_PARMS_ALL, REDACT_QUERY_PARMS_HASH}
+var (
+	LoadBalancingStrategies         = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
+	AZPreferences                   = []string{AZ_PREF_NONE, AZ_PREF_LOCAL}
+	AllowedShardingModes            = []string{SHARD_ALL, SHARD_SEGMENTS, SHARD_SHARED_AND_SEGMENTS}
+	AllowedForwardedClientCertModes = []string{ALWAYS_FORWARD, FORWARD, SANITIZE_SET}
+	AllowedQueryParmRedactionModes  = []string{REDACT_QUERY_PARMS_NONE, REDACT_QUERY_PARMS_ALL, REDACT_QUERY_PARMS_HASH}
+)
 
 type StringSet map[string]struct{}
 
@@ -585,6 +586,7 @@ func (c *Config) Process() error {
 		certificate, err := tls.X509KeyPair([]byte(c.Backends.CertChain), []byte(c.Backends.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			//lint:ignore SA1006 - for consistency sake
 			return fmt.Errorf(errMsg)
 		}
 		c.Backends.ClientAuthCertificate = certificate
@@ -594,6 +596,7 @@ func (c *Config) Process() error {
 		certificate, err := tls.X509KeyPair([]byte(c.RouteServiceConfig.CertChain), []byte(c.RouteServiceConfig.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			//lint:ignore SA1006 - for consistency sake
 			return fmt.Errorf(errMsg)
 		}
 		c.RouteServiceConfig.ClientAuthCertificate = certificate
@@ -603,6 +606,7 @@ func (c *Config) Process() error {
 		certificate, err := tls.X509KeyPair([]byte(c.RoutingApi.CertChain), []byte(c.RoutingApi.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+			//lint:ignore SA1006 - for consistency sake
 			return fmt.Errorf(errMsg)
 		}
 		c.RoutingApi.ClientAuthCertificate = certificate
@@ -619,6 +623,7 @@ func (c *Config) Process() error {
 		certificate, err := tls.X509KeyPair([]byte(c.Nats.CertChain), []byte(c.Nats.PrivateKey))
 		if err != nil {
 			errMsg := fmt.Sprintf("Error loading NATS key pair: %s", err.Error())
+			//lint:ignore SA1006 - for consistency sake
 			return fmt.Errorf(errMsg)
 		}
 		c.Nats.ClientAuthCertificate = certificate
@@ -698,6 +703,7 @@ func (c *Config) Process() error {
 			certificate, err := tls.X509KeyPair([]byte(v.CertChain), []byte(v.PrivateKey))
 			if err != nil {
 				errMsg := fmt.Sprintf("Error loading key pair: %s", err.Error())
+				//lint:ignore SA1006 - for consistency sake
 				return fmt.Errorf(errMsg)
 			}
 			c.SSLCertificates = append(c.SSLCertificates, certificate)
@@ -711,6 +717,7 @@ func (c *Config) Process() error {
 	} else {
 		if c.DisableHTTP {
 			errMsg := fmt.Sprintf("neither http nor https listener is enabled: router.enable_ssl: %t, router.disable_http: %t", c.EnableSSL, c.DisableHTTP)
+			//lint:ignore SA1006 - for consistency sake
 			return fmt.Errorf(errMsg)
 		}
 	}
@@ -729,6 +736,7 @@ func (c *Config) Process() error {
 	}
 	if !validLb {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
@@ -741,11 +749,13 @@ func (c *Config) Process() error {
 	}
 	if !validAZPref {
 		errMsg := fmt.Sprintf("Invalid load balancing AZ preference %s. Allowed values are %s", c.LoadBalanceAZPreference, AZPreferences)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
 	if c.LoadBalancerHealthyThreshold < 0 {
 		errMsg := fmt.Sprintf("Invalid load balancer healthy threshold: %s", c.LoadBalancerHealthyThreshold)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
@@ -758,6 +768,7 @@ func (c *Config) Process() error {
 	}
 	if !validForwardedClientCertMode {
 		errMsg := fmt.Sprintf("Invalid forwarded client cert mode: %s. Allowed values are %s", c.ForwardedClientCert, AllowedForwardedClientCertModes)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
@@ -770,6 +781,7 @@ func (c *Config) Process() error {
 	}
 	if !validShardMode {
 		errMsg := fmt.Sprintf("Invalid sharding mode: %s. Allowed values are %s", c.RoutingTableShardingMode, AllowedShardingModes)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
@@ -786,6 +798,7 @@ func (c *Config) Process() error {
 	}
 	if !validQueryParamRedaction {
 		errMsg := fmt.Sprintf("Invalid query param redaction mode: %s. Allowed values are %s", c.Logging.RedactQueryParams, AllowedQueryParmRedactionModes)
+		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)
 	}
 
@@ -901,11 +914,12 @@ func convertCipherStringToInt(cipherStrs []string, cipherMap map[string]uint16) 
 		if val, ok := cipherMap[cipher]; ok {
 			ciphers = append(ciphers, val)
 		} else {
-			var supportedCipherSuites = []string{}
+			supportedCipherSuites := []string{}
 			for key := range cipherMap {
 				supportedCipherSuites = append(supportedCipherSuites, key)
 			}
 			errMsg := fmt.Sprintf("Invalid cipher string configuration: %s, please choose from %v", cipher, supportedCipherSuites)
+			//lint:ignore SA1006 - for consistency sake
 			return nil, fmt.Errorf(errMsg)
 		}
 	}
