@@ -60,24 +60,25 @@ type ProxyRoundTripper interface {
 }
 
 type Endpoint struct {
-	ApplicationId        string
-	AvailabilityZone     string
-	addr                 string
-	Protocol             string
-	Tags                 map[string]string
-	ServerCertDomainSAN  string
-	PrivateInstanceId    string
-	StaleThreshold       time.Duration
-	RouteServiceUrl      string
-	PrivateInstanceIndex string
-	ModificationTag      models.ModificationTag
-	Stats                *Stats
-	IsolationSegment     string
-	useTls               bool
-	roundTripper         ProxyRoundTripper
-	roundTripperMutex    sync.RWMutex
-	UpdatedAt            time.Time
-	RoundTripperInit     sync.Once
+	ApplicationId          string
+	AvailabilityZone       string
+	addr                   string
+	Protocol               string
+	Tags                   map[string]string
+	ServerCertDomainSAN    string
+	PrivateInstanceId      string
+	StaleThreshold         time.Duration
+	RouteServiceUrl        string
+	PrivateInstanceIndex   string
+	ModificationTag        models.ModificationTag
+	Stats                  *Stats
+	IsolationSegment       string
+	useTls                 bool
+	roundTripper           ProxyRoundTripper
+	roundTripperMutex      sync.RWMutex
+	UpdatedAt              time.Time
+	RoundTripperInit       sync.Once
+	LoadBalancingAlgorithm string
 }
 
 func (e *Endpoint) RoundTripper() ProxyRoundTripper {
@@ -156,9 +157,10 @@ type EndpointPool struct {
 	NextIdx            int
 	maxConnsPerBackend int64
 
-	random    *rand.Rand
-	logger    logger.Logger
-	updatedAt time.Time
+	random      *rand.Rand
+	logger      logger.Logger
+	updatedAt   time.Time
+	LBAlgorithm string
 }
 
 type EndpointOpts struct {
@@ -177,25 +179,27 @@ type EndpointOpts struct {
 	IsolationSegment        string
 	UseTLS                  bool
 	UpdatedAt               time.Time
+	LoadBalancingAlgorithm  string
 }
 
 func NewEndpoint(opts *EndpointOpts) *Endpoint {
 	return &Endpoint{
-		ApplicationId:        opts.AppId,
-		AvailabilityZone:     opts.AvailabilityZone,
-		addr:                 fmt.Sprintf("%s:%d", opts.Host, opts.Port),
-		Protocol:             opts.Protocol,
-		Tags:                 opts.Tags,
-		useTls:               opts.UseTLS,
-		ServerCertDomainSAN:  opts.ServerCertDomainSAN,
-		PrivateInstanceId:    opts.PrivateInstanceId,
-		PrivateInstanceIndex: opts.PrivateInstanceIndex,
-		StaleThreshold:       time.Duration(opts.StaleThresholdInSeconds) * time.Second,
-		RouteServiceUrl:      opts.RouteServiceUrl,
-		ModificationTag:      opts.ModificationTag,
-		Stats:                NewStats(),
-		IsolationSegment:     opts.IsolationSegment,
-		UpdatedAt:            opts.UpdatedAt,
+		ApplicationId:          opts.AppId,
+		AvailabilityZone:       opts.AvailabilityZone,
+		addr:                   fmt.Sprintf("%s:%d", opts.Host, opts.Port),
+		Protocol:               opts.Protocol,
+		Tags:                   opts.Tags,
+		useTls:                 opts.UseTLS,
+		ServerCertDomainSAN:    opts.ServerCertDomainSAN,
+		PrivateInstanceId:      opts.PrivateInstanceId,
+		PrivateInstanceIndex:   opts.PrivateInstanceIndex,
+		StaleThreshold:         time.Duration(opts.StaleThresholdInSeconds) * time.Second,
+		RouteServiceUrl:        opts.RouteServiceUrl,
+		ModificationTag:        opts.ModificationTag,
+		Stats:                  NewStats(),
+		IsolationSegment:       opts.IsolationSegment,
+		UpdatedAt:              opts.UpdatedAt,
+		LoadBalancingAlgorithm: opts.LoadBalancingAlgorithm,
 	}
 }
 
@@ -204,11 +208,12 @@ func (e *Endpoint) IsTLS() bool {
 }
 
 type PoolOpts struct {
-	RetryAfterFailure  time.Duration
-	Host               string
-	ContextPath        string
-	MaxConnsPerBackend int64
-	Logger             logger.Logger
+	RetryAfterFailure      time.Duration
+	Host                   string
+	ContextPath            string
+	MaxConnsPerBackend     int64
+	Logger                 logger.Logger
+	LoadBalancingAlgorithm string
 }
 
 func NewPool(opts *PoolOpts) *EndpointPool {
@@ -223,6 +228,7 @@ func NewPool(opts *PoolOpts) *EndpointPool {
 		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
 		logger:             opts.Logger,
 		updatedAt:          time.Now(),
+		LBAlgorithm:        opts.LoadBalancingAlgorithm,
 	}
 }
 
@@ -371,8 +377,8 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	p.Update()
 }
 
-func (p *EndpointPool) Endpoints(logger logger.Logger, defaultLoadBalance string, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
-	switch defaultLoadBalance {
+func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
+	switch p.LBAlgorithm {
 	case config.LOAD_BALANCE_LC:
 		return NewLeastConnection(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:

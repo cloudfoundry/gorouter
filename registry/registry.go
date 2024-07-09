@@ -56,8 +56,9 @@ type RouteRegistry struct {
 
 	maxConnsPerBackend int64
 
-	EmptyPoolTimeout         time.Duration
-	EmptyPoolResponseCode503 bool
+	EmptyPoolTimeout              time.Duration
+	EmptyPoolResponseCode503      bool
+	DefaultLoadBalancingAlgorithm string
 }
 
 func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
@@ -77,6 +78,7 @@ func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.R
 	r.maxConnsPerBackend = c.Backends.MaxConns
 	r.EmptyPoolTimeout = c.EmptyPoolTimeout
 	r.EmptyPoolResponseCode503 = c.EmptyPoolResponseCode503
+	r.DefaultLoadBalancingAlgorithm = c.LoadBalance
 	return r
 }
 
@@ -123,6 +125,19 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 	}
 
 	endpointAdded := pool.Put(endpoint)
+	//Check endpoint for a load balancing algorithm. If it does exist & differs from that of the pool, then take the lb algorithm of the endpoint, otherwise keep the pools lb algorithm.
+	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != pool.LBAlgorithm {
+		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
+			pool.Lock()
+			pool.LBAlgorithm = endpoint.LoadBalancingAlgorithm
+			pool.Unlock()
+
+		} else {
+			r.logger.Error("Invalid load balancing algorithm provided for a route, keeping the pool load balancing algorithm.",
+				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				zap.String("poolLBAlgorithm", pool.LBAlgorithm))
+		}
+	}
 
 	r.SetTimeOfLastUpdate(t)
 
@@ -139,11 +154,12 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 	if pool == nil {
 		host, contextPath := splitHostAndContextPath(uri)
 		pool = route.NewPool(&route.PoolOpts{
-			Logger:             r.logger,
-			RetryAfterFailure:  r.dropletStaleThreshold / 4,
-			Host:               host,
-			ContextPath:        contextPath,
-			MaxConnsPerBackend: r.maxConnsPerBackend,
+			Logger:                 r.logger,
+			RetryAfterFailure:      r.dropletStaleThreshold / 4,
+			Host:                   host,
+			ContextPath:            contextPath,
+			MaxConnsPerBackend:     r.maxConnsPerBackend,
+			LoadBalancingAlgorithm: r.DefaultLoadBalancingAlgorithm,
 		})
 		r.byURI.Insert(routekey, pool)
 		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
