@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"code.cloudfoundry.org/localip"
+	"slices"
 )
 
 const (
@@ -558,6 +559,10 @@ func DefaultConfig() (*Config, error) {
 	return &c, nil
 }
 
+func IsLoadBalancingAlgorithmValid(lbAlgo string) bool {
+	return slices.Contains(LoadBalancingStrategies, lbAlgo)
+}
+
 func (c *Config) Process() error {
 	if c.GoMaxProcs == -1 {
 		c.GoMaxProcs = runtime.NumCPU()
@@ -727,14 +732,7 @@ func (c *Config) Process() error {
 	}
 
 	// check if valid load balancing strategy
-	validLb := false
-	for _, lb := range LoadBalancingStrategies {
-		if c.LoadBalance == lb {
-			validLb = true
-			break
-		}
-	}
-	if !validLb {
+	if !IsLoadBalancingAlgorithmValid(c.LoadBalance) {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
 		//lint:ignore SA1006 - for consistency sake
 		return fmt.Errorf(errMsg)

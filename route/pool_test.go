@@ -181,7 +181,7 @@ var _ = Describe("EndpointPool", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
 
 				Expect(pool.Put(endpoint)).To(Equal(route.UPDATED))
-				Expect(pool.Endpoints(logger, "", "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
+				Expect(pool.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 			})
 
 			Context("when modification_tag is older", func() {
@@ -196,7 +196,7 @@ var _ = Describe("EndpointPool", func() {
 					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
 					Expect(pool.Put(endpoint)).To(Equal(route.UNMODIFIED))
-					Expect(pool.Endpoints(logger, "", "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
+					Expect(pool.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 				})
 			})
 		})
@@ -302,7 +302,7 @@ var _ = Describe("EndpointPool", func() {
 					azPreference := "none"
 					connectionResetError := &net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")}
 					pool.EndpointFailed(failedEndpoint, connectionResetError)
-					i := pool.Endpoints(logger, "", "", false, azPreference, az)
+					i := pool.Endpoints(logger, "", false, azPreference, az)
 					epOne := i.Next(0)
 					epTwo := i.Next(1)
 					Expect(epOne).To(Equal(epTwo))

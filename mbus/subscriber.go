@@ -37,6 +37,7 @@ type RegistryMessage struct {
 	TLSPort                 uint16            `json:"tls_port"`
 	Tags                    map[string]string `json:"tags"`
 	Uris                    []route.Uri       `json:"uris"`
+	LoadBalancingAlgorithm  string            `json:"lb_algo"`
 }
 
 func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, error) {
@@ -70,6 +71,7 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 		IsolationSegment:        rm.IsolationSegment,
 		UseTLS:                  useTLS,
 		UpdatedAt:               updatedAt,
+		LoadBalancingAlgorithm:  rm.LoadBalancingAlgorithm,
 	}), nil
 }
 
@@ -78,7 +80,7 @@ func (rm *RegistryMessage) ValidateMessage() bool {
 	return rm.RouteServiceURL == "" || strings.HasPrefix(rm.RouteServiceURL, "https")
 }
 
-// Prefer TLS Port instead of HTTP Port in Registrty Message
+// Prefer TLS Port instead of HTTP Port in Registry Message
 func (rm *RegistryMessage) port() (uint16, bool, error) {
 	if rm.TLSPort != 0 {
 		return rm.TLSPort, true, nil

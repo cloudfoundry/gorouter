@@ -53,7 +53,7 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 		if err != nil {
 			logger.Error("request-info-err", zap.Error(err))
 		} else {
-			endpointIterator, err := EndpointIteratorForRequest(logger, r, m.cfg.LoadBalance, m.cfg.StickySessionCookieNames, m.cfg.StickySessionsForAuthNegotiate, m.cfg.LoadBalanceAZPreference, m.cfg.Zone)
+			endpointIterator, err := EndpointIteratorForRequest(logger, r, m.cfg.StickySessionCookieNames, m.cfg.StickySessionsForAuthNegotiate, m.cfg.LoadBalanceAZPreference, m.cfg.Zone)
 			if err != nil {
 				logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
 			} else {
