@@ -129,6 +129,7 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != pool.LBAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			pool.Lock()
+			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
 			pool.LBAlgorithm = endpoint.LoadBalancingAlgorithm
 			pool.Unlock()
 
