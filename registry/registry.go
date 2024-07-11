@@ -126,16 +126,16 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 
 	endpointAdded := pool.Put(endpoint)
 	//Check endpoint for a load balancing algorithm. If it does exist & differs from that of the pool, then take the lb algorithm of the endpoint, otherwise keep the pools lb algorithm.
-	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != pool.LBAlgorithm {
-		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
+	if len(endpoint.LoadBalancingAlgorithm()) > 0 && endpoint.LoadBalancingAlgorithm() != pool.LBAlgorithm {
+		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm()) {
 			pool.Lock()
 			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
-			pool.LBAlgorithm = endpoint.LoadBalancingAlgorithm
+			pool.LBAlgorithm = endpoint.LoadBalancingAlgorithm()
 			pool.Unlock()
 
 		} else {
 			r.logger.Error("Invalid load balancing algorithm provided for a route, keeping the pool load balancing algorithm.",
-				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm()),
 				zap.String("poolLBAlgorithm", pool.LBAlgorithm))
 		}
 	}
