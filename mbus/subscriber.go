@@ -22,22 +22,26 @@ import (
 )
 
 type RegistryMessage struct {
-	App                     string            `json:"app"`
-	AvailabilityZone        string            `json:"availability_zone"`
-	EndpointUpdatedAtNs     int64             `json:"endpoint_updated_at_ns"`
-	Host                    string            `json:"host"`
-	IsolationSegment        string            `json:"isolation_segment"`
-	Port                    uint16            `json:"port"`
-	PrivateInstanceID       string            `json:"private_instance_id"`
-	PrivateInstanceIndex    string            `json:"private_instance_index"`
-	Protocol                string            `json:"protocol"`
-	RouteServiceURL         string            `json:"route_service_url"`
-	ServerCertDomainSAN     string            `json:"server_cert_domain_san"`
-	StaleThresholdInSeconds int               `json:"stale_threshold_in_seconds"`
-	TLSPort                 uint16            `json:"tls_port"`
-	Tags                    map[string]string `json:"tags"`
-	Uris                    []route.Uri       `json:"uris"`
-	LoadBalancingAlgorithm  string            `json:"lb_algo"`
+	App                     string              `json:"app"`
+	AvailabilityZone        string              `json:"availability_zone"`
+	EndpointUpdatedAtNs     int64               `json:"endpoint_updated_at_ns"`
+	Host                    string              `json:"host"`
+	IsolationSegment        string              `json:"isolation_segment"`
+	Port                    uint16              `json:"port"`
+	PrivateInstanceID       string              `json:"private_instance_id"`
+	PrivateInstanceIndex    string              `json:"private_instance_index"`
+	Protocol                string              `json:"protocol"`
+	RouteServiceURL         string              `json:"route_service_url"`
+	ServerCertDomainSAN     string              `json:"server_cert_domain_san"`
+	StaleThresholdInSeconds int                 `json:"stale_threshold_in_seconds"`
+	TLSPort                 uint16              `json:"tls_port"`
+	Tags                    map[string]string   `json:"tags"`
+	Uris                    []route.Uri         `json:"uris"`
+	Options                 RegistryMessageOpts `json:"options"`
+}
+
+type RegistryMessageOpts struct {
+	LoadBalancingAlgorithm string `json:"lb_algo"`
 }
 
 func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, error) {
@@ -55,6 +59,8 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 		protocol = "http1"
 	}
 
+	//lbAlgorithm := mapOptions(rm)
+
 	return route.NewEndpoint(&route.EndpointOpts{
 		AppId:                   rm.App,
 		AvailabilityZone:        rm.AvailabilityZone,
@@ -71,9 +77,16 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 		IsolationSegment:        rm.IsolationSegment,
 		UseTLS:                  useTLS,
 		UpdatedAt:               updatedAt,
-		LoadBalancingAlgorithm:  rm.LoadBalancingAlgorithm,
+		LoadBalancingAlgorithm:  rm.Options.LoadBalancingAlgorithm,
 	}), nil
 }
+
+//const LoadBalancingAlgorithmTag string = "lb_algo"
+
+/*func mapOptions(registryMsg *RegistryMessage) string {
+	if registryMsg.Options != nil {
+	}
+}*/
 
 // ValidateMessage checks to ensure the registry message is valid
 func (rm *RegistryMessage) ValidateMessage() bool {

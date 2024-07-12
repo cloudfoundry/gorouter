@@ -105,6 +105,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				Host:               "myapp.com",
 				ContextPath:        "",
 				MaxConnsPerBackend: 0,
+				//LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			numEndpoints = 1
 			resp = httptest.NewRecorder()
