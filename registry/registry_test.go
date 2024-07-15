@@ -441,6 +441,43 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 		})
+
+		Context("Load Balancing Algorithm of a route", func() {
+
+			var (
+				lbSpecEndpoint   *route.Endpoint
+				lbUnSpecEndpoint *route.Endpoint
+				app1Uri          route.Uri
+				app2Uri          route.Uri
+			)
+
+			BeforeEach(func() {
+				app1Uri = "test.com/app1"
+				app2Uri = "test.com/app2"
+				lbUnSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{})
+				r.Register(app1Uri, lbUnSpecEndpoint)
+			})
+
+			Context("If a load balancing algorithm of a route is not specified", func() {
+
+				It("keeps configured pool default load balancing algorithm", func() {
+					p := r.Lookup(app1Uri)
+					Expect(p.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+				})
+			})
+
+			Context("If a load balancing algorithm of a route is specified", func() {
+
+				It("overwrites the load balancing algorithm of a pool", func() {
+					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
+						LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+					})
+					r.Register(app2Uri, lbSpecEndpoint)
+					p := r.Lookup(app2Uri)
+					Expect(p.LBAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+				})
+			})
+		})
 	})
 
 	Context("Unregister", func() {
