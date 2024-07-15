@@ -11,6 +11,7 @@ import (
 
 	"net"
 
+	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
@@ -229,6 +230,20 @@ var _ = Describe("EndpointPool", func() {
 				})
 			})
 
+		})
+	})
+	Context("Load Balancing Algorithm of a pool", func() {
+
+		It("has a value specified in the pool options", func() {
+			poolWithLBAlgo := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				RetryAfterFailure:      2 * time.Minute,
+				Host:                   "",
+				ContextPath:            "",
+				MaxConnsPerBackend:     0,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+			})
+			Expect(poolWithLBAlgo.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 		})
 	})
 
