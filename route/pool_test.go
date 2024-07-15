@@ -1,6 +1,7 @@
 package route_test
 
 import (
+	"code.cloudfoundry.org/gorouter/config"
 	"errors"
 	"net/http"
 	"time"
@@ -11,7 +12,6 @@ import (
 
 	"net"
 
-	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
@@ -244,6 +244,19 @@ var _ = Describe("EndpointPool", func() {
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			Expect(poolWithLBAlgo.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+		})
+
+		It("has an invalid specified in the pool options and will log an error.", func() {
+			poolWithLBAlgo2 := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				RetryAfterFailure:      2 * time.Minute,
+				Host:                   "",
+				ContextPath:            "",
+				MaxConnsPerBackend:     0,
+				LoadBalancingAlgorithm: "wrong-lb-algo",
+			})
+			poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
+			Expect(logger.Buffer()).To(gbytes.Say(`Invalid pool load balancing algorithm.`))
 		})
 	})
 
