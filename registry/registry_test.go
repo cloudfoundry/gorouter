@@ -445,14 +445,16 @@ var _ = Describe("RouteRegistry", func() {
 		Context("Load Balancing Algorithm of a route", func() {
 
 			var (
-				lbSpecEndpoint, lbSpecWrongEndpoint, lbUnSpecEndpoint *route.Endpoint
-				app1Uri, app2Uri                                      route.Uri
-				pool                                                  *route.EndpointPool
+				lbSpecEndpoint, lbSpecWrongEndpoint, lbUnSpecEndpoint, lbSpecEmptyEndpoint *route.Endpoint
+				app1Uri, app2Uri, app3Uri, app4Uri                                         route.Uri
+				pool                                                                       *route.EndpointPool
 			)
 
 			BeforeEach(func() {
 				app1Uri = "test.com/app1"
 				app2Uri = "test.com/app2"
+				app3Uri = "test.com/app3"
+				app4Uri = "test.com/app4"
 			})
 
 			Context("If a load balancing algorithm of a route is not specified", func() {
@@ -467,10 +469,10 @@ var _ = Describe("RouteRegistry", func() {
 
 			Context("If a load balancing algorithm of a route is specified", func() {
 				var (
-					p1, p2 *route.EndpointPool
+					p1, p2, p3, p4 *route.EndpointPool
 				)
 
-				It("overwrites the load balancing algorithm of a pool if it is valid", func() {
+				It("overwrites the load balancing algorithm of a pool if provided value is valid", func() {
 					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
 						LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
 					})
@@ -479,13 +481,37 @@ var _ = Describe("RouteRegistry", func() {
 					Expect(p1.LBAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
 				})
 
-				It("keeps the load balancing algorithm of a pool if it is valid", func() {
+				It("keeps the load balancing algorithm of a pool if provided value is invalid", func() {
 					lbSpecWrongEndpoint = route.NewEndpoint(&route.EndpointOpts{
 						LoadBalancingAlgorithm: "wrong-load-balancing-algo-value",
 					})
 					r.Register(app2Uri, lbSpecWrongEndpoint)
 					p2 = r.Lookup(app2Uri)
 					Expect(p2.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+				})
+
+				It("keeps the load balancing algorithm of a pool if provided value is an empty string", func() {
+					lbSpecEmptyEndpoint = route.NewEndpoint(&route.EndpointOpts{
+						LoadBalancingAlgorithm: "",
+					})
+					r.Register(app3Uri, lbSpecEmptyEndpoint)
+					p3 = r.Lookup(app3Uri)
+					Expect(p3.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+				})
+
+				It("overwrites the load balancing algorithm of a pool with the provided value of the last added endpoint", func() {
+					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
+						LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+					})
+					r.Register(app4Uri, lbSpecEndpoint)
+
+					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
+						LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+					})
+					r.Register(app4Uri, lbSpecEndpoint)
+
+					p4 = r.Lookup(app4Uri)
+					Expect(p4.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 				})
 			})
 		})
