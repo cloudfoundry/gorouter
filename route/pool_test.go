@@ -247,7 +247,8 @@ var _ = Describe("EndpointPool", func() {
 				Logger:                 logger,
 				LoadBalancingAlgorithm: "wrong-lb-algo",
 			})
-			poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
+			iterator := poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
+			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
 			Expect(logger.Buffer()).To(gbytes.Say(`Invalid pool load balancing algorithm.`))
 		})
 

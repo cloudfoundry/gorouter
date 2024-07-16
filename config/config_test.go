@@ -48,6 +48,16 @@ zone: meow-zone
 			})
 		})
 
+		Context("Load Balancing Algorithm Validator", func() {
+			It("Returns false if the value is not in the list of configured load balancing strategies", func() {
+				Expect(IsLoadBalancingAlgorithmValid("wrong.algo")).To(Equal(false))
+			})
+
+			It("Returns true if the value is in the list of configured load balancing strategies", func() {
+				Expect(IsLoadBalancingAlgorithmValid(LOAD_BALANCE_RR)).To(Equal(true))
+			})
+		})
+
 		Context("load balance config", func() {
 			It("sets default load balance strategy", func() {
 				Expect(config.LoadBalance).To(Equal(LOAD_BALANCE_RR))
