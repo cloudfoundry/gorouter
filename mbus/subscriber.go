@@ -59,8 +59,6 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 		protocol = "http1"
 	}
 
-	//lbAlgorithm := mapOptions(rm)
-
 	return route.NewEndpoint(&route.EndpointOpts{
 		AppId:                   rm.App,
 		AvailabilityZone:        rm.AvailabilityZone,
@@ -80,13 +78,6 @@ func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, err
 		LoadBalancingAlgorithm:  rm.Options.LoadBalancingAlgorithm,
 	}), nil
 }
-
-//const LoadBalancingAlgorithmTag string = "lb_algo"
-
-/*func mapOptions(registryMsg *RegistryMessage) string {
-	if registryMsg.Options != nil {
-	}
-}*/
 
 // ValidateMessage checks to ensure the registry message is valid
 func (rm *RegistryMessage) ValidateMessage() bool {
