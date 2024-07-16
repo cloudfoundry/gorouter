@@ -256,7 +256,8 @@ var _ = Describe("EndpointPool", func() {
 				Logger:                 logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
 			})
-			poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			Expect(iterator).To(BeAssignableToTypeOf(&route.LeastConnection{}))
 			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a least connection load balancing algorithm added to the pool.`))
 		})
 
@@ -265,7 +266,8 @@ var _ = Describe("EndpointPool", func() {
 				Logger:                 logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
-			poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
 			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a round-robin load balancing algorithm added to the pool.`))
 		})
 	})
