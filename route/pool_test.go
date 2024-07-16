@@ -237,26 +237,36 @@ var _ = Describe("EndpointPool", func() {
 		It("has a value specified in the pool options", func() {
 			poolWithLBAlgo := route.NewPool(&route.PoolOpts{
 				Logger:                 logger,
-				RetryAfterFailure:      2 * time.Minute,
-				Host:                   "",
-				ContextPath:            "",
-				MaxConnsPerBackend:     0,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			Expect(poolWithLBAlgo.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 		})
 
-		It("has an invalid specified in the pool options and will log an error.", func() {
+		It("has an invalid specified in the pool options", func() {
 			poolWithLBAlgo2 := route.NewPool(&route.PoolOpts{
 				Logger:                 logger,
-				RetryAfterFailure:      2 * time.Minute,
-				Host:                   "",
-				ContextPath:            "",
-				MaxConnsPerBackend:     0,
 				LoadBalancingAlgorithm: "wrong-lb-algo",
 			})
 			poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
 			Expect(logger.Buffer()).To(gbytes.Say(`Invalid pool load balancing algorithm.`))
+		})
+
+		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_LC ", func() {
+			poolWithLBAlgoLC := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+			})
+			poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a least connection load balancing algorithm added to the pool.`))
+		})
+
+		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_RR ", func() {
+			poolWithLBAlgoLC := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+			})
+			poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a round-robin load balancing algorithm added to the pool.`))
 		})
 	})
 

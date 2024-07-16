@@ -384,8 +384,10 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
 	switch p.LBAlgorithm {
 	case config.LOAD_BALANCE_LC:
+		logger.Debug("A new endpoint with a least connection load balancing algorithm added to the pool.")
 		return NewLeastConnection(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	case config.LOAD_BALANCE_RR:
+		logger.Debug("A new endpoint with a round-robin load balancing algorithm added to the pool.")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
 		logger.Error(
