@@ -100,12 +100,12 @@ var _ = Describe("ProxyRoundTripper", func() {
 		BeforeEach(func() {
 			logger = test_util.NewTestZapLogger("test")
 			routePool = route.NewPool(&route.PoolOpts{
-				Logger:             logger,
-				RetryAfterFailure:  1 * time.Second,
-				Host:               "myapp.com",
-				ContextPath:        "",
-				MaxConnsPerBackend: 0,
-				//LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+				Logger:                 logger,
+				RetryAfterFailure:      1 * time.Second,
+				Host:                   "myapp.com",
+				ContextPath:            "",
+				MaxConnsPerBackend:     0,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			numEndpoints = 1
 			resp = httptest.NewRecorder()
