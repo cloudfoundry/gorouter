@@ -242,7 +242,7 @@ var _ = Describe("EndpointPool", func() {
 			Expect(poolWithLBAlgo.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 		})
 
-		It("has an invalid specified in the pool options", func() {
+		It("has an invalid value specified in the pool options", func() {
 			poolWithLBAlgo2 := route.NewPool(&route.PoolOpts{
 				Logger:                 logger,
 				LoadBalancingAlgorithm: "wrong-lb-algo",
