@@ -479,7 +479,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register(app2Uri, lbSpecEndpoint)
 					p1 = r.Lookup(app2Uri)
 					Expect(p1.LBAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
-					Expect(logger).To(gbytes.Say(`Setting load balancing algorithm of a pool to that of a last registered endpoint.`))
+					Expect(logger).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 				})
 
 				It("keeps the load balancing algorithm of a pool if provided value for an endpoint is invalid and logs correctly", func() {
@@ -489,7 +489,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register(app2Uri, lbSpecWrongEndpoint)
 					p2 = r.Lookup(app2Uri)
 					Expect(p2.LBAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
-					Expect(logger).To(gbytes.Say(`"Invalid load balancing algorithm provided for an endpoint, keeping the pool load balancing algorithm.`))
+					Expect(logger).To(gbytes.Say(`"invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 				})
 
 				It("keeps the load balancing algorithm of a pool if provided value is an empty string and logs correctly", func() {

@@ -78,11 +78,7 @@ type Endpoint struct {
 	roundTripperMutex      sync.RWMutex
 	UpdatedAt              time.Time
 	RoundTripperInit       sync.Once
-	loadBalancingAlgorithm string
-}
-
-func (e *Endpoint) LoadBalancingAlgorithm() string {
-	return e.loadBalancingAlgorithm
+	LoadBalancingAlgorithm string
 }
 
 func (e *Endpoint) RoundTripper() ProxyRoundTripper {
@@ -203,7 +199,7 @@ func NewEndpoint(opts *EndpointOpts) *Endpoint {
 		Stats:                  NewStats(),
 		IsolationSegment:       opts.IsolationSegment,
 		UpdatedAt:              opts.UpdatedAt,
-		loadBalancingAlgorithm: opts.LoadBalancingAlgorithm,
+		LoadBalancingAlgorithm: opts.LoadBalancingAlgorithm,
 	}
 }
 
@@ -384,16 +380,13 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
 	switch p.LBAlgorithm {
 	case config.LOAD_BALANCE_LC:
-		logger.Debug("A new endpoint with a least connection load balancing algorithm added to the pool.")
+		logger.Debug("endpoint-with-least-connection-lb-algo-added-to-pool")
 		return NewLeastConnection(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	case config.LOAD_BALANCE_RR:
-		logger.Debug("A new endpoint with a round-robin load balancing algorithm added to the pool.")
+		logger.Debug("endpoint-with-round-robin-lb-algo-added-to-pool")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
-		logger.Error(
-			"Invalid pool load balancing algorithm.",
-			zap.String("poolLBAlgorithm", p.LBAlgorithm),
-		)
+		logger.Error("invalid-pool-load-balancing-algorithm", zap.String("poolLBAlgorithm", p.LBAlgorithm))
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }

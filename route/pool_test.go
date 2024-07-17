@@ -249,7 +249,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`Invalid pool load balancing algorithm.`))
+			Expect(logger.Buffer()).To(gbytes.Say(`invalid-pool-load-balancing-algorithm`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_LC ", func() {
@@ -259,7 +259,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.LeastConnection{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a least connection load balancing algorithm added to the pool.`))
+			Expect(logger.Buffer()).To(gbytes.Say(`endpoint-with-least-connection-lb-algo-added-to-pool`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_RR ", func() {
@@ -269,7 +269,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`A new endpoint with a round-robin load balancing algorithm added to the pool.`))
+			Expect(logger.Buffer()).To(gbytes.Say(`endpoint-with-round-robin-lb-algo-added-to-pool`))
 		})
 	})
 
