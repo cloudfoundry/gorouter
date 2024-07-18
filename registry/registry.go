@@ -125,7 +125,8 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 	}
 
 	endpointAdded := pool.Put(endpoint)
-	//Check endpoint for a load balancing algorithm. If it does exist & differs from that of the pool, then take the lb algorithm of the endpoint, otherwise keep the pools lb algorithm.
+	// Overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
+	pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
 	if len(endpoint.LoadBalancingAlgorithm) > 0 && strings.Compare(endpoint.LoadBalancingAlgorithm, pool.LBAlgorithm) != 0 {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			pool.Lock()

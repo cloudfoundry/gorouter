@@ -732,7 +732,6 @@ func (c *Config) Process() error {
 		c.RouteServiceEnabled = true
 	}
 
-	// check if valid load balancing strategy
 	if !IsLoadBalancingAlgorithmValid(c.LoadBalance) {
 		errMsg := fmt.Sprintf("Invalid load balancing algorithm %s. Allowed values are %s", c.LoadBalance, LoadBalancingStrategies)
 		//lint:ignore SA1006 - for consistency sake
