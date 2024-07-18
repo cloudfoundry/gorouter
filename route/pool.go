@@ -157,10 +157,10 @@ type EndpointPool struct {
 	NextIdx            int
 	maxConnsPerBackend int64
 
-	random      *rand.Rand
-	logger      logger.Logger
-	updatedAt   time.Time
-	LBAlgorithm string
+	random                 *rand.Rand
+	logger                 logger.Logger
+	updatedAt              time.Time
+	LoadBalancingAlgorithm string
 }
 
 type EndpointOpts struct {
@@ -218,17 +218,17 @@ type PoolOpts struct {
 
 func NewPool(opts *PoolOpts) *EndpointPool {
 	return &EndpointPool{
-		endpoints:          make([]*endpointElem, 0, 1),
-		index:              make(map[string]*endpointElem),
-		retryAfterFailure:  opts.RetryAfterFailure,
-		NextIdx:            -1,
-		maxConnsPerBackend: opts.MaxConnsPerBackend,
-		host:               opts.Host,
-		contextPath:        opts.ContextPath,
-		random:             rand.New(rand.NewSource(time.Now().UnixNano())),
-		logger:             opts.Logger,
-		updatedAt:          time.Now(),
-		LBAlgorithm:        opts.LoadBalancingAlgorithm,
+		endpoints:              make([]*endpointElem, 0, 1),
+		index:                  make(map[string]*endpointElem),
+		retryAfterFailure:      opts.RetryAfterFailure,
+		NextIdx:                -1,
+		maxConnsPerBackend:     opts.MaxConnsPerBackend,
+		host:                   opts.Host,
+		contextPath:            opts.ContextPath,
+		random:                 rand.New(rand.NewSource(time.Now().UnixNano())),
+		logger:                 opts.Logger,
+		updatedAt:              time.Now(),
+		LoadBalancingAlgorithm: opts.LoadBalancingAlgorithm,
 	}
 }
 
@@ -378,7 +378,7 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 }
 
 func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
-	switch p.LBAlgorithm {
+	switch p.LoadBalancingAlgorithm {
 	case config.LOAD_BALANCE_LC:
 		logger.Debug("endpoint-with-least-connection-lb-algo-added-to-pool")
 		return NewLeastConnection(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
@@ -386,7 +386,7 @@ func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSti
 		logger.Debug("endpoint-with-round-robin-lb-algo-added-to-pool")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
-		logger.Error("invalid-pool-load-balancing-algorithm", zap.String("poolLBAlgorithm", p.LBAlgorithm))
+		logger.Error("invalid-pool-load-balancing-algorithm", zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }
@@ -488,17 +488,17 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	p.Lock()
 	defer p.Unlock()
-	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm == p.LBAlgorithm {
+	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm == p.LoadBalancingAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
-			p.LBAlgorithm = endpoint.LoadBalancingAlgorithm
+			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm
 			p.logger.Debug("setting-pool-load-balancing-algorithm-to-that-of-an-endpoint",
 				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
-				zap.String("poolLBAlgorithm", p.LBAlgorithm))
+				zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		} else {
 			p.logger.Error("invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo",
 				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
-				zap.String("poolLBAlgorithm", p.LBAlgorithm))
+				zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		}
 	}
 }
