@@ -484,6 +484,25 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(endpoints)
 }
 
+// OverrulePoolLoadBalancingAlgorithm Overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
+func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
+	p.Lock()
+	defer p.Unlock()
+	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm == p.LBAlgorithm {
+		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
+			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
+			p.LBAlgorithm = endpoint.LoadBalancingAlgorithm
+			p.logger.Debug("setting-pool-load-balancing-algorithm-to-that-of-an-endpoint",
+				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				zap.String("poolLBAlgorithm", p.LBAlgorithm))
+		} else {
+			p.logger.Error("invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo",
+				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				zap.String("poolLBAlgorithm", p.LBAlgorithm))
+		}
+	}
+}
+
 func (e *endpointElem) failed() {
 	t := time.Now()
 	e.failedAt = &t
