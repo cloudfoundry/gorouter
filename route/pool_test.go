@@ -239,7 +239,7 @@ var _ = Describe("EndpointPool", func() {
 				Logger:                 logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
-			Expect(poolWithLBAlgo.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+			Expect(poolWithLBAlgo.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 		})
 
 		It("has an invalid value specified in the pool options", func() {

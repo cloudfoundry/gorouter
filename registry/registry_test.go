@@ -465,7 +465,7 @@ var _ = Describe("RouteRegistry", func() {
 					lbUnSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{})
 					r.Register(appUri, lbUnSpecEndpoint)
 					pool = r.Lookup(appUri)
-					Expect(pool.LBAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
+					Expect(pool.LoadBalancingAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
 				})
 			})
 
@@ -480,7 +480,7 @@ var _ = Describe("RouteRegistry", func() {
 					})
 					r.Register(app1Uri, lbSpecEndpoint)
 					p1 = r.Lookup(app1Uri)
-					Expect(p1.LBAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+					Expect(p1.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
 					Expect(logger).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 				})
 
@@ -490,7 +490,7 @@ var _ = Describe("RouteRegistry", func() {
 					})
 					r.Register(app2Uri, lbSpecWrongEndpoint)
 					p2 = r.Lookup(app2Uri)
-					Expect(p2.LBAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
+					Expect(p2.LoadBalancingAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
 					Expect(logger).To(gbytes.Say(`"invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 				})
 
@@ -500,14 +500,14 @@ var _ = Describe("RouteRegistry", func() {
 					})
 					r.Register(app3Uri, lbSpecEmptyEndpoint)
 					p3 = r.Lookup(app3Uri)
-					Expect(p3.LBAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
+					Expect(p3.LoadBalancingAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
 				})
 
 				It("keeps the load balancing algorithm of a pool if the value is not provided", func() {
 					lbNoSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{})
 					r.Register(app4Uri, lbNoSpecEndpoint)
 					p4 = r.Lookup(app4Uri)
-					Expect(p4.LBAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
+					Expect(p4.LoadBalancingAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
 				})
 
 				It("overwrites the load balancing algorithm of a pool with the provided value of the last added endpoint", func() {
@@ -522,7 +522,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register(app5Uri, lbSpecEndpoint)
 
 					p5 = r.Lookup(app5Uri)
-					Expect(p5.LBAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+					Expect(p5.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 				})
 			})
 		})
