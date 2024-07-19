@@ -273,6 +273,70 @@ var _ = Describe("EndpointPool", func() {
 		})
 	})
 
+	Context("Load balancing algorithm of a newly added endpoint", func() {
+
+		It("is valid and will overwrite the load balancing algorithm of a pool", func() {
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+			})
+			expectedLBAlgo := config.LOAD_BALANCE_LC
+			endpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host: "host-1", Port: 1234,
+				RouteServiceUrl:        "url",
+				LoadBalancingAlgorithm: expectedLBAlgo,
+			})
+			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
+			Expect(logger.Buffer()).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
+		})
+
+		It("is an empty string and the load balancing algorithm of a pool is kept", func() {
+			expectedLBAlgo := config.LOAD_BALANCE_RR
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: expectedLBAlgo,
+			})
+			endpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host: "host-1", Port: 1234,
+				RouteServiceUrl:        "url",
+				LoadBalancingAlgorithm: "",
+			})
+			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
+		})
+
+		It("is not specified in the endpoint options and the load balancing algorithm of a pool is kept", func() {
+			expectedLBAlgo := config.LOAD_BALANCE_RR
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: expectedLBAlgo,
+			})
+			endpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host: "host-1", Port: 1234,
+				RouteServiceUrl: "url",
+			})
+			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
+		})
+
+		It("is an invalid value and the load balancing algorithm of a pool is kept", func() {
+			expectedLBAlgo := config.LOAD_BALANCE_RR
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger,
+				LoadBalancingAlgorithm: expectedLBAlgo,
+			})
+			endpoint := route.NewEndpoint(&route.EndpointOpts{
+				Host: "host-1", Port: 1234,
+				RouteServiceUrl:        "url",
+				LoadBalancingAlgorithm: "invalid-lb-algo",
+			})
+			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
+			Expect(logger.Buffer()).To(gbytes.Say(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
+		})
+	})
+
 	Context("RouteServiceUrl", func() {
 		It("returns the route_service_url associated with the pool", func() {
 			endpoint := &route.Endpoint{}
