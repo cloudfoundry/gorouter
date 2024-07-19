@@ -525,7 +525,6 @@ var _ = Describe("Subscriber", func() {
 					App:      "app",
 					Protocol: "http2",
 					Uris:     []route.Uri{"test.example.com"},
-					Options:  mbus.RegistryMessageOpts{LoadBalancingAlgorithm: ""},
 				}
 				data, err := json.Marshal(msg)
 				Expect(err).NotTo(HaveOccurred())
@@ -536,10 +535,9 @@ var _ = Describe("Subscriber", func() {
 				Eventually(registry.RegisterCallCount).Should(Equal(2))
 				_, originalEndpoint := registry.RegisterArgsForCall(0)
 				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
-					Host:                   "host",
-					AppId:                  "app",
-					Protocol:               "http2",
-					LoadBalancingAlgorithm: "",
+					Host:     "host",
+					AppId:    "app",
+					Protocol: "http2",
 				})
 
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
