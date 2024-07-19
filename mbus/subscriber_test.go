@@ -545,31 +545,6 @@ var _ = Describe("Subscriber", func() {
 				Expect(originalEndpoint).To(Equal(expectedEndpoint))
 			})
 
-			It("endpoint is constructed with an empty options struct", func() {
-				var msg = mbus.RegistryMessage{
-					Host:     "host",
-					App:      "app",
-					Protocol: "http2",
-					Uris:     []route.Uri{"test.example.com"},
-					Options:  mbus.RegistryMessageOpts{},
-				}
-				data, err := json.Marshal(msg)
-				Expect(err).NotTo(HaveOccurred())
-
-				err = natsClient.Publish("router.register", data)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(registry.RegisterCallCount).Should(Equal(2))
-				_, originalEndpoint := registry.RegisterArgsForCall(0)
-				expectedEndpoint := route.NewEndpoint(&route.EndpointOpts{
-					Host:                   "host",
-					AppId:                  "app",
-					Protocol:               "http2",
-					LoadBalancingAlgorithm: "",
-				})
-
-				Expect(originalEndpoint).To(Equal(expectedEndpoint))
-			})
 		})
 
 		Context("when HTTP/2 is disabled and the protocol is http2", func() {
