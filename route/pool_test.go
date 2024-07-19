@@ -286,7 +286,7 @@ var _ = Describe("EndpointPool", func() {
 				RouteServiceUrl:        "url",
 				LoadBalancingAlgorithm: expectedLBAlgo,
 			})
-			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 			Expect(logger.Buffer()).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 		})
@@ -299,10 +299,9 @@ var _ = Describe("EndpointPool", func() {
 			})
 			endpoint := route.NewEndpoint(&route.EndpointOpts{
 				Host: "host-1", Port: 1234,
-				RouteServiceUrl:        "url",
-				LoadBalancingAlgorithm: "",
+				RouteServiceUrl: "url",
 			})
-			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 		})
 
@@ -316,7 +315,7 @@ var _ = Describe("EndpointPool", func() {
 				Host: "host-1", Port: 1234,
 				RouteServiceUrl: "url",
 			})
-			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 		})
 
@@ -331,7 +330,7 @@ var _ = Describe("EndpointPool", func() {
 				RouteServiceUrl:        "url",
 				LoadBalancingAlgorithm: "invalid-lb-algo",
 			})
-			pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 			Expect(logger.Buffer()).To(gbytes.Say(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 		})
