@@ -484,7 +484,7 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(endpoints)
 }
 
-// OverrulePoolLoadBalancingAlgorithm Overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
+// OverrulePoolLoadBalancingAlgorithm overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
 func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	p.Lock()
 	defer p.Unlock()
