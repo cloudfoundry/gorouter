@@ -126,7 +126,7 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 
 	endpointAdded := pool.Put(endpoint)
 	// Overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
-	pool.OverrulePoolLoadBalancingAlgorithm(endpoint)
+	pool.SetPoolLoadBalancingAlgorithm(endpoint)
 	r.SetTimeOfLastUpdate(t)
 
 	return endpointAdded
