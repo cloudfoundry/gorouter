@@ -380,10 +380,10 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
 	switch p.LoadBalancingAlgorithm {
 	case config.LOAD_BALANCE_LC:
-		logger.Debug("endpoint-with-least-connection-lb-algo-added-to-pool")
+		logger.Debug("endpoint-iterator-with-least-connection-lb-algo")
 		return NewLeastConnection(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	case config.LOAD_BALANCE_RR:
-		logger.Debug("endpoint-with-round-robin-lb-algo-added-to-pool")
+		logger.Debug("endpoint-iterator-with-round-robin-lb-algo")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
 		logger.Error("invalid-pool-load-balancing-algorithm", zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
@@ -490,7 +490,6 @@ func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	defer p.Unlock()
 	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != p.LoadBalancingAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
-			// Multiple apps can have the same route, a pool will get the last endpoint's algorithm
 			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm
 			p.logger.Debug("setting-pool-load-balancing-algorithm-to-that-of-an-endpoint",
 				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
