@@ -512,17 +512,17 @@ var _ = Describe("RouteRegistry", func() {
 
 				It("overwrites the load balancing algorithm of a pool with the provided value of the last added endpoint", func() {
 					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
-						LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
-					})
-					r.Register(app5Uri, lbSpecEndpoint)
-
-					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
 						LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 					})
 					r.Register(app5Uri, lbSpecEndpoint)
 
+					lbSpecEndpoint = route.NewEndpoint(&route.EndpointOpts{
+						LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+					})
+					r.Register(app5Uri, lbSpecEndpoint)
+
 					p5 = r.Lookup(app5Uri)
-					Expect(p5.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+					Expect(p5.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
 				})
 			})
 		})
