@@ -490,7 +490,7 @@ func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	defer p.Unlock()
 	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != p.LoadBalancingAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
-			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
+			// Multiple apps can have the same route, a pool will get the last endpoint's algorithm
 			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm
 			p.logger.Debug("setting-pool-load-balancing-algorithm-to-that-of-an-endpoint",
 				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
