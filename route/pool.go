@@ -488,7 +488,7 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 func (p *EndpointPool) OverrulePoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	p.Lock()
 	defer p.Unlock()
-	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm == p.LoadBalancingAlgorithm {
+	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != p.LoadBalancingAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			//Multiple apps can have the same route, a pool will get the last endpoint's algorithm
 			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm
