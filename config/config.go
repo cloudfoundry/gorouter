@@ -559,7 +559,6 @@ func DefaultConfig() (*Config, error) {
 	return &c, nil
 }
 
-// IsLoadBalancingAlgorithmValid Check validity of the provided load balancing algorithm
 func IsLoadBalancingAlgorithmValid(lbAlgo string) bool {
 	return slices.Contains(LoadBalancingStrategies, lbAlgo)
 }
