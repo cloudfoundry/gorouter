@@ -169,7 +169,7 @@ var _ = Describe("Router", func() {
 		config.EnableSSL = true
 		config.SSLPort = sslPort
 		config.SSLCertificates = []tls.Certificate{defaultCert, cert2}
-		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+		config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA}
 		config.EndpointTimeout = 1 * time.Second
 
 		mbusClient = natsRunner.MessageBus

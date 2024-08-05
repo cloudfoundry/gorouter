@@ -329,6 +329,7 @@ func (cc *CertChain) AsTLSConfig() *tls.Config {
 	Expect(err).ToNot(HaveOccurred())
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
+		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA},
 	}
 }
 
