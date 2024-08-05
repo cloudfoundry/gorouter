@@ -150,8 +150,8 @@ var _ = Describe("Route services", func() {
 
 			app.GUID = tlsTestAppID
 			app.TlsRegisterWithIndex(testState.trustedBackendServerCertSAN, index)
-			err := app.TlsListen(testState.trustedBackendTLSConfig.Clone())
-			Expect(err).NotTo(HaveOccurred())
+			errChan := app.TlsListen(testState.trustedBackendTLSConfig.Clone())
+			Consistently(errChan).ShouldNot(Receive())
 
 			return app
 		}
@@ -312,7 +312,7 @@ var _ = Describe("Route services", func() {
 	Context("when the route service has a MaxVersion of TLS 1.1", func() {
 		BeforeEach(func() {
 			routeService.TLS = testState.trustedExternalServiceTLS
-			routeService.TLS.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_128_CBC_SHA}
+			routeService.TLS.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA}
 			routeService.TLS.MaxVersion = tls.VersionTLS11
 			routeService.TLS.MinVersion = tls.VersionTLS11
 			routeService.StartTLS()
@@ -349,7 +349,7 @@ var _ = Describe("Route services", func() {
 		Context("when the client has MinVersion of TLS 1.1", func() {
 			BeforeEach(func() {
 				testState.cfg.MinTLSVersionString = "TLSv1.1"
-				testState.cfg.CipherString = "TLS_RSA_WITH_AES_128_CBC_SHA"
+				testState.cfg.CipherString = "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
 				testState.StartGorouterOrFail()
 			})
 

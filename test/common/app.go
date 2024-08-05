@@ -65,15 +65,19 @@ func (a *TestApp) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
 }
 
-func (a *TestApp) TlsListen(tlsConfig *tls.Config) error {
+func (a *TestApp) TlsListen(tlsConfig *tls.Config) chan error {
 	a.server = &http.Server{
 		Addr:      fmt.Sprintf(":%d", a.port),
 		Handler:   a.mux,
 		TLSConfig: tlsConfig,
 	}
+	errChan := make(chan error, 1)
 
-	go a.server.ListenAndServeTLS("", "")
-	return nil
+	go func() {
+		err := a.server.ListenAndServeTLS("", "")
+		errChan <- err
+	}()
+	return errChan
 }
 
 func (a *TestApp) RegisterAndListen() {

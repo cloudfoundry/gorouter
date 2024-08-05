@@ -41,7 +41,8 @@ var _ = Describe("Large upload", func() {
 
 			echoApp = newEchoApp([]route.Uri{route.Uri(appURL)}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			echoApp.TlsRegister(testState.trustedBackendServerCertSAN)
-			echoApp.TlsListen(testState.trustedBackendTLSConfig)
+			errChan := echoApp.TlsListen(testState.trustedBackendTLSConfig)
+			Consistently(errChan).ShouldNot(Receive())
 		})
 
 		It("the connection remains open for the entire upload", func() {

@@ -68,7 +68,8 @@ var _ = Describe("TLS to backends", func() {
 		It("successfully connects with both websockets and TLS to backends", func() {
 			wsApp := test.NewWebSocketApp([]route.Uri{"ws-app." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 			wsApp.TlsRegister(testState.trustedBackendServerCertSAN)
-			wsApp.TlsListen(testState.trustedBackendTLSConfig)
+			errChan := wsApp.TlsListen(testState.trustedBackendTLSConfig)
+			Consistently(errChan).ShouldNot(Receive())
 
 			assertWebsocketSuccess(wsApp)
 		})
@@ -124,7 +125,8 @@ var _ = Describe("TLS to backends", func() {
 	It("successfully establishes a mutual TLS connection with backend", func() {
 		runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, nil)
 		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
-		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
+		errChan := runningApp1.TlsListen(testState.trustedBackendTLSConfig)
+		Consistently(errChan).ShouldNot(Receive())
 
 		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 
@@ -136,7 +138,9 @@ var _ = Describe("TLS to backends", func() {
 		// registering a route setup
 		runningApp1 := test.NewGreetApp([]route.Uri{"some-app-expecting-client-certs." + test_util.LocalhostDNS}, testState.cfg.Port, testState.mbusClient, nil)
 		runningApp1.TlsRegister(testState.trustedBackendServerCertSAN)
-		runningApp1.TlsListen(testState.trustedBackendTLSConfig)
+		errChan := runningApp1.TlsListen(testState.trustedBackendTLSConfig)
+		Consistently(errChan).ShouldNot(Receive())
+
 		routesURI := fmt.Sprintf("http://%s:%s@%s:%d/routes", testState.cfg.Status.User, testState.cfg.Status.Pass, "localhost", testState.cfg.Status.Routes.Port)
 		Eventually(func() bool { return appRegistered(routesURI, runningApp1) }, "2s").Should(BeTrue())
 		runningApp1.VerifyAppStatus(200)

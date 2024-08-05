@@ -237,6 +237,7 @@ func CustomSpecSSLConfig(onlyTrustClientCACerts bool, TLSClientConfigOption int,
 		unknownCertChain := CreateSignedCertWithRootCA(CertNames{CommonName: "neopets-is-gr8.com"})
 		clientTLSConfig = unknownCertChain.AsTLSConfig()
 	}
+	clientTLSConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}
 
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(rootCertChain.CACertPEM)
@@ -329,6 +330,7 @@ func (cc *CertChain) AsTLSConfig() *tls.Config {
 	Expect(err).ToNot(HaveOccurred())
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
+		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA},
 	}
 }
 

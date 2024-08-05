@@ -44,8 +44,8 @@ var _ = Describe("Retries", func() {
 				w.WriteHeader(http.StatusTeapot)
 			})
 
-			err := app.TlsListen(testState.trustedBackendTLSConfig)
-			Expect(err).ToNot(HaveOccurred())
+			errChan := app.TlsListen(testState.trustedBackendTLSConfig)
+			Consistently(errChan).ShouldNot(Receive())
 		})
 
 		AfterEach(func() {
