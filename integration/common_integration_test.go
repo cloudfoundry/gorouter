@@ -103,6 +103,7 @@ func NewTestState() *testState {
 	gorouterToBackendsClientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: "gorouter", SANs: test_util.SubjectAltNames{DNS: "gorouter"}})
 	trustedBackendTLSConfig := backendCertChain.AsTLSConfig()
 	trustedBackendTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	trustedBackendTLSConfig.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}
 
 	untrustedBackendServerCertSAN := "some-trusted-backend.example.net"
 	untrustedBackendCLientCertChain := test_util.CreateSignedCertWithRootCA(test_util.CertNames{CommonName: untrustedBackendServerCertSAN, SANs: test_util.SubjectAltNames{DNS: untrustedBackendServerCertSAN}})

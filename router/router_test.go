@@ -94,7 +94,7 @@ var _ = Describe("Router", func() {
 		config.DisableHTTP = false
 		cert := test_util.CreateCert("default")
 		config.SSLCertificates = []tls.Certificate{cert}
-		config.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+		config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA}
 		config.ClientCertificateValidation = tls.NoClientCert
 		config.StickySessionCookieNames = map[string]struct{}{
 			StickyCookieKey: struct{}{},

@@ -107,7 +107,7 @@ var _ = JustBeforeEach(func() {
 
 	conf.EnableSSL = true
 	if len(conf.CipherSuites) == 0 {
-		conf.CipherSuites = []uint16{tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+		conf.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA}
 	}
 
 	tlsConfig := &tls.Config{
