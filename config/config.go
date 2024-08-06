@@ -17,8 +17,9 @@ import (
 	"github.com/uber-go/zap"
 	"gopkg.in/yaml.v2"
 
-	"code.cloudfoundry.org/localip"
 	"slices"
+
+	"code.cloudfoundry.org/localip"
 )
 
 const (
@@ -835,6 +836,9 @@ func (c *Config) processCipherSuites() ([]uint16, error) {
 		"ECDHE-ECDSA-CHACHA20-POLY1305":          0xcca9,
 		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":   0xcca8,
 		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305": 0xcca9,
+		"TLS13-AES-128-GCM-SHA256":               0x1301,
+		"TLS13-AES-256-GCM-SHA384":               0x1302,
+		"TLS13-CHACHA20-POLY1305-SHA256":         0x1303,
 	}
 	// generate the remaining suites based off of what golang has implemented using RFC names
 	for _, suite := range append(tls.CipherSuites(), tls.InsecureCipherSuites()...) {
