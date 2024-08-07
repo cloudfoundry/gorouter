@@ -2,16 +2,17 @@ package metrics_test
 
 import (
 	"bufio"
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
 	"fmt"
-	"github.com/uber-go/zap"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"time"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
 
@@ -332,14 +333,23 @@ var _ = Describe("MetricsReporter", func() {
 
 	Context("metric empty_content_length_header", func() {
 		var testApp *httptest.Server
-
+		var godebug string
 		BeforeEach(func() {
+			// Ensure we always have httplaxcontentlength=1 set for this test.
+			// When httplaxcontentlength=1. is no longer a thing, we should consider
+			// removing this test and the metric logic it relates to
+			godebug = os.Getenv("GODEBUG")
+			os.Setenv("GODEBUG", fmt.Sprintf("%s,httplaxcontentlength=1", godebug))
 			logger := logger.NewLogger("gorouter.test", "unix-epoch", zap.Output(os.Stdout))
 			negroni := negroni.New()
 			negroni.Use(handlers.NewRequestInfo())
 			negroni.Use(handlers.NewReporter(metricReporter, logger))
 
 			testApp = httptest.NewServer(negroni)
+		})
+		AfterEach(func() {
+			// Set GODEBUG back to whatever it was prior to this test
+			os.Setenv("GODEBUG", godebug)
 		})
 
 		It("counts request with empty content-length header correctly", func() {
