@@ -1444,7 +1444,7 @@ func hostnameAndPort(url string) (string, int) {
 
 func newMessageBus(c *config.Config) (*nats.Conn, error) {
 	natsMembers := make([]string, len(c.Nats.Hosts))
-	options := nats.DefaultOptions
+	options := nats.GetDefaultOptions()
 	options.PingInterval = 200 * time.Millisecond
 	for _, host := range c.Nats.Hosts {
 		uri := url.URL{

@@ -58,7 +58,7 @@ func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats
 }
 
 func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, natsAddr *atomic.Value, reconnected chan<- Signal) nats.Options {
-	options := nats.DefaultOptions
+	options := nats.GetDefaultOptions()
 	options.Servers = c.NatsServers()
 	if c.Nats.TLSEnabled {
 		var err error
