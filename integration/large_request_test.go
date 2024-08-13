@@ -31,6 +31,7 @@ var _ = Describe("Large requests", func() {
 		echoApp = newEchoApp([]route.Uri{route.Uri(appURL)}, testState.cfg.Port, testState.mbusClient, time.Millisecond, "")
 		echoApp.TlsRegister(testState.trustedBackendServerCertSAN)
 		echoApp.TlsListen(testState.trustedBackendTLSConfig)
+		echoApp.WaitUntilReady()
 	})
 
 	AfterEach(func() {
