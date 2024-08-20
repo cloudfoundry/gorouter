@@ -106,6 +106,7 @@ func RegisterWSHandler(reg *registry.RouteRegistry, path string, handler websock
 
 	return ln
 }
+
 func startBackendListener(rcfg RegisterConfig) (net.Listener, error) {
 	if rcfg.TLSConfig != nil && !rcfg.IgnoreTLSConfig {
 		return tls.Listen("tcp", "127.0.0.1:0", rcfg.TLSConfig)
@@ -380,7 +381,7 @@ func CreateExpiredSignedCertWithRootCA(cert CertNames) CertChain {
 	rootCert, err := x509.ParseCertificate(rootCADER)
 	Expect(err).NotTo(HaveOccurred())
 
-	ownKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	ownKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	Expect(err).NotTo(HaveOccurred())
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)
@@ -396,6 +397,7 @@ func CreateExpiredSignedCertWithRootCA(cert CertNames) CertChain {
 		CAPrivKey:    rootPrivateKey,
 	}
 }
+
 func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)
@@ -470,7 +472,7 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 		IsCA:                  true,
 	}
 
-	privKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	Expect(err).ToNot(HaveOccurred())
 	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
 	Expect(err).ToNot(HaveOccurred())
