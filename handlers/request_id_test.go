@@ -2,24 +2,28 @@ package handlers_test
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
+	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 const UUIDRegex = "^(urn\\:uuid\\:)?\\{?([a-z0-9]{8})-([a-z0-9]{4})-([1-5][a-z0-9]{3})-([a-z0-9]{4})-([a-z0-9]{12})\\}?$"
 
 var _ = Describe("Set Vcap Request Id header", func() {
 	var (
-		logger          logger.Logger
+		testSink        *test_util.TestSink
+		logger          *slog.Logger
 		nextCalled      bool
 		resp            *httptest.ResponseRecorder
 		req             *http.Request
@@ -39,7 +43,10 @@ var _ = Describe("Set Vcap Request Id header", func() {
 	})
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("setVcapRequestIdHeader")
+		logger = log.CreateLoggerWithSource("setVcapRequestIdHeader", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		nextCalled = false
 		handler = handlers.NewVcapRequestIdHeader(logger)
 
@@ -63,8 +70,8 @@ var _ = Describe("Set Vcap Request Id header", func() {
 	})
 
 	It("logs the header", func() {
-		Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
-		Expect(logger).To(gbytes.Say(vcapIdHeader))
+		Expect(string(testSink.Contents())).To(ContainSubstring("vcap-request-id-header-set"))
+		Expect(string(testSink.Contents())).To(ContainSubstring(vcapIdHeader))
 	})
 
 	It("sets request context", func() {
@@ -85,8 +92,8 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		})
 
 		It("logs the header with trace info", func() {
-			Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
-			Expect(logger).To(gbytes.Say(`"data":{"trace-id":"11111111111111111111111111111111","span-id":"2222222222222222","VcapRequestIdHeader":"` + vcapIdHeader + `"}`))
+			Expect(string(testSink.Contents())).To(ContainSubstring("vcap-request-id-header-set"))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`"data":{"trace-id":"11111111111111111111111111111111","span-id":"2222222222222222","VcapRequestIdHeader":"` + vcapIdHeader + `"}`))
 		})
 	})
 
@@ -102,8 +109,8 @@ var _ = Describe("Set Vcap Request Id header", func() {
 		})
 
 		It("logs the header", func() {
-			Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
-			Expect(logger).To(gbytes.Say(vcapIdHeader))
+			Expect(string(testSink.Contents())).To(ContainSubstring("vcap-request-id-header-set"))
+			Expect(string(testSink.Contents())).To(ContainSubstring(vcapIdHeader))
 		})
 	})
 })

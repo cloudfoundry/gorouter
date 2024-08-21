@@ -3,12 +3,12 @@ package router
 import (
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type HealthListener struct {
@@ -16,7 +16,7 @@ type HealthListener struct {
 	TLSConfig   *tls.Config
 	Port        uint16
 	Router      *Router
-	Logger      logger.Logger
+	Logger      *slog.Logger
 
 	listener    net.Listener
 	tlsListener net.Listener
@@ -55,7 +55,7 @@ func (hl *HealthListener) ListenAndServe() error {
 	go func() {
 		err := s.Serve(healthListener)
 		if !hl.Router.IsStopping() {
-			hl.Logger.Error("health-listener-failed", zap.Error(err))
+			hl.Logger.Error("health-listener-failed", log.ErrAttr(err))
 		}
 	}()
 	return nil

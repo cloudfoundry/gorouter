@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,9 +34,10 @@ var _ = Describe("MaxRequestSize", func() {
 		responseBody []byte
 		requestBody  *bytes.Buffer
 
-		cfg        *config.Config
-		fakeLogger *logger_fakes.FakeLogger
-		rh         *handlers.MaxRequestSize
+		cfg      *config.Config
+		testSink *test_util.TestSink
+		logger   *slog.Logger
+		rh       *handlers.MaxRequestSize
 
 		nextCalled bool
 	)
@@ -73,9 +79,12 @@ var _ = Describe("MaxRequestSize", func() {
 	})
 
 	JustBeforeEach(func() {
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		handler = negroni.New()
-		rh = handlers.NewMaxRequestSize(cfg, fakeLogger)
+		rh = handlers.NewMaxRequestSize(cfg, logger)
 		handler.Use(rh)
 		handler.Use(nextHandler)
 
@@ -225,7 +234,9 @@ var _ = Describe("MaxRequestSize", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))
 			})
 			It("logs a warning", func() {
-				Expect(fakeLogger.WarnCallCount()).To(Equal(1))
+				Expect(testSink.Lines()[0]).To(MatchRegexp(
+					`{"log_level":2,"timestamp":[0-9]+[.][0-9]+.+}`,
+				))
 			})
 		})
 	})

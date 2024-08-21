@@ -2,12 +2,16 @@ package handlers_test
 
 import (
 	"bufio"
+	"log/slog"
 	"net"
 	"net/http"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -18,8 +22,9 @@ import (
 
 var _ = Describe("Protocolcheck", func() {
 	var (
-		logger logger.Logger
-		ew     = errorwriter.NewPlaintextErrorWriter()
+		testSink *test_util.TestSink
+		logger   *slog.Logger
+		ew       = errorwriter.NewPlaintextErrorWriter()
 
 		nextCalled  bool
 		server      *ghttp.Server
@@ -29,7 +34,10 @@ var _ = Describe("Protocolcheck", func() {
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("protocolcheck")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		nextCalled = false
 		prevHandler = &PrevHandler{}
 	})

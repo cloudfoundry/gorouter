@@ -3,12 +3,15 @@ package handlers_test
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -28,7 +31,8 @@ var _ = Describe("Reporter Handler", func() {
 		req  *http.Request
 
 		fakeReporter *metrics_fakes.FakeProxyReporter
-		logger       logger.Logger
+		testSink     *test_util.TestSink
+		logger       *slog.Logger
 		prevHandler  negroni.Handler
 
 		nextCalled bool
@@ -40,7 +44,10 @@ var _ = Describe("Reporter Handler", func() {
 		resp = httptest.NewRecorder()
 
 		fakeReporter = new(metrics_fakes.FakeProxyReporter)
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLoggerWithSource("test", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)
@@ -171,7 +178,7 @@ var _ = Describe("Reporter Handler", func() {
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`"error":"RequestInfo not set on context"`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`"error":"RequestInfo not set on context"`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)

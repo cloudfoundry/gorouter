@@ -2,13 +2,17 @@ package handlers_test
 
 import (
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	loggerfakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
@@ -23,7 +27,8 @@ var _ = Describe("Lookup", func() {
 	var (
 		handler        *negroni.Negroni
 		nextHandler    http.HandlerFunc
-		logger         *loggerfakes.FakeLogger
+		testSink       *test_util.TestSink
+		logger         *slog.Logger
 		reg            *fakeRegistry.FakeRegistry
 		rep            *fakes.FakeProxyReporter
 		resp           *httptest.ResponseRecorder
@@ -45,7 +50,10 @@ var _ = Describe("Lookup", func() {
 		nextCalled = false
 		nextRequest = &http.Request{}
 		maxConnections = 2
-		logger = new(loggerfakes.FakeLogger)
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		rep = &fakes.FakeProxyReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
@@ -56,14 +64,14 @@ var _ = Describe("Lookup", func() {
 		handler.UseHandler(nextHandler)
 	})
 
-	JustBeforeEach(func() {
-		handler.ServeHTTP(resp, req)
-	})
-
 	Context("when the host is identical to the remote IP address", func() {
 		BeforeEach(func() {
 			req.Host = "1.2.3.4"
 			req.RemoteAddr = "1.2.3.4:60001"
+		})
+
+		JustBeforeEach(func() {
+			handler.ServeHTTP(resp, req)
 		})
 
 		It("sends a bad request metric", func() {
@@ -93,6 +101,10 @@ var _ = Describe("Lookup", func() {
 			req.Host = ""
 		})
 
+		JustBeforeEach(func() {
+			handler.ServeHTTP(resp, req)
+		})
+
 		It("sends a bad request metric", func() {
 			Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
 		})
@@ -116,6 +128,11 @@ var _ = Describe("Lookup", func() {
 	})
 
 	Context("when there is no pool that matches the request", func() {
+
+		JustBeforeEach(func() {
+			handler.ServeHTTP(resp, req)
+		})
+
 		Context("when the route does not exist", func() {
 			It("sends a bad request metric", func() {
 				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
@@ -169,6 +186,11 @@ var _ = Describe("Lookup", func() {
 
 	Context("when there is a pool that matches the request, but it has no endpoints", func() {
 		var pool *route.EndpointPool
+
+		JustBeforeEach(func() {
+			handler.ServeHTTP(resp, req)
+		})
+
 		Context("when empty pool response code 503 is set to true", func() {
 			BeforeEach(func() {
 				emptyPoolResponseCode503 := true
@@ -266,6 +288,10 @@ var _ = Describe("Lookup", func() {
 				reg.LookupReturns(pool)
 			})
 
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("all backends are in the pool", func() {
 				Expect(nextCalled).To(BeTrue())
 				requestInfo, err := handlers.ContextRequestInfo(nextRequest)
@@ -299,6 +325,10 @@ var _ = Describe("Lookup", func() {
 				reg.LookupReturns(pool)
 			})
 
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("calls next with the pool", func() {
 				Expect(nextCalled).To(BeTrue())
 				requestInfo, err := handlers.ContextRequestInfo(nextRequest)
@@ -330,6 +360,10 @@ var _ = Describe("Lookup", func() {
 				reg.LookupReturns(pool)
 			})
 
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("returns a 503", func() {
 				Expect(nextCalled).To(BeFalse())
 				Expect(resp.Code).To(Equal(http.StatusServiceUnavailable))
@@ -358,6 +392,10 @@ var _ = Describe("Lookup", func() {
 				reg.LookupWithInstanceReturns(pool)
 			})
 
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("lookups with instance", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(1))
 				uri, appGuid, appIndex := reg.LookupWithInstanceArgsForCall(0)
@@ -384,6 +422,10 @@ var _ = Describe("Lookup", func() {
 				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1:invalid-part")
 
 				reg.LookupWithInstanceReturns(pool)
+			})
+
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
 			})
 
 			It("does not lookup the instance", func() {
@@ -432,6 +474,10 @@ var _ = Describe("Lookup", func() {
 				reg.LookupWithInstanceReturns(pool)
 			})
 
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("does not lookup the instance", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
 			})
@@ -459,6 +505,11 @@ var _ = Describe("Lookup", func() {
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
 				reg.LookupWithInstanceReturns(pool)
 			})
+
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
 			It("does not lookup the instance", func() {
 				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
 			})
@@ -492,7 +543,7 @@ var _ = Describe("Lookup", func() {
 				reg.LookupReturns(pool)
 			})
 			It("calls Panic on the logger", func() {
-				Expect(logger.PanicCallCount()).To(Equal(1))
+				Expect(func() { handler.ServeHTTP(resp, req) }).To(Panic())
 				Expect(nextCalled).To(BeFalse())
 			})
 		})

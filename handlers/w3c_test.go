@@ -3,15 +3,18 @@ package handlers_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -34,7 +37,8 @@ var _ = Describe("W3C", func() {
 
 	var (
 		handler    *handlers.W3C
-		logger     logger.Logger
+		testSink   *test_util.TestSink
+		logger     *slog.Logger
 		resp       http.ResponseWriter
 		req        *http.Request
 		reqInfo    *handlers.RequestInfo
@@ -49,7 +53,11 @@ var _ = Describe("W3C", func() {
 	})
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("w3c")
+		logger = log.CreateLoggerWithSource("w3c", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
+
 		ri := new(handlers.RequestInfo)
 		req = test_util.NewRequest("GET", "example.com", "/", nil).
 			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
@@ -108,7 +116,7 @@ var _ = Describe("W3C", func() {
 
 						Expect(traceparentHeader).To(BeEmpty())
 
-						Expect(logger).To(gbytes.Say(`failed-to-create-w3c-traceparent`))
+						Expect(string(testSink.Contents())).To(ContainSubstring(`failed-to-create-w3c-traceparent`))
 					})
 				})
 

@@ -6,10 +6,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
@@ -54,7 +57,8 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		req  *http.Request
 
 		fakeEmitter *fake.FakeEventEmitter
-		logger      logger.Logger
+		testSink    *test_util.TestSink
+		logger      *slog.Logger
 
 		nextCalled bool
 	)
@@ -70,7 +74,11 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		req.Header.Set(handlers.VcapRequestIdHeader, vcapHeader)
 
 		fakeEmitter = fake.NewFakeEventEmitter("fake")
-		logger = test_util.NewTestZapLogger("test")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)
@@ -238,7 +246,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			handler.UseHandlerFunc(nextHandler)
 			handler.ServeHTTP(resp, req)
 
-			Expect(logger).To(gbytes.Say(`"message":"request-info-err"`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`"message":"request-info-err"`))
 
 			Expect(nextCalled).To(BeTrue())
 		})
@@ -252,7 +260,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		It("calls error on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`"data":{"error":"X-Vcap-Request-Id not found"}`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`"data":{"error":"X-Vcap-Request-Id not found"}`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 
@@ -267,7 +275,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			It("logs message with trace info", func() {
 				defer func() {
 					recover()
-					Expect(logger).To(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","error":"X-Vcap-Request-Id not found"}`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`"data":{"trace-id":"1111","span-id":"2222","error":"X-Vcap-Request-Id not found"}`))
 					Expect(nextCalled).To(BeFalse())
 				}()
 
@@ -291,7 +299,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			It("calls error on the logger with request trace id", func() {
 				defer func() {
 					recover()
-					Eventually(logger).Should(gbytes.Say(`"data":{"error":"ProxyResponseWriter not found"}`))
+					Eventually(string(testSink.Contents())).Should(ContainSubstring(`"data":{"error":"ProxyResponseWriter not found"}`))
 					Expect(nextCalled).To(BeFalse())
 				}()
 				badHandler.ServeHTTP(resp, req)
@@ -305,7 +313,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		})
 		It("calls Info on the logger, but does not fail the request", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(logger).To(gbytes.Say(`"message":"failed-to-emit-startstop-event"`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`"message":"failed-to-emit-startstop-event"`))
 
 			Expect(nextCalled).To(BeTrue())
 		})

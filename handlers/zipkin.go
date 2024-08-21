@@ -1,25 +1,25 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/openzipkin/zipkin-go/propagation/b3"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 // Zipkin is a handler that sets Zipkin headers on requests
 type Zipkin struct {
 	zipkinEnabled bool
-	logger        logger.Logger
+	logger        *slog.Logger
 }
 
 var _ negroni.Handler = new(Zipkin)
 
 // NewZipkin creates a new handler that sets Zipkin headers on requests
-func NewZipkin(enabled bool, logger logger.Logger) *Zipkin {
+func NewZipkin(enabled bool, logger *slog.Logger) *Zipkin {
 	return &Zipkin{
 		zipkinEnabled: enabled,
 		logger:        logger,
@@ -37,23 +37,23 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		logger.Error("failed-to-get-request-info", zap.Error(err))
+		logger.Error("failed-to-get-request-info", log.ErrAttr(err))
 		return
 	}
 
 	existingContext := r.Header.Get(b3.Context)
 	if existingContext != "" {
 		logger.Debug("b3-header-exists",
-			zap.String("b3", existingContext),
+			slog.String("b3", existingContext),
 		)
 
 		sc, err := b3.ParseSingleHeader(existingContext)
 		if err != nil {
-			logger.Error("failed-to-parse-single-header", zap.Error(err))
+			logger.Error("failed-to-parse-single-header", log.ErrAttr(err))
 		} else {
 			err = requestInfo.SetTraceInfo(sc.TraceID.String(), sc.ID.String())
 			if err != nil {
-				logger.Error("failed-to-set-trace-info", zap.Error(err))
+				logger.Error("failed-to-set-trace-info", log.ErrAttr(err))
 			} else {
 				return
 			}
@@ -71,19 +71,19 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 			r.Header.Get(b3.Flags),
 		)
 		if err != nil {
-			logger.Info("failed-to-parse-b3-trace-id", zap.Error(err))
+			logger.Info("failed-to-parse-b3-trace-id", log.ErrAttr(err))
 			return
 		}
 		r.Header.Set(b3.Context, b3.BuildSingleHeader(*sc))
 
 		logger.Debug("b3-trace-id-span-id-header-exists",
-			zap.String("trace-id", existingTraceID),
-			zap.String("span-id", existingSpanID),
+			slog.String("trace-id", existingTraceID),
+			slog.String("span-id", existingSpanID),
 		)
 
 		err = requestInfo.SetTraceInfo(sc.TraceID.String(), sc.ID.String())
 		if err != nil {
-			logger.Error("failed-to-set-trace-info", zap.Error(err))
+			logger.Error("failed-to-set-trace-info", log.ErrAttr(err))
 		} else {
 			return
 		}
@@ -91,7 +91,7 @@ func (z *Zipkin) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 
 	traceInfo, err := requestInfo.ProvideTraceInfo()
 	if err != nil {
-		logger.Error("failed-to-get-trace-info", zap.Error(err))
+		logger.Error("failed-to-get-trace-info", log.ErrAttr(err))
 		return
 	}
 

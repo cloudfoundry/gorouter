@@ -1,23 +1,26 @@
 package route_test
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
-	"crypto/tls"
+	"go.uber.org/zap/zapcore"
 
-	"crypto/x509"
+	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 
-	"net"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/routing-api/models"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Endpoint", func() {
@@ -45,12 +48,16 @@ var _ = Describe("Endpoint", func() {
 
 var _ = Describe("EndpointPool", func() {
 	var (
-		pool   *route.EndpointPool
-		logger *test_util.TestZapLogger
+		pool     *route.EndpointPool
+		testSink *test_util.TestSink
+		logger   *slog.Logger
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLoggerWithSource("test", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		pool = route.NewPool(&route.PoolOpts{
 			Logger:             logger,
 			RetryAfterFailure:  2 * time.Minute,
@@ -135,8 +142,10 @@ var _ = Describe("EndpointPool", func() {
 	})
 
 	Context("Put", func() {
-		var az = "meow-zone"
-		var azPreference = "none"
+		var (
+			az           = "meow-zone"
+			azPreference = "none"
+		)
 
 		It("adds endpoints", func() {
 			endpoint := &route.Endpoint{}
@@ -233,7 +242,6 @@ var _ = Describe("EndpointPool", func() {
 		})
 	})
 	Context("Load Balancing Algorithm of a pool", func() {
-
 		It("has a value specified in the pool options", func() {
 			poolWithLBAlgo := route.NewPool(&route.PoolOpts{
 				Logger:                 logger,
@@ -249,7 +257,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`invalid-pool-load-balancing-algorithm`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`invalid-pool-load-balancing-algorithm`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_LC ", func() {
@@ -259,7 +267,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.LeastConnection{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`endpoint-iterator-with-least-connection-lb-algo`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`endpoint-iterator-with-least-connection-lb-algo`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_RR ", func() {
@@ -269,7 +277,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(logger.Buffer()).To(gbytes.Say(`endpoint-iterator-with-round-robin-lb-algo`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`endpoint-iterator-with-round-robin-lb-algo`))
 		})
 	})
 
@@ -288,7 +296,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
-			Expect(logger.Buffer()).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 		})
 
 		It("is an empty string and the load balancing algorithm of a pool is kept", func() {
@@ -332,7 +340,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
-			Expect(logger.Buffer()).To(gbytes.Say(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
+			Expect(string(testSink.Contents())).To(ContainSubstring(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 		})
 	})
 
@@ -449,7 +457,7 @@ var _ = Describe("EndpointPool", func() {
 				pool.MarkUpdated(time.Now())
 				pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
 
-				Expect(logger.Buffer()).To(gbytes.Say(`prune-failed-endpoint`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`prune-failed-endpoint`))
 			})
 
 			It("does not prune connection reset errors", func() {

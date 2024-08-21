@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"net/textproto"
 	"time"
@@ -8,19 +9,19 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type reporterHandler struct {
 	reporter metrics.ProxyReporter
-	logger   logger.Logger
+	logger   *slog.Logger
 }
 
 // NewReporter creates a new handler that handles reporting backend
 // responses to metrics and missing Content-Length header
-func NewReporter(reporter metrics.ProxyReporter, logger logger.Logger) negroni.Handler {
+func NewReporter(reporter metrics.ProxyReporter, logger *slog.Logger) negroni.Handler {
 	return &reporterHandler{
 		reporter: reporter,
 		logger:   logger,
@@ -34,7 +35,7 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	// logger.Panic does not cause gorouter to exit 1 but rather throw panic with
 	// stacktrace in error log
 	if err != nil {
-		logger.Panic("request-info-err", zap.Error(err))
+		logger.Error("request-info-err", log.ErrAttr(err))
 		return
 	}
 	if !validContentLength(r.Header) {

@@ -2,25 +2,32 @@ package route_test
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("LeastConnection", func() {
 	var (
-		pool   *route.EndpointPool
-		logger logger.Logger
+		pool     *route.EndpointPool
+		testSink *test_util.TestSink
+		logger   *slog.Logger
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLoggerWithSource("test", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		pool = route.NewPool(
 			&route.PoolOpts{
 				Logger:             logger,
@@ -250,7 +257,7 @@ var _ = Describe("LeastConnection", func() {
 							})
 							It("logs that it could not choose another endpoint", func() {
 								iter.Next(0)
-								Expect(logger).Should(gbytes.Say("endpoint-overloaded-but-request-must-be-sticky"))
+								Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-overloaded-but-request-must-be-sticky"))
 							})
 						})
 					})
@@ -285,7 +292,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 						It("logs that it chose another endpoint", func() {
 							iter.Next(0)
-							Expect(logger).Should(gbytes.Say("endpoint-missing-choosing-alternate"))
+							Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-missing-choosing-alternate"))
 						})
 
 					})
@@ -301,7 +308,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 						It("logs that it could not choose another endpoint", func() {
 							iter.Next(0)
-							Expect(logger).Should(gbytes.Say("endpoint-missing-but-request-must-be-sticky"))
+							Expect(testSink.Contents()).Should(ContainSubstring("endpoint-missing-but-request-must-be-sticky"))
 						})
 					})
 				})

@@ -4,20 +4,22 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 )
 
@@ -201,17 +203,14 @@ var _ = Describe("RequestInfo", func() {
 	})
 
 	Describe("LoggerWithTraceInfo", func() {
-		var testSink *test_util.TestZapSink
-		var testLogger logger.Logger
+		var testSink *test_util.TestSink
+		var logger *slog.Logger
 
 		BeforeEach(func() {
-			testSink = &test_util.TestZapSink{Buffer: gbytes.NewBuffer()}
-			testLogger = logger.NewLogger(
-				"request-info",
-				"unix-epoch",
-				zap.DebugLevel,
-				zap.Output(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))),
-				zap.ErrorOutput(zap.MultiWriteSyncer(testSink, zap.AddSync(GinkgoWriter))))
+			logger = log.CreateLoggerWithSource("request-info", "")
+			testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+			log.SetLoggingLevel("Debug")
 		})
 
 		Context("when request has trace context", func() {
@@ -223,8 +222,8 @@ var _ = Describe("RequestInfo", func() {
 				ri.TraceInfo.SpanID = "def"
 				req = req.WithContext(context.WithValue(req.Context(), handlers.RequestInfoCtxKey, ri))
 
-				testLogger = handlers.LoggerWithTraceInfo(testLogger, req)
-				testLogger.Info("some-action")
+				logger = handlers.LoggerWithTraceInfo(logger, req)
+				logger.Info("some-action")
 			})
 
 			It("returns a logger that adds trace and spand ids to every log line", func() {
@@ -237,8 +236,8 @@ var _ = Describe("RequestInfo", func() {
 			BeforeEach(func() {
 				req, err := http.NewRequest("GET", "http://example.com", nil)
 				Expect(err).NotTo(HaveOccurred())
-				testLogger = handlers.LoggerWithTraceInfo(testLogger, req)
-				testLogger.Info("some-action")
+				logger = handlers.LoggerWithTraceInfo(logger, req)
+				logger.Info("some-action")
 			})
 
 			It("returns a logger that doesn't add trace and span ids to log lines", func() {

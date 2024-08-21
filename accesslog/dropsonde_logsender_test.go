@@ -1,11 +1,14 @@
 package accesslog_test
 
 import (
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/accesslog/fakes"
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
-	loggerFakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	"code.cloudfoundry.org/gorouter/test_util"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +22,7 @@ var _ = Describe("DropsondeLogSender", func() {
 			logSender    schema.LogSender
 			conf         *config.Config
 			eventEmitter *fakes.FakeEventEmitter
-			logger       *loggerFakes.FakeLogger
+			logger       *test_util.TestLogger
 		)
 
 		BeforeEach(func() {
@@ -27,19 +30,17 @@ var _ = Describe("DropsondeLogSender", func() {
 			conf, err = config.DefaultConfig()
 			Expect(err).ToNot(HaveOccurred())
 			conf.Logging.LoggregatorEnabled = true
-
 			eventEmitter = &fakes.FakeEventEmitter{}
-			logger = &loggerFakes.FakeLogger{}
+			logger = test_util.NewTestLogger("test")
 
-			logSender = accesslog.NewLogSender(conf, eventEmitter, logger)
+			logSender = accesslog.NewLogSender(conf, eventEmitter, logger.Logger)
 
 			eventEmitter.OriginReturns("someOrigin")
 		})
 
 		It("emits an envelope", func() {
 			logSender.SendAppLog("someID", "someMessage", nil)
-
-			Expect(logger.ErrorCallCount()).To(Equal(0))
+			Expect(logger.Lines(zapcore.ErrorLevel)).To(HaveLen(0))
 			Expect(eventEmitter.EmitEnvelopeCallCount()).To(Equal(1))
 			logMessage := eventEmitter.EmitEnvelopeArgsForCall(0).LogMessage
 			Expect(logMessage.AppId).To(Equal(proto.String("someID")))
@@ -53,7 +54,7 @@ var _ = Describe("DropsondeLogSender", func() {
 			}
 			logSender.SendAppLog("someID", "someMessage", tags)
 
-			Expect(logger.ErrorCallCount()).To(Equal(0))
+			Expect(logger.Lines(zapcore.ErrorLevel)).To(HaveLen(0))
 			Expect(eventEmitter.EmitEnvelopeCallCount()).To(Equal(1))
 			envelope := eventEmitter.EmitEnvelopeArgsForCall(0)
 			Expect(envelope.Tags).To(Equal(map[string]string{

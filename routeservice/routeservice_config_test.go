@@ -2,16 +2,20 @@ package routeservice_test
 
 import (
 	"errors"
+	"log/slog"
 	"net/url"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/common/secure/fakes"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/secure/fakes"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Route Service Config", func() {
@@ -20,7 +24,8 @@ var _ = Describe("Route Service Config", func() {
 		crypto           secure.Crypto
 		cryptoPrev       secure.Crypto
 		cryptoKey        = "ABCDEFGHIJKLMNOP"
-		logger           logger.Logger
+		testSink         *test_util.TestSink
+		logger           *slog.Logger
 		recommendHttps   bool
 		strictValidation bool
 	)
@@ -29,7 +34,10 @@ var _ = Describe("Route Service Config", func() {
 		var err error
 		crypto, err = secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		config = routeservice.NewRouteServiceConfig(logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 	})
 

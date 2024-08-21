@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 const (
@@ -21,13 +21,13 @@ const (
 type W3C struct {
 	w3cEnabled  bool
 	w3cTenantID string
-	logger      logger.Logger
+	logger      *slog.Logger
 }
 
 var _ negroni.Handler = new(W3C)
 
 // NewW3C creates a new handler that sets W3C headers on requests
-func NewW3C(enabled bool, tenantID string, logger logger.Logger) *W3C {
+func NewW3C(enabled bool, tenantID string, logger *slog.Logger) *W3C {
 	return &W3C{
 		w3cEnabled:  enabled,
 		w3cTenantID: tenantID,
@@ -44,7 +44,7 @@ func (m *W3C) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Handl
 
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		m.logger.Error("failed-to-get-request-info", zap.Error(err))
+		m.logger.Error("failed-to-get-request-info", log.ErrAttr(err))
 		return
 	}
 
@@ -62,10 +62,10 @@ func (m *W3C) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Handl
 	}
 }
 
-func (m *W3C) ServeNewTraceparent(rw http.ResponseWriter, r *http.Request, requestInfo *RequestInfo, logger logger.Logger) {
+func (m *W3C) ServeNewTraceparent(rw http.ResponseWriter, r *http.Request, requestInfo *RequestInfo, logger *slog.Logger) {
 	traceparent, err := NewW3CTraceparent(requestInfo)
 	if err != nil {
-		logger.Error("failed-to-create-w3c-traceparent", zap.Error(err))
+		logger.Error("failed-to-create-w3c-traceparent", log.ErrAttr(err))
 		return
 	}
 
@@ -80,11 +80,11 @@ func (m *W3C) ServeUpdatedTraceparent(
 	r *http.Request,
 	requestInfo *RequestInfo,
 	prevTraceparent W3CTraceparent,
-	logger logger.Logger,
+	logger *slog.Logger,
 ) {
 	traceparent, err := prevTraceparent.Next()
 	if err != nil {
-		logger.Info("failed-to-generate-next-w3c-traceparent", zap.Error(err))
+		logger.Info("failed-to-generate-next-w3c-traceparent", log.ErrAttr(err))
 		return
 	}
 

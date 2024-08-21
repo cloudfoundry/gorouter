@@ -2,13 +2,17 @@ package handlers_test
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
@@ -33,7 +37,8 @@ const (
 var _ = Describe("Zipkin", func() {
 	var (
 		handler    *handlers.Zipkin
-		logger     logger.Logger
+		testSink   *test_util.TestSink
+		logger     *slog.Logger
 		resp       http.ResponseWriter
 		req        *http.Request
 		nextCalled bool
@@ -48,7 +53,11 @@ var _ = Describe("Zipkin", func() {
 	})
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("zipkin")
+		logger = log.CreateLoggerWithSource("zipkin", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
+
 		ri := new(handlers.RequestInfo)
 		req = test_util.NewRequest("GET", "example.com", "/", nil).
 			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))

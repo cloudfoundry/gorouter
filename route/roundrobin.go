@@ -1,14 +1,12 @@
 package route
 
 import (
+	"log/slog"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 )
 
 type RoundRobin struct {
-	logger logger.Logger
+	logger *slog.Logger
 	pool   *EndpointPool
 
 	initialEndpoint       string
@@ -18,7 +16,7 @@ type RoundRobin struct {
 	localAvailabilityZone string
 }
 
-func NewRoundRobin(logger logger.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
+func NewRoundRobin(logger *slog.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &RoundRobin{
 		logger:                logger,
 		pool:                  p,
@@ -42,12 +40,12 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 		}
 
 		if e == nil && r.mustBeSticky {
-			r.logger.Debug("endpoint-missing-but-request-must-be-sticky", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			r.logger.Debug("endpoint-missing-but-request-must-be-sticky", slog.String("requested-endpoint", r.initialEndpoint))
 			return nil
 		}
 
 		if !r.mustBeSticky {
-			r.logger.Debug("endpoint-missing-choosing-alternate", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			r.logger.Debug("endpoint-missing-choosing-alternate", slog.String("requested-endpoint", r.initialEndpoint))
 			r.initialEndpoint = ""
 		}
 	}

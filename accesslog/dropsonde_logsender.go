@@ -2,31 +2,32 @@ package accesslog
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/accesslog/schema"
-	"code.cloudfoundry.org/gorouter/config"
-	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/uber-go/zap"
 	"google.golang.org/protobuf/proto"
+
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type DropsondeLogSender struct {
 	eventEmitter   dropsonde.EventEmitter
 	sourceInstance string
-	logger         goRouterLogger.Logger
+	logger         *slog.Logger
 }
 
 func (l *DropsondeLogSender) SendAppLog(appID, message string, tags map[string]string) {
 	if l.sourceInstance == "" || appID == "" {
 		l.logger.Debug("dropping-loggregator-access-log",
-			zap.Error(fmt.Errorf("either no appId or source instance present")),
-			zap.String("appID", appID),
-			zap.String("sourceInstance", l.sourceInstance),
+			log.ErrAttr(fmt.Errorf("either no appId or source instance present")),
+			slog.String("appID", appID),
+			slog.String("sourceInstance", l.sourceInstance),
 		)
 
 		return
@@ -45,21 +46,21 @@ func (l *DropsondeLogSender) SendAppLog(appID, message string, tags map[string]s
 
 	envelope, err := emitter.Wrap(logMessage, l.eventEmitter.Origin())
 	if err != nil {
-		l.logger.Error("error-wrapping-access-log-for-emitting", zap.Error(err))
+		l.logger.Error("error-wrapping-access-log-for-emitting", log.ErrAttr(err))
 		return
 	}
 
 	envelope.Tags = tags
 
 	if err = l.eventEmitter.EmitEnvelope(envelope); err != nil {
-		l.logger.Error("error-emitting-access-log-to-writers", zap.Error(err))
+		l.logger.Error("error-emitting-access-log-to-writers", log.ErrAttr(err))
 	}
 }
 
 func NewLogSender(
 	c *config.Config,
 	e dropsonde.EventEmitter,
-	logger goRouterLogger.Logger,
+	logger *slog.Logger,
 ) schema.LogSender {
 	var dropsondeSourceInstance string
 

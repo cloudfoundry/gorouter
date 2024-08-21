@@ -3,21 +3,20 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/route"
 	gouuid "github.com/nu7hatch/gouuid"
-	"github.com/uber-go/zap"
-
 	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 type key string
@@ -142,7 +141,7 @@ func generateTraceAndSpanIDFromGUID(guid string) (string, string, error) {
 	return traceID.String(), spanID.String(), nil
 }
 
-func LoggerWithTraceInfo(l logger.Logger, r *http.Request) logger.Logger {
+func LoggerWithTraceInfo(l *slog.Logger, r *http.Request) *slog.Logger {
 	reqInfo, err := ContextRequestInfo(r)
 	if err != nil {
 		return l
@@ -151,7 +150,7 @@ func LoggerWithTraceInfo(l logger.Logger, r *http.Request) logger.Logger {
 		return l
 	}
 
-	return l.With(zap.String("trace-id", reqInfo.TraceInfo.TraceID), zap.String("span-id", reqInfo.TraceInfo.SpanID))
+	return l.With(slog.String("trace-id", reqInfo.TraceInfo.TraceID), slog.String("span-id", reqInfo.TraceInfo.SpanID))
 }
 
 // ContextRequestInfo gets the RequestInfo from the request Context

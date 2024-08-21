@@ -2,25 +2,33 @@ package route_test
 
 import (
 	"errors"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("RoundRobin", func() {
 	var (
-		pool   *route.EndpointPool
-		logger *test_util.TestZapLogger
+		pool     *route.EndpointPool
+		testSink *test_util.TestSink
+		logger   *slog.Logger
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		pool = route.NewPool(&route.PoolOpts{
 			Logger:             logger,
 			RetryAfterFailure:  2 * time.Minute,
@@ -168,7 +176,7 @@ var _ = Describe("RoundRobin", func() {
 				It("logs that it chose another endpoint", func() {
 					iter := route.NewRoundRobin(logger, pool, "bogus", false, false, "meow-az")
 					iter.Next(0)
-					Expect(logger).Should(gbytes.Say("endpoint-missing-choosing-alternate"))
+					Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-missing-choosing-alternate"))
 				})
 			})
 		})
@@ -191,7 +199,7 @@ var _ = Describe("RoundRobin", func() {
 				It("logs that it could not choose another endpoint", func() {
 					iter := route.NewRoundRobin(logger, pool, "bogus", true, false, "meow-az")
 					iter.Next(0)
-					Expect(logger).Should(gbytes.Say("endpoint-missing-but-request-must-be-sticky"))
+					Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-missing-but-request-must-be-sticky"))
 				})
 			})
 		})
@@ -265,7 +273,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -422,7 +430,7 @@ var _ = Describe("RoundRobin", func() {
 
 							It("logs that it could not choose another endpoint", func() {
 								iter.Next(0)
-								Expect(logger).Should(gbytes.Say("endpoint-overloaded-but-request-must-be-sticky"))
+								Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-overloaded-but-request-must-be-sticky"))
 							})
 						})
 
@@ -445,7 +453,7 @@ var _ = Describe("RoundRobin", func() {
 							)
 							It("logs that it could not choose another endpoint", func() {
 								iter.Next(0)
-								Expect(logger).Should(gbytes.Say("endpoint-overloaded-but-request-must-be-sticky"))
+								Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-overloaded-but-request-must-be-sticky"))
 							})
 						})
 					})
@@ -482,7 +490,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -830,7 +838,7 @@ var _ = Describe("RoundRobin", func() {
 		DescribeTable("it resets failed endpoints after exceeding failure duration",
 			func(nextIdx int) {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger,
 					RetryAfterFailure:  50 * time.Millisecond,
 					Host:               "",
 					ContextPath:        "",

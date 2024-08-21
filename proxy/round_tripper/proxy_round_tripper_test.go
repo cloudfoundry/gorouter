@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,13 +18,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/onsi/gomega/gbytes"
-	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
@@ -75,7 +77,8 @@ var _ = Describe("ProxyRoundTripper", func() {
 			proxyRoundTripper      round_tripper.ProxyRoundTripper
 			routePool              *route.EndpointPool
 			transport              *roundtripperfakes.FakeProxyRoundTripper
-			logger                 *test_util.TestZapLogger
+			logger                 *slog.Logger
+			testSink               *test_util.TestSink
 			req                    *http.Request
 			reqBody                *testBody
 			resp                   *httptest.ResponseRecorder
@@ -98,7 +101,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 		)
 
 		BeforeEach(func() {
-			logger = test_util.NewTestZapLogger("test")
+			logger = log.CreateLogger()
+			testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+			log.SetLoggingLevel("Debug")
 			routePool = route.NewPool(&route.PoolOpts{
 				Logger:                 logger,
 				RetryAfterFailure:      1 * time.Second,
@@ -266,38 +272,40 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("logs the error and removes offending backend", func() {
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
-
+					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
 					iter := routePool.Endpoints(logger, "", false, AZPreference, AZ)
 					ep1 := iter.Next(0)
 					ep2 := iter.Next(1)
 					Expect(ep1.PrivateInstanceId).To(Equal(ep2.PrivateInstanceId))
-
-					errorLogs := logger.Lines(zap.ErrorLevel)
-					Expect(len(errorLogs)).To(BeNumerically(">=", 2))
-					count := 0
-					for i := 0; i < len(errorLogs); i++ {
-						if strings.Contains(errorLogs[i], "backend-endpoint-failed") {
-							count++
+					var errorLogs []string
+					countBackendEndpointFailedLogs := 0
+					for _, s := range testSink.Lines() {
+						if strings.Contains(s, "\"log_level\":3") {
+							errorLogs = append(errorLogs, s)
 						}
-						Expect(errorLogs[i]).To(ContainSubstring(AZ))
+						if strings.Contains(s, "backend-endpoint-failed") {
+							countBackendEndpointFailedLogs++
+						}
 					}
-					Expect(count).To(Equal(2))
-					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+					Expect(len(errorLogs)).To(BeNumerically(">=", 2))
+					Expect(countBackendEndpointFailedLogs).To(Equal(2))
 				})
 
 				It("logs the attempt number", func() {
 					res, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
-
-					errorLogs := logger.Lines(zap.ErrorLevel)
-					Expect(len(errorLogs)).To(BeNumerically(">=", 3))
+					var errorLogs []string
 					count := 0
-					for i := 0; i < len(errorLogs); i++ {
-						if strings.Contains(errorLogs[i], fmt.Sprintf("\"attempt\":%d", count+1)) {
-							count++
+					for _, s := range testSink.Lines() {
+						if strings.Contains(s, "\"log_level\":3") {
+							errorLogs = append(errorLogs, s)
+							if strings.Contains(s, fmt.Sprintf("\"attempt\":%d", count+1)) {
+								count++
+							}
 						}
 					}
+					Expect(len(errorLogs)).To(BeNumerically(">=", 3))
 					Expect(count).To(Equal(2))
 				})
 
@@ -472,7 +480,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
 
-					Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
+					Expect(testSink.Contents()).ToNot(ContainSubstring(`route-service`))
 				})
 
 				It("does log the error and reports the endpoint failure", func() {
@@ -494,10 +502,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					ep1 := iter.Next(0)
 					ep2 := iter.Next(1)
 					Expect(ep1).To(Equal(ep2))
-
-					logOutput := logger.Buffer()
-					Expect(logOutput).To(gbytes.Say(`backend-endpoint-failed`))
-					Expect(logOutput).To(gbytes.Say(`vcap_request_id`))
+					Expect(string(testSink.Contents())).To(MatchRegexp(`.*"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"backend-endpoint-failed","data":{.*vcap_request_id.*`))
 				})
 			})
 
@@ -678,9 +683,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 				It("logs a message with `select-endpoint-failed`", func() {
 					proxyRoundTripper.RoundTrip(req)
-					logOutput := logger.Buffer()
-					Expect(logOutput).To(gbytes.Say(`select-endpoint-failed`))
-					Expect(logOutput).To(gbytes.Say(`myapp.com`))
+					Expect(string(testSink.Contents())).To(MatchRegexp(`.*"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"select-endpoint-failed","data":{"host":"myapp.com".*`))
 				})
 
 				It("does not capture any routing requests to the backend", func() {
@@ -693,15 +696,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("does not log anything about route services", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(Equal(round_tripper.NoEndpointsAvailable))
-
-					Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
+					Expect(string(testSink.Contents())).NotTo(ContainSubstring("route-service"))
 				})
 
 				It("does not report the endpoint failure", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(MatchError(round_tripper.NoEndpointsAvailable))
-
-					Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
+					Expect(string(testSink.Contents())).NotTo(ContainSubstring("backend-endpoint-failed"))
 				})
 			})
 
@@ -721,15 +722,13 @@ var _ = Describe("ProxyRoundTripper", func() {
 				It("does not log an error or report the endpoint failure", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-
-					Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
+					Expect(string(testSink.Contents())).NotTo(ContainSubstring("backend-endpoint-failed"))
 				})
 
 				It("does not log anything about route services", func() {
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
-
-					Expect(logger.Buffer()).ToNot(gbytes.Say(`route-service`))
+					Expect(string(testSink.Contents())).NotTo(ContainSubstring("route-service"))
 				})
 
 			})
@@ -962,7 +961,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					It("logs the response error", func() {
 						_, err := proxyRoundTripper.RoundTrip(req)
 						Expect(err).ToNot(HaveOccurred())
-						Expect(logger.Buffer()).To(gbytes.Say(`response.*status-code":418`))
+						Expect(string(testSink.Contents())).To(MatchRegexp(`.*"log_level":1,"timestamp":[0-9]+[.][0-9]+,"message":"route-service-response","data":{"route-service-endpoint":"https://foo.com","status-code":418}}.*`))
 					})
 				})
 
@@ -1003,13 +1002,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 					It("logs the failure", func() {
 						_, err := proxyRoundTripper.RoundTrip(req)
 						Expect(err).To(MatchError(dialError))
-
-						Expect(logger.Buffer()).ToNot(gbytes.Say(`backend-endpoint-failed`))
-						for i := 0; i < 3; i++ {
-							logOutput := logger.Buffer()
-							Expect(logOutput).To(gbytes.Say(`route-service-connection-failed`))
-							Expect(logOutput).To(gbytes.Say(`foo.com`))
+						Expect(testSink.Contents()).ToNot(ContainSubstring(`backend-endpoint-failed`))
+						count := 0
+						for _, s := range testSink.Lines() {
+							if strings.Contains(s, "\"message\":\"route-service-connection-failed\",\"data\":{\"route-service-endpoint\":\"https://foo.com\"") {
+								count++
+							}
 						}
+						Expect(count).To(Equal(3))
 					})
 
 					Context("when MaxAttempts is set to 5", func() {
@@ -1046,9 +1046,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						It("logs the error", func() {
 							_, err := proxyRoundTripper.RoundTrip(req)
 							Expect(err).To(MatchError("banana"))
-							logOutput := logger.Buffer()
-							Expect(logOutput).To(gbytes.Say(`route-service-connection-failed`))
-							Expect(logOutput).To(gbytes.Say(`foo.com`))
+							Expect(string(testSink.Contents())).To(MatchRegexp(`.*"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"route-service-connection-failed","data":{"route-service-endpoint":"https://foo.com".*`))
 						})
 					})
 				})

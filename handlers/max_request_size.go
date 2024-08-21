@@ -2,25 +2,25 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type MaxRequestSize struct {
 	cfg     *config.Config
 	MaxSize int
-	logger  logger.Logger
+	logger  *slog.Logger
 }
 
 const ONE_MB = 1024 * 1024 // bytes * kb
 
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
-func NewMaxRequestSize(cfg *config.Config, logger logger.Logger) *MaxRequestSize {
+func NewMaxRequestSize(cfg *config.Config, logger *slog.Logger) *MaxRequestSize {
 	maxSize := cfg.MaxHeaderBytes
 
 	if maxSize < 1 {
@@ -28,7 +28,7 @@ func NewMaxRequestSize(cfg *config.Config, logger logger.Logger) *MaxRequestSize
 	}
 
 	if maxSize > ONE_MB {
-		logger.Warn("innefectual-max-header-bytes-value", zap.String("error", fmt.Sprintf("Values over %d are limited by http.Server", maxSize)))
+		logger.Warn("innefectual-max-header-bytes-value", slog.String("error", fmt.Sprintf("Values over %d are limited by http.Server", maxSize)))
 		maxSize = ONE_MB
 	}
 
@@ -51,11 +51,11 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	if reqSize >= m.MaxSize {
 		reqInfo, err := ContextRequestInfo(r)
 		if err != nil {
-			logger.Error("request-info-err", zap.Error(err))
+			logger.Error("request-info-err", log.ErrAttr(err))
 		} else {
 			endpointIterator, err := EndpointIteratorForRequest(logger, r, m.cfg.StickySessionCookieNames, m.cfg.StickySessionsForAuthNegotiate, m.cfg.LoadBalanceAZPreference, m.cfg.Zone)
 			if err != nil {
-				logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", zap.Error(err))
+				logger.Error("failed-to-find-endpoint-for-req-during-431-short-circuit", log.ErrAttr(err))
 			} else {
 				reqInfo.RouteEndpoint = endpointIterator.Next(0)
 			}

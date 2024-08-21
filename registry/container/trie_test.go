@@ -1,12 +1,19 @@
 package container_test
 
 import (
-	"code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/route"
+	"log/slog"
 
-	"code.cloudfoundry.org/gorouter/registry/container"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/registry/container"
 )
 
 var _ = Describe("Trie", func() {
@@ -14,12 +21,18 @@ var _ = Describe("Trie", func() {
 	var (
 		r         *container.Trie
 		p, p1, p2 *route.EndpointPool
+		testSink  *test_util.TestSink
+		logger    *slog.Logger
 	)
 
 	BeforeEach(func() {
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+
 		r = container.NewTrie()
 		p = route.NewPool(&route.PoolOpts{
-			Logger:             new(fakes.FakeLogger),
+			Logger:             logger,
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -27,7 +40,7 @@ var _ = Describe("Trie", func() {
 		})
 
 		p1 = route.NewPool(&route.PoolOpts{
-			Logger:             new(fakes.FakeLogger),
+			Logger:             logger,
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -35,7 +48,7 @@ var _ = Describe("Trie", func() {
 		})
 
 		p2 = route.NewPool(&route.PoolOpts{
-			Logger:             new(fakes.FakeLogger),
+			Logger:             logger,
 			RetryAfterFailure:  42,
 			Host:               "",
 			ContextPath:        "",
@@ -175,13 +188,13 @@ var _ = Describe("Trie", func() {
 		It("adds a child node", func() {
 			rootPool := route.NewPool(
 				&route.PoolOpts{
-					Logger:            new(fakes.FakeLogger),
+					Logger:            logger,
 					RetryAfterFailure: 0,
 					Host:              "",
 					ContextPath:       "",
 				})
 			childPool := route.NewPool(&route.PoolOpts{
-				Logger:            new(fakes.FakeLogger),
+				Logger:            logger,
 				RetryAfterFailure: 0,
 				Host:              "",
 				ContextPath:       "",
@@ -319,13 +332,13 @@ var _ = Describe("Trie", func() {
 			e1 := route.NewEndpoint(&route.EndpointOpts{Port: 1234})
 			e2 := route.NewEndpoint(&route.EndpointOpts{Port: 4321})
 			p3 := route.NewPool(&route.PoolOpts{
-				Logger:            new(fakes.FakeLogger),
+				Logger:            logger,
 				RetryAfterFailure: 42,
 				Host:              "",
 				ContextPath:       "",
 			})
 			p4 := route.NewPool(&route.PoolOpts{
-				Logger:            new(fakes.FakeLogger),
+				Logger:            logger,
 				RetryAfterFailure: 42,
 				Host:              "",
 				ContextPath:       "",

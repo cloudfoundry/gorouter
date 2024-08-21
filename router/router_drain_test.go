@@ -5,19 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/common/health"
+
+	"github.com/nats-io/nats.go"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/tedsuo/ifrit"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
 	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -29,15 +38,12 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/tedsuo/ifrit"
 )
 
 var _ = Describe("Router", func() {
 	var (
-		logger     logger.Logger
+		testSink   *test_util.TestSink
+		logger     *slog.Logger
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 		p          http.Handler
@@ -150,7 +156,10 @@ var _ = Describe("Router", func() {
 	}
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		natsPort = test_util.NextAvailPort()
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
@@ -196,7 +205,7 @@ var _ = Describe("Router", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
-		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber")))
+		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, log.CreateLoggerWithSource("subscriber", "")))
 		<-subscriber.Ready()
 
 	})

@@ -1,12 +1,17 @@
 package handlers_test
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 
 	"github.com/urfave/negroni/v3"
 
@@ -15,16 +20,29 @@ import (
 )
 
 var _ = Describe("HTTPRewrite Handler", func() {
+	var (
+		testSink *test_util.TestSink
+		logger   *slog.Logger
+	)
+
+	BeforeEach(func() {
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
+	})
+
 	process := func(cfg config.HTTPRewrite) *httptest.ResponseRecorder {
 		mockedService := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header()["X-Foo"] = []string{"foo"}
 			w.WriteHeader(http.StatusTeapot)
 			w.Write([]byte("I'm a little teapot, short and stout."))
 		})
-
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 		n := negroni.New()
 		n.Use(handlers.NewRequestInfo())
-		n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
+		n.Use(handlers.NewProxyWriter(logger))
 		n.Use(handlers.NewHTTPRewriteHandler(cfg, []string{}))
 		n.UseHandler(mockedService)
 
@@ -160,10 +178,11 @@ var _ = Describe("HTTPRewrite Handler", func() {
 				w.WriteHeader(http.StatusTeapot)
 				w.Write([]byte("I'm a little teapot, short and stout."))
 			})
-
+			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+			log.SetLoggingLevel("Debug")
 			n := negroni.New()
 			n.Use(handlers.NewRequestInfo())
-			n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
+			n.Use(handlers.NewProxyWriter(logger))
 			n.Use(handlers.NewHTTPRewriteHandler(config.HTTPRewrite{}, headersToAlwaysRemove))
 			n.UseHandler(mockedService)
 

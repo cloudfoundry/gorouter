@@ -8,29 +8,36 @@ import (
 	"os"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	schemaFakes "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
+
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("AccessLog", func() {
 
+	var (
+		logger *test_util.TestLogger
+	)
+
+	BeforeEach(func() {
+		logger = test_util.NewTestLogger("test")
+	})
+
 	Describe("LoggregatorAccessLogger", func() {
 		var (
-			logger logger.Logger
-			cfg    *config.Config
-			ls     *schemaFakes.FakeLogSender
+			cfg *config.Config
+			ls  *schemaFakes.FakeLogSender
 		)
 
 		Context("log sender", func() {
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
@@ -42,7 +49,7 @@ var _ = Describe("AccessLog", func() {
 				cfg.Logging.LoggregatorEnabled = true
 				cfg.Index = 42
 
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				record := *CreateAccessLogRecord()
@@ -65,7 +72,6 @@ var _ = Describe("AccessLog", func() {
 			)
 
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
@@ -91,7 +97,7 @@ var _ = Describe("AccessLog", func() {
 					LoggregatorEnabled: true,
 				}
 
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				contents := make(chan string, 1)
@@ -106,7 +112,6 @@ var _ = Describe("AccessLog", func() {
 
 		Context("when created with access log file", func() {
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 				var err error
 				cfg, err = config.DefaultConfig()
@@ -119,7 +124,7 @@ var _ = Describe("AccessLog", func() {
 				defer os.Remove(stdout.Name())
 
 				cfg.AccessLog.File = stdout.Name()
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				accessLogger.Log(*CreateAccessLogRecord())
@@ -140,7 +145,6 @@ var _ = Describe("AccessLog", func() {
 			)
 
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
@@ -167,7 +171,7 @@ var _ = Describe("AccessLog", func() {
 					DisableLogForwardedFor: true,
 				}
 
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				contents := make(chan string, 1)
@@ -188,7 +192,6 @@ var _ = Describe("AccessLog", func() {
 			)
 
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
@@ -215,7 +218,7 @@ var _ = Describe("AccessLog", func() {
 					DisableLogSourceIP: true,
 				}
 
-				accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+				accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 				Expect(err).ToNot(HaveOccurred())
 
 				b := make(chan string, 1)
@@ -238,7 +241,6 @@ var _ = Describe("AccessLog", func() {
 			)
 
 			BeforeEach(func() {
-				logger = test_util.NewTestZapLogger("test")
 				ls = &schemaFakes.FakeLogSender{}
 
 				var err error
@@ -266,7 +268,7 @@ var _ = Describe("AccessLog", func() {
 						RedactQueryParams:  "all",
 					}
 
-					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 					Expect(err).ToNot(HaveOccurred())
 
 					b := make(chan string, 1)
@@ -292,7 +294,7 @@ var _ = Describe("AccessLog", func() {
 						RedactQueryParams:  "none",
 					}
 
-					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 					Expect(err).ToNot(HaveOccurred())
 
 					b := make(chan string, 1)
@@ -318,7 +320,7 @@ var _ = Describe("AccessLog", func() {
 						RedactQueryParams:  "hash",
 					}
 
-					accessLogger, err := accesslog.CreateRunningAccessLogger(logger, ls, cfg)
+					accessLogger, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 					Expect(err).ToNot(HaveOccurred())
 
 					b := make(chan string, 1)
@@ -338,13 +340,11 @@ var _ = Describe("AccessLog", func() {
 
 	Describe("FileLogger", func() {
 		var (
-			baseLogger logger.Logger
-			cfg        *config.Config
-			ls         *schemaFakes.FakeLogSender
+			cfg *config.Config
+			ls  *schemaFakes.FakeLogSender
 		)
 
 		BeforeEach(func() {
-			baseLogger = test_util.NewTestZapLogger("test")
 			ls = &schemaFakes.FakeLogSender{}
 
 			var err error
@@ -353,7 +353,7 @@ var _ = Describe("AccessLog", func() {
 		})
 
 		It("creates null access loger if no access log and loggregator is disabled", func() {
-			Expect(accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)).To(BeAssignableToTypeOf(&accesslog.NullAccessLogger{}))
+			Expect(accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)).To(BeAssignableToTypeOf(&accesslog.NullAccessLogger{}))
 		})
 
 		It("does not creates an a file AccessLogger when only loggegrator is enabled", func() {
@@ -361,7 +361,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = ""
 			cfg.AccessLog.EnableStreaming = false
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).To(BeEmpty())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(0))
 		})
@@ -370,7 +370,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = "/dev/null"
 			cfg.AccessLog.EnableStreaming = false
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeEmpty())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
@@ -380,7 +380,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = "/dev/null"
 			cfg.AccessLog.EnableStreaming = false
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeEmpty())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
@@ -390,7 +390,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = "/dev/null"
 			cfg.AccessLog.EnableStreaming = true
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(2))
 		})
@@ -400,7 +400,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = "/dev/null"
 			cfg.AccessLog.EnableStreaming = false
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
@@ -410,7 +410,7 @@ var _ = Describe("AccessLog", func() {
 			cfg.AccessLog.File = ""
 			cfg.AccessLog.EnableStreaming = true
 
-			accessLogger, _ := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			accessLogger, _ := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).FileWriters()).ToNot(BeNil())
 			Expect(accessLogger.(*accesslog.FileAndLoggregatorAccessLogger).WriterCount()).To(Equal(1))
 		})
@@ -418,7 +418,7 @@ var _ = Describe("AccessLog", func() {
 		It("reports an error if the access log location is invalid", func() {
 			cfg.AccessLog.File = "/this\\is/illegal"
 
-			a, err := accesslog.CreateRunningAccessLogger(baseLogger, ls, cfg)
+			a, err := accesslog.CreateRunningAccessLogger(logger.Logger, ls, cfg)
 			Expect(err).To(HaveOccurred())
 			Expect(a).To(BeNil())
 		})

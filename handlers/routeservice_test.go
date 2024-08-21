@@ -5,14 +5,17 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -46,7 +49,8 @@ var _ = Describe("Route Service Handler", func() {
 
 		nextCalled  bool
 		prevHandler negroni.Handler
-		logger      logger.Logger
+		testSink    *test_util.TestSink
+		logger      *slog.Logger
 	)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -77,7 +81,10 @@ var _ = Describe("Route Service Handler", func() {
 		req, err = http.ReadRequest(bufio.NewReader(reqBuf))
 		Expect(err).ToNot(HaveOccurred())
 
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLoggerWithSource("test", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 
 		resp = httptest.NewRecorder()
 
@@ -160,7 +167,7 @@ var _ = Describe("Route Service Handler", func() {
 			It("returns 502 Bad Gateway", func() {
 				handler.ServeHTTP(resp, req)
 
-				Expect(logger).To(gbytes.Say(`route-service-unsupported`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`route-service-unsupported`))
 				Expect(resp.Code).To(Equal(http.StatusBadGateway))
 				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal(`route_service_unsupported`))
 				Expect(resp.Body.String()).To(ContainSubstring(`Support for route services is disabled.`))
@@ -519,7 +526,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(logger).To(gbytes.Say(`signature-validation-failed`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -543,7 +550,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(logger).To(gbytes.Say(`signature-validation-failed`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -571,7 +578,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(logger).To(gbytes.Say(`signature-validation-failed`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -598,7 +605,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(logger).To(gbytes.Say(`signature-validation-failed`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -662,7 +669,7 @@ var _ = Describe("Route Service Handler", func() {
 
 						Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-						Expect(logger).To(gbytes.Say(`signature-validation-failed`))
+						Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
 
 						Expect(nextCalled).To(BeFalse())
 					})
@@ -744,7 +751,7 @@ var _ = Describe("Route Service Handler", func() {
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`request-info-err`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`request-info-err`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)
@@ -762,7 +769,7 @@ var _ = Describe("Route Service Handler", func() {
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`failed-to-access-RoutePool`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`failed-to-access-RoutePool`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)
@@ -896,7 +903,7 @@ var _ = Describe("Route Service Handler", func() {
 				if testCase.err {
 					defer func() {
 						recover()
-						Expect(logger).To(gbytes.Say(`allowlist-entry-invalid`))
+						Expect(string(testSink.Contents())).To(ContainSubstring(`allowlist-entry-invalid`))
 					}()
 					handlers.NewRouteService(config, reg, logger, ew)
 					continue

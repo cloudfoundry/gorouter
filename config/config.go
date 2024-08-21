@@ -5,20 +5,20 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"go.step.sm/crypto/pemutil"
 
 	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 	"gopkg.in/yaml.v3"
 
 	"code.cloudfoundry.org/localip"
-	"slices"
 )
 
 const (
@@ -284,7 +284,7 @@ func (c CertSubject) ToName() pkix.Name {
 // If a rule does apply, it is evaluated.
 //
 // Returns an error if there is an applicable rule which does not find a valid client certificate subject.
-func VerifyClientCertMetadata(rules []VerifyClientCertificateMetadataRule, chains [][]*x509.Certificate, logger logger.Logger) error {
+func VerifyClientCertMetadata(rules []VerifyClientCertificateMetadataRule, chains [][]*x509.Certificate, logger *slog.Logger) error {
 	for _, rule := range rules {
 		for _, chain := range chains {
 			requiredSubject := rule.CASubject.ToName()
@@ -304,9 +304,9 @@ func VerifyClientCertMetadata(rules []VerifyClientCertificateMetadataRule, chain
 // whose subject matches the requiredCASubject name.
 //
 // Returns true, if a CA certificate in the chain (cert.IsCA == true) matches the requiredCASubject name.
-func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger logger.Logger, requiredCASubject pkix.Name) bool {
+func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger *slog.Logger, requiredCASubject pkix.Name) bool {
 	for i, cert := range chain {
-		logger.Debug("cert", zap.Int("index", i), zap.Bool("ca", cert.IsCA), zap.String("subject", cert.Subject.String()), zap.String("issuer", cert.Issuer.String()))
+		logger.Debug("cert", slog.Int("index", i), slog.Bool("ca", cert.IsCA), slog.Any("subject", fmt.Stringer(cert.Subject)), slog.String("issuer", cert.Issuer.String()))
 		if cert.IsCA && requiredCASubject.ToRDNSequence().String() == cert.Subject.ToRDNSequence().String() {
 			return true
 		}
@@ -320,7 +320,7 @@ func checkIfRuleAppliesToChain(chain []*x509.Certificate, logger logger.Logger, 
 // Returns an error when:
 // * the certificate does not match any of the ValidSubjects in rule.
 // * the chain does not contain any client certificates (i.e. IsCA == false).
-func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger.Logger, rule VerifyClientCertificateMetadataRule) error {
+func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger *slog.Logger, rule VerifyClientCertificateMetadataRule) error {
 	for _, cert := range chain {
 		if cert.IsCA {
 			continue
@@ -329,11 +329,11 @@ func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger logger
 		for _, validSubject := range rule.ValidSubjects {
 			validCertSubject := validSubject.ToName()
 			if validCertSubject.ToRDNSequence().String() == subject.ToRDNSequence().String() {
-				logger.Debug("chain", zap.String("issuer", cert.Issuer.String()), zap.Bool("CA", cert.IsCA), zap.String("subject", cert.Subject.String()))
+				logger.Debug("chain", slog.String("issuer", cert.Issuer.String()), slog.Bool("CA", cert.IsCA), slog.String("subject", cert.Subject.String()))
 				return nil
 			}
 		}
-		logger.Warn("invalid-subject", zap.String("issuer", cert.Issuer.String()), zap.String("subject", cert.Subject.String()), zap.Object("allowed", rule.ValidSubjects))
+		logger.Warn("invalid-subject", slog.String("issuer", cert.Issuer.String()), slog.String("subject", cert.Subject.String()), slog.Any("allowed", rule.ValidSubjects))
 		return fmt.Errorf("subject not in the list of allowed subjects for CA Subject %q: %q", rule.CASubject, subject)
 	}
 	// this should never happen as the function is only called on successful client certificate verification as callback

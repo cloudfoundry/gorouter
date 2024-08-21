@@ -1,12 +1,16 @@
 package monitor_test
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -21,13 +25,17 @@ var _ = Describe("FileDescriptor", func() {
 		sender   *fakes.MetricSender
 		procPath string
 		tr       *time.Ticker
-		logger   logger.Logger
+		testSink *test_util.TestSink
+		logger   *slog.Logger
 	)
 
 	BeforeEach(func() {
 		tr = time.NewTicker(1 * time.Second)
 		sender = &fakes.MetricSender{}
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 	})
 
 	AfterEach(func() {

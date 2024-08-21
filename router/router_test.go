@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
@@ -24,16 +25,22 @@ import (
 	"syscall"
 	"time"
 
-	. "code.cloudfoundry.org/gorouter/router"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	. "code.cloudfoundry.org/gorouter/router"
+
+	"github.com/nats-io/nats.go"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -41,11 +48,6 @@ import (
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/nats-io/nats.go"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/tedsuo/ifrit"
-	"github.com/tedsuo/ifrit/grouper"
-	"github.com/tedsuo/ifrit/sigmon"
 
 	cfg "code.cloudfoundry.org/gorouter/config"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
@@ -68,7 +70,7 @@ var _ = Describe("Router", func() {
 		registry            *rregistry.RouteRegistry
 		varz                vvarz.Varz
 		router              *Router
-		logger              logger.Logger
+		logger              *test_util.TestLogger
 		statusPort          uint16
 		statusTLSPort       uint16
 		statusRoutesPort    uint16
@@ -107,18 +109,18 @@ var _ = Describe("Router", func() {
 		routeServicesServer = &sharedfakes.RouteServicesServer{}
 
 		mbusClient = natsRunner.MessageBus
-		logger = test_util.NewTestZapLogger("router-test")
+		logger = test_util.NewTestLogger("router-test")
 		fakeReporter = new(fakeMetrics.FakeRouteRegistryReporter)
-		registry = rregistry.NewRouteRegistry(logger, config, fakeReporter)
+		registry = rregistry.NewRouteRegistry(logger.Logger, config, fakeReporter)
 		varz = vvarz.NewVarz(registry)
 	})
 
 	JustBeforeEach(func() {
-		router, err = initializeRouter(config, backendIdleTimeout, requestTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+		router, err = initializeRouter(config, backendIdleTimeout, requestTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
-		subscriber := mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber"))
+		subscriber := mbus.NewSubscriber(mbusClient, registry, config, nil, test_util.NewTestLogger("subscriber").Logger)
 
 		members := grouper.Members{
 			{Name: "subscriber", Runner: subscriber},
@@ -163,7 +165,7 @@ var _ = Describe("Router", func() {
 				c := test_util.SpecConfig(statusPort, statusTLSPort, statusRoutesPort, proxyPort, natsPort)
 				c.StartResponseDelayInterval = 1 * time.Second
 
-				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
+				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, rss)
 				Expect(err).NotTo(HaveOccurred())
 
 				signals := make(chan os.Signal)
@@ -191,7 +193,7 @@ var _ = Describe("Router", func() {
 					return nil
 				}
 
-				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, rss)
+				rtr, err := initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, rss)
 				Expect(err).NotTo(HaveOccurred())
 
 				signals := make(chan os.Signal)
@@ -237,7 +239,7 @@ var _ = Describe("Router", func() {
 		Context("and the nontls health listener is enabled", func() {
 			It("does not immediately make the health check endpoint available", func() {
 				// Create a second router to test the health check in parallel to startup
-				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 
 				Expect(err).ToNot(HaveOccurred())
 				signals := make(chan os.Signal)
@@ -263,7 +265,7 @@ var _ = Describe("Router", func() {
 			})
 			It("never listen on the nontls status port", func() {
 				// Create a second router to test the health check in parallel to startup
-				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 
 				Expect(err).ToNot(HaveOccurred())
 				signals := make(chan os.Signal)
@@ -285,7 +287,7 @@ var _ = Describe("Router", func() {
 
 			It("does not immediately make the health check endpoint available", func() {
 				// Create a second router to test the health check in parallel to startup
-				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 
 				Expect(err).ToNot(HaveOccurred())
 				signals := make(chan os.Signal)
@@ -312,7 +314,7 @@ var _ = Describe("Router", func() {
 			})
 			It("does not start the TLS health listener", func() {
 				// Create a second router to test the health check in parallel to startup
-				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 				Expect(err).ToNot(HaveOccurred())
 				signals := make(chan os.Signal)
 				readyChan := make(chan struct{})
@@ -332,7 +334,7 @@ var _ = Describe("Router", func() {
 				c.Status.EnableNonTLSHealthChecks = false
 			})
 			It("throws an error initalizing the router", func() {
-				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger, routeServicesServer)
+				rtr, err = initializeRouter(c, c.EndpointTimeout, c.EndpointTimeout, registry, varz, mbusClient, logger.Logger, routeServicesServer)
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(ContainSubstring("bug in gorouter")))
 				Expect(rtr).To(BeNil())
@@ -2383,7 +2385,7 @@ func badCertTemplate(cname string) (*x509.Certificate, error) {
 	return &tmpl, nil
 }
 
-func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout time.Duration, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger logger.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
+func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout time.Duration, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger *slog.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
 	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}

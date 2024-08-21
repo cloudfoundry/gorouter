@@ -3,13 +3,16 @@ package handlers_test
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+
+	"go.uber.org/zap/zapcore"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 
@@ -26,7 +29,8 @@ var _ = Describe("QueryParamHandler", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		logger logger.Logger
+		testSink *test_util.TestSink
+		logger   *slog.Logger
 
 		prevHandler negroni.Handler
 
@@ -64,7 +68,10 @@ var _ = Describe("QueryParamHandler", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLoggerWithSource("test", "")
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 
 		reqChan = make(chan *http.Request, 1)
 
@@ -100,8 +107,8 @@ var _ = Describe("QueryParamHandler", func() {
 				req.RequestURI = "/example?param1;param2"
 				handler.ServeHTTP(resp, req)
 
-				Expect(logger).To(gbytes.Say(`deprecated-semicolon-params`))
-				Expect(logger).To(gbytes.Say(`"data":{"vcap_request_id":"` + id + `"}`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`deprecated-semicolon-params`))
+				Expect(string(testSink.Contents())).To(ContainSubstring(`"data":{"vcap_request_id":"` + id + `"}`))
 
 				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("deprecated-semicolon-params"))
 			})
@@ -115,7 +122,7 @@ var _ = Describe("QueryParamHandler", func() {
 					req.RequestURI = "/example?param1;param2"
 					handler.ServeHTTP(resp, req)
 
-					Expect(logger).To(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","vcap_request_id":"` + id + `"}`))
+					Expect(string(testSink.Contents())).To(ContainSubstring(`"data":{"trace-id":"1111","span-id":"2222","vcap_request_id":"` + id + `"}`))
 
 					Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal("deprecated-semicolon-params"))
 				})
@@ -126,7 +133,7 @@ var _ = Describe("QueryParamHandler", func() {
 				req.RequestURI = "/example?param1&param2"
 				handler.ServeHTTP(resp, req)
 
-				Expect(logger).NotTo(gbytes.Say(`deprecated-semicolon-params`))
+				Expect(testSink.Contents()).NotTo(ContainSubstring(`deprecated-semicolon-params`))
 				Expect(resp.Header().Get(router_http.CfRouterError)).To(Equal(""))
 			})
 		})

@@ -6,7 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger/fakes"
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 )
@@ -29,15 +33,18 @@ const (
 )
 
 func setupEndpointIterator(total int, azDistribution int, strategy string) route.EndpointIterator {
+	logger := log.CreateLogger()
+	testSink := &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+	log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+	log.SetLoggingLevel("Debug")
 	// Make pool
 	pool := route.NewPool(&route.PoolOpts{
-		Logger:             new(fakes.FakeLogger),
+		Logger:             logger,
 		RetryAfterFailure:  2 * time.Minute,
 		Host:               "",
 		ContextPath:        "",
 		MaxConnsPerBackend: 0,
 	})
-	logger := test_util.NewTestZapLogger("test")
 
 	// Create endpoints with desired AZ distribution
 	endpoints := make([]*route.Endpoint, 0)

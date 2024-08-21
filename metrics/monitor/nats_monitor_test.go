@@ -2,17 +2,20 @@ package monitor_test
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/gorouter/metrics/monitor"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
+	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("NATSMonitor", func() {
@@ -22,7 +25,8 @@ var _ = Describe("NATSMonitor", func() {
 		sender       *fakes.MetricSender
 		ch           chan time.Time
 		natsMonitor  *monitor.NATSMonitor
-		logger       logger.Logger
+		testSink     *test_util.TestSink
+		logger       *slog.Logger
 		process      ifrit.Process
 	)
 
@@ -33,7 +37,10 @@ var _ = Describe("NATSMonitor", func() {
 		valueChainer = new(fakes.FakeValueChainer)
 		sender.ValueReturns(valueChainer)
 
-		logger = test_util.NewTestZapLogger("test")
+		logger = log.CreateLogger()
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetLoggingLevel("Debug")
 
 		natsMonitor = &monitor.NATSMonitor{
 			Subscriber: subscriber,
@@ -97,7 +104,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-sending-buffered-messages-metric"))
+			Expect(string(testSink.Contents())).To(ContainSubstring("error-sending-buffered-messages-metric"))
 		})
 	})
 
@@ -117,7 +124,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-sending-total-dropped-messages-metric"))
+			Expect(string(testSink.Contents())).To(ContainSubstring("error-sending-total-dropped-messages-metric"))
 		})
 	})
 
@@ -129,7 +136,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-pending-messages"))
+			Expect(string(testSink.Contents())).To(ContainSubstring("error-retrieving-nats-subscription-pending-messages"))
 		})
 	})
 
@@ -141,7 +148,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-dropped-messages"))
+			Expect(string(testSink.Contents())).To(ContainSubstring("error-retrieving-nats-subscription-dropped-messages"))
 		})
 	})
 })
