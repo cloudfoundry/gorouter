@@ -129,23 +129,6 @@ func NewProxy(
 		ModifyResponse: p.modifyResponse,
 	}
 
-	// by default, we should close 100-continue requests for safety
-	// this requires a second proxy because Director and Rewrite cannot coexist
-	// additionally, Director() is called before hop-by-hop headers are sanitized
-	// whereas Rewrite is after, and this is where `Connection: close` can be added
-	expect100ContinueRProxy := &httputil.ReverseProxy{
-		Rewrite:        p.setupProxyRequestClose100Continue,
-		Transport:      prt,
-		FlushInterval:  50 * time.Millisecond,
-		BufferPool:     p.bufferPool,
-		ModifyResponse: p.modifyResponse,
-	}
-
-	// if we want to not force close 100-continue requests, use the normal rproxy
-	if cfg.KeepAlive100ContinueRequests {
-		expect100ContinueRProxy = rproxy
-	}
-
 	routeServiceHandler := handlers.NewRouteService(routeServiceConfig, registry, logger, errorWriter)
 
 	zipkinHandler := handlers.NewZipkin(cfg.Tracing.EnableZipkin, logger)
@@ -195,7 +178,7 @@ func NewProxy(
 	})
 	n.Use(routeServiceHandler)
 	n.Use(p)
-	n.Use(handlers.NewProxyPicker(rproxy, expect100ContinueRProxy))
+	n.UseHandler(rproxy)
 
 	return n
 }
@@ -279,44 +262,6 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 
 	setRequestXRequestStart(target)
 	target.Header.Del(router_http.CfAppInstance)
-}
-
-func (p *proxy) setupProxyRequestClose100Continue(target *httputil.ProxyRequest) {
-	reqInfo, err := handlers.ContextRequestInfo(target.In)
-	if err != nil {
-		p.logger.Panic("request-info-err", zap.Error(err))
-		return
-	}
-	reqInfo.BackendReqHeaders = target.Out.Header
-
-	target.Out.URL.Scheme = "http"
-	target.Out.URL.Host = target.In.Host
-	target.Out.URL.ForceQuery = false
-	target.Out.URL.Opaque = target.In.RequestURI
-
-	if strings.HasPrefix(target.In.RequestURI, "//") {
-		path := escapePathAndPreserveSlashes(target.In.URL.Path)
-		target.Out.URL.Opaque = "//" + target.In.Host + path
-
-		if len(target.In.URL.Query()) > 0 {
-			target.Out.URL.Opaque = target.Out.URL.Opaque + "?" + target.In.URL.Query().Encode()
-		}
-	}
-	target.Out.URL.RawQuery = ""
-
-	setRequestXRequestStart(target.Out)
-	target.Out.Header.Del(router_http.CfAppInstance)
-
-	// always set connection close on 100-continue requests
-	target.Out.Header.Set("Connection", "close")
-
-	target.Out.Header["X-Forwarded-For"] = target.In.Header["X-Forwarded-For"]
-	target.Out.Header["Forwarded"] = target.In.Header["Forwarded"]
-	// Takes care of setting the X-Forwarded-For header properly. Also sets the X-Forwarded-Proto
-	// which we overwrite again.
-	target.SetXForwarded()
-	target.Out.Header["X-Forwarded-Proto"] = target.In.Header["X-Forwarded-Proto"]
-	target.Out.Header["X-Forwarded-Host"] = target.In.Header["X-Forwarded-Host"]
 }
 
 func setRequestXRequestStart(request *http.Request) {

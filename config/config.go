@@ -17,8 +17,9 @@ import (
 	"github.com/uber-go/zap"
 	"gopkg.in/yaml.v2"
 
-	"code.cloudfoundry.org/localip"
 	"slices"
+
+	"code.cloudfoundry.org/localip"
 )
 
 const (
@@ -457,11 +458,10 @@ type Config struct {
 	LoadBalance             string `yaml:"balancing_algorithm,omitempty"`
 	LoadBalanceAZPreference string `yaml:"balancing_algorithm_az_preference,omitempty"`
 
-	DisableKeepAlives            bool `yaml:"disable_keep_alives"`
-	MaxIdleConns                 int  `yaml:"max_idle_conns,omitempty"`
-	MaxIdleConnsPerHost          int  `yaml:"max_idle_conns_per_host,omitempty"`
-	MaxHeaderBytes               int  `yaml:"max_header_bytes"`
-	KeepAlive100ContinueRequests bool `yaml:"keep_alive_100_continue_requests"`
+	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
+	MaxIdleConns        int  `yaml:"max_idle_conns,omitempty"`
+	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host,omitempty"`
+	MaxHeaderBytes      int  `yaml:"max_header_bytes"`
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
 
