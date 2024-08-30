@@ -1,9 +1,10 @@
 package uuid_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/uuid"
 )
 
 var _ = Describe("UUID", func() {

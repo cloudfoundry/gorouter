@@ -6,10 +6,11 @@ import (
 	"net/textproto"
 	"time"
 
+	"github.com/urfave/negroni/v3"
+
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"github.com/urfave/negroni/v3"
 )
 
 type reporterHandler struct {
@@ -33,7 +34,7 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 	// logger.Panic does not cause gorouter to exit 1 but rather throw panic with
 	// stacktrace in error log
 	if err != nil {
-		logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	if !validContentLength(r.Header) {

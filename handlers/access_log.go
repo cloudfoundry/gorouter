@@ -7,12 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"github.com/urfave/negroni/v3"
 )
 
 type accessLog struct {

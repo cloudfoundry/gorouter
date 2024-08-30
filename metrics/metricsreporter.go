@@ -7,8 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/route"
 	"github.com/cloudfoundry/dropsonde/metrics"
+
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 type MetricsReporter struct {

@@ -15,6 +15,16 @@ import (
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	mr "code.cloudfoundry.org/go-metric-registry"
+	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/tlsconfig"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
+	"github.com/nats-io/nats.go"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -31,17 +41,8 @@ import (
 	"code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager/v3"
 	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/uaaclient"
-	"code.cloudfoundry.org/tlsconfig"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/metric_sender"
-	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/nats-io/nats.go"
-	"github.com/tedsuo/ifrit"
-	"github.com/tedsuo/ifrit/grouper"
-	"github.com/tedsuo/ifrit/sigmon"
 )
 
 var (
@@ -54,7 +55,7 @@ func main() {
 	flag.Parse()
 
 	prefix := "gorouter.stdout"
-	coreLogger := grlog.CreateLoggerWithSource("", "")
+	coreLogger := grlog.CreateLogger()
 	grlog.SetLoggingLevel("INFO")
 
 	c, err := config.DefaultConfig()
@@ -119,7 +120,7 @@ func main() {
 	if c.RoutingApiEnabled() {
 		logger.Info("setting-up-routing-api")
 
-		routingAPIClient, err = setupRoutingAPIClient(coreLogger, c)
+		routingAPIClient, err = setupRoutingAPIClient(logger, c)
 		if err != nil {
 			grlog.Fatal(logger, "routing-api-connection-failed", grlog.ErrAttr(err))
 		}

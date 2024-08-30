@@ -3,37 +3,30 @@ package varz_test
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/config"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "code.cloudfoundry.org/gorouter/varz"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Varz", func() {
 	var Varz Varz
 	var Registry *registry.RouteRegistry
-	var testSink *test_util.TestSink
-	var logger *slog.Logger
+	var logger *test_util.TestLogger
 
 	BeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		cfg, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
-		Registry = registry.NewRouteRegistry(logger, cfg, new(fakes.FakeRouteRegistryReporter))
+		Registry = registry.NewRouteRegistry(logger.Logger, cfg, new(fakes.FakeRouteRegistryReporter))
 		Varz = NewVarz(Registry)
 	})
 

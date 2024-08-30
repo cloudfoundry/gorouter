@@ -182,7 +182,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				logger.Error("select-endpoint-failed", slog.String("host", reqInfo.RoutePool.Host()), log.ErrAttr(selectEndpointErr))
 				break
 			}
-			logger = logger.With(slog.Any("route-endpoint", endpoint.ToLogData()))
+			logger = logger.With(slog.Group("route-endpoint", endpoint.ToLogData()...))
 			reqInfo.RouteEndpoint = endpoint
 
 			logger.Debug("backend", slog.Int("attempt", attempt))

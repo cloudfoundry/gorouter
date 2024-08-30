@@ -446,8 +446,7 @@ func (p *EndpointPool) EndpointFailed(endpoint *Endpoint, err error) {
 	if e == nil {
 		return
 	}
-
-	logger := p.logger.With(slog.Any("route-endpoint", endpoint.ToLogData()))
+	logger := p.logger.With(slog.Group("route-endpoint", endpoint.ToLogData()...))
 	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
 		logger.Error("prune-failed-endpoint")
 		p.removeEndpoint(e)

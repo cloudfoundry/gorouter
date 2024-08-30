@@ -2,27 +2,24 @@ package handlers_test
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Paniccheck", func() {
 	var (
 		healthStatus *health.Health
-		testSink     *test_util.TestSink
-		logger       *slog.Logger
+		logger       *test_util.TestLogger
 		panicHandler negroni.Handler
 		request      *http.Request
 		recorder     *httptest.ResponseRecorder
@@ -32,14 +29,11 @@ var _ = Describe("Paniccheck", func() {
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
 
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		request = httptest.NewRequest("GET", "http://example.com/foo", nil)
 		request.Host = "somehost.com"
 		recorder = httptest.NewRecorder()
-		panicHandler = handlers.NewPanicCheck(healthStatus, logger)
+		panicHandler = handlers.NewPanicCheck(healthStatus, logger.Logger)
 	})
 
 	Context("when something panics", func() {
@@ -60,8 +54,9 @@ var _ = Describe("Paniccheck", func() {
 
 		It("logs the panic message with Host", func() {
 			panicHandler.ServeHTTP(recorder, request, expectedPanic)
-			Expect(testSink.Lines()[0]).To(ContainSubstring("somehost.com"))
-			Expect(string(testSink.Contents())).To(And(ContainSubstring("we expect this panic"), ContainSubstring("stacktrace")))
+			Eventually(logger).Should(gbytes.Say("somehost.com"))
+			Eventually(logger).Should(gbytes.Say("we expect this panic"))
+			Eventually(logger).Should(gbytes.Say("stacktrace"))
 		})
 	})
 
@@ -81,7 +76,7 @@ var _ = Describe("Paniccheck", func() {
 
 		It("does not log anything", func() {
 			panicHandler.ServeHTTP(recorder, request, noop)
-			Expect(string(testSink.Contents())).NotTo(ContainSubstring("panic-check"))
+			Expect(logger).NotTo(gbytes.Say("panic-check"))
 		})
 	})
 
@@ -105,7 +100,8 @@ var _ = Describe("Paniccheck", func() {
 			Expect(func() {
 				panicHandler.ServeHTTP(recorder, request, errAbort)
 			}).To(Panic())
-			Expect(string(testSink.Contents())).NotTo(ContainSubstring("panic-check"))
+
+			Expect(logger).NotTo(gbytes.Say("panic-check"))
 		})
 	})
 })

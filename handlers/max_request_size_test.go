@@ -4,20 +4,18 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("MaxRequestSize", func() {
@@ -32,10 +30,9 @@ var _ = Describe("MaxRequestSize", func() {
 		responseBody []byte
 		requestBody  *bytes.Buffer
 
-		cfg      *config.Config
-		testSink *test_util.TestSink
-		logger   *slog.Logger
-		rh       *handlers.MaxRequestSize
+		cfg    *config.Config
+		logger *test_util.TestLogger
+		rh     *handlers.MaxRequestSize
 
 		nextCalled bool
 	)
@@ -77,12 +74,9 @@ var _ = Describe("MaxRequestSize", func() {
 	})
 
 	JustBeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		handler = negroni.New()
-		rh = handlers.NewMaxRequestSize(cfg, logger)
+		rh = handlers.NewMaxRequestSize(cfg, logger.Logger)
 		handler.Use(rh)
 		handler.Use(nextHandler)
 
@@ -232,9 +226,7 @@ var _ = Describe("MaxRequestSize", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))
 			})
 			It("logs a warning", func() {
-				Expect(testSink.Lines()[0]).To(MatchRegexp(
-					`{"log_level":2,"timestamp":[0-9]+[.][0-9]+.+}`,
-				))
+				Expect(logger.Lines(zap.WarnLevel)).To(HaveLen(1))
 			})
 		})
 	})

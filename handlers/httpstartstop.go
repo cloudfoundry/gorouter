@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
@@ -15,6 +13,9 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/urfave/negroni/v3"
 	"google.golang.org/protobuf/proto"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type httpStartStopHandler struct {

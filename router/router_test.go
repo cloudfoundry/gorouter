@@ -25,6 +25,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nats-io/nats.go"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -44,13 +52,6 @@ import (
 	testcommon "code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/tedsuo/ifrit"
-	"github.com/tedsuo/ifrit/grouper"
-	"github.com/tedsuo/ifrit/sigmon"
 )
 
 var _ = Describe("Router", func() {
@@ -116,7 +117,7 @@ var _ = Describe("Router", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
-		subscriber := mbus.NewSubscriber(mbusClient, registry, config, nil, test_util.NewTestLogger("subscriber").Logger)
+		subscriber := mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Logger)
 
 		members := grouper.Members{
 			{Name: "subscriber", Runner: subscriber},
@@ -732,7 +733,7 @@ var _ = Describe("Router", func() {
 		Eventually(done).Should(Receive(&answer))
 		Expect(answer).ToNot(Equal("A-BOGUS-REQUEST-ID"))
 		Expect(answer).To(MatchRegexp(uuid_regex))
-		Expect(logger).To(gbytes.Say("vcap-request-id-header-set"))
+		Eventually(logger).Should(gbytes.Say("vcap-request-id-header-set"))
 
 		resp, _ := httpConn.ReadResponse()
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -1075,8 +1076,8 @@ var _ = Describe("Router", func() {
 
 					_, err = io.ReadAll(resp.Body)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
-					Expect(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
+					Eventually(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
+					Eventually(logger).Should(gbytes.Say("backend-endpoint-failed.*context deadline exceeded"))
 				})
 			})
 
@@ -1095,7 +1096,8 @@ var _ = Describe("Router", func() {
 
 					_, err = io.ReadAll(resp.Body)
 					Expect(err).To(MatchError("unexpected EOF"))
-					Expect(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
+					Eventually(logger).Should(gbytes.Say("backend-request-timeout.*context deadline exceeded"))
+
 				})
 			})
 		})

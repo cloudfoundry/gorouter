@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
+	nats "github.com/nats-io/nats.go"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	nats "github.com/nats-io/nats.go"
-	. "github.com/onsi/gomega"
 )
 
 type TestApp struct {

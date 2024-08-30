@@ -4,9 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
 	"github.com/urfave/negroni/v3"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 // Zipkin is a handler that sets Zipkin headers on requests

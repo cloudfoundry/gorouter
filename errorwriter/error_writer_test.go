@@ -7,13 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 
-	. "code.cloudfoundry.org/gorouter/errorwriter"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	"go.uber.org/zap/zapcore"
+
+	. "code.cloudfoundry.org/gorouter/errorwriter"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Plaintext ErrorWriter", func() {
@@ -21,23 +22,19 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 		errorWriter ErrorWriter
 		recorder    *httptest.ResponseRecorder
 
-		logger   *slog.Logger
-		testSink *test_util.TestSink
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
 		errorWriter = NewPlaintextErrorWriter()
 		recorder = httptest.NewRecorder()
 		recorder.Header().Set("Connection", "dummy")
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 	})
 
 	Context("when the response code is a success", func() {
 		BeforeEach(func() {
-			errorWriter.WriteError(recorder, http.StatusOK, "hi", logger)
+			errorWriter.WriteError(recorder, http.StatusOK, "hi", logger.Logger)
 		})
 
 		It("should write the status code", func() {
@@ -49,8 +46,8 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 		})
 
 		It("should log the message", func() {
-			Expect(testSink.Lines()).To(HaveLen(1))
-			Expect(testSink.Lines()[0]).To(MatchRegexp(
+			Expect(logger.TestSink.Lines()).To(HaveLen(1))
+			Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
 				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"status".+}`,
 			))
 		})
@@ -70,7 +67,7 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 
 	Context("when the response code is not a success", func() {
 		BeforeEach(func() {
-			errorWriter.WriteError(recorder, http.StatusBadRequest, "bad", logger)
+			errorWriter.WriteError(recorder, http.StatusBadRequest, "bad", logger.Logger)
 		})
 
 		It("should write the status code", func() {
@@ -82,7 +79,7 @@ var _ = Describe("Plaintext ErrorWriter", func() {
 		})
 
 		It("should log the message", func() {
-			Expect(testSink.Lines()[0]).To(MatchRegexp(
+			Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
 				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"status".+}`,
 			))
 		})

@@ -5,24 +5,22 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/errorwriter"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/errorwriter"
+	"code.cloudfoundry.org/gorouter/handlers"
+	fakeRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Route Service Handler", func() {
@@ -46,8 +44,7 @@ var _ = Describe("Route Service Handler", func() {
 
 		nextCalled  bool
 		prevHandler negroni.Handler
-		testSink    *test_util.TestSink
-		logger      *slog.Logger
+		logger      *test_util.TestLogger
 	)
 
 	nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -78,17 +75,14 @@ var _ = Describe("Route Service Handler", func() {
 		req, err = http.ReadRequest(bufio.NewReader(reqBuf))
 		Expect(err).ToNot(HaveOccurred())
 
-		logger = log.CreateLoggerWithSource("test", "")
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 
 		resp = httptest.NewRecorder()
 
 		reqChan = make(chan *http.Request, 1)
 
 		routePool = route.NewPool(&route.PoolOpts{
-			Logger:             logger,
+			Logger:             logger.Logger,
 			RetryAfterFailure:  1 * time.Second,
 			Host:               "my_host.com",
 			ContextPath:        "/resource+9-9_9",
@@ -105,7 +99,7 @@ var _ = Describe("Route Service Handler", func() {
 		crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
 		Expect(err).NotTo(HaveOccurred())
 		config = routeservice.NewRouteServiceConfig(
-			logger, true, true, nil, 60*time.Second, crypto, nil, true, false,
+			logger.Logger, true, true, nil, 60*time.Second, crypto, nil, true, false,
 		)
 
 		nextCalled = false
@@ -121,13 +115,13 @@ var _ = Describe("Route Service Handler", func() {
 		handler.Use(handlers.NewRequestInfo())
 		handler.UseFunc(testSetupHandler)
 		handler.Use(prevHandler)
-		handler.Use(handlers.NewRouteService(config, reg, logger, ew))
+		handler.Use(handlers.NewRouteService(config, reg, logger.Logger, ew))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
 	Context("with route services disabled", func() {
 		BeforeEach(func() {
-			config = routeservice.NewRouteServiceConfig(logger, false, false, nil, 0, nil, nil, false, false)
+			config = routeservice.NewRouteServiceConfig(logger.Logger, false, false, nil, 0, nil, nil, false, false)
 		})
 
 		Context("for normal routes", func() {
@@ -164,7 +158,7 @@ var _ = Describe("Route Service Handler", func() {
 			It("returns 502 Bad Gateway", func() {
 				handler.ServeHTTP(resp, req)
 
-				Expect(string(testSink.Contents())).To(ContainSubstring(`route-service-unsupported`))
+				Eventually(logger).Should(gbytes.Say(`route-service-unsupported`))
 				Expect(resp.Code).To(Equal(http.StatusBadGateway))
 				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal(`route_service_unsupported`))
 				Expect(resp.Body.String()).To(ContainSubstring(`Support for route services is disabled.`))
@@ -198,7 +192,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("with strictSignatureValidation enabled", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, nil, 60*time.Second, crypto, nil, false, true,
+						logger.Logger, true, false, nil, 60*time.Second, crypto, nil, false, true,
 					)
 				})
 
@@ -245,7 +239,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("when the route service has a route in the route registry", func() {
 				BeforeEach(func() {
 					rsPool := route.NewPool(&route.PoolOpts{
-						Logger:             logger,
+						Logger:             logger.Logger,
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "route-service.com",
 						ContextPath:        "/",
@@ -280,7 +274,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := false
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true, false,
+							logger.Logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true, false,
 						)
 					})
 
@@ -311,7 +305,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true, false,
+							logger.Logger, true, hairpinning, nil, 60*time.Second, crypto, nil, true, false,
 						)
 					})
 
@@ -342,7 +336,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, []string{"route-service.com"}, 60*time.Second, crypto, nil, true, false,
+							logger.Logger, true, hairpinning, []string{"route-service.com"}, 60*time.Second, crypto, nil, true, false,
 						)
 					})
 
@@ -374,7 +368,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, []string{"example.com"}, 60*time.Second, crypto, nil, true, false,
+							logger.Logger, true, hairpinning, []string{"example.com"}, 60*time.Second, crypto, nil, true, false,
 						)
 					})
 
@@ -406,7 +400,7 @@ var _ = Describe("Route Service Handler", func() {
 					BeforeEach(func() {
 						hairpinning := true
 						config = routeservice.NewRouteServiceConfig(
-							logger, true, hairpinning, generateHugeAllowlist(1000000), 60*time.Second, crypto, nil, true, false,
+							logger.Logger, true, hairpinning, generateHugeAllowlist(1000000), 60*time.Second, crypto, nil, true, false,
 						)
 					})
 
@@ -444,7 +438,7 @@ var _ = Describe("Route Service Handler", func() {
 			Context("when recommendHttps is set to false", func() {
 				BeforeEach(func() {
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, nil, 60*time.Second, crypto, nil, false, false,
+						logger.Logger, true, false, nil, 60*time.Second, crypto, nil, false, false,
 					)
 				})
 				It("sends the request to the route service with X-CF-Forwarded-Url using http scheme", func() {
@@ -523,7 +517,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
+					Eventually(logger).Should(gbytes.Say(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -547,7 +541,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
+					Eventually(logger).Should(gbytes.Say(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -561,7 +555,7 @@ var _ = Describe("Route Service Handler", func() {
 					req.Header.Set(routeservice.HeaderKeyMetadata, reqArgs.Metadata)
 
 					rsPool := route.NewPool(&route.PoolOpts{
-						Logger:             logger,
+						Logger:             logger.Logger,
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "my_host.com",
 						ContextPath:        "/original_path",
@@ -575,7 +569,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
+					Eventually(logger).Should(gbytes.Say(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -602,7 +596,7 @@ var _ = Describe("Route Service Handler", func() {
 
 					Expect(resp.Code).To(Equal(http.StatusBadGateway))
 					Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-					Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
+					Eventually(logger).Should(gbytes.Say(`signature-validation-failed`))
 
 					Expect(nextCalled).To(BeFalse())
 				})
@@ -615,7 +609,7 @@ var _ = Describe("Route Service Handler", func() {
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
 					config = routeservice.NewRouteServiceConfig(
-						logger, true, false, nil, 60*time.Second, crypto, cryptoPrev, true, false,
+						logger.Logger, true, false, nil, 60*time.Second, crypto, cryptoPrev, true, false,
 					)
 				})
 
@@ -666,7 +660,7 @@ var _ = Describe("Route Service Handler", func() {
 
 						Expect(resp.Code).To(Equal(http.StatusGatewayTimeout))
 						Expect(resp.Body.String()).To(ContainSubstring("Failed to validate Route Service Signature"))
-						Expect(string(testSink.Contents())).To(ContainSubstring(`signature-validation-failed`))
+						Eventually(logger).Should(gbytes.Say(`signature-validation-failed`))
 
 						Expect(nextCalled).To(BeFalse())
 					})
@@ -742,13 +736,13 @@ var _ = Describe("Route Service Handler", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger.Logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(string(testSink.Contents())).To(ContainSubstring(`request-info-err`))
+				Eventually(logger).Should(gbytes.Say(`request-info-err`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)
@@ -760,13 +754,13 @@ var _ = Describe("Route Service Handler", func() {
 		BeforeEach(func() {
 			badHandler = negroni.New()
 			badHandler.Use(handlers.NewRequestInfo())
-			badHandler.Use(handlers.NewRouteService(config, reg, logger, ew))
+			badHandler.Use(handlers.NewRouteService(config, reg, logger.Logger, ew))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(string(testSink.Contents())).To(ContainSubstring(`failed-to-access-RoutePool`))
+				Eventually(logger).Should(gbytes.Say(`failed-to-access-RoutePool`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)
@@ -894,19 +888,19 @@ var _ = Describe("Route Service Handler", func() {
 				By(testCase.name)
 
 				config = routeservice.NewRouteServiceConfig(
-					logger, true, true, testCase.allowlist, 60*time.Second, crypto, nil, true, false,
+					logger.Logger, true, true, testCase.allowlist, 60*time.Second, crypto, nil, true, false,
 				)
 
 				if testCase.err {
 					defer func() {
 						recover()
-						Expect(string(testSink.Contents())).To(ContainSubstring(`allowlist-entry-invalid`))
+						Eventually(logger).Should(gbytes.Say(`allowlist-entry-invalid`))
 					}()
-					handlers.NewRouteService(config, reg, logger, ew)
+					handlers.NewRouteService(config, reg, logger.Logger, ew)
 					continue
 				}
 
-				r := handlers.NewRouteService(config, reg, logger, ew).(*handlers.RouteService)
+				r := handlers.NewRouteService(config, reg, logger.Logger, ew).(*handlers.RouteService)
 
 				matched := r.MatchAllowlistHostname(testCase.host)
 				Expect(matched).To(Equal(testCase.matched))

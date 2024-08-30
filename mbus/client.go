@@ -3,14 +3,14 @@ package mbus
 import (
 	"log/slog"
 	"net/url"
-	"os"
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/config"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/nats-io/nats.go"
+
+	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type Signal struct{}
@@ -40,8 +40,7 @@ func Connect(c *config.Config, reconnected chan<- Signal, l *slog.Logger) *nats.
 	}
 
 	if err != nil {
-		l.Error("nats-connection-error", log.ErrAttr(err))
-		os.Exit(1)
+		log.Fatal(l, "nats-connection-error", log.ErrAttr(err))
 	}
 
 	var natsHostStr string
@@ -70,8 +69,7 @@ func natsOptions(l *slog.Logger, c *config.Config, natsHost *atomic.Value, natsA
 			tlsconfig.WithAuthority(c.Nats.CAPool),
 		)
 		if err != nil {
-			l.Error("nats-tls-config-invalid", log.ErrAttr(err))
-			os.Exit(1)
+			log.Fatal(l, "nats-tls-config-invalid", log.ErrAttr(err))
 		}
 	}
 	options.PingInterval = c.NatsClientPingInterval
@@ -79,12 +77,11 @@ func natsOptions(l *slog.Logger, c *config.Config, natsHost *atomic.Value, natsA
 	notDisconnected := make(chan Signal)
 
 	options.ClosedCB = func(conn *nats.Conn) {
-		l.Error(
-			"nats-connection-closed",
+		log.Fatal(
+			l, "nats-connection-closed",
 			slog.String("error", "unexpected close"),
 			slog.String("last_error", conn.LastError().Error()),
 		)
-		os.Exit(1)
 	}
 
 	options.DisconnectedCB = func(conn *nats.Conn) {

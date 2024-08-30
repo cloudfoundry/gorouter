@@ -3,21 +3,18 @@ package handlers_test
 import (
 	"bytes"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/accesslog/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("AccessLog", func() {
@@ -27,8 +24,7 @@ var _ = Describe("AccessLog", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		testSink          *test_util.TestSink
-		logger            *slog.Logger
+		logger            *test_util.TestLogger
 		accessLogger      *fakes.FakeAccessLogger
 		extraHeadersToLog []string
 
@@ -80,15 +76,12 @@ var _ = Describe("AccessLog", func() {
 
 		accessLogger = &fakes.FakeAccessLogger{}
 
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(logger))
-		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
+		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
 		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -153,7 +146,7 @@ var _ = Describe("AccessLog", func() {
 		BeforeEach(func() {
 			handler = negroni.New()
 			handler.UseFunc(testProxyWriterHandler)
-			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
 			handler.Use(nextHandler)
 		})
 		It("calls Panic on the logger", func() {

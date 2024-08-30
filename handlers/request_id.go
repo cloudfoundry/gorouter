@@ -4,8 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/urfave/negroni/v3"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 const (

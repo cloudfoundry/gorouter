@@ -5,9 +5,10 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/nats-io/nats.go"
+
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test/common"
-	"github.com/nats-io/nats.go"
 )
 
 func NewStickyApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string, stickyCookieName string) *common.TestApp {

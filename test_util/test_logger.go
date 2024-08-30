@@ -6,10 +6,11 @@ import (
 	"regexp"
 	"strings"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega/gbytes"
 	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 // We add 1 to zap's default values to match our level definitions
@@ -18,7 +19,7 @@ func levelNumber(level zapcore.Level) int {
 	return int(level) + 1
 }
 
-// TestLogger implements a zap logger that can be used with Ginkgo tests
+// TestLogger implements an slog logger that can be used with Ginkgo tests
 type TestLogger struct {
 	*slog.Logger
 	*TestSink

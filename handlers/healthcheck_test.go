@@ -2,41 +2,34 @@ package handlers_test
 
 import (
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Healthcheck", func() {
 	var (
 		handler      http.Handler
-		testSink     *test_util.TestSink
-		logger       *slog.Logger
+		logger       *test_util.TestLogger
 		resp         *httptest.ResponseRecorder
 		req          *http.Request
 		healthStatus *health.Health
 	)
 
 	BeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
 
-		handler = handlers.NewHealthcheck(healthStatus, logger)
+		handler = handlers.NewHealthcheck(healthStatus, logger.Logger)
 	})
 
 	It("closes the request", func() {

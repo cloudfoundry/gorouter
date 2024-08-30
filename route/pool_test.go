@@ -4,20 +4,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"log/slog"
 	"net"
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/config"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/routing-api/models"
 )
 
 var _ = Describe("Endpoint", func() {
@@ -45,18 +43,14 @@ var _ = Describe("Endpoint", func() {
 
 var _ = Describe("EndpointPool", func() {
 	var (
-		pool     *route.EndpointPool
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		pool   *route.EndpointPool
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
-		logger = log.CreateLoggerWithSource("test", "")
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		pool = route.NewPool(&route.PoolOpts{
-			Logger:             logger,
+			Logger:             logger.Logger,
 			RetryAfterFailure:  2 * time.Minute,
 			Host:               "",
 			ContextPath:        "",
@@ -67,14 +61,14 @@ var _ = Describe("EndpointPool", func() {
 	Context("PoolsMatch", func() {
 		It("returns true if the hosts and paths on both pools are the same", func() {
 			p1 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
@@ -85,14 +79,14 @@ var _ = Describe("EndpointPool", func() {
 
 		It("returns false if the hosts are the same but paths are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/other",
@@ -103,14 +97,14 @@ var _ = Describe("EndpointPool", func() {
 
 		It("returns false if the paths are the same but hosts are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/path",
@@ -121,14 +115,14 @@ var _ = Describe("EndpointPool", func() {
 
 		It("returns false if the both hosts and paths on the pools are different", func() {
 			p1 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "foo.com",
 				ContextPath:        "/path",
 				MaxConnsPerBackend: 0,
 			})
 			p2 := route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "bar.com",
 				ContextPath:        "/other",
@@ -188,7 +182,7 @@ var _ = Describe("EndpointPool", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
 
 				Expect(pool.Put(endpoint)).To(Equal(route.UPDATED))
-				Expect(pool.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
+				Expect(pool.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 			})
 
 			Context("when modification_tag is older", func() {
@@ -203,7 +197,7 @@ var _ = Describe("EndpointPool", func() {
 					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
 					Expect(pool.Put(endpoint)).To(Equal(route.UNMODIFIED))
-					Expect(pool.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
+					Expect(pool.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 				})
 			})
 		})
@@ -241,7 +235,7 @@ var _ = Describe("EndpointPool", func() {
 	Context("Load Balancing Algorithm of a pool", func() {
 		It("has a value specified in the pool options", func() {
 			poolWithLBAlgo := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			Expect(poolWithLBAlgo.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
@@ -249,32 +243,32 @@ var _ = Describe("EndpointPool", func() {
 
 		It("has an invalid value specified in the pool options", func() {
 			poolWithLBAlgo2 := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: "wrong-lb-algo",
 			})
-			iterator := poolWithLBAlgo2.Endpoints(logger, "", false, "none", "zone")
+			iterator := poolWithLBAlgo2.Endpoints(logger.Logger, "", false, "none", "zone")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(string(testSink.Contents())).To(ContainSubstring(`invalid-pool-load-balancing-algorithm`))
+			Eventually(logger).Should(gbytes.Say(`invalid-pool-load-balancing-algorithm`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_LC ", func() {
 			poolWithLBAlgoLC := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
 			})
-			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			iterator := poolWithLBAlgoLC.Endpoints(logger.Logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.LeastConnection{}))
-			Expect(string(testSink.Contents())).To(ContainSubstring(`endpoint-iterator-with-least-connection-lb-algo`))
+			Eventually(logger).Should(gbytes.Say(`endpoint-iterator-with-least-connection-lb-algo`))
 		})
 
 		It("is correctly propagated to the newly created endpoints LOAD_BALANCE_RR ", func() {
 			poolWithLBAlgoLC := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
-			iterator := poolWithLBAlgoLC.Endpoints(logger, "", false, "none", "az")
+			iterator := poolWithLBAlgoLC.Endpoints(logger.Logger, "", false, "none", "az")
 			Expect(iterator).To(BeAssignableToTypeOf(&route.RoundRobin{}))
-			Expect(string(testSink.Contents())).To(ContainSubstring(`endpoint-iterator-with-round-robin-lb-algo`))
+			Eventually(logger).Should(gbytes.Say(`endpoint-iterator-with-round-robin-lb-algo`))
 		})
 	})
 
@@ -282,7 +276,7 @@ var _ = Describe("EndpointPool", func() {
 
 		It("is valid and will overwrite the load balancing algorithm of a pool", func() {
 			pool := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
 			})
 			expectedLBAlgo := config.LOAD_BALANCE_LC
@@ -293,13 +287,13 @@ var _ = Describe("EndpointPool", func() {
 			})
 			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
-			Expect(string(testSink.Contents())).To(ContainSubstring(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
+			Eventually(logger).Should(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 		})
 
 		It("is an empty string and the load balancing algorithm of a pool is kept", func() {
 			expectedLBAlgo := config.LOAD_BALANCE_RR
 			pool := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: expectedLBAlgo,
 			})
 			endpoint := route.NewEndpoint(&route.EndpointOpts{
@@ -313,7 +307,7 @@ var _ = Describe("EndpointPool", func() {
 		It("is not specified in the endpoint options and the load balancing algorithm of a pool is kept", func() {
 			expectedLBAlgo := config.LOAD_BALANCE_RR
 			pool := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: expectedLBAlgo,
 			})
 			endpoint := route.NewEndpoint(&route.EndpointOpts{
@@ -327,7 +321,7 @@ var _ = Describe("EndpointPool", func() {
 		It("is an invalid value and the load balancing algorithm of a pool is kept", func() {
 			expectedLBAlgo := config.LOAD_BALANCE_RR
 			pool := route.NewPool(&route.PoolOpts{
-				Logger:                 logger,
+				Logger:                 logger.Logger,
 				LoadBalancingAlgorithm: expectedLBAlgo,
 			})
 			endpoint := route.NewEndpoint(&route.EndpointOpts{
@@ -337,7 +331,7 @@ var _ = Describe("EndpointPool", func() {
 			})
 			pool.SetPoolLoadBalancingAlgorithm(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
-			Expect(string(testSink.Contents())).To(ContainSubstring(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
+			Eventually(logger).Should(gbytes.Say(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 		})
 	})
 
@@ -411,7 +405,7 @@ var _ = Describe("EndpointPool", func() {
 					azPreference := "none"
 					connectionResetError := &net.OpError{Op: "read", Err: errors.New("read: connection reset by peer")}
 					pool.EndpointFailed(failedEndpoint, connectionResetError)
-					i := pool.Endpoints(logger, "", false, azPreference, az)
+					i := pool.Endpoints(logger.Logger, "", false, azPreference, az)
 					epOne := i.Next(0)
 					epTwo := i.Next(1)
 					Expect(epOne).To(Equal(epTwo))
@@ -454,7 +448,7 @@ var _ = Describe("EndpointPool", func() {
 				pool.MarkUpdated(time.Now())
 				pool.EndpointFailed(endpoint, &net.OpError{Op: "dial"})
 
-				Expect(string(testSink.Contents())).To(ContainSubstring(`prune-failed-endpoint`))
+				Eventually(logger).Should(gbytes.Say(`prune-failed-endpoint`))
 			})
 
 			It("does not prune connection reset errors", func() {
@@ -538,7 +532,7 @@ var _ = Describe("EndpointPool", func() {
 		Context("when MaxConnsPerBackend is not set (unlimited)", func() {
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             logger,
+					Logger:             logger.Logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -569,7 +563,7 @@ var _ = Describe("EndpointPool", func() {
 
 		BeforeEach(func() {
 			pool = route.NewPool(&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "",
 				ContextPath:        "",

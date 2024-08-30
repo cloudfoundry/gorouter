@@ -1,13 +1,14 @@
 package logger_test
 
 import (
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	"code.cloudfoundry.org/lager/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("LagerAdapter", func() {
@@ -26,6 +27,7 @@ var _ = Describe("LagerAdapter", func() {
 		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
 		log.SetLoggingLevel("DEBUG")
 		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		log.SetTimeEncoder("epoch")
 		lagerLogger = log.NewLagerAdapter(prefix)
 
 	})

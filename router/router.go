@@ -16,6 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/armon/go-proxyproto"
+	"github.com/nats-io/nats.go"
+
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -25,8 +28,6 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
-	"github.com/armon/go-proxyproto"
-	"github.com/nats-io/nats.go"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
@@ -308,7 +309,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 	if err != nil {
-		r.logger.Error("tls-listener-error", log.ErrAttr(err))
+		log.Fatal(r.logger, "tls-listener-error", log.ErrAttr(err))
 		return err
 	}
 
@@ -353,7 +354,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
-		r.logger.Error("tcp-listener-error", log.ErrAttr(err))
+		log.Fatal(r.logger, "tcp-listener-error", log.ErrAttr(err))
 		return err
 	}
 

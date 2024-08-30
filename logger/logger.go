@@ -4,6 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -12,12 +13,16 @@ import (
 )
 
 var (
-	dynamicLoggingConfig dynamicTimeEncoder
-	baseLogger           *slog.Logger
-	writeSyncer          = &dynamicWriter{w: zapcore.Lock(os.Stdout)}
+	conf        dynamicLoggingConfig
+	baseLogger  *slog.Logger
+	writeSyncer = &dynamicWriter{w: os.Stdout}
+	mutex       sync.Mutex
 )
 
-type dynamicTimeEncoder struct {
+/*
+dynamicLoggingConfig holds dynamic configuration for the time encoding and logging level.
+*/
+type dynamicLoggingConfig struct {
 	encoding string
 	level    zap.AtomicLevel
 }
@@ -26,15 +31,22 @@ type dynamicWriter struct {
 	w WriteSyncer
 }
 
+// SetDynamicWriteSyncer sets the log handler's sink.
 func SetDynamicWriteSyncer(syncer WriteSyncer) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	writeSyncer.w = syncer
 }
 
 func (d *dynamicWriter) Write(b []byte) (n int, err error) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return d.w.Write(b)
 }
 
 func (d *dynamicWriter) Sync() error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return d.w.Sync()
 }
 
@@ -43,6 +55,14 @@ type WriteSyncer interface {
 	Sync() error
 }
 
+/*
+init creates one global, configured logger instance. This instance has no 'source'
+and nested 'data' field yet. It allows creating copies later on, where 'source'
+and 'data' is set.
+This is a workaround to a limitation in slog: Once the 'data' field has been added
+via 'WithGroup()', we cannot go back and set the 'source' field in the log message
+root.
+*/
 func init() {
 	baseLogger = initializeLogger()
 }
@@ -53,10 +73,10 @@ SetTimeEncoder dynamically sets the time encoder at runtime:
 All other values: The encoder is set to an Epoch encoder
 */
 func SetTimeEncoder(enc string) {
-	dynamicLoggingConfig.encoding = enc
+	conf.encoding = enc
 }
 
-func (e *dynamicTimeEncoder) encodeTime(t time.Time, pae zapcore.PrimitiveArrayEncoder) {
+func (e *dynamicLoggingConfig) encodeTime(t time.Time, pae zapcore.PrimitiveArrayEncoder) {
 	switch e.encoding {
 	case "rfc3339":
 		RFC3339Formatter()(t, pae)
@@ -74,27 +94,27 @@ func SetLoggingLevel(level string) {
 	if err != nil {
 		panic(err)
 	}
-	dynamicLoggingConfig.level.SetLevel(zapLevel)
+	conf.level.SetLevel(zapLevel)
 }
 
 type Logger interface {
 }
 
 /*
-InitializeLogger is used to create a pre-configured slog.Logger with a zapslog handler and provided logging level,
+InitializeLogger is used in init() to create a pre-configured slog.Logger with a zapslog handler and provided logging level,
 timestamp format and writeSyncer.
 */
 func initializeLogger() *slog.Logger {
 	zapLevel := zap.InfoLevel
 
-	dynamicLoggingConfig = dynamicTimeEncoder{encoding: "epoch", level: zap.NewAtomicLevelAt(zapLevel)}
+	conf = dynamicLoggingConfig{encoding: "epoch", level: zap.NewAtomicLevelAt(zapLevel)}
 
 	zapConfig := zapcore.EncoderConfig{
 		MessageKey:    "message",
 		LevelKey:      "log_level",
 		EncodeLevel:   numberLevelFormatter,
 		TimeKey:       "timestamp",
-		EncodeTime:    dynamicLoggingConfig.encodeTime,
+		EncodeTime:    conf.encodeTime,
 		EncodeCaller:  zapcore.ShortCallerEncoder,
 		StacktraceKey: "stack_trace",
 	}
@@ -102,7 +122,7 @@ func initializeLogger() *slog.Logger {
 	zapCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zapConfig),
 		writeSyncer,
-		dynamicLoggingConfig.level,
+		conf.level,
 	)
 
 	zapHandler := zapslog.NewHandler(zapCore, &zapslog.HandlerOptions{AddSource: true})
@@ -128,7 +148,7 @@ func levelNumber(level zapcore.Level) int {
 }
 
 /*
-CreateLoggerWithSource returns a copy of the provided logger, which comes with the 'source' attribute set to the provided
+CreateLoggerWithSource returns a copy of the logger, which comes with the 'source' attribute set to the provided
 prefix and component. All subsequent log statements will be nested in the 'data' field.
 */
 func CreateLoggerWithSource(prefix string, component string) *slog.Logger {
@@ -146,7 +166,7 @@ func CreateLoggerWithSource(prefix string, component string) *slog.Logger {
 }
 
 /*
-CreateLoggerWithSource returns a copy of the provided logger. All subsequent log statements will be nested in the 'data' field.
+CreateLogger returns a copy of the logger. All subsequent log statements will be nested in the 'data' field.
 */
 func CreateLogger() *slog.Logger {
 	if baseLogger == nil {

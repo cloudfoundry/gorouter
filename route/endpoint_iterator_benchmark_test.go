@@ -6,12 +6,8 @@ import (
 	"testing"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
 )
 
 func testLoadBalance(lb route.EndpointIterator, b *testing.B) {
@@ -32,13 +28,10 @@ const (
 )
 
 func setupEndpointIterator(total int, azDistribution int, strategy string) route.EndpointIterator {
-	logger := log.CreateLogger()
-	testSink := &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-	log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-	log.SetLoggingLevel("Debug")
+	logger := test_util.NewTestLogger("test")
 	// Make pool
 	pool := route.NewPool(&route.PoolOpts{
-		Logger:             logger,
+		Logger:             logger.Logger,
 		RetryAfterFailure:  2 * time.Minute,
 		Host:               "",
 		ContextPath:        "",
@@ -77,13 +70,13 @@ func setupEndpointIterator(total int, azDistribution int, strategy string) route
 	var lb route.EndpointIterator
 	switch strategy {
 	case "round-robin":
-		lb = route.NewRoundRobin(logger, pool, "", false, false, localAZ)
+		lb = route.NewRoundRobin(logger.Logger, pool, "", false, false, localAZ)
 	case "round-robin-locally-optimistic":
-		lb = route.NewRoundRobin(logger, pool, "", false, true, localAZ)
+		lb = route.NewRoundRobin(logger.Logger, pool, "", false, true, localAZ)
 	case "least-connection":
-		lb = route.NewLeastConnection(logger, pool, "", false, false, localAZ)
+		lb = route.NewLeastConnection(logger.Logger, pool, "", false, false, localAZ)
 	case "least-connection-locally-optimistic":
-		lb = route.NewLeastConnection(logger, pool, "", false, true, localAZ)
+		lb = route.NewLeastConnection(logger.Logger, pool, "", false, true, localAZ)
 	default:
 		panic("invalid load balancing strategy")
 	}

@@ -5,22 +5,19 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Clientcert", func() {
@@ -43,16 +40,12 @@ var _ = Describe("Clientcert", func() {
 		dontSkipSanitization = func(req *http.Request) bool { return false }
 		errorWriter          = errorwriter.NewPlaintextErrorWriter()
 
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		logger *test_util.TestLogger
 	)
 
 	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger, errorWriter)
+		logger = test_util.NewTestLogger("")
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger.Logger, errorWriter)
 
 		nextHandlerWasCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
@@ -64,13 +57,13 @@ var _ = Describe("Clientcert", func() {
 		req := test_util.NewRequest("GET", "xyz.com", "", nil)
 		rw := httptest.NewRecorder()
 		clientCertHandler.ServeHTTP(rw, req, nextHandler)
-		Expect(testSink.Lines()[0]).To(MatchRegexp(
+		Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
 			`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed".+}`,
 		))
 
 		switch errorCase {
 		case "forceDeleteError":
-			Expect(testSink.Lines()[0]).To(MatchRegexp(
+			Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
 				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed","data":{"error":"forceDelete error"}}`,
 			))
 			Expect(rw.Code).To(Equal(http.StatusBadGateway))
@@ -88,11 +81,8 @@ var _ = Describe("Clientcert", func() {
 	)
 
 	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger, errorWriter)
+		logger = test_util.NewTestLogger("test")
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger.Logger, errorWriter)
 
 		nextReq := &http.Request{}
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextReq = r })

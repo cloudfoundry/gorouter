@@ -3,7 +3,6 @@ package proxy_test
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +11,11 @@ import (
 	"time"
 
 	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/emitter/fake"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
 	"code.cloudfoundry.org/gorouter/common/health"
@@ -19,18 +23,11 @@ import (
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/emitter/fake"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
 )
 
 //go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper
@@ -46,8 +43,7 @@ var (
 	al                        accesslog.AccessLogger
 	ls                        *fakelogsender.FakeLogSender
 	crypto                    secure.Crypto
-	testSink                  *test_util.TestSink
-	logger                    *slog.Logger
+	logger                    *test_util.TestLogger
 	cryptoPrev                secure.Crypto
 	caCertPool                *x509.CertPool
 	recommendHTTPS            bool
@@ -67,10 +63,7 @@ func TestProxy(t *testing.T) {
 var _ = BeforeEach(func() {
 	healthStatus = &health.Health{}
 	healthStatus.SetHealth(health.Healthy)
-	logger = log.CreateLogger()
-	testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-	log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-
+	logger = test_util.NewTestLogger("test")
 	var err error
 
 	crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
@@ -96,7 +89,7 @@ var _ = BeforeEach(func() {
 
 var _ = JustBeforeEach(func() {
 	var err error
-	r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
+	r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
@@ -105,7 +98,7 @@ var _ = JustBeforeEach(func() {
 	Expect(err).NotTo(HaveOccurred())
 	conf.AccessLog.File = f.Name()
 	ls = &fakelogsender.FakeLogSender{}
-	al, err = accesslog.CreateRunningAccessLogger(logger, ls, conf)
+	al, err = accesslog.CreateRunningAccessLogger(logger.Logger, ls, conf)
 	Expect(err).NotTo(HaveOccurred())
 	go al.Run()
 
@@ -122,7 +115,7 @@ var _ = JustBeforeEach(func() {
 	}
 
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
-		logger,
+		logger.Logger,
 		conf.RouteServiceEnabled,
 		conf.RouteServicesHairpinning,
 		conf.RouteServicesHairpinningAllowlist,
@@ -145,7 +138,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(logger, al, fakeRegistry, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
+	p = proxy.NewProxy(logger.Logger, al, fakeRegistry, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
 	if conf.EnableHTTP2 {
 		server := http.Server{Handler: p}

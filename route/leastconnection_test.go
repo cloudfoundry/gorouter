@@ -2,34 +2,28 @@ package route_test
 
 import (
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("LeastConnection", func() {
 	var (
-		pool     *route.EndpointPool
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		pool   *route.EndpointPool
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
-		logger = log.CreateLoggerWithSource("test", "")
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		pool = route.NewPool(
 			&route.PoolOpts{
-				Logger:             logger,
+				Logger:             logger.Logger,
 				RetryAfterFailure:  2 * time.Minute,
 				Host:               "",
 				ContextPath:        "",
@@ -39,7 +33,7 @@ var _ = Describe("LeastConnection", func() {
 	Describe("Next", func() {
 		Context("when pool is empty", func() {
 			It("does not select an endpoint", func() {
-				iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+				iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 				Expect(iter.Next(0)).To(BeNil())
 			})
 		})
@@ -68,7 +62,7 @@ var _ = Describe("LeastConnection", func() {
 
 			Context("when all endpoints have no statistics", func() {
 				It("selects a random endpoint", func() {
-					iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+					iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 					n := iter.Next(0)
 					Expect(n).NotTo(BeNil())
 				})
@@ -85,7 +79,7 @@ var _ = Describe("LeastConnection", func() {
 					for i := 0; i < 100; i++ {
 						wg.Add(1)
 						go func(attempt int) {
-							iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+							iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 							n1 := iter.Next(attempt)
 							Expect(n1).NotTo(BeNil())
 
@@ -103,7 +97,7 @@ var _ = Describe("LeastConnection", func() {
 			Context("when endpoints have varying number of connections", func() {
 				It("selects endpoint with least connection", func() {
 					setConnectionCount(endpoints, []int{0, 1, 1, 1, 1})
-					iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+					iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 					Expect(iter.Next(0)).To(Equal(endpoints[0]))
 
 					setConnectionCount(endpoints, []int{1, 0, 1, 1, 1})
@@ -132,7 +126,7 @@ var _ = Describe("LeastConnection", func() {
 				})
 
 				It("selects random endpoint from all with least connection", func() {
-					iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+					iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 
 					setConnectionCount(endpoints, []int{1, 0, 0, 0, 0})
 					okRandoms := []string{
@@ -160,7 +154,7 @@ var _ = Describe("LeastConnection", func() {
 
 				BeforeEach(func() {
 					pool = route.NewPool(&route.PoolOpts{
-						Logger:             logger,
+						Logger:             logger.Logger,
 						RetryAfterFailure:  2 * time.Minute,
 						Host:               "",
 						ContextPath:        "",
@@ -184,7 +178,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 
 						It("returns nil", func() {
-							iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+							iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 							Consistently(func() *route.Endpoint {
 								return iter.Next(0)
 							}).Should(BeNil())
@@ -200,7 +194,7 @@ var _ = Describe("LeastConnection", func() {
 
 						Context("when that endpoint is overload", func() {
 							It("returns no endpoint", func() {
-								iter := route.NewLeastConnection(logger, pool, "", false, false, "meow-az")
+								iter := route.NewLeastConnection(logger.Logger, pool, "", false, false, "meow-az")
 								Consistently(func() *route.Endpoint {
 									return iter.Next(0)
 								}).Should(BeNil())
@@ -220,7 +214,7 @@ var _ = Describe("LeastConnection", func() {
 
 						Context("when the endpoint is not required to be sticky", func() {
 							BeforeEach(func() {
-								iter = route.NewLeastConnection(logger, pool, "private-label-1", false, false, "meow-az")
+								iter = route.NewLeastConnection(logger.Logger, pool, "private-label-1", false, false, "meow-az")
 							})
 
 							Context("when there is an unencumbered endpoint", func() {
@@ -246,7 +240,7 @@ var _ = Describe("LeastConnection", func() {
 
 						Context("when the endpoint must be be sticky", func() {
 							BeforeEach(func() {
-								iter = route.NewLeastConnection(logger, pool, "private-label-1", true, false, "meow-az")
+								iter = route.NewLeastConnection(logger.Logger, pool, "private-label-1", true, false, "meow-az")
 							})
 
 							It("returns nil", func() {
@@ -256,7 +250,7 @@ var _ = Describe("LeastConnection", func() {
 							})
 							It("logs that it could not choose another endpoint", func() {
 								iter.Next(0)
-								Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-overloaded-but-request-must-be-sticky"))
+								Expect(logger).Should(gbytes.Say("endpoint-overloaded-but-request-must-be-sticky"))
 							})
 						})
 					})
@@ -267,7 +261,7 @@ var _ = Describe("LeastConnection", func() {
 
 					BeforeEach(func() {
 						pool = route.NewPool(&route.PoolOpts{
-							Logger:             logger,
+							Logger:             logger.Logger,
 							RetryAfterFailure:  2 * time.Minute,
 							Host:               "",
 							ContextPath:        "",
@@ -281,7 +275,7 @@ var _ = Describe("LeastConnection", func() {
 
 					Context("when the endpoint is not required to be sticky", func() {
 						BeforeEach(func() {
-							iter = route.NewLeastConnection(logger, pool, "private-label-2", false, false, "meow-az")
+							iter = route.NewLeastConnection(logger.Logger, pool, "private-label-2", false, false, "meow-az")
 						})
 
 						It("Returns the next available endpoint", func() {
@@ -291,13 +285,13 @@ var _ = Describe("LeastConnection", func() {
 						})
 						It("logs that it chose another endpoint", func() {
 							iter.Next(0)
-							Expect(string(testSink.Contents())).Should(ContainSubstring("endpoint-missing-choosing-alternate"))
+							Expect(logger).Should(gbytes.Say("endpoint-missing-choosing-alternate"))
 						})
 
 					})
 					Context("when the endpoint is required to be sticky", func() {
 						BeforeEach(func() {
-							iter = route.NewLeastConnection(logger, pool, "private-label-2", true, false, "meow-az")
+							iter = route.NewLeastConnection(logger.Logger, pool, "private-label-2", true, false, "meow-az")
 						})
 
 						It("returns nil", func() {
@@ -307,7 +301,7 @@ var _ = Describe("LeastConnection", func() {
 						})
 						It("logs that it could not choose another endpoint", func() {
 							iter.Next(0)
-							Expect(testSink.Contents()).Should(ContainSubstring("endpoint-missing-but-request-must-be-sticky"))
+							Expect(logger).Should(gbytes.Say("endpoint-missing-but-request-must-be-sticky"))
 						})
 					})
 				})
@@ -324,7 +318,7 @@ var _ = Describe("LeastConnection", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             logger,
+					Logger:             logger.Logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -340,7 +334,7 @@ var _ = Describe("LeastConnection", func() {
 			})
 
 			JustBeforeEach(func() {
-				iter = route.NewLeastConnection(logger, pool, "", false, true, localAZ)
+				iter = route.NewLeastConnection(logger.Logger, pool, "", false, true, localAZ)
 			})
 
 			Context("on the first attempt", func() {
@@ -515,7 +509,7 @@ var _ = Describe("LeastConnection", func() {
 
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
-			iter := route.NewLeastConnection(logger, pool, "foo", false, false, "meow-az")
+			iter := route.NewLeastConnection(logger.Logger, pool, "foo", false, false, "meow-az")
 			iter.PreRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 		})
@@ -530,7 +524,7 @@ var _ = Describe("LeastConnection", func() {
 			}
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 			pool.Put(endpointFoo)
-			iter := route.NewLeastConnection(logger, pool, "foo", false, false, "meow-az")
+			iter := route.NewLeastConnection(logger.Logger, pool, "foo", false, false, "meow-az")
 			iter.PostRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 		})

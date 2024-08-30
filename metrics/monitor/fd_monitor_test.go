@@ -1,21 +1,18 @@
 package monitor_test
 
 import (
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/tedsuo/ifrit"
+
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/tedsuo/ifrit"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("FileDescriptor", func() {
@@ -23,17 +20,13 @@ var _ = Describe("FileDescriptor", func() {
 		sender   *fakes.MetricSender
 		procPath string
 		tr       *time.Ticker
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		logger   *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
 		tr = time.NewTicker(1 * time.Second)
 		sender = &fakes.MetricSender{}
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 	})
 
 	AfterEach(func() {
@@ -42,7 +35,7 @@ var _ = Describe("FileDescriptor", func() {
 	})
 
 	It("exits when os signal is received", func() {
-		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger.Logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
@@ -55,7 +48,7 @@ var _ = Describe("FileDescriptor", func() {
 
 	It("monitors all the open file descriptors for a given pid", func() {
 		procPath = createTestPath("", 10)
-		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger.Logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 

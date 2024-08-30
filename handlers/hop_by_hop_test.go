@@ -4,20 +4,17 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("HopByHop", func() {
@@ -33,8 +30,7 @@ var _ = Describe("HopByHop", func() {
 		requestBody  *bytes.Buffer
 
 		cfg      *config.Config
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		logger   *test_util.TestLogger
 		hopByHop *handlers.HopByHop
 
 		nextCalled bool
@@ -82,12 +78,9 @@ var _ = Describe("HopByHop", func() {
 	})
 
 	JustBeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		handler = negroni.New()
-		hopByHop = handlers.NewHopByHop(cfg, logger)
+		hopByHop = handlers.NewHopByHop(cfg, logger.Logger)
 		handler.Use(hopByHop)
 		handler.Use(nextHandler)
 

@@ -2,19 +2,16 @@ package routeservice_test
 
 import (
 	"errors"
-	"log/slog"
 	"net/url"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/common/secure/fakes"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/common/secure/fakes"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Route Service Config", func() {
@@ -23,8 +20,7 @@ var _ = Describe("Route Service Config", func() {
 		crypto           secure.Crypto
 		cryptoPrev       secure.Crypto
 		cryptoKey        = "ABCDEFGHIJKLMNOP"
-		testSink         *test_util.TestSink
-		logger           *slog.Logger
+		logger           *test_util.TestLogger
 		recommendHttps   bool
 		strictValidation bool
 	)
@@ -33,11 +29,8 @@ var _ = Describe("Route Service Config", func() {
 		var err error
 		crypto, err = secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
-		config = routeservice.NewRouteServiceConfig(logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+		logger = test_util.NewTestLogger("test")
+		config = routeservice.NewRouteServiceConfig(logger.Logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 	})
 
 	AfterEach(func() {
@@ -80,7 +73,7 @@ var _ = Describe("Route Service Config", func() {
 				fakeCrypto := &fakes.FakeCrypto{}
 				fakeCrypto.EncryptReturns([]byte{}, []byte{}, errors.New("test failed"))
 
-				config = routeservice.NewRouteServiceConfig(logger, true, false, nil, 1*time.Hour, fakeCrypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, false, nil, 1*time.Hour, fakeCrypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns an error", func() {
@@ -186,7 +179,7 @@ var _ = Describe("Route Service Config", func() {
 				var err error
 				crypto, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 				Expect(err).NotTo(HaveOccurred())
-				config = routeservice.NewRouteServiceConfig(logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			Context("when there is no previous key in the configuration", func() {
@@ -202,7 +195,7 @@ var _ = Describe("Route Service Config", func() {
 					var err error
 					cryptoPrev, err = secure.NewAesGCM([]byte(cryptoKey))
 					Expect(err).ToNot(HaveOccurred())
-					config = routeservice.NewRouteServiceConfig(logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+					config = routeservice.NewRouteServiceConfig(logger.Logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 				})
 
 				It("validates the signature", func() {
@@ -239,7 +232,7 @@ var _ = Describe("Route Service Config", func() {
 					var err error
 					cryptoPrev, err = secure.NewAesGCM([]byte("QRSTUVWXYZ123456"))
 					Expect(err).ToNot(HaveOccurred())
-					config = routeservice.NewRouteServiceConfig(logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+					config = routeservice.NewRouteServiceConfig(logger.Logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 				})
 
 				It("rejects the signature", func() {
@@ -255,7 +248,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when rs recommendHttps is set to true", func() {
 			BeforeEach(func() {
 				recommendHttps = true
-				config = routeservice.NewRouteServiceConfig(logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceEnabled to be true", func() {
@@ -266,7 +259,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when rs recommendHttps is set to false", func() {
 			BeforeEach(func() {
 				recommendHttps = false
-				config = routeservice.NewRouteServiceConfig(logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceEnabled to be false", func() {
@@ -279,7 +272,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when routeServiceHairpinning is set to true", func() {
 			BeforeEach(func() {
 				recommendHttps = true
-				config = routeservice.NewRouteServiceConfig(logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, true, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceEnabled to be true", func() {
@@ -290,7 +283,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when routeServiceHairpinning is set to false", func() {
 			BeforeEach(func() {
 				recommendHttps = false
-				config = routeservice.NewRouteServiceConfig(logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, true, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceHairpinning to be false", func() {
@@ -303,7 +296,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when  RouteService is Enabled", func() {
 			BeforeEach(func() {
 				routeServiceEnabled := true
-				config = routeservice.NewRouteServiceConfig(logger, routeServiceEnabled, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, routeServiceEnabled, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceEnabled to be true", func() {
@@ -314,7 +307,7 @@ var _ = Describe("Route Service Config", func() {
 		Context("when  RouteService is not Enabled", func() {
 			BeforeEach(func() {
 				routeServiceEnabled := false
-				config = routeservice.NewRouteServiceConfig(logger, routeServiceEnabled, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
+				config = routeservice.NewRouteServiceConfig(logger.Logger, routeServiceEnabled, false, nil, 1*time.Hour, crypto, cryptoPrev, recommendHttps, strictValidation)
 			})
 
 			It("returns the routeServiceEnabled to be false", func() {

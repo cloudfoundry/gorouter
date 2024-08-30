@@ -3,9 +3,10 @@ package mbus_test
 import (
 	"encoding/json"
 
-	. "code.cloudfoundry.org/gorouter/mbus"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	. "code.cloudfoundry.org/gorouter/mbus"
 )
 
 var _ = Describe("RegistryMessage", func() {

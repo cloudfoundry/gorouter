@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"net"
 
-	"code.cloudfoundry.org/gorouter/proxy/fails"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/proxy/fails"
 )
 
 var _ = Describe("ClassifierGroup", func() {

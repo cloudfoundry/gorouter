@@ -8,10 +8,11 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/routeservice"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/routeservice"
 )
 
 var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {

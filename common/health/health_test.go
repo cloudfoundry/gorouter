@@ -1,9 +1,10 @@
 package health_test
 
 import (
-	. "code.cloudfoundry.org/gorouter/common/health"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	. "code.cloudfoundry.org/gorouter/common/health"
 )
 
 var _ = Describe("Health", func() {

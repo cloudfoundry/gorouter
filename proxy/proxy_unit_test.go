@@ -9,11 +9,14 @@ import (
 	"net/http/httptest"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gbytes"
+
 	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -23,18 +26,13 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Proxy Unit tests", func() {
 	var (
 		proxyObj           http.Handler
 		fakeAccessLogger   *fakelogger.FakeAccessLogger
-		testSink           *test_util.TestSink
-		logger             *slog.Logger
+		logger             *test_util.TestLogger
 		resp               utils.ProxyResponseWriter
 		combinedReporter   metrics.ProxyReporter
 		routeServiceConfig *routeservice.RouteServiceConfig
@@ -53,13 +51,11 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
-			logger = log.CreateLogger()
-			testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-			r = registry.NewRouteRegistry(logger, conf, new(fakes.FakeRouteRegistryReporter))
+			logger = test_util.NewTestLogger("test")
+			r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 			routeServiceConfig = routeservice.NewRouteServiceConfig(
-				logger,
+				logger.Logger,
 				conf.RouteServiceEnabled,
 				conf.RouteServicesHairpinning,
 				conf.RouteServicesHairpinningAllowlist,
@@ -79,7 +75,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
-			proxyObj = proxy.NewProxy(logger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
+			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
@@ -94,8 +90,9 @@ var _ = Describe("Proxy Unit tests", func() {
 				req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader(body))
 
 				proxyObj.ServeHTTP(resp, req)
-				Expect(testSink.Contents()).To(ContainSubstring("route-endpoint"))
-				Expect(testSink.Contents()).To(ContainSubstring("error"))
+
+				Eventually(logger).Should(Say("route-endpoint"))
+				Eventually(logger).Should(Say("error"))
 			})
 		})
 
@@ -117,7 +114,8 @@ var _ = Describe("Proxy Unit tests", func() {
 							responseRecorder.EnableFullDuplexErr = errors.New("unsupported")
 							req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
 							proxyObj.ServeHTTP(resp, req)
-							Expect(testSink.Contents()).To(ContainSubstring("enable-full-duplex-err"))
+
+							Eventually(logger).Should(Say("enable-full-duplex-err"))
 						})
 					})
 				})
@@ -212,13 +210,11 @@ var _ = Describe("Proxy Unit tests", func() {
 
 	Describe("ForceDeleteXFCCHeader", func() {
 		BeforeEach(func() {
-			logger = log.CreateLogger()
-			testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+			logger = test_util.NewTestLogger("test")
 		})
 		DescribeTable("the returned function",
-			func(arrivedViaRouteService proxy.RouteServiceValidator, lgr *slog.Logger, forwardedClientCert string, expectedValue bool, expectedErr error) {
-				forceDeleteXFCCHeaderFunc := proxy.ForceDeleteXFCCHeader(arrivedViaRouteService, forwardedClientCert, lgr)
+			func(arrivedViaRouteService proxy.RouteServiceValidator, lgr func() *slog.Logger, forwardedClientCert string, expectedValue bool, expectedErr error) {
+				forceDeleteXFCCHeaderFunc := proxy.ForceDeleteXFCCHeader(arrivedViaRouteService, forwardedClientCert, lgr())
 				forceDelete, err := forceDeleteXFCCHeaderFunc(&http.Request{})
 				if expectedErr != nil {
 					Expect(err).To(Equal(expectedErr))
@@ -228,17 +224,17 @@ var _ = Describe("Proxy Unit tests", func() {
 				Expect(forceDelete).To(Equal(expectedValue))
 			},
 			Entry("arrivedViaRouteService returns (false, nil), forwardedClientCert == sanitize_set",
-				notArrivedViaRouteService, logger, "sanitize_set", false, nil),
+				notArrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, nil),
 			Entry("arrivedViaRouteService returns (false, nil), forwardedClientCert != sanitize_set",
-				notArrivedViaRouteService, logger, "", false, nil),
+				notArrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "", false, nil),
 			Entry("arrivedViaRouteService returns (true, nil), forwardedClientCert == sanitize_set",
-				arrivedViaRouteService, logger, "sanitize_set", false, nil),
+				arrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, nil),
 			Entry("arrivedViaRouteService returns (true, nil), forwardedClientCert != sanitize_set",
-				arrivedViaRouteService, logger, "", true, nil),
+				arrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "", true, nil),
 			Entry("arrivedViaRouteService returns (false, error), forwardedClientCert == sanitize_set",
-				errorViaRouteService, logger, "sanitize_set", false, errors.New("Bad route service validator")),
+				errorViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, errors.New("Bad route service validator")),
 			Entry("arrivedViaRouteService returns (false, error), forwardedClientCert != sanitize_set",
-				errorViaRouteService, logger, "", false, errors.New("Bad route service validator")),
+				errorViaRouteService, func() *slog.Logger { return logger.Logger }, "", false, errors.New("Bad route service validator")),
 		)
 	})
 })

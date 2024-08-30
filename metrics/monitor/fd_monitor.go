@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde/metrics"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type FileDescriptor struct {

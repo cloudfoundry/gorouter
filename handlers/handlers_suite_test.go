@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"testing"
 
-	"code.cloudfoundry.org/gorouter/handlers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/handlers"
 )
 
 func TestHandlers(t *testing.T) {

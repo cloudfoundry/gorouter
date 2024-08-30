@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/secure/fakes"
-	"code.cloudfoundry.org/gorouter/routeservice"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/secure/fakes"
+	"code.cloudfoundry.org/gorouter/routeservice"
 )
 
 var _ = Describe("Route Service Signature", func() {

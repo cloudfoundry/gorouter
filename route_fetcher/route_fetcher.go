@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock"
+	"github.com/cloudfoundry/dropsonde/metrics"
+	"golang.org/x/oauth2"
+
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
@@ -16,8 +19,6 @@ import (
 	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/models"
 	"code.cloudfoundry.org/routing-api/uaaclient"
-	"github.com/cloudfoundry/dropsonde/metrics"
-	"golang.org/x/oauth2"
 )
 
 type RouteFetcher struct {

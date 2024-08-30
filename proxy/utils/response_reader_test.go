@@ -6,10 +6,11 @@ import (
 	"io"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("ResponseReader", func() {

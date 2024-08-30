@@ -4,12 +4,13 @@ import (
 	"errors"
 	"log/slog"
 
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"go.uber.org/zap/zapcore"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Logger", func() {
@@ -22,14 +23,16 @@ var _ = Describe("Logger", func() {
 		logKey    = "my-key"
 		logValue  = "my-value"
 	)
+	BeforeEach(func() {
+		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+		log.SetTimeEncoder("epoch")
+		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+	})
 
 	Describe("CreateLogger", func() {
 		Context("when logger is created", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetTimeEncoder("epoch")
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 			})
 			It("outputs a properly-formatted message without source attribute", func() {
 				logger.Info(action, slog.String(logKey, logValue))
@@ -45,11 +48,8 @@ var _ = Describe("Logger", func() {
 
 	Describe("CreateLoggerWithSource", func() {
 		Context("when prefix without component is provided", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLoggerWithSource(prefix, "")
-				log.SetTimeEncoder("epoch")
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 			})
 			It("outputs a properly-formatted message with prefix as source", func() {
 				logger.Info(action, slog.String(logKey, logValue))
@@ -62,11 +62,8 @@ var _ = Describe("Logger", func() {
 		})
 
 		Context("when prefix and component are provided", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLoggerWithSource(prefix, component)
-				log.SetTimeEncoder("epoch")
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 			})
 			It("outputs a properly-formatted message with 'prefix.component' as source", func() {
 				logger.Info(action, slog.String(logKey, logValue))
@@ -81,10 +78,8 @@ var _ = Describe("Logger", func() {
 
 	Describe("SetTimeEncoder", func() {
 		Context("when rfc3339 is provided as time encoder", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 				log.SetTimeEncoder("rfc3339")
 			})
 			It("outputs a properly-formatted message with timestamp in rfc3339 format", func() {
@@ -98,10 +93,8 @@ var _ = Describe("Logger", func() {
 			})
 		})
 		Context("when epoch is provided as time encoder", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 				log.SetTimeEncoder("rfc3339")
 				log.SetTimeEncoder("epoch")
 			})
@@ -119,12 +112,9 @@ var _ = Describe("Logger", func() {
 
 	Describe("SetLoggingLevel", func() {
 		Context("when DEBUG is provided as logging level", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 				log.SetLoggingLevel("DEBUG")
-				log.SetTimeEncoder("epoch")
 			})
 			It("outputs messages with DEBUG level", func() {
 				logger.Debug(action, slog.String(logKey, logValue))
@@ -142,13 +132,10 @@ var _ = Describe("Logger", func() {
 			})
 		})
 		Context("when DEBUG is provided as logging level", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 				log.SetLoggingLevel("DEBUG")
 				log.SetLoggingLevel("INFO")
-				log.SetTimeEncoder("epoch")
 			})
 			It("only outputs messages with level INFO and above", func() {
 				logger.Debug(action, slog.String(logKey, logValue))
@@ -165,11 +152,8 @@ var _ = Describe("Logger", func() {
 
 	Describe("Panic", func() {
 		Context("when an error is logged with 'Panic'", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-				log.SetTimeEncoder("epoch")
 			})
 			It("outputs an error log message and panics", func() {
 				Expect(func() { log.Panic(logger, action) }).To(Panic())
@@ -185,10 +169,8 @@ var _ = Describe("Logger", func() {
 
 	Describe("ErrAttr", func() {
 		Context("when appending an error created by ErrAttr ", func() {
-			BeforeEach(func() {
-				testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			JustBeforeEach(func() {
 				logger = log.CreateLogger()
-				log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 			})
 			It("outputs log messages with 'error' attribute", func() {
 				err := errors.New("this-is-an-error")

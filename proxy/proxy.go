@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
@@ -25,8 +28,6 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/urfave/negroni/v3"
 )
 
 var (
@@ -234,17 +235,17 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		err := rc.EnableFullDuplex()
 		if err != nil {
-			logger.Error("enable-full-duplex-err", log.ErrAttr(err))
+			log.Panic(logger, "enable-full-duplex-err", log.ErrAttr(err))
 		}
 	}
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
 	if err != nil {
-		logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 	}
 
 	if reqInfo.RoutePool == nil {
-		logger.Error("request-info-err", log.ErrAttr(errors.New("failed-to-access-RoutePool")))
+		log.Panic(logger, "request-info-err", log.ErrAttr(errors.New("failed-to-access-RoutePool")))
 	}
 
 	reqInfo.AppRequestStartedAt = time.Now()
@@ -255,7 +256,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 func (p *proxy) setupProxyRequest(target *http.Request) {
 	reqInfo, err := handlers.ContextRequestInfo(target)
 	if err != nil {
-		p.logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(p.logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	reqInfo.BackendReqHeaders = target.Header
@@ -282,7 +283,7 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 func (p *proxy) setupProxyRequestClose100Continue(target *httputil.ProxyRequest) {
 	reqInfo, err := handlers.ContextRequestInfo(target.In)
 	if err != nil {
-		p.logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(p.logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	reqInfo.BackendReqHeaders = target.Out.Header

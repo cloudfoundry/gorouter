@@ -2,29 +2,25 @@ package proxy
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("modifyResponse", func() {
 	var (
-		p        *proxy
-		resp     *http.Response
-		reqInfo  *handlers.RequestInfo
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		p       *proxy
+		resp    *http.Response
+		reqInfo *handlers.RequestInfo
+		logger  *test_util.TestLogger
 	)
 	BeforeEach(func() {
 		p = &proxy{config: &config.Config{}}
@@ -35,9 +31,7 @@ var _ = Describe("modifyResponse", func() {
 		Expect(err).ToNot(HaveOccurred())
 		req.Header.Set(handlers.VcapRequestIdHeader, "foo-uuid")
 		req.Header.Set(router_http.VcapTraceHeader, "trace-key")
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+		logger = test_util.NewTestLogger("test")
 		var modifiedReq *http.Request
 		handlers.NewRequestInfo().ServeHTTP(nil, req, func(rw http.ResponseWriter, r *http.Request) {
 			modifiedReq = r
@@ -46,7 +40,7 @@ var _ = Describe("modifyResponse", func() {
 		Expect(err).ToNot(HaveOccurred())
 		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 		reqInfo.RoutePool = route.NewPool(&route.PoolOpts{
-			Logger:             logger,
+			Logger:             logger.Logger,
 			RetryAfterFailure:  0,
 			Host:               "foo.com",
 			ContextPath:        "context-path",

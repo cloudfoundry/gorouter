@@ -1,32 +1,25 @@
 package handlers_test
 
 import (
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("HTTPRewrite Handler", func() {
 	var (
-		testSink *test_util.TestSink
-		logger   *slog.Logger
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 	})
 
 	process := func(cfg config.HTTPRewrite) *httptest.ResponseRecorder {
@@ -35,11 +28,9 @@ var _ = Describe("HTTPRewrite Handler", func() {
 			w.WriteHeader(http.StatusTeapot)
 			w.Write([]byte("I'm a little teapot, short and stout."))
 		})
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
 		n := negroni.New()
 		n.Use(handlers.NewRequestInfo())
-		n.Use(handlers.NewProxyWriter(logger))
+		n.Use(handlers.NewProxyWriter(logger.Logger))
 		n.Use(handlers.NewHTTPRewriteHandler(cfg, []string{}))
 		n.UseHandler(mockedService)
 
@@ -175,11 +166,10 @@ var _ = Describe("HTTPRewrite Handler", func() {
 				w.WriteHeader(http.StatusTeapot)
 				w.Write([]byte("I'm a little teapot, short and stout."))
 			})
-			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-			log.SetLoggingLevel("Debug")
+
 			n := negroni.New()
 			n.Use(handlers.NewRequestInfo())
-			n.Use(handlers.NewProxyWriter(logger))
+			n.Use(handlers.NewProxyWriter(logger.Logger))
 			n.Use(handlers.NewHTTPRewriteHandler(config.HTTPRewrite{}, headersToAlwaysRemove))
 			n.UseHandler(mockedService)
 

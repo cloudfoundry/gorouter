@@ -3,11 +3,12 @@ package monitor_test
 import (
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/sonde-go/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/protobuf/proto"
+
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
 )
 
 const (

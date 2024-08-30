@@ -9,12 +9,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
-	"github.com/urfave/negroni/v3"
 )
 
 type RouteService struct {
@@ -35,7 +36,7 @@ func NewRouteService(
 	allowlistDomains, err := CreateDomainAllowlist(config.RouteServiceHairpinningAllowlist())
 
 	if err != nil {
-		logger.Error("allowlist-entry-invalid", log.ErrAttr(err))
+		log.Panic(logger, "allowlist-entry-invalid", log.ErrAttr(err))
 	}
 	return &RouteService{
 		config:                      config,
@@ -50,11 +51,11 @@ func (r *RouteService) ServeHTTP(rw http.ResponseWriter, req *http.Request, next
 	logger := LoggerWithTraceInfo(r.logger, req)
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
-		logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	if reqInfo.RoutePool == nil {
-		logger.Error("request-info-err", log.ErrAttr(errors.New("failed-to-access-RoutePool")))
+		log.Panic(logger, "request-info-err", log.ErrAttr(errors.New("failed-to-access-RoutePool")))
 		return
 	}
 
@@ -288,12 +289,12 @@ func (r *RouteService) IsRouteServiceTraffic(req *http.Request) bool {
 func (r *RouteService) ArrivedViaRouteService(req *http.Request, logger *slog.Logger) (bool, error) {
 	reqInfo, err := ContextRequestInfo(req)
 	if err != nil {
-		logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 		return false, err
 	}
 	if reqInfo.RoutePool == nil {
 		err = errors.New("failed-to-access-RoutePool")
-		logger.Error("request-info-err", log.ErrAttr(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 		return false, err
 	}
 

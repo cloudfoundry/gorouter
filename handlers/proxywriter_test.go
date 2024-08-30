@@ -3,19 +3,16 @@ package handlers_test
 import (
 	"bytes"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
-	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("ProxyWriter", func() {
@@ -26,8 +23,7 @@ var _ = Describe("ProxyWriter", func() {
 		req  *http.Request
 
 		nextCalled bool
-		testSink   *test_util.TestSink
-		logger     *slog.Logger
+		logger     *test_util.TestLogger
 
 		reqChan  chan *http.Request
 		respChan chan http.ResponseWriter
@@ -46,17 +42,14 @@ var _ = Describe("ProxyWriter", func() {
 	})
 
 	BeforeEach(func() {
-		logger = log.CreateLogger()
-		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
-		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
-		log.SetLoggingLevel("Debug")
+		logger = test_util.NewTestLogger("test")
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(logger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
 		handler.UseHandlerFunc(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -93,7 +86,7 @@ var _ = Describe("ProxyWriter", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewProxyWriter(logger))
+			badHandler.Use(handlers.NewProxyWriter(logger.Logger))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Panic on the logger", func() {

@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde/metrics"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 //go:generate counterfeiter -o ../fakes/fake_subscriber.go . Subscriber

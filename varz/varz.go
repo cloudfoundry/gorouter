@@ -6,10 +6,11 @@ import (
 	"sync"
 	"time"
 
+	metrics "github.com/rcrowley/go-metrics"
+
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/stats"
-	metrics "github.com/rcrowley/go-metrics"
 )
 
 type topAppsEntry struct {

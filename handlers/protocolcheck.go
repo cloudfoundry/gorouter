@@ -8,8 +8,9 @@ import (
 	"net"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/errorwriter"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/errorwriter"
 )
 
 type protocolCheck struct {

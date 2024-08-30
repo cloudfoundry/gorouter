@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/common/health"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	log "code.cloudfoundry.org/gorouter/logger"
-	"github.com/urfave/negroni/v3"
 )
 
 type panicCheck struct {
