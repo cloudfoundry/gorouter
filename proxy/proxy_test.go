@@ -19,24 +19,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/net/http2"
-	"golang.org/x/net/websocket"
-
 	"code.cloudfoundry.org/gorouter/common/health"
-
-	"github.com/cloudfoundry/dropsonde/factories"
-	"github.com/cloudfoundry/sonde-go/events"
-	uuid "github.com/nu7hatch/gouuid"
-	"github.com/openzipkin/zipkin-go/propagation/b3"
-
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-
+	"github.com/cloudfoundry/dropsonde/factories"
+	"github.com/cloudfoundry/sonde-go/events"
+	uuid "github.com/nu7hatch/gouuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/websocket"
 )
 
 var _ = Describe("Proxy", func() {

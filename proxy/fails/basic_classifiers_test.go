@@ -12,11 +12,9 @@ import (
 
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	"golang.org/x/net/context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/context"
 )
 
 // If the golang standard library ever changes what kind

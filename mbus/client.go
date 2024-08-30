@@ -7,12 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nats-io/nats.go"
-
-	"code.cloudfoundry.org/tlsconfig"
-
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/tlsconfig"
+	"github.com/nats-io/nats.go"
 )
 
 type Signal struct{}

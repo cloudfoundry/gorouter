@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"go.step.sm/crypto/pemutil"
-
-	"code.cloudfoundry.org/gorouter/logger"
 	"gopkg.in/yaml.v3"
 
 	"code.cloudfoundry.org/localip"

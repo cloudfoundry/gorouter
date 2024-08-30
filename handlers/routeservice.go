@@ -9,14 +9,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/urfave/negroni/v3"
-
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/routeservice"
-
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/urfave/negroni/v3"
 )
 
 type RouteService struct {

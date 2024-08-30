@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
-
 	"github.com/cloudfoundry/dropsonde/metrics"
 )
 

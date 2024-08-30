@@ -3,17 +3,14 @@ package container_test
 import (
 	"log/slog"
 
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry/container"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Trie", func() {

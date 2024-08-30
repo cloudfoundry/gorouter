@@ -3,10 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/urfave/negroni/v3"
-
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/urfave/negroni/v3"
 )
 
 type httpRewriteHandler struct {

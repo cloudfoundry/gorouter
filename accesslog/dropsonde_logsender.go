@@ -6,14 +6,13 @@ import (
 	"strconv"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/sonde-go/events"
 	"google.golang.org/protobuf/proto"
-
-	"code.cloudfoundry.org/gorouter/accesslog/schema"
-	"code.cloudfoundry.org/gorouter/config"
-	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type DropsondeLogSender struct {

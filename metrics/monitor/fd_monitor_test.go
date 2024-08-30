@@ -7,17 +7,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("FileDescriptor", func() {

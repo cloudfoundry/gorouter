@@ -7,14 +7,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock/fakeclock"
-	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
-	"github.com/cloudfoundry/dropsonde/metrics"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/tedsuo/ifrit"
-	"golang.org/x/oauth2"
-
 	"code.cloudfoundry.org/gorouter/config"
 	testRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
@@ -24,6 +16,13 @@ import (
 	fake_routing_api "code.cloudfoundry.org/routing-api/fake_routing_api"
 	"code.cloudfoundry.org/routing-api/models"
 	test_uaa_client "code.cloudfoundry.org/routing-api/uaaclient/fakes"
+	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
+	"github.com/cloudfoundry/dropsonde/metrics"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
+	"golang.org/x/oauth2"
 )
 
 var sender *metrics_fakes.FakeMetricSender

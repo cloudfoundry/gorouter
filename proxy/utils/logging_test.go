@@ -2,7 +2,6 @@ package utils_test
 
 import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

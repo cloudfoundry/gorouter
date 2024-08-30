@@ -11,16 +11,15 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/secure"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/types"
 	"go.uber.org/zap/zapcore"
-
-	"code.cloudfoundry.org/gorouter/common/secure"
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 func HaveErrored() types.GomegaMatcher {

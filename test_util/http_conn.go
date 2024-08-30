@@ -1,15 +1,14 @@
 package test_util
 
 import (
-	"io"
-	"strings"
-
-	. "github.com/onsi/gomega"
-
 	"bufio"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
+
+	. "github.com/onsi/gomega"
 )
 
 type HttpConn struct {

@@ -11,30 +11,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
-	"code.cloudfoundry.org/gorouter/common/health"
-	log "code.cloudfoundry.org/gorouter/logger"
-
+	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
 	"code.cloudfoundry.org/gorouter/accesslog"
+	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
-	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
 )
 
 //go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper

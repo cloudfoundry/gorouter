@@ -8,9 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
@@ -19,11 +16,12 @@ import (
 	registryFakes "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-
 	"github.com/nats-io/nats.go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Subscriber", func() {

@@ -3,9 +3,8 @@ package round_tripper
 import (
 	"net/http"
 
-	"github.com/cloudfoundry/dropsonde"
-
 	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/cloudfoundry/dropsonde"
 )
 
 func NewDropsondeRoundTripper(p ProxyRoundTripper) ProxyRoundTripper {

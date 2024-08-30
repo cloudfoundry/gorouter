@@ -1,10 +1,10 @@
 package varz_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
 
 func TestVarz(t *testing.T) {

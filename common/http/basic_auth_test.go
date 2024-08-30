@@ -1,12 +1,12 @@
 package http_test
 
 import (
+	"net"
+	"net/http"
+
 	. "code.cloudfoundry.org/gorouter/common/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"net"
-	"net/http"
 )
 
 var _ = Describe("http", func() {

@@ -1,9 +1,9 @@
 package test_util
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-
 	"sync"
+
+	. "github.com/onsi/ginkgo/v2"
 )
 
 var (

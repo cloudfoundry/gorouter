@@ -12,7 +12,6 @@ import (
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-
 	"github.com/urfave/negroni/v3"
 )
 

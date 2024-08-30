@@ -6,12 +6,10 @@ import (
 	"net/textproto"
 	"time"
 
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-
 	"github.com/urfave/negroni/v3"
-
-	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type reporterHandler struct {

@@ -9,16 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/localip"
-	"github.com/nats-io/nats.go"
-
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
+	"github.com/nats-io/nats.go"
 )
 
 type RegistryMessage struct {

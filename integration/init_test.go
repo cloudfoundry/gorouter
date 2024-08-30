@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"testing"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -17,8 +18,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 	"github.com/onsi/gomega/ghttp"
-
-	"testing"
 )
 
 var (

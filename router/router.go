@@ -16,9 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/armon/go-proxyproto"
-	"github.com/nats-io/nats.go"
-
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
@@ -28,6 +25,8 @@ import (
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
+	"github.com/armon/go-proxyproto"
+	"github.com/nats-io/nats.go"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")

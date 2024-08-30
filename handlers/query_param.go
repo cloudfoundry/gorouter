@@ -5,9 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/urfave/negroni/v3"
-
 	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"github.com/urfave/negroni/v3"
 )
 
 type queryParam struct {

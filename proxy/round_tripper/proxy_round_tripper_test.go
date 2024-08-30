@@ -16,27 +16,24 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"go.uber.org/zap/zapcore"
-
-	"github.com/onsi/gomega/gbytes"
-
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
+	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
+	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	errorClassifierFakes "code.cloudfoundry.org/gorouter/proxy/fails/fakes"
-	roundtripperfakes "code.cloudfoundry.org/gorouter/proxy/round_tripper/fakes"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
 )
 
 const StickyCookieKey = "JSESSIONID"

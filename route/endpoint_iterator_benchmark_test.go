@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
 )
 
 func testLoadBalance(lb route.EndpointIterator, b *testing.B) {

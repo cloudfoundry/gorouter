@@ -10,15 +10,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"go.uber.org/zap/zapcore"
-
-	log "code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/sonde-go/events"
 	gouuid "github.com/nu7hatch/gouuid"
@@ -26,6 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
+	"go.uber.org/zap/zapcore"
 )
 
 func findEnvelope(fakeEmitter *fake.FakeEventEmitter, eventType events.Envelope_EventType) *events.Envelope {

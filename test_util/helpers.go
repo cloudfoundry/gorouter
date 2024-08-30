@@ -21,14 +21,12 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"golang.org/x/net/websocket"
 )
 
 func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg RegisterConfig) {

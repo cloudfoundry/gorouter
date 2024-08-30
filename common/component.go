@@ -12,15 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/localip"
-	"github.com/nats-io/nats.go"
-
 	"code.cloudfoundry.org/gorouter/common/health"
 	. "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/localip"
+	"github.com/nats-io/nats.go"
 )
 
 const RefreshInterval time.Duration = time.Second * 1

@@ -7,11 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"go.uber.org/zap/zapcore"
-
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -19,6 +14,10 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "code.cloudfoundry.org/gorouter/varz"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("Varz", func() {

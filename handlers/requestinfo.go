@@ -9,14 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/route"
 	gouuid "github.com/nu7hatch/gouuid"
 	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/urfave/negroni/v3"
-
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/route"
 )
 
 type key string

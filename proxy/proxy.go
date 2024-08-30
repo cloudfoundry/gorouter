@@ -12,12 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/urfave/negroni/v3"
-
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
@@ -29,6 +25,8 @@ import (
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/urfave/negroni/v3"
 )
 
 var (

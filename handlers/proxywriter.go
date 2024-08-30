@@ -4,10 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/urfave/negroni/v3"
-
 	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/urfave/negroni/v3"
 )
 
 type proxyWriterHandler struct {

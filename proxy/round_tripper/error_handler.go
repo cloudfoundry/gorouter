@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
-
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 )
 
 type ErrorSpec struct {
