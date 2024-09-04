@@ -10,11 +10,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 
 	. "code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	"gopkg.in/yaml.v3"
 )
 
 var _ = Describe("Config", func() {

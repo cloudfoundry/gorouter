@@ -1,6 +1,7 @@
 package route
 
 import (
+	"context"
 	"log/slog"
 	"time"
 )
@@ -33,7 +34,9 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 		e = r.pool.findById(r.initialEndpoint)
 		if e != nil && e.isOverloaded() {
 			if r.mustBeSticky {
-				r.logger.Debug("endpoint-overloaded-but-request-must-be-sticky", e.endpoint.ToLogData()...)
+				if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+					r.logger.Debug("endpoint-overloaded-but-request-must-be-sticky", e.endpoint.ToLogData()...)
+				}
 				return nil
 			}
 			e = nil

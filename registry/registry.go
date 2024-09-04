@@ -1,8 +1,8 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -96,11 +96,17 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	switch endpointAdded {
 	case route.ADDED:
-		r.logger.Info("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+			r.logger.Info("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	case route.UPDATED:
-		r.logger.Debug("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+			r.logger.Debug("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	default:
-		r.logger.Debug("endpoint-not-registered", buildSlogAttrs(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+			r.logger.Debug("endpoint-not-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	}
 }
 
@@ -149,9 +155,9 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 			LoadBalancingAlgorithm: r.DefaultLoadBalancingAlgorithm,
 		})
 		r.byURI.Insert(routekey, pool)
-		r.logger.Info("route-registered", slog.Any("uri", fmt.Stringer(routekey)))
+		r.logger.Info("route-registered", slog.Any("uri", routekey))
 		// for backward compatibility:
-		r.logger.Debug("uri-added", slog.Any("uri", fmt.Stringer(routekey)))
+		r.logger.Debug("uri-added", slog.Any("uri", routekey))
 	}
 	return pool
 }
@@ -176,9 +182,13 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Info("endpoint-unregistered", buildSlogAttrs(uri, endpoint)...)
+			if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+				r.logger.Info("endpoint-unregistered", buildSlogAttrs(uri, endpoint)...)
+			}
 		} else {
-			r.logger.Info("endpoint-not-unregistered", buildSlogAttrs(uri, endpoint)...)
+			if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+				r.logger.Info("endpoint-not-unregistered", buildSlogAttrs(uri, endpoint)...)
+			}
 		}
 
 		if pool.IsEmpty() {

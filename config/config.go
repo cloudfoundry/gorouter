@@ -13,10 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/localip"
 	"go.step.sm/crypto/pemutil"
 	"gopkg.in/yaml.v3"
-
-	"code.cloudfoundry.org/localip"
 )
 
 const (

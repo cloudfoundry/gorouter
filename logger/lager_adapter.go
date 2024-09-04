@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -55,16 +56,25 @@ func (l *LagerAdapter) SessionName() string {
 
 // Debug logs a message at the debug log setLoggingLevel.
 func (l *LagerAdapter) Debug(action string, data ...lager.Data) {
+	if !l.logger.Enabled(context.Background(), slog.LevelDebug) {
+		return
+	}
 	l.logger.Debug(action, dataToFields(data)...)
 }
 
 // Info logs a message at the info log setLoggingLevel.
 func (l *LagerAdapter) Info(action string, data ...lager.Data) {
+	if !l.logger.Enabled(context.Background(), slog.LevelInfo) {
+		return
+	}
 	l.logger.Info(action, dataToFields(data)...)
 }
 
 // Error logs a message at the error log setLoggingLevel.
 func (l *LagerAdapter) Error(action string, err error, data ...lager.Data) {
+	if !l.logger.Enabled(context.Background(), slog.LevelError) {
+		return
+	}
 	l.logger.Error(action, append(dataToFields(data), ErrAttr(err))...)
 }
 
