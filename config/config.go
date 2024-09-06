@@ -15,7 +15,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/uber-go/zap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"code.cloudfoundry.org/localip"
 	"slices"
