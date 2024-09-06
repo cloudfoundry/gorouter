@@ -14,7 +14,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/test_util"
 
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 var _ = Describe("Config", func() {
@@ -1906,18 +1906,15 @@ load_balancer_healthy_threshold: 10s
 
 		Describe("Timeout", func() {
 			var b []byte
-			BeforeEach(func() {
-				b = createYMLSnippet((cfgForSnippet))
-			})
 			It("converts timeouts to a duration", func() {
-				b = append(b, []byte(`
+				b = []byte(`
 endpoint_timeout: 10s
 endpoint_dial_timeout: 6s
 websocket_dial_timeout: 8s
 route_services_timeout: 10s
 drain_timeout: 15s
 tls_handshake_timeout: 9s
-`)...)
+`)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1932,9 +1929,9 @@ tls_handshake_timeout: 9s
 			})
 
 			It("defaults to the EndpointTimeout when not set", func() {
-				b = append(b, []byte(`
+				b = []byte(`
 endpoint_timeout: 10s
-`)...)
+`)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1946,11 +1943,11 @@ endpoint_timeout: 10s
 			})
 
 			It("lets drain_timeout be 60 if it wants", func() {
-				b = append(b, []byte(`
+				b = []byte(`
 endpoint_timeout: 10s
 route_services_timeout: 11s
 drain_timeout: 60s
-`)...)
+`)
 				err := config.Initialize(b)
 				Expect(err).ToNot(HaveOccurred())
 

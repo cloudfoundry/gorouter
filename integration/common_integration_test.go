@@ -21,7 +21,7 @@ import (
 	"code.cloudfoundry.org/gorouter/test_util"
 
 	nats "github.com/nats-io/nats.go"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
