@@ -62,7 +62,7 @@ func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender,
 	}
 
 	if config.AccessLog.File != "" {
-		file, err := os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		file, err := os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
 			logger.Error("error-creating-accesslog-file", zap.String("filename", config.AccessLog.File), zap.Error(err))
 			return nil, err
