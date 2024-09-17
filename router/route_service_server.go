@@ -26,11 +26,12 @@ const (
 )
 
 type RouteServicesServer struct {
-	listener   net.Listener
-	port       string
-	rootCA     *x509.CertPool
-	clientCert tls.Certificate
-	serverCert tls.Certificate
+	listener          net.Listener
+	port              string
+	readHeaderTimeout time.Duration
+	rootCA            *x509.CertPool
+	clientCert        tls.Certificate
+	serverCert        tls.Certificate
 }
 
 func NewRouteServicesServer(cfg *config.Config) (*RouteServicesServer, error) {
@@ -62,19 +63,22 @@ func NewRouteServicesServer(cfg *config.Config) (*RouteServicesServer, error) {
 	}
 
 	return &RouteServicesServer{
-		listener:   l,
-		port:       port,
-		rootCA:     rootCertPool,
-		clientCert: clientCert,
-		serverCert: serverCert,
+		listener:          l,
+		port:              port,
+		readHeaderTimeout: cfg.ReadHeaderTimeout,
+		rootCA:            rootCertPool,
+		clientCert:        clientCert,
+		serverCert:        serverCert,
 	}, nil
 }
 
 func (rs *RouteServicesServer) Serve(handler http.Handler, errChan chan error) error {
+	fmt.Printf("starting server with timeout: %#v\n", rs.readHeaderTimeout)
 	localServer := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler.ServeHTTP(w, r)
 		}),
+		ReadHeaderTimeout: rs.readHeaderTimeout,
 	}
 	tlsConfig := &tls.Config{
 		ClientAuth:   tls.RequireAndVerifyClientCert,
@@ -108,7 +112,7 @@ func (rs *RouteServicesServer) GetRoundTripper() RouteServiceRoundTripper {
 
 type RouteServiceRoundTripper struct {
 	port      string
-	transport http.RoundTripper
+	transport *http.Transport
 }
 
 func (rc RouteServiceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -116,6 +120,10 @@ func (rc RouteServiceRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	req.URL.Host = fmt.Sprintf("127.0.0.1:%s", rc.port)
 
 	return rc.transport.RoundTrip(req)
+}
+
+func (rc RouteServiceRoundTripper) TLSClientConfig() *tls.Config {
+	return rc.transport.TLSClientConfig
 }
 
 func createCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
