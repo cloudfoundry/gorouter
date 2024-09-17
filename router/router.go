@@ -210,10 +210,11 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	time.Sleep(r.config.StartResponseDelayInterval)
 
 	server := &http.Server{
-		Handler:        r.handler,
-		ConnState:      r.HandleConnState,
-		IdleTimeout:    r.config.FrontendIdleTimeout,
-		MaxHeaderBytes: MAX_HEADER_BYTES,
+		Handler:           r.handler,
+		ConnState:         r.HandleConnState,
+		IdleTimeout:       r.config.FrontendIdleTimeout,
+		ReadHeaderTimeout: r.config.ReadHeaderTimeout,
+		MaxHeaderBytes:    MAX_HEADER_BYTES,
 	}
 
 	err = r.serveHTTP(server, r.errChan)

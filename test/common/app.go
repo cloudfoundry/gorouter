@@ -69,9 +69,10 @@ func (a *TestApp) Endpoint() string {
 
 func (a *TestApp) TlsListen(tlsConfig *tls.Config) chan error {
 	a.server = &http.Server{
-		Addr:      fmt.Sprintf(":%d", a.port),
-		Handler:   a.mux,
-		TLSConfig: tlsConfig,
+		Addr:              fmt.Sprintf(":%d", a.port),
+		Handler:           a.mux,
+		TLSConfig:         tlsConfig,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	errChan := make(chan error, 1)
 
@@ -89,8 +90,9 @@ func (a *TestApp) RegisterAndListen() {
 
 func (a *TestApp) Listen() {
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", a.port),
-		Handler: a.mux,
+		Addr:              fmt.Sprintf(":%d", a.port),
+		Handler:           a.mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go server.ListenAndServe()
 }

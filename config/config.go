@@ -420,6 +420,7 @@ type Config struct {
 	EndpointKeepAliveProbeInterval  time.Duration `yaml:"endpoint_keep_alive_probe_interval,omitempty"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout,omitempty"`
 	FrontendIdleTimeout             time.Duration `yaml:"frontend_idle_timeout,omitempty"`
+	ReadHeaderTimeout               time.Duration `yaml:"read_header_timeout,omitempty"`
 
 	RouteLatencyMetricMuzzleDuration time.Duration `yaml:"route_latency_metric_muzzle_duration,omitempty"`
 
