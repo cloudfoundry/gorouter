@@ -64,9 +64,15 @@ func (hl *HealthListener) ListenAndServe() error {
 
 func (hl *HealthListener) Stop() {
 	if hl.listener != nil {
-		hl.listener.Close()
+		err := hl.listener.Close()
+		if err != nil {
+			hl.Logger.Error("failed-closing-health-listener", zap.Error(err))
+		}
 	}
 	if hl.tlsListener != nil {
-		hl.tlsListener.Close()
+		err := hl.tlsListener.Close()
+		if err != nil {
+			hl.Logger.Error("failed-closing-health-tls-listener", zap.Error(err))
+		}
 	}
 }

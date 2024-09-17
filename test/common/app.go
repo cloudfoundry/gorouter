@@ -150,10 +150,8 @@ func (a *TestApp) TlsRegisterWithIndex(serverCertDomainSAN string, index int) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshalling registration JSON: %s\n", err)
 	}
-	err = a.mbusClient.Publish("router.register", b)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error publishing register message: %s\n", err)
-	}
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
+	a.mbusClient.Publish("router.register", b)
 }
 func (a *TestApp) Register() {
 	id, _ := uuid.GenerateUUID()
@@ -175,10 +173,8 @@ func (a *TestApp) Register() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshalling registration JSON: %s\n", err)
 	}
-	err = a.mbusClient.Publish("router.register", b)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error publishing register message: %s\n", err)
-	}
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
+	a.mbusClient.Publish("router.register", b)
 }
 
 func (a *TestApp) Unregister() {

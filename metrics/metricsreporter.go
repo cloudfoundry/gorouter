@@ -7,15 +7,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 
 	"github.com/cloudfoundry/dropsonde/metrics"
+	"github.com/uber-go/zap"
 )
 
 type MetricsReporter struct {
 	Sender                     metrics.MetricSender
 	Batcher                    metrics.MetricBatcher
 	PerRequestMetricsReporting bool
+	Logger                     logger.Logger
 	unmuzzled                  uint64
 }
 
@@ -78,11 +81,17 @@ func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int
 		//this function has extra arguments to match varz reporter
 		latency := float64(d / time.Millisecond)
 		unit := "ms"
-		m.Sender.SendValue("latency", latency, unit)
+		err := m.Sender.SendValue("latency", latency, unit)
+		if err != nil {
+			m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", "latency"))
+		}
 
 		componentName, ok := b.Tags["component"]
 		if ok && len(componentName) > 0 {
-			m.Sender.SendValue(fmt.Sprintf("latency.%s", componentName), latency, unit)
+			err := m.Sender.SendValue(fmt.Sprintf("latency.%s", componentName), latency, unit)
+			if err != nil {
+				m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", fmt.Sprintf("latency.%s", componentName)))
+			}
 		}
 	}
 }
@@ -90,7 +99,10 @@ func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int
 func (m *MetricsReporter) CaptureLookupTime(t time.Duration) {
 	if m.PerRequestMetricsReporting {
 		unit := "ns"
-		m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
+		err := m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
+		if err != nil {
+			m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", "route_lookup_time"))
+		}
 	}
 }
 
@@ -100,13 +112,22 @@ func (m *MetricsReporter) UnmuzzleRouteRegistrationLatency() {
 
 func (m *MetricsReporter) CaptureRouteRegistrationLatency(t time.Duration) {
 	if atomic.LoadUint64(&m.unmuzzled) == 1 {
-		m.Sender.SendValue("route_registration_latency", float64(t/time.Millisecond), "ms")
+		err := m.Sender.SendValue("route_registration_latency", float64(t/time.Millisecond), "ms")
+		if err != nil {
+			m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", "route_registration_latency"))
+		}
 	}
 }
 
 func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
-	m.Sender.SendValue("total_routes", float64(totalRoutes), "")
-	m.Sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
+	err := m.Sender.SendValue("total_routes", float64(totalRoutes), "")
+	if err != nil {
+		m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", "total_routes"))
+	}
+	err = m.Sender.SendValue("ms_since_last_registry_update", float64(msSinceLastUpdate), "ms")
+	if err != nil {
+		m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", "ms_since_last_registry_update"))
+	}
 }
 
 func (m *MetricsReporter) CaptureRoutesPruned(routesPruned uint64) {
@@ -130,7 +151,10 @@ func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
 	} else {
 		componentName = "unregistry_message." + msg.Component()
 	}
-	m.Sender.IncrementCounter(componentName)
+	err := m.Sender.IncrementCounter(componentName)
+	if err != nil {
+		m.Logger.Debug("failed-sending-metric", zap.Error(err), zap.String("metric", componentName))
+	}
 }
 
 func (m *MetricsReporter) CaptureWebSocketUpdate() {

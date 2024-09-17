@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -132,7 +133,7 @@ func main() {
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 
-	metricsReporter := initializeMetrics(sender, c)
+	metricsReporter := initializeMetrics(sender, c, logger)
 	fdMonitor := initializeFDMonitor(sender, logger)
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
@@ -290,7 +291,7 @@ func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.Me
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger goRouterLogger.Logger) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -312,7 +313,7 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *me
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting}
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger.Session("metricsreporter")}
 }
 
 func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
@@ -413,12 +414,12 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 
 func createLogger(component string, level string, timestampFormat string) (goRouterLogger.Logger, lager.LogLevel) {
 	var logLevel zap.Level
-	err := logLevel.UnmarshalText([]byte(level))
+	err := logLevel.UnmarshalText([]byte(strings.ToLower(level)))
 	if err != nil {
 		panic(fmt.Errorf("unknown log level: %s", level))
 	}
 
-	minLagerLogLevel, err := lager.LogLevelFromString(level)
+	minLagerLogLevel, err := lager.LogLevelFromString(strings.ToLower(level))
 	if err != nil {
 		panic(fmt.Errorf("unknown log level: %s", level))
 	}

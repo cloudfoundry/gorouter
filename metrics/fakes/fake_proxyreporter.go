@@ -35,9 +35,9 @@ type FakeProxyReporter struct {
 	captureBadRequestMutex       sync.RWMutex
 	captureBadRequestArgsForCall []struct {
 	}
-	CaptureMissingContentLengthHeaderStub        func()
-	captureMissingContentLengthHeaderMutex       sync.RWMutex
-	captureMissingContentLengthHeaderArgsForCall []struct {
+	CaptureEmptyContentLengthHeaderStub        func()
+	captureEmptyContentLengthHeaderMutex       sync.RWMutex
+	captureEmptyContentLengthHeaderArgsForCall []struct {
 	}
 	CaptureRouteServiceResponseStub        func(*http.Response)
 	captureRouteServiceResponseMutex       sync.RWMutex
@@ -219,27 +219,27 @@ func (fake *FakeProxyReporter) CaptureBadRequestCalls(stub func()) {
 }
 
 func (fake *FakeProxyReporter) CaptureEmptyContentLengthHeader() {
-	fake.captureMissingContentLengthHeaderMutex.Lock()
-	fake.captureMissingContentLengthHeaderArgsForCall = append(fake.captureMissingContentLengthHeaderArgsForCall, struct {
+	fake.captureEmptyContentLengthHeaderMutex.Lock()
+	fake.captureEmptyContentLengthHeaderArgsForCall = append(fake.captureEmptyContentLengthHeaderArgsForCall, struct {
 	}{})
-	stub := fake.CaptureMissingContentLengthHeaderStub
+	stub := fake.CaptureEmptyContentLengthHeaderStub
 	fake.recordInvocation("CaptureEmptyContentLengthHeader", []interface{}{})
-	fake.captureMissingContentLengthHeaderMutex.Unlock()
+	fake.captureEmptyContentLengthHeaderMutex.Unlock()
 	if stub != nil {
-		fake.CaptureMissingContentLengthHeaderStub()
+		fake.CaptureEmptyContentLengthHeaderStub()
 	}
 }
 
-func (fake *FakeProxyReporter) CaptureMissingContentLengthHeaderCallCount() int {
-	fake.captureMissingContentLengthHeaderMutex.RLock()
-	defer fake.captureMissingContentLengthHeaderMutex.RUnlock()
-	return len(fake.captureMissingContentLengthHeaderArgsForCall)
+func (fake *FakeProxyReporter) CaptureEmptyContentLengthHeaderCallCount() int {
+	fake.captureEmptyContentLengthHeaderMutex.RLock()
+	defer fake.captureEmptyContentLengthHeaderMutex.RUnlock()
+	return len(fake.captureEmptyContentLengthHeaderArgsForCall)
 }
 
-func (fake *FakeProxyReporter) CaptureMissingContentLengthHeaderCalls(stub func()) {
-	fake.captureMissingContentLengthHeaderMutex.Lock()
-	defer fake.captureMissingContentLengthHeaderMutex.Unlock()
-	fake.CaptureMissingContentLengthHeaderStub = stub
+func (fake *FakeProxyReporter) CaptureEmptyContentLengthHeaderCalls(stub func()) {
+	fake.captureEmptyContentLengthHeaderMutex.Lock()
+	defer fake.captureEmptyContentLengthHeaderMutex.Unlock()
+	fake.CaptureEmptyContentLengthHeaderStub = stub
 }
 
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(arg1 *http.Response) {
@@ -436,8 +436,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureBadGatewayMutex.RUnlock()
 	fake.captureBadRequestMutex.RLock()
 	defer fake.captureBadRequestMutex.RUnlock()
-	fake.captureMissingContentLengthHeaderMutex.RLock()
-	defer fake.captureMissingContentLengthHeaderMutex.RUnlock()
+	fake.captureEmptyContentLengthHeaderMutex.RLock()
+	defer fake.captureEmptyContentLengthHeaderMutex.RUnlock()
 	fake.captureRouteServiceResponseMutex.RLock()
 	defer fake.captureRouteServiceResponseMutex.RUnlock()
 	fake.captureRoutingRequestMutex.RLock()

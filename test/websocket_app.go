@@ -38,6 +38,7 @@ func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, dela
 		x.WriteResponse(resp)
 
 		x.CheckLine("hello from client")
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		x.WriteLine("hello from server")
 	})
 

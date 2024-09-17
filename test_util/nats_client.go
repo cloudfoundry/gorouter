@@ -46,10 +46,12 @@ func (n *Nats) Start() {
 }
 
 func (n *Nats) Stop() {
-	n.cmd.Process.Kill()
-	n.cmd.Wait()
+	err := n.cmd.Process.Kill()
+	Expect(err).ToNot(HaveOccurred())
+	err = n.cmd.Wait()
+	Expect(err).ToNot(HaveOccurred())
 
-	err := n.waitUntilNatsDown()
+	err = n.waitUntilNatsDown()
 	Expect(err).ToNot(HaveOccurred())
 }
 

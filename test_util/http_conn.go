@@ -41,6 +41,7 @@ func (x *HttpConn) ReadRequest() (*http.Request, string) {
 func (x *HttpConn) WriteRequest(req *http.Request) {
 	err := req.Write(x.Writer)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	// #nosec G104 - ignore errors when flushing HTTP responses because otherwise it masks our ability to validate the response that the handler is sending
 	x.Writer.Flush()
 }
 
@@ -56,17 +57,24 @@ func (x *HttpConn) ReadResponse() (*http.Response, string) {
 }
 
 func NewResponse(status int) *http.Response {
+	headers := make(http.Header)
+	// Our test handlers close the connection because they don't read multiple
+	// requests from the stream.  But this leaves a dangling connection to a closed
+	// network socket in the backend's connetion pool, unless we set Connection: close on our
+	// response
+	headers.Set("Connection", "close")
 	return &http.Response{
 		StatusCode: status,
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Header:     make(http.Header),
+		Header:     headers,
 	}
 }
 
 func (x *HttpConn) WriteResponse(resp *http.Response) {
 	err := resp.Write(x.Writer)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	// #nosec G104 - ignore errors when flushing HTTP responses because otherwise it masks our ability to validate the response that the handler is sending
 	x.Writer.Flush()
 }
 
@@ -84,18 +92,28 @@ func (x *HttpConn) CheckLines(expected []string) {
 	x.CheckLine("")
 }
 
-func (x *HttpConn) WriteLine(line string) {
-	x.Writer.WriteString(line)
-	x.Writer.WriteString("\r\n")
-	x.Writer.Flush()
+func (x *HttpConn) WriteLine(line string) error {
+	_, err := x.Writer.WriteString(line)
+	if err != nil {
+		return err
+	}
+	_, err = x.Writer.WriteString("\r\n")
+	if err != nil {
+		return err
+	}
+	// #nosec G104 - ignore errors when flushing HTTP responses because otherwise it masks our ability to validate the response that the handler is sending
+	return x.Writer.Flush()
 }
 
-func (x *HttpConn) WriteLines(lines []string) {
+func (x *HttpConn) WriteLines(lines []string) error {
 	for _, e := range lines {
-		x.WriteLine(e)
+		err := x.WriteLine(e)
+		if err != nil {
+			return err
+		}
 	}
 
-	x.WriteLine("")
+	return x.WriteLine("")
 }
 
 func NewRequest(method, host, rawPath string, body io.Reader) *http.Request {

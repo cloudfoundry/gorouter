@@ -39,7 +39,7 @@ const (
 //go:generate counterfeiter -o ../fakes/route_services_server.go --fake-name RouteServicesServer . rss
 type rss interface {
 	Serve(handler http.Handler, errChan chan error) error
-	Stop()
+	Stop() error
 }
 type Router struct {
 	config            *config.Config
@@ -187,7 +187,7 @@ func NewRouter(
 		}
 	}
 
-	router.uptimeMonitor = monitor.NewUptime(emitInterval)
+	router.uptimeMonitor = monitor.NewUptime(emitInterval, router.logger)
 	return router, nil
 }
 
@@ -197,7 +197,10 @@ const MAX_HEADER_BYTES = 1024 * 1024
 func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.registry.StartPruningCycle()
 
-	r.RegisterComponent()
+	err := r.RegisterComponent()
+	if err != nil {
+		return err
+	}
 
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
@@ -212,7 +215,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		MaxHeaderBytes: MAX_HEADER_BYTES,
 	}
 
-	err := r.serveHTTP(server, r.errChan)
+	err = r.serveHTTP(server, r.errChan)
 	if err != nil {
 		r.errChan <- err
 		return err
@@ -432,12 +435,18 @@ func (r *Router) Stop() {
 	r.connLock.Unlock()
 
 	if r.component != nil {
-		r.component.Stop()
+		err := r.component.Stop()
+		if err != nil {
+			r.logger.Error("error-stopping-component", zap.Error(err))
+		}
 	}
 	if r.healthListener != nil {
 		r.healthListener.Stop()
 	}
-	r.routesListener.Stop()
+	err := r.routesListener.Stop()
+	if err != nil {
+		r.logger.Error("error-stopping-route-listener", zap.Error(err))
+	}
 	if r.healthTLSListener != nil {
 		r.healthTLSListener.Stop()
 	}
@@ -480,10 +489,10 @@ func (r *Router) stopListening() {
 		<-r.tlsServeDone
 	}
 
-	r.routeServicesServer.Stop()
-	// if err != nil {
-	// 	r.logger.Error("error-stopping-route-services-server", zap.Error(err))
-	// }
+	err = r.routeServicesServer.Stop()
+	if err != nil {
+		r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+	}
 }
 
 func (r *Router) RegisterComponent() error {

@@ -39,9 +39,10 @@ func (fake *FakeVarzReporter) CaptureBadGateway() {
 	fake.captureBadGatewayMutex.Lock()
 	fake.captureBadGatewayArgsForCall = append(fake.captureBadGatewayArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBadGatewayStub
 	fake.recordInvocation("CaptureBadGateway", []interface{}{})
 	fake.captureBadGatewayMutex.Unlock()
-	if fake.CaptureBadGatewayStub != nil {
+	if stub != nil {
 		fake.CaptureBadGatewayStub()
 	}
 }
@@ -62,9 +63,10 @@ func (fake *FakeVarzReporter) CaptureBadRequest() {
 	fake.captureBadRequestMutex.Lock()
 	fake.captureBadRequestArgsForCall = append(fake.captureBadRequestArgsForCall, struct {
 	}{})
+	stub := fake.CaptureBadRequestStub
 	fake.recordInvocation("CaptureBadRequest", []interface{}{})
 	fake.captureBadRequestMutex.Unlock()
-	if fake.CaptureBadRequestStub != nil {
+	if stub != nil {
 		fake.CaptureBadRequestStub()
 	}
 }
@@ -86,9 +88,10 @@ func (fake *FakeVarzReporter) CaptureRoutingRequest(arg1 *route.Endpoint) {
 	fake.captureRoutingRequestArgsForCall = append(fake.captureRoutingRequestArgsForCall, struct {
 		arg1 *route.Endpoint
 	}{arg1})
+	stub := fake.CaptureRoutingRequestStub
 	fake.recordInvocation("CaptureRoutingRequest", []interface{}{arg1})
 	fake.captureRoutingRequestMutex.Unlock()
-	if fake.CaptureRoutingRequestStub != nil {
+	if stub != nil {
 		fake.CaptureRoutingRequestStub(arg1)
 	}
 }
@@ -120,9 +123,10 @@ func (fake *FakeVarzReporter) CaptureRoutingResponseLatency(arg1 *route.Endpoint
 		arg3 time.Time
 		arg4 time.Duration
 	}{arg1, arg2, arg3, arg4})
+	stub := fake.CaptureRoutingResponseLatencyStub
 	fake.recordInvocation("CaptureRoutingResponseLatency", []interface{}{arg1, arg2, arg3, arg4})
 	fake.captureRoutingResponseLatencyMutex.Unlock()
-	if fake.CaptureRoutingResponseLatencyStub != nil {
+	if stub != nil {
 		fake.CaptureRoutingResponseLatencyStub(arg1, arg2, arg3, arg4)
 	}
 }
@@ -176,5 +180,5 @@ func (fake *FakeVarzReporter) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-//lint:ignore SA1019 - ignoring deprecation of internal object
+//lint:ignore SA1019 - auto-generated fake will go away when Varz goes away
 var _ metrics.VarzReporter = new(FakeVarzReporter)
