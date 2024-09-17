@@ -29,6 +29,7 @@ func (hl *HealthListener) ListenAndServe() error {
 	})
 	mux.HandleFunc("/is-process-alive-do-not-use-for-loadbalancing", func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		w.Write([]byte("ok\n"))
 		req.Close = true
 	})

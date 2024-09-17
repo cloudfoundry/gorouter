@@ -219,6 +219,7 @@ func (c *VcapComponent) ListenAndServe() error {
 
 		enc := json.NewEncoder(w)
 		c.UpdateVarz()
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		enc.Encode(c.Varz)
 	})
 
@@ -230,6 +231,7 @@ func (c *VcapComponent) ListenAndServe() error {
 			w.WriteHeader(http.StatusOK)
 
 			enc := json.NewEncoder(w)
+			// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 			enc.Encode(m)
 		})
 	}

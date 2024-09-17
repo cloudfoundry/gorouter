@@ -19,8 +19,10 @@ func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map
 }
 
 func headerHandler(w http.ResponseWriter, r *http.Request) {
+	// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 	io.WriteString(w, fmt.Sprintf("%+v", r.Header.Get("X-Forwarded-Proto")))
 }
 func greetHandler(w http.ResponseWriter, r *http.Request) {
+	// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 	io.WriteString(w, fmt.Sprintf("Hello, %s", r.RemoteAddr))
 }

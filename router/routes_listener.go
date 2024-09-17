@@ -26,6 +26,7 @@ func (rl *RoutesListener) ListenAndServe() error {
 		w.WriteHeader(http.StatusOK)
 
 		enc := json.NewEncoder(w)
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		enc.Encode(rl.RouteRegistry)
 	})
 

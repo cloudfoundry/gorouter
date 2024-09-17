@@ -43,6 +43,7 @@ func (x *BasicAuth) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if authenticatedEndpoint(req.URL.Path) && (y == nil || !x.Authenticator(y[0], y[1])) {
 		w.Header().Set("WWW-Authenticate", "Basic")
 		w.WriteHeader(http.StatusUnauthorized)
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		w.Write([]byte(fmt.Sprintf("%d Unauthorized\n", http.StatusUnauthorized)))
 	} else {
 		x.Handler.ServeHTTP(w, req)

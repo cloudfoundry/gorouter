@@ -272,7 +272,10 @@ func (r *Router) DrainAndStop() {
 		zap.Float64("timeout_seconds", drainTimeout.Seconds()),
 	)
 
-	r.Drain(drainWait, drainTimeout)
+	err := r.Drain(drainWait, drainTimeout)
+	if err != nil {
+		r.logger.Error("gorouter-draining-error", zap.Error(err))
+	}
 
 	r.Stop()
 }
@@ -450,6 +453,7 @@ func (r *Router) closeIdleConns() {
 	r.closeConnections = true
 
 	for conn := range r.idleConns {
+		// #nosec G104 - ignore connection close errors here since this has the potential to balloon logs up
 		conn.Close()
 	}
 }
@@ -458,24 +462,35 @@ func (r *Router) stopListening() {
 	r.stopLock.Lock()
 	r.stopping = true
 	r.stopLock.Unlock()
+	var err error
 
 	if r.listener != nil {
-		r.listener.Close()
+		err = r.listener.Close()
+		if err != nil {
+			r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+		}
 		<-r.serveDone
 	}
 
 	if r.tlsListener != nil {
-		r.tlsListener.Close()
+		err = r.tlsListener.Close()
+		if err != nil {
+			r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+		}
 		<-r.tlsServeDone
 	}
 
 	r.routeServicesServer.Stop()
+	// if err != nil {
+	// 	r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+	// }
 }
 
-func (r *Router) RegisterComponent() {
+func (r *Router) RegisterComponent() error {
 	if r.component != nil {
-		r.component.Register(r.mbusClient)
+		return r.component.Register(r.mbusClient)
 	}
+	return nil
 }
 
 func (r *Router) ScheduleFlushApps() {
@@ -508,6 +523,7 @@ func (r *Router) HandleConnState(conn net.Conn, state http.ConnState) {
 		r.idleConns[conn] = struct{}{}
 
 		if r.closeConnections {
+			// #nosec G104 - ignore connection close errors here since this has the potential to balloon logs up
 			conn.Close()
 		}
 	case http.StateHijacked, http.StateClosed:
@@ -537,12 +553,21 @@ func (r *Router) flushApps(t time.Time) {
 
 	b := bytes.Buffer{}
 	w := zlib.NewWriter(&b)
-	w.Write(y)
-	w.Close()
+	_, err = w.Write(y)
+	if err != nil {
+		r.logger.Error("error-compressing-active-apps-message", zap.Error(err))
+	}
+	err = w.Close()
+	if err != nil {
+		r.logger.Error("error-closing-compression-writer", zap.Error(err))
+	}
 
 	z := b.Bytes()
 
 	r.logger.Debug("Debug Info", zap.Int("Active apps", len(x)), zap.Int("message size:", len(z)))
 
-	r.mbusClient.Publish("router.active_apps", z)
+	err = r.mbusClient.Publish("router.active_apps", z)
+	if err != nil {
+		r.logger.Error("error-publishing-active-apps-to-nats", zap.Error(err))
+	}
 }
