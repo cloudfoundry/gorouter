@@ -322,7 +322,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 	r.tlsListener = tls.NewListener(listener, tlsConfig)
 
-	r.logger.Info("tls-listener-started", slog.Any("address", r.tlsListener.Addr()))
+	r.logger.Info("tls-listener-started", "address", log.StructValue(r.tlsListener.Addr()))
 
 	go func() {
 		err := server.Serve(r.tlsListener)
@@ -366,7 +366,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.logger.Info("tcp-listener-started", slog.Any("address", r.listener.Addr()))
+	r.logger.Info("tcp-listener-started", "address", log.StructValue(r.listener.Addr()))
 
 	go func() {
 		err := server.Serve(r.listener)

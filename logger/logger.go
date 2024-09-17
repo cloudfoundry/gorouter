@@ -4,6 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
@@ -135,6 +136,38 @@ ErrAttr is creating an slog.String attribute with 'error' key and the provided e
 */
 func ErrAttr(err error) slog.Attr {
 	return slog.String("error", err.Error())
+}
+
+/*
+StructValue takes an arbitrary struct. It returns a StructWithLogValue. which implements LogValue(), which return an slog.Value
+where struct fields are parsed as a list of slog.Attr, and returned as an grouped slog.Value.
+*/
+func StructValue(obj any) StructWithLogValue {
+	return StructWithLogValue{Value: obj}
+}
+
+/*
+StructWithLogValue implements LogValue(), which allows lazy execution.
+*/
+type StructWithLogValue struct {
+	Value any
+}
+
+func (r StructWithLogValue) LogValue() slog.Value {
+	v := reflect.ValueOf(r.Value)
+	if v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+	var values []slog.Attr
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.CanInterface() {
+			values = append(values, slog.Any(
+				v.Type().Field(i).Name,
+				slog.AnyValue(field.Interface())))
+		}
+	}
+	return slog.GroupValue(values...)
 }
 
 func numberLevelFormatter(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {

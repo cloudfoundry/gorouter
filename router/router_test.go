@@ -143,6 +143,10 @@ var _ = Describe("Router", func() {
 			Expect(routeServicesServer.ServeCallCount()).To(Equal(1))
 		})
 
+		It("logs tls-listener-started event with proper address structure", func() {
+			Eventually(logger, "60s").Should(gbytes.Say("\"message\":\"tls-listener-started\",\"source\":\"router.test\",\"data\":{\"address\":{\"IP\":\"[::]:\""))
+		})
+
 		It("shuts down the server properly", func() {
 			router.Stop()
 			router = nil
