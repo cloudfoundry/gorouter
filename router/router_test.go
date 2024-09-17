@@ -988,6 +988,45 @@ var _ = Describe("Router", func() {
 		})
 	})
 
+	Describe("ReadHeaderTimeout", func() {
+		BeforeEach(func() {
+			config.ReadHeaderTimeout = 100 * time.Millisecond
+		})
+
+		It("closes requests when their header write exceeds ReadHeaderTimeout", func() {
+			app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+			app.RegisterAndListen()
+			Eventually(func() bool {
+				return appRegistered(registry, app)
+			}).Should(BeTrue())
+
+			conn, err := net.Dial("tcp", fmt.Sprintf("test.%s:%d", test_util.LocalhostDNS, config.Port))
+			Expect(err).NotTo(HaveOccurred())
+			defer conn.Close()
+
+			writer := bufio.NewWriter(conn)
+
+			fmt.Fprintf(writer, "GET /some-request HTTP/1.1\r\n")
+
+			// started writing headers
+			fmt.Fprintf(writer, "Host: localhost\r\n")
+			writer.Flush()
+
+			time.Sleep(300 * time.Millisecond)
+
+			fmt.Fprintf(writer, "User-Agent: CustomClient/1.0\r\n")
+			writer.Flush()
+
+			// done
+			fmt.Fprintf(writer, "\r\n")
+			writer.Flush()
+
+			resp := bufio.NewReader(conn)
+			_, err = resp.ReadString('\n')
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Describe("MaxHeaderBytes", func() {
 		var client http.Client
 

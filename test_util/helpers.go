@@ -78,7 +78,7 @@ func RegisterHTTPHandler(reg *registry.RouteRegistry, path string, handler http.
 	ln, err := startBackendListener(rcfg)
 	Expect(err).NotTo(HaveOccurred())
 
-	server := http.Server{Handler: handler}
+	server := http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go server.Serve(ln)
 
 	RegisterAddr(reg, path, ln.Addr().String(), prepareConfig(rcfg))
@@ -98,7 +98,7 @@ func RegisterWSHandler(reg *registry.RouteRegistry, path string, handler websock
 	nilHandshake := func(c *websocket.Config, request *http.Request) error { return nil }
 	wsServer := websocket.Server{Handler: handler, Handshake: nilHandshake}
 
-	server := http.Server{Handler: wsServer}
+	server := http.Server{Handler: wsServer, ReadHeaderTimeout: 5 * time.Second}
 	go server.Serve(ln)
 
 	RegisterAddr(reg, path, ln.Addr().String(), prepareConfig(rcfg))

@@ -255,6 +255,16 @@ frontend_idle_timeout: 5s
 			Expect(config.FrontendIdleTimeout).To(Equal(5 * time.Second))
 		})
 
+		It("sets read header timeout", func() {
+			var b = []byte(`
+read_header_timeout: 30s
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.ReadHeaderTimeout).To(Equal(30 * time.Second))
+		})
+
 		It("sets endpoint timeout", func() {
 			var b = []byte(`
 endpoint_timeout: 10s
