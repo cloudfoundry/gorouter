@@ -223,7 +223,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		} else {
 			logger.Debug(
 				"route-service",
-				slog.Any("route-service-url", reqInfo.RouteServiceURL),
+				slog.Any("route-service-url", log.StructValue(reqInfo.RouteServiceURL)),
 				slog.Int("attempt", attempt),
 			)
 

@@ -160,7 +160,7 @@ func (r *RouteFetcher) subscribeToEvents(token *oauth2.Token) error {
 			}
 			break
 		}
-		r.logger.Debug("received-event", slog.Any("event", event))
+		r.logger.Debug("received-event", slog.Any("event", log.StructValue(event)))
 		r.eventChannel <- event
 	}
 	return err

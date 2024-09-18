@@ -243,7 +243,7 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 	if err != nil {
 		s.logger.Error("Unable to register route",
 			log.ErrAttr(err),
-			slog.Any("message", msg),
+			slog.Any("message", log.StructValue(msg)),
 		)
 		return
 	}
@@ -258,7 +258,7 @@ func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
 	if err != nil {
 		s.logger.Error("Unable to unregister route",
 			log.ErrAttr(err),
-			slog.Any("message", msg),
+			slog.Any("message", log.StructValue(msg)),
 		)
 		return
 	}

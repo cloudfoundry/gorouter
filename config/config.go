@@ -16,6 +16,8 @@ import (
 	"code.cloudfoundry.org/localip"
 	"go.step.sm/crypto/pemutil"
 	"gopkg.in/yaml.v3"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 const (
@@ -330,7 +332,7 @@ func checkClientCertificateMetadataRule(chain []*x509.Certificate, logger *slog.
 				return nil
 			}
 		}
-		logger.Warn("invalid-subject", slog.String("issuer", cert.Issuer.String()), slog.String("subject", cert.Subject.String()), slog.Any("allowed", rule.ValidSubjects))
+		logger.Warn("invalid-subject", slog.String("issuer", cert.Issuer.String()), slog.String("subject", cert.Subject.String()), slog.Any("allowed", log.StructValue(rule.ValidSubjects)))
 		return fmt.Errorf("subject not in the list of allowed subjects for CA Subject %q: %q", rule.CASubject, subject)
 	}
 	// this should never happen as the function is only called on successful client certificate verification as callback

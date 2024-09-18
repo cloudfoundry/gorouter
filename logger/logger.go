@@ -154,9 +154,14 @@ type StructWithLogValue struct {
 }
 
 func (r StructWithLogValue) LogValue() slog.Value {
+	if r.Value == nil || (reflect.ValueOf(r.Value).Kind() == reflect.Ptr && reflect.ValueOf(r.Value).IsNil()) {
+		return slog.GroupValue()
+	}
 	v := reflect.ValueOf(r.Value)
 	if v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
 		v = v.Elem()
+	} else if v.Kind() != reflect.Struct {
+		return slog.GroupValue()
 	}
 	var values []slog.Attr
 	for i := 0; i < v.NumField(); i++ {

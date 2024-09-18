@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry/container"
 	"code.cloudfoundry.org/gorouter/route"
@@ -435,7 +436,7 @@ func buildSlogAttrs(uri route.Uri, endpoint *route.Endpoint) []any {
 		slog.String("instance_id", endpoint.PrivateInstanceId),
 		slog.String("server_cert_domain_san", endpoint.ServerCertDomainSAN),
 		slog.String("protocol", endpoint.Protocol),
-		slog.Any("modification_tag", endpoint.ModificationTag),
+		slog.Any("modification_tag", log.StructValue(endpoint.ModificationTag)),
 		isoSegField,
 		slog.Bool("isTLS", endpoint.IsTLS()),
 	}
