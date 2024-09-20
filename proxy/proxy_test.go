@@ -1622,7 +1622,7 @@ var _ = Describe("Proxy", func() {
 			Expect(string(b)).To(ContainSubstring(`response_time:`))
 			Expect(string(b)).To(ContainSubstring(`app_id:"456"`))
 			Expect(string(b)).To(ContainSubstring(`app_index:"2"`))
-			Expect(b[len(b)-1]).To(Equal(byte('\n')))
+			Expect(string(b[len(b)-1])).To(Equal("\n"))
 		})
 
 		It("logs a websocket request", func() {

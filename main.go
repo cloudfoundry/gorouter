@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -103,8 +104,15 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
+		// FIXME: this reconfigurableSink isn't hooked up to our logger instance at all, so has no effect
+		//        additionally, shouldn't we be adding debugserver to our ifrit groups and running it that way?
+		//        or do we want to keep it separate intentionally so any failures don't take down the rest of gorouter?
+		//        either way we should do something to stop it during shutdown, no?
 		reconfigurableSink := lager.NewReconfigurableSink(lager.NewWriterSink(os.Stdout, lager.DEBUG), minLagerLogLevel)
-		debugserver.Run(c.DebugAddr, reconfigurableSink)
+		_, err = debugserver.Run(c.DebugAddr, reconfigurableSink)
+		if err != nil {
+			logger.Error("failed-to-start-debug-server", zap.Error(err))
+		}
 	}
 
 	logger.Info("setting-up-nats-connection")
@@ -125,7 +133,7 @@ func main() {
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 
-	metricsReporter := initializeMetrics(sender, c)
+	metricsReporter := initializeMetrics(sender, c, logger)
 	fdMonitor := initializeFDMonitor(sender, logger)
 	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
@@ -283,7 +291,7 @@ func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.Me
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger goRouterLogger.Logger) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -305,7 +313,7 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *me
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting}
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger.Session("metricsreporter")}
 }
 
 func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
@@ -406,19 +414,13 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 
 func createLogger(component string, level string, timestampFormat string) (goRouterLogger.Logger, lager.LogLevel) {
 	var logLevel zap.Level
-	logLevel.UnmarshalText([]byte(level))
+	err := logLevel.UnmarshalText([]byte(strings.ToLower(level)))
+	if err != nil {
+		panic(fmt.Errorf("unknown log level: %s", level))
+	}
 
-	var minLagerLogLevel lager.LogLevel
-	switch minLagerLogLevel {
-	case lager.DEBUG:
-		minLagerLogLevel = lager.DEBUG
-	case lager.INFO:
-		minLagerLogLevel = lager.INFO
-	case lager.ERROR:
-		minLagerLogLevel = lager.ERROR
-	case lager.FATAL:
-		minLagerLogLevel = lager.FATAL
-	default:
+	minLagerLogLevel, err := lager.LogLevelFromString(strings.ToLower(level))
+	if err != nil {
 		panic(fmt.Errorf("unknown log level: %s", level))
 	}
 

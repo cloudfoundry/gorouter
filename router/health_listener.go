@@ -29,6 +29,7 @@ func (hl *HealthListener) ListenAndServe() error {
 	})
 	mux.HandleFunc("/is-process-alive-do-not-use-for-loadbalancing", func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		w.Write([]byte("ok\n"))
 		req.Close = true
 	})
@@ -63,9 +64,15 @@ func (hl *HealthListener) ListenAndServe() error {
 
 func (hl *HealthListener) Stop() {
 	if hl.listener != nil {
-		hl.listener.Close()
+		err := hl.listener.Close()
+		if err != nil {
+			hl.Logger.Error("failed-closing-health-listener", zap.Error(err))
+		}
 	}
 	if hl.tlsListener != nil {
-		hl.tlsListener.Close()
+		err := hl.tlsListener.Close()
+		if err != nil {
+			hl.Logger.Error("failed-closing-health-tls-listener", zap.Error(err))
+		}
 	}
 }

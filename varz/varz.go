@@ -193,8 +193,14 @@ func (x *RealVarz) MarshalJSON() ([]byte, error) {
 	x.updateTop()
 
 	d := make(map[string]interface{})
-	transform(x.varz.All, d)
-	transform(x.varz, d)
+	err := transform(x.varz.All, d)
+	if err != nil {
+		return []byte{}, err
+	}
+	err = transform(x.varz, d)
+	if err != nil {
+		return []byte{}, err
+	}
 	delete(d, "all")
 
 	return json.Marshal(d)

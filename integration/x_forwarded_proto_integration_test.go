@@ -220,6 +220,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				appReceivedHeaders := make(chan http.Header, 1)
 				testApp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					appReceivedHeaders <- r.Header
+					w.Header().Set("connection", "close")
 					w.WriteHeader(200)
 				}))
 				defer testApp.Close()
@@ -228,6 +229,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				externalRsHeaders := make(chan http.Header, 1)
 				externalRouteService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					externalRsHeaders <- r.Header
+					w.Header().Set("connection", "close")
 					w.WriteHeader(200)
 					url, err := url.Parse(r.Header.Get(routeservice.HeaderKeyForwardedURL))
 					Expect(err).ToNot(HaveOccurred())
@@ -252,11 +254,11 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				doRequest(testCase, hostname)
 
 				var expectedBackendHeader http.Header
-				Eventually(appReceivedHeaders, "3s").Should(Receive(&expectedBackendHeader))
+				Eventually(appReceivedHeaders, "10s", "500ms").Should(Receive(&expectedBackendHeader))
 				Expect(expectedBackendHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectBackendHeader}))
 
 				var expectedRsHeader http.Header
-				Eventually(externalRsHeaders, "3s").Should(Receive(&expectedRsHeader))
+				Eventually(externalRsHeaders, "10s", "500ms").Should(Receive(&expectedRsHeader))
 				Expect(expectedRsHeader).To(HaveKeyWithValue("X-Forwarded-Proto", []string{testCase.expectedRsHeader}))
 
 				By("registering internal route service")

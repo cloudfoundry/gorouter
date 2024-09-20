@@ -89,7 +89,15 @@ func (m *W3C) ServeUpdatedTraceparent(
 	}
 
 	if requestInfo.TraceInfo.TraceID == "" {
-		requestInfo.SetTraceInfo(fmt.Sprintf("%x", traceparent.TraceID), fmt.Sprintf("%x", traceparent.ParentID))
+		traceIdHex := fmt.Sprintf("%x", traceparent.TraceID)
+		parentIdHex := fmt.Sprintf("%x", traceparent.ParentID)
+		err = requestInfo.SetTraceInfo(traceIdHex, parentIdHex)
+		if err != nil {
+			logger.Debug("failed-to-set-trace-info-from-generated-vaulue",
+				zap.Error(err),
+				zap.String("trace_id", traceIdHex),
+				zap.String("parent_id", parentIdHex))
+		}
 	}
 
 	tracestate := ParseW3CTracestate(r.Header.Get(W3CTracestateHeader))

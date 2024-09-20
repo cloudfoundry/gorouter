@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 
 	"code.cloudfoundry.org/gorouter/common/uuid"
@@ -73,7 +74,10 @@ func (a *TcpApp) Listen() error {
 		defer GinkgoRecover()
 		for i := 0; i < len(a.handlers); i++ {
 			if a.isStopped() {
-				a.listener.Close()
+				err := a.listener.Close()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error closing TCP listener: %s\n", err)
+				}
 				break
 			}
 			conn, err := a.listener.Accept()
@@ -88,7 +92,10 @@ func (a *TcpApp) Listen() error {
 
 func (a *TcpApp) RegisterAndListen() {
 	a.Register()
-	a.Listen()
+	err := a.Listen()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listening on TCP socket: %s\n", err)
+	}
 }
 
 func (a *TcpApp) Port() uint16 {
@@ -121,6 +128,7 @@ func (a *TcpApp) TlsRegisterWithIndex(serverCertDomainSAN string, index int) {
 	}
 
 	b, _ := json.Marshal(rm)
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
 	a.mbusClient.Publish("router.register", b)
 }
 func (a *TcpApp) Register() {
@@ -140,6 +148,7 @@ func (a *TcpApp) Register() {
 	}
 
 	b, _ := json.Marshal(rm)
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
 	a.mbusClient.Publish("router.register", b)
 }
 
@@ -154,7 +163,10 @@ func (a *TcpApp) Unregister() {
 	}
 
 	b, _ := json.Marshal(rm)
-	a.mbusClient.Publish("router.unregister", b)
+	err := a.mbusClient.Publish("router.unregister", b)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error publishing unregister message: %s\n", err)
+	}
 
 	a.Stop()
 }
@@ -163,7 +175,10 @@ func (a *TcpApp) Stop() {
 	a.mutex.Lock()
 	a.stopped = true
 	if a.listener != nil {
-		a.listener.Close()
+		err := a.listener.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error closing TCP listener: %s\n", err)
+		}
 	}
 	a.mutex.Unlock()
 }

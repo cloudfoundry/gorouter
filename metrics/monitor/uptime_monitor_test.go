@@ -3,6 +3,7 @@ package monitor_test
 import (
 	"time"
 
+	"code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/sonde-go/events"
 	. "github.com/onsi/ginkgo/v2"
@@ -21,7 +22,8 @@ var _ = Describe("Uptime", func() {
 
 	BeforeEach(func() {
 		fakeEventEmitter.Reset()
-		uptime = monitor.NewUptime(interval)
+		fakeLogger := fakes.FakeLogger{}
+		uptime = monitor.NewUptime(interval, &fakeLogger)
 		go uptime.Start()
 	})
 

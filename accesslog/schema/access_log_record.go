@@ -227,8 +227,11 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 
 	b := new(recordBuffer)
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(r.Request.Host)
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(` - `)
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`[` + r.formatStartedAt() + `] `)
 
 	b.AppendSpaces(true)
@@ -253,6 +256,7 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 
 	b.WriteDashOrStringValue(destIPandPort)
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`x_forwarded_for:`)
 	if r.DisableXFFLogging {
 		b.WriteDashOrStringValue("-")
@@ -261,49 +265,63 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 		b.WriteDashOrStringValue(xForwardedFor)
 	}
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`x_forwarded_proto:`)
 	xForwardedProto := formatHeader(headers, "X-Forwarded-Proto", performTruncate)
 	b.WriteDashOrStringValue(xForwardedProto)
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`vcap_request_id:`)
 	b.WriteDashOrStringValue(headers.Get("X-Vcap-Request-Id"))
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`response_time:`)
 	b.WriteDashOrFloatValue(r.roundtripTime())
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`gorouter_time:`)
 	b.WriteDashOrFloatValue(r.gorouterTime())
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`app_id:`)
 	b.WriteDashOrStringValue(appID)
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`app_index:`)
 	b.WriteDashOrStringValue(appIndex)
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`instance_id:`)
 	b.WriteDashOrStringValue(instanceId)
 
 	if r.LogAttemptsDetails {
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`failed_attempts:`)
 		b.WriteIntValue(r.FailedAttempts)
 
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`failed_attempts_time:`)
 		b.WriteDashOrFloatValue(r.failedAttemptsTime())
 
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`dns_time:`)
 		b.WriteDashOrFloatValue(r.dnsTime())
 
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`dial_time:`)
 		b.WriteDashOrFloatValue(r.dialTime())
 
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`tls_time:`)
 		b.WriteDashOrFloatValue(r.tlsTime())
 
+		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`backend_time:`)
 		b.WriteDashOrFloatValue(r.successfulAttemptTime())
 	}
 
 	b.AppendSpaces(false)
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`x_cf_routererror:`)
 	b.WriteDashOrStringValue(r.RouterError)
 
@@ -413,6 +431,7 @@ func (r *AccessLogRecord) addExtraHeaders(b *recordBuffer, performTruncate bool)
 
 		// ensure what we're about to append is under our limit for headers
 		if extraHeaderNeedsTruncate(anticipatedLength, performTruncate) {
+			// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 			headerBuffer.WriteString("...EXTRA-REQUEST-HEADERS-TOO-LONG-TO-LOG--TRUNCATED")
 			break
 		}
@@ -421,7 +440,9 @@ func (r *AccessLogRecord) addExtraHeaders(b *recordBuffer, performTruncate bool)
 		writeExtraHeader(headerBuffer, headerName, headerValue, endOfRange)
 	}
 
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteByte(' ')
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.Write(headerBuffer.Bytes())
 }
 
@@ -440,7 +461,9 @@ func (r *AccessLogRecord) processExtraHeader(header string) (headerName string, 
 }
 
 func writeExtraHeader(buffer *recordBuffer, headerName string, headerValue string, endOfRange bool) {
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	buffer.WriteString(headerName)
+	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	buffer.WriteByte(':')
 	if endOfRange {
 		buffer.AppendSpaces(false)
