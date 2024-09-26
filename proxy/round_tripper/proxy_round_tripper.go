@@ -10,7 +10,6 @@ import (
 	"net/http/httptrace"
 	"net/textproto"
 	"net/url"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -61,20 +60,6 @@ func GetRoundTripper(endpoint *route.Endpoint, roundTripperFactory RoundTripperF
 	})
 
 	return endpoint.RoundTripper()
-}
-
-type Cookie struct {
-	http.Cookie
-	// indicates, whether this cookie is partitioned. Relevant for embedding in iframes.
-	Partitioned bool
-}
-
-func (c *Cookie) String() string {
-	cookieString := c.Cookie.String()
-	if c.Partitioned {
-		return cookieString + "; Partitioned"
-	}
-	return cookieString
 }
 
 //go:generate counterfeiter -o fakes/fake_error_handler.go --fake-name ErrorHandler . errorHandler
@@ -451,11 +436,8 @@ func setupStickySession(
 				secure = v.Secure
 				sameSite = v.SameSite
 				expiry = v.Expires
+				partitioned = v.Partitioned
 
-				// temporary workaround for "Partitioned" cookies, used in embedded websites (iframe),
-				// until Golang natively supports parsing the Partitioned flag.
-				// See also https://github.com/golang/go/issues/62490
-				partitioned = slices.Contains(v.Unparsed, "Partitioned")
 				break
 			}
 		}
@@ -475,17 +457,15 @@ func setupStickySession(
 			secure = true
 		}
 
-		vcapIDCookie := &Cookie{
-			Cookie: http.Cookie{
-				Name:     VcapCookieId,
-				Value:    endpoint.PrivateInstanceId,
-				Path:     path,
-				MaxAge:   maxAge,
-				HttpOnly: true,
-				Secure:   secure,
-				SameSite: sameSite,
-				Expires:  expiry,
-			},
+		vcapIDCookie := http.Cookie{
+			Name:        VcapCookieId,
+			Value:       endpoint.PrivateInstanceId,
+			Path:        path,
+			MaxAge:      maxAge,
+			HttpOnly:    true,
+			Secure:      secure,
+			SameSite:    sameSite,
+			Expires:     expiry,
 			Partitioned: partitioned,
 		}
 
