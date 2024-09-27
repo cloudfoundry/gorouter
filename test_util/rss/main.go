@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/urfave/cli"
@@ -69,7 +70,10 @@ func main() {
 	app.CommandNotFound = commandNotFound
 	app.Version = "0.1.0"
 
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatalf("Error: %s", err)
+	}
 	os.Exit(0)
 }
 

@@ -106,7 +106,10 @@ func (r *RouteFetcher) startEventCycle() {
 			r.logger.Debug("fetching-token")
 			token, err := r.UaaTokenFetcher.FetchToken(context.Background(), forceUpdate)
 			if err != nil {
-				metrics.IncrementCounter(TokenFetchErrors)
+				metricsErr := metrics.IncrementCounter(TokenFetchErrors)
+				if metricsErr != nil {
+					r.logger.Debug("failed-to-emit-metric", log.ErrAttr(metricsErr))
+				}
 				r.logger.Error("failed-to-fetch-token", log.ErrAttr(err))
 			} else {
 				r.logger.Debug("token-fetched-successfully")
@@ -134,7 +137,10 @@ func (r *RouteFetcher) subscribeToEvents(token *oauth2.Token) error {
 	r.logger.Info("subscribing-to-routing-api-event-stream")
 	source, err := r.client.SubscribeToEventsWithMaxRetries(maxRetries)
 	if err != nil {
-		metrics.IncrementCounter(SubscribeEventsErrors)
+		metricsErr := metrics.IncrementCounter(SubscribeEventsErrors)
+		if metricsErr != nil {
+			r.logger.Debug("failed-to-emit-metric", log.ErrAttr(metricsErr))
+		}
 		r.logger.Error("failed-subscribing-to-routing-api-event-stream", log.ErrAttr(err))
 		return err
 	}
@@ -151,7 +157,10 @@ func (r *RouteFetcher) subscribeToEvents(token *oauth2.Token) error {
 	for {
 		event, err = source.Next()
 		if err != nil {
-			metrics.IncrementCounter(SubscribeEventsErrors)
+			metricsErr := metrics.IncrementCounter(SubscribeEventsErrors)
+			if metricsErr != nil {
+				r.logger.Debug("failed-to-emit-metric", log.ErrAttr(metricsErr))
+			}
 			r.logger.Error("failed-getting-next-event: ", log.ErrAttr(err))
 
 			closeErr := source.Close()
@@ -211,7 +220,10 @@ func (r *RouteFetcher) fetchRoutesWithTokenRefresh() ([]models.Route, error) {
 		token, tokenErr := r.UaaTokenFetcher.FetchToken(context.Background(), forceUpdate)
 
 		if tokenErr != nil {
-			metrics.IncrementCounter(TokenFetchErrors)
+			metricsErr := metrics.IncrementCounter(TokenFetchErrors)
+			if err != nil {
+				r.logger.Debug("failed-to-emit-metric", log.ErrAttr(metricsErr))
+			}
 			return []models.Route{}, tokenErr
 		}
 		r.client.SetToken(token.AccessToken)

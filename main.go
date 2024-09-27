@@ -108,7 +108,10 @@ func main() {
 
 	if c.DebugAddr != "" {
 		reconfigurableSink := lager.ReconfigurableSink{}
-		debugserver.Run(c.DebugAddr, &reconfigurableSink)
+		_, err = debugserver.Run(c.DebugAddr, &reconfigurableSink)
+		if err != nil {
+			logger.Error("failed-to-start-debug-server", grlog.ErrAttr(err))
+		}
 	}
 
 	logger.Info("setting-up-nats-connection")
@@ -129,7 +132,7 @@ func main() {
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 
-	metricsReporter := initializeMetrics(sender, c)
+	metricsReporter := initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
 	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
 	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
@@ -286,7 +289,7 @@ func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.Me
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -308,7 +311,7 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config) *me
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting}
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
 }
 
 func createCrypto(logger *slog.Logger, secret string) *secure.AesGCM {

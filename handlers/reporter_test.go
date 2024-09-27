@@ -72,7 +72,7 @@ var _ = Describe("Reporter Handler", func() {
 		It("emits metric for missing content length header", func() {
 			req.Header.Add("Content-Length", "")
 			handler.ServeHTTP(resp, req)
-			Expect(fakeReporter.CaptureMissingContentLengthHeaderCallCount()).To(Equal(1))
+			Expect(fakeReporter.CaptureEmptyContentLengthHeaderCallCount()).To(Equal(1))
 		})
 	})
 
@@ -80,7 +80,7 @@ var _ = Describe("Reporter Handler", func() {
 		It("does not emit metric for missing content length header", func() {
 			req.Header.Add("Content-Length", "10")
 			handler.ServeHTTP(resp, req)
-			Expect(fakeReporter.CaptureMissingContentLengthHeaderCallCount()).To(Equal(0))
+			Expect(fakeReporter.CaptureEmptyContentLengthHeaderCallCount()).To(Equal(0))
 		})
 	})
 

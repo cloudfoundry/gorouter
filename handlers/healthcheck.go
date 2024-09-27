@@ -31,6 +31,7 @@ func (h *healthcheck) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	rw.WriteHeader(http.StatusOK)
+	// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 	rw.Write([]byte("ok\n"))
 	r.Close = true
 }

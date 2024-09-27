@@ -16,6 +16,7 @@ func ReadSignature(c *cli.Context) {
 	metaEncoded := c.String("metadata")
 
 	if sigEncoded == "" || metaEncoded == "" {
+		// #nosec G104 - this will never return an error since we hardcode "read" which is the command calling this function to begin with
 		cli.ShowCommandHelp(c, "read")
 		os.Exit(1)
 	}

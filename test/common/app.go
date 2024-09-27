@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -146,7 +147,11 @@ func (a *TestApp) TlsRegisterWithIndex(serverCertDomainSAN string, index int) {
 		PrivateInstanceId:   id,
 	}
 
-	b, _ := json.Marshal(rm)
+	b, err := json.Marshal(rm)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshalling registration JSON: %s\n", err)
+	}
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
 	a.mbusClient.Publish("router.register", b)
 }
 func (a *TestApp) Register() {
@@ -165,7 +170,11 @@ func (a *TestApp) Register() {
 		PrivateInstanceId: id,
 	}
 
-	b, _ := json.Marshal(rm)
+	b, err := json.Marshal(rm)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshalling registration JSON: %s\n", err)
+	}
+	// #nosec G104 - ignore errors publishing to nats in these test apps because it spamms test output immenseley
 	a.mbusClient.Publish("router.register", b)
 }
 
@@ -179,8 +188,14 @@ func (a *TestApp) Unregister() {
 		App:  "0",
 	}
 
-	b, _ := json.Marshal(rm)
-	a.mbusClient.Publish("router.unregister", b)
+	b, err := json.Marshal(rm)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshalling unregistration JSON: %s\n", err)
+	}
+	err = a.mbusClient.Publish("router.unregister", b)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error publishing unregister message: %s\n", err)
+	}
 
 	a.Stop()
 }
@@ -239,7 +254,10 @@ func (a *TestApp) Stop() {
 	a.mutex.Lock()
 	a.stopped = true
 	if a.server != nil {
-		a.server.Close()
+		err := a.server.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error closing HTTP server: %s\n", err)
+		}
 	}
 	a.mutex.Unlock()
 }

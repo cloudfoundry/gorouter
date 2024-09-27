@@ -90,8 +90,8 @@ func (rs *RouteServicesServer) Serve(handler http.Handler, errChan chan error) e
 	return nil
 }
 
-func (rs *RouteServicesServer) Stop() {
-	rs.listener.Close()
+func (rs *RouteServicesServer) Stop() error {
+	return rs.listener.Close()
 }
 
 func (rs *RouteServicesServer) GetRoundTripper() RouteServiceRoundTripper {

@@ -19,9 +19,15 @@ type RouteServicesServer struct {
 	serveReturnsOnCall map[int]struct {
 		result1 error
 	}
-	StopStub        func()
+	StopStub        func() error
 	stopMutex       sync.RWMutex
 	stopArgsForCall []struct {
+	}
+	stopReturns struct {
+		result1 error
+	}
+	stopReturnsOnCall map[int]struct {
+		result1 error
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
@@ -89,16 +95,22 @@ func (fake *RouteServicesServer) ServeReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *RouteServicesServer) Stop() {
+func (fake *RouteServicesServer) Stop() error {
 	fake.stopMutex.Lock()
+	ret, specificReturn := fake.stopReturnsOnCall[len(fake.stopArgsForCall)]
 	fake.stopArgsForCall = append(fake.stopArgsForCall, struct {
 	}{})
 	stub := fake.StopStub
+	fakeReturns := fake.stopReturns
 	fake.recordInvocation("Stop", []interface{}{})
 	fake.stopMutex.Unlock()
 	if stub != nil {
-		fake.StopStub()
+		return stub()
 	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
 }
 
 func (fake *RouteServicesServer) StopCallCount() int {
@@ -107,10 +119,33 @@ func (fake *RouteServicesServer) StopCallCount() int {
 	return len(fake.stopArgsForCall)
 }
 
-func (fake *RouteServicesServer) StopCalls(stub func()) {
+func (fake *RouteServicesServer) StopCalls(stub func() error) {
 	fake.stopMutex.Lock()
 	defer fake.stopMutex.Unlock()
 	fake.StopStub = stub
+}
+
+func (fake *RouteServicesServer) StopReturns(result1 error) {
+	fake.stopMutex.Lock()
+	defer fake.stopMutex.Unlock()
+	fake.StopStub = nil
+	fake.stopReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *RouteServicesServer) StopReturnsOnCall(i int, result1 error) {
+	fake.stopMutex.Lock()
+	defer fake.stopMutex.Unlock()
+	fake.StopStub = nil
+	if fake.stopReturnsOnCall == nil {
+		fake.stopReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.stopReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *RouteServicesServer) Invocations() map[string][][]interface{} {

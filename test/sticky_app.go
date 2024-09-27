@@ -25,6 +25,7 @@ func stickyHandler(port uint16, stickyCookieName string) func(http.ResponseWrite
 			Value: "xxx",
 		}
 		http.SetCookie(w, cookie)
+		// #nosec G104 - ignore errors writing http responses to prevent logs from filling up during a DoS
 		io.WriteString(w, fmt.Sprintf("%d", port))
 	}
 }

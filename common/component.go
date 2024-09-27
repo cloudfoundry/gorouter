@@ -166,7 +166,7 @@ func (c *VcapComponent) Start() error {
 }
 
 func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
-	mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
+	_, err := mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
 		if msg.Reply == "" {
 			logger.Info("Received message with empty reply", slog.String("nats-msg-subject", msg.Subject))
 			return
@@ -179,8 +179,14 @@ func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 			return
 		}
 
-		mbusClient.Publish(msg.Reply, b)
+		err := mbusClient.Publish(msg.Reply, b)
+		if err != nil {
+			logger.Error("error-publishing-registration", log.ErrAttr(e))
+		}
 	})
+	if err != nil {
+		return err
+	}
 
 	b, e := json.Marshal(c.Varz)
 	if e != nil {
@@ -188,18 +194,25 @@ func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 		return e
 	}
 
-	mbusClient.Publish("vcap.component.announce", b)
+	err = mbusClient.Publish("vcap.component.announce", b)
+	if err != nil {
+		return err
+	}
 
 	logger.Info(fmt.Sprintf("Component %s registered successfully", c.Varz.Type))
 	return nil
 }
 
-func (c *VcapComponent) Stop() {
+func (c *VcapComponent) Stop() error {
 	close(c.quitCh)
 	if c.listener != nil {
-		c.listener.Close()
+		err := c.listener.Close()
 		<-c.statusCh
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c *VcapComponent) ListenAndServe() error {
@@ -220,6 +233,7 @@ func (c *VcapComponent) ListenAndServe() error {
 
 		enc := json.NewEncoder(w)
 		c.UpdateVarz()
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		enc.Encode(c.Varz)
 	})
 
@@ -231,6 +245,7 @@ func (c *VcapComponent) ListenAndServe() error {
 			w.WriteHeader(http.StatusOK)
 
 			enc := json.NewEncoder(w)
+			// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 			enc.Encode(m)
 		})
 	}

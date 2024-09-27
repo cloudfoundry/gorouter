@@ -45,7 +45,9 @@ func (p *protocolCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		}
 
 		fmt.Fprintf(buf, "HTTP/1.0 400 Bad Request\r\n\r\n")
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		buf.Flush()
+		// #nosec G104 - ignore errors when writing HTTP responses so we don't spam our logs during a DoS
 		conn.Close()
 		return
 	}

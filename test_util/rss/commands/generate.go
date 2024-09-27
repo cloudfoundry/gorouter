@@ -16,6 +16,7 @@ func GenerateSignature(c *cli.Context) {
 	url := c.String("url")
 
 	if url == "" {
+		// #nosec G104 - this will never return an error since we hardcode "read" which is the command calling this function to begin with
 		cli.ShowCommandHelp(c, "generate")
 		os.Exit(1)
 	}
