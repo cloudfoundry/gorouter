@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 const (
@@ -18,11 +19,13 @@ const (
 var _ = Describe("Uptime", func() {
 	var (
 		uptime *monitor.Uptime
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
+		logger = test_util.NewTestLogger("test")
 		fakeEventEmitter.Reset()
-		uptime = monitor.NewUptime(interval)
+		uptime = monitor.NewUptime(interval, logger.Logger)
 		go uptime.Start()
 	})
 
