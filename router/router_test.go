@@ -144,7 +144,7 @@ var _ = Describe("Router", func() {
 		})
 
 		It("logs tls-listener-started event with proper address structure", func() {
-			Eventually(logger, "60s").Should(gbytes.Say("\"message\":\"tls-listener-started\",\"source\":\"router.test\",\"data\":{\"address\":{\"IP\":\"[::]:\""))
+			Eventually(logger, "60s").Should(gbytes.Say("\"message\":\"tls-listener-started\",\"source\":\"router.test\",\"data\":{\"address\":{\"IP\":\".+?\",\"Port\":[0-9]+,\"Zone\":\".*\""))
 		})
 
 		It("shuts down the server properly", func() {
