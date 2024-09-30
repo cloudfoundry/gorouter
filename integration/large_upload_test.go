@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test/common"
-	"code.cloudfoundry.org/gorouter/test_util"
 	nats "github.com/nats-io/nats.go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test/common"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Large upload", func() {

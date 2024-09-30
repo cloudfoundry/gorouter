@@ -6,14 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("ProxyWriter", func() {
@@ -24,7 +23,7 @@ var _ = Describe("ProxyWriter", func() {
 		req  *http.Request
 
 		nextCalled bool
-		fakeLogger *logger_fakes.FakeLogger
+		logger     *test_util.TestLogger
 
 		reqChan  chan *http.Request
 		respChan chan http.ResponseWriter
@@ -43,14 +42,14 @@ var _ = Describe("ProxyWriter", func() {
 	})
 
 	BeforeEach(func() {
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestLogger("test")
 		body := bytes.NewBufferString("What are you?")
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(fakeLogger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
 		handler.UseHandlerFunc(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -87,12 +86,11 @@ var _ = Describe("ProxyWriter", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewProxyWriter(fakeLogger))
+			badHandler.Use(handlers.NewProxyWriter(logger.Logger))
 			badHandler.UseHandlerFunc(nextHandler)
 		})
 		It("calls Panic on the logger", func() {
-			badHandler.ServeHTTP(resp, req)
-			Expect(fakeLogger.PanicCallCount()).To(Equal(1))
+			Expect(func() { badHandler.ServeHTTP(resp, req) }).To(Panic())
 			Expect(nextCalled).To(BeFalse())
 		})
 	})

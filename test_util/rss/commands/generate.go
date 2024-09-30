@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/urfave/cli"
+
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util/rss/common"
-	"github.com/urfave/cli"
 )
 
 func GenerateSignature(c *cli.Context) {

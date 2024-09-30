@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gbytes"
 
 	fakelogger "code.cloudfoundry.org/gorouter/accesslog/fakes"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy"
@@ -23,16 +26,13 @@ import (
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Proxy Unit tests", func() {
 	var (
 		proxyObj           http.Handler
 		fakeAccessLogger   *fakelogger.FakeAccessLogger
-		fakeLogger         logger.Logger
+		logger             *test_util.TestLogger
 		resp               utils.ProxyResponseWriter
 		combinedReporter   metrics.ProxyReporter
 		routeServiceConfig *routeservice.RouteServiceConfig
@@ -51,11 +51,11 @@ var _ = Describe("Proxy Unit tests", func() {
 
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
-			fakeLogger = test_util.NewTestZapLogger("test")
-			r = registry.NewRouteRegistry(fakeLogger, conf, new(fakes.FakeRouteRegistryReporter))
+			logger = test_util.NewTestLogger("test")
+			r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 			routeServiceConfig = routeservice.NewRouteServiceConfig(
-				fakeLogger,
+				logger.Logger,
 				conf.RouteServiceEnabled,
 				conf.RouteServicesHairpinning,
 				conf.RouteServicesHairpinningAllowlist,
@@ -75,7 +75,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
-			proxyObj = proxy.NewProxy(fakeLogger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
+			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})
@@ -91,8 +91,8 @@ var _ = Describe("Proxy Unit tests", func() {
 
 				proxyObj.ServeHTTP(resp, req)
 
-				Eventually(fakeLogger).Should(Say("route-endpoint"))
-				Eventually(fakeLogger).Should(Say("error"))
+				Eventually(logger).Should(Say("route-endpoint"))
+				Eventually(logger).Should(Say("error"))
 			})
 		})
 
@@ -115,7 +115,7 @@ var _ = Describe("Proxy Unit tests", func() {
 							req := test_util.NewRequest("GET", "some-app", "/", bytes.NewReader([]byte("some-body")))
 							proxyObj.ServeHTTP(resp, req)
 
-							Eventually(fakeLogger).Should(Say("enable-full-duplex-err"))
+							Eventually(logger).Should(Say("enable-full-duplex-err"))
 						})
 					})
 				})
@@ -210,11 +210,11 @@ var _ = Describe("Proxy Unit tests", func() {
 
 	Describe("ForceDeleteXFCCHeader", func() {
 		BeforeEach(func() {
-			fakeLogger = test_util.NewTestZapLogger("test")
+			logger = test_util.NewTestLogger("test")
 		})
 		DescribeTable("the returned function",
-			func(arrivedViaRouteService proxy.RouteServiceValidator, lgr logger.Logger, forwardedClientCert string, expectedValue bool, expectedErr error) {
-				forceDeleteXFCCHeaderFunc := proxy.ForceDeleteXFCCHeader(arrivedViaRouteService, forwardedClientCert, lgr)
+			func(arrivedViaRouteService proxy.RouteServiceValidator, lgr func() *slog.Logger, forwardedClientCert string, expectedValue bool, expectedErr error) {
+				forceDeleteXFCCHeaderFunc := proxy.ForceDeleteXFCCHeader(arrivedViaRouteService, forwardedClientCert, lgr())
 				forceDelete, err := forceDeleteXFCCHeaderFunc(&http.Request{})
 				if expectedErr != nil {
 					Expect(err).To(Equal(expectedErr))
@@ -224,17 +224,17 @@ var _ = Describe("Proxy Unit tests", func() {
 				Expect(forceDelete).To(Equal(expectedValue))
 			},
 			Entry("arrivedViaRouteService returns (false, nil), forwardedClientCert == sanitize_set",
-				notArrivedViaRouteService, fakeLogger, "sanitize_set", false, nil),
+				notArrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, nil),
 			Entry("arrivedViaRouteService returns (false, nil), forwardedClientCert != sanitize_set",
-				notArrivedViaRouteService, fakeLogger, "", false, nil),
+				notArrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "", false, nil),
 			Entry("arrivedViaRouteService returns (true, nil), forwardedClientCert == sanitize_set",
-				arrivedViaRouteService, fakeLogger, "sanitize_set", false, nil),
+				arrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, nil),
 			Entry("arrivedViaRouteService returns (true, nil), forwardedClientCert != sanitize_set",
-				arrivedViaRouteService, fakeLogger, "", true, nil),
+				arrivedViaRouteService, func() *slog.Logger { return logger.Logger }, "", true, nil),
 			Entry("arrivedViaRouteService returns (false, error), forwardedClientCert == sanitize_set",
-				errorViaRouteService, fakeLogger, "sanitize_set", false, errors.New("Bad route service validator")),
+				errorViaRouteService, func() *slog.Logger { return logger.Logger }, "sanitize_set", false, errors.New("Bad route service validator")),
 			Entry("arrivedViaRouteService returns (false, error), forwardedClientCert != sanitize_set",
-				errorViaRouteService, fakeLogger, "", false, errors.New("Bad route service validator")),
+				errorViaRouteService, func() *slog.Logger { return logger.Logger }, "", false, errors.New("Bad route service validator")),
 		)
 	})
 })
@@ -293,7 +293,7 @@ type returns struct {
 	Error error
 }
 
-func (h *hasBeenToRouteServiceValidatorFake) ArrivedViaRouteService(req *http.Request, logger logger.Logger) (bool, error) {
+func (h *hasBeenToRouteServiceValidatorFake) ArrivedViaRouteService(req *http.Request, logger *slog.Logger) (bool, error) {
 	return h.ValidatedHasBeenToRouteServiceCall.Returns.Value, h.ValidatedHasBeenToRouteServiceCall.Returns.Error
 }
 

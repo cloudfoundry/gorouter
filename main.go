@@ -6,22 +6,32 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"runtime"
-	"strings"
 	"syscall"
 	"time"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	mr "code.cloudfoundry.org/go-metric-registry"
+	"code.cloudfoundry.org/lager/v3"
+	"code.cloudfoundry.org/tlsconfig"
+	"github.com/cloudfoundry/dropsonde"
+	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
+	"github.com/nats-io/nats.go"
+	"github.com/tedsuo/ifrit"
+	"github.com/tedsuo/ifrit/grouper"
+	"github.com/tedsuo/ifrit/sigmon"
+
 	"code.cloudfoundry.org/gorouter/accesslog"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/secure"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
-	goRouterLogger "code.cloudfoundry.org/gorouter/logger"
+	grlog "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
@@ -31,18 +41,8 @@ import (
 	"code.cloudfoundry.org/gorouter/router"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	rvarz "code.cloudfoundry.org/gorouter/varz"
-	"code.cloudfoundry.org/lager/v3"
 	routing_api "code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/uaaclient"
-	"code.cloudfoundry.org/tlsconfig"
-	"github.com/cloudfoundry/dropsonde"
-	"github.com/cloudfoundry/dropsonde/metric_sender"
-	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/nats-io/nats.go"
-	"github.com/tedsuo/ifrit"
-	"github.com/tedsuo/ifrit/grouper"
-	"github.com/tedsuo/ifrit/sigmon"
-	"github.com/uber-go/zap"
 )
 
 var (
@@ -55,34 +55,37 @@ func main() {
 	flag.Parse()
 
 	prefix := "gorouter.stdout"
-	tmpLogger, _ := createLogger(prefix, "INFO", "unix-epoch")
+	coreLogger := grlog.CreateLogger()
+	grlog.SetLoggingLevel("INFO")
 
 	c, err := config.DefaultConfig()
 	if err != nil {
-		tmpLogger.Fatal("Error loading config:", zap.Error(err))
+		grlog.Fatal(coreLogger, "Error loading config", grlog.ErrAttr(err))
 	}
 
 	if configFile != "" {
 		c, err = config.InitConfigFromFile(configFile)
 		if err != nil {
-			tmpLogger.Fatal("Error loading config:", zap.Error(err))
+			grlog.Fatal(coreLogger, "Error loading config:", grlog.ErrAttr(err))
 		}
 	}
-
 	logCounter := schema.NewLogCounter()
 
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
-	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level, c.Logging.Format.Timestamp)
+
+	grlog.SetLoggingLevel(c.Logging.Level)
+	grlog.SetTimeEncoder(c.Logging.Format.Timestamp)
+	logger := grlog.CreateLoggerWithSource(prefix, "")
 	logger.Info("starting")
-	logger.Debug("local-az-set", zap.String("AvailabilityZone", c.Zone))
+	logger.Debug("local-az-set", slog.String("AvailabilityZone", c.Zone))
 
 	var ew errorwriter.ErrorWriter
 	if c.HTMLErrorTemplateFile != "" {
 		ew, err = errorwriter.NewHTMLErrorWriterFromFile(c.HTMLErrorTemplateFile)
 		if err != nil {
-			logger.Fatal("new-html-error-template-from-file", zap.Error(err))
+			grlog.Fatal(logger, "new-html-error-template-from-file", grlog.ErrAttr(err))
 		}
 	} else {
 		ew = errorwriter.NewPlaintextErrorWriter()
@@ -90,12 +93,12 @@ func main() {
 
 	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
+		grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
 	}
 
 	logger.Info("retrieved-isolation-segments",
-		zap.Object("isolation_segments", c.IsolationSegments),
-		zap.Object("routing_table_sharding_mode", c.RoutingTableShardingMode),
+		slog.Any("isolation_segments", c.IsolationSegments),
+		slog.String("routing_table_sharding_mode", c.RoutingTableShardingMode),
 	)
 
 	// setup number of procs
@@ -104,20 +107,16 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		// FIXME: this reconfigurableSink isn't hooked up to our logger instance at all, so has no effect
-		//        additionally, shouldn't we be adding debugserver to our ifrit groups and running it that way?
-		//        or do we want to keep it separate intentionally so any failures don't take down the rest of gorouter?
-		//        either way we should do something to stop it during shutdown, no?
-		reconfigurableSink := lager.NewReconfigurableSink(lager.NewWriterSink(os.Stdout, lager.DEBUG), minLagerLogLevel)
-		_, err = debugserver.Run(c.DebugAddr, reconfigurableSink)
+		reconfigurableSink := lager.ReconfigurableSink{}
+		_, err = debugserver.Run(c.DebugAddr, &reconfigurableSink)
 		if err != nil {
-			logger.Error("failed-to-start-debug-server", zap.Error(err))
+			logger.Error("failed-to-start-debug-server", grlog.ErrAttr(err))
 		}
 	}
 
 	logger.Info("setting-up-nats-connection")
 	natsReconnected := make(chan mbus.Signal)
-	natsClient := mbus.Connect(c, natsReconnected, logger.Session("nats"))
+	natsClient := mbus.Connect(c, natsReconnected, grlog.CreateLoggerWithSource(prefix, "nats"))
 
 	var routingAPIClient routing_api.Client
 
@@ -126,16 +125,16 @@ func main() {
 
 		routingAPIClient, err = setupRoutingAPIClient(logger, c)
 		if err != nil {
-			logger.Fatal("routing-api-connection-failed", zap.Error(err))
+			grlog.Fatal(logger, "routing-api-connection-failed", grlog.ErrAttr(err))
 		}
 
 	}
 
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
 
-	metricsReporter := initializeMetrics(sender, c, logger)
-	fdMonitor := initializeFDMonitor(sender, logger)
-	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter)
+	metricsReporter := initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
+	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricsReporter)
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
@@ -144,12 +143,12 @@ func main() {
 	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
-		logger.Session("access-log"),
+		grlog.CreateLoggerWithSource(prefix, "access-grlog"),
 		accesslog.NewLogSender(c, dropsonde.AutowiredEmitter(), logger),
 		c,
 	)
 	if err != nil {
-		logger.Fatal("error-creating-access-logger", zap.Error(err))
+		grlog.Fatal(logger, "error-creating-access-logger", grlog.ErrAttr(err))
 	}
 
 	var crypto secure.Crypto
@@ -162,7 +161,7 @@ func main() {
 	}
 
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
-		logger.Session("proxy"),
+		grlog.CreateLoggerWithSource(prefix, "proxy"),
 		c.RouteServiceEnabled,
 		c.RouteServicesHairpinning,
 		c.RouteServicesHairpinningAllowlist,
@@ -173,7 +172,7 @@ func main() {
 		c.RouteServiceConfig.StrictSignatureValidation,
 	)
 
-	// These TLS configs are just tempaltes. If you add other keys you will
+	// These TLS configs are just templates. If you add other keys you will
 	// also need to edit proxy/utils/tls_config.go
 	backendTLSConfig := &tls.Config{
 		CipherSuites: c.CipherSuites,
@@ -192,7 +191,7 @@ func main() {
 
 	rss, err := router.NewRouteServicesServer(c)
 	if err != nil {
-		logger.Fatal("new-route-services-server", zap.Error(err))
+		grlog.Fatal(logger, "new-route-services-server", grlog.ErrAttr(err))
 	}
 
 	var metricsRegistry *mr.Registry
@@ -202,7 +201,7 @@ func main() {
 	}
 
 	h = &health.Health{}
-	proxy := proxy.NewProxy(
+	proxyHandler := proxy.NewProxy(
 		logger,
 		accessLogger,
 		metricsRegistry,
@@ -220,9 +219,9 @@ func main() {
 	var errorChannel chan error = nil
 
 	goRouter, err := router.NewRouter(
-		logger.Session("router"),
+		grlog.CreateLoggerWithSource(prefix, "router"),
 		c,
-		proxy,
+		proxyHandler,
 		natsClient,
 		registry,
 		varz,
@@ -235,18 +234,18 @@ func main() {
 	h.OnDegrade = goRouter.DrainAndStop
 
 	if err != nil {
-		logger.Fatal("initialize-router-error", zap.Error(err))
+		grlog.Fatal(logger, "initialize-router-error", grlog.ErrAttr(err))
 	}
 
 	members := grouper.Members{}
 
 	if c.RoutingApiEnabled() {
-		routeFetcher := setupRouteFetcher(logger.Session("route-fetcher"), c, registry, routingAPIClient)
+		routeFetcher := setupRouteFetcher(grlog.CreateLoggerWithSource(prefix, "route-fetcher"), c, registry, routingAPIClient)
 		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
 	}
 
-	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, logger.Session("subscriber"))
-	natsMonitor := initializeNATSMonitor(subscriber, sender, logger)
+	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, grlog.CreateLoggerWithSource(prefix, "subscriber"))
+	natsMonitor := initializeNATSMonitor(subscriber, sender, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
@@ -267,31 +266,30 @@ func main() {
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Error("gorouter.exited-with-failure", zap.Error(err))
-		os.Exit(1)
+		grlog.Fatal(logger, "gorouter.exited-with-failure", grlog.ErrAttr(err))
 	}
 
 	os.Exit(0)
 }
 
-func initializeFDMonitor(sender *metric_sender.MetricSender, logger goRouterLogger.Logger) *monitor.FileDescriptor {
+func initializeFDMonitor(sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.FileDescriptor {
 	pid := os.Getpid()
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
-	return monitor.NewFileDescriptor(path, ticker, sender, logger.Session("FileDescriptor"))
+	return monitor.NewFileDescriptor(path, ticker, sender, logger)
 }
 
-func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger goRouterLogger.Logger) *monitor.NATSMonitor {
+func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.NATSMonitor {
 	ticker := time.NewTicker(time.Second * 5)
 	return &monitor.NATSMonitor{
 		Subscriber: subscriber,
 		Sender:     sender,
 		TickChan:   ticker.C,
-		Logger:     logger.Session("NATSMonitor"),
+		Logger:     logger,
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger goRouterLogger.Logger) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.MetricsReporter {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -313,20 +311,20 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, log
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger.Session("metricsreporter")}
+	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
 }
 
-func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
+func createCrypto(logger *slog.Logger, secret string) *secure.AesGCM {
 	// generate secure encryption key using key derivation function (pbkdf2)
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
 	if err != nil {
-		logger.Fatal("error-creating-route-service-crypto", zap.Error(err))
+		grlog.Fatal(logger, "error-creating-route-service-crypto", grlog.ErrAttr(err))
 	}
 	return crypto
 }
 
-func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {
+func setupRoutingAPIClient(logger *slog.Logger, c *config.Config) (routing_api.Client, error) {
 	routingAPIURI := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 
 	tlsConfig, err := tlsconfig.Build(
@@ -342,7 +340,7 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	client := routing_api.NewClientWithTLSConfig(routingAPIURI, tlsConfig)
 
 	logger.Debug("fetching-token")
-	clock := clock.NewClock()
+	clockInstance := clock.NewClock()
 
 	uaaConfig := uaaclient.Config{
 		Port:              c.OAuth.Port,
@@ -353,9 +351,9 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 		TokenEndpoint:     c.OAuth.TokenEndpoint,
 	}
 
-	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clock, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, goRouterLogger.NewLagerAdapter(logger))
+	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clockInstance, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, grlog.NewLagerAdapter(c.Logging.Syslog))
 	if err != nil {
-		logger.Fatal("initialize-uaa-client", zap.Error(err))
+		grlog.Fatal(logger, "initialize-uaa-client", grlog.ErrAttr(err))
 	}
 
 	if !c.RoutingApi.AuthDisabled {
@@ -376,7 +374,7 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	return client, nil
 }
 
-func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(logger *slog.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
 	cl := clock.NewClock()
 
 	uaaConfig := uaaclient.Config{
@@ -388,14 +386,14 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		TokenEndpoint:     c.OAuth.TokenEndpoint,
 	}
 	clock := clock.NewClock()
-	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clock, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, goRouterLogger.NewLagerAdapter(logger))
+	uaaTokenFetcher, err := uaaclient.NewTokenFetcher(c.RoutingApi.AuthDisabled, uaaConfig, clock, uint(c.TokenFetcherMaxRetries), c.TokenFetcherRetryInterval, c.TokenFetcherExpirationBufferTimeInSeconds, grlog.NewLagerAdapter(c.Logging.Syslog))
 	if err != nil {
-		logger.Fatal("initialize-uaa-client", zap.Error(err))
+		grlog.Fatal(logger, "initialize-uaa-client", grlog.ErrAttr(err))
 	}
 
 	_, err = uaaTokenFetcher.FetchToken(context.Background(), true)
 	if err != nil {
-		logger.Fatal("unable-to-fetch-token", zap.Error(err))
+		grlog.Fatal(logger, "unable-to-fetch-token", grlog.ErrAttr(err))
 	}
 
 	subscriptionRetryInterval := 1 * time.Second
@@ -410,20 +408,4 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		cl,
 	)
 	return routeFetcher
-}
-
-func createLogger(component string, level string, timestampFormat string) (goRouterLogger.Logger, lager.LogLevel) {
-	var logLevel zap.Level
-	err := logLevel.UnmarshalText([]byte(strings.ToLower(level)))
-	if err != nil {
-		panic(fmt.Errorf("unknown log level: %s", level))
-	}
-
-	minLagerLogLevel, err := lager.LogLevelFromString(strings.ToLower(level))
-	if err != nil {
-		panic(fmt.Errorf("unknown log level: %s", level))
-	}
-
-	lggr := goRouterLogger.NewLogger(component, timestampFormat, logLevel, zap.Output(os.Stdout))
-	return lggr, minLagerLogLevel
 }

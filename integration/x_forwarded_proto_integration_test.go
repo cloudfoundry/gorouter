@@ -6,9 +6,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 
-	"code.cloudfoundry.org/gorouter/routeservice"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/routeservice"
 )
 
 var _ = Describe("modifications of X-Forwarded-Proto header", func() {

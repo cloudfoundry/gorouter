@@ -6,16 +6,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/accesslog/fakes"
-	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/accesslog/fakes"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("AccessLog", func() {
@@ -25,7 +24,7 @@ var _ = Describe("AccessLog", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeLogger        *logger_fakes.FakeLogger
+		logger            *test_util.TestLogger
 		accessLogger      *fakes.FakeAccessLogger
 		extraHeadersToLog []string
 
@@ -77,12 +76,12 @@ var _ = Describe("AccessLog", func() {
 
 		accessLogger = &fakes.FakeAccessLogger{}
 
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestLogger("test")
 
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(fakeLogger))
-		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, fakeLogger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
+		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
 		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -147,12 +146,11 @@ var _ = Describe("AccessLog", func() {
 		BeforeEach(func() {
 			handler = negroni.New()
 			handler.UseFunc(testProxyWriterHandler)
-			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, fakeLogger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
 			handler.Use(nextHandler)
 		})
 		It("calls Panic on the logger", func() {
-			handler.ServeHTTP(resp, req)
-			Expect(fakeLogger.PanicCallCount()).To(Equal(1))
+			Expect(func() { handler.ServeHTTP(resp, req) }).To(Panic())
 		})
 	})
 

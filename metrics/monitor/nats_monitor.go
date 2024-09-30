@@ -1,12 +1,13 @@
 package monitor
 
 import (
+	"log/slog"
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/uber-go/zap"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 //go:generate counterfeiter -o ../fakes/fake_subscriber.go . Subscriber
@@ -19,7 +20,7 @@ type NATSMonitor struct {
 	Subscriber Subscriber
 	Sender     metrics.MetricSender
 	TickChan   <-chan time.Time
-	Logger     logger.Logger
+	Logger     *slog.Logger
 }
 
 func (n *NATSMonitor) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
@@ -29,22 +30,22 @@ func (n *NATSMonitor) Run(signals <-chan os.Signal, ready chan<- struct{}) error
 		case <-n.TickChan:
 			queuedMsgs, err := n.Subscriber.Pending()
 			if err != nil {
-				n.Logger.Error("error-retrieving-nats-subscription-pending-messages", zap.Error(err))
+				n.Logger.Error("error-retrieving-nats-subscription-pending-messages", log.ErrAttr(err))
 			}
 			chainer := n.Sender.Value("buffered_messages", float64(queuedMsgs), "message")
 			err = chainer.Send()
 			if err != nil {
-				n.Logger.Error("error-sending-buffered-messages-metric", zap.Error(err))
+				n.Logger.Error("error-sending-buffered-messages-metric", log.ErrAttr(err))
 			}
 
 			droppedMsgs, err := n.Subscriber.Dropped()
 			if err != nil {
-				n.Logger.Error("error-retrieving-nats-subscription-dropped-messages", zap.Error(err))
+				n.Logger.Error("error-retrieving-nats-subscription-dropped-messages", log.ErrAttr(err))
 			}
 			chainer = n.Sender.Value("total_dropped_messages", float64(droppedMsgs), "message")
 			err = chainer.Send()
 			if err != nil {
-				n.Logger.Error("error-sending-total-dropped-messages-metric", zap.Error(err))
+				n.Logger.Error("error-sending-total-dropped-messages-metric", log.ErrAttr(err))
 			}
 		case <-signals:
 			n.Logger.Info("exited")

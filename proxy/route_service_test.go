@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
+
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 func HaveErrored() types.GomegaMatcher {
@@ -33,6 +34,7 @@ var _ = Describe("Route Services", func() {
 		forwardedUrl         string
 		rsCertChain          test_util.CertChain
 		routeServiceServer   sync.WaitGroup
+		logger               *test_util.TestLogger
 	)
 
 	JustBeforeEach(func() {
@@ -70,9 +72,9 @@ var _ = Describe("Route Services", func() {
 
 		crypto, err := secure.NewAesGCM([]byte(cryptoKey))
 		Expect(err).ToNot(HaveOccurred())
-
+		logger = test_util.NewTestLogger("test")
 		config := routeservice.NewRouteServiceConfig(
-			testLogger,
+			logger.Logger,
 			conf.RouteServiceEnabled,
 			conf.RouteServicesHairpinning,
 			conf.RouteServicesHairpinningAllowlist,

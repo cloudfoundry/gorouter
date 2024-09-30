@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,18 +16,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/armon/go-proxyproto"
+	"github.com/nats-io/nats.go"
+
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/varz"
-	"github.com/armon/go-proxyproto"
-	"github.com/nats-io/nats.go"
-	"github.com/uber-go/zap"
 )
 
 var DrainTimeout = errors.New("router: Drain timeout")
@@ -65,13 +66,13 @@ type Router struct {
 	stopLock            sync.Mutex
 	uptimeMonitor       *monitor.Uptime
 	health              *health.Health
-	logger              logger.Logger
+	logger              *slog.Logger
 	errChan             chan error
 	routeServicesServer rss
 }
 
 func NewRouter(
-	logger logger.Logger,
+	logger *slog.Logger,
 	cfg *config.Config,
 	handler http.Handler,
 	mbusClient *nats.Conn,
@@ -147,7 +148,7 @@ func NewRouter(
 				Port:        cfg.Status.Port,
 				HealthCheck: healthCheck,
 				Router:      router,
-				Logger:      logger.Session("nontls-health-listener"),
+				Logger:      logger.With("session", "nontls-health-listener"),
 			}
 			if err := router.healthListener.ListenAndServe(); err != nil {
 				return nil, err
@@ -166,7 +167,7 @@ func NewRouter(
 			},
 			HealthCheck: healthCheck,
 			Router:      router,
-			Logger:      logger.Session("tls-health-listener"),
+			Logger:      logger.With("session", "tls-health-listener"),
 		}
 		if cfg.EnableHTTP2 {
 			router.healthTLSListener.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
@@ -205,7 +206,7 @@ func (r *Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// Schedule flushing active app's app_id
 	r.ScheduleFlushApps()
 
-	r.logger.Debug("Sleeping before returning success on /health endpoint to preload routing table", zap.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
+	r.logger.Debug("Sleeping before returning success on /health endpoint to preload routing table", slog.Float64("sleep_time_seconds", r.config.StartResponseDelayInterval.Seconds()))
 	time.Sleep(r.config.StartResponseDelayInterval)
 
 	server := &http.Server{
@@ -245,7 +246,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 	select {
 	case err := <-errChan:
 		if err != nil {
-			r.logger.Error("Error occurred", zap.Error(err))
+			r.logger.Error("Error occurred", log.ErrAttr(err))
 			r.health.SetHealth(health.Degraded)
 		}
 	case sig := <-signals:
@@ -253,7 +254,7 @@ func (r *Router) OnErrOrSignal(signals <-chan os.Signal, errChan chan error) {
 			for sig := range signals {
 				r.logger.Info(
 					"gorouter.signal.ignored",
-					zap.String("signal", sig.String()),
+					slog.String("signal", sig.String()),
 				)
 			}
 		}()
@@ -271,13 +272,13 @@ func (r *Router) DrainAndStop() {
 	drainTimeout := r.config.DrainTimeout
 	r.logger.Info(
 		"gorouter-draining",
-		zap.Float64("wait_seconds", drainWait.Seconds()),
-		zap.Float64("timeout_seconds", drainTimeout.Seconds()),
+		slog.Float64("wait_seconds", drainWait.Seconds()),
+		slog.Float64("timeout_seconds", drainTimeout.Seconds()),
 	)
 
 	err := r.Drain(drainWait, drainTimeout)
 	if err != nil {
-		r.logger.Error("gorouter-draining-error", zap.Error(err))
+		r.logger.Error("gorouter-draining-error", log.ErrAttr(err))
 	}
 
 	r.Stop()
@@ -314,7 +315,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.SSLPort))
 	if err != nil {
-		r.logger.Fatal("tls-listener-error", zap.Error(err))
+		log.Fatal(r.logger, "tls-listener-error", log.ErrAttr(err))
 		return err
 	}
 
@@ -327,7 +328,7 @@ func (r *Router) serveHTTPS(server *http.Server, errChan chan error) error {
 
 	r.tlsListener = tls.NewListener(listener, tlsConfig)
 
-	r.logger.Info("tls-listener-started", zap.Object("address", r.tlsListener.Addr()))
+	r.logger.Info("tls-listener-started", slog.Any("address", log.StructValue(r.tlsListener.Addr())))
 
 	go func() {
 		err := server.Serve(r.tlsListener)
@@ -359,7 +360,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", r.config.Port))
 	if err != nil {
-		r.logger.Fatal("tcp-listener-error", zap.Error(err))
+		log.Fatal(r.logger, "tcp-listener-error", log.ErrAttr(err))
 		return err
 	}
 
@@ -371,7 +372,7 @@ func (r *Router) serveHTTP(server *http.Server, errChan chan error) error {
 		}
 	}
 
-	r.logger.Info("tcp-listener-started", zap.Object("address", r.listener.Addr()))
+	r.logger.Info("tcp-listener-started", slog.Any("address", log.StructValue(r.listener.Addr())))
 
 	go func() {
 		err := server.Serve(r.listener)
@@ -437,7 +438,7 @@ func (r *Router) Stop() {
 	if r.component != nil {
 		err := r.component.Stop()
 		if err != nil {
-			r.logger.Error("error-stopping-component", zap.Error(err))
+			r.logger.Error("error-stopping-component", log.ErrAttr(err))
 		}
 	}
 	if r.healthListener != nil {
@@ -445,7 +446,7 @@ func (r *Router) Stop() {
 	}
 	err := r.routesListener.Stop()
 	if err != nil {
-		r.logger.Error("error-stopping-route-listener", zap.Error(err))
+		r.logger.Error("error-stopping-route-listener", log.ErrAttr(err))
 	}
 	if r.healthTLSListener != nil {
 		r.healthTLSListener.Stop()
@@ -453,7 +454,7 @@ func (r *Router) Stop() {
 	r.uptimeMonitor.Stop()
 	r.logger.Info(
 		"gorouter.stopped",
-		zap.Duration("took", time.Since(stoppingAt)),
+		slog.Duration("took", time.Since(stoppingAt)),
 	)
 }
 
@@ -476,7 +477,7 @@ func (r *Router) stopListening() {
 	if r.listener != nil {
 		err = r.listener.Close()
 		if err != nil {
-			r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+			r.logger.Error("error-stopping-route-services-server", log.ErrAttr(err))
 		}
 		<-r.serveDone
 	}
@@ -484,14 +485,14 @@ func (r *Router) stopListening() {
 	if r.tlsListener != nil {
 		err = r.tlsListener.Close()
 		if err != nil {
-			r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+			r.logger.Error("error-stopping-route-services-server", log.ErrAttr(err))
 		}
 		<-r.tlsServeDone
 	}
 
 	err = r.routeServicesServer.Stop()
 	if err != nil {
-		r.logger.Error("error-stopping-route-services-server", zap.Error(err))
+		r.logger.Error("error-stopping-route-services-server", log.ErrAttr(err))
 	}
 }
 
@@ -564,19 +565,19 @@ func (r *Router) flushApps(t time.Time) {
 	w := zlib.NewWriter(&b)
 	_, err = w.Write(y)
 	if err != nil {
-		r.logger.Error("error-compressing-active-apps-message", zap.Error(err))
+		r.logger.Error("error-compressing-active-apps-message", log.ErrAttr(err))
 	}
 	err = w.Close()
 	if err != nil {
-		r.logger.Error("error-closing-compression-writer", zap.Error(err))
+		r.logger.Error("error-closing-compression-writer", log.ErrAttr(err))
 	}
 
 	z := b.Bytes()
 
-	r.logger.Debug("Debug Info", zap.Int("Active apps", len(x)), zap.Int("message size:", len(z)))
+	r.logger.Debug("Debug Info", slog.Int("Active apps", len(x)), slog.Int("message size:", len(z)))
 
 	err = r.mbusClient.Publish("router.active_apps", z)
 	if err != nil {
-		r.logger.Error("error-publishing-active-apps-to-nats", zap.Error(err))
+		r.logger.Error("error-publishing-active-apps-to-nats", log.ErrAttr(err))
 	}
 }

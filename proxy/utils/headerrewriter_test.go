@@ -3,9 +3,10 @@ package utils_test
 import (
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 var _ = Describe("AddHeaderIfNotPresentRewriter", func() {

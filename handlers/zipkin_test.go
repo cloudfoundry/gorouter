@@ -5,13 +5,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/test_util"
-
-	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 // 64-bit random hexadecimal string
@@ -33,7 +32,7 @@ const (
 var _ = Describe("Zipkin", func() {
 	var (
 		handler    *handlers.Zipkin
-		logger     logger.Logger
+		logger     *test_util.TestLogger
 		resp       http.ResponseWriter
 		req        *http.Request
 		nextCalled bool
@@ -48,7 +47,8 @@ var _ = Describe("Zipkin", func() {
 	})
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("zipkin")
+		logger = test_util.NewTestLogger("zipkin")
+
 		ri := new(handlers.RequestInfo)
 		req = test_util.NewRequest("GET", "example.com", "/", nil).
 			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
@@ -61,7 +61,7 @@ var _ = Describe("Zipkin", func() {
 
 	Context("with Zipkin enabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(true, logger)
+			handler = handlers.NewZipkin(true, logger.Logger)
 		})
 
 		It("sets zipkin headers", func() {
@@ -325,7 +325,7 @@ var _ = Describe("Zipkin", func() {
 
 	Context("with Zipkin disabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewZipkin(false, logger)
+			handler = handlers.NewZipkin(false, logger.Logger)
 		})
 
 		It("doesn't set any headers", func() {

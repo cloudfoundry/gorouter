@@ -7,8 +7,15 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock/fakeclock"
+	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
+	"github.com/cloudfoundry/dropsonde/metrics"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
+	"golang.org/x/oauth2"
+
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	testRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	. "code.cloudfoundry.org/gorouter/route_fetcher"
@@ -17,13 +24,6 @@ import (
 	fake_routing_api "code.cloudfoundry.org/routing-api/fake_routing_api"
 	"code.cloudfoundry.org/routing-api/models"
 	test_uaa_client "code.cloudfoundry.org/routing-api/uaaclient/fakes"
-	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
-	"github.com/cloudfoundry/dropsonde/metrics"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/tedsuo/ifrit"
-	"golang.org/x/oauth2"
 )
 
 var sender *metrics_fakes.FakeMetricSender
@@ -39,7 +39,7 @@ var _ = Describe("RouteFetcher", func() {
 		tokenFetcher *test_uaa_client.FakeTokenFetcher
 		registry     *testRegistry.FakeRegistry
 		fetcher      *RouteFetcher
-		logger       logger.Logger
+		logger       *test_util.TestLogger
 		client       *fake_routing_api.FakeClient
 		eventSource  *fake_routing_api.FakeEventSource
 
@@ -54,7 +54,7 @@ var _ = Describe("RouteFetcher", func() {
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 		var err error
 		cfg, err = config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
@@ -88,7 +88,7 @@ var _ = Describe("RouteFetcher", func() {
 		}
 
 		clock = fakeclock.NewFakeClock(time.Now())
-		fetcher = NewRouteFetcher(logger, tokenFetcher, registry, cfg, client, retryInterval, clock)
+		fetcher = NewRouteFetcher(logger.Logger, tokenFetcher, registry, cfg, client, retryInterval, clock)
 	})
 
 	AfterEach(func() {

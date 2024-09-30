@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/localip"
+	"github.com/nats-io/nats.go"
+
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/common/uuid"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
-
-	"github.com/nats-io/nats.go"
-	"github.com/uber-go/zap"
 )
 
 type RegistryMessage struct {
@@ -103,7 +103,7 @@ type Subscriber struct {
 
 	params startMessageParams
 
-	logger logger.Logger
+	logger *slog.Logger
 }
 
 type startMessageParams struct {
@@ -118,11 +118,11 @@ func NewSubscriber(
 	routeRegistry registry.Registry,
 	c *config.Config,
 	reconnected <-chan Signal,
-	l logger.Logger,
+	l *slog.Logger,
 ) *Subscriber {
 	guid, err := uuid.GenerateUUID()
 	if err != nil {
-		l.Fatal("failed-to-generate-uuid", zap.Error(err))
+		log.Fatal(l, "failed-to-generate-uuid", log.ErrAttr(err))
 	}
 
 	return &Subscriber{
@@ -167,7 +167,7 @@ func (s *Subscriber) Run(signals <-chan os.Signal, ready chan<- struct{}) error 
 		case <-s.reconnected:
 			err := s.sendStartMessage()
 			if err != nil {
-				s.logger.Error("failed-to-send-start-message", zap.Error(err))
+				s.logger.Error("failed-to-send-start-message", log.ErrAttr(err))
 			}
 		case <-signals:
 			s.logger.Info("exited")
@@ -210,9 +210,9 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 		msg, regErr := createRegistryMessage(message.Data)
 		if regErr != nil {
 			s.logger.Error("validation-error",
-				zap.Error(regErr),
-				zap.String("payload", string(message.Data)),
-				zap.String("subject", message.Subject),
+				log.ErrAttr(regErr),
+				slog.String("payload", string(message.Data)),
+				slog.String("subject", message.Subject),
 			)
 			return
 		}
@@ -221,7 +221,7 @@ func (s *Subscriber) subscribeRoutes() (*nats.Subscription, error) {
 			s.registerEndpoint(msg)
 		case "router.unregister":
 			s.unregisterEndpoint(msg)
-			s.logger.Debug("unregister-route", zap.String("message", string(message.Data)))
+			s.logger.Debug("unregister-route", slog.String("message", string(message.Data)))
 		default:
 		}
 	})
@@ -242,8 +242,8 @@ func (s *Subscriber) registerEndpoint(msg *RegistryMessage) {
 	endpoint, err := msg.makeEndpoint(s.http2Enabled)
 	if err != nil {
 		s.logger.Error("Unable to register route",
-			zap.Error(err),
-			zap.Object("message", msg),
+			log.ErrAttr(err),
+			slog.Any("message", log.StructValue(msg)),
 		)
 		return
 	}
@@ -257,8 +257,8 @@ func (s *Subscriber) unregisterEndpoint(msg *RegistryMessage) {
 	endpoint, err := msg.makeEndpoint(s.http2Enabled)
 	if err != nil {
 		s.logger.Error("Unable to unregister route",
-			zap.Error(err),
-			zap.Object("message", msg),
+			log.ErrAttr(err),
+			slog.Any("message", log.StructValue(msg)),
 		)
 		return
 	}

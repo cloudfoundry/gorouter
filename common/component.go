@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"runtime"
@@ -11,20 +12,20 @@ import (
 	"syscall"
 	"time"
 
+	"code.cloudfoundry.org/localip"
+	"github.com/nats-io/nats.go"
+
 	"code.cloudfoundry.org/gorouter/common/health"
 	. "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/localip"
-	"github.com/nats-io/nats.go"
-	"github.com/uber-go/zap"
 )
 
 const RefreshInterval time.Duration = time.Second * 1
 
-var log logger.Logger
+var logger *slog.Logger
 
 type ProcessStatus struct {
 	sync.RWMutex
@@ -59,7 +60,7 @@ func NewProcessStatus() *ProcessStatus {
 func (p *ProcessStatus) Update() {
 	e := syscall.Getrusage(syscall.RUSAGE_SELF, p.rusage)
 	if e != nil {
-		log.Fatal("failed-to-get-rusage", zap.Error(e))
+		log.Fatal(logger, "failed-to-get-rusage", log.ErrAttr(e))
 	}
 
 	p.Lock()
@@ -88,7 +89,7 @@ type VcapComponent struct {
 	Varz       *health.Varz `json:"-"`
 	Health     http.Handler
 	InfoRoutes map[string]json.Marshaler `json:"-"`
-	Logger     logger.Logger             `json:"-"`
+	Logger     *slog.Logger              `json:"-"`
 
 	listener net.Listener
 	statusCh chan error
@@ -116,7 +117,7 @@ func (c *VcapComponent) UpdateVarz() {
 func (c *VcapComponent) Start() error {
 	if c.Varz.Type == "" {
 		err := errors.New("type is required")
-		log.Error("Component type is required", zap.Error(err))
+		logger.Error("Component type is required", log.ErrAttr(err))
 		return err
 	}
 
@@ -131,7 +132,7 @@ func (c *VcapComponent) Start() error {
 	if c.Varz.Host == "" {
 		host, err := localip.LocalIP()
 		if err != nil {
-			log.Error("error-getting-localIP", zap.Error(err))
+			logger.Error("error-getting-localIP", log.ErrAttr(err))
 			return err
 		}
 
@@ -154,7 +155,7 @@ func (c *VcapComponent) Start() error {
 	}
 
 	if c.Logger != nil {
-		log = c.Logger
+		logger = c.Logger
 	}
 
 	c.Varz.NumCores = runtime.NumCPU()
@@ -167,20 +168,20 @@ func (c *VcapComponent) Start() error {
 func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 	_, err := mbusClient.Subscribe("vcap.component.discover", func(msg *nats.Msg) {
 		if msg.Reply == "" {
-			log.Info("Received message with empty reply", zap.String("nats-msg-subject", msg.Subject))
+			logger.Info("Received message with empty reply", slog.String("nats-msg-subject", msg.Subject))
 			return
 		}
 
 		c.Varz.Uptime = c.Varz.StartTime.Elapsed()
 		b, e := json.Marshal(c.Varz)
 		if e != nil {
-			log.Error("error-json-marshaling", zap.Error(e))
+			logger.Error("error-json-marshaling", log.ErrAttr(e))
 			return
 		}
 
 		err := mbusClient.Publish(msg.Reply, b)
 		if err != nil {
-			log.Error("error-publishing-registration", zap.Error(e))
+			logger.Error("error-publishing-registration", log.ErrAttr(e))
 		}
 	})
 	if err != nil {
@@ -189,7 +190,7 @@ func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 
 	b, e := json.Marshal(c.Varz)
 	if e != nil {
-		log.Error("error-json-marshaling", zap.Error(e))
+		logger.Error("error-json-marshaling", log.ErrAttr(e))
 		return e
 	}
 
@@ -198,7 +199,7 @@ func (c *VcapComponent) Register(mbusClient *nats.Conn) error {
 		return err
 	}
 
-	log.Info(fmt.Sprintf("Component %s registered successfully", c.Varz.Type))
+	logger.Info(fmt.Sprintf("Component %s registered successfully", c.Varz.Type))
 	return nil
 }
 

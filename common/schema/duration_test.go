@@ -1,13 +1,14 @@
 package schema_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/schema"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"encoding/json"
 	"fmt"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/schema"
 )
 
 var _ = Describe("Durations", func() {

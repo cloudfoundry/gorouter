@@ -1,16 +1,15 @@
 package test_util
 
 import (
-	"os"
-
-	. "github.com/onsi/gomega"
-
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"time"
+
+	. "github.com/onsi/gomega"
 )
 
 type Nats struct {

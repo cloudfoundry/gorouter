@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	router_http "code.cloudfoundry.org/gorouter/common/http"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("modifyResponse", func() {
@@ -20,6 +20,7 @@ var _ = Describe("modifyResponse", func() {
 		p       *proxy
 		resp    *http.Response
 		reqInfo *handlers.RequestInfo
+		logger  *test_util.TestLogger
 	)
 	BeforeEach(func() {
 		p = &proxy{config: &config.Config{}}
@@ -30,7 +31,7 @@ var _ = Describe("modifyResponse", func() {
 		Expect(err).ToNot(HaveOccurred())
 		req.Header.Set(handlers.VcapRequestIdHeader, "foo-uuid")
 		req.Header.Set(router_http.VcapTraceHeader, "trace-key")
-
+		logger = test_util.NewTestLogger("test")
 		var modifiedReq *http.Request
 		handlers.NewRequestInfo().ServeHTTP(nil, req, func(rw http.ResponseWriter, r *http.Request) {
 			modifiedReq = r
@@ -39,7 +40,7 @@ var _ = Describe("modifyResponse", func() {
 		Expect(err).ToNot(HaveOccurred())
 		reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 		reqInfo.RoutePool = route.NewPool(&route.PoolOpts{
-			Logger:             new(fakes.FakeLogger),
+			Logger:             logger.Logger,
 			RetryAfterFailure:  0,
 			Host:               "foo.com",
 			ContextPath:        "context-path",

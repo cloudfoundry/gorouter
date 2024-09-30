@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/route"
 )
 
@@ -63,7 +63,7 @@ func upgradeHeader(request *http.Request) string {
 	return ""
 }
 
-func EndpointIteratorForRequest(logger logger.Logger, request *http.Request, stickySessionCookieNames config.StringSet, authNegotiateSticky bool, azPreference string, az string) (route.EndpointIterator, error) {
+func EndpointIteratorForRequest(logger *slog.Logger, request *http.Request, stickySessionCookieNames config.StringSet, authNegotiateSticky bool, azPreference string, az string) (route.EndpointIterator, error) {
 	reqInfo, err := ContextRequestInfo(request)
 	if err != nil {
 		return nil, fmt.Errorf("could not find reqInfo in context")

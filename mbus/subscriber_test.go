@@ -7,19 +7,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nats-io/nats.go"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/tedsuo/ifrit"
+
 	"code.cloudfoundry.org/gorouter/common"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	mbusFakes "code.cloudfoundry.org/gorouter/mbus/fakes"
 	registryFakes "code.cloudfoundry.org/gorouter/registry/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/tedsuo/ifrit"
 )
 
 var _ = Describe("Subscriber", func() {
@@ -35,7 +34,7 @@ var _ = Describe("Subscriber", func() {
 		natsClient  *nats.Conn
 		reconnected chan mbus.Signal
 
-		l logger.Logger
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
@@ -47,7 +46,7 @@ var _ = Describe("Subscriber", func() {
 
 		registry = new(registryFakes.FakeRegistry)
 
-		l = test_util.NewTestZapLogger("mbus-test")
+		logger = test_util.NewTestLogger("mbus-test")
 
 		reconnected = make(chan mbus.Signal)
 		var err error
@@ -57,7 +56,7 @@ var _ = Describe("Subscriber", func() {
 		cfg.StartResponseDelayInterval = 60 * time.Second
 		cfg.DropletStaleThreshold = 120 * time.Second
 
-		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 	})
 
 	AfterEach(func() {
@@ -106,7 +105,7 @@ var _ = Describe("Subscriber", func() {
 	})
 
 	It("errors when mbus client is nil", func() {
-		sub = mbus.NewSubscriber(nil, registry, cfg, reconnected, l)
+		sub = mbus.NewSubscriber(nil, registry, cfg, reconnected, logger.Logger)
 		process = ifrit.Invoke(sub)
 
 		var err error
@@ -116,7 +115,7 @@ var _ = Describe("Subscriber", func() {
 
 	It("errors when pending limit is 0", func() {
 		cfg.NatsClientMessageBufferSize = 0
-		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+		sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 		process = ifrit.Invoke(sub)
 
 		var err error
@@ -196,7 +195,7 @@ var _ = Describe("Subscriber", func() {
 		var droppedMsgs func() int
 		BeforeEach(func() {
 			cfg.NatsClientMessageBufferSize = 1
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			droppedMsgs = func() int {
 				msgs, errs := sub.Dropped()
 				Expect(errs).ToNot(HaveOccurred())
@@ -250,7 +249,7 @@ var _ = Describe("Subscriber", func() {
 			fakeClient.PublishReturns(errors.New("potato"))
 		})
 		It("errors", func() {
-			sub = mbus.NewSubscriber(fakeClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(fakeClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 
 			var err error
@@ -338,7 +337,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message cannot be unmarshaled", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -351,7 +350,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message contains an availability_zone", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -385,7 +384,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message does not contain an availability_zone", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -417,7 +416,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message does not contain a protocol", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -448,7 +447,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message contains a protocol", func() {
 		JustBeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -479,7 +478,7 @@ var _ = Describe("Subscriber", func() {
 
 		Context("when the message contains load balancing algorithm option", func() {
 			JustBeforeEach(func() {
-				sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+				sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 				process = ifrit.Invoke(sub)
 				Eventually(process.Ready()).Should(BeClosed())
 			})
@@ -514,7 +513,7 @@ var _ = Describe("Subscriber", func() {
 
 		Context("when the message contains an empty load balancing algorithm option", func() {
 			JustBeforeEach(func() {
-				sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+				sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 				process = ifrit.Invoke(sub)
 				Eventually(process.Ready()).Should(BeClosed())
 			})
@@ -578,7 +577,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message contains a tls port for route", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -702,7 +701,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when the message contains an http url for route services", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})
@@ -732,7 +731,7 @@ var _ = Describe("Subscriber", func() {
 
 	Context("when a route is unregistered", func() {
 		BeforeEach(func() {
-			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, l)
+			sub = mbus.NewSubscriber(natsClient, registry, cfg, reconnected, logger.Logger)
 			process = ifrit.Invoke(sub)
 			Eventually(process.Ready()).Should(BeClosed())
 		})

@@ -1,20 +1,20 @@
 package handlers
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"fmt"
+	"github.com/urfave/negroni/v3"
 
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/errorwriter"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-	"github.com/uber-go/zap"
-	"github.com/urfave/negroni/v3"
 )
 
 const CfAppInstance = "X-CF-APP-INSTANCE"
@@ -30,7 +30,7 @@ func (err InvalidInstanceHeaderError) Error() string {
 type lookupHandler struct {
 	registry                 registry.Registry
 	reporter                 metrics.ProxyReporter
-	logger                   logger.Logger
+	logger                   *slog.Logger
 	errorWriter              errorwriter.ErrorWriter
 	EmptyPoolResponseCode503 bool
 }
@@ -39,7 +39,7 @@ type lookupHandler struct {
 func NewLookup(
 	registry registry.Registry,
 	rep metrics.ProxyReporter,
-	logger logger.Logger,
+	logger *slog.Logger,
 	ew errorwriter.ErrorWriter,
 	emptyPoolResponseCode503 bool,
 ) negroni.Handler {
@@ -102,14 +102,14 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		logger.Panic("request-info-err", zap.Error(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	requestInfo.RoutePool = pool
 	next(rw, r)
 }
 
-func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
+func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "invalid_cf_app_instance_header")
@@ -123,7 +123,7 @@ func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *h
 	)
 }
 
-func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
+func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "empty_host")
@@ -137,7 +137,7 @@ func (l *lookupHandler) handleMissingHost(rw http.ResponseWriter, r *http.Reques
 	)
 }
 
-func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
+func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "unknown_route")
@@ -160,7 +160,7 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	)
 }
 
-func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
+func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	AddRouterErrorHeader(rw, "no_endpoints")
 	addInvalidResponseCacheControlHeader(rw)
 
@@ -172,7 +172,7 @@ func (l *lookupHandler) handleUnavailableRoute(rw http.ResponseWriter, r *http.R
 	)
 }
 
-func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request, logger logger.Logger) {
+func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	l.reporter.CaptureBackendExhaustedConns()
 	l.logger.Info("connection-limit-reached")
 
@@ -186,7 +186,7 @@ func (l *lookupHandler) handleOverloadedRoute(rw http.ResponseWriter, r *http.Re
 	)
 }
 
-func (l *lookupHandler) lookup(r *http.Request, logger logger.Logger) (*route.EndpointPool, error) {
+func (l *lookupHandler) lookup(r *http.Request, logger *slog.Logger) (*route.EndpointPool, error) {
 	requestPath := r.URL.EscapedPath()
 
 	uri := route.Uri(hostWithoutPort(r.Host) + requestPath)
@@ -195,7 +195,7 @@ func (l *lookupHandler) lookup(r *http.Request, logger logger.Logger) (*route.En
 	if appInstanceHeader != "" {
 		err := validateInstanceHeader(appInstanceHeader)
 		if err != nil {
-			logger.Error("invalid-app-instance-header", zap.Error(err))
+			logger.Error("invalid-app-instance-header", log.ErrAttr(err))
 			return nil, InvalidInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 

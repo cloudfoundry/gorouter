@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("HopByHop", func() {
@@ -29,9 +29,9 @@ var _ = Describe("HopByHop", func() {
 		responseBody []byte
 		requestBody  *bytes.Buffer
 
-		cfg        *config.Config
-		fakeLogger *logger_fakes.FakeLogger
-		hopByHop   *handlers.HopByHop
+		cfg      *config.Config
+		logger   *test_util.TestLogger
+		hopByHop *handlers.HopByHop
 
 		nextCalled bool
 	)
@@ -78,9 +78,9 @@ var _ = Describe("HopByHop", func() {
 	})
 
 	JustBeforeEach(func() {
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestLogger("test")
 		handler = negroni.New()
-		hopByHop = handlers.NewHopByHop(cfg, fakeLogger)
+		hopByHop = handlers.NewHopByHop(cfg, logger.Logger)
 		handler.Use(hopByHop)
 		handler.Use(nextHandler)
 

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/gorouter/config"
-
 	"code.cloudfoundry.org/gorouter/route"
 )
 

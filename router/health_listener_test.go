@@ -6,14 +6,13 @@ import (
 	"io"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("HealthListener", func() {
@@ -25,11 +24,12 @@ var _ = Describe("HealthListener", func() {
 		port            uint16
 		h               *health.Health
 		router          *Router
-		logger          logger.Logger
+		logger          *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("health-listener-test")
+		logger = test_util.NewTestLogger("health-listener-test")
+
 		router = &Router{}
 		port = test_util.NextAvailPort()
 		addr = "127.0.0.1"
@@ -38,9 +38,9 @@ var _ = Describe("HealthListener", func() {
 
 		healthListener = &HealthListener{
 			Port:        port,
-			HealthCheck: handlers.NewHealthcheck(h, test_util.NewTestZapLogger("test")),
+			HealthCheck: handlers.NewHealthcheck(h, logger.Logger),
 			Router:      router,
-			Logger:      logger,
+			Logger:      logger.Logger,
 		}
 		healthcheckPath = "health"
 	})

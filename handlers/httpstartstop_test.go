@@ -9,13 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/route"
-
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	"github.com/cloudfoundry/sonde-go/events"
 	gouuid "github.com/nu7hatch/gouuid"
@@ -23,6 +16,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/common/uuid"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 func findEnvelope(fakeEmitter *fake.FakeEventEmitter, eventType events.Envelope_EventType) *events.Envelope {
@@ -54,7 +52,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		req  *http.Request
 
 		fakeEmitter *fake.FakeEventEmitter
-		logger      logger.Logger
+		logger      *test_util.TestLogger
 
 		nextCalled bool
 	)
@@ -70,7 +68,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		req.Header.Set(handlers.VcapRequestIdHeader, vcapHeader)
 
 		fakeEmitter = fake.NewFakeEventEmitter("fake")
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)
@@ -109,8 +107,8 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.Use(prevHandler)
-		handler.Use(handlers.NewProxyWriter(logger))
-		handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
+		handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger.Logger))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -231,14 +229,14 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			handler = negroni.New()
 			handler.Use(prevHandler)
 			handler.Use(handlers.NewRequestInfo())
-			handler.Use(handlers.NewProxyWriter(logger))
+			handler.Use(handlers.NewProxyWriter(logger.Logger))
 			handler.Use(&removeRequestInfoHandler{})
-			handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
+			handler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger.Logger))
 			handler.Use(handlers.NewRequestInfo())
 			handler.UseHandlerFunc(nextHandler)
 			handler.ServeHTTP(resp, req)
 
-			Expect(logger).To(gbytes.Say(`"message":"request-info-err"`))
+			Eventually(logger).Should(gbytes.Say(`"message":"request-info-err"`))
 
 			Expect(nextCalled).To(BeTrue())
 		})
@@ -252,7 +250,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		It("calls error on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`"data":{"error":"X-Vcap-Request-Id not found"}`))
+				Eventually(logger).Should(gbytes.Say(`"data":{"error":"X-Vcap-Request-Id not found"}`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 
@@ -267,7 +265,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			It("logs message with trace info", func() {
 				defer func() {
 					recover()
-					Expect(logger).To(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","error":"X-Vcap-Request-Id not found"}`))
+					Eventually(logger).Should(gbytes.Say(`"data":{"trace-id":"1111","span-id":"2222","error":"X-Vcap-Request-Id not found"}`))
 					Expect(nextCalled).To(BeFalse())
 				}()
 
@@ -285,7 +283,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 			var badHandler *negroni.Negroni
 			BeforeEach(func() {
 				badHandler = negroni.New()
-				badHandler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger))
+				badHandler.Use(handlers.NewHTTPStartStop(fakeEmitter, logger.Logger))
 			})
 
 			It("calls error on the logger with request trace id", func() {
@@ -305,7 +303,7 @@ var _ = Describe("HTTPStartStop Handler", func() {
 		})
 		It("calls Info on the logger, but does not fail the request", func() {
 			handler.ServeHTTP(resp, req)
-			Expect(logger).To(gbytes.Say(`"message":"failed-to-emit-startstop-event"`))
+			Eventually(logger).Should(gbytes.Say(`"message":"failed-to-emit-startstop-event"`))
 
 			Expect(nextCalled).To(BeTrue())
 		})

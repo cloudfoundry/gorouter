@@ -5,14 +5,14 @@ import (
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/gorouter/metrics/monitor"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/tedsuo/ifrit"
+
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("NATSMonitor", func() {
@@ -22,7 +22,7 @@ var _ = Describe("NATSMonitor", func() {
 		sender       *fakes.MetricSender
 		ch           chan time.Time
 		natsMonitor  *monitor.NATSMonitor
-		logger       logger.Logger
+		logger       *test_util.TestLogger
 		process      ifrit.Process
 	)
 
@@ -33,13 +33,13 @@ var _ = Describe("NATSMonitor", func() {
 		valueChainer = new(fakes.FakeValueChainer)
 		sender.ValueReturns(valueChainer)
 
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 
 		natsMonitor = &monitor.NATSMonitor{
 			Subscriber: subscriber,
 			Sender:     sender,
 			TickChan:   ch,
-			Logger:     logger,
+			Logger:     logger.Logger,
 		}
 
 		process = ifrit.Invoke(natsMonitor)
@@ -97,7 +97,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-sending-buffered-messages-metric"))
+			Eventually(logger).Should(gbytes.Say("error-sending-buffered-messages-metric"))
 		})
 	})
 
@@ -117,7 +117,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-sending-total-dropped-messages-metric"))
+			Eventually(logger).Should(gbytes.Say("error-sending-total-dropped-messages-metric"))
 		})
 	})
 
@@ -129,7 +129,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-pending-messages"))
+			Eventually(logger).Should(gbytes.Say("error-retrieving-nats-subscription-pending-messages"))
 		})
 	})
 
@@ -141,7 +141,7 @@ var _ = Describe("NATSMonitor", func() {
 			ch <- time.Time{}
 			ch <- time.Time{}
 
-			Expect(logger).To(gbytes.Say("error-retrieving-nats-subscription-dropped-messages"))
+			Eventually(logger).Should(gbytes.Say("error-retrieving-nats-subscription-dropped-messages"))
 		})
 	})
 })

@@ -1,15 +1,14 @@
 package route
 
 import (
+	"context"
+	"log/slog"
 	"math/rand"
 	"time"
-
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 )
 
 type LeastConnection struct {
-	logger                logger.Logger
+	logger                *slog.Logger
 	pool                  *EndpointPool
 	initialEndpoint       string
 	mustBeSticky          bool
@@ -19,7 +18,7 @@ type LeastConnection struct {
 	localAvailabilityZone string
 }
 
-func NewLeastConnection(logger logger.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
+func NewLeastConnection(logger *slog.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &LeastConnection{
 		logger:                logger,
 		pool:                  p,
@@ -37,19 +36,21 @@ func (r *LeastConnection) Next(attempt int) *Endpoint {
 		e = r.pool.findById(r.initialEndpoint)
 		if e != nil && e.isOverloaded() {
 			if r.mustBeSticky {
-				r.logger.Debug("endpoint-overloaded-but-request-must-be-sticky", e.endpoint.ToLogData()...)
+				if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+					r.logger.Debug("endpoint-overloaded-but-request-must-be-sticky", e.endpoint.ToLogData()...)
+				}
 				return nil
 			}
 			e = nil
 		}
 
 		if e == nil && r.mustBeSticky {
-			r.logger.Debug("endpoint-missing-but-request-must-be-sticky", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			r.logger.Debug("endpoint-missing-but-request-must-be-sticky", slog.String("requested-endpoint", r.initialEndpoint))
 			return nil
 		}
 
 		if !r.mustBeSticky {
-			r.logger.Debug("endpoint-missing-choosing-alternate", zap.Field(zap.String("requested-endpoint", r.initialEndpoint)))
+			r.logger.Debug("endpoint-missing-choosing-alternate", slog.String("requested-endpoint", r.initialEndpoint))
 			r.initialEndpoint = ""
 		}
 	}

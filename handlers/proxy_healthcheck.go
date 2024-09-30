@@ -3,8 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/common/health"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/common/health"
 )
 
 type proxyHealthcheck struct {

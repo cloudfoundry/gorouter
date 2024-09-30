@@ -5,20 +5,19 @@ import (
 	"net"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/errorwriter"
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/errorwriter"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Protocolcheck", func() {
 	var (
-		logger logger.Logger
+		logger *test_util.TestLogger
 		ew     = errorwriter.NewPlaintextErrorWriter()
 
 		nextCalled  bool
@@ -29,7 +28,7 @@ var _ = Describe("Protocolcheck", func() {
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("protocolcheck")
+		logger = test_util.NewTestLogger("protocolcheck")
 		nextCalled = false
 		prevHandler = &PrevHandler{}
 	})
@@ -40,7 +39,7 @@ var _ = Describe("Protocolcheck", func() {
 			next(rw, req)
 		})
 		n.Use(prevHandler)
-		n.Use(handlers.NewProtocolCheck(logger, ew, enableHTTP2))
+		n.Use(handlers.NewProtocolCheck(logger.Logger, ew, enableHTTP2))
 		n.UseHandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})

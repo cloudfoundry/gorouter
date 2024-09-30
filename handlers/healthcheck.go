@@ -1,18 +1,18 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"code.cloudfoundry.org/gorouter/common/health"
-	"code.cloudfoundry.org/gorouter/logger"
 )
 
 type healthcheck struct {
 	health *health.Health
-	logger logger.Logger
+	logger *slog.Logger
 }
 
-func NewHealthcheck(health *health.Health, logger logger.Logger) http.Handler {
+func NewHealthcheck(health *health.Health, logger *slog.Logger) http.Handler {
 	return &healthcheck{
 		health: health,
 		logger: logger,

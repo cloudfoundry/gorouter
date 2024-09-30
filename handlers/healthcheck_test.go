@@ -5,32 +5,31 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Healthcheck", func() {
 	var (
 		handler      http.Handler
-		logger       logger.Logger
+		logger       *test_util.TestLogger
 		resp         *httptest.ResponseRecorder
 		req          *http.Request
 		healthStatus *health.Health
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("healthcheck")
+		logger = test_util.NewTestLogger("healthcheck")
 		req = test_util.NewRequest("GET", "example.com", "/", nil)
 		resp = httptest.NewRecorder()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
 
-		handler = handlers.NewHealthcheck(healthStatus, logger)
+		handler = handlers.NewHealthcheck(healthStatus, logger.Logger)
 	})
 
 	It("closes the request", func() {

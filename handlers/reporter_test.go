@@ -7,16 +7,15 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("Reporter Handler", func() {
@@ -28,7 +27,7 @@ var _ = Describe("Reporter Handler", func() {
 		req  *http.Request
 
 		fakeReporter *metrics_fakes.FakeProxyReporter
-		logger       logger.Logger
+		logger       *test_util.TestLogger
 		prevHandler  negroni.Handler
 
 		nextCalled bool
@@ -40,7 +39,7 @@ var _ = Describe("Reporter Handler", func() {
 		resp = httptest.NewRecorder()
 
 		fakeReporter = new(metrics_fakes.FakeProxyReporter)
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)
@@ -63,9 +62,9 @@ var _ = Describe("Reporter Handler", func() {
 	JustBeforeEach(func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
-		handler.Use(handlers.NewProxyWriter(logger))
+		handler.Use(handlers.NewProxyWriter(logger.Logger))
 		handler.Use(prevHandler)
-		handler.Use(handlers.NewReporter(fakeReporter, logger))
+		handler.Use(handlers.NewReporter(fakeReporter, logger.Logger))
 		handler.UseHandlerFunc(nextHandler)
 	})
 
@@ -165,13 +164,13 @@ var _ = Describe("Reporter Handler", func() {
 		var badHandler *negroni.Negroni
 		BeforeEach(func() {
 			badHandler = negroni.New()
-			badHandler.Use(handlers.NewReporter(fakeReporter, logger))
+			badHandler.Use(handlers.NewReporter(fakeReporter, logger.Logger))
 		})
 
 		It("calls Panic on the logger", func() {
 			defer func() {
 				recover()
-				Expect(logger).To(gbytes.Say(`"error":"RequestInfo not set on context"`))
+				Eventually(logger).Should(gbytes.Say(`"error":"RequestInfo not set on context"`))
 				Expect(nextCalled).To(BeFalse())
 			}()
 			badHandler.ServeHTTP(resp, req)

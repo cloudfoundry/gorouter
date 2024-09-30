@@ -10,19 +10,16 @@ import (
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gbytes"
-	"github.com/uber-go/zap"
 
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 )
 
-var testLogger = setupLogger()
+var logger = setupLogger()
 var configObj = setupConfig()
 
 var _ = dropsonde.Initialize(configObj.Logging.MetronAddress, configObj.Logging.JobName)
@@ -32,21 +29,10 @@ var reporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
 
 var fooEndpoint = route.NewEndpoint(&route.EndpointOpts{})
 
-func setupLogger() logger.Logger {
-	sink := &test_util.TestZapSink{
-		Buffer: gbytes.NewBuffer(),
-	}
-	l := logger.NewLogger(
-		"test",
-		"unix-epoch",
-		zap.WarnLevel,
-		zap.Output(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
-		zap.ErrorOutput(zap.MultiWriteSyncer(sink, zap.AddSync(ginkgo.GinkgoWriter))),
-	)
-	return &test_util.TestZapLogger{
-		Logger:      l,
-		TestZapSink: sink,
-	}
+func setupLogger() *test_util.TestLogger {
+	tmpLogger := test_util.NewTestLogger("test")
+	log.SetLoggingLevel("Warn")
+	return tmpLogger
 }
 func setupConfig() *config.Config {
 	c, err := config.DefaultConfig()
@@ -60,7 +46,7 @@ func setupConfig() *config.Config {
 	return c
 }
 func BenchmarkRegisterWith100KRoutes(b *testing.B) {
-	r := registry.NewRouteRegistry(testLogger, configObj, reporter)
+	r := registry.NewRouteRegistry(logger.Logger, configObj, reporter)
 
 	for i := 0; i < 100000; i++ {
 		r.Register(route.Uri(fmt.Sprintf("foo%d.example.com", i)), fooEndpoint)
@@ -75,7 +61,7 @@ func BenchmarkRegisterWith100KRoutes(b *testing.B) {
 }
 
 func BenchmarkRegisterWithOneRoute(b *testing.B) {
-	r := registry.NewRouteRegistry(testLogger, configObj, reporter)
+	r := registry.NewRouteRegistry(logger.Logger, configObj, reporter)
 
 	r.Register("foo.example.com", fooEndpoint)
 
@@ -88,7 +74,7 @@ func BenchmarkRegisterWithOneRoute(b *testing.B) {
 }
 
 func BenchmarkRegisterWithConcurrentLookupWith100kRoutes(b *testing.B) {
-	r := registry.NewRouteRegistry(testLogger, configObj, reporter)
+	r := registry.NewRouteRegistry(logger.Logger, configObj, reporter)
 	maxRoutes := 100000
 	routeUris := make([]route.Uri, maxRoutes)
 

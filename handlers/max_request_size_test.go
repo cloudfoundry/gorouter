@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni/v3"
+	"go.uber.org/zap"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("MaxRequestSize", func() {
@@ -29,9 +30,9 @@ var _ = Describe("MaxRequestSize", func() {
 		responseBody []byte
 		requestBody  *bytes.Buffer
 
-		cfg        *config.Config
-		fakeLogger *logger_fakes.FakeLogger
-		rh         *handlers.MaxRequestSize
+		cfg    *config.Config
+		logger *test_util.TestLogger
+		rh     *handlers.MaxRequestSize
 
 		nextCalled bool
 	)
@@ -73,9 +74,9 @@ var _ = Describe("MaxRequestSize", func() {
 	})
 
 	JustBeforeEach(func() {
-		fakeLogger = new(logger_fakes.FakeLogger)
+		logger = test_util.NewTestLogger("test")
 		handler = negroni.New()
-		rh = handlers.NewMaxRequestSize(cfg, fakeLogger)
+		rh = handlers.NewMaxRequestSize(cfg, logger.Logger)
 		handler.Use(rh)
 		handler.Use(nextHandler)
 
@@ -225,7 +226,7 @@ var _ = Describe("MaxRequestSize", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))
 			})
 			It("logs a warning", func() {
-				Expect(fakeLogger.WarnCallCount()).To(Equal(1))
+				Expect(logger.Lines(zap.WarnLevel)).To(HaveLen(1))
 			})
 		})
 	})

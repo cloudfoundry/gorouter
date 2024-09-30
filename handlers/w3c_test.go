@@ -8,13 +8,12 @@ import (
 	"regexp"
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/test_util"
-
-	"code.cloudfoundry.org/gorouter/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("W3C", func() {
@@ -34,7 +33,7 @@ var _ = Describe("W3C", func() {
 
 	var (
 		handler    *handlers.W3C
-		logger     logger.Logger
+		logger     *test_util.TestLogger
 		resp       http.ResponseWriter
 		req        *http.Request
 		reqInfo    *handlers.RequestInfo
@@ -49,7 +48,8 @@ var _ = Describe("W3C", func() {
 	})
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("w3c")
+		logger = test_util.NewTestLogger("w3c")
+
 		ri := new(handlers.RequestInfo)
 		req = test_util.NewRequest("GET", "example.com", "/", nil).
 			WithContext(context.WithValue(context.Background(), handlers.RequestInfoCtxKey, ri))
@@ -64,7 +64,7 @@ var _ = Describe("W3C", func() {
 	Context("with W3C enabled", func() {
 		Context("without a tenantID set", func() {
 			BeforeEach(func() {
-				handler = handlers.NewW3C(true, "", logger)
+				handler = handlers.NewW3C(true, "", logger.Logger)
 			})
 
 			Context("when there are no pre-existing headers", func() {
@@ -108,7 +108,7 @@ var _ = Describe("W3C", func() {
 
 						Expect(traceparentHeader).To(BeEmpty())
 
-						Expect(logger).To(gbytes.Say(`failed-to-create-w3c-traceparent`))
+						Eventually(logger).Should(gbytes.Say(`failed-to-create-w3c-traceparent`))
 					})
 				})
 
@@ -242,7 +242,7 @@ var _ = Describe("W3C", func() {
 		})
 		Context("with a tenantID set", func() {
 			BeforeEach(func() {
-				handler = handlers.NewW3C(true, "tid", logger)
+				handler = handlers.NewW3C(true, "tid", logger.Logger)
 			})
 
 			Context("when there are no pre-existing headers", func() {
@@ -394,7 +394,7 @@ var _ = Describe("W3C", func() {
 
 	Context("with W3C disabled", func() {
 		BeforeEach(func() {
-			handler = handlers.NewW3C(false, "", logger)
+			handler = handlers.NewW3C(false, "", logger.Logger)
 		})
 
 		It("doesn't set any headers", func() {

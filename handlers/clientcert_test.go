@@ -9,16 +9,15 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/urfave/negroni/v3"
+
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
 	"code.cloudfoundry.org/gorouter/routeservice"
 	"code.cloudfoundry.org/gorouter/test_util"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/uber-go/zap"
-	"github.com/urfave/negroni/v3"
 )
 
 var _ = Describe("Clientcert", func() {
@@ -40,11 +39,13 @@ var _ = Describe("Clientcert", func() {
 		skipSanitization     = func(req *http.Request) bool { return true }
 		dontSkipSanitization = func(req *http.Request) bool { return false }
 		errorWriter          = errorwriter.NewPlaintextErrorWriter()
+
+		logger *test_util.TestLogger
 	)
 
 	DescribeTable("Client Cert Error Handling", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, errorCase string) {
-		logger := new(logger_fakes.FakeLogger)
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger, errorWriter)
+		logger = test_util.NewTestLogger("")
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, config.SANITIZE_SET, logger.Logger, errorWriter)
 
 		nextHandlerWasCalled := false
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextHandlerWasCalled = true })
@@ -56,13 +57,15 @@ var _ = Describe("Clientcert", func() {
 		req := test_util.NewRequest("GET", "xyz.com", "", nil)
 		rw := httptest.NewRecorder()
 		clientCertHandler.ServeHTTP(rw, req, nextHandler)
-
-		message, zapFields := logger.ErrorArgsForCall(0)
-		Expect(message).To(Equal("signature-validation-failed"))
+		Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
+			`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed".+}`,
+		))
 
 		switch errorCase {
 		case "forceDeleteError":
-			Expect(zapFields).To(ContainElement(zap.Error(errors.New("forceDelete error"))))
+			Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
+				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed","data":{"error":"forceDelete error"}}`,
+			))
 			Expect(rw.Code).To(Equal(http.StatusBadGateway))
 		case "routeServiceTimeout":
 			Expect(rw.Code).To(Equal(http.StatusGatewayTimeout))
@@ -78,8 +81,8 @@ var _ = Describe("Clientcert", func() {
 	)
 
 	DescribeTable("Client Cert Result", func(forceDeleteHeaderFunc func(*http.Request) (bool, error), skipSanitizationFunc func(*http.Request) bool, forwardedClientCert string, noTLSCertStrip bool, TLSCertStrip bool, mTLSCertStrip string) {
-		logger := new(logger_fakes.FakeLogger)
-		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger, errorWriter)
+		logger = test_util.NewTestLogger("test")
+		clientCertHandler := handlers.NewClientCert(skipSanitizationFunc, forceDeleteHeaderFunc, forwardedClientCert, logger.Logger, errorWriter)
 
 		nextReq := &http.Request{}
 		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { nextReq = r })

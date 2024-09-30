@@ -1,16 +1,16 @@
 package mbus
 
 import (
-	"errors"
+	"log/slog"
 	"net/url"
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/nats-io/nats.go"
-	"github.com/uber-go/zap"
+
+	"code.cloudfoundry.org/gorouter/config"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type Signal struct{}
@@ -21,7 +21,7 @@ type Client interface {
 	Publish(subj string, data []byte) error
 }
 
-func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats.Conn {
+func Connect(c *config.Config, reconnected chan<- Signal, l *slog.Logger) *nats.Conn {
 	var natsClient *nats.Conn
 	var natsHost atomic.Value
 	var natsAddr atomic.Value
@@ -40,7 +40,7 @@ func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats
 	}
 
 	if err != nil {
-		l.Fatal("nats-connection-error", zap.Error(err))
+		log.Fatal(l, "nats-connection-error", log.ErrAttr(err))
 	}
 
 	var natsHostStr string
@@ -50,14 +50,14 @@ func Connect(c *config.Config, reconnected chan<- Signal, l logger.Logger) *nats
 	}
 	natsAddrStr := natsClient.ConnectedAddr()
 
-	l.Info("Successfully-connected-to-nats", zap.String("host", natsHostStr), zap.String("addr", natsAddrStr))
+	l.Info("Successfully-connected-to-nats", slog.String("host", natsHostStr), slog.String("addr", natsAddrStr))
 
 	natsHost.Store(natsHostStr)
 	natsAddr.Store(natsAddrStr)
 	return natsClient
 }
 
-func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, natsAddr *atomic.Value, reconnected chan<- Signal) nats.Options {
+func natsOptions(l *slog.Logger, c *config.Config, natsHost *atomic.Value, natsAddr *atomic.Value, reconnected chan<- Signal) nats.Options {
 	options := nats.GetDefaultOptions()
 	options.Servers = c.NatsServers()
 	if c.Nats.TLSEnabled {
@@ -69,7 +69,7 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, nats
 			tlsconfig.WithAuthority(c.Nats.CAPool),
 		)
 		if err != nil {
-			l.Fatal("nats-tls-config-invalid", zap.Object("error", err))
+			log.Fatal(l, "nats-tls-config-invalid", log.ErrAttr(err))
 		}
 	}
 	options.PingInterval = c.NatsClientPingInterval
@@ -77,17 +77,17 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, nats
 	notDisconnected := make(chan Signal)
 
 	options.ClosedCB = func(conn *nats.Conn) {
-		l.Fatal(
-			"nats-connection-closed",
-			zap.Error(errors.New("unexpected close")),
-			zap.Object("last_error", conn.LastError()),
+		log.Fatal(
+			l, "nats-connection-closed",
+			slog.String("error", "unexpected close"),
+			slog.String("last_error", conn.LastError().Error()),
 		)
 	}
 
 	options.DisconnectedCB = func(conn *nats.Conn) {
 		hostStr := natsHost.Load().(string)
 		addrStr := natsAddr.Load().(string)
-		l.Info("nats-connection-disconnected", zap.String("host", hostStr), zap.String("addr", addrStr))
+		l.Info("nats-connection-disconnected", slog.String("host", hostStr), slog.String("addr", addrStr))
 
 		go func() {
 			ticker := time.NewTicker(c.NatsClientPingInterval)
@@ -109,7 +109,7 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, nats
 		natsURL, err := url.Parse(conn.ConnectedUrl())
 		natsHostStr := ""
 		if err != nil {
-			l.Error("nats-url-parse-error", zap.Error(err))
+			l.Error("nats-url-parse-error", log.ErrAttr(err))
 		} else {
 			natsHostStr = natsURL.Host
 		}
@@ -117,7 +117,7 @@ func natsOptions(l logger.Logger, c *config.Config, natsHost *atomic.Value, nats
 		natsHost.Store(natsHostStr)
 		natsAddr.Store(natsAddrStr)
 
-		l.Info("nats-connection-reconnected", zap.String("host", natsHostStr), zap.String("addr", natsAddrStr))
+		l.Info("nats-connection-reconnected", slog.String("host", natsHostStr), slog.String("addr", natsAddrStr))
 		reconnected <- Signal{}
 	}
 

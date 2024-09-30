@@ -1,20 +1,20 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 )
 
 type HopByHop struct {
 	cfg    *config.Config
-	logger logger.Logger
+	logger *slog.Logger
 }
 
 // NewHopByHop creates a new handler that sanitizes hop-by-hop headers based on the HopByHopHeadersToFilter config
-func NewHopByHop(cfg *config.Config, logger logger.Logger) *HopByHop {
+func NewHopByHop(cfg *config.Config, logger *slog.Logger) *HopByHop {
 	return &HopByHop{
 		logger: logger,
 		cfg:    cfg,

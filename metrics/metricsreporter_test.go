@@ -3,6 +3,7 @@ package metrics_test
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -10,20 +11,19 @@ import (
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
-
-	"code.cloudfoundry.org/gorouter/config"
-
-	"github.com/urfave/negroni/v3"
-
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
-
-	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/urfave/negroni/v3"
+	"go.uber.org/zap/zapcore"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("MetricsReporter", func() {
@@ -332,15 +332,23 @@ var _ = Describe("MetricsReporter", func() {
 	})
 
 	Context("metric empty_content_length_header", func() {
-		var testApp *httptest.Server
-		var godebug string
+		var (
+			testApp  *httptest.Server
+			godebug  string
+			testSink *test_util.TestSink
+			logger   *slog.Logger
+		)
+
 		BeforeEach(func() {
 			// Ensure we always have httplaxcontentlength=1 set for this test.
 			// When httplaxcontentlength=1. is no longer a thing, we should consider
 			// removing this test and the metric logic it relates to
 			godebug = os.Getenv("GODEBUG")
 			os.Setenv("GODEBUG", fmt.Sprintf("%s,httplaxcontentlength=1", godebug))
-			logger := logger.NewLogger("gorouter.test", "unix-epoch", zap.Output(os.Stdout))
+			logger = log.CreateLogger()
+			testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
+			log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
+			log.SetLoggingLevel("Debug")
 			negroni := negroni.New()
 			negroni.Use(handlers.NewRequestInfo())
 			negroni.Use(handlers.NewReporter(metricReporter, logger))

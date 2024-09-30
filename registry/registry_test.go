@@ -1,22 +1,20 @@
 package registry_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	. "code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	. "code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
-
-	"encoding/json"
-	"time"
+	"code.cloudfoundry.org/gorouter/test_util"
+	"code.cloudfoundry.org/routing-api/models"
 )
 
 var _ = Describe("RouteRegistry", func() {
@@ -25,7 +23,7 @@ var _ = Describe("RouteRegistry", func() {
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
-	var logger logger.Logger
+	var logger *test_util.TestLogger
 
 	var azPreference, az string
 
@@ -33,7 +31,7 @@ var _ = Describe("RouteRegistry", func() {
 		azPreference = "none"
 		az = "meow-zone"
 
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 		var err error
 		configObj, err = config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
@@ -44,7 +42,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		reporter = new(fakes.FakeRouteRegistryReporter)
 
-		r = NewRouteRegistry(logger, configObj, reporter)
+		r = NewRouteRegistry(logger.Logger, configObj, reporter)
 		fooEndpoint = route.NewEndpoint(&route.EndpointOpts{
 			Host: "192.168.1.1",
 			Tags: map[string]string{
@@ -238,25 +236,25 @@ var _ = Describe("RouteRegistry", func() {
 			It("logs the route and endpoint registration at info level", func() {
 				r.Register("a.route", fooEndpoint)
 
-				Expect(logger).To(gbytes.Say(`"log_level":1.*route-registered.*a\.route`))
-				Expect(logger).To(gbytes.Say(`"log_level":1.*endpoint-registered.*a\.route.*192\.168\.1\.1`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*route-registered.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-registered.*a\.route.*192\.168\.1\.1`))
 			})
 
 			It("logs 'uri-added' at debug level for backward compatibility", func() {
 				r.Register("a.route", fooEndpoint)
 
-				Expect(logger).To(gbytes.Say(`"log_level":0.*uri-added.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":0.*uri-added.*a\.route`))
 			})
 
 			It("logs register message only for new routes", func() {
 				r.Register("a.route", fooEndpoint)
-				Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`uri-added.*.*a\.route`))
 				r.Register("a.route", fooEndpoint)
 				Expect(logger).NotTo(gbytes.Say(`uri-added.*.*a\.route`))
 				By("not providing IsolationSegment property")
 				r.Register("a.route", fooEndpoint)
 				//TODO: use pattern matching to make sure we are asserting on the unregister line
-				Expect(logger).To(gbytes.Say(`"isolation_segment":"-"`))
+				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
 			It("logs register message with IsolationSegment when it's provided", func() {
@@ -266,7 +264,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				r.Register("a.route", isoSegEndpoint)
 				//TODO: use pattern matching to make sure we are asserting on the unregister line
-				Expect(logger).To(gbytes.Say(`"isolation_segment":"is1"`))
+				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 
 			It("logs register message with application_id,instance_id,domain_san when it's provided", func() {
@@ -277,13 +275,13 @@ var _ = Describe("RouteRegistry", func() {
 				})
 
 				r.Register("b.route", endpointWithAppId)
-				Expect(logger).To(gbytes.Say(`b\.route.*.*app_id1.*instance_id.*instance_id1.*server_cert_domain_san.*san1`))
+				Eventually(logger).Should(gbytes.Say(`b\.route.*.*app_id1.*instance_id.*instance_id1.*server_cert_domain_san.*san1`))
 			})
 
 			Context("when routing table sharding mode is `segments`", func() {
 				BeforeEach(func() {
 					configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS
-					r = NewRouteRegistry(logger, configObj, reporter)
+					r = NewRouteRegistry(logger.Logger, configObj, reporter)
 					fooEndpoint.IsolationSegment = "foo"
 					barEndpoint.IsolationSegment = "bar"
 					bar2Endpoint.IsolationSegment = "baz"
@@ -293,15 +291,15 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(1))
 					Expect(r.NumEndpoints()).To(Equal(1))
-					Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+					Eventually(logger).Should(gbytes.Say(`uri-added.*.*a\.route`))
 					r.Register("b.route", barEndpoint)
 					Expect(r.NumUris()).To(Equal(2))
 					Expect(r.NumEndpoints()).To(Equal(2))
-					Expect(logger).To(gbytes.Say(`uri-added.*.*b\.route`))
+					Eventually(logger).Should(gbytes.Say(`uri-added.*.*b\.route`))
 					r.Register("c.route", bar2Endpoint)
 					Expect(r.NumUris()).To(Equal(2))
 					Expect(r.NumEndpoints()).To(Equal(2))
-					Expect(logger).ToNot(gbytes.Say(`uri-added.*.*c\.route`))
+					Eventually(logger).ShouldNot(gbytes.Say(`uri-added.*.*c\.route`))
 				})
 
 				Context("with an endpoint in a shared isolation segment", func() {
@@ -312,16 +310,15 @@ var _ = Describe("RouteRegistry", func() {
 						r.Register("a.route", fooEndpoint)
 						Expect(r.NumUris()).To(Equal(0))
 						Expect(r.NumEndpoints()).To(Equal(0))
-						Expect(logger).ToNot(gbytes.Say(`uri-added.*.*a\.route`))
+						Eventually(logger).ShouldNot(gbytes.Say(`uri-added.*.*a\.route`))
 					})
 				})
-
 			})
 
 			Context("when routing table sharding mode is `shared-and-segments`", func() {
 				BeforeEach(func() {
 					configObj.RoutingTableShardingMode = config.SHARD_SHARED_AND_SEGMENTS
-					r = NewRouteRegistry(logger, configObj, reporter)
+					r = NewRouteRegistry(logger.Logger, configObj, reporter)
 					fooEndpoint.IsolationSegment = "foo"
 					barEndpoint.IsolationSegment = "bar"
 					bar2Endpoint.IsolationSegment = "baz"
@@ -331,26 +328,26 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(1))
 					Expect(r.NumEndpoints()).To(Equal(1))
-					Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+					Eventually(logger).Should(gbytes.Say(`uri-added.*.*a\.route`))
 					r.Register("b.route", barEndpoint)
 					Expect(r.NumUris()).To(Equal(2))
 					Expect(r.NumEndpoints()).To(Equal(2))
-					Expect(logger).To(gbytes.Say(`uri-added.*.*b\.route`))
+					Eventually(logger).Should(gbytes.Say(`uri-added.*.*b\.route`))
 					r.Register("c.route", bar2Endpoint)
 					Expect(r.NumUris()).To(Equal(2))
 					Expect(r.NumEndpoints()).To(Equal(2))
-					Expect(logger).ToNot(gbytes.Say(`uri-added.*.*c\.route`))
+					Eventually(logger).ShouldNot(gbytes.Say(`uri-added.*.*c\.route`))
 				})
 
 				Context("with an endpoint in a shared isolation segment", func() {
 					BeforeEach(func() {
 						fooEndpoint.IsolationSegment = ""
 					})
-					It("resgisters the route", func() {
+					It("registers the route", func() {
 						r.Register("a.route", fooEndpoint)
 						Expect(r.NumUris()).To(Equal(1))
 						Expect(r.NumEndpoints()).To(Equal(1))
-						Expect(logger).To(gbytes.Say(`uri-added.*.*a\.route`))
+						Eventually(logger).Should(gbytes.Say(`uri-added.*.*a\.route`))
 					})
 				})
 			})
@@ -374,7 +371,7 @@ var _ = Describe("RouteRegistry", func() {
 					Expect(r.NumEndpoints()).To(Equal(1))
 
 					p := r.Lookup("foo.com")
-					Expect(p.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
+					Expect(p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
 				})
 			})
 
@@ -396,7 +393,7 @@ var _ = Describe("RouteRegistry", func() {
 						Expect(r.NumEndpoints()).To(Equal(1))
 
 						p := r.Lookup("foo.com")
-						Expect(p.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
+						Expect(p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
 					})
 
 					Context("updating an existing route with an older modification tag", func() {
@@ -416,7 +413,7 @@ var _ = Describe("RouteRegistry", func() {
 							Expect(r.NumEndpoints()).To(Equal(1))
 
 							p := r.Lookup("foo.com")
-							ep := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+							ep := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 							Expect(ep.ModificationTag).To(Equal(modTag))
 							Expect(ep).To(Equal(endpoint2))
 						})
@@ -435,7 +432,7 @@ var _ = Describe("RouteRegistry", func() {
 						Expect(r.NumEndpoints()).To(Equal(1))
 
 						p := r.Lookup("foo.com")
-						Expect(p.Endpoints(logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
+						Expect(p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag))
 					})
 				})
 			})
@@ -480,7 +477,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register(app1Uri, lbSpecEndpoint)
 					p1 = r.Lookup(app1Uri)
 					Expect(p1.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
-					Expect(logger).To(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
+					Eventually(logger).Should(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 				})
 
 				It("keeps the load balancing algorithm of a pool if provided value for an endpoint is invalid and logs correctly", func() {
@@ -490,7 +487,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Register(app2Uri, lbSpecWrongEndpoint)
 					p2 = r.Lookup(app2Uri)
 					Expect(p2.LoadBalancingAlgorithm).To(Equal(r.DefaultLoadBalancingAlgorithm))
-					Expect(logger).To(gbytes.Say(`"invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
+					Eventually(logger).Should(gbytes.Say(`"invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
 				})
 
 				It("keeps the load balancing algorithm of a pool if the value is not provided", func() {
@@ -670,7 +667,7 @@ var _ = Describe("RouteRegistry", func() {
 		Context("when routing table sharding mode is `segments`", func() {
 			BeforeEach(func() {
 				configObj.RoutingTableShardingMode = config.SHARD_SEGMENTS
-				r = NewRouteRegistry(logger, configObj, reporter)
+				r = NewRouteRegistry(logger.Logger, configObj, reporter)
 				fooEndpoint.IsolationSegment = "foo"
 				barEndpoint.IsolationSegment = "bar"
 				bar2Endpoint.IsolationSegment = "bar"
@@ -686,18 +683,18 @@ var _ = Describe("RouteRegistry", func() {
 				r.Unregister("a.route", fooEndpoint)
 				Expect(r.NumUris()).To(Equal(2))
 				Expect(r.NumEndpoints()).To(Equal(2))
-				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
 
 				r.Unregister("b.route", barEndpoint)
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(1))
-				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*b\.route`))
+				Eventually(logger).Should(gbytes.Say(`endpoint-unregistered.*.*b\.route`))
 
 				bar2Endpoint.IsolationSegment = "baz"
 				r.Unregister("c.route", bar2Endpoint)
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(1))
-				Expect(logger).ToNot(gbytes.Say(`endpoint-unregistered.*.*c\.route`))
+				Eventually(logger).ShouldNot(gbytes.Say(`endpoint-unregistered.*.*c\.route`))
 			})
 
 			Context("with an endpoint in a shared isolation segment", func() {
@@ -708,7 +705,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Unregister("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(3))
 					Expect(r.NumEndpoints()).To(Equal(3))
-					Expect(logger).ToNot(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+					Eventually(logger).ShouldNot(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
 				})
 			})
 
@@ -716,7 +713,7 @@ var _ = Describe("RouteRegistry", func() {
 		Context("when routing table sharding mode is `shared-and-segments`", func() {
 			BeforeEach(func() {
 				configObj.RoutingTableShardingMode = config.SHARD_SHARED_AND_SEGMENTS
-				r = NewRouteRegistry(logger, configObj, reporter)
+				r = NewRouteRegistry(logger.Logger, configObj, reporter)
 				fooEndpoint.IsolationSegment = "foo"
 				barEndpoint.IsolationSegment = "bar"
 				bar2Endpoint.IsolationSegment = "bar"
@@ -732,18 +729,18 @@ var _ = Describe("RouteRegistry", func() {
 				r.Unregister("a.route", fooEndpoint)
 				Expect(r.NumUris()).To(Equal(2))
 				Expect(r.NumEndpoints()).To(Equal(2))
-				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
 
 				r.Unregister("b.route", barEndpoint)
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(1))
-				Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*b\.route`))
+				Eventually(logger).Should(gbytes.Say(`endpoint-unregistered.*.*b\.route`))
 
 				bar2Endpoint.IsolationSegment = "baz"
 				r.Unregister("c.route", bar2Endpoint)
 				Expect(r.NumUris()).To(Equal(1))
 				Expect(r.NumEndpoints()).To(Equal(1))
-				Expect(logger).ToNot(gbytes.Say(`endpoint-unregistered.*.*c\.route`))
+				Eventually(logger).ShouldNot(gbytes.Say(`endpoint-unregistered.*.*c\.route`))
 			})
 
 			Context("with an endpoint in a shared isolation segment", func() {
@@ -754,7 +751,7 @@ var _ = Describe("RouteRegistry", func() {
 					r.Unregister("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(2))
 					Expect(r.NumEndpoints()).To(Equal(2))
-					Expect(logger).To(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
+					Eventually(logger).Should(gbytes.Say(`endpoint-unregistered.*.*a\.route`))
 				})
 			})
 		})
@@ -778,7 +775,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumUris()).To(Equal(1))
 
 			p1 := r.Lookup("foo/bar")
-			iter := p1.Endpoints(logger, "", false, azPreference, az)
+			iter := p1.Endpoints(logger.Logger, "", false, azPreference, az)
 			Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 
 			p2 := r.Lookup("foo")
@@ -806,8 +803,8 @@ var _ = Describe("RouteRegistry", func() {
 			})
 
 			It("logs the route and endpoint unregistration at info level", func() {
-				Expect(logger).To(gbytes.Say(`"log_level":1.*endpoint-unregistered.*a\.route.*192\.168\.1\.1`))
-				Expect(logger).To(gbytes.Say(`"log_level":1.*route-unregistered.*a\.route`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-unregistered.*a\.route.*192\.168\.1\.1`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*route-unregistered.*a\.route`))
 			})
 
 			It("only logs unregistration for existing routes", func() {
@@ -817,7 +814,7 @@ var _ = Describe("RouteRegistry", func() {
 				By("not providing IsolationSegment property")
 				r.Unregister("a.route", fooEndpoint)
 				//TODO: use pattern matching to make sure we are asserting on the unregister line
-				Expect(logger).To(gbytes.Say(`"isolation_segment":"-"`))
+				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
 			It("logs unregister message with IsolationSegment when it's provided", func() {
@@ -827,7 +824,7 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("a.isoSegRoute", isoSegEndpoint)
 				r.Unregister("a.isoSegRoute", isoSegEndpoint)
 				//TODO: use pattern matching to make sure we are asserting on the unregister line
-				Expect(logger).To(gbytes.Say(`"isolation_segment":"is1"`))
+				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 		})
 
@@ -874,7 +871,7 @@ var _ = Describe("RouteRegistry", func() {
 			p2 := r.Lookup("FOO")
 			Expect(p1).To(Equal(p2))
 
-			iter := p1.Endpoints(logger, "", false, azPreference, az)
+			iter := p1.Endpoints(logger.Logger, "", false, azPreference, az)
 			Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
@@ -893,7 +890,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("bar")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:123[4|5]"))
 
@@ -908,13 +905,13 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("foo.wild.card")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
 
 			p = r.Lookup("foo.space.wild.card")
 			Expect(p).ToNot(BeNil())
-			e = p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e = p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.2:1234"))
 		})
@@ -928,7 +925,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("not.wild.card")
 			Expect(p).ToNot(BeNil())
-			e := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
@@ -960,7 +957,7 @@ var _ = Describe("RouteRegistry", func() {
 				p := r.Lookup("dora.app.com/env?foo=bar")
 
 				Expect(p).ToNot(BeNil())
-				iter := p.Endpoints(logger, "", false, azPreference, az)
+				iter := p.Endpoints(logger.Logger, "", false, azPreference, az)
 				Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 			})
 
@@ -969,7 +966,7 @@ var _ = Describe("RouteRegistry", func() {
 				p := r.Lookup("dora.app.com/env/abc?foo=bar&baz=bing")
 
 				Expect(p).ToNot(BeNil())
-				iter := p.Endpoints(logger, "", false, azPreference, az)
+				iter := p.Endpoints(logger.Logger, "", false, azPreference, az)
 				Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 			})
 		})
@@ -989,7 +986,7 @@ var _ = Describe("RouteRegistry", func() {
 			p1 := r.Lookup("foo/extra/paths")
 			Expect(p1).ToNot(BeNil())
 
-			iter := p1.Endpoints(logger, "", false, azPreference, az)
+			iter := p1.Endpoints(logger.Logger, "", false, azPreference, az)
 			Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
@@ -1001,7 +998,7 @@ var _ = Describe("RouteRegistry", func() {
 			p1 := r.Lookup("foo?fields=foo,bar")
 			Expect(p1).ToNot(BeNil())
 
-			iter := p1.Endpoints(logger, "", false, azPreference, az)
+			iter := p1.Endpoints(logger.Logger, "", false, azPreference, az)
 			Expect(iter.Next(0).CanonicalAddr()).To(Equal("192.168.1.1:1234"))
 		})
 
@@ -1037,7 +1034,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(2))
 
 			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-			e := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:1234"))
@@ -1051,7 +1048,7 @@ var _ = Describe("RouteRegistry", func() {
 			Expect(r.NumEndpoints()).To(Equal(2))
 
 			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
-			e := p.Endpoints(logger, "", false, azPreference, az).Next(0)
+			e := p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)
 
 			Expect(e).ToNot(BeNil())
 			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:1234"))
@@ -1120,7 +1117,7 @@ var _ = Describe("RouteRegistry", func() {
 				time.Sleep(2 * (configObj.PruneStaleDropletsInterval + configObj.EmptyPoolTimeout))
 
 				Expect(r.NumUris()).To(Equal(0))
-				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
 			})
 		})
 		Context("when emptyPoolResponseCode503 is true and EmptyPoolTimeout equals 0", func() {
@@ -1139,7 +1136,7 @@ var _ = Describe("RouteRegistry", func() {
 				time.Sleep(2 * configObj.PruneStaleDropletsInterval)
 
 				Expect(r.NumUris()).To(Equal(0))
-				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
 			})
 		})
 		Context("when emptyPoolResponseCode503 is false", func() {
@@ -1153,7 +1150,7 @@ var _ = Describe("RouteRegistry", func() {
 				time.Sleep(2 * configObj.PruneStaleDropletsInterval)
 
 				Expect(r.NumUris()).To(Equal(0))
-				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*isolation_segment`))
 			})
 		})
 
@@ -1244,7 +1241,7 @@ var _ = Describe("RouteRegistry", func() {
 
 			p := r.Lookup("foo")
 			Expect(p).ToNot(BeNil())
-			Expect(p.Endpoints(logger, "", false, azPreference, az).Next(0)).To(Equal(endpoint))
+			Expect(p.Endpoints(logger.Logger, "", false, azPreference, az).Next(0)).To(Equal(endpoint))
 
 			p = r.Lookup("bar")
 			Expect(p).To(BeNil())
@@ -1276,7 +1273,7 @@ var _ = Describe("RouteRegistry", func() {
 				reporter = new(fakes.FakeRouteRegistryReporter)
 				fooEndpoint.StaleThreshold = configObj.DropletStaleThreshold
 
-				r = NewRouteRegistry(logger, configObj, reporter)
+				r = NewRouteRegistry(logger.Logger, configObj, reporter)
 			})
 
 			It("sends route metrics to the reporter", func() {
@@ -1305,7 +1302,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.DropletStaleThreshold = 1 * time.Second
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
-				r = NewRouteRegistry(logger, configObj, reporter)
+				r = NewRouteRegistry(logger.Logger, configObj, reporter)
 			})
 
 			It("does not log the route info for fresh routes when pruning", func() {
@@ -1318,7 +1315,7 @@ var _ = Describe("RouteRegistry", func() {
 				time.Sleep(configObj.PruneStaleDropletsInterval + 10*time.Millisecond)
 
 				Expect(r.NumUris()).To(Equal(1))
-				Expect(logger).ToNot(gbytes.Say(`prune.*"log_level":0.*foo.com/bar`))
+				Eventually(logger).ShouldNot(gbytes.Say(`prune.*"log_level":0.*foo.com/bar`))
 			})
 		})
 

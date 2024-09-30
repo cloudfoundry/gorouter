@@ -3,6 +3,7 @@ package route
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"maps"
 	"math/rand"
 	"net/http"
@@ -10,10 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/routing-api/models"
 )
@@ -158,7 +156,7 @@ type EndpointPool struct {
 	maxConnsPerBackend int64
 
 	random                 *rand.Rand
-	logger                 logger.Logger
+	logger                 *slog.Logger
 	updatedAt              time.Time
 	LoadBalancingAlgorithm string
 }
@@ -212,7 +210,7 @@ type PoolOpts struct {
 	Host                   string
 	ContextPath            string
 	MaxConnsPerBackend     int64
-	Logger                 logger.Logger
+	Logger                 *slog.Logger
 	LoadBalancingAlgorithm string
 }
 
@@ -377,7 +375,7 @@ func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	p.Update()
 }
 
-func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
+func (p *EndpointPool) Endpoints(logger *slog.Logger, initial string, mustBeSticky bool, azPreference string, az string) EndpointIterator {
 	switch p.LoadBalancingAlgorithm {
 	case config.LOAD_BALANCE_LC:
 		logger.Debug("endpoint-iterator-with-least-connection-lb-algo")
@@ -386,7 +384,7 @@ func (p *EndpointPool) Endpoints(logger logger.Logger, initial string, mustBeSti
 		logger.Debug("endpoint-iterator-with-round-robin-lb-algo")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
-		logger.Error("invalid-pool-load-balancing-algorithm", zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
+		logger.Error("invalid-pool-load-balancing-algorithm", slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }
@@ -448,8 +446,7 @@ func (p *EndpointPool) EndpointFailed(endpoint *Endpoint, err error) {
 	if e == nil {
 		return
 	}
-
-	logger := p.logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
+	logger := p.logger.With(slog.Group("route-endpoint", endpoint.ToLogData()...))
 	if e.endpoint.useTls && fails.PrunableClassifiers.Classify(err) {
 		logger.Error("prune-failed-endpoint")
 		p.removeEndpoint(e)
@@ -492,12 +489,12 @@ func (p *EndpointPool) SetPoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm
 			p.logger.Debug("setting-pool-load-balancing-algorithm-to-that-of-an-endpoint",
-				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
-				zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
+				slog.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		} else {
 			p.logger.Error("invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo",
-				zap.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
-				zap.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
+				slog.String("endpointLBAlgorithm", endpoint.LoadBalancingAlgorithm),
+				slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
 		}
 	}
 }
@@ -550,13 +547,13 @@ func (e *Endpoint) Component() string {
 	return e.Tags["component"]
 }
 
-func (e *Endpoint) ToLogData() []zap.Field {
-	return []zap.Field{
-		zap.String("ApplicationId", e.ApplicationId),
-		zap.String("Addr", e.addr),
-		zap.Object("Tags", e.Tags),
-		zap.String("RouteServiceUrl", e.RouteServiceUrl),
-		zap.String("AZ", e.AvailabilityZone),
+func (e *Endpoint) ToLogData() []any {
+	return []any{
+		slog.String("ApplicationId", e.ApplicationId),
+		slog.String("Addr", e.addr),
+		slog.Any("Tags", e.Tags),
+		slog.String("RouteServiceUrl", e.RouteServiceUrl),
+		slog.String("AZ", e.AvailabilityZone),
 	}
 }
 

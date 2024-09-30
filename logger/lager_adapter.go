@@ -1,78 +1,92 @@
 package logger
 
 import (
-	"fmt"
+	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"code.cloudfoundry.org/lager/v3"
 	"github.com/openzipkin/zipkin-go/idgenerator"
 	"github.com/openzipkin/zipkin-go/model"
-	"github.com/uber-go/zap"
 )
 
 const (
 	RequestIdHeader = "X-Vcap-Request-Id"
 )
 
-// LagerAdapter satisfies the lager.Logger interface with zap as the
-// implementation.
+// LagerAdapter tbd
 type LagerAdapter struct {
-	originalLogger Logger
+	logger *slog.Logger
+	source string
 }
 
-// NewLagerAdapter returns a new lager.Logger that uses zap underneath.
-func NewLagerAdapter(zapLogger Logger) *LagerAdapter {
-	return &LagerAdapter{
-		originalLogger: zapLogger,
+// NewLagerAdapter returns a new lager.Logger that uses slog with a zap handler underneath.
+func NewLagerAdapter(source string) *LagerAdapter {
+	lagerAdapter := &LagerAdapter{
+		source: source,
+		logger: CreateLoggerWithSource(source, ""),
 	}
+	return lagerAdapter
 }
 
 // RegisterSink is never used after initialization, so it does nothing.
-func (l *LagerAdapter) RegisterSink(_ lager.Sink) {}
+func (l *LagerAdapter) RegisterSink(_ lager.Sink) {
+	panic("RegisterSink is not implemented")
+}
 
-// Session returns a new logger with a nested session.
+// Session returns a new logger with a nested source and optional data.
 func (l *LagerAdapter) Session(task string, data ...lager.Data) lager.Logger {
-	tmpLogger := l.originalLogger.Session(task)
+	logger := CreateLoggerWithSource(l.source, task)
 
 	if data != nil {
-		tmpLogger = l.originalLogger.With(dataToFields(data)...)
+		logger = logger.With(dataToFields(data)...)
 	}
 
 	return &LagerAdapter{
-		originalLogger: tmpLogger,
+		logger: logger,
+		source: l.source + "." + task,
 	}
 }
 
-// SessionName returns the name of the logger session
+// SessionName returns the name of the logger source
 func (l *LagerAdapter) SessionName() string {
-	return l.originalLogger.SessionName()
+	return l.source
 }
 
-// Debug logs a message at the debug log level.
+// Debug logs a message at the debug log setLoggingLevel.
 func (l *LagerAdapter) Debug(action string, data ...lager.Data) {
-	l.originalLogger.Debug(action, dataToFields(data)...)
+	if !l.logger.Enabled(context.Background(), slog.LevelDebug) {
+		return
+	}
+	l.logger.Debug(action, dataToFields(data)...)
 }
 
-// Info logs a message at the info log level.
+// Info logs a message at the info log setLoggingLevel.
 func (l *LagerAdapter) Info(action string, data ...lager.Data) {
-	l.originalLogger.Info(action, dataToFields(data)...)
+	if !l.logger.Enabled(context.Background(), slog.LevelInfo) {
+		return
+	}
+	l.logger.Info(action, dataToFields(data)...)
 }
 
-// Error logs a message at the error log level.
+// Error logs a message at the error log setLoggingLevel.
 func (l *LagerAdapter) Error(action string, err error, data ...lager.Data) {
-	l.originalLogger.Error(action, appendError(err, dataToFields(data))...)
+	if !l.logger.Enabled(context.Background(), slog.LevelError) {
+		return
+	}
+	l.logger.Error(action, append(dataToFields(data), ErrAttr(err))...)
 }
 
 // Fatal logs a message and exits with status 1.
 func (l *LagerAdapter) Fatal(action string, err error, data ...lager.Data) {
-	l.originalLogger.Fatal(action, appendError(err, dataToFields(data))...)
+	Fatal(l.logger, action, append(dataToFields(data), ErrAttr(err))...)
 }
 
 // WithData returns a logger with newly added data.
 func (l *LagerAdapter) WithData(data lager.Data) lager.Logger {
 	return &LagerAdapter{
-		originalLogger: l.originalLogger.With(dataToFields([]lager.Data{data})...),
+		logger: l.logger.With(dataToFields([]lager.Data{data})...),
 	}
 }
 
@@ -91,16 +105,12 @@ func (l *LagerAdapter) WithTraceInfo(req *http.Request) lager.Logger {
 	return l.WithData(lager.Data{"trace-id": traceID.String(), "span-id": spanID.String()})
 }
 
-func dataToFields(data []lager.Data) []zap.Field {
-	fields := []zap.Field{}
+func dataToFields(data []lager.Data) []any {
+	var fields []any
 	for _, datum := range data {
 		for key, value := range datum {
-			fields = append(fields, zap.String(key, fmt.Sprintf("%v", value)))
+			fields = append(fields, slog.Any(key, value))
 		}
 	}
 	return fields
-}
-
-func appendError(err error, fields []zap.Field) []zap.Field {
-	return append(fields, zap.Error(err))
 }

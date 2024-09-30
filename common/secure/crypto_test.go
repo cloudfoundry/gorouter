@@ -1,9 +1,10 @@
 package secure_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/secure"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/secure"
 )
 
 var _ = Describe("Crypto", func() {

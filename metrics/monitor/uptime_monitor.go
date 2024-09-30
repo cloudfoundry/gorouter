@@ -1,21 +1,22 @@
 package monitor
 
 import (
+	"log/slog"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/uber-go/zap"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type Uptime struct {
-	logger   logger.Logger
+	logger   *slog.Logger
 	interval time.Duration
 	started  int64
 	doneChan chan chan struct{}
 }
 
-func NewUptime(interval time.Duration, logger logger.Logger) *Uptime {
+func NewUptime(interval time.Duration, logger *slog.Logger) *Uptime {
 	return &Uptime{
 		interval: interval,
 		started:  time.Now().Unix(),
@@ -32,7 +33,7 @@ func (u *Uptime) Start() {
 		case <-ticker.C:
 			err := metrics.SendValue("uptime", float64(time.Now().Unix()-u.started), "seconds")
 			if err != nil {
-				u.logger.Debug("failed-to-send-metric", zap.Error(err), zap.String("metric", "uptime"))
+				u.logger.Debug("failed-to-send-metric", log.ErrAttr(err), slog.String("metric", "uptime"))
 			}
 		case stopped := <-u.doneChan:
 			ticker.Stop()

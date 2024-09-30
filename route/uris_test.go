@@ -1,9 +1,10 @@
 package route_test
 
 import (
-	"code.cloudfoundry.org/gorouter/route"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/route"
 )
 
 var _ = Describe("URIs", func() {

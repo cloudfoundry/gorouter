@@ -1,11 +1,12 @@
 package stats_test
 
 import (
-	. "code.cloudfoundry.org/gorouter/stats"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"time"
+	. "code.cloudfoundry.org/gorouter/stats"
 )
 
 var _ = Describe("ActiveApps", func() {

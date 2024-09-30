@@ -1,11 +1,11 @@
 package round_tripper
 
 import (
-	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptrace"
 	"net/textproto"
@@ -14,11 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber-go/zap"
-
+	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
@@ -70,7 +69,7 @@ type errorHandler interface {
 func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
 	retriableClassifiers fails.Classifier,
-	logger logger.Logger,
+	logger *slog.Logger,
 	combinedReporter metrics.ProxyReporter,
 	errHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
@@ -89,7 +88,7 @@ func NewProxyRoundTripper(
 }
 
 type roundTripper struct {
-	logger                 logger.Logger
+	logger                 *slog.Logger
 	combinedReporter       metrics.ProxyReporter
 	roundTripperFactory    RoundTripperFactory
 	retriableClassifier    fails.Classifier
@@ -165,13 +164,13 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			// which expects a 0-indexed value
 			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request, attempt-1)
 			if selectEndpointErr != nil {
-				logger.Error("select-endpoint-failed", zap.String("host", reqInfo.RoutePool.Host()), zap.Error(selectEndpointErr))
+				logger.Error("select-endpoint-failed", slog.String("host", reqInfo.RoutePool.Host()), log.ErrAttr(selectEndpointErr))
 				break
 			}
-			logger = logger.With(zap.Nest("route-endpoint", endpoint.ToLogData()...))
+			logger = logger.With(slog.Group("route-endpoint", endpoint.ToLogData()...))
 			reqInfo.RouteEndpoint = endpoint
 
-			logger.Debug("backend", zap.Int("attempt", attempt))
+			logger.Debug("backend", slog.Int("attempt", attempt))
 			if endpoint.IsTLS() {
 				request.URL.Scheme = "https"
 			} else {
@@ -185,17 +184,17 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				retriable, err := rt.isRetriable(request, err, trace)
 
 				logger.Error("backend-endpoint-failed",
-					zap.Error(err),
-					zap.Int("attempt", attempt),
-					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
-					zap.Bool("retriable", retriable),
-					zap.Int("num-endpoints", numberOfEndpoints),
-					zap.Bool("got-connection", trace.GotConn()),
-					zap.Bool("wrote-headers", trace.WroteHeaders()),
-					zap.Bool("conn-reused", trace.ConnReused()),
-					zap.Float64("dns-lookup-time", trace.DnsTime()),
-					zap.Float64("dial-time", trace.DialTime()),
-					zap.Float64("tls-handshake-time", trace.TlsTime()),
+					log.ErrAttr(err),
+					slog.Int("attempt", attempt),
+					slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+					slog.Bool("retriable", retriable),
+					slog.Int("num-endpoints", numberOfEndpoints),
+					slog.Bool("got-connection", trace.GotConn()),
+					slog.Bool("wrote-headers", trace.WroteHeaders()),
+					slog.Bool("conn-reused", trace.ConnReused()),
+					slog.Float64("dns-lookup-time", trace.DnsTime()),
+					slog.Float64("dial-time", trace.DialTime()),
+					slog.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
 				iter.EndpointFailed(err)
@@ -209,8 +208,8 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		} else {
 			logger.Debug(
 				"route-service",
-				zap.Object("route-service-url", reqInfo.RouteServiceURL),
-				zap.Int("attempt", attempt),
+				slog.Any("route-service-url", log.StructValue(reqInfo.RouteServiceURL)),
+				slog.Int("attempt", attempt),
 			)
 
 			endpoint = &route.Endpoint{
@@ -235,18 +234,18 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 				logger.Error(
 					"route-service-connection-failed",
-					zap.String("route-service-endpoint", request.URL.String()),
-					zap.Error(err),
-					zap.Int("attempt", attempt),
-					zap.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
-					zap.Bool("retriable", retriable),
-					zap.Int("num-endpoints", numberOfEndpoints),
-					zap.Bool("got-connection", trace.GotConn()),
-					zap.Bool("wrote-headers", trace.WroteHeaders()),
-					zap.Bool("conn-reused", trace.ConnReused()),
-					zap.Float64("dns-lookup-time", trace.DnsTime()),
-					zap.Float64("dial-time", trace.DialTime()),
-					zap.Float64("tls-handshake-time", trace.TlsTime()),
+					slog.String("route-service-endpoint", request.URL.String()),
+					log.ErrAttr(err),
+					slog.Int("attempt", attempt),
+					slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+					slog.Bool("retriable", retriable),
+					slog.Int("num-endpoints", numberOfEndpoints),
+					slog.Bool("got-connection", trace.GotConn()),
+					slog.Bool("wrote-headers", trace.WroteHeaders()),
+					slog.Bool("conn-reused", trace.ConnReused()),
+					slog.Float64("dns-lookup-time", trace.DnsTime()),
+					slog.Float64("dial-time", trace.DialTime()),
+					slog.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
 				if retriable {
@@ -257,8 +256,8 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
 				logger.Info(
 					"route-service-response",
-					zap.String("route-service-endpoint", request.URL.String()),
-					zap.Int("status-code", res.StatusCode),
+					slog.String("route-service-endpoint", request.URL.String()),
+					slog.Int("status-code", res.StatusCode),
 				)
 			}
 
@@ -268,7 +267,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 	// if the client disconnects before response is sent then return context.Canceled (499) instead of the gateway error
 	if err != nil && errors.Is(originalRequest.Context().Err(), context.Canceled) && !errors.Is(err, context.Canceled) {
-		rt.logger.Error("gateway-error-and-original-request-context-cancelled", zap.Error(err))
+		rt.logger.Error("gateway-error-and-original-request-context-cancelled", log.ErrAttr(err))
 		err = originalRequest.Context().Err()
 		if originalRequest.Body != nil {
 			_ = originalRequest.Body.Close()
@@ -337,7 +336,7 @@ func (rt *roundTripper) CancelRequest(request *http.Request) {
 	tr.CancelRequest(request)
 }
 
-func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.Endpoint, iter route.EndpointIterator, logger logger.Logger) (*http.Response, error) {
+func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.Endpoint, iter route.EndpointIterator, logger *slog.Logger) (*http.Response, error) {
 	request.URL.Host = endpoint.CanonicalAddr()
 	request.Header.Set("X-CF-ApplicationID", endpoint.ApplicationId)
 	request.Header.Set("X-CF-InstanceIndex", endpoint.PrivateInstanceIndex)
@@ -355,7 +354,7 @@ func (rt *roundTripper) backendRoundTrip(request *http.Request, endpoint *route.
 	return res, err
 }
 
-func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger logger.Logger) (*http.Response, error) {
+func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Request, logger *slog.Logger) (*http.Response, error) {
 	if rt.config.EndpointTimeout <= 0 || handlers.IsWebSocketUpgrade(request) {
 		return tr.RoundTrip(request)
 	}
@@ -369,7 +368,7 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	go func() {
 		<-reqCtx.Done()
 		if errors.Is(reqCtx.Err(), context.DeadlineExceeded) {
-			logger.Error("backend-request-timeout", zap.Error(reqCtx.Err()), zap.String("vcap_request_id", vrid))
+			logger.Error("backend-request-timeout", log.ErrAttr(reqCtx.Err()), slog.String("vcap_request_id", vrid))
 		}
 		cancel()
 	}()

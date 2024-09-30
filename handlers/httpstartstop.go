@@ -1,30 +1,31 @@
 package handlers
 
 import (
+	"log/slog"
 	"maps"
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
 	uuid "github.com/nu7hatch/gouuid"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 	"google.golang.org/protobuf/proto"
+
+	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/proxy/utils"
 )
 
 type httpStartStopHandler struct {
 	emitter dropsonde.EventEmitter
-	logger  logger.Logger
+	logger  *slog.Logger
 }
 
 // NewHTTPStartStop creates a new handler that handles emitting frontend
 // HTTP StartStop events
-func NewHTTPStartStop(emitter dropsonde.EventEmitter, logger logger.Logger) negroni.Handler {
+func NewHTTPStartStop(emitter dropsonde.EventEmitter, logger *slog.Logger) negroni.Handler {
 	return &httpStartStopHandler{
 		emitter: emitter,
 		logger:  logger,
@@ -37,12 +38,12 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	requestID, err := uuid.ParseHex(r.Header.Get(VcapRequestIdHeader))
 	if err != nil {
-		logger.Panic("start-stop-handler-err", zap.String("error", "X-Vcap-Request-Id not found"))
+		log.Panic(logger, "start-stop-handler-err", slog.String("error", "X-Vcap-Request-Id not found"))
 		return
 	}
 	prw, ok := rw.(utils.ProxyResponseWriter)
 	if !ok {
-		logger.Panic("request-info-err", zap.String("error", "ProxyResponseWriter not found"))
+		log.Panic(logger, "request-info-err", slog.String("error", "ProxyResponseWriter not found"))
 		return
 	}
 
@@ -61,20 +62,20 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	envelope, err := emitter.Wrap(startStopEvent, hh.emitter.Origin())
 	if err != nil {
-		logger.Info("failed-to-create-startstop-envelope", zap.Error(err))
+		logger.Info("failed-to-create-startstop-envelope", log.ErrAttr(err))
 		return
 	}
 
 	info, err := ContextRequestInfo(r)
 	if err != nil {
-		logger.Error("request-info-err", zap.Error(err))
+		logger.Error("request-info-err", log.ErrAttr(err))
 	} else {
 		envelope.Tags = hh.envelopeTags(info)
 	}
 
 	err = hh.emitter.EmitEnvelope(envelope)
 	if err != nil {
-		logger.Info("failed-to-emit-startstop-event", zap.Error(err))
+		logger.Info("failed-to-emit-startstop-event", log.ErrAttr(err))
 	}
 }
 

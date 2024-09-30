@@ -1,14 +1,14 @@
 package metrics_test
 
 import (
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"net/http"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/metrics"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 )
 

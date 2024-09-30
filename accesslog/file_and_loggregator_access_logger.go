@@ -3,15 +3,13 @@ package accesslog
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"log/syslog"
-
-	"github.com/uber-go/zap"
+	"os"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
-
-	"os"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 //go:generate counterfeiter -o fakes/accesslogger.go . AccessLogger
@@ -36,7 +34,7 @@ type FileAndLoggregatorAccessLogger struct {
 	disableXFFLogging      bool
 	disableSourceIPLogging bool
 	redactQueryParams      string
-	logger                 logger.Logger
+	logger                 *slog.Logger
 	logsender              schema.LogSender
 }
 
@@ -46,7 +44,7 @@ type CustomWriter struct {
 	PerformTruncate bool
 }
 
-func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender, config *config.Config) (AccessLogger, error) {
+func CreateRunningAccessLogger(logger *slog.Logger, logsender schema.LogSender, config *config.Config) (AccessLogger, error) {
 	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
 		return &NullAccessLogger{}, nil
 	}
@@ -64,7 +62,7 @@ func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender,
 	if config.AccessLog.File != "" {
 		file, err := os.OpenFile(config.AccessLog.File, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
-			logger.Error("error-creating-accesslog-file", zap.String("filename", config.AccessLog.File), zap.Error(err))
+			logger.Error("error-creating-accesslog-file", slog.String("filename", config.AccessLog.File), log.ErrAttr(err))
 			return nil, err
 		}
 
@@ -74,7 +72,7 @@ func CreateRunningAccessLogger(logger logger.Logger, logsender schema.LogSender,
 	if config.AccessLog.EnableStreaming {
 		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.LOG_INFO, config.Logging.Syslog)
 		if err != nil {
-			logger.Error("error-creating-syslog-writer", zap.Error(err))
+			logger.Error("error-creating-syslog-writer", log.ErrAttr(err))
 			return nil, err
 		}
 
@@ -92,7 +90,7 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 			for _, w := range x.writers {
 				_, err := record.WriteTo(w.Writer)
 				if err != nil {
-					x.logger.Error(fmt.Sprintf("error-emitting-access-log-to-writer-%s", w.Name), zap.Error(err))
+					x.logger.Error(fmt.Sprintf("error-emitting-access-log-to-writer-%s", w.Name), log.ErrAttr(err))
 				}
 			}
 			record.SendLog(x.logsender)

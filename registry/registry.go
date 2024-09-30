@@ -1,15 +1,15 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/registry/container"
 	"code.cloudfoundry.org/gorouter/route"
@@ -33,7 +33,7 @@ const (
 type RouteRegistry struct {
 	sync.RWMutex
 
-	logger logger.Logger
+	logger *slog.Logger
 
 	// Access to the Trie datastructure should be governed by the RWMutex of RouteRegistry
 	byURI *container.Trie
@@ -61,7 +61,7 @@ type RouteRegistry struct {
 	DefaultLoadBalancingAlgorithm string
 }
 
-func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
+func NewRouteRegistry(logger *slog.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byURI = container.NewTrie()
@@ -97,11 +97,17 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	switch endpointAdded {
 	case route.ADDED:
-		r.logger.Info("endpoint-registered", zapData(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+			r.logger.Info("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	case route.UPDATED:
-		r.logger.Debug("endpoint-registered", zapData(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+			r.logger.Debug("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	default:
-		r.logger.Debug("endpoint-not-registered", zapData(uri, endpoint)...)
+		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+			r.logger.Debug("endpoint-not-registered", buildSlogAttrs(uri, endpoint)...)
+		}
 	}
 }
 
@@ -150,9 +156,9 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 			LoadBalancingAlgorithm: r.DefaultLoadBalancingAlgorithm,
 		})
 		r.byURI.Insert(routekey, pool)
-		r.logger.Info("route-registered", zap.Stringer("uri", routekey))
+		r.logger.Info("route-registered", slog.Any("uri", routekey))
 		// for backward compatibility:
-		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
+		r.logger.Debug("uri-added", slog.Any("uri", routekey))
 	}
 	return pool
 }
@@ -177,20 +183,24 @@ func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Info("endpoint-unregistered", zapData(uri, endpoint)...)
+			if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+				r.logger.Info("endpoint-unregistered", buildSlogAttrs(uri, endpoint)...)
+			}
 		} else {
-			r.logger.Info("endpoint-not-unregistered", zapData(uri, endpoint)...)
+			if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+				r.logger.Info("endpoint-not-unregistered", buildSlogAttrs(uri, endpoint)...)
+			}
 		}
 
 		if pool.IsEmpty() {
 			if r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 {
 				if time.Since(pool.LastUpdated()) > r.EmptyPoolTimeout {
 					r.byURI.Delete(uri)
-					r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
+					r.logger.Info("route-unregistered", slog.Any("uri", uri))
 				}
 			} else {
 				r.byURI.Delete(uri)
-				r.logger.Info("route-unregistered", zap.Stringer("uri", uri))
+				r.logger.Info("route-unregistered", slog.Any("uri", uri))
 			}
 		}
 	}
@@ -374,9 +384,9 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 				isolationSegment = "-"
 			}
 			r.logger.Info("pruned-route",
-				zap.String("uri", t.ToPath()),
-				zap.Object("endpoints", addresses),
-				zap.Object("isolation_segment", isolationSegment),
+				slog.String("uri", t.ToPath()),
+				slog.Any("endpoints", addresses),
+				slog.String("isolation_segment", isolationSegment),
 			)
 			r.reporter.CaptureRoutesPruned(uint64(len(endpoints)))
 		}
@@ -413,21 +423,21 @@ func splitHostAndContextPath(uri route.Uri) (string, string) {
 	return before, contextPath
 }
 
-func zapData(uri route.Uri, endpoint *route.Endpoint) []zap.Field {
-	isoSegField := zap.String("isolation_segment", "-")
+func buildSlogAttrs(uri route.Uri, endpoint *route.Endpoint) []any {
+	isoSegField := slog.String("isolation_segment", "-")
 	if endpoint.IsolationSegment != "" {
-		isoSegField = zap.String("isolation_segment", endpoint.IsolationSegment)
+		isoSegField = slog.String("isolation_segment", endpoint.IsolationSegment)
 	}
-	return []zap.Field{
-		zap.Stringer("uri", uri),
-		zap.String("route_service_url", endpoint.RouteServiceUrl),
-		zap.String("backend", endpoint.CanonicalAddr()),
-		zap.String("application_id", endpoint.ApplicationId),
-		zap.String("instance_id", endpoint.PrivateInstanceId),
-		zap.String("server_cert_domain_san", endpoint.ServerCertDomainSAN),
-		zap.String("protocol", endpoint.Protocol),
-		zap.Object("modification_tag", endpoint.ModificationTag),
+	return []any{
+		slog.Any("uri", uri),
+		slog.String("route_service_url", endpoint.RouteServiceUrl),
+		slog.String("backend", endpoint.CanonicalAddr()),
+		slog.String("application_id", endpoint.ApplicationId),
+		slog.String("instance_id", endpoint.PrivateInstanceId),
+		slog.String("server_cert_domain_san", endpoint.ServerCertDomainSAN),
+		slog.String("protocol", endpoint.Protocol),
+		slog.Any("modification_tag", log.StructValue(endpoint.ModificationTag)),
 		isoSegField,
-		zap.Bool("isTLS", endpoint.IsTLS()),
+		slog.Bool("isTLS", endpoint.IsTLS()),
 	}
 }

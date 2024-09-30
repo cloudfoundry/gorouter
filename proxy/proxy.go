@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/tls"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -11,18 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
-
 	"github.com/cloudfoundry/dropsonde"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics"
 	"code.cloudfoundry.org/gorouter/proxy/fails"
 	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
@@ -36,7 +35,7 @@ var (
 )
 
 type proxy struct {
-	logger                logger.Logger
+	logger                *slog.Logger
 	errorWriter           errorwriter.ErrorWriter
 	reporter              metrics.ProxyReporter
 	accessLogger          accesslog.AccessLogger
@@ -50,7 +49,7 @@ type proxy struct {
 }
 
 func NewProxy(
-	logger logger.Logger,
+	logger *slog.Logger,
 	accessLogger accesslog.AccessLogger,
 	promRegistry handlers.Registry,
 	errorWriter errorwriter.ErrorWriter,
@@ -201,7 +200,7 @@ func NewProxy(
 }
 
 type RouteServiceValidator interface {
-	ArrivedViaRouteService(req *http.Request, logger logger.Logger) (bool, error)
+	ArrivedViaRouteService(req *http.Request, logger *slog.Logger) (bool, error)
 	IsRouteServiceTraffic(req *http.Request) bool
 }
 
@@ -217,7 +216,7 @@ func SkipSanitize(routeServiceValidator RouteServiceValidator) func(*http.Reques
 	}
 }
 
-func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwardedClientCert string, logger logger.Logger) func(*http.Request) (bool, error) {
+func ForceDeleteXFCCHeader(routeServiceValidator RouteServiceValidator, forwardedClientCert string, logger *slog.Logger) func(*http.Request) (bool, error) {
 	return func(req *http.Request) (bool, error) {
 		valid, err := routeServiceValidator.ArrivedViaRouteService(req, logger)
 		if err != nil {
@@ -236,17 +235,17 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 
 		err := rc.EnableFullDuplex()
 		if err != nil {
-			logger.Panic("enable-full-duplex-err", zap.Error(err))
+			log.Panic(logger, "enable-full-duplex-err", log.ErrAttr(err))
 		}
 	}
 
 	reqInfo, err := handlers.ContextRequestInfo(request)
 	if err != nil {
-		logger.Panic("request-info-err", zap.Error(err))
+		log.Panic(logger, "request-info-err", log.ErrAttr(err))
 	}
 
 	if reqInfo.RoutePool == nil {
-		logger.Panic("request-info-err", zap.Error(errors.New("failed-to-access-RoutePool")))
+		log.Panic(logger, "request-info-err", log.ErrAttr(errors.New("failed-to-access-RoutePool")))
 	}
 
 	reqInfo.AppRequestStartedAt = time.Now()
@@ -257,7 +256,7 @@ func (p *proxy) ServeHTTP(responseWriter http.ResponseWriter, request *http.Requ
 func (p *proxy) setupProxyRequest(target *http.Request) {
 	reqInfo, err := handlers.ContextRequestInfo(target)
 	if err != nil {
-		p.logger.Panic("request-info-err", zap.Error(err))
+		log.Panic(p.logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	reqInfo.BackendReqHeaders = target.Header
@@ -284,7 +283,7 @@ func (p *proxy) setupProxyRequest(target *http.Request) {
 func (p *proxy) setupProxyRequestClose100Continue(target *httputil.ProxyRequest) {
 	reqInfo, err := handlers.ContextRequestInfo(target.In)
 	if err != nil {
-		p.logger.Panic("request-info-err", zap.Error(err))
+		log.Panic(p.logger, "request-info-err", log.ErrAttr(err))
 		return
 	}
 	reqInfo.BackendReqHeaders = target.Out.Header

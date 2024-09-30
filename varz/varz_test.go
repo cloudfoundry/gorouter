@@ -1,32 +1,32 @@
 package varz_test
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/registry"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 	. "code.cloudfoundry.org/gorouter/varz"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"time"
 )
 
 var _ = Describe("Varz", func() {
 	var Varz Varz
 	var Registry *registry.RouteRegistry
-	var logger logger.Logger
+	var logger *test_util.TestLogger
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 		cfg, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
-		Registry = registry.NewRouteRegistry(logger, cfg, new(fakes.FakeRouteRegistryReporter))
+		Registry = registry.NewRouteRegistry(logger.Logger, cfg, new(fakes.FakeRouteRegistryReporter))
 		Varz = NewVarz(Registry)
 	})
 

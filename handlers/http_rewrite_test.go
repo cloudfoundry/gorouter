@@ -4,27 +4,33 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/handlers"
-	logger_fakes "code.cloudfoundry.org/gorouter/logger/fakes"
-
-	"github.com/urfave/negroni/v3"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/handlers"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("HTTPRewrite Handler", func() {
+	var (
+		logger *test_util.TestLogger
+	)
+
+	BeforeEach(func() {
+		logger = test_util.NewTestLogger("test")
+	})
+
 	process := func(cfg config.HTTPRewrite) *httptest.ResponseRecorder {
 		mockedService := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header()["X-Foo"] = []string{"foo"}
 			w.WriteHeader(http.StatusTeapot)
 			w.Write([]byte("I'm a little teapot, short and stout."))
 		})
-
 		n := negroni.New()
 		n.Use(handlers.NewRequestInfo())
-		n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
+		n.Use(handlers.NewProxyWriter(logger.Logger))
 		n.Use(handlers.NewHTTPRewriteHandler(cfg, []string{}))
 		n.UseHandler(mockedService)
 
@@ -163,7 +169,7 @@ var _ = Describe("HTTPRewrite Handler", func() {
 
 			n := negroni.New()
 			n.Use(handlers.NewRequestInfo())
-			n.Use(handlers.NewProxyWriter(new(logger_fakes.FakeLogger)))
+			n.Use(handlers.NewProxyWriter(logger.Logger))
 			n.Use(handlers.NewHTTPRewriteHandler(config.HTTPRewrite{}, headersToAlwaysRemove))
 			n.UseHandler(mockedService)
 

@@ -21,10 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/websocket"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/net/websocket"
 
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/registry"

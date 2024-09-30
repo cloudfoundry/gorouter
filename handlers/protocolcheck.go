@@ -3,25 +3,25 @@ package handlers
 import (
 	"bufio"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 
-	"fmt"
+	"github.com/urfave/negroni/v3"
 
 	"code.cloudfoundry.org/gorouter/errorwriter"
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/urfave/negroni/v3"
 )
 
 type protocolCheck struct {
-	logger      logger.Logger
+	logger      *slog.Logger
 	errorWriter errorwriter.ErrorWriter
 	enableHTTP2 bool
 }
 
 // NewProtocolCheck creates a handler responsible for checking the protocol of
 // the request
-func NewProtocolCheck(logger logger.Logger, errorWriter errorwriter.ErrorWriter, enableHTTP2 bool) negroni.Handler {
+func NewProtocolCheck(logger *slog.Logger, errorWriter errorwriter.ErrorWriter, enableHTTP2 bool) negroni.Handler {
 	return &protocolCheck{
 		logger:      logger,
 		errorWriter: errorWriter,

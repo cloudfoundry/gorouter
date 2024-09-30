@@ -6,23 +6,24 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+
+	"code.cloudfoundry.org/gorouter/route"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 var _ = Describe("RoundRobin", func() {
 	var (
 		pool   *route.EndpointPool
-		logger *test_util.TestZapLogger
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 		pool = route.NewPool(&route.PoolOpts{
-			Logger:             logger,
+			Logger:             logger.Logger,
 			RetryAfterFailure:  2 * time.Minute,
 			Host:               "",
 			ContextPath:        "",
@@ -45,7 +46,7 @@ var _ = Describe("RoundRobin", func() {
 
 				counts := make([]int, len(endpoints))
 
-				iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 
 				loops := 50
 				for i := 0; i < len(endpoints)*loops; i += 1 {
@@ -71,7 +72,7 @@ var _ = Describe("RoundRobin", func() {
 		DescribeTable("it returns nil when no endpoints exist",
 			func(nextIdx int) {
 				pool.NextIdx = nextIdx
-				iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 				e := iter.Next(0)
 				Expect(e).To(BeNil())
 			},
@@ -89,7 +90,7 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
 
 				for i := 0; i < 10; i++ {
-					iter := route.NewRoundRobin(logger, pool, b.PrivateInstanceId, false, false, "meow-az")
+					iter := route.NewRoundRobin(logger.Logger, pool, b.PrivateInstanceId, false, false, "meow-az")
 					e := iter.Next(i)
 					Expect(e).ToNot(BeNil())
 					Expect(e.PrivateInstanceId).To(Equal(b.PrivateInstanceId))
@@ -112,7 +113,7 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1237}))
 
 				for i := 0; i < 10; i++ {
-					iter := route.NewRoundRobin(logger, pool, b.CanonicalAddr(), false, false, "meow-az")
+					iter := route.NewRoundRobin(logger.Logger, pool, b.CanonicalAddr(), false, false, "meow-az")
 					e := iter.Next(i)
 					Expect(e).ToNot(BeNil())
 					Expect(e.CanonicalAddr()).To(Equal(b.CanonicalAddr()))
@@ -134,12 +135,12 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(endpointFoo)
 				pool.Put(endpointBar)
 
-				iter := route.NewRoundRobin(logger, pool, endpointFoo.PrivateInstanceId, false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, endpointFoo.PrivateInstanceId, false, false, "meow-az")
 				foundEndpoint := iter.Next(0)
 				Expect(foundEndpoint).ToNot(BeNil())
 				Expect(foundEndpoint).To(Equal(endpointFoo))
 
-				iter = route.NewRoundRobin(logger, pool, endpointBar.PrivateInstanceId, false, false, "meow-az")
+				iter = route.NewRoundRobin(logger.Logger, pool, endpointBar.PrivateInstanceId, false, false, "meow-az")
 				foundEndpoint = iter.Next(1)
 				Expect(foundEndpoint).ToNot(BeNil())
 				Expect(foundEndpoint).To(Equal(endpointBar))
@@ -157,7 +158,7 @@ var _ = Describe("RoundRobin", func() {
 						endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 						pool.Put(endpointFoo)
 
-						iter := route.NewRoundRobin(logger, pool, "bogus", false, false, "meow-az")
+						iter := route.NewRoundRobin(logger.Logger, pool, "bogus", false, false, "meow-az")
 						e := iter.Next(0)
 						Expect(e).ToNot(BeNil())
 						Expect(e).To(Equal(endpointFoo))
@@ -166,7 +167,7 @@ var _ = Describe("RoundRobin", func() {
 					Entry("When the next index is 0", 0),
 				)
 				It("logs that it chose another endpoint", func() {
-					iter := route.NewRoundRobin(logger, pool, "bogus", false, false, "meow-az")
+					iter := route.NewRoundRobin(logger.Logger, pool, "bogus", false, false, "meow-az")
 					iter.Next(0)
 					Expect(logger).Should(gbytes.Say("endpoint-missing-choosing-alternate"))
 				})
@@ -181,7 +182,7 @@ var _ = Describe("RoundRobin", func() {
 						endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 						pool.Put(endpointFoo)
 
-						iter := route.NewRoundRobin(logger, pool, "bogus", true, false, "meow-az")
+						iter := route.NewRoundRobin(logger.Logger, pool, "bogus", true, false, "meow-az")
 						e := iter.Next(0)
 						Expect(e).To(BeNil())
 					},
@@ -189,7 +190,7 @@ var _ = Describe("RoundRobin", func() {
 					Entry("When the next index is 0", 0),
 				)
 				It("logs that it could not choose another endpoint", func() {
-					iter := route.NewRoundRobin(logger, pool, "bogus", true, false, "meow-az")
+					iter := route.NewRoundRobin(logger.Logger, pool, "bogus", true, false, "meow-az")
 					iter.Next(0)
 					Expect(logger).Should(gbytes.Say("endpoint-missing-but-request-must-be-sticky"))
 				})
@@ -202,7 +203,7 @@ var _ = Describe("RoundRobin", func() {
 				endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 				pool.Put(endpointFoo)
 
-				iter := route.NewRoundRobin(logger, pool, endpointFoo.PrivateInstanceId, false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, endpointFoo.PrivateInstanceId, false, false, "meow-az")
 				foundEndpoint := iter.Next(0)
 				Expect(foundEndpoint).ToNot(BeNil())
 				Expect(foundEndpoint).To(Equal(endpointFoo))
@@ -210,11 +211,11 @@ var _ = Describe("RoundRobin", func() {
 				endpointBar := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "bar"})
 				pool.Put(endpointBar)
 
-				iter = route.NewRoundRobin(logger, pool, "foo", false, false, "meow-az")
+				iter = route.NewRoundRobin(logger.Logger, pool, "foo", false, false, "meow-az")
 				foundEndpoint = iter.Next(0)
 				Expect(foundEndpoint).ToNot(Equal(endpointFoo))
 
-				iter = route.NewRoundRobin(logger, pool, "bar", false, false, "meow-az")
+				iter = route.NewRoundRobin(logger.Logger, pool, "bar", false, false, "meow-az")
 				foundEndpoint = iter.Next(0)
 				Expect(foundEndpoint).To(Equal(endpointBar))
 			},
@@ -234,7 +235,7 @@ var _ = Describe("RoundRobin", func() {
 			iterateLoop := func(pool *route.EndpointPool) {
 				defer GinkgoRecover()
 				for j := 0; j < numReaders; j++ {
-					iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+					iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 					Expect(iter.Next(j)).NotTo(BeNil())
 				}
 				wg.Done()
@@ -265,7 +266,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger.Logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -284,7 +285,7 @@ var _ = Describe("RoundRobin", func() {
 						pool.NextIdx = nextIdx
 						epTwo.Stats.NumberConnections.Increment()
 						epTwo.Stats.NumberConnections.Increment()
-						iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+						iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 
 						foundEndpoint := iter.Next(0)
 						Expect(foundEndpoint).To(Equal(epOne))
@@ -305,7 +306,7 @@ var _ = Describe("RoundRobin", func() {
 							epOne.Stats.NumberConnections.Increment()
 							epTwo.Stats.NumberConnections.Increment()
 							epTwo.Stats.NumberConnections.Increment()
-							iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+							iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 
 							Consistently(func() *route.Endpoint {
 								return iter.Next(0)
@@ -324,7 +325,7 @@ var _ = Describe("RoundRobin", func() {
 						epThree := route.NewEndpoint(&route.EndpointOpts{Host: "3.3.3.3", Port: 2222, PrivateInstanceId: "private-label-2"})
 						pool.Put(epThree)
 
-						iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+						iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 
 						Expect(iter.Next(0)).To(Equal(epOne))
 						iter.EndpointFailed(&net.OpError{Op: "dial"})
@@ -353,7 +354,7 @@ var _ = Describe("RoundRobin", func() {
 
 				Context("when the endpoint is not required to be sticky", func() {
 					BeforeEach(func() {
-						iter = route.NewRoundRobin(logger, pool, "private-label-1", false, false, "meow-az")
+						iter = route.NewRoundRobin(logger.Logger, pool, "private-label-1", false, false, "meow-az")
 					})
 
 					Context("when the initial endpoint is overloaded", func() {
@@ -398,7 +399,7 @@ var _ = Describe("RoundRobin", func() {
 
 				Context("when the endpoint must be sticky", func() {
 					BeforeEach(func() {
-						iter = route.NewRoundRobin(logger, pool, "private-label-1", true, false, "meow-az")
+						iter = route.NewRoundRobin(logger.Logger, pool, "private-label-1", true, false, "meow-az")
 					})
 
 					Context("when the initial endpoint is overloaded", func() {
@@ -482,7 +483,7 @@ var _ = Describe("RoundRobin", func() {
 
 			BeforeEach(func() {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger.Logger,
 					RetryAfterFailure:  2 * time.Minute,
 					Host:               "",
 					ContextPath:        "",
@@ -498,7 +499,7 @@ var _ = Describe("RoundRobin", func() {
 			})
 
 			JustBeforeEach(func() {
-				iter = route.NewRoundRobin(logger, pool, "", false, true, localAZ)
+				iter = route.NewRoundRobin(logger.Logger, pool, "", false, true, localAZ)
 			})
 
 			Context("on the first attempt", func() {
@@ -745,7 +746,7 @@ var _ = Describe("RoundRobin", func() {
 
 							counts := make([]int, len(endpoints))
 
-							iter := route.NewRoundRobin(logger, pool, "", false, true, localAZ)
+							iter := route.NewRoundRobin(logger.Logger, pool, "", false, true, localAZ)
 
 							loops := 50
 							for i := 0; i < len(endpoints)*loops; i += 1 {
@@ -785,7 +786,7 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(e1)
 				pool.Put(e2)
 
-				iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 				n := iter.Next(0)
 				Expect(n).ToNot(BeNil())
 
@@ -811,7 +812,7 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(e1)
 				pool.Put(e2)
 
-				iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 				n1 := iter.Next(0)
 				iter.EndpointFailed(&net.OpError{Op: "dial"})
 				n2 := iter.Next(1)
@@ -830,7 +831,7 @@ var _ = Describe("RoundRobin", func() {
 		DescribeTable("it resets failed endpoints after exceeding failure duration",
 			func(nextIdx int) {
 				pool = route.NewPool(&route.PoolOpts{
-					Logger:             test_util.NewTestZapLogger("test"),
+					Logger:             logger.Logger,
 					RetryAfterFailure:  50 * time.Millisecond,
 					Host:               "",
 					ContextPath:        "",
@@ -843,7 +844,7 @@ var _ = Describe("RoundRobin", func() {
 				pool.Put(e1)
 				pool.Put(e2)
 
-				iter := route.NewRoundRobin(logger, pool, "", false, false, "meow-az")
+				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 				n1 := iter.Next(0)
 				n2 := iter.Next(1)
 				Expect(n1).ToNot(Equal(n2))
@@ -871,7 +872,7 @@ var _ = Describe("RoundRobin", func() {
 			endpointFoo := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 1234, PrivateInstanceId: "foo"})
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 			pool.Put(endpointFoo)
-			iter := route.NewRoundRobin(logger, pool, "foo", false, false, "meow-az")
+			iter := route.NewRoundRobin(logger.Logger, pool, "foo", false, false, "meow-az")
 			iter.PreRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 		})
@@ -885,7 +886,7 @@ var _ = Describe("RoundRobin", func() {
 			}
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(1)))
 			pool.Put(endpointFoo)
-			iter := route.NewRoundRobin(logger, pool, "foo", false, false, "meow-az")
+			iter := route.NewRoundRobin(logger.Logger, pool, "foo", false, false, "meow-az")
 			iter.PostRequest(endpointFoo)
 			Expect(endpointFoo.Stats.NumberConnections.Count()).To(Equal(int64(0)))
 		})

@@ -3,12 +3,13 @@ package monitor_test
 import (
 	"time"
 
-	"code.cloudfoundry.org/gorouter/logger/fakes"
-	"code.cloudfoundry.org/gorouter/metrics/monitor"
 	"github.com/cloudfoundry/sonde-go/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/protobuf/proto"
+
+	"code.cloudfoundry.org/gorouter/metrics/monitor"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 const (
@@ -18,12 +19,13 @@ const (
 var _ = Describe("Uptime", func() {
 	var (
 		uptime *monitor.Uptime
+		logger *test_util.TestLogger
 	)
 
 	BeforeEach(func() {
+		logger = test_util.NewTestLogger("test")
 		fakeEventEmitter.Reset()
-		fakeLogger := fakes.FakeLogger{}
-		uptime = monitor.NewUptime(interval, &fakeLogger)
+		uptime = monitor.NewUptime(interval, logger.Logger)
 		go uptime.Start()
 	})
 

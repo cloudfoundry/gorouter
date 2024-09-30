@@ -19,26 +19,23 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudfoundry/dropsonde/factories"
+	"github.com/cloudfoundry/sonde-go/events"
+	uuid "github.com/nu7hatch/gouuid"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/openzipkin/zipkin-go/propagation/b3"
+	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/websocket"
 
 	"code.cloudfoundry.org/gorouter/common/health"
-
-	"github.com/cloudfoundry/dropsonde/factories"
-	"github.com/cloudfoundry/sonde-go/events"
-	uuid "github.com/nu7hatch/gouuid"
-	"github.com/openzipkin/zipkin-go/propagation/b3"
-	"github.com/uber-go/zap"
-
 	router_http "code.cloudfoundry.org/gorouter/common/http"
 	"code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/handlers"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Proxy", func() {
@@ -1094,7 +1091,7 @@ var _ = Describe("Proxy", func() {
 			defer ln.Close()
 
 			process("hsts-test")
-			Expect(testLogger).NotTo(gbytes.Say("http-rewrite"))
+			Expect(logger).NotTo(gbytes.Say("http-rewrite"))
 		})
 
 		Context("when add response header is set", func() {
@@ -1571,7 +1568,7 @@ var _ = Describe("Proxy", func() {
 
 			resp, _ := conn.ReadResponse()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
-			Expect(testLogger.(*test_util.TestZapLogger).Lines(zap.WarnLevel)).To(ContainElement(ContainSubstring("deprecated-semicolon-params")))
+			Expect(logger.Lines(zap.WarnLevel)).To(ContainElement(ContainSubstring("deprecated-semicolon-params")))
 
 		})
 	})

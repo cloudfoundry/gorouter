@@ -10,14 +10,18 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/common/health"
+	"github.com/nats-io/nats.go"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/tedsuo/ifrit"
 
 	"code.cloudfoundry.org/gorouter/accesslog"
+	"code.cloudfoundry.org/gorouter/common/health"
 	"code.cloudfoundry.org/gorouter/common/schema"
 	cfg "code.cloudfoundry.org/gorouter/config"
 	"code.cloudfoundry.org/gorouter/errorwriter"
 	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	"code.cloudfoundry.org/gorouter/logger"
+	log "code.cloudfoundry.org/gorouter/logger"
 	"code.cloudfoundry.org/gorouter/mbus"
 	"code.cloudfoundry.org/gorouter/metrics"
 	fakeMetrics "code.cloudfoundry.org/gorouter/metrics/fakes"
@@ -29,15 +33,11 @@ import (
 	"code.cloudfoundry.org/gorouter/test/common"
 	"code.cloudfoundry.org/gorouter/test_util"
 	vvarz "code.cloudfoundry.org/gorouter/varz"
-	"github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/tedsuo/ifrit"
 )
 
 var _ = Describe("Router", func() {
 	var (
-		logger     logger.Logger
+		logger     *test_util.TestLogger
 		natsRunner *test_util.NATSRunner
 		config     *cfg.Config
 		p          http.Handler
@@ -150,7 +150,7 @@ var _ = Describe("Router", func() {
 	}
 
 	BeforeEach(func() {
-		logger = test_util.NewTestZapLogger("test")
+		logger = test_util.NewTestLogger("test")
 		natsPort = test_util.NextAvailPort()
 		natsRunner = test_util.NewNATSRunner(int(natsPort))
 		natsRunner.Start()
@@ -173,7 +173,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 1 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger.Logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
 		logcounter := schema.NewLogCounter()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
@@ -186,17 +186,17 @@ var _ = Describe("Router", func() {
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 		rt := &sharedfakes.RoundTripper{}
-		p = proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
+		p = proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthStatus, rt)
 
 		errChan := make(chan error, 2)
 		var err error
 		rss := &sharedfakes.RouteServicesServer{}
-		rtr, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, healthStatus, logcounter, errChan, rss)
+		rtr, err = router.NewRouter(logger.Logger, config, p, mbusClient, registry, varz, healthStatus, logcounter, errChan, rss)
 		Expect(err).ToNot(HaveOccurred())
 
 		config.Index = 4321
-		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, logger.Session("subscriber")))
+		subscriber = ifrit.Background(mbus.NewSubscriber(mbusClient, registry, config, nil, log.CreateLoggerWithSource("subscriber", "")))
 		<-subscriber.Ready()
 
 	})
@@ -421,13 +421,13 @@ var _ = Describe("Router", func() {
 				config.Status.TLS.Port = test_util.NextAvailPort()
 				config.Status.Routes.Port = test_util.NextAvailPort()
 				rt := &sharedfakes.RoundTripper{}
-				p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
+				p := proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)
 
 				errChan = make(chan error, 2)
 				var err error
 				rss := &sharedfakes.RouteServicesServer{}
-				rtr2, err = router.NewRouter(logger, config, p, mbusClient, registry, varz, h, logcounter, errChan, rss)
+				rtr2, err = router.NewRouter(logger.Logger, config, p, mbusClient, registry, varz, h, logcounter, errChan, rss)
 				Expect(err).ToNot(HaveOccurred())
 				runRouter(rtr2)
 			})

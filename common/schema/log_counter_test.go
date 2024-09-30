@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"code.cloudfoundry.org/gorouter/common/schema"
 	"code.cloudfoundry.org/lager/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/common/schema"
 )
 
 var _ = Describe("LogCounter", func() {

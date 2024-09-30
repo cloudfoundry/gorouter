@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
 	"github.com/urfave/negroni/v3"
+
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 const (
@@ -13,10 +14,10 @@ const (
 )
 
 type setVcapRequestIdHeader struct {
-	logger logger.Logger
+	logger *slog.Logger
 }
 
-func NewVcapRequestIdHeader(logger logger.Logger) negroni.Handler {
+func NewVcapRequestIdHeader(logger *slog.Logger) negroni.Handler {
 	return &setVcapRequestIdHeader{
 		logger: logger,
 	}
@@ -28,7 +29,7 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 
 	requestInfo, err := ContextRequestInfo(r)
 	if err != nil {
-		s.logger.Error("failed-to-get-request-info", zap.Error(err))
+		s.logger.Error("failed-to-get-request-info", log.ErrAttr(err))
 		return
 	}
 
@@ -36,12 +37,12 @@ func (s *setVcapRequestIdHeader) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 
 	traceInfo, err := requestInfo.ProvideTraceInfo()
 	if err != nil {
-		logger.Error("failed-to-get-trace-info", zap.Error(err))
+		logger.Error("failed-to-get-trace-info", log.ErrAttr(err))
 		return
 	}
 
 	r.Header.Set(VcapRequestIdHeader, traceInfo.UUID)
-	logger.Debug("vcap-request-id-header-set", zap.String("VcapRequestIdHeader", traceInfo.UUID))
+	logger.Debug("vcap-request-id-header-set", slog.String("VcapRequestIdHeader", traceInfo.UUID))
 
 	next(rw, r)
 }

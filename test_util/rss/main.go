@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 
-	"code.cloudfoundry.org/gorouter/test_util/rss/commands"
 	"github.com/urfave/cli"
+
+	"code.cloudfoundry.org/gorouter/test_util/rss/commands"
 )
 
 var keyFlag = cli.StringFlag{

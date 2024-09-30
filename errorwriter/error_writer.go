@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"os"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"github.com/uber-go/zap"
+	log "code.cloudfoundry.org/gorouter/logger"
 )
 
 type ErrorWriter interface {
@@ -16,7 +16,7 @@ type ErrorWriter interface {
 		rw http.ResponseWriter,
 		code int,
 		message string,
-		logger logger.Logger,
+		logger *slog.Logger,
 	)
 }
 
@@ -31,12 +31,12 @@ func (ew *plaintextErrorWriter) WriteError(
 	rw http.ResponseWriter,
 	code int,
 	message string,
-	logger logger.Logger,
+	logger *slog.Logger,
 ) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
 	if code != http.StatusNotFound {
-		logger.Info("status", zap.String("body", body))
+		logger.Info("status", slog.String("body", body))
 	}
 
 	if code > 299 {
@@ -85,12 +85,12 @@ func (ew *htmlErrorWriter) WriteError(
 	rw http.ResponseWriter,
 	code int,
 	message string,
-	logger logger.Logger,
+	logger *slog.Logger,
 ) {
 	body := fmt.Sprintf("%d %s: %s", code, http.StatusText(code), message)
 
 	if code != http.StatusNotFound {
-		logger.Info("status", zap.String("body", body))
+		logger.Info("status", slog.String("body", body))
 	}
 
 	if code > 299 {
@@ -108,7 +108,7 @@ func (ew *htmlErrorWriter) WriteError(
 	var respBytes []byte
 	var rendered bytes.Buffer
 	if err := ew.tpl.Execute(&rendered, &tplContext); err != nil {
-		logger.Error("render-error-failed", zap.Error(err))
+		logger.Error("render-error-failed", log.ErrAttr(err))
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
 		respBytes = []byte(body)

@@ -7,30 +7,27 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-
-	"code.cloudfoundry.org/gorouter/common/health"
-
-	"code.cloudfoundry.org/gorouter/accesslog"
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/errorwriter"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
-
 	"testing"
 	"time"
 
 	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
-	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
-	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"code.cloudfoundry.org/gorouter/accesslog"
+	fakelogsender "code.cloudfoundry.org/gorouter/accesslog/schema/fakes"
+	"code.cloudfoundry.org/gorouter/common/health"
+	"code.cloudfoundry.org/gorouter/common/secure"
+	"code.cloudfoundry.org/gorouter/config"
+	"code.cloudfoundry.org/gorouter/errorwriter"
+	sharedfakes "code.cloudfoundry.org/gorouter/fakes"
+	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"code.cloudfoundry.org/gorouter/proxy"
+	"code.cloudfoundry.org/gorouter/registry"
+	"code.cloudfoundry.org/gorouter/routeservice"
+	"code.cloudfoundry.org/gorouter/test_util"
 )
 
 //go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper
@@ -46,7 +43,7 @@ var (
 	al                        accesslog.AccessLogger
 	ls                        *fakelogsender.FakeLogSender
 	crypto                    secure.Crypto
-	testLogger                logger.Logger
+	logger                    *test_util.TestLogger
 	cryptoPrev                secure.Crypto
 	caCertPool                *x509.CertPool
 	recommendHTTPS            bool
@@ -66,7 +63,7 @@ func TestProxy(t *testing.T) {
 var _ = BeforeEach(func() {
 	healthStatus = &health.Health{}
 	healthStatus.SetHealth(health.Healthy)
-	testLogger = test_util.NewTestZapLogger("test")
+	logger = test_util.NewTestLogger("test")
 	var err error
 
 	crypto, err = secure.NewAesGCM([]byte("ABCDEFGHIJKLMNOP"))
@@ -92,7 +89,7 @@ var _ = BeforeEach(func() {
 
 var _ = JustBeforeEach(func() {
 	var err error
-	r = registry.NewRouteRegistry(testLogger, conf, new(fakes.FakeRouteRegistryReporter))
+	r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
 
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)
@@ -101,7 +98,7 @@ var _ = JustBeforeEach(func() {
 	Expect(err).NotTo(HaveOccurred())
 	conf.AccessLog.File = f.Name()
 	ls = &fakelogsender.FakeLogSender{}
-	al, err = accesslog.CreateRunningAccessLogger(testLogger, ls, conf)
+	al, err = accesslog.CreateRunningAccessLogger(logger.Logger, ls, conf)
 	Expect(err).NotTo(HaveOccurred())
 	go al.Run()
 
@@ -118,7 +115,7 @@ var _ = JustBeforeEach(func() {
 	}
 
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
-		testLogger,
+		logger.Logger,
 		conf.RouteServiceEnabled,
 		conf.RouteServicesHairpinning,
 		conf.RouteServicesHairpinningAllowlist,
@@ -141,7 +138,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(testLogger, al, fakeRegistry, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
+	p = proxy.NewProxy(logger.Logger, al, fakeRegistry, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
 	if conf.EnableHTTP2 {
 		server := http.Server{Handler: p}
