@@ -184,4 +184,74 @@ var _ = Describe("Logger", func() {
 		})
 	})
 
+	Describe("StructValue", func() {
+
+		Context("when creating an slog value created by StructValue and json tag is present", func() {
+
+			type Extras struct {
+				Drink   string `json:"drink"`
+				Dessert string `json:"dessert"`
+			}
+
+			type Menu struct {
+				Menu   string `json:"menu"`
+				Extras Extras `json:"extras"`
+			}
+
+			JustBeforeEach(func() {
+				logger = log.CreateLogger()
+			})
+			It("takes the keys from json tags", func() {
+				extras := Extras{
+					Drink:   "coke",
+					Dessert: "icecream",
+				}
+				menu := Menu{
+					Menu:   "cheeseburger",
+					Extras: extras,
+				}
+				logger.Info(action, slog.Any("order", log.StructValue(menu)))
+
+				Expect(testSink.Lines()).To(HaveLen(1))
+				Expect(testSink.Lines()[0]).To(MatchRegexp(
+					`{"log_level":1,"timestamp":[0-9]+[.][0-9]+,"message":"%s","data":{"order":{"menu":"cheeseburger","extras":{"drink":"coke","dessert":"icecream"}}}}`, action,
+				))
+			})
+		})
+
+		Context("when creating an slog value created by StructValue and json tag is missing", func() {
+
+			type Extras struct {
+				Drink   string
+				Dessert string
+			}
+
+			type Menu struct {
+				Menu   string
+				Extras Extras
+			}
+
+			JustBeforeEach(func() {
+				logger = log.CreateLogger()
+			})
+			It("takes the keys from field names", func() {
+				extras := Extras{
+					Drink:   "coke",
+					Dessert: "icecream",
+				}
+				menu := Menu{
+					Menu:   "cheeseburger",
+					Extras: extras,
+				}
+				logger.Info(action, slog.Any("order", log.StructValue(menu)))
+
+				Expect(testSink.Lines()).To(HaveLen(1))
+				Expect(testSink.Lines()[0]).To(MatchRegexp(
+					`{"log_level":1,"timestamp":[0-9]+[.][0-9]+,"message":"%s","data":{"order":{"Menu":"cheeseburger","Extras":{"Drink":"coke","Dessert":"icecream"}}}}`, action,
+				))
+			})
+		})
+
+	})
+
 })

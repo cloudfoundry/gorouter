@@ -166,9 +166,13 @@ func (r StructWithLogValue) LogValue() slog.Value {
 	var values []slog.Attr
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
+		fieldValue, ok := v.Type().Field(i).Tag.Lookup("json")
+		if !ok {
+			fieldValue = v.Type().Field(i).Name
+		}
 		if field.CanInterface() {
 			values = append(values, slog.Any(
-				v.Type().Field(i).Name,
+				fieldValue,
 				slog.AnyValue(field.Interface())))
 		}
 	}
