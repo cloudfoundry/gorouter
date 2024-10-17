@@ -412,15 +412,16 @@ func (p *EndpointPool) IsEmpty() bool {
 func (p *EndpointPool) NextIndex() int {
 	if p.NextIdx == -1 {
 		p.NextIdx = p.random.Intn(len(p.endpoints))
-	} else {
-		p.NextIdx++
 	}
+
+	next := p.NextIdx
+	p.NextIdx++
 
 	if p.NextIdx >= len(p.endpoints) {
 		p.NextIdx = 0
 	}
 
-	return p.NextIdx
+	return next
 }
 
 func (p *EndpointPool) IsOverloaded() bool {
