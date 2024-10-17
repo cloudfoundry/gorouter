@@ -3,7 +3,6 @@ package route
 import (
 	"context"
 	"log/slog"
-	"math/rand"
 	"sync"
 	"time"
 )
@@ -12,7 +11,6 @@ type RoundRobin struct {
 	logger *slog.Logger
 	pool   *EndpointPool
 	lock   *sync.Mutex
-	random *rand.Rand
 
 	initialEndpoint       string
 	mustBeSticky          bool
@@ -28,7 +26,6 @@ func NewRoundRobin(logger *slog.Logger, p *EndpointPool, initial string, mustBeS
 		logger:                logger,
 		pool:                  p,
 		lock:                  &sync.Mutex{},
-		random:                rand.New(rand.NewSource(time.Now().UnixNano())),
 		initialEndpoint:       initial,
 		mustBeSticky:          mustBeSticky,
 		locallyOptimistic:     locallyOptimistic,
