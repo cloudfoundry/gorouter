@@ -44,9 +44,14 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	reqSize := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 5 // add 5 bytes for space-separation of method, URI, protocol, and /r/n
 
 	for k, v := range r.Header {
-		reqSize += len(k) + len(v) + 4 // add two bytes for ": " delimiting, and 2 more for \r\n
+		valueLen := 0
+		for _, value := range r.Header.Values(k) {
+			valueLen += len(value)
+		}
+		reqSize += len(k) + valueLen + 4 + len(v) - 1 // add padding for ': ' and newlines and comma delimiting of multiple values
 	}
-	reqSize += len(r.Host) + 4 // add two bytes for ": " delimiting, and 2 more for \r\n
+
+	reqSize += len(r.Host) + 8 // add padding for "Host: " and newlines
 
 	if reqSize >= m.MaxSize {
 		reqInfo, err := ContextRequestInfo(r)

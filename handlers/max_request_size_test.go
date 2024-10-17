@@ -63,7 +63,7 @@ var _ = Describe("MaxRequestSize", func() {
 
 	BeforeEach(func() {
 		cfg = &config.Config{
-			MaxHeaderBytes:           40,
+			MaxHeaderBytes:           89,
 			LoadBalance:              config.LOAD_BALANCE_RR,
 			StickySessionCookieNames: config.StringSet{"blarg": struct{}{}},
 		}
@@ -155,6 +155,17 @@ var _ = Describe("MaxRequestSize", func() {
 			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
 		})
 	})
+	Context("when a single header has multiple small values taking it over the limit", func() {
+		BeforeEach(func() {
+			for i := 0; i < 10; i++ {
+				header.Add("k", "meow")
+			}
+		})
+		It("throws an http 431", func() {
+			handleRequest()
+			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
+		})
+	})
 	Context("when enough normally-sized headers put the request over the limit", func() {
 		BeforeEach(func() {
 			header.Add("header1", "smallRequest")
@@ -168,7 +179,7 @@ var _ = Describe("MaxRequestSize", func() {
 	})
 	Context("when any combination of things makes the request over the limit", func() {
 		BeforeEach(func() {
-			rawPath = "/?q=v"
+			rawPath = "/?q=meowmeow"
 			header.Add("header1", "smallRequest")
 			header.Add("header2", "smallRequest")
 		})
