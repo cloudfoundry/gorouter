@@ -73,7 +73,6 @@ func NewRouteServicesServer(cfg *config.Config) (*RouteServicesServer, error) {
 }
 
 func (rs *RouteServicesServer) Serve(handler http.Handler, errChan chan error) error {
-	fmt.Printf("starting server with timeout: %#v\n", rs.readHeaderTimeout)
 	localServer := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler.ServeHTTP(w, r)
