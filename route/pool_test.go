@@ -822,6 +822,7 @@ var _ = Describe("EndpointPool", func() {
 			ServerCertDomainSAN:     "pvt_test_san",
 			PrivateInstanceId:       "pvt_test_instance_id",
 			UseTLS:                  true,
+			LoadBalancingAlgorithm:  "lb-meow",
 		})
 
 		pool.Put(e)
@@ -830,7 +831,7 @@ var _ = Describe("EndpointPool", func() {
 		json, err := pool.MarshalJSON()
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http1","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","availability_zone":"","protocol":"http2","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san"}]`))
+		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http1","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","availability_zone":"","protocol":"http2","tls":true,"ttl":-1,"tags":null,"private_instance_id":"pvt_test_instance_id","server_cert_domain_san":"pvt_test_san","load_balancing_algorithm":"lb-meow"}]`))
 	})
 
 	Context("when endpoints do not have empty tags", func() {

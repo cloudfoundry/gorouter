@@ -517,16 +517,17 @@ func (e *endpointElem) isOverloaded() bool {
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	var jsonObj struct {
-		Address             string            `json:"address"`
-		AvailabilityZone    string            `json:"availability_zone"`
-		Protocol            string            `json:"protocol"`
-		TLS                 bool              `json:"tls"`
-		TTL                 int               `json:"ttl"`
-		RouteServiceUrl     string            `json:"route_service_url,omitempty"`
-		Tags                map[string]string `json:"tags"`
-		IsolationSegment    string            `json:"isolation_segment,omitempty"`
-		PrivateInstanceId   string            `json:"private_instance_id,omitempty"`
-		ServerCertDomainSAN string            `json:"server_cert_domain_san,omitempty"`
+		Address                string            `json:"address"`
+		AvailabilityZone       string            `json:"availability_zone"`
+		Protocol               string            `json:"protocol"`
+		TLS                    bool              `json:"tls"`
+		TTL                    int               `json:"ttl"`
+		RouteServiceUrl        string            `json:"route_service_url,omitempty"`
+		Tags                   map[string]string `json:"tags"`
+		IsolationSegment       string            `json:"isolation_segment,omitempty"`
+		PrivateInstanceId      string            `json:"private_instance_id,omitempty"`
+		ServerCertDomainSAN    string            `json:"server_cert_domain_san,omitempty"`
+		LoadBalancingAlgorithm string            `json:"load_balancing_algorithm,omitempty"`
 	}
 
 	jsonObj.Address = e.addr
@@ -539,6 +540,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	jsonObj.IsolationSegment = e.IsolationSegment
 	jsonObj.PrivateInstanceId = e.PrivateInstanceId
 	jsonObj.ServerCertDomainSAN = e.ServerCertDomainSAN
+	jsonObj.LoadBalancingAlgorithm = e.LoadBalancingAlgorithm
 	return json.Marshal(jsonObj)
 }
 
