@@ -3,32 +3,41 @@ package route
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 )
 
 type RoundRobin struct {
 	logger *slog.Logger
 	pool   *EndpointPool
+	lock   *sync.Mutex
 
 	initialEndpoint       string
 	mustBeSticky          bool
 	lastEndpoint          *Endpoint
 	locallyOptimistic     bool
 	localAvailabilityZone string
+
+	nextIdx int
 }
 
 func NewRoundRobin(logger *slog.Logger, p *EndpointPool, initial string, mustBeSticky bool, locallyOptimistic bool, localAvailabilityZone string) EndpointIterator {
 	return &RoundRobin{
 		logger:                logger,
 		pool:                  p,
+		lock:                  &sync.Mutex{},
 		initialEndpoint:       initial,
 		mustBeSticky:          mustBeSticky,
 		locallyOptimistic:     locallyOptimistic,
 		localAvailabilityZone: localAvailabilityZone,
+		nextIdx:               -1,
 	}
 }
 
 func (r *RoundRobin) Next(attempt int) *Endpoint {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	var e *endpointElem
 	if r.initialEndpoint != "" {
 		e = r.pool.findById(r.initialEndpoint)
@@ -73,6 +82,7 @@ func (r *RoundRobin) Next(attempt int) *Endpoint {
 }
 
 func (r *RoundRobin) next(attempt int) *endpointElem {
+	// Note: the iterator lock must be held when calling this function.
 	r.pool.Lock()
 	defer r.pool.Unlock()
 
@@ -83,13 +93,15 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 		return nil
 	}
 
-	if r.pool.NextIdx == -1 {
-		r.pool.NextIdx = r.pool.random.Intn(poolSize)
-	} else if r.pool.NextIdx >= poolSize {
-		r.pool.NextIdx = 0
+	if r.nextIdx == -1 {
+		r.nextIdx = r.pool.NextIndex()
+	}
+	// Check the next index of iterator in case the pool size decreased
+	if r.nextIdx >= poolSize {
+		r.nextIdx = 0
 	}
 
-	startingIndex := r.pool.NextIdx
+	startingIndex := r.nextIdx
 	currentIndex := startingIndex
 	var nextIndex int
 
@@ -99,7 +111,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 		// We tried using the actual modulo operator, but it has a 10x performance penalty
 		nextIndex = currentIndex + 1
-		if nextIndex == poolSize {
+		if nextIndex >= poolSize {
 			nextIndex = 0
 		}
 
@@ -107,7 +119,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 		if !localDesired || (localDesired && currentEndpointIsLocal) {
 			if e.failedAt == nil && !e.isOverloaded() {
-				r.pool.NextIdx = nextIndex
+				r.nextIdx = nextIndex
 				return e
 			}
 		}

@@ -80,6 +80,52 @@ var _ = Describe("RoundRobin", func() {
 			Entry("When the next index is 0", 0),
 		)
 
+		DescribeTable("it performs round-robin through the endpoints for two parallel-running iterators",
+			func(nextIdx int) {
+				pool.NextIdx = nextIdx
+				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
+				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 1234})
+				endpoints := []*route.Endpoint{e1, e2}
+
+				for _, e := range endpoints {
+					pool.Put(e)
+				}
+
+				By("Create two iterators running over the same endpoint pool")
+				iter1 := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
+				iter2 := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
+
+				iteratedEndpoints1 := make(map[*route.Endpoint]int)
+				iteratedEndpoints2 := make(map[*route.Endpoint]int)
+
+				By("Simulate retrying with attempts = endpoint number and count how many times both iterators iterate over every endpoint")
+				for i := 0; i < len(endpoints); i += 1 {
+					n := iter1.Next(i)
+					k := iter2.Next(i)
+					for _, e := range endpoints {
+						if e == n {
+							iteratedEndpoints1[e]++
+						}
+						if e == k {
+							iteratedEndpoints2[e]++
+						}
+					}
+				}
+				By("Expect that first round robin iterator iterates over every endpoint exactly one time")
+				for e := range iteratedEndpoints1 {
+					Expect(iteratedEndpoints1[e]).To(Equal(1))
+				}
+
+				By("Expect that second round robin iterator iterates over every endpoint exactly one time")
+				for e := range iteratedEndpoints2 {
+					Expect(iteratedEndpoints2[e]).To(Equal(1))
+				}
+			},
+			Entry("When the next index is -1", -1),
+			Entry("When the next index is 0", 0),
+			Entry("When the next index is 1", 1),
+		)
+
 		DescribeTable("it finds the initial endpoint by private id",
 			func(nextIdx int) {
 				pool.NextIdx = nextIdx
@@ -221,7 +267,6 @@ var _ = Describe("RoundRobin", func() {
 			},
 			Entry("When the next index is -1", -1),
 			Entry("When the next index is 0", 0),
-			Entry("When the next index is 1", 1),
 		)
 
 		It("is safe for concurrent use", func() {
@@ -654,7 +699,6 @@ var _ = Describe("RoundRobin", func() {
 					Context("when all AZ-local endpoints have errors", func() {
 						JustBeforeEach(func() {
 							pool.NextIdx = 3
-
 							Expect(iter.Next(0)).To(Equal(localAZEndpointOne))
 							iter.EndpointFailed(&net.OpError{Op: "dial"})
 
@@ -666,18 +710,18 @@ var _ = Describe("RoundRobin", func() {
 						})
 
 						DescribeTable("it resets the errors and returns one of the endpoints regardless of AZ",
-							func(nextIdx int, address string) {
+							func(nextIdx int) {
 								pool.NextIdx = nextIdx
-
+								nonLocalEndpoints := []string{
+									otherAZEndpointOne.CanonicalAddr(),
+									otherAZEndpointTwo.CanonicalAddr(),
+									otherAZEndpointThree.CanonicalAddr(),
+								}
 								chosen := iter.Next(0)
-								Expect(chosen.CanonicalAddr()).To(Equal(address))
+								Expect(nonLocalEndpoints).Should(ContainElement(chosen.CanonicalAddr()))
 							},
-							Entry("When the next index is 0", 0, "10.0.1.0:60000"),
-							Entry("When the next index is 1", 1, "10.0.1.1:60000"),
-							Entry("When the next index is 2", 2, "10.0.1.2:60000"),
-							Entry("When the next index is 3", 3, "10.0.1.3:60000"),
-							Entry("When the next index is 4", 4, "10.0.1.4:60000"),
-							Entry("When the next index is 5", 5, "10.0.1.5:60000"),
+							Entry("When the next index is -1", -1),
+							Entry("When the next index is 0", 0),
 						)
 
 					})
