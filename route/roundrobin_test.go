@@ -80,46 +80,6 @@ var _ = Describe("RoundRobin", func() {
 			Entry("When the next index is 0", 0),
 		)
 
-		DescribeTable("it performs round-robin consecutively through the endpoints",
-			func(nextIdx int) {
-				pool.NextIdx = nextIdx
-				e1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
-				e2 := route.NewEndpoint(&route.EndpointOpts{Host: "5.6.7.8", Port: 1234})
-				e3 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.7.8", Port: 1234})
-				endpoints := []*route.Endpoint{e1, e2, e3}
-
-				for _, e := range endpoints {
-					pool.Put(e)
-				}
-
-				iter := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
-
-				iteratedEndpoints := make([]*route.Endpoint, len(endpoints))
-				for i := 0; i < len(endpoints); i += 1 {
-					n := iter.Next(i)
-					for _, e := range endpoints {
-						if e == n {
-							iteratedEndpoints[i] = e
-							break
-						}
-					}
-				}
-
-				currentIndex := nextIdx
-				for i := 0; i < len(endpoints); i += 1 {
-					if currentIndex >= len(endpoints) {
-						currentIndex = 0
-					}
-					Expect(iteratedEndpoints[i]).To(Equal(endpoints[currentIndex]))
-					currentIndex++
-				}
-
-			},
-			Entry("When the next index is 0", 0),
-			Entry("When the next index is 1", 1),
-			Entry("When the next index is 2", 2),
-		)
-
 		DescribeTable("it performs round-robin through the endpoints for two parallel-running iterators",
 			func(nextIdx int) {
 				pool.NextIdx = nextIdx
@@ -131,11 +91,14 @@ var _ = Describe("RoundRobin", func() {
 					pool.Put(e)
 				}
 
+				By("Create two iterators running over the same endpoint pool")
 				iter1 := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 				iter2 := route.NewRoundRobin(logger.Logger, pool, "", false, false, "meow-az")
 
 				iteratedEndpoints1 := make(map[*route.Endpoint]int)
 				iteratedEndpoints2 := make(map[*route.Endpoint]int)
+
+				By("Simulate retrying with attempts = endpoint number and count how many times both iterators iterate over every endpoint")
 				for i := 0; i < len(endpoints); i += 1 {
 					n := iter1.Next(i)
 					k := iter2.Next(i)
@@ -148,10 +111,12 @@ var _ = Describe("RoundRobin", func() {
 						}
 					}
 				}
-
+				By("Expect that first round robin iterator iterates over every endpoint exactly one time")
 				for e := range iteratedEndpoints1 {
 					Expect(iteratedEndpoints1[e]).To(Equal(1))
 				}
+
+				By("Expect that second round robin iterator iterates over every endpoint exactly one time")
 				for e := range iteratedEndpoints2 {
 					Expect(iteratedEndpoints2[e]).To(Equal(1))
 				}

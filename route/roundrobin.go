@@ -96,6 +96,10 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 	if r.nextIdx == -1 {
 		r.nextIdx = r.pool.NextIndex()
 	}
+	// Check the next index of iterator in case the pool size decreased
+	if r.nextIdx >= poolSize {
+		r.nextIdx = 0
+	}
 
 	startingIndex := r.nextIdx
 	currentIndex := startingIndex
@@ -107,7 +111,7 @@ func (r *RoundRobin) next(attempt int) *endpointElem {
 
 		// We tried using the actual modulo operator, but it has a 10x performance penalty
 		nextIndex = currentIndex + 1
-		if nextIndex == poolSize {
+		if nextIndex >= poolSize {
 			nextIndex = 0
 		}
 
