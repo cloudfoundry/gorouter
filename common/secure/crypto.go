@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -64,10 +65,13 @@ func NewPbkdf2(input []byte, keyLen int) []byte {
 }
 
 func (gcm *AesGCM) generateNonce() ([]byte, error) {
-	return RandomBytes(uint(gcm.NonceSize()))
+	return RandomBytes(gcm.NonceSize())
 }
 
-func RandomBytes(size uint) ([]byte, error) {
+func RandomBytes(size int) ([]byte, error) {
+	if size < 0 {
+		return nil, fmt.Errorf("cannot generate a negative number of random bytes")
+	}
 	b := make([]byte, size)
 	_, err := rand.Read(b)
 	if err != nil {

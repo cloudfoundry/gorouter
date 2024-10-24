@@ -34,7 +34,7 @@ func RegisterAddr(reg *registry.RouteRegistry, path string, addr string, cfg Reg
 	host, portStr, err := net.SplitHostPort(addr)
 	Expect(err).NotTo(HaveOccurred())
 
-	port, err := strconv.Atoi(portStr)
+	port, err := strconv.ParseUint(portStr, 10, 16)
 	Expect(err).NotTo(HaveOccurred())
 	reg.Register(
 		route.Uri(path),

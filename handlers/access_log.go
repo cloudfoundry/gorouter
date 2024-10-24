@@ -87,17 +87,19 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 
 type countingReadCloser struct {
 	delegate io.ReadCloser
-	count    uint32
+	count    uint64
 }
 
 func (crc *countingReadCloser) Read(b []byte) (int, error) {
 	n, err := crc.delegate.Read(b)
-	atomic.AddUint32(&crc.count, uint32(n))
+	// #nosec G115 - we should never have a negative number of bytes read, so no overflow issues here
+	atomic.AddUint64(&crc.count, uint64(n))
 	return n, err
 }
 
 func (crc *countingReadCloser) GetCount() int {
-	return int(atomic.LoadUint32(&crc.count))
+	// #nosec G115 - we would only have overflow issues here if an http response was more than 9,223,372,036,854,775,807 bytes.
+	return int(atomic.LoadUint64(&crc.count))
 }
 
 func (crc *countingReadCloser) Close() error {
