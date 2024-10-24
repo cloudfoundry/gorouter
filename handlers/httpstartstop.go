@@ -57,6 +57,7 @@ func (hh *httpStartStopHandler) ServeHTTP(rw http.ResponseWriter, r *http.Reques
 
 	next(rw, r)
 
+	// #nosec G115 - http status codes are `int` values, but dropsonde requires int32. per the RFC, it will only ever be 3 digits so ignore any loss/overflow due to conversion
 	startStopEvent := factories.NewHttpStartStop(r, int32(prw.Status()), int64(prw.Size()), events.PeerType_Server, requestID)
 	startStopEvent.StartTimestamp = proto.Int64(startTime.UnixNano())
 
