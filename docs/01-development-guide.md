@@ -10,12 +10,6 @@ tags: [ routing-release,gorouter ]
 
 Please report all issues and feature requests in [cloudfoundry/routing-release](https://github.com/cloudfoundry/routing-release).
 
-## Contributing
-
-Please read the [contributors'
-guide](https://github.com/cloudfoundry/gorouter/blob/main/CONTRIBUTING.md) and our [Development Guide for
-Gorouter](https://github.com/cloudfoundry/gorouter/blob/main/docs/gorouter_development_guide.md).
-
 ### Setup
 
 Gorouter dependencies are managed with

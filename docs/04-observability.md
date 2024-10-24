@@ -1,5 +1,10 @@
-# Observability
+---
+title: Observability
+expires_at: never
+tags: [ routing-release,gorouter ]
+---
 
+# Observability
 
 ## Instrumentation
 
@@ -43,7 +48,9 @@ $ curl "http://someuser:somepass@localhost:8080/routes"
   ]
 }
 ```
-**NOTE:** This endpoint is internal only, and may change in the future. To safeguard
+
+> [!NOTE]
+> This endpoint is internal only, and may change in the future. To safeguard
 against changes, rely on the `/var/vcap/jobs/gorouter/bin/retrieve-local-routes` script
 to get this information.
 
@@ -228,6 +235,7 @@ $ curl "http://someuser:somepass@10.0.32.15:8080/varz"
   "uuid": "0-c7fd7d76-f8d8-46b7-7a1c-7a59bcf7e286"
 }
 ```
+
 </details>
 
 ### Profiling the Server
@@ -243,16 +251,15 @@ ssh -L localhost:8080:[INTERNAL_SERVER_IP]:17001 vcap@[BOSH_DIRECTOR]
 go tool pprof http://localhost:8080/debug/pprof/profile
 ```
 
-
 ## Logs
 
 The router's logging is specified in its YAML configuration file. It supports
 the following log levels:
 
 * `fatal` - A fatal error has occurred that makes gorouter unable to handle any
-  requests.  Examples: the router can't bind to its TCP port, a CF component has
+  requests. Examples: the router can't bind to its TCP port, a CF component has
   published invalid data to the router.
-* `error` - An unexpected error has occurred.  Examples: the router failed to
+* `error` - An unexpected error has occurred. Examples: the router failed to
   fetch token from UAA service.
 * `info` - An expected event has occurred. Examples: the router started or
   exited, the router has begun to prune routes for stale droplets.
@@ -283,29 +290,32 @@ The following log messages are emitted any time the routing table changes:
 Examples:
 
 Route mapped to existing application with 1 app instance:
+
 ```
 {"log_level":1,"timestamp":"2020-08-27T22:59:43.462087363Z","message":"route-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com"}}
 {"log_level":1,"timestamp":"2020-08-27T22:59:43.462279999Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61002","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 ```
 
 App with two mapped routes scaled up from 1 instance to 2:
+
 ```
 {"log_level":1,"timestamp":"2020-08-27T22:59:59.350998043Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 {"log_level":1,"timestamp":"2020-08-27T22:59:59.351131999Z","message":"endpoint-registered","source":"vcap.gorouter.registry","data":{"uri":"foo.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 ```
 
 App with two mapped routes scaled down from 2 instances to 1:
+
 ```
 {"log_level":1,"timestamp":"2020-08-27T23:00:27.122616625Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 {"log_level":1,"timestamp":"2020-08-27T23:00:27.123043785Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"foo.springgreen.cf-app.com","backend":"10.0.1.11:61006","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 ```
 
 Route unmapped from application with 1 app instance:
+
 ```
 {"log_level":1,"timestamp":"2020-08-27T23:00:46.702876112Z","message":"endpoint-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com","backend":"10.0.1.11:61002","modification_tag":{"guid":"","index":0},"isolation_segment":"-","isTLS":true}}
 {"log_level":1,"timestamp":"2020-08-27T23:00:46.703133349Z","message":"route-unregistered","source":"vcap.gorouter.registry","data":{"uri":"a.springgreen.cf-app.com"}}
 ```
-
 
 ### Access logs
 

@@ -1,3 +1,10 @@
+---
+title: Features
+expires_at: never
+tags: [ routing-release,gorouter ]
+---
+
+
 # Features
 
 ## Dynamic Routing Table
@@ -177,7 +184,8 @@ Note that if `router.backends.enable_tls` is true and `host` and `tls_port`
 happens to match a registered `host` and `port` pair, this `host` and `port`
 pair will be unregistered. The reverse is also true.
 
-> **Note:** In order to use `nats-pub` to register a route, you must install the
+> [!NOTE]
+> In order to use `nats-pub` to register a route, you must install the
 > [gem](https://github.com/nats-io/ruby-nats) on a Cloud Foundry VM. It's
 > easiest on a VM that has ruby as a package, such as the API VM. Find the ruby
 > installed in `/var/vcap/packages`, export your PATH variable to include the bin
@@ -274,10 +282,14 @@ Least connection based load balancing will select the endpoint with the least
 number of connections. If multiple endpoints match with the same number of least
 connections, it will select a random one within those least connections.
 
-_NOTE: Gorouter currently only supports changing the load balancing strategy at
+> [!NOTE]
+> Gorouter currently only supports changing the load balancing strategy at
 the gorouter level and does not yet support a finer-grained level such as
-route-level. Therefore changing the load balancing algorithm from the default
-(round-robin) should be proceeded with caution._
+route-level. 
+> Therefore changing the load balancing algorithm from the default
+(round-robin) should be proceeded with caution.
+>
+> Implementation of customizable LB Algorithm (per-route) is being tracked in [RFC-0027](https://github.com/cloudfoundry/community/issues/909)
 
 ## When terminating TLS in front of Gorouter with a component that does not support sending HTTP headers
 
