@@ -8,13 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/lager/v3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/exp/zapslog"
 	"go.uber.org/zap/zapcore"
 )
 
 var (
-	conf        dynamicLoggingConfig
+	Conf        DynamicLoggingConfig
 	baseLogger  *slog.Logger
 	writeSyncer = &dynamicWriter{w: os.Stdout}
 	mutex       sync.Mutex
@@ -23,7 +24,7 @@ var (
 /*
 dynamicLoggingConfig holds dynamic configuration for the time encoding and logging level.
 */
-type dynamicLoggingConfig struct {
+type DynamicLoggingConfig struct {
 	encoding string
 	level    zap.AtomicLevel
 }
@@ -74,10 +75,10 @@ SetTimeEncoder dynamically sets the time encoder at runtime:
 All other values: The encoder is set to an Epoch encoder
 */
 func SetTimeEncoder(enc string) {
-	conf.encoding = enc
+	Conf.encoding = enc
 }
 
-func (e *dynamicLoggingConfig) encodeTime(t time.Time, pae zapcore.PrimitiveArrayEncoder) {
+func (e *DynamicLoggingConfig) encodeTime(t time.Time, pae zapcore.PrimitiveArrayEncoder) {
 	switch e.encoding {
 	case "rfc3339":
 		RFC3339Formatter()(t, pae)
@@ -95,7 +96,27 @@ func SetLoggingLevel(level string) {
 	if err != nil {
 		panic(err)
 	}
-	conf.level.SetLevel(zapLevel)
+	Conf.level.SetLevel(zapLevel)
+}
+
+// This exists to be able to export the logging level configs to the debugserver
+func (loggingConf DynamicLoggingConfig) SetMinLevel(level lager.LogLevel) {
+	Conf.level.SetLevel(toZapLevel(level))
+}
+
+func toZapLevel(level lager.LogLevel) zapcore.Level {
+	switch level {
+	case lager.DEBUG:
+		return zapcore.DebugLevel
+	case lager.INFO:
+		return zapcore.InfoLevel
+	case lager.ERROR:
+		return zapcore.ErrorLevel
+	case lager.FATAL:
+		return zapcore.FatalLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
 
 type Logger interface {
@@ -108,14 +129,14 @@ timestamp format and writeSyncer.
 func initializeLogger() *slog.Logger {
 	zapLevel := zap.InfoLevel
 
-	conf = dynamicLoggingConfig{encoding: "epoch", level: zap.NewAtomicLevelAt(zapLevel)}
+	Conf = DynamicLoggingConfig{encoding: "epoch", level: zap.NewAtomicLevelAt(zapLevel)}
 
 	zapConfig := zapcore.EncoderConfig{
 		MessageKey:    "message",
 		LevelKey:      "log_level",
 		EncodeLevel:   numberLevelFormatter,
 		TimeKey:       "timestamp",
-		EncodeTime:    conf.encodeTime,
+		EncodeTime:    Conf.encodeTime,
 		EncodeCaller:  zapcore.ShortCallerEncoder,
 		StacktraceKey: "stack_trace",
 	}
@@ -123,7 +144,7 @@ func initializeLogger() *slog.Logger {
 	zapCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zapConfig),
 		writeSyncer,
-		conf.level,
+		Conf.level,
 	)
 
 	zapHandler := zapslog.NewHandler(zapCore, zapslog.WithCaller(true))

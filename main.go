@@ -15,7 +15,6 @@ import (
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
 	mr "code.cloudfoundry.org/go-metric-registry"
-	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
@@ -107,8 +106,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		reconfigurableSink := lager.ReconfigurableSink{}
-		_, err = debugserver.Run(c.DebugAddr, &reconfigurableSink)
+		_, err = debugserver.Run(c.DebugAddr, *grlog.Conf)
 		if err != nil {
 			logger.Error("failed-to-start-debug-server", grlog.ErrAttr(err))
 		}
