@@ -178,7 +178,7 @@ var _ = Describe("Logger", func() {
 
 				Expect(testSink.Lines()).To(HaveLen(1))
 				Expect(testSink.Lines()[0]).To(MatchRegexp(
-					`{"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"%s","data":{"error":"%s"}}`, action, err.Error(),
+					`{"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"%s","data":{"error":"%s"}`, action, err.Error(),
 				))
 			})
 		})

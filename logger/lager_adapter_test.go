@@ -55,7 +55,7 @@ var _ = Describe("LagerAdapter", func() {
 				lagerLogger.Info(message)
 				Expect(testSink.Lines()).To(HaveLen(1))
 				Expect(testSink.Lines()[0]).To(MatchRegexp(
-					`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"%s.%s","data":{}}`,
+					`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"%s.%s"}`,
 					message,
 					prefix,
 					component,
@@ -70,7 +70,7 @@ var _ = Describe("LagerAdapter", func() {
 				lagerLogger.Info(message)
 				Expect(testSink.Lines()).To(HaveLen(1))
 				Expect(testSink.Lines()[0]).To(MatchRegexp(
-					`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"%s.%s.%s","data":{}}`,
+					`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"%s","source":"%s.%s.%s"}`,
 					message,
 					prefix,
 					component,

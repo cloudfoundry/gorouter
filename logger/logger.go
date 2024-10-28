@@ -126,7 +126,7 @@ func initializeLogger() *slog.Logger {
 		conf.level,
 	)
 
-	zapHandler := zapslog.NewHandler(zapCore, &zapslog.HandlerOptions{AddSource: true})
+	zapHandler := zapslog.NewHandler(zapCore, zapslog.WithCaller(true))
 	slogFrontend := slog.New(zapHandler)
 	return slogFrontend
 }
