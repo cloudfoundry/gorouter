@@ -152,7 +152,7 @@ type RoutingApiConfig struct {
 
 type OAuthConfig struct {
 	TokenEndpoint     string `yaml:"token_endpoint"`
-	Port              uint16 `yaml:"port"`
+	Port              int    `yaml:"port"`
 	SkipSSLValidation bool   `yaml:"skip_ssl_validation"`
 	ClientName        string `yaml:"client_name"`
 	ClientSecret      string `yaml:"client_secret"`

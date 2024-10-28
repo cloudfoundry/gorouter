@@ -654,7 +654,7 @@ oauth:
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(config.OAuth.TokenEndpoint).To(Equal("uaa.internal"))
-			Expect(config.OAuth.Port).To(Equal(uint16(8443)))
+			Expect(config.OAuth.Port).To(Equal(int(8443)))
 			Expect(config.OAuth.SkipSSLValidation).To(Equal(true))
 			Expect(config.OAuth.ClientName).To(Equal("client-name"))
 			Expect(config.OAuth.ClientSecret).To(Equal("client-secret"))

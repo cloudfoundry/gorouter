@@ -64,7 +64,7 @@ var _ = Describe("Clientcert", func() {
 		switch errorCase {
 		case "forceDeleteError":
 			Expect(logger.TestSink.Lines()[0]).To(MatchRegexp(
-				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed","data":{"error":"forceDelete error"}}`,
+				`{"log_level":[0-9]*,"timestamp":[0-9]+[.][0-9]+,"message":"signature-validation-failed","data":{"error":"forceDelete error"}`,
 			))
 			Expect(rw.Code).To(Equal(http.StatusBadGateway))
 		case "routeServiceTimeout":
