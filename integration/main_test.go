@@ -1115,7 +1115,7 @@ var _ = Describe("Router Integration", func() {
 
 		Context("when tls for uaa is disabled", func() {
 			It("fails fast", func() {
-				cfg.OAuth.Port = -1
+				cfg.OAuth.Port = 0
 				writeConfig(cfg, cfgFile)
 
 				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
@@ -1433,12 +1433,12 @@ func uriAndPort(url string) (string, int) {
 	return uri, port
 }
 
-func hostnameAndPort(url string) (string, int) {
+func hostnameAndPort(url string) (string, uint16) {
 	parts := strings.Split(url, ":")
 	hostname := parts[0]
 	port, err := strconv.ParseUint(parts[1], 10, 16)
 	Expect(err).ToNot(HaveOccurred())
-	return hostname, int(port)
+	return hostname, uint16(port)
 }
 
 func newMessageBus(c *config.Config) (*nats.Conn, error) {
