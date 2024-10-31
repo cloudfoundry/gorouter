@@ -106,7 +106,7 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		_, err = debugserver.Run(c.DebugAddr, *grlog.Conf)
+		_, err = debugserver.Run(c.DebugAddr, &grlog.Conf)
 		if err != nil {
 			logger.Error("failed-to-start-debug-server", grlog.ErrAttr(err))
 		}
