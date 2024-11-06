@@ -92,6 +92,8 @@ SetLoggingLevel dynamically sets the logging level at runtime. See https://githu
 for possible logging levels.
 */
 func SetLoggingLevel(level string) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	zapLevel, err := zapcore.ParseLevel(level)
 	if err != nil {
 		panic(err)
