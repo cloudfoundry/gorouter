@@ -461,6 +461,7 @@ type Config struct {
 	MaxIdleConns                 int  `yaml:"max_idle_conns,omitempty"`
 	MaxIdleConnsPerHost          int  `yaml:"max_idle_conns_per_host,omitempty"`
 	MaxRequestHeaderBytes        int  `yaml:"max_request_header_bytes"`
+	MaxResponseHeaderBytes       int  `yaml:"max_response_header_bytes"`
 	KeepAlive100ContinueRequests bool `yaml:"keep_alive_100_continue_requests"`
 
 	HTTPRewrite HTTPRewrite `yaml:"http_rewrite,omitempty"`
