@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -195,6 +196,29 @@ var _ = Describe("Headers", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(400))
 			Expect(resp.Header.Get(HeaderKeySignature)).To(BeEmpty())
+		})
+	})
+
+	Context("Header Limits", func() {
+		Context("when a response header size limit is configured", func() {
+			BeforeEach(func() {
+				testApp = NewUnstartedTestApp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Too-Large", strings.Repeat("0123456789", 10))
+					w.WriteHeader(200)
+				}))
+				testState.cfg.MaxResponseHeaderBytes = 80
+				testState.StartGorouterOrFail()
+				testApp.Start()
+				testState.register(testApp.Server, testAppRoute)
+			})
+
+			It("fails with 502 when the app exceeds the limit", func() {
+				req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+				resp, err := testState.client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
+				Expect(resp.Header).To(HaveKeyWithValue("X-Cf-Routererror", []string{"endpoint_failure (net/http: HTTP/1.x transport connection broken: net/http: server response headers exceeded 80 bytes; aborted)"}))
+			})
 		})
 	})
 })

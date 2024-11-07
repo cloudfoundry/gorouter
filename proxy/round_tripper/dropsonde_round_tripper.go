@@ -45,16 +45,17 @@ func (t *FactoryImpl) New(expectedServerName string, isRouteService bool, isHttp
 	customTLSConfig := utils.TLSConfigWithServerName(expectedServerName, template.TLSClientConfig, isRouteService)
 
 	newTransport := &http.Transport{
-		DialContext:           template.DialContext,
-		DisableKeepAlives:     template.DisableKeepAlives,
-		MaxIdleConns:          template.MaxIdleConns,
-		IdleConnTimeout:       template.IdleConnTimeout,
-		MaxIdleConnsPerHost:   template.MaxIdleConnsPerHost,
-		DisableCompression:    template.DisableCompression,
-		TLSClientConfig:       customTLSConfig,
-		TLSHandshakeTimeout:   template.TLSHandshakeTimeout,
-		ForceAttemptHTTP2:     isHttp2,
-		ExpectContinueTimeout: template.ExpectContinueTimeout,
+		DialContext:            template.DialContext,
+		DisableKeepAlives:      template.DisableKeepAlives,
+		MaxIdleConns:           template.MaxIdleConns,
+		IdleConnTimeout:        template.IdleConnTimeout,
+		MaxIdleConnsPerHost:    template.MaxIdleConnsPerHost,
+		DisableCompression:     template.DisableCompression,
+		TLSClientConfig:        customTLSConfig,
+		TLSHandshakeTimeout:    template.TLSHandshakeTimeout,
+		ForceAttemptHTTP2:      isHttp2,
+		ExpectContinueTimeout:  template.ExpectContinueTimeout,
+		MaxResponseHeaderBytes: template.MaxResponseHeaderBytes,
 	}
 	if t.IsInstrumented {
 		return NewDropsondeRoundTripper(newTransport)
