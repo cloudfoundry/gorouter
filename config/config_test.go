@@ -213,13 +213,13 @@ status:
 		})
 		It("sets MaxHeaderBytes", func() {
 			var b = []byte(`
-max_header_bytes: 10
+max_request_header_bytes: 10
 `)
 
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(config.MaxHeaderBytes).To(Equal(10))
+			Expect(config.MaxRequestHeaderBytes).To(Equal(10))
 		})
 
 		It("sets prometheus endpoint config", func() {

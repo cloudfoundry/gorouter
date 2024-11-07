@@ -63,7 +63,7 @@ var _ = Describe("MaxRequestSize", func() {
 
 	BeforeEach(func() {
 		cfg = &config.Config{
-			MaxHeaderBytes:           89,
+			MaxRequestHeaderBytes:    89,
 			LoadBalance:              config.LOAD_BALANCE_RR,
 			StickySessionCookieNames: config.StringSet{"blarg": struct{}{}},
 		}
@@ -216,7 +216,7 @@ var _ = Describe("MaxRequestSize", func() {
 	Describe("NewMaxRequestSize()", func() {
 		Context("when using a custom MaxHeaderBytes", func() {
 			BeforeEach(func() {
-				cfg.MaxHeaderBytes = 1234
+				cfg.MaxRequestHeaderBytes = 1234
 			})
 			It("returns a new requestSizeHandler using the provided size", func() {
 				Expect(rh.MaxSize).To(Equal(1234))
@@ -225,7 +225,7 @@ var _ = Describe("MaxRequestSize", func() {
 
 		Context("when using a negative MaxHeaderBytes", func() {
 			BeforeEach(func() {
-				cfg.MaxHeaderBytes = -1
+				cfg.MaxRequestHeaderBytes = -1
 			})
 			It("defaults to 1mb", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))
@@ -233,7 +233,7 @@ var _ = Describe("MaxRequestSize", func() {
 		})
 		Context("when using a zero-value MaxHeaderBytes", func() {
 			BeforeEach(func() {
-				cfg.MaxHeaderBytes = 0
+				cfg.MaxRequestHeaderBytes = 0
 			})
 			It("defaults to 1mb", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))
@@ -242,7 +242,7 @@ var _ = Describe("MaxRequestSize", func() {
 
 		Context("when using a >1mb MaxHeaderBytes", func() {
 			BeforeEach(func() {
-				cfg.MaxHeaderBytes = handlers.ONE_MB * 2
+				cfg.MaxRequestHeaderBytes = handlers.ONE_MB * 2
 			})
 			It("defaults  to 1mb if the provided size", func() {
 				Expect(rh.MaxSize).To(Equal(1024 * 1024))

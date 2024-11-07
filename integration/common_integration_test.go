@@ -137,7 +137,7 @@ func NewTestState() *testState {
 	}
 	cfg.OAuth.TokenEndpoint, cfg.OAuth.Port = hostnameAndPort(oauthServer.Addr())
 
-	cfg.MaxHeaderBytes = 48 * 1024 //1kb
+	cfg.MaxRequestHeaderBytes = 48 * 1024 //1kb
 
 	return &testState{
 		cfg: cfg,
