@@ -21,7 +21,7 @@ const ONE_MB = 1024 * 1024 // bytes * kb
 // NewAccessLog creates a new handler that handles logging requests to the
 // access log
 func NewMaxRequestSize(cfg *config.Config, logger *slog.Logger) *MaxRequestSize {
-	maxSize := cfg.MaxHeaderBytes
+	maxSize := cfg.MaxRequestHeaderBytes
 
 	if maxSize < 1 {
 		maxSize = ONE_MB

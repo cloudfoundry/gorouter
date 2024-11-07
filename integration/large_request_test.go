@@ -25,7 +25,7 @@ var _ = Describe("Large requests", func() {
 		testState = NewTestState()
 		testState.EnableAccessLog()
 		testState.EnableMetron()
-		testState.cfg.MaxHeaderBytes = 1 * 1024 // 1kb
+		testState.cfg.MaxRequestHeaderBytes = 1 * 1024 // 1kb
 		testState.StartGorouterOrFail()
 
 		appURL = "echo-app." + test_util.LocalhostDNS
