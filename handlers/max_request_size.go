@@ -41,17 +41,23 @@ func NewMaxRequestSize(cfg *config.Config, logger *slog.Logger) *MaxRequestSize 
 
 func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	logger := LoggerWithTraceInfo(m.logger, r)
-	reqSize := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 5 // add 5 bytes for space-separation of method, URI, protocol, and /r/n
 
-	for k, v := range r.Header {
-		valueLen := 0
-		for _, value := range r.Header.Values(k) {
-			valueLen += len(value)
+	// Four additional bytes for the two spaces and \r\n:
+	//   GET / HTTP/1.1\r\n
+	reqSize := len(r.Method) + len(r.URL.RequestURI()) + len(r.Proto) + 4
+
+	// Host header which is not passed on to us, plus eight bytes for 'Host: ' and \r\n
+	reqSize += len(r.Host) + 8
+
+	// Go doesn't split header values on commas, instead it only splits the value when it's
+	// provided via repeated header keys. Therefore we have to account for each value of a repeated
+	// header as well as its key.
+	for k, vv := range r.Header {
+		for _, v := range vv {
+			// Four additional bytes for the colon and space after the header key and \r\n.
+			reqSize += len(k) + len(v) + 4
 		}
-		reqSize += len(k) + valueLen + 4 + len(v) - 1 // add padding for ': ' and newlines and comma delimiting of multiple values
 	}
-
-	reqSize += len(r.Host) + 8 // add padding for "Host: " and newlines
 
 	if reqSize >= m.MaxSize {
 		reqInfo, err := ContextRequestInfo(r)

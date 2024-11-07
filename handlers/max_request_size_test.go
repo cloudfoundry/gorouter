@@ -166,6 +166,17 @@ var _ = Describe("MaxRequestSize", func() {
 			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
 		})
 	})
+	Context("when a repeated header has a short value and long key taking it over the limit", func() {
+		BeforeEach(func() {
+			for i := 0; i < 10; i++ {
+				header.Add("foobar", "m")
+			}
+		})
+		It("throws an http 431", func() {
+			handleRequest()
+			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
+		})
+	})
 	Context("when enough normally-sized headers put the request over the limit", func() {
 		BeforeEach(func() {
 			header.Add("header1", "smallRequest")
