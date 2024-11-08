@@ -191,6 +191,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				slog.Float64("dns-lookup-time", trace.DnsTime()),
 				slog.Float64("dial-time", trace.DialTime()),
 				slog.Float64("tls-handshake-time", trace.TlsTime()),
+				slog.String("local-address", trace.LocalAddr()),
 			)
 
 			if err != nil {
@@ -255,6 +256,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 				slog.Float64("dns-lookup-time", trace.DnsTime()),
 				slog.Float64("dial-time", trace.DialTime()),
 				slog.Float64("tls-handshake-time", trace.TlsTime()),
+				slog.String("local-address", trace.LocalAddr()),
 			)
 
 			if err != nil {
@@ -347,6 +349,7 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	reqInfo.DialFinishedAt = trace.DialDone()
 	reqInfo.TlsHandshakeStartedAt = trace.TlsStart()
 	reqInfo.TlsHandshakeFinishedAt = trace.TlsDone()
+	reqInfo.LocalAddress = trace.LocalAddr()
 
 	if res != nil && endpoint.PrivateInstanceId != "" && !requestSentToRouteService(request) {
 		setupStickySession(
