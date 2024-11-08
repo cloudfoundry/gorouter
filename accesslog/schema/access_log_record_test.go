@@ -314,6 +314,43 @@ var _ = Describe("AccessLogRecord", func() {
 				Eventually(r).Should(Say(`x_cf_routererror:"-"`))
 			})
 		})
+
+		Context("when extra_fields is set to [local_address]", func() {
+			Context("and the local address is empty", func() {
+				It("makes a record with the local address set to -", func() {
+					record.ExtraFields = []string{"local_address"}
+
+					r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+					Eventually(r).Should(Say(`local_address:"-"`))
+				})
+			})
+			Context("and the local address contains an address", func() {
+				It("makes a record with the local address set to that address", func() {
+					record.ExtraFields = []string{"local_address"}
+					record.LocalAddress = "10.0.0.1:34823"
+
+					r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+					Eventually(r).Should(Say(`local_address:"10.0.0.1:34823"`))
+				})
+			})
+		})
+
+		Context("when extra_fields is set to [foobarbazz]", func() {
+			It("ignores it", func() {
+				record.ExtraFields = []string{"foobarbazz"}
+				record.LocalAddress = "10.0.0.1:34823"
+
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(Say("foobarbazz"))
+			})
+			It("does not log local_address", func() {
+				record.ExtraFields = []string{"foobarbazz"}
+				record.LocalAddress = "10.0.0.1:34823"
+
+				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
+				Consistently(r).ShouldNot(Say(`local_address:"10.0.0.1:34823"`))
+			})
+		})
 	})
 
 	Describe("WriteTo", func() {

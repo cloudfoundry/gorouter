@@ -4,6 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -20,6 +21,7 @@ type accessLog struct {
 	accessLogger       accesslog.AccessLogger
 	extraHeadersToLog  []string
 	logAttemptsDetails bool
+	extraFields        []string
 	logger             *slog.Logger
 }
 
@@ -29,12 +31,14 @@ func NewAccessLog(
 	accessLogger accesslog.AccessLogger,
 	extraHeadersToLog []string,
 	logAttemptsDetails bool,
+	extraFields []string,
 	logger *slog.Logger,
 ) negroni.Handler {
 	return &accessLog{
 		accessLogger:       accessLogger,
 		extraHeadersToLog:  extraHeadersToLog,
 		logAttemptsDetails: logAttemptsDetails,
+		extraFields:        deduplicate(extraFields),
 		logger:             logger,
 	}
 }
@@ -46,6 +50,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		Request:            r,
 		ExtraHeadersToLog:  a.extraHeadersToLog,
 		LogAttemptsDetails: a.logAttemptsDetails,
+		ExtraFields:        a.extraFields,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}
@@ -82,6 +87,8 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
 	alr.FinishedAt = reqInfo.FinishedAt
 
+	alr.LocalAddress = reqInfo.LocalAddress
+
 	a.accessLogger.Log(*alr)
 }
 
@@ -104,4 +111,20 @@ func (crc *countingReadCloser) GetCount() int {
 
 func (crc *countingReadCloser) Close() error {
 	return crc.delegate.Close()
+}
+
+func deduplicate[S ~[]E, E comparable](s S) S {
+	// costs some memory and requires an allocation but reduces complexity from O(n^2)
+	// to O(n) where n = len(s)
+	m := make(map[E]struct{}, len(s))
+	return slices.DeleteFunc(s, func(s E) bool {
+		_, ok := m[s]
+		if ok {
+			return true
+		}
+
+		m[s] = struct{}{}
+
+		return false
+	})
 }

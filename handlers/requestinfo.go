@@ -71,6 +71,8 @@ type RequestInfo struct {
 	ShouldRouteToInternalRouteService bool
 	FailedAttempts                    int
 
+	LocalAddress string
+
 	// RoundTripSuccessful will be set once a request has successfully reached a backend instance.
 	RoundTripSuccessful bool
 

@@ -186,6 +186,7 @@ type LoggingConfig struct {
 	RedactQueryParams      string       `yaml:"redact_query_params"`
 	EnableAttemptsDetails  bool         `yaml:"enable_attempts_details"`
 	Format                 FormatConfig `yaml:"format"`
+	ExtraAccessLogFields   []string     `yaml:"extra_access_log_fields"`
 
 	// This field is populated by the `Process` function.
 	JobName string `yaml:"-"`

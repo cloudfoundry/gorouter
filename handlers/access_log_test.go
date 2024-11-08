@@ -81,7 +81,7 @@ var _ = Describe("AccessLog", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.Use(handlers.NewProxyWriter(logger.Logger))
-		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
+		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, nil, logger.Logger))
 		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -116,6 +116,24 @@ var _ = Describe("AccessLog", func() {
 		Expect(alr.RouterError).To(BeEmpty())
 	})
 
+	Context("when duplicate extraFields are set", func() {
+		BeforeEach(func() {
+			handler = negroni.New()
+			handler.Use(handlers.NewRequestInfo())
+			handler.Use(handlers.NewProxyWriter(logger.Logger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, []string{"local_address", "local_address"}, logger.Logger))
+			handler.Use(nextHandler)
+		})
+		It("only logs them once", func() {
+			handler.ServeHTTP(resp, req)
+			Expect(accessLogger.LogCallCount()).To(Equal(1))
+
+			alr := accessLogger.LogArgsForCall(0)
+
+			Expect(alr.ExtraFields).To(Equal([]string{"local_address"}))
+		})
+	})
+
 	Context("when there are backend request headers on the context", func() {
 		BeforeEach(func() {
 			extraHeadersHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -146,7 +164,7 @@ var _ = Describe("AccessLog", func() {
 		BeforeEach(func() {
 			handler = negroni.New()
 			handler.UseFunc(testProxyWriterHandler)
-			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, logger.Logger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, nil, logger.Logger))
 			handler.Use(nextHandler)
 		})
 		It("calls Panic on the logger", func() {
