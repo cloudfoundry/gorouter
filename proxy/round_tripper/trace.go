@@ -11,8 +11,9 @@ import (
 // requestTracer holds trace data of a single request.
 type requestTracer struct {
 	gotConn      atomic.Bool
-	connInfo     atomic.Pointer[httptrace.GotConnInfo]
+	connReused   atomic.Bool
 	wroteHeaders atomic.Bool
+	localAddr    atomic.Pointer[string]
 
 	// all times are stored as returned by time.Time{}.UnixNano()
 	dnsStart  atomic.Int64
@@ -26,8 +27,9 @@ type requestTracer struct {
 // Reset the trace data. Helpful when performing the same request again.
 func (t *requestTracer) Reset() {
 	t.gotConn.Store(false)
-	t.connInfo.Store(nil)
+	t.connReused.Store(false)
 	t.wroteHeaders.Store(false)
+	t.localAddr.Store(nil)
 	t.dnsStart.Store(0)
 	t.dnsDone.Store(0)
 	t.dialStart.Store(0)
@@ -49,11 +51,15 @@ func (t *requestTracer) WroteHeaders() bool {
 // ConnReused returns true if the traced request used an idle connection.
 // it returns false if no idle connection was used or if the information was unavailable.
 func (t *requestTracer) ConnReused() bool {
-	info := t.connInfo.Load()
-	if info != nil {
-		return info.Reused
+	return t.connReused.Load()
+}
+
+func (t *requestTracer) LocalAddr() string {
+	p := t.localAddr.Load()
+	if p == nil {
+		return ""
 	}
-	return false
+	return *p
 }
 
 func (t *requestTracer) DnsStart() time.Time {
@@ -121,7 +127,10 @@ func traceRequest(req *http.Request) (*http.Request, *requestTracer) {
 	r2 := req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
 		GotConn: func(info httptrace.GotConnInfo) {
 			t.gotConn.Store(true)
-			t.connInfo.Store(&info)
+			t.connReused.Store(info.Reused)
+			la := info.Conn.LocalAddr().String()
+			t.localAddr.Store(&la)
+
 			// FIXME: due to https://github.com/golang/go/issues/31259 this breaks our acceptance tests and is dangerous
 			//        disabled for now even though this will reduce the number of requests we can retry
 			// if !info.Reused {
