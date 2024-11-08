@@ -38,7 +38,10 @@ const (
 	AuthNegotiateHeaderCookieMaxAgeInSeconds = 60
 )
 
-var NoEndpointsAvailable = errors.New("No endpoints available")
+var (
+	NoEndpointsAvailable   = errors.New("No endpoints available")
+	TooManyResponseHeaders = errors.New("too many response headers")
+)
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
 type ProxyRoundTripper interface {
@@ -178,6 +181,18 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			}
 			res, err = rt.backendRoundTrip(request, endpoint, iter, logger)
 
+			logger = logger.With(
+				slog.Int("attempt", attempt),
+				slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+				slog.Int("num-endpoints", numberOfEndpoints),
+				slog.Bool("got-connection", trace.GotConn()),
+				slog.Bool("wrote-headers", trace.WroteHeaders()),
+				slog.Bool("conn-reused", trace.ConnReused()),
+				slog.Float64("dns-lookup-time", trace.DnsTime()),
+				slog.Float64("dial-time", trace.DialTime()),
+				slog.Float64("tls-handshake-time", trace.TlsTime()),
+			)
+
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
@@ -185,22 +200,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 
 				logger.Error("backend-endpoint-failed",
 					log.ErrAttr(err),
-					slog.Int("attempt", attempt),
-					slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					slog.Bool("retriable", retriable),
-					slog.Int("num-endpoints", numberOfEndpoints),
-					slog.Bool("got-connection", trace.GotConn()),
-					slog.Bool("wrote-headers", trace.WroteHeaders()),
-					slog.Bool("conn-reused", trace.ConnReused()),
-					slog.Float64("dns-lookup-time", trace.DnsTime()),
-					slog.Float64("dial-time", trace.DialTime()),
-					slog.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
 				iter.EndpointFailed(err)
 
 				if retriable {
 					continue
+				}
+			}
+
+			if res != nil && err == nil {
+				err = checkResponseHeaders(rt.config.MaxResponseHeaders, res.Header)
+				if err != nil {
+					logger.Error("backend-too-many-response-headers",
+						log.ErrAttr(err),
+						slog.Bool("retriable", false),
+					)
+					break
 				}
 			}
 
@@ -227,6 +244,19 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 			}
 
 			res, err = rt.timedRoundTrip(roundTripper, request, logger)
+
+			logger = logger.With(
+				slog.Int("attempt", attempt),
+				slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
+				slog.Int("num-endpoints", numberOfEndpoints),
+				slog.Bool("got-connection", trace.GotConn()),
+				slog.Bool("wrote-headers", trace.WroteHeaders()),
+				slog.Bool("conn-reused", trace.ConnReused()),
+				slog.Float64("dns-lookup-time", trace.DnsTime()),
+				slog.Float64("dial-time", trace.DialTime()),
+				slog.Float64("tls-handshake-time", trace.TlsTime()),
+			)
+
 			if err != nil {
 				reqInfo.FailedAttempts++
 				reqInfo.LastFailedAttemptFinishedAt = time.Now()
@@ -236,21 +266,24 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 					"route-service-connection-failed",
 					slog.String("route-service-endpoint", request.URL.String()),
 					log.ErrAttr(err),
-					slog.Int("attempt", attempt),
-					slog.String("vcap_request_id", request.Header.Get(handlers.VcapRequestIdHeader)),
 					slog.Bool("retriable", retriable),
-					slog.Int("num-endpoints", numberOfEndpoints),
-					slog.Bool("got-connection", trace.GotConn()),
-					slog.Bool("wrote-headers", trace.WroteHeaders()),
-					slog.Bool("conn-reused", trace.ConnReused()),
-					slog.Float64("dns-lookup-time", trace.DnsTime()),
-					slog.Float64("dial-time", trace.DialTime()),
-					slog.Float64("tls-handshake-time", trace.TlsTime()),
 				)
 
 				if retriable {
 					continue
 				}
+			}
+
+			if res != nil && err == nil {
+				err = checkResponseHeaders(rt.config.MaxResponseHeaders, res.Header)
+				if err != nil {
+					logger.Error("route-service-too-many-response-headers",
+						log.ErrAttr(err),
+						slog.Bool("retriable", false),
+					)
+					break
+				}
+
 			}
 
 			if res != nil && (res.StatusCode < 200 || res.StatusCode >= 300) {
@@ -389,6 +422,24 @@ func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *htt
 	}
 
 	return endpoint, nil
+}
+
+func checkResponseHeaders(maxCount int, headers http.Header) error {
+	if maxCount > 0 {
+		// Go doesn't split header values on commas, instead it only splits the value when it's
+		// provided via repeated header keys. We can therefore get the number of header lines by
+		// checking how many values are in the map.
+		hdrCount := 0
+		for _, vv := range headers {
+			hdrCount += len(vv)
+		}
+
+		if hdrCount > maxCount {
+			return TooManyResponseHeaders
+		}
+	}
+
+	return nil
 }
 
 func setRequestXCfInstanceId(request *http.Request, endpoint *route.Endpoint) {

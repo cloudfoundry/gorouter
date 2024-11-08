@@ -64,6 +64,7 @@ var _ = Describe("MaxRequestSize", func() {
 	BeforeEach(func() {
 		cfg = &config.Config{
 			MaxRequestHeaderBytes:    89,
+			MaxRequestHeaders:        15,
 			LoadBalance:              config.LOAD_BALANCE_RR,
 			StickySessionCookieNames: config.StringSet{"blarg": struct{}{}},
 		}
@@ -175,6 +176,18 @@ var _ = Describe("MaxRequestSize", func() {
 		It("throws an http 431", func() {
 			handleRequest()
 			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
+		})
+	})
+	Context("when there are too many headers", func() {
+		BeforeEach(func() {
+			for i := 0; i < 16; i++ {
+				header.Add("f", "m")
+			}
+		})
+		It("throws an http 431", func() {
+			handleRequest()
+			Expect(result.StatusCode).To(Equal(http.StatusRequestHeaderFieldsTooLarge))
+			Expect(result.Header).To(HaveKeyWithValue("X-Cf-Routererror", []string{"max-request-size-exceeded"}))
 		})
 	})
 	Context("when enough normally-sized headers put the request over the limit", func() {

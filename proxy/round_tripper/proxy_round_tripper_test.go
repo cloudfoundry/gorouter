@@ -1753,6 +1753,49 @@ var _ = Describe("ProxyRoundTripper", func() {
 					Expect(transport.CancelRequestArgsForCall(0)).To(Equal(req))
 				})
 			})
+			Context("when response headers are limited in count", func() {
+				// Note: we can only test the header count as the limit on header bytes is
+				// implemented in the http.Transport which we fake for these tests.
+				BeforeEach(func() {
+					cfg.MaxResponseHeaders = 20
+				})
+				It("returns an error when the response exceeds it", func() {
+					transport.RoundTripStub = func(r *http.Request) (*http.Response, error) {
+						header := http.Header{}
+						for i := 0; i < 21; i++ {
+							header[fmt.Sprintf("header-%d", i)] = []string{"foobar"}
+						}
+
+						return &http.Response{
+							StatusCode: http.StatusTeapot,
+							Header:     header,
+						}, nil
+					}
+
+					_, err := proxyRoundTripper.RoundTrip(req)
+
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(Equal(round_tripper.TooManyResponseHeaders))
+				})
+				It("doesn't return an error when the response does not exceed it", func() {
+					transport.RoundTripStub = func(r *http.Request) (*http.Response, error) {
+						header := http.Header{}
+						for i := 0; i < 10; i++ {
+							header[fmt.Sprintf("header-%d", i)] = []string{"foobar"}
+						}
+
+						return &http.Response{
+							StatusCode: http.StatusTeapot,
+							Header:     header,
+						}, nil
+					}
+
+					res, err := proxyRoundTripper.RoundTrip(req)
+
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res.StatusCode).To(Equal(http.StatusTeapot))
+				})
+			})
 		})
 	})
 })

@@ -11,9 +11,10 @@ import (
 )
 
 type MaxRequestSize struct {
-	cfg     *config.Config
-	MaxSize int
-	logger  *slog.Logger
+	cfg      *config.Config
+	MaxSize  int
+	MaxCount int
+	logger   *slog.Logger
 }
 
 const ONE_MB = 1024 * 1024 // bytes * kb
@@ -33,9 +34,10 @@ func NewMaxRequestSize(cfg *config.Config, logger *slog.Logger) *MaxRequestSize 
 	}
 
 	return &MaxRequestSize{
-		MaxSize: maxSize,
-		logger:  logger,
-		cfg:     cfg,
+		MaxSize:  maxSize,
+		MaxCount: cfg.MaxRequestHeaders,
+		logger:   logger,
+		cfg:      cfg,
 	}
 }
 
@@ -49,6 +51,8 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	// Host header which is not passed on to us, plus eight bytes for 'Host: ' and \r\n
 	reqSize += len(r.Host) + 8
 
+	hdrCount := 0
+
 	// Go doesn't split header values on commas, instead it only splits the value when it's
 	// provided via repeated header keys. Therefore we have to account for each value of a repeated
 	// header as well as its key.
@@ -56,10 +60,11 @@ func (m *MaxRequestSize) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 		for _, v := range vv {
 			// Four additional bytes for the colon and space after the header key and \r\n.
 			reqSize += len(k) + len(v) + 4
+			hdrCount++
 		}
 	}
 
-	if reqSize >= m.MaxSize {
+	if reqSize >= m.MaxSize || (m.MaxCount > 0 && hdrCount > m.MaxCount) {
 		reqInfo, err := ContextRequestInfo(r)
 		if err != nil {
 			logger.Error("request-info-err", log.ErrAttr(err))
