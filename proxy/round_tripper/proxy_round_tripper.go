@@ -40,7 +40,7 @@ const (
 
 var (
 	NoEndpointsAvailable   = errors.New("No endpoints available")
-	TooManyResponseHeaders = errors.New("too many response headers")
+	TooManyResponseHeaders = errors.New("Too many response headers")
 )
 
 //go:generate counterfeiter -o fakes/fake_proxy_round_tripper.go . ProxyRoundTripper
