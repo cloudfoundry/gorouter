@@ -72,7 +72,7 @@ Recommended reading before diving into Gorouter code:
 
 - [Hypertext Transfer Protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Message_format)
 - [How to use interfaces in Go](https://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go)
-- [Golang Concurrency](http://www.golangbootcamp.com/book/concurrency)
+- [Golang Concurrency](https://go.dev/blog/pipelines)
 - [http.Transport.RoundTrip](https://golang.org/pkg/net/http/#Transport.RoundTrip)
 - [http.RoundTripper](https://golang.org/pkg/net/http/#RoundTripper)
 - [http.ResponseWriter](https://golang.org/pkg/net/http/#ResponseWriter)
