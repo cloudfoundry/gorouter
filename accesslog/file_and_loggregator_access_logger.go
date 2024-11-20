@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"log/syslog"
 	"os"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	"code.cloudfoundry.org/gorouter/accesslog/syslog"
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
 )
@@ -113,7 +113,7 @@ func CreateRunningAccessLogger(logger *slog.Logger, logsender schema.LogSender, 
 	}
 
 	if config.AccessLog.EnableStreaming {
-		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.LOG_INFO, config.Logging.Syslog)
+		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.SeverityInfo, syslog.FacilityUser, config.Logging.Syslog)
 		if err != nil {
 			logger.Error("error-creating-syslog-writer", log.ErrAttr(err))
 			return nil, err
