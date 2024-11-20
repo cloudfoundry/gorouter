@@ -218,6 +218,8 @@ var defaultLoggingConfig = LoggingConfig{
 	JobName:               "gorouter",
 	RedactQueryParams:     REDACT_QUERY_PARMS_NONE,
 	EnableAttemptsDetails: false,
+	SyslogNetwork:         "udp",
+	SyslogAddr:            "127.0.0.1:514",
 }
 
 type HeaderNameValue struct {
