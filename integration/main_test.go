@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -616,6 +617,78 @@ var _ = Describe("Router Integration", func() {
 			return string(gorouterSession.Out.Contents())
 		}
 		Consistently(contentsFunc).ShouldNot(ContainSubstring("Component Router registered successfully"))
+	})
+
+	Context("It starts up a debugserver", func() {
+		var (
+			testState    *testState
+			contentsFunc func() string = func() string {
+				return string(gorouterSession.Out.Contents())
+			}
+		)
+
+		BeforeEach(func() {
+
+			testState = NewTestState()
+			testState.cfg.DebugAddr = "127.0.0.1:17017"
+			gorouterSession = testState.StartGorouter()
+		})
+
+		It("can change the debugserver's logging level", func() {
+
+			Consistently(contentsFunc).ShouldNot(ContainSubstring(`{log_level":0,"timestamp"`))
+
+			request, err := http.NewRequest("PUT", fmt.Sprintf("http://%s/log-level", testState.cfg.DebugAddr), bytes.NewBufferString("debug"))
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := http.DefaultClient.Do(request)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			response.Body.Close()
+
+			Consistently(contentsFunc).Should(ContainSubstring(`{"log_level":0,"timestamp"`))
+
+			// And back to info level
+			gorouterSession.Out.Clear()
+			request, err = http.NewRequest("PUT", fmt.Sprintf("http://%s/log-level", testState.cfg.DebugAddr), bytes.NewBufferString("info"))
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err = http.DefaultClient.Do(request)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			response.Body.Close()
+
+			//Terminate everything just to generate some info logs
+			testState.StopAndCleanup()
+
+			Consistently(contentsFunc).ShouldNot(ContainSubstring(`{"log_level":0,"timestamp"`))
+			Eventually(contentsFunc).Should(ContainSubstring(`{"log_level":1,"timestamp"`))
+
+		})
+
+		It("Does not accept invalid debug levels", func() {
+
+			Consistently(contentsFunc).ShouldNot(ContainSubstring(`{log_level":0,"timestamp"`))
+
+			gorouterSession.Out.Clear()
+
+			request, err := http.NewRequest("PUT", fmt.Sprintf("http://%s/log-level", testState.cfg.DebugAddr), bytes.NewBufferString("meow"))
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := http.DefaultClient.Do(request)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			response.Body.Close()
+
+			Expect(gorouterSession.ExitCode()).To(Equal(-1))
+
+			Consistently(contentsFunc).ShouldNot(ContainSubstring(`{"log_level":0,"timestamp"`))
+			Eventually(contentsFunc).Should(ContainSubstring(`{"log_level":1,"timestamp"`))
+		})
+
 	})
 
 	Describe("loggregator metrics emitted", func() {
