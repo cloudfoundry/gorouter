@@ -110,6 +110,7 @@ type AccessLogRecord struct {
 	LogAttemptsDetails     bool
 	FailedAttempts         int
 	RoundTripSuccessful    bool
+	ExtraFields            []string
 	record                 []byte
 
 	// See the handlers.RequestInfo struct for details on these timings.
@@ -124,6 +125,8 @@ type AccessLogRecord struct {
 	TlsHandshakeFinishedAt      time.Time
 	AppRequestFinishedAt        time.Time
 	FinishedAt                  time.Time
+
+	LocalAddress string
 }
 
 func (r *AccessLogRecord) formatStartedAt() string {
@@ -317,6 +320,17 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 		b.WriteString(`backend_time:`)
 		b.WriteDashOrFloatValue(r.successfulAttemptTime())
+	}
+
+	// We have to consider the impact of iterating over a list. This technically allows to repeat
+	// some of the fields but it allows us to iterate over the list only once instead of once per
+	// field when we perform a [slices.Contains] check.
+	for _, field := range r.ExtraFields {
+		switch field {
+		case "local_address":
+			b.WriteString(`local_address:`)
+			b.WriteDashOrStringValue(r.LocalAddress)
+		}
 	}
 
 	b.AppendSpaces(false)
