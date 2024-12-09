@@ -45,7 +45,7 @@ var _ = Describe("Headers", func() {
 		})
 
 		It("does not follow the redirect and instead forwards it to the client", func() {
-			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute))
 
 			// this makes the test client NOT follow redirects, so that we can
 			// test that the return code is indeed 3xx

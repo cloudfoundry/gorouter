@@ -30,7 +30,7 @@ var _ = Describe("W3C tracing headers", func() {
 		appReceivedHeaders = make(chan http.Header, 1)
 
 		doRequest = func(headers http.Header) {
-			req := testState.newRequest(fmt.Sprintf("http://%s", hostname))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", hostname))
 
 			for headerName, headerVals := range headers {
 				for _, headerVal := range headerVals {

@@ -48,7 +48,7 @@ var _ = Describe("Route services", func() {
 					sigHeader := r.Header.Get("X-Cf-Proxy-Signature")
 					metadata := r.Header.Get("X-Cf-Proxy-Metadata")
 
-					req := testState.newRequest(forwardedURL)
+					req := testState.newGetRequest(forwardedURL)
 
 					req.Header.Add("X-CF-Forwarded-Url", forwardedURL)
 					req.Header.Add("X-Cf-Proxy-Metadata", metadata)
@@ -99,7 +99,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("succeeds", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 
@@ -112,7 +112,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("properly URL-encodes and decodes", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s?%s", appHostname, "param=a%0Ab"),
 				)
 
@@ -166,7 +166,7 @@ var _ = Describe("Route services", func() {
 			tlsTestApp2 = setupAppInstance(1)
 
 			// Verify we get app1 if we request it while it's running
-			req := testState.newRequest(
+			req := testState.newGetRequest(
 				fmt.Sprintf("https://%s", appHostname),
 			)
 			Eventually(func(g Gomega) {
@@ -184,7 +184,7 @@ var _ = Describe("Route services", func() {
 		})
 
 		It("prunes the stale endpoint", func() {
-			req := testState.newRequest(
+			req := testState.newGetRequest(
 				fmt.Sprintf("https://%s", appHostname),
 			)
 			time.Sleep(100 * time.Millisecond)
@@ -207,7 +207,7 @@ var _ = Describe("Route services", func() {
 							sigHeader := r.Header.Get("X-Cf-Proxy-Signature")
 							metadata := r.Header.Get("X-Cf-Proxy-Metadata")
 
-							req := testState.newRequest(forwardedURL)
+							req := testState.newGetRequest(forwardedURL)
 
 							req.Header.Add("X-CF-Forwarded-Url", forwardedURL)
 							req.Header.Add("X-Cf-Proxy-Metadata", metadata)
@@ -238,7 +238,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("still prunes the stale endpoint", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 				time.Sleep(100 * time.Millisecond)
@@ -278,7 +278,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("fails with a 502", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 
@@ -296,7 +296,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("succeeds", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 
@@ -336,7 +336,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("fails with a 502", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 
@@ -355,7 +355,7 @@ var _ = Describe("Route services", func() {
 			})
 
 			It("succeeds", func() {
-				req := testState.newRequest(
+				req := testState.newGetRequest(
 					fmt.Sprintf("https://%s", appHostname),
 				)
 

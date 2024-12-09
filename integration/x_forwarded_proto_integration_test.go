@@ -98,7 +98,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 			testState.StartGorouterOrFail()
 
 			doRequest := func(testCase testCase, hostname string) {
-				req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
+				req := testState.newGetRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
 				req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
 
 				resp, err := testState.client.Do(req)
@@ -210,7 +210,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 				testState.StartGorouterOrFail()
 
 				doRequest := func(testCase rsTestCase, hostname string) {
-					req := testState.newRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
+					req := testState.newGetRequest(fmt.Sprintf("%s://%s", testCase.clientRequestScheme, hostname))
 					req.Header.Set("X-Forwarded-Proto", testCase.clientRequestHeader)
 					resp, err := testState.client.Do(req)
 					Expect(err).NotTo(HaveOccurred())
@@ -234,7 +234,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 					w.WriteHeader(200)
 					url, err := url.Parse(r.Header.Get(routeservice.HeaderKeyForwardedURL))
 					Expect(err).ToNot(HaveOccurred())
-					newRequest := testState.newRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
+					newRequest := testState.newGetRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
 
 					// routes service does not change headers
 					for k, v := range r.Header {
@@ -269,7 +269,7 @@ var _ = Describe("modifications of X-Forwarded-Proto header", func() {
 					w.WriteHeader(200)
 					url, err := url.Parse(r.Header.Get(routeservice.HeaderKeyForwardedURL))
 					Expect(err).ToNot(HaveOccurred())
-					newRequest := testState.newRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
+					newRequest := testState.newGetRequest(fmt.Sprintf("%s://%s", testCase.rsRequestScheme, url.Host))
 
 					// route service does not change headers
 					for k, v := range r.Header {

@@ -53,7 +53,7 @@ var _ = Describe("Headers", func() {
 		})
 
 		It("returns a header that was set by the app", func() {
-			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute))
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -81,7 +81,7 @@ var _ = Describe("Headers", func() {
 		})
 
 		It("returns a header that was set by the gorouter", func() {
-			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute))
 			req.Header.Set("Connection", "X-Forwarded-Proto")
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -109,7 +109,7 @@ var _ = Describe("Headers", func() {
 		})
 
 		It("removes the header specified in the config", func() {
-			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute))
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -141,7 +141,7 @@ var _ = Describe("Headers", func() {
 		})
 
 		It("adds the header specified in the config", func() {
-			req := testState.newRequest(fmt.Sprintf("http://%s", testAppRoute))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute))
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -190,7 +190,7 @@ var _ = Describe("Headers", func() {
 			)
 
 			testState.client.Transport.(*http.Transport).TLSClientConfig.Certificates = testState.trustedClientTLSConfig.Certificates
-			req := testState.newRequest(fmt.Sprintf("https://%s", appHostname))
+			req := testState.newGetRequest(fmt.Sprintf("https://%s", appHostname))
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(400))

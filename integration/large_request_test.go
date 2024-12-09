@@ -46,7 +46,7 @@ var _ = Describe("Large requests", func() {
 		pathSize := 2 * 1024 // 2kb
 		path := strings.Repeat("a", pathSize)
 
-		req := testState.newRequest(fmt.Sprintf("http://%s/%s", appURL, path))
+		req := testState.newGetRequest(fmt.Sprintf("http://%s/%s", appURL, path))
 
 		resp, err := testState.client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
