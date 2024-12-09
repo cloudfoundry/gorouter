@@ -45,7 +45,7 @@ var _ = Describe("GDPR", func() {
 			hostname := "basic-app.some.domain"
 			testState.register(testApp, hostname)
 
-			req := testState.newRequest(fmt.Sprintf("http://%s", hostname))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", hostname))
 			req.Header.Add("X-FORWARDED-FOR", "192.168.0.1")
 
 			resp, err := testState.client.Do(req)
@@ -120,7 +120,7 @@ var _ = Describe("GDPR", func() {
 			hostname := "basic-app.some.domain"
 			testState.register(testApp, hostname)
 
-			req := testState.newRequest(fmt.Sprintf("http://%s", hostname))
+			req := testState.newGetRequest(fmt.Sprintf("http://%s", hostname))
 			req.Header.Set("User-Agent", "foo-agent")
 
 			resp, err := testState.client.Do(req)

@@ -373,12 +373,8 @@ func formatHeader(headers http.Header, name string, performTruncate bool) string
 
 // WriteTo allows the AccessLogRecord to implement the io.WriterTo interface
 func (r *AccessLogRecord) WriteTo(w io.Writer) (int64, error) {
-	bytesWritten, err := w.Write(r.getRecord(false))
-	if err != nil {
-		return int64(bytesWritten), err
-	}
-	newline, err := w.Write([]byte("\n"))
-	return int64(bytesWritten + newline), err
+	n, err := w.Write(r.getRecord(false))
+	return int64(n), err
 }
 
 func (r *AccessLogRecord) SendLog(ls LogSender) {
