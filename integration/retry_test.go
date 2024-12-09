@@ -63,7 +63,7 @@ var _ = Describe("Retries", func() {
 			_ = conn.Close()
 
 			Consistently(func() bool {
-				res, err := testState.client.Do(testState.newRequest("http://" + appURL))
+				res, err := testState.client.Do(testState.newGetRequest("http://" + appURL))
 				return err == nil && res.StatusCode == http.StatusTeapot
 			}).Should(Equal(true))
 		})
