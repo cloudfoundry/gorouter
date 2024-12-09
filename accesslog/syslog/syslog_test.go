@@ -1,15 +1,13 @@
 package syslog_test
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"net"
 	"os"
 	"strings"
 	"testing"
 
 	"code.cloudfoundry.org/gorouter/accesslog/syslog"
+	"code.cloudfoundry.org/gorouter/test/common"
 
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -55,7 +53,7 @@ func TestLogger(t *testing.T) {
 		syslog.FacilityFtp,
 		"gorouter",
 		"foobar",
-		"<90>1 1970-01-01T00:00:00Z %s gorouter %d - \ufefffoobar\n",
+		"<90>1 1970-01-01T00:00:00Z %s gorouter %d - \ufefffoobar", // line feed is stripped, but if there is none at all the log will not be returned
 	}, {
 		"ensure TCP syslog does not append additional line feeds at the end",
 		"tcp",
@@ -63,91 +61,39 @@ func TestLogger(t *testing.T) {
 		syslog.FacilityFtp,
 		"gorouter",
 		"foobar\n",
-		"<90>1 1970-01-01T00:00:00Z %s gorouter %d - \ufefffoobar\n",
+		"<90>1 1970-01-01T00:00:00Z %s gorouter %d - \ufefffoobar",
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := NewWithT(t)
+			RegisterTestingT(t)
+			done := make(chan bool)
+			defer close(done)
 
 			var (
-				addr   string
-				result func() string
+				addr string
+				logs <-chan string
 			)
 			// we only support tcp and udp
 			switch tt.network {
 			case "tcp":
-				addr, result = testTcp(t)
+				addr, logs = common.TestTcp(done)
 			case "udp":
-				addr, result = testUdp(t)
+				addr, logs = common.TestUdp(done)
 			default:
 				t.Fatalf("invalid network: %s", tt.network)
 			}
 
 			w, err := syslog.Dial(tt.network, addr, tt.severity, tt.facility, tt.appName)
-			g.Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			defer func() { _ = w.Close() }()
 
 			err = w.Log(tt.message)
-			g.Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
 			want := fmt.Sprintf(tt.want, must(os.Hostname), os.Getpid())
-			g.Eventually(func() string {
-				return cutTimestamp(result())
-			}).Should(Equal(cutTimestamp(want)))
+			Expect(cutTimestamp(<-logs)).To(Equal(cutTimestamp(want)))
 		})
-	}
-}
-
-// testUdp sets up a UDP listener which makes the payload of the first received datagram available
-// via the returned function.
-func testUdp(t *testing.T) (addr string, result func() string) {
-	t.Helper()
-	g := NewWithT(t)
-
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.IP{127, 0, 0, 1},
-		Port: 0,
-	})
-	g.Expect(err).NotTo(HaveOccurred())
-
-	out := make([]byte, 65507)
-	read := 0
-	go func() {
-		defer conn.Close()
-		read, _, _ = conn.ReadFrom(out)
-	}()
-
-	return conn.LocalAddr().String(), func() string {
-		return string(out[:read])
-	}
-}
-
-// testTcp sets up a TCP listener which accepts the first connection and makes data sent via that
-// connection available via the returned function.
-func testTcp(t *testing.T) (addr string, result func() string) {
-	t.Helper()
-	g := NewWithT(t)
-
-	l, err := net.ListenTCP("tcp", &net.TCPAddr{
-		IP:   net.IP{127, 0, 0, 1},
-		Port: 0,
-	})
-	g.Expect(err).NotTo(HaveOccurred())
-
-	out := &bytes.Buffer{}
-	go func() {
-		defer l.Close()
-
-		conn, err := l.Accept()
-		g.Expect(err).NotTo(HaveOccurred())
-		defer conn.Close()
-
-		_, _ = io.Copy(out, conn)
-	}()
-
-	return l.Addr().String(), func() string {
-		return out.String()
 	}
 }
 
