@@ -151,7 +151,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 				})
 
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.Added))
 			}
 
 			proxyRoundTripper = round_tripper.NewProxyRoundTripper(
@@ -483,7 +483,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					added := routePool.Put(endpoint)
-					Expect(added).To(Equal(route.ADDED))
+					Expect(added).To(Equal(route.Added))
 
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).To(MatchError(ContainSubstring("tls: handshake failure")))
@@ -738,14 +738,14 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Port:   20222,
 						UseTLS: true,
 					})
-					Expect(routePool.Put(tlsEndpoint)).To(Equal(route.ADDED))
+					Expect(routePool.Put(tlsEndpoint)).To(Equal(route.Added))
 
 					nonTLSEndpoint := route.NewEndpoint(&route.EndpointOpts{
 						Host:   "3.3.3.3",
 						Port:   30333,
 						UseTLS: false,
 					})
-					Expect(routePool.Put(nonTLSEndpoint)).To(Equal(route.ADDED))
+					Expect(routePool.Put(nonTLSEndpoint)).To(Equal(route.Added))
 				})
 
 				Context("when retrying different backends", func() {
@@ -799,7 +799,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					added := routePool.Put(endpoint)
-					Expect(added).To(Equal(route.ADDED))
+					Expect(added).To(Equal(route.Added))
 					transport.RoundTripReturns(
 						&http.Response{StatusCode: http.StatusTeapot}, nil,
 					)
@@ -822,7 +822,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						})
 
 						added := routePool.Put(endpoint)
-						Expect(added).To(Equal(route.UPDATED))
+						Expect(added).To(Equal(route.Updated))
 						transport.RoundTripReturns(
 							&http.Response{StatusCode: http.StatusTeapot}, nil,
 						)
@@ -859,7 +859,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 						Host: "1.1.1.1", Port: 9091, UseTLS: true, PrivateInstanceId: "instanceId-2",
 					})
 					added := routePool.Put(endpoint)
-					Expect(added).To(Equal(route.ADDED))
+					Expect(added).To(Equal(route.Added))
 
 					_, err := proxyRoundTripper.RoundTrip(req)
 					Expect(err).ToNot(HaveOccurred())
@@ -1143,9 +1143,9 @@ var _ = Describe("ProxyRoundTripper", func() {
 					})
 
 					added := routePool.Put(endpoint1)
-					Expect(added).To(Equal(route.ADDED))
+					Expect(added).To(Equal(route.Added))
 					added = routePool.Put(endpoint2)
-					Expect(added).To(Equal(route.ADDED))
+					Expect(added).To(Equal(route.Added))
 					removed := routePool.Remove(endpoint)
 					Expect(removed).To(BeTrue())
 				})
@@ -1446,7 +1446,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
-								Expect(added).To(Equal(route.ADDED))
+								Expect(added).To(Equal(route.Added))
 							})
 
 							Context("when route service headers are not on the request", func() {
@@ -1509,7 +1509,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
-								Expect(added).To(Equal(route.ADDED))
+								Expect(added).To(Equal(route.Added))
 							})
 
 							Context("when route service headers are not on the request", func() {
@@ -1575,7 +1575,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
-								Expect(added).To(Equal(route.ADDED))
+								Expect(added).To(Equal(route.Added))
 							})
 
 							Context("when route service headers are not on the request", func() {

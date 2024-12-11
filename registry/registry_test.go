@@ -253,7 +253,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(logger).NotTo(gbytes.Say(`uri-added.*.*a\.route`))
 				By("not providing IsolationSegment property")
 				r.Register("a.route", fooEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
@@ -263,7 +263,7 @@ var _ = Describe("RouteRegistry", func() {
 				})
 
 				r.Register("a.route", isoSegEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 
@@ -701,7 +701,7 @@ var _ = Describe("RouteRegistry", func() {
 				BeforeEach(func() {
 					fooEndpoint.IsolationSegment = ""
 				})
-				It("does not log an unregister message", func() {
+				It("does not log an unregisterEndpoint message", func() {
 					r.Unregister("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(3))
 					Expect(r.NumEndpoints()).To(Equal(3))
@@ -809,21 +809,21 @@ var _ = Describe("RouteRegistry", func() {
 
 			It("only logs unregistration for existing routes", func() {
 				r.Unregister("non-existent-route", fooEndpoint)
-				Expect(logger).NotTo(gbytes.Say(`unregister.*.*a\.non-existent-route`))
+				Expect(logger).NotTo(gbytes.Say(`unregisterEndpoint.*.*a\.non-existent-route`))
 
 				By("not providing IsolationSegment property")
 				r.Unregister("a.route", fooEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
-			It("logs unregister message with IsolationSegment when it's provided", func() {
+			It("logs unregisterEndpoint message with IsolationSegment when it's provided", func() {
 				isoSegEndpoint := route.NewEndpoint(&route.EndpointOpts{
 					IsolationSegment: "is1",
 				})
 				r.Register("a.isoSegRoute", isoSegEndpoint)
 				r.Unregister("a.isoSegRoute", isoSegEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 		})
@@ -849,7 +849,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(r.NumEndpoints()).To(Equal(0))
 			})
 
-			It("does not unregister route if modification tag older", func() {
+			It("does not unregisterEndpoint route if modification tag older", func() {
 				modTag2 := models.ModificationTag{
 					Guid:  "abc",
 					Index: 8,
