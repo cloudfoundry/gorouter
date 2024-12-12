@@ -76,7 +76,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
 				endpoint1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
 				Expect(endpoint1).To(Equal(fooEndpoint))
-				Expect(action1).To(Equal("endpoint-registered"))
+				Expect(action1).To(Equal("endpoint-added"))
 			})
 		})
 
@@ -91,7 +91,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(2))
 				endpointR1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
 				Expect(endpointR1).To(Equal(endpoint1))
-				Expect(action1).To(Equal("endpoint-registered"))
+				Expect(action1).To(Equal("endpoint-added"))
 				endpointR2, action2 := reporter.CaptureRegistryMessageArgsForCall(1)
 				Expect(endpointR2).To(Equal(endpoint2))
 				Expect(action2).To(Equal("endpoint-updated"))
@@ -109,7 +109,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(2))
 				endpointR1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
 				Expect(endpointR1).To(Equal(endpoint1))
-				Expect(action1).To(Equal("endpoint-registered"))
+				Expect(action1).To(Equal("endpoint-added"))
 				endpointR2, action2 := reporter.CaptureRegistryMessageArgsForCall(1)
 				Expect(endpointR2).To(Equal(endpoint2))
 				Expect(action2).To(Equal("endpoint-not-updated"))
@@ -278,7 +278,7 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("a.route", fooEndpoint)
 
 				Eventually(logger).Should(gbytes.Say(`"log_level":1.*route-registered.*a\.route`))
-				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-registered.*a\.route.*192\.168\.1\.1`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-added.*a\.route.*192\.168\.1\.1`))
 			})
 
 			It("logs 'uri-added' at debug level for backward compatibility", func() {

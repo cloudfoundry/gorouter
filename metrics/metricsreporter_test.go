@@ -462,8 +462,8 @@ var _ = Describe("MetricsReporter", func() {
 			metricReporter.CaptureRegistryMessage(endpoint, "some-action")
 
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
-			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message.uaa.some-action"))
-			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("registry_message.route-emitter.some-action"))
+			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message.some-action.uaa"))
+			Expect(batcher.BatchIncrementCounterArgsForCall(1)).To(Equal("registry_message.some-action.route-emitter"))
 		})
 
 		It("sends the total routes", func() {
@@ -522,7 +522,7 @@ var _ = Describe("MetricsReporter", func() {
 
 			It("increments the counter metric", func() {
 				Expect(sender.IncrementCounterCallCount()).To(Equal(1))
-				Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("unregistry_message.oauth-server.some-action"))
+				Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("unregistry_message.some-action.oauth-server"))
 			})
 
 			It("increments the counter metric for each component unregistered", func() {
@@ -531,8 +531,8 @@ var _ = Describe("MetricsReporter", func() {
 				metricReporter.CaptureUnregistryMessage(endpointTwo, "some-action")
 
 				Expect(sender.IncrementCounterCallCount()).To(Equal(2))
-				Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("unregistry_message.oauth-server.some-action"))
-				Expect(sender.IncrementCounterArgsForCall(1)).To(Equal("unregistry_message.api-server.some-action"))
+				Expect(sender.IncrementCounterArgsForCall(0)).To(Equal("unregistry_message.some-action.oauth-server"))
+				Expect(sender.IncrementCounterArgsForCall(1)).To(Equal("unregistry_message.some-action.api-server"))
 			})
 		})
 		Context("when unregister msg with empty component name is incremented", func() {

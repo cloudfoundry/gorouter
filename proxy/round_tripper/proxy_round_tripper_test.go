@@ -655,7 +655,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 			Context("when there are no more endpoints available", func() {
 				JustBeforeEach(func() {
 					removed := routePool.Remove(endpoint)
-					Expect(removed).To(BeTrue())
+					Expect(removed).To(Equal(route.EndpointUnregistered))
 				})
 
 				It("returns a 502 Bad Gateway response", func() {
@@ -1147,7 +1147,7 @@ var _ = Describe("ProxyRoundTripper", func() {
 					added = routePool.Put(endpoint2)
 					Expect(added).To(Equal(route.Added))
 					removed := routePool.Remove(endpoint)
-					Expect(removed).To(BeTrue())
+					Expect(removed).To(Equal(route.EndpointUnregistered))
 				})
 
 				Context("when there are no cookies on the request", func() {
@@ -1439,10 +1439,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 							JustBeforeEach(func() {
 								removed := routePool.Remove(endpoint1)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								removed = routePool.Remove(endpoint2)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
@@ -1502,10 +1502,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 							JustBeforeEach(func() {
 								removed := routePool.Remove(endpoint1)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								removed = routePool.Remove(endpoint2)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
@@ -1568,10 +1568,10 @@ var _ = Describe("ProxyRoundTripper", func() {
 
 							JustBeforeEach(func() {
 								removed := routePool.Remove(endpoint1)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								removed = routePool.Remove(endpoint2)
-								Expect(removed).To(BeTrue())
+								Expect(removed).To(Equal(route.EndpointUnregistered))
 
 								new_endpoint := route.NewEndpoint(&route.EndpointOpts{PrivateInstanceId: "id-5"})
 								added := routePool.Put(new_endpoint)
