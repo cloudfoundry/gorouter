@@ -87,26 +87,27 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		return
 	}
 
-	endpointAdded := r.register(uri, endpoint)
+	endpointPutResult := r.register(uri, endpoint)
 
-	r.reporter.CaptureRegistryMessage(endpoint)
-
-	if endpointAdded == route.Added && !endpoint.UpdatedAt.IsZero() {
+	if endpointPutResult == route.Added && !endpoint.UpdatedAt.IsZero() {
 		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
 	}
 
-	switch endpointAdded {
+	switch endpointPutResult {
 	case route.Added:
+		r.reporter.CaptureRegistryMessage(endpoint, "endpoint-added")
 		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
-			r.logger.Info("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+			r.logger.Info("endpoint-added", buildSlogAttrs(uri, endpoint)...)
 		}
 	case route.Updated:
+		r.reporter.CaptureRegistryMessage(endpoint, "endpoint-updated")
 		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
-			r.logger.Debug("endpoint-registered", buildSlogAttrs(uri, endpoint)...)
+			r.logger.Debug("endpoint-updated", buildSlogAttrs(uri, endpoint)...)
 		}
 	default:
+		r.reporter.CaptureRegistryMessage(endpoint, "endpoint-not-updated")
 		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
-			r.logger.Debug("endpoint-not-registered", buildSlogAttrs(uri, endpoint)...)
+			r.logger.Debug("endpoint-not-updated", buildSlogAttrs(uri, endpoint)...)
 		}
 	}
 }
@@ -167,7 +168,6 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if !r.endpointInRouterShard(endpoint) {
 		return
 	}
-	r.reporter.CaptureUnregistryMessage(endpoint)
 
 	routeKey := uri.RouteKey()
 	endpointUnregisteredResult, pool := r.unregisterEndpoint(routeKey, endpoint)
@@ -176,10 +176,12 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	}
 	switch endpointUnregisteredResult {
 	case route.EndpointUnregistered:
+		r.reporter.CaptureUnregistryMessage(endpoint, "endpoint-unregistered")
 		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
 			r.logger.Info("endpoint-unregistered", buildSlogAttrs(routeKey, endpoint)...)
 		}
 	case route.EndpointUnmodified:
+		r.reporter.CaptureUnregistryMessage(endpoint, "endpoint-not-unregistered")
 		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
 			r.logger.Info("endpoint-not-unregistered", buildSlogAttrs(routeKey, endpoint)...)
 		}
@@ -188,6 +190,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	routeUnregisteredResult := r.deleteRouteWithoutEndpoint(routeKey, pool)
 	switch routeUnregisteredResult {
 	case route.RouteUnregistered:
+		r.reporter.CaptureUnregistryMessage(endpoint, "route-unregistered")
 		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
 			r.logger.Info("route-unregistered", slog.Any("uri", routeKey))
 		}

@@ -135,22 +135,22 @@ func (m *MetricsReporter) CaptureRoutesPruned(routesPruned uint64) {
 	m.Batcher.BatchAddCounter("routes_pruned", routesPruned)
 }
 
-func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
+func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged, action string) {
 	var componentName string
 	if msg.Component() == "" {
-		componentName = "registry_message"
+		componentName = "registry_message." + action
 	} else {
-		componentName = "registry_message." + msg.Component()
+		componentName = "registry_message." + action + "." + msg.Component()
 	}
 	m.Batcher.BatchIncrementCounter(componentName)
 }
 
-func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
+func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged, action string) {
 	var componentName string
 	if msg.Component() == "" {
-		componentName = "unregistry_message"
+		componentName = "unregistry_message." + action
 	} else {
-		componentName = "unregistry_message." + msg.Component()
+		componentName = "unregistry_message." + action + "." + msg.Component()
 	}
 	err := m.Sender.IncrementCounter(componentName)
 	if err != nil {

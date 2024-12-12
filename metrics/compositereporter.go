@@ -44,10 +44,10 @@ type RouteRegistryReporter interface {
 	CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64)
 	CaptureRoutesPruned(prunedRoutes uint64)
 	CaptureLookupTime(t time.Duration)
-	CaptureRegistryMessage(msg ComponentTagged)
+	CaptureRegistryMessage(msg ComponentTagged, action string)
 	CaptureRouteRegistrationLatency(t time.Duration)
 	UnmuzzleRouteRegistrationLatency()
-	CaptureUnregistryMessage(msg ComponentTagged)
+	CaptureUnregistryMessage(msg ComponentTagged, action string)
 }
 
 type CompositeReporter struct {
