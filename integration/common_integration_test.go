@@ -176,7 +176,7 @@ func (s *testState) newPostRequest(url string, body io.Reader) *http.Request {
 	return req
 }
 
-func (s *testState) newGetRequest(url string) *http.Request {
+func (s *testState) newRequest(url string) *http.Request {
 	req, err := http.NewRequest("GET", url, nil)
 	Expect(err).NotTo(HaveOccurred())
 	port := s.cfg.Port
