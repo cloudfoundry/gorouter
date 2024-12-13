@@ -384,7 +384,9 @@ func (p *EndpointPool) Endpoints(logger *slog.Logger, initial string, mustBeStic
 		logger.Debug("endpoint-iterator-with-round-robin-lb-algo")
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	default:
-		logger.Error("invalid-pool-load-balancing-algorithm", slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm))
+		logger.Error("invalid-pool-load-balancing-algorithm",
+			slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm),
+			slog.String("poolRouteSvcUrl", p.RouteSvcUrl))
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }
