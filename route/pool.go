@@ -20,26 +20,26 @@ type Counter struct {
 	value int64
 }
 
-type PoolPutResult int
+type PoolPutResult string
 
 const (
-	EndpointNotUpdated = PoolPutResult(iota)
-	EndpointUpdated
-	EndpointAdded
+	EndpointNotUpdated PoolPutResult = "endpoint-not-updated"
+	EndpointUpdated    PoolPutResult = "endpoint-updated"
+	EndpointAdded      PoolPutResult = "endpoint-added"
 )
 
-type PoolRemoveEndpointResult int
+type PoolRemoveEndpointResult string
 
 const (
-	EndpointUnregistered = PoolRemoveEndpointResult(iota)
-	EndpointNotUnregistered
+	EndpointUnregistered    PoolRemoveEndpointResult = "endpoint-unregistered"
+	EndpointNotUnregistered PoolRemoveEndpointResult = "endpoint-not-unregistered"
 )
 
-type PoolRemoveRouteResult int
+type PoolRemoveRouteResult string
 
 const (
-	RouteUnregistered = PoolRemoveRouteResult(iota)
-	RouteNotUnregistered
+	RouteUnregistered    PoolRemoveRouteResult = "route-unregistered"
+	RouteNotUnregistered PoolRemoveRouteResult = "route-not-unregistered"
 )
 
 func NewCounter(initial int64) *Counter {
