@@ -142,7 +142,7 @@ var _ = Describe("EndpointPool", func() {
 			endpoint := &route.Endpoint{}
 
 			b := pool.Put(endpoint)
-			Expect(b).To(Equal(route.Added))
+			Expect(b).To(Equal(route.EndpointAdded))
 		})
 
 		It("handles duplicate endpoints", func() {
@@ -152,7 +152,7 @@ var _ = Describe("EndpointPool", func() {
 			pool.MarkUpdated(time.Now().Add(-(10 * time.Minute)))
 
 			b := pool.Put(endpoint)
-			Expect(b).To(Equal(route.Updated))
+			Expect(b).To(Equal(route.EndpointUpdated))
 
 			prunedEndpoints := pool.PruneEndpoints()
 			Expect(prunedEndpoints).To(BeEmpty())
@@ -163,7 +163,7 @@ var _ = Describe("EndpointPool", func() {
 			endpoint2 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678})
 
 			pool.Put(endpoint1)
-			Expect(pool.Put(endpoint2)).To(Equal(route.Updated))
+			Expect(pool.Put(endpoint2)).To(Equal(route.EndpointUpdated))
 		})
 
 		Context("with modification tags", func() {
@@ -175,13 +175,13 @@ var _ = Describe("EndpointPool", func() {
 				modTag2 = models.ModificationTag{Guid: "abc"}
 				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 
-				Expect(pool.Put(endpoint1)).To(Equal(route.Added))
+				Expect(pool.Put(endpoint1)).To(Equal(route.EndpointAdded))
 			})
 
 			It("updates an endpoint with modification tag", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag2})
 
-				Expect(pool.Put(endpoint)).To(Equal(route.Updated))
+				Expect(pool.Put(endpoint)).To(Equal(route.EndpointUpdated))
 				Expect(pool.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 			})
 
@@ -196,7 +196,7 @@ var _ = Describe("EndpointPool", func() {
 					olderModTag := models.ModificationTag{Guid: "abc"}
 					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
-					Expect(pool.Put(endpoint)).To(Equal(route.Unmodified))
+					Expect(pool.Put(endpoint)).To(Equal(route.EndpointNotUpdated))
 					Expect(pool.Endpoints(logger.Logger, "", false, azPreference, az).Next(0).ModificationTag).To(Equal(modTag2))
 				})
 			})
@@ -340,13 +340,13 @@ var _ = Describe("EndpointPool", func() {
 			endpoint := &route.Endpoint{}
 			endpointRS := &route.Endpoint{RouteServiceUrl: "my-url"}
 			b := pool.Put(endpoint)
-			Expect(b).To(Equal(route.Added))
+			Expect(b).To(Equal(route.EndpointAdded))
 
 			url := pool.RouteServiceUrl()
 			Expect(url).To(BeEmpty())
 
 			b = pool.Put(endpointRS)
-			Expect(b).To(Equal(route.Updated))
+			Expect(b).To(Equal(route.EndpointUpdated))
 			url = pool.RouteServiceUrl()
 			Expect(url).To(Equal("my-url"))
 		})
@@ -362,25 +362,25 @@ var _ = Describe("EndpointPool", func() {
 				endpointRS1 := route.NewEndpoint(&route.EndpointOpts{Host: "host-1", Port: 1234, RouteServiceUrl: "first-url"})
 				endpointRS2 := route.NewEndpoint(&route.EndpointOpts{Host: "host-2", Port: 2234, RouteServiceUrl: "second-url"})
 				b := pool.Put(endpointRS1)
-				Expect(b).To(Equal(route.Added))
+				Expect(b).To(Equal(route.EndpointAdded))
 
 				url := pool.RouteServiceUrl()
 				Expect(url).To(Equal("first-url"))
 
 				b = pool.Put(endpointRS2)
-				Expect(b).To(Equal(route.Added))
+				Expect(b).To(Equal(route.EndpointAdded))
 				url = pool.RouteServiceUrl()
 				Expect(url).To(Equal("second-url"))
 
 				endpointRS1.RouteServiceUrl = "third-url"
 				b = pool.Put(endpointRS1)
-				Expect(b).To(Equal(route.Updated))
+				Expect(b).To(Equal(route.EndpointUpdated))
 				url = pool.RouteServiceUrl()
 				Expect(url).To(Equal("third-url"))
 
 				endpointRS2.RouteServiceUrl = "fourth-url"
 				b = pool.Put(endpointRS2)
-				Expect(b).To(Equal(route.Updated))
+				Expect(b).To(Equal(route.EndpointUpdated))
 				url = pool.RouteServiceUrl()
 				Expect(url).To(Equal("fourth-url"))
 			})
@@ -478,7 +478,7 @@ var _ = Describe("EndpointPool", func() {
 
 			b := pool.Remove(endpoint)
 
-			Expect(b).To(Equal(route.EndpointUnmodified))
+			Expect(b).To(Equal(route.EndpointNotUnregistered))
 		})
 
 		Context("with modification tags", func() {
@@ -487,7 +487,7 @@ var _ = Describe("EndpointPool", func() {
 				modTag = models.ModificationTag{Guid: "abc"}
 				endpoint1 := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: modTag})
 
-				Expect(pool.Put(endpoint1)).To(Equal(route.Added))
+				Expect(pool.Put(endpoint1)).To(Equal(route.EndpointAdded))
 			})
 
 			It("removes an endpoint with modification tag", func() {
@@ -521,7 +521,7 @@ var _ = Describe("EndpointPool", func() {
 					olderModTag := models.ModificationTag{Guid: "abc"}
 					endpoint := route.NewEndpoint(&route.EndpointOpts{Host: "1.2.3.4", Port: 5678, ModificationTag: olderModTag})
 
-					Expect(pool.Remove(endpoint)).To(Equal(route.EndpointUnmodified))
+					Expect(pool.Remove(endpoint)).To(Equal(route.EndpointNotUnregistered))
 					Expect(pool.IsEmpty()).To(BeFalse())
 				})
 			})

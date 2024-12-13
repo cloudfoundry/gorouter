@@ -23,23 +23,23 @@ type Counter struct {
 type PoolPutResult int
 
 const (
-	Unmodified = PoolPutResult(iota)
-	Updated
-	Added
+	EndpointNotUpdated = PoolPutResult(iota)
+	EndpointUpdated
+	EndpointAdded
 )
 
 type PoolRemoveEndpointResult int
 
 const (
 	EndpointUnregistered = PoolRemoveEndpointResult(iota)
-	EndpointUnmodified
+	EndpointNotUnregistered
 )
 
 type PoolRemoveRouteResult int
 
 const (
 	RouteUnregistered = PoolRemoveRouteResult(iota)
-	RouteUnmodified
+	RouteNotUnregistered
 )
 
 func NewCounter(initial int64) *Counter {
@@ -275,13 +275,13 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 	var result PoolPutResult
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
-		result = Updated
+		result = EndpointUpdated
 		if !e.endpoint.Equal(endpoint) {
 			e.Lock()
 			defer e.Unlock()
 
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
-				return Unmodified
+				return EndpointNotUpdated
 			}
 
 			oldEndpoint := e.endpoint
@@ -297,7 +297,7 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 			}
 		}
 	} else {
-		result = Added
+		result = EndpointAdded
 		e = &endpointElem{
 			endpoint:           endpoint,
 			index:              len(p.endpoints),
@@ -370,7 +370,7 @@ func (p *EndpointPool) Remove(endpoint *Endpoint) PoolRemoveEndpointResult {
 		}
 	}
 
-	return EndpointUnmodified
+	return EndpointNotUnregistered
 }
 
 func (p *EndpointPool) removeEndpoint(e *endpointElem) {
