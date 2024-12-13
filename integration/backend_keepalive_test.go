@@ -42,7 +42,7 @@ var _ = Describe("KeepAlive (HTTP Persistent Connections) to backends", func() {
 
 	doRequest := func() {
 		assertRequestSucceeds(testState.client,
-			testState.newGetRequest(fmt.Sprintf("http://%s", testAppRoute)))
+			testState.newRequest(fmt.Sprintf("http://%s", testAppRoute)))
 	}
 
 	Context("when KeepAlives are disabled", func() {
