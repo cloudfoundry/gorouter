@@ -152,10 +152,7 @@ func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged, action s
 	} else {
 		componentName = "unregistry_message." + action + "." + msg.Component()
 	}
-	err := m.Sender.IncrementCounter(componentName)
-	if err != nil {
-		m.Logger.Debug("failed-sending-metric", log.ErrAttr(err), slog.String("metric", componentName))
-	}
+	m.Batcher.BatchIncrementCounter(componentName)
 }
 
 func (m *MetricsReporter) CaptureWebSocketUpdate() {
