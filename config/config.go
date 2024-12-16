@@ -177,6 +177,7 @@ type LoggingConfig struct {
 	Syslog                 string       `yaml:"syslog"`
 	SyslogAddr             string       `yaml:"syslog_addr"`
 	SyslogNetwork          string       `yaml:"syslog_network"`
+	SyslogTruncate         int          `yaml:"syslog_truncate"`
 	Level                  string       `yaml:"level"`
 	LoggregatorEnabled     bool         `yaml:"loggregator_enabled"`
 	MetronAddress          string       `yaml:"metron_address"`
@@ -217,6 +218,8 @@ var defaultLoggingConfig = LoggingConfig{
 	JobName:               "gorouter",
 	RedactQueryParams:     REDACT_QUERY_PARMS_NONE,
 	EnableAttemptsDetails: false,
+	SyslogNetwork:         "udp",
+	SyslogAddr:            "127.0.0.1:514",
 }
 
 type HeaderNameValue struct {

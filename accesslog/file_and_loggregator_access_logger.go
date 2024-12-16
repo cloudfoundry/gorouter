@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"log/syslog"
 	"os"
 
 	"code.cloudfoundry.org/gorouter/accesslog/schema"
+	"code.cloudfoundry.org/gorouter/accesslog/syslog"
 	"code.cloudfoundry.org/gorouter/config"
 	log "code.cloudfoundry.org/gorouter/logger"
 )
@@ -38,14 +38,54 @@ type FileAndLoggregatorAccessLogger struct {
 	logsender              schema.LogSender
 }
 
-type CustomWriter struct {
-	Name            string
-	Writer          io.Writer
-	PerformTruncate bool
+type CustomWriter interface {
+	Name() string
+	io.Writer
+}
+
+// SyslogWriter sends logs to a [syslog.Writer].
+type SyslogWriter struct {
+	name     string
+	truncate int
+	*syslog.Writer
+}
+
+func (w *SyslogWriter) Name() string {
+	return w.name
+}
+
+func (w *SyslogWriter) Write(b []byte) (int, error) {
+	n := len(b)
+	if w.truncate > 0 && n > w.truncate {
+		n = w.truncate
+	}
+	return w.Writer.Write(b[:n])
+}
+
+// FileWriter sends logs to a [os.File] and appends a new line to each line written to seperate log
+// lines.
+type FileWriter struct {
+	name string
+	*os.File
+}
+
+func (w *FileWriter) Name() string {
+	return w.name
+}
+
+func (w *FileWriter) Write(b []byte) (int, error) {
+	n, err := w.File.Write(b)
+	if err != nil {
+		return n, err
+	}
+
+	// Do not count the extra bytes, we can not return more than len(b).
+	_, err = w.File.Write([]byte{'\n'})
+	return n, err
 }
 
 func CreateRunningAccessLogger(logger *slog.Logger, logsender schema.LogSender, config *config.Config) (AccessLogger, error) {
-	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled {
+	if config.AccessLog.File == "" && !config.Logging.LoggregatorEnabled && !config.AccessLog.EnableStreaming {
 		return &NullAccessLogger{}, nil
 	}
 
@@ -66,17 +106,24 @@ func CreateRunningAccessLogger(logger *slog.Logger, logsender schema.LogSender, 
 			return nil, err
 		}
 
-		accessLogger.addWriter(CustomWriter{Name: "accesslog", Writer: file, PerformTruncate: false})
+		accessLogger.addWriter(&FileWriter{
+			name: "accesslog",
+			File: file,
+		})
 	}
 
 	if config.AccessLog.EnableStreaming {
-		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.LOG_INFO, config.Logging.Syslog)
+		syslogWriter, err := syslog.Dial(config.Logging.SyslogNetwork, config.Logging.SyslogAddr, syslog.SeverityInfo, syslog.FacilityUser, config.Logging.Syslog)
 		if err != nil {
 			logger.Error("error-creating-syslog-writer", log.ErrAttr(err))
 			return nil, err
 		}
 
-		accessLogger.addWriter(CustomWriter{Name: "syslog", Writer: syslogWriter, PerformTruncate: true})
+		accessLogger.addWriter(&SyslogWriter{
+			name:     "syslog",
+			truncate: config.Logging.SyslogTruncate,
+			Writer:   syslogWriter,
+		})
 	}
 
 	go accessLogger.Run()
@@ -88,9 +135,9 @@ func (x *FileAndLoggregatorAccessLogger) Run() {
 		select {
 		case record := <-x.channel:
 			for _, w := range x.writers {
-				_, err := record.WriteTo(w.Writer)
+				_, err := record.WriteTo(w)
 				if err != nil {
-					x.logger.Error(fmt.Sprintf("error-emitting-access-log-to-writer-%s", w.Name), log.ErrAttr(err))
+					x.logger.Error(fmt.Sprintf("error-emitting-access-log-to-writer-%s", w.Name()), log.ErrAttr(err))
 				}
 			}
 			record.SendLog(x.logsender)

@@ -117,7 +117,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 				testState.StartGorouterOrFail()
 
 				doRequest := func(scheme, hostname string, addXFCCHeader bool) {
-					req := testState.newRequest(fmt.Sprintf("%s://%s", scheme, hostname))
+					req := testState.newGetRequest(fmt.Sprintf("%s://%s", scheme, hostname))
 					if addXFCCHeader {
 						req.Header.Add("X-Forwarded-Client-Cert", "some-client-xfcc")
 					}
@@ -141,7 +141,7 @@ var _ = Describe("modifications of X-Forwarded-Client-Cert", func() {
 					w.WriteHeader(200)
 
 					url := r.Header.Get(routeservice.HeaderKeyForwardedURL)
-					newRequest := testState.newRequest(url)
+					newRequest := testState.newGetRequest(url)
 					for k, v := range r.Header {
 						newRequest.Header[k] = v
 					}

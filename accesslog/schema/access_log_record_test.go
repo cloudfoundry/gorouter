@@ -330,7 +330,7 @@ var _ = Describe("AccessLogRecord", func() {
 			Eventually(r).Should(Say(`x_forwarded_proto:"FakeOriginalRequestProto" `))
 			Eventually(r).Should(Say(`vcap_request_id:"abc-123-xyz-pdq" response_time:60.000000 gorouter_time:10.000000 app_id:"FakeApplicationId" `))
 			Eventually(r).Should(Say(`app_index:"3"`))
-			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"\n`))
+			Eventually(r).Should(Say(`x_cf_routererror:"some-router-error"`))
 		})
 
 		Context("when the AccessLogRecord is too large for UDP", func() {
