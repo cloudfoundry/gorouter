@@ -23,7 +23,7 @@ var _ = Describe("Error Writers", func() {
 		body       []byte
 
 		doRequest = func() {
-			req := testState.newRequest(fmt.Sprintf("http://not-%s", hostname))
+			req := testState.newGetRequest(fmt.Sprintf("http://not-%s", hostname))
 
 			resp, err := testState.client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
