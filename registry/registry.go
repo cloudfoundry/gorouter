@@ -267,6 +267,7 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 				Host:               p.Host(),
 				ContextPath:        p.ContextPath(),
 				MaxConnsPerBackend: p.MaxConnsPerBackend(),
+				LoadBalancingAlgorithm: p.LoadBalancingAlgorithm,
 			})
 			surgicalPool.Put(e)
 		}
