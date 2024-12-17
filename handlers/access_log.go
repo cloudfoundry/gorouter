@@ -20,6 +20,7 @@ type accessLog struct {
 	accessLogger       accesslog.AccessLogger
 	extraHeadersToLog  []string
 	logAttemptsDetails bool
+	extraFields        []string
 	logger             *slog.Logger
 }
 
@@ -46,6 +47,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		Request:            r,
 		ExtraHeadersToLog:  a.extraHeadersToLog,
 		LogAttemptsDetails: a.logAttemptsDetails,
+		ExtraFields:        a.extraFields,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}
@@ -81,6 +83,8 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.TlsHandshakeFinishedAt = reqInfo.TlsHandshakeFinishedAt
 	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
 	alr.FinishedAt = reqInfo.FinishedAt
+
+	alr.LocalAddress = reqInfo.LocalAddress
 
 	a.accessLogger.Log(*alr)
 }
