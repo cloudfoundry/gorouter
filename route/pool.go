@@ -386,7 +386,7 @@ func (p *EndpointPool) Endpoints(logger *slog.Logger, initial string, mustBeStic
 	default:
 		logger.Error("invalid-pool-load-balancing-algorithm",
 			slog.String("poolLBAlgorithm", p.LoadBalancingAlgorithm),
-			slog.Group("data", slog.String("Host", p.host)))
+			slog.String("Host", p.host))
 		return NewRoundRobin(logger, p, initial, mustBeSticky, azPreference == config.AZ_PREF_LOCAL, az)
 	}
 }
