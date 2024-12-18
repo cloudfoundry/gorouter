@@ -14,10 +14,11 @@ type FakeRouteRegistryReporter struct {
 	captureLookupTimeArgsForCall []struct {
 		arg1 time.Duration
 	}
-	CaptureRegistryMessageStub        func(metrics.ComponentTagged)
+	CaptureRegistryMessageStub        func(metrics.ComponentTagged, string)
 	captureRegistryMessageMutex       sync.RWMutex
 	captureRegistryMessageArgsForCall []struct {
 		arg1 metrics.ComponentTagged
+		arg2 string
 	}
 	CaptureRouteRegistrationLatencyStub        func(time.Duration)
 	captureRouteRegistrationLatencyMutex       sync.RWMutex
@@ -35,10 +36,11 @@ type FakeRouteRegistryReporter struct {
 	captureRoutesPrunedArgsForCall []struct {
 		arg1 uint64
 	}
-	CaptureUnregistryMessageStub        func(metrics.ComponentTagged)
+	CaptureUnregistryMessageStub        func(metrics.ComponentTagged, string)
 	captureUnregistryMessageMutex       sync.RWMutex
 	captureUnregistryMessageArgsForCall []struct {
 		arg1 metrics.ComponentTagged
+		arg2 string
 	}
 	UnmuzzleRouteRegistrationLatencyStub        func()
 	unmuzzleRouteRegistrationLatencyMutex       sync.RWMutex
@@ -80,16 +82,17 @@ func (fake *FakeRouteRegistryReporter) CaptureLookupTimeArgsForCall(i int) time.
 	return argsForCall.arg1
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(arg1 metrics.ComponentTagged) {
+func (fake *FakeRouteRegistryReporter) CaptureRegistryMessage(arg1 metrics.ComponentTagged, arg2 string) {
 	fake.captureRegistryMessageMutex.Lock()
 	fake.captureRegistryMessageArgsForCall = append(fake.captureRegistryMessageArgsForCall, struct {
 		arg1 metrics.ComponentTagged
-	}{arg1})
+		arg2 string
+	}{arg1, arg2})
 	stub := fake.CaptureRegistryMessageStub
-	fake.recordInvocation("CaptureRegistryMessage", []interface{}{arg1})
+	fake.recordInvocation("CaptureRegistryMessage", []interface{}{arg1, arg2})
 	fake.captureRegistryMessageMutex.Unlock()
 	if stub != nil {
-		fake.CaptureRegistryMessageStub(arg1)
+		fake.CaptureRegistryMessageStub(arg1, arg2)
 	}
 }
 
@@ -99,17 +102,17 @@ func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageCallCount() int {
 	return len(fake.captureRegistryMessageArgsForCall)
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageCalls(stub func(metrics.ComponentTagged)) {
+func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageCalls(stub func(metrics.ComponentTagged, string)) {
 	fake.captureRegistryMessageMutex.Lock()
 	defer fake.captureRegistryMessageMutex.Unlock()
 	fake.CaptureRegistryMessageStub = stub
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) metrics.ComponentTagged {
+func (fake *FakeRouteRegistryReporter) CaptureRegistryMessageArgsForCall(i int) (metrics.ComponentTagged, string) {
 	fake.captureRegistryMessageMutex.RLock()
 	defer fake.captureRegistryMessageMutex.RUnlock()
 	argsForCall := fake.captureRegistryMessageArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeRouteRegistryReporter) CaptureRouteRegistrationLatency(arg1 time.Duration) {
@@ -209,16 +212,17 @@ func (fake *FakeRouteRegistryReporter) CaptureRoutesPrunedArgsForCall(i int) uin
 	return argsForCall.arg1
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(arg1 metrics.ComponentTagged) {
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessage(arg1 metrics.ComponentTagged, arg2 string) {
 	fake.captureUnregistryMessageMutex.Lock()
 	fake.captureUnregistryMessageArgsForCall = append(fake.captureUnregistryMessageArgsForCall, struct {
 		arg1 metrics.ComponentTagged
-	}{arg1})
+		arg2 string
+	}{arg1, arg2})
 	stub := fake.CaptureUnregistryMessageStub
-	fake.recordInvocation("CaptureUnregistryMessage", []interface{}{arg1})
+	fake.recordInvocation("CaptureUnregistryMessage", []interface{}{arg1, arg2})
 	fake.captureUnregistryMessageMutex.Unlock()
 	if stub != nil {
-		fake.CaptureUnregistryMessageStub(arg1)
+		fake.CaptureUnregistryMessageStub(arg1, arg2)
 	}
 }
 
@@ -228,17 +232,17 @@ func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageCallCount() int {
 	return len(fake.captureUnregistryMessageArgsForCall)
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageCalls(stub func(metrics.ComponentTagged)) {
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageCalls(stub func(metrics.ComponentTagged, string)) {
 	fake.captureUnregistryMessageMutex.Lock()
 	defer fake.captureUnregistryMessageMutex.Unlock()
 	fake.CaptureUnregistryMessageStub = stub
 }
 
-func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageArgsForCall(i int) metrics.ComponentTagged {
+func (fake *FakeRouteRegistryReporter) CaptureUnregistryMessageArgsForCall(i int) (metrics.ComponentTagged, string) {
 	fake.captureUnregistryMessageMutex.RLock()
 	defer fake.captureUnregistryMessageMutex.RUnlock()
 	argsForCall := fake.captureUnregistryMessageArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeRouteRegistryReporter) UnmuzzleRouteRegistrationLatency() {
