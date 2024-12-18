@@ -20,12 +20,19 @@ type Counter struct {
 	value int64
 }
 
-type PoolPutResult string
+type PoolRegisterEndpointResult string
 
 const (
-	EndpointNotUpdated PoolPutResult = "endpoint-not-updated"
-	EndpointUpdated    PoolPutResult = "endpoint-updated"
-	EndpointAdded      PoolPutResult = "endpoint-added"
+	EndpointNotUpdated PoolRegisterEndpointResult = "endpoint-not-updated"
+	EndpointUpdated    PoolRegisterEndpointResult = "endpoint-updated"
+	EndpointAdded      PoolRegisterEndpointResult = "endpoint-added"
+)
+
+type PoolRegisterRouteResult string
+
+const (
+	RouteRegistered    PoolRegisterRouteResult = "route-registered"
+	RouteAlreadyExists PoolRegisterRouteResult = "route-already-exists"
 )
 
 type PoolRemoveEndpointResult string
@@ -268,11 +275,11 @@ func (p *EndpointPool) Update() {
 	p.updatedAt = time.Now()
 }
 
-func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
+func (p *EndpointPool) Put(endpoint *Endpoint) PoolRegisterEndpointResult {
 	p.Lock()
 	defer p.Unlock()
 
-	var result PoolPutResult
+	var result PoolRegisterEndpointResult
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
 		result = EndpointUpdated

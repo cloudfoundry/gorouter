@@ -146,13 +146,11 @@ func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged, action str
 }
 
 func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged, action string) {
-	var componentName string
-	if msg.Component() == "" {
-		componentName = "unregistry_message." + action
-	} else {
-		componentName = "unregistry_message." + action + "." + msg.Component()
+	unregisterMsg := "unregistry_message." + action
+	if msg.Component() != "" {
+		unregisterMsg = unregisterMsg + "." + msg.Component()
 	}
-	m.Batcher.BatchIncrementCounter(componentName)
+	m.Batcher.BatchIncrementCounter(unregisterMsg)
 }
 
 func (m *MetricsReporter) CaptureWebSocketUpdate() {

@@ -87,23 +87,42 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		return
 	}
 
-	endpointPutResult := r.register(uri, endpoint)
+	r.RLock()
+	defer r.RUnlock()
+
+	t := time.Now()
+	registerRouteResult, pool := r.registerRoute(uri)
+	if registerRouteResult == route.RouteRegistered {
+		r.reporter.CaptureRegistryMessage(endpoint, string(route.RouteRegistered))
+		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+			r.logger.Info(string(route.RouteRegistered), buildSlogAttrs(uri, endpoint)...)
+		}
+	}
+
+	endpointPutResult := r.registerEndpoint(endpoint, pool)
 
 	if endpointPutResult == route.EndpointAdded && !endpoint.UpdatedAt.IsZero() {
 		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
 	}
 
 	r.reporter.CaptureRegistryMessage(endpoint, string(endpointPutResult))
-	if r.logger.Enabled(context.Background(), slog.LevelInfo) {
-		r.logger.Info(string(endpointPutResult), buildSlogAttrs(uri, endpoint)...)
+
+	switch endpointPutResult {
+	case route.EndpointAdded:
+		if r.logger.Enabled(context.Background(), slog.LevelInfo) {
+			r.logger.Info(string(endpointPutResult), buildSlogAttrs(uri, endpoint)...)
+		}
+	default:
+		if r.logger.Enabled(context.Background(), slog.LevelDebug) {
+			r.logger.Debug(string(endpointPutResult), buildSlogAttrs(uri, endpoint)...)
+		}
 	}
+
+	r.SetTimeOfLastUpdate(t)
 }
 
-func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
-	r.RLock()
-	defer r.RUnlock()
-
-	t := time.Now()
+func (r *RouteRegistry) registerRoute(uri route.Uri) (route.PoolRegisterRouteResult, *route.EndpointPool) {
+	poolRegisterRouteResult := route.RouteAlreadyExists
 	routekey := uri.RouteKey()
 	pool := r.byURI.Find(routekey)
 
@@ -112,18 +131,21 @@ func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.
 		r.RUnlock()
 		pool = r.insertRouteKey(routekey, uri)
 		r.RLock()
+		poolRegisterRouteResult = route.RouteRegistered
 	}
+	return poolRegisterRouteResult, pool
+}
 
+func (r *RouteRegistry) registerEndpoint(endpoint *route.Endpoint, pool *route.EndpointPool) route.PoolRegisterEndpointResult {
 	if endpoint.StaleThreshold > r.dropletStaleThreshold || endpoint.StaleThreshold == 0 {
 		endpoint.StaleThreshold = r.dropletStaleThreshold
 	}
 
-	endpointAdded := pool.Put(endpoint)
+	endpointAddedResult := pool.Put(endpoint)
 	// Overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
 	pool.SetPoolLoadBalancingAlgorithm(endpoint)
-	r.SetTimeOfLastUpdate(t)
 
-	return endpointAdded
+	return endpointAddedResult
 }
 
 // insertRouteKey acquires a write lock, inserts the route key into the registry and releases the write lock.
@@ -144,7 +166,7 @@ func (r *RouteRegistry) insertRouteKey(routekey route.Uri, uri route.Uri) *route
 			LoadBalancingAlgorithm: r.DefaultLoadBalancingAlgorithm,
 		})
 		r.byURI.Insert(routekey, pool)
-		r.logger.Info("route-registered", slog.Any("uri", routekey))
+		r.logger.Info(string(route.RouteRegistered), slog.Any("uri", routekey))
 		// for backward compatibility:
 		r.logger.Debug("uri-added", slog.Any("uri", routekey))
 	}
@@ -155,6 +177,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if !r.endpointInRouterShard(endpoint) {
 		return
 	}
+
+	r.Lock()
+	defer r.Unlock()
 
 	routeKey := uri.RouteKey()
 	endpointUnregisteredResult, pool := r.unregisterEndpoint(routeKey, endpoint)
@@ -178,9 +203,6 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 }
 
 func (r *RouteRegistry) unregisterEndpoint(routeKey route.Uri, endpoint *route.Endpoint) (route.PoolRemoveEndpointResult, *route.EndpointPool) {
-	r.Lock()
-	defer r.Unlock()
-
 	pool := r.byURI.Find(routeKey)
 	if pool == nil {
 		return route.EndpointNotUnregistered, nil
@@ -189,16 +211,9 @@ func (r *RouteRegistry) unregisterEndpoint(routeKey route.Uri, endpoint *route.E
 }
 
 func (r *RouteRegistry) deleteRouteWithoutEndpoint(routeKey route.Uri, pool *route.EndpointPool) route.PoolRemoveRouteResult {
-	r.Lock()
-	defer r.Unlock()
-
 	if pool.IsEmpty() {
-		if r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 {
-			if time.Since(pool.LastUpdated()) > r.EmptyPoolTimeout {
-				r.byURI.Delete(routeKey)
-				return route.RouteUnregistered
-			}
-		} else {
+		if !(r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0) ||
+			(r.EmptyPoolResponseCode503 && r.EmptyPoolTimeout > 0 && time.Since(pool.LastUpdated()) > r.EmptyPoolTimeout) {
 			r.byURI.Delete(routeKey)
 			return route.RouteUnregistered
 		}
