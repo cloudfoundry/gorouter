@@ -135,27 +135,22 @@ func (m *MetricsReporter) CaptureRoutesPruned(routesPruned uint64) {
 	m.Batcher.BatchAddCounter("routes_pruned", routesPruned)
 }
 
-func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged) {
+func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged, action string) {
 	var componentName string
 	if msg.Component() == "" {
-		componentName = "registry_message"
+		componentName = "registry_message." + action
 	} else {
-		componentName = "registry_message." + msg.Component()
+		componentName = "registry_message." + action + "." + msg.Component()
 	}
 	m.Batcher.BatchIncrementCounter(componentName)
 }
 
-func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
-	var componentName string
-	if msg.Component() == "" {
-		componentName = "unregistry_message"
-	} else {
-		componentName = "unregistry_message." + msg.Component()
+func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged, action string) {
+	unregisterMsg := "unregistry_message." + action
+	if msg.Component() != "" {
+		unregisterMsg = unregisterMsg + "." + msg.Component()
 	}
-	err := m.Sender.IncrementCounter(componentName)
-	if err != nil {
-		m.Logger.Debug("failed-sending-metric", log.ErrAttr(err), slog.String("metric", componentName))
-	}
+	m.Batcher.BatchIncrementCounter(unregisterMsg)
 }
 
 func (m *MetricsReporter) CaptureWebSocketUpdate() {

@@ -129,7 +129,7 @@ var _ = Describe("Route Service Handler", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{})
 
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 			})
 			It("should not add route service metadata to the request for normal routes", func() {
 				handler.ServeHTTP(resp, req)
@@ -152,7 +152,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "route-service.com"})
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 			})
 
 			It("returns 502 Bad Gateway", func() {
@@ -172,7 +172,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{})
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 			})
 			It("should not add route service metadata to the request for normal routes", func() {
 				handler.ServeHTTP(resp, req)
@@ -211,7 +211,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://route-service.com"})
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 			})
 
 			It("sends the request to the route service with X-CF-Forwarded-Url using https scheme", func() {
@@ -699,7 +699,7 @@ var _ = Describe("Route Service Handler", func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://goodrouteservice.com"})
 
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 				req.Header.Set("connection", "upgrade")
 				req.Header.Set("upgrade", "websocket")
 
@@ -718,7 +718,7 @@ var _ = Describe("Route Service Handler", func() {
 			BeforeEach(func() {
 				endpoint := route.NewEndpoint(&route.EndpointOpts{RouteServiceUrl: "https://bad%20service.com"})
 				added := routePool.Put(endpoint)
-				Expect(added).To(Equal(route.ADDED))
+				Expect(added).To(Equal(route.EndpointAdded))
 
 			})
 			It("returns a 500 internal server error response", func() {
