@@ -1012,6 +1012,57 @@ var _ = Describe("RouteRegistry", func() {
 		})
 	})
 
+	Context("LookupWithInstance with specified load balancing algorithms for routes", func() {
+		var (
+			appId    string
+			appIndex string
+		)
+
+		BeforeEach(func() {
+			m1 := route.NewEndpoint(&route.EndpointOpts{AppId: "app-1-ID", Host: "192.168.1.1", Port: 1234, PrivateInstanceIndex: "0"})
+			r.Register("bar.com/foo", m1)
+			appId = "app-1-ID"
+			appIndex = "0"
+		})
+
+		It("sets a default load balancing algorithm of a pool if no value is specified for a route", func() {
+			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
+
+			Expect(p).ToNot(BeNil())
+			Expect(p.LoadBalancingAlgorithm).To(Equal("round-robin"))
+		})
+
+		It("keeps the default load balancing algorithm of a pool if the value for an endpoint is an empty string", func() {
+			m2 := route.NewEndpoint(&route.EndpointOpts{AppId: "app-2-ID", Host: "192.168.1.2", Port: 1235, PrivateInstanceIndex: "0", LoadBalancingAlgorithm: ""})
+			r.Register("bar.com/foo", m2)
+
+			p := r.LookupWithInstance("bar.com/foo", "app-2-ID", appIndex)
+
+			Expect(p).ToNot(BeNil())
+			Expect(p.LoadBalancingAlgorithm).To(Equal("round-robin"))
+		})
+
+		It("sets the load balancing algorithm of pool to that of a newly added endpoint", func() {
+			m3 := route.NewEndpoint(&route.EndpointOpts{AppId: "app-3-ID", Host: "192.168.1.3", Port: 1235, PrivateInstanceIndex: "0", LoadBalancingAlgorithm: "least-connection"})
+			r.Register("bar.com/foo", m3)
+
+			p := r.LookupWithInstance("bar.com/foo", "app-3-ID", appIndex)
+
+			Expect(p).ToNot(BeNil())
+			Expect(p.LoadBalancingAlgorithm).To(Equal("least-connection"))
+		})
+
+		It("repeatedly sets the load balancing algorithm of pool to that of a newly added endpoint", func() {
+			m4 := route.NewEndpoint(&route.EndpointOpts{AppId: "app-4-ID", Host: "192.168.1.4", Port: 1235, PrivateInstanceIndex: "0", LoadBalancingAlgorithm: "round-robin"})
+			r.Register("bar.com/foo", m4)
+
+			p := r.LookupWithInstance("bar.com/foo", "app-4-ID", appIndex)
+
+			Expect(p).ToNot(BeNil())
+			Expect(p.LoadBalancingAlgorithm).To(Equal("round-robin"))
+		})
+	})
+
 	Context("LookupWithInstance", func() {
 		var (
 			appId    string
@@ -1041,6 +1092,13 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(1))
 			Expect(r.NumEndpoints()).To(Equal(2))
+		})
+
+		It("load balancing algorithm of an endpoint is not set and pool has a default load balancing value", func() {
+			p := r.LookupWithInstance("bar.com/foo", appId, appIndex)
+
+			Expect(p).ToNot(BeNil())
+			Expect(p.LoadBalancingAlgorithm).To(Equal("round-robin"))
 		})
 
 		It("returns a pool that matches the result of Lookup", func() {
@@ -1083,7 +1141,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		Context("when given an incorrect app id", func() {
 			BeforeEach(func() {
-				appId = "app-3-ID"
+				appId = "app-none-ID"
 				appIndex = "0"
 			})
 
