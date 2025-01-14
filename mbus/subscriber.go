@@ -41,7 +41,7 @@ type RegistryMessage struct {
 }
 
 type RegistryMessageOpts struct {
-	LoadBalancingAlgorithm string `json:"loadbalancing"`
+	LoadBalancingAlgorithm string `json:"lb_algo"`
 }
 
 func (rm *RegistryMessage) makeEndpoint(http2Enabled bool) (*route.Endpoint, error) {
