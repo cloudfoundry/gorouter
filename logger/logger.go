@@ -126,7 +126,11 @@ func initializeLogger() *slog.Logger {
 		conf.level,
 	)
 
-	zapHandler := zapslog.NewHandler(zapCore, zapslog.WithCaller(true))
+	// Disable adding the stack trace to all error messages automatically.
+	// The stack trace in the panic handler is added manually and remains in effect.
+	disableErrorStacktrace := zapslog.AddStacktraceAt(slog.LevelError + 1)
+
+	zapHandler := zapslog.NewHandler(zapCore, zapslog.WithCaller(true), disableErrorStacktrace)
 	slogFrontend := slog.New(zapHandler)
 	return slogFrontend
 }

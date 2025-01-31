@@ -167,6 +167,25 @@ var _ = Describe("Logger", func() {
 		})
 	})
 
+	Describe("Error", func() {
+		Context("when an error is logged with 'Error' level", func() {
+			JustBeforeEach(func() {
+				logger = log.CreateLogger()
+			})
+			It("outputs an error log message without stack trace", func() {
+				Expect(func() { logger.Error(action) }).NotTo(Panic())
+
+				Expect(testSink.Lines()).To(HaveLen(1))
+				Expect(testSink.Lines()[0]).To(MatchRegexp(
+					`{"log_level":3,"timestamp":[0-9]+[.][0-9]+,"message":"%s"`,
+					action,
+				))
+				Expect(testSink.Lines()[0]).NotTo(ContainSubstring("stack_trace"))
+				Expect(testSink.Lines()[0]).NotTo(ContainSubstring("logger_test"))
+			})
+		})
+	})
+
 	Describe("ErrAttr", func() {
 		Context("when appending an error created by ErrAttr ", func() {
 			JustBeforeEach(func() {

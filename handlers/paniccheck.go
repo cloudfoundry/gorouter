@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"runtime"
+	"runtime/debug"
 
 	"github.com/urfave/negroni/v3"
 
@@ -41,7 +41,7 @@ func (p *panicCheck) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 					err = fmt.Errorf("%v", rec)
 				}
 				logger := LoggerWithTraceInfo(p.logger, r)
-				logger.Error("panic-check", slog.String("host", r.Host), log.ErrAttr(err), slog.Any("stacktrace", runtime.StartTrace()))
+				logger.Error("panic-check", slog.String("host", r.Host), log.ErrAttr(err), slog.String("stacktrace", string(debug.Stack())))
 
 				rw.Header().Set(router_http.CfRouterError, "unknown_failure")
 				rw.WriteHeader(http.StatusBadGateway)

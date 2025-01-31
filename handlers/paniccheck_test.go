@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,6 +58,9 @@ var _ = Describe("Paniccheck", func() {
 			Eventually(logger).Should(gbytes.Say("somehost.com"))
 			Eventually(logger).Should(gbytes.Say("we expect this panic"))
 			Eventually(logger).Should(gbytes.Say("stacktrace"))
+
+			// check that the stack trace is there and mentions the panicCheck handler.
+			Eventually(logger).Should(gbytes.Say(regexp.QuoteMeta("handlers.(*panicCheck)")))
 		})
 	})
 
