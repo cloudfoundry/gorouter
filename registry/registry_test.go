@@ -70,9 +70,59 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Register", func() {
-		It("emits message_count metrics", func() {
-			r.Register("foo", fooEndpoint)
-			Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(1))
+		Context("when a new endpoint is registered", func() {
+			It("emits endpoint-registered message_count metrics", func() {
+				r.Register("foo", fooEndpoint)
+				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(2))
+				endpoint1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
+				Expect(endpoint1).To(Equal(fooEndpoint))
+				Expect(action1).To(Equal(string(route.RouteRegistered)))
+				endpoint2, action2 := reporter.CaptureRegistryMessageArgsForCall(1)
+				Expect(endpoint2).To(Equal(fooEndpoint))
+				Expect(action2).To(Equal(string(route.EndpointAdded)))
+			})
+		})
+
+		Context("when an endpoint is updated", func() {
+			It("emits endpoint-updated message_count metrics", func() {
+				modTag1 := models.ModificationTag{Guid: "abc", Index: 0}
+				endpoint1 := route.NewEndpoint(&route.EndpointOpts{ModificationTag: modTag1})
+				modTag2 := models.ModificationTag{Guid: "abc", Index: 1}
+				endpoint2 := route.NewEndpoint(&route.EndpointOpts{ModificationTag: modTag2})
+				r.Register("foo", endpoint1)
+				r.Register("foo", endpoint2)
+				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(3))
+				endpointR1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
+				Expect(endpointR1).To(Equal(endpoint1))
+				Expect(action1).To(Equal(string(route.RouteRegistered)))
+				endpointR2, action2 := reporter.CaptureRegistryMessageArgsForCall(1)
+				Expect(endpointR2).To(Equal(endpoint1))
+				Expect(action2).To(Equal(string(route.EndpointAdded)))
+				endpointR3, action3 := reporter.CaptureRegistryMessageArgsForCall(2)
+				Expect(endpointR3).To(Equal(endpoint2))
+				Expect(action3).To(Equal(string(route.EndpointUpdated)))
+			})
+		})
+
+		Context("when modificationTag is older so that the endpoint is not updated", func() {
+			It("emits endpoint-bot-updated message_count metrics", func() {
+				modTag1 := models.ModificationTag{Guid: "abc", Index: 1}
+				endpoint1 := route.NewEndpoint(&route.EndpointOpts{ModificationTag: modTag1})
+				modTag2 := models.ModificationTag{Guid: "abc", Index: 0}
+				endpoint2 := route.NewEndpoint(&route.EndpointOpts{ModificationTag: modTag2})
+				r.Register("foo", endpoint1)
+				r.Register("foo", endpoint2)
+				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(3))
+				endpointR1, action1 := reporter.CaptureRegistryMessageArgsForCall(0)
+				Expect(endpointR1).To(Equal(endpoint1))
+				Expect(action1).To(Equal(string(route.RouteRegistered)))
+				endpointR2, action2 := reporter.CaptureRegistryMessageArgsForCall(1)
+				Expect(endpointR2).To(Equal(endpoint1))
+				Expect(action2).To(Equal(string(route.EndpointAdded)))
+				endpointR3, action3 := reporter.CaptureRegistryMessageArgsForCall(2)
+				Expect(endpointR3).To(Equal(endpoint2))
+				Expect(action3).To(Equal(string(route.EndpointNotUpdated)))
+			})
 		})
 
 		Context("when the endpoint has an UpdatedAt timestamp", func() {
@@ -237,7 +287,7 @@ var _ = Describe("RouteRegistry", func() {
 				r.Register("a.route", fooEndpoint)
 
 				Eventually(logger).Should(gbytes.Say(`"log_level":1.*route-registered.*a\.route`))
-				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-registered.*a\.route.*192\.168\.1\.1`))
+				Eventually(logger).Should(gbytes.Say(`"log_level":1.*endpoint-added.*a\.route.*192\.168\.1\.1`))
 			})
 
 			It("logs 'uri-added' at debug level for backward compatibility", func() {
@@ -253,7 +303,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(logger).NotTo(gbytes.Say(`uri-added.*.*a\.route`))
 				By("not providing IsolationSegment property")
 				r.Register("a.route", fooEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
@@ -263,7 +313,7 @@ var _ = Describe("RouteRegistry", func() {
 				})
 
 				r.Register("a.route", isoSegEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 
@@ -516,25 +566,73 @@ var _ = Describe("RouteRegistry", func() {
 	})
 
 	Context("Unregister", func() {
-		Context("when endpoint has component tagged", func() {
-			BeforeEach(func() {
-				fooEndpoint.Tags = map[string]string{"component": "oauth-server"}
+		Context("when route is registered", func() {
+			Context("when endpoint has component tagged", func() {
+				BeforeEach(func() {
+					fooEndpoint.Tags = map[string]string{"component": "oauth-server"}
+					r.Register("foo", fooEndpoint)
+					Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(2))
+				})
+
+				It("emits counter metrics for unregister endpoint and route", func() {
+					r.Unregister("foo", fooEndpoint)
+					Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(2))
+					endpoint1, action1 := reporter.CaptureUnregistryMessageArgsForCall(0)
+					Expect(endpoint1).To(Equal(fooEndpoint))
+					Expect(action1).To(Equal(string(route.EndpointUnregistered)))
+					endpoint2, action2 := reporter.CaptureUnregistryMessageArgsForCall(1)
+					Expect(endpoint2).To(Equal(fooEndpoint))
+					Expect(action2).To(Equal(string(route.RouteUnregistered)))
+				})
 			})
-			It("emits counter metrics", func() {
-				r.Unregister("foo", fooEndpoint)
-				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(1))
-				Expect(reporter.CaptureUnregistryMessageArgsForCall(0)).To(Equal(fooEndpoint))
+
+			Context("when endpoint does not have component tag", func() {
+				BeforeEach(func() {
+					fooEndpoint.Tags = map[string]string{}
+					r.Register("foo", fooEndpoint)
+					Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(2))
+				})
+				It("emits counter metrics for unregister endpoint and route", func() {
+					r.Unregister("foo", fooEndpoint)
+					Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(2))
+					endpoint1, action1 := reporter.CaptureUnregistryMessageArgsForCall(0)
+					Expect(endpoint1).To(Equal(fooEndpoint))
+					Expect(action1).To(Equal(string(route.EndpointUnregistered)))
+					endpoint2, action2 := reporter.CaptureUnregistryMessageArgsForCall(1)
+					Expect(endpoint2).To(Equal(fooEndpoint))
+					Expect(action2).To(Equal(string(route.RouteUnregistered)))
+				})
 			})
 		})
+		Context("when route has multiple endpoints", func() {
+			BeforeEach(func() {
+				fooEndpoint.Tags = map[string]string{}
+				fooEndpoint2 := route.NewEndpoint(&route.EndpointOpts{
+					Host: "192.168.1.2",
+					Tags: map[string]string{
+						"runtime":   "ruby18",
+						"framework": "sinatra",
+					}})
 
-		Context("when endpoint does not have component tag", func() {
+				r.Register("foo", fooEndpoint)
+				r.Register("foo", fooEndpoint2)
+				Expect(reporter.CaptureRegistryMessageCallCount()).To(Equal(3))
+			})
+			It("emits counter metrics for unregister endpoint only", func() {
+				r.Unregister("foo", fooEndpoint)
+				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(1))
+				endpoint1, action1 := reporter.CaptureUnregistryMessageArgsForCall(0)
+				Expect(endpoint1).To(Equal(fooEndpoint))
+				Expect(action1).To(Equal(string(route.EndpointUnregistered)))
+			})
+		})
+		Context("when route is not registered", func() {
 			BeforeEach(func() {
 				fooEndpoint.Tags = map[string]string{}
 			})
-			It("emits counter metrics", func() {
+			It("does not emit counter metrics for unregister", func() {
 				r.Unregister("foo", fooEndpoint)
-				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(1))
-				Expect(reporter.CaptureUnregistryMessageArgsForCall(0)).To(Equal(fooEndpoint))
+				Expect(reporter.CaptureUnregistryMessageCallCount()).To(Equal(0))
 			})
 		})
 
@@ -701,7 +799,7 @@ var _ = Describe("RouteRegistry", func() {
 				BeforeEach(func() {
 					fooEndpoint.IsolationSegment = ""
 				})
-				It("does not log an unregister message", func() {
+				It("does not log an unregisterEndpoint message", func() {
 					r.Unregister("a.route", fooEndpoint)
 					Expect(r.NumUris()).To(Equal(3))
 					Expect(r.NumEndpoints()).To(Equal(3))
@@ -809,21 +907,21 @@ var _ = Describe("RouteRegistry", func() {
 
 			It("only logs unregistration for existing routes", func() {
 				r.Unregister("non-existent-route", fooEndpoint)
-				Expect(logger).NotTo(gbytes.Say(`unregister.*.*a\.non-existent-route`))
+				Expect(logger).NotTo(gbytes.Say(`unregisterEndpoint.*.*a\.non-existent-route`))
 
 				By("not providing IsolationSegment property")
 				r.Unregister("a.route", fooEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"-"`))
 			})
 
-			It("logs unregister message with IsolationSegment when it's provided", func() {
+			It("logs unregisterEndpoint message with IsolationSegment when it's provided", func() {
 				isoSegEndpoint := route.NewEndpoint(&route.EndpointOpts{
 					IsolationSegment: "is1",
 				})
 				r.Register("a.isoSegRoute", isoSegEndpoint)
 				r.Unregister("a.isoSegRoute", isoSegEndpoint)
-				//TODO: use pattern matching to make sure we are asserting on the unregister line
+				//TODO: use pattern matching to make sure we are asserting on the unregisterEndpoint line
 				Eventually(logger).Should(gbytes.Say(`"isolation_segment":"is1"`))
 			})
 		})
@@ -849,7 +947,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(r.NumEndpoints()).To(Equal(0))
 			})
 
-			It("does not unregister route if modification tag older", func() {
+			It("does not unregisterEndpoint route if modification tag older", func() {
 				modTag2 := models.ModificationTag{
 					Guid:  "abc",
 					Index: 8,
