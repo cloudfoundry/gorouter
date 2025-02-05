@@ -223,21 +223,44 @@ max_request_header_bytes: 10
 		})
 
 		It("sets prometheus endpoint config", func() {
+			cfg, err := DefaultConfig()
+			Expect(err).ToNot(HaveOccurred())
+
 			var b = []byte(`
 prometheus:
+  enabled: true
   port: 1234
   cert_path: /some-cert-path
   key_path: /some-key-path
   ca_path: /some-ca-path
 `)
 
-			err := config.Initialize(b)
+			err = config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 
+			Expect(config.Prometheus.Enabled).To(BeTrue())
 			Expect(config.Prometheus.Port).To(Equal(uint16(1234)))
 			Expect(config.Prometheus.CertPath).To(Equal("/some-cert-path"))
 			Expect(config.Prometheus.KeyPath).To(Equal("/some-key-path"))
 			Expect(config.Prometheus.CAPath).To(Equal("/some-ca-path"))
+			Expect(config.Prometheus.Meters).To(Equal(cfg.Prometheus.Meters))
+		})
+
+		It("sets prometheus histogram buckets config", func() {
+			var b = []byte(`
+prometheus:
+  meters:
+    route_lookup_time_histogram_buckets: [0, 100, 10000]
+    route_registration_latency_histogram_buckets: [-10, 0, 10]
+    routing_response_latency_histogram_buckets: [0.1, 0.5, 1]
+`)
+
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(config.Prometheus.Meters.RouteLookupTimeHistogramBuckets).To(Equal([]float64{0, 100, 10000}))
+			Expect(config.Prometheus.Meters.RouteRegistrationLatencyHistogramBuckets).To(Equal([]float64{-10, 0, 10}))
+			Expect(config.Prometheus.Meters.RoutingResponseLatencyHistogramBuckets).To(Equal([]float64{0.1, 0.5, 1}))
 		})
 
 		It("defaults frontend idle timeout to 900", func() {
@@ -922,6 +945,17 @@ backends:
 			err := config.Initialize(b)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(config.PerRequestMetricsReporting).To(BeFalse())
+		})
+
+		It("defaults EnableEnvelopeV1Metrics to true", func() {
+			Expect(config.EnableEnvelopeV1Metrics).To(Equal(true))
+		})
+
+		It("sets EnableEnvelopeV1Metrics", func() {
+			var b = []byte(`enable_envelope_v1_metrics: false`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.EnableEnvelopeV1Metrics).To(BeFalse())
 		})
 
 		It("defaults SendHttpStartStopServerEvent to true", func() {
