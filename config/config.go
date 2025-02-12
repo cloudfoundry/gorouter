@@ -184,7 +184,6 @@ type LoggingConfig struct {
 	DisableLogForwardedFor bool         `yaml:"disable_log_forwarded_for"`
 	DisableLogSourceIP     bool         `yaml:"disable_log_source_ip"`
 	RedactQueryParams      string       `yaml:"redact_query_params"`
-	EnableAttemptsDetails  bool         `yaml:"enable_attempts_details"`
 	Format                 FormatConfig `yaml:"format"`
 	ExtraAccessLogFields   []string     `yaml:"extra_access_log_fields"`
 
@@ -213,14 +212,13 @@ type TLSPem struct {
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level:                 "debug",
-	MetronAddress:         "localhost:3457",
-	Format:                FormatConfig{"unix-epoch"},
-	JobName:               "gorouter",
-	RedactQueryParams:     REDACT_QUERY_PARMS_NONE,
-	EnableAttemptsDetails: false,
-	SyslogNetwork:         "udp",
-	SyslogAddr:            "127.0.0.1:514",
+	Level:             "debug",
+	MetronAddress:     "localhost:3457",
+	Format:            FormatConfig{"unix-epoch"},
+	JobName:           "gorouter",
+	RedactQueryParams: REDACT_QUERY_PARMS_NONE,
+	SyslogNetwork:     "udp",
+	SyslogAddr:        "127.0.0.1:514",
 }
 
 type HeaderNameValue struct {
