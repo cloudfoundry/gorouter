@@ -81,7 +81,7 @@ var _ = Describe("AccessLog", func() {
 		handler = negroni.New()
 		handler.Use(handlers.NewRequestInfo())
 		handler.Use(handlers.NewProxyWriter(logger.Logger))
-		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, nil, logger.Logger))
+		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, nil, logger.Logger))
 		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -121,7 +121,7 @@ var _ = Describe("AccessLog", func() {
 			handler = negroni.New()
 			handler.Use(handlers.NewRequestInfo())
 			handler.Use(handlers.NewProxyWriter(logger.Logger))
-			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, []string{"local_address", "local_address"}, logger.Logger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, []string{"local_address", "local_address"}, logger.Logger))
 			handler.Use(nextHandler)
 		})
 		It("only logs them once", func() {
@@ -164,7 +164,7 @@ var _ = Describe("AccessLog", func() {
 		BeforeEach(func() {
 			handler = negroni.New()
 			handler.UseFunc(testProxyWriterHandler)
-			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, false, nil, logger.Logger))
+			handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, nil, logger.Logger))
 			handler.Use(nextHandler)
 		})
 		It("calls Panic on the logger", func() {

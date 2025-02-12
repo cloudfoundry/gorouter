@@ -1772,7 +1772,7 @@ var _ = Describe("Proxy", func() {
 			Context("A slow app with multiple broken endpoints and attempt details logging enabled", func() {
 				BeforeEach(func() {
 					conf.EndpointDialTimeout = 100 * time.Millisecond
-					conf.Logging.EnableAttemptsDetails = true
+					conf.Logging.ExtraAccessLogFields = []string{"failed_attempts", "failed_attempts_time", "dns_time", "dial_time", "tls_time", "backend_time"}
 					conf.DropletStaleThreshold = 1
 				})
 
@@ -1979,7 +1979,7 @@ var _ = Describe("Proxy", func() {
 
 		Context("lookup errors when attempt details logging is enabled", func() {
 			BeforeEach(func() {
-				conf.Logging.EnableAttemptsDetails = true
+				conf.Logging.ExtraAccessLogFields = []string{"failed_attempts", "failed_attempts_time", "dns_time", "dial_time", "tls_time", "backend_time"}
 			})
 
 			It("logs no backend_time on missing app route", func() {
