@@ -107,7 +107,6 @@ type AccessLogRecord struct {
 	DisableSourceIPLogging bool
 	RedactQueryParams      string
 	RouterError            string
-	LogAttemptsDetails     bool
 	FailedAttempts         int
 	RoundTripSuccessful    bool
 	ExtraFields            []string
@@ -296,40 +295,33 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 	b.WriteString(`instance_id:`)
 	b.WriteDashOrStringValue(instanceId)
 
-	if r.LogAttemptsDetails {
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`failed_attempts:`)
-		b.WriteIntValue(r.FailedAttempts)
-
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`failed_attempts_time:`)
-		b.WriteDashOrFloatValue(r.failedAttemptsTime())
-
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`dns_time:`)
-		b.WriteDashOrFloatValue(r.dnsTime())
-
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`dial_time:`)
-		b.WriteDashOrFloatValue(r.dialTime())
-
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`tls_time:`)
-		b.WriteDashOrFloatValue(r.tlsTime())
-
-		// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
-		b.WriteString(`backend_time:`)
-		b.WriteDashOrFloatValue(r.successfulAttemptTime())
-	}
-
 	// We have to consider the impact of iterating over a list. This technically allows to repeat
 	// some of the fields but it allows us to iterate over the list only once instead of once per
-	// field when we perform a [slices.Contains] check.
+	// field when we perform a [slices.Contains] check. When loading the fields the list is
+	// deduplicated so this shouldn't be a concern.
 	for _, field := range r.ExtraFields {
 		switch field {
+		case "backend_time":
+			b.WriteString(`backend_time:`)
+			b.WriteDashOrFloatValue(r.successfulAttemptTime())
+		case "dial_time":
+			b.WriteString(`dial_time:`)
+			b.WriteDashOrFloatValue(r.dialTime())
+		case "dns_time":
+			b.WriteString(`dns_time:`)
+			b.WriteDashOrFloatValue(r.dnsTime())
+		case "failed_attempts":
+			b.WriteString(`failed_attempts:`)
+			b.WriteIntValue(r.FailedAttempts)
+		case "failed_attempts_time":
+			b.WriteString(`failed_attempts_time:`)
+			b.WriteDashOrFloatValue(r.failedAttemptsTime())
 		case "local_address":
 			b.WriteString(`local_address:`)
 			b.WriteDashOrStringValue(r.LocalAddress)
+		case "tls_time":
+			b.WriteString(`tls_time:`)
+			b.WriteDashOrFloatValue(r.tlsTime())
 		}
 	}
 

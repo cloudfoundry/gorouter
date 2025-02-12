@@ -18,11 +18,10 @@ import (
 )
 
 type accessLog struct {
-	accessLogger       accesslog.AccessLogger
-	extraHeadersToLog  []string
-	logAttemptsDetails bool
-	extraFields        []string
-	logger             *slog.Logger
+	accessLogger      accesslog.AccessLogger
+	extraHeadersToLog []string
+	extraFields       []string
+	logger            *slog.Logger
 }
 
 // NewAccessLog creates a new handler that handles logging requests to the
@@ -30,16 +29,14 @@ type accessLog struct {
 func NewAccessLog(
 	accessLogger accesslog.AccessLogger,
 	extraHeadersToLog []string,
-	logAttemptsDetails bool,
 	extraFields []string,
 	logger *slog.Logger,
 ) negroni.Handler {
 	return &accessLog{
-		accessLogger:       accessLogger,
-		extraHeadersToLog:  extraHeadersToLog,
-		logAttemptsDetails: logAttemptsDetails,
-		extraFields:        deduplicate(extraFields),
-		logger:             logger,
+		accessLogger:      accessLogger,
+		extraHeadersToLog: extraHeadersToLog,
+		extraFields:       deduplicate(extraFields),
+		logger:            logger,
 	}
 }
 
@@ -47,10 +44,9 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	proxyWriter := rw.(utils.ProxyResponseWriter)
 
 	alr := &schema.AccessLogRecord{
-		Request:            r,
-		ExtraHeadersToLog:  a.extraHeadersToLog,
-		LogAttemptsDetails: a.logAttemptsDetails,
-		ExtraFields:        a.extraFields,
+		Request:           r,
+		ExtraHeadersToLog: a.extraHeadersToLog,
+		ExtraFields:       a.extraFields,
 	}
 
 	requestBodyCounter := &countingReadCloser{delegate: r.Body}

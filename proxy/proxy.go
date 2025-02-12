@@ -173,7 +173,7 @@ func NewProxy(
 			n.Use(handlers.NewHTTPLatencyPrometheus(p.promRegistry))
 		}
 	}
-	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, cfg.Logging.EnableAttemptsDetails, cfg.Logging.ExtraAccessLogFields, logger))
+	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, cfg.Logging.ExtraAccessLogFields, logger))
 	n.Use(handlers.NewQueryParam(logger))
 	n.Use(handlers.NewReporter(reporter, logger))
 	n.Use(handlers.NewHTTPRewriteHandler(cfg.HTTPRewrite, headersToAlwaysRemove))
