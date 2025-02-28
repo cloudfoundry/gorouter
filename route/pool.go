@@ -22,6 +22,19 @@ type Counter struct {
 
 type PoolPutResult int
 
+func (p PoolPutResult) String() string {
+	switch p {
+	case UNMODIFIED:
+		return "unmodified"
+	case UPDATED:
+		return "updated"
+	case ADDED:
+		return "added"
+	default:
+		panic("invalid PoolPutResult")
+	}
+}
+
 const (
 	UNMODIFIED = PoolPutResult(iota)
 	UPDATED

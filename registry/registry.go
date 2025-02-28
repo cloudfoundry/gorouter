@@ -89,7 +89,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	endpointAdded := r.register(uri, endpoint)
 
-	r.reporter.CaptureRegistryMessage(endpoint)
+	r.reporter.CaptureRegistryMessage(endpoint, endpointAdded.String())
 
 	if endpointAdded == route.ADDED && !endpoint.UpdatedAt.IsZero() {
 		r.reporter.CaptureRouteRegistrationLatency(time.Since(endpoint.UpdatedAt))
@@ -109,6 +109,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 			r.logger.Debug("endpoint-not-registered", buildSlogAttrs(uri, endpoint)...)
 		}
 	}
+
 }
 
 func (r *RouteRegistry) register(uri route.Uri, endpoint *route.Endpoint) route.PoolPutResult {
@@ -171,6 +172,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	r.unregister(uri, endpoint)
 
 	r.reporter.CaptureUnregistryMessage(endpoint)
+
 }
 
 func (r *RouteRegistry) unregister(uri route.Uri, endpoint *route.Endpoint) {
@@ -211,9 +213,7 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.EndpointPool {
 
 	pool := r.lookup(uri)
 
-	endLookup := time.Now()
-	r.reporter.CaptureLookupTime(endLookup.Sub(started))
-
+	r.reporter.CaptureLookupTime(time.Since(started))
 	return pool
 }
 

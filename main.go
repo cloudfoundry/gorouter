@@ -5,16 +5,18 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"runtime"
 	"syscall"
 	"time"
 
+	mr "code.cloudfoundry.org/go-metric-registry"
+
+	"code.cloudfoundry.org/gorouter/metrics_prometheus"
+
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
-	mr "code.cloudfoundry.org/go-metric-registry"
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/cloudfoundry/dropsonde"
@@ -130,17 +132,51 @@ func main() {
 
 	}
 
+	// setup metrics via dropsonse
 	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	var metricsReporter *metrics.MetricsReporter
+	if c.EnableEnvelopeV1Metrics {
+		metricsReporter = initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+	}
 
-	metricsReporter := initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
-	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
-	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricsReporter)
+	var promRegistry *mr.Registry
+	var promMetrics *metrics_prometheus.Metrics
+	if c.Prometheus.Enabled {
+		promRegistry = metrics_prometheus.NewMetricsRegistry(c.Prometheus)
+		promMetrics = metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
+	}
+
+	// setup metrics via prometheus
+	var registryMetrics metrics.MultiRouteRegistryReporter
+
+	if metricsReporter != nil {
+		registryMetrics = append(registryMetrics, metricsReporter)
+	}
+	if promMetrics != nil {
+		registryMetrics = append(registryMetrics, promMetrics)
+	}
+
+	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, registryMetrics)
+
+	varz := rvarz.NewVarz(registry)
+
+	var proxyMetrics metrics.MultiProxyReporter
+
+	if metricsReporter != nil {
+		proxyMetrics = append(proxyMetrics, metricsReporter)
+	}
+
+	if promMetrics != nil {
+		proxyMetrics = append(proxyMetrics, promMetrics)
+	}
+
+	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyMetrics}
+
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
 
-	varz := rvarz.NewVarz(registry)
-	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
+	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
 		grlog.CreateLoggerWithSource(prefix, "access-grlog"),
@@ -194,17 +230,11 @@ func main() {
 		grlog.Fatal(logger, "new-route-services-server", grlog.ErrAttr(err))
 	}
 
-	var metricsRegistry *mr.Registry
-	if c.Prometheus.Port != 0 {
-		metricsRegistry = mr.NewRegistry(log.Default(),
-			mr.WithTLSServer(int(c.Prometheus.Port), c.Prometheus.CertPath, c.Prometheus.KeyPath, c.Prometheus.CAPath))
-	}
-
 	h = &health.Health{}
 	proxyHandler := proxy.NewProxy(
 		logger,
 		accessLogger,
-		metricsRegistry,
+		promRegistry,
 		ew,
 		c,
 		registry,
@@ -257,8 +287,8 @@ func main() {
 	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
 
 	go func() {
-		time.Sleep(c.RouteLatencyMetricMuzzleDuration) // this way we avoid reporting metrics for pre-existing routes
-		metricsReporter.UnmuzzleRouteRegistrationLatency()
+		time.Sleep(c.RouteLatencyMetricMuzzleDuration)     // this way we avoid reporting metrics for pre-existing routes
+		registryMetrics.UnmuzzleRouteRegistrationLatency() // Required for Envelope V1. Keep it while we have both Envelope V1 and Prometheus.
 	}()
 
 	<-monitor.Ready()

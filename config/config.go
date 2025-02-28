@@ -112,10 +112,28 @@ var defaultStatusConfig = StatusConfig{
 }
 
 type PrometheusConfig struct {
-	Port     uint16 `yaml:"port"`
-	CertPath string `yaml:"cert_path"`
-	KeyPath  string `yaml:"key_path"`
-	CAPath   string `yaml:"ca_path"`
+	Enabled  bool         `yaml:"enabled,omitempty"`
+	Port     uint16       `yaml:"port"`
+	CertPath string       `yaml:"cert_path"`
+	KeyPath  string       `yaml:"key_path"`
+	CAPath   string       `yaml:"ca_path"`
+	Meters   MetersConfig `yaml:"meters,omitempty"`
+}
+
+var defaultPrometheusConfig = PrometheusConfig{
+	Meters: defaultMetersConfig,
+}
+
+type MetersConfig struct {
+	RouteLookupTimeHistogramBuckets          []float64 `yaml:"route_lookup_time_histogram_buckets,omitempty"`
+	RouteRegistrationLatencyHistogramBuckets []float64 `yaml:"route_registration_latency_histogram_buckets,omitempty"`
+	RoutingResponseLatencyHistogramBuckets   []float64 `yaml:"routing_response_latency_histogram_buckets,omitempty"`
+}
+
+var defaultMetersConfig = MetersConfig{
+	RouteLookupTimeHistogramBuckets:          []float64{10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000, 90_000, 100_000},
+	RouteRegistrationLatencyHistogramBuckets: []float64{0.1, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4},
+	RoutingResponseLatencyHistogramBuckets:   []float64{1, 2, 4, 6, 8, 10, 20, 40, 50, 100, 500, 1000},
 }
 
 type NatsConfig struct {
@@ -479,6 +497,9 @@ type Config struct {
 	// reports latency under gorouter sourceid, and with and without component name
 	PerRequestMetricsReporting bool `yaml:"per_request_metrics_reporting,omitempty"`
 
+	// Switch to disable old metrics reporting using Envelope v1
+	EnableEnvelopeV1Metrics bool `yaml:"enable_envelope_v1_metrics"`
+
 	// Old metric, to eventually be replaced by prometheus reporting
 	SendHttpStartStopServerEvent bool `yaml:"send_http_start_stop_server_event,omitempty"`
 
@@ -496,6 +517,7 @@ var defaultConfig = Config{
 	Nats:                           defaultNatsConfig,
 	Logging:                        defaultLoggingConfig,
 	Port:                           8081,
+	Prometheus:                     defaultPrometheusConfig,
 	Index:                          0,
 	GoMaxProcs:                     -1,
 	EnablePROXY:                    false,
@@ -549,6 +571,8 @@ var defaultConfig = Config{
 	StickySessionsForAuthNegotiate: false,
 
 	PerRequestMetricsReporting: true,
+
+	EnableEnvelopeV1Metrics: true,
 
 	SendHttpStartStopServerEvent: true,
 
