@@ -47,8 +47,14 @@ type RouteRegistryReporter interface {
 	CaptureRegistryMessage(msg ComponentTagged, action string)
 	CaptureRouteRegistrationLatency(t time.Duration)
 	CaptureUnregistryMessage(msg ComponentTagged)
-	// Deprecated: used only in Envelope v1, should be removed when Envelope v1 support is eliminated
 	UnmuzzleRouteRegistrationLatency()
+}
+
+//go:generate counterfeiter -o fakes/fake_monitorreporter.go . MonitorReporter
+type MonitorReporter interface {
+	CaptureFoundFileDescriptors(files int)
+	CaptureNATSBufferedMessages(messages int)
+	CaptureNATSDroppedMessages(messages int)
 }
 
 type CompositeReporter struct {
@@ -181,6 +187,28 @@ func (m MultiProxyReporter) CaptureWebSocketUpdate() {
 func (m MultiProxyReporter) CaptureWebSocketFailure() {
 	for _, r := range m {
 		r.CaptureWebSocketFailure()
+	}
+}
+
+type MultiMonitorReporter []MonitorReporter
+
+var _ MonitorReporter = MultiMonitorReporter{}
+
+func (m MultiMonitorReporter) CaptureFoundFileDescriptors(files int) {
+	for _, r := range m {
+		r.CaptureFoundFileDescriptors(files)
+	}
+}
+
+func (m MultiMonitorReporter) CaptureNATSBufferedMessages(messages int) {
+	for _, r := range m {
+		r.CaptureNATSBufferedMessages(messages)
+	}
+}
+
+func (m MultiMonitorReporter) CaptureNATSDroppedMessages(messages int) {
+	for _, r := range m {
+		r.CaptureNATSDroppedMessages(messages)
 	}
 }
 

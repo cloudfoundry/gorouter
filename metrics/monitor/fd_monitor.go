@@ -9,24 +9,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/dropsonde/metrics"
-
 	log "code.cloudfoundry.org/gorouter/logger"
+	"code.cloudfoundry.org/gorouter/metrics"
 )
 
 type FileDescriptor struct {
-	path   string
-	ticker *time.Ticker
-	sender metrics.MetricSender
-	logger *slog.Logger
+	path     string
+	ticker   *time.Ticker
+	reporter metrics.MonitorReporter
+	logger   *slog.Logger
 }
 
-func NewFileDescriptor(path string, ticker *time.Ticker, sender metrics.MetricSender, logger *slog.Logger) *FileDescriptor {
+func NewFileDescriptor(path string, ticker *time.Ticker, reporter metrics.MonitorReporter, logger *slog.Logger) *FileDescriptor {
 	return &FileDescriptor{
-		path:   path,
-		ticker: ticker,
-		sender: sender,
-		logger: logger,
+		path:     path,
+		ticker:   ticker,
+		reporter: reporter,
+		logger:   logger,
 	}
 }
 
@@ -58,9 +57,7 @@ func (f *FileDescriptor) Run(signals <-chan os.Signal, ready chan<- struct{}) er
 					numFds = symlinks(dirEntries)
 				}
 			}
-			if err := f.sender.SendValue("file_descriptors", float64(numFds), "file"); err != nil {
-				f.logger.Error("error-sending-file-descriptor-metric", log.ErrAttr(err))
-			}
+			f.reporter.CaptureFoundFileDescriptors(numFds)
 
 		case <-signals:
 			f.logger.Info("exited")

@@ -17,7 +17,7 @@ import (
 
 var _ = Describe("FileDescriptor", func() {
 	var (
-		sender   *fakes.MetricSender
+		reporter *fakes.FakeMonitorReporter
 		procPath string
 		tr       *time.Ticker
 		logger   *test_util.TestLogger
@@ -25,7 +25,7 @@ var _ = Describe("FileDescriptor", func() {
 
 	BeforeEach(func() {
 		tr = time.NewTicker(1 * time.Second)
-		sender = &fakes.MetricSender{}
+		reporter = new(fakes.FakeMonitorReporter)
 		logger = test_util.NewTestLogger("test")
 	})
 
@@ -35,7 +35,7 @@ var _ = Describe("FileDescriptor", func() {
 	})
 
 	It("exits when os signal is received", func() {
-		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger.Logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, reporter, logger.Logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
@@ -48,24 +48,20 @@ var _ = Describe("FileDescriptor", func() {
 
 	It("monitors all the open file descriptors for a given pid", func() {
 		procPath = createTestPath("", 10)
-		fdMonitor := monitor.NewFileDescriptor(procPath, tr, sender, logger.Logger)
+		fdMonitor := monitor.NewFileDescriptor(procPath, tr, reporter, logger.Logger)
 		process := ifrit.Invoke(fdMonitor)
 		Eventually(process.Ready()).Should(BeClosed())
 
-		Eventually(sender.SendValueCallCount, "2s").Should(Equal(1))
-		name, value, unit := sender.SendValueArgsForCall(0)
-		Expect(name).To(Equal("file_descriptors"))
-		Expect(value).To(BeEquivalentTo(10))
-		Expect(unit).To(Equal("file"))
+		Eventually(reporter.CaptureFoundFileDescriptorsCallCount, "2s").Should(Equal(1))
+		files := reporter.CaptureFoundFileDescriptorsArgsForCall(0)
+		Expect(files).To(BeEquivalentTo(10))
 
 		// create some more FDs
 		createTestPath(procPath, 20)
 
-		Eventually(sender.SendValueCallCount, "2s").Should(Equal(2))
-		name, value, unit = sender.SendValueArgsForCall(1)
-		Expect(name).To(Equal("file_descriptors"))
-		Expect(value).To(BeEquivalentTo(20))
-		Expect(unit).To(Equal("file"))
+		Eventually(reporter.CaptureFoundFileDescriptorsCallCount, "2s").Should(Equal(2))
+		files = reporter.CaptureFoundFileDescriptorsArgsForCall(1)
+		Expect(files).To(BeEquivalentTo(20))
 	})
 })
 
