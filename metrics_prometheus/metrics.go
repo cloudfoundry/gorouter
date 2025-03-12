@@ -47,7 +47,7 @@ func NewMetricsRegistry(config config.PrometheusConfig) *mr.Registry {
 		metricsRegistry = mr.NewRegistry(log.Default(),
 			// the server starts in background. Endpoint: 127.0.0.1:port/metrics
 			mr.WithTLSServer(int(config.Port), config.CertPath, config.KeyPath, config.CAPath))
-	} else {
+	} else { // port zero is used in test suites
 		metricsRegistry = mr.NewRegistry(log.Default(),
 			// the server starts in background. Endpoint: 127.0.0.1:port/metrics
 			mr.WithServer(int(config.Port)))
