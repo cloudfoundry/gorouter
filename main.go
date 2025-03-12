@@ -93,11 +93,6 @@ func main() {
 		ew = errorwriter.NewPlaintextErrorWriter()
 	}
 
-	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
-	if err != nil {
-		grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
-	}
-
 	logger.Info("retrieved-isolation-segments",
 		slog.Any("isolation_segments", c.IsolationSegments),
 		slog.String("routing_table_sharding_mode", c.RoutingTableShardingMode),
@@ -132,51 +127,48 @@ func main() {
 
 	}
 
-	// setup metrics via dropsonse
-	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	var registryMetrics metrics.MultiRouteRegistryReporter
+	var proxyMetrics metrics.MultiProxyReporter
+	var monitorMetrics metrics.MultiMonitorReporter
+
+	// setup metrics via dropsonse if enabled
 	var metricsReporter *metrics.MetricsReporter
+	var dropsondeMetricSender *metric_sender.MetricSender
 	if c.EnableEnvelopeV1Metrics {
-		metricsReporter = initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+		err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+		if err != nil {
+			grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
+		}
+
+		dropsondeMetricSender = metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+		metricsReporter = initializeMetrics(dropsondeMetricSender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+
+		registryMetrics = append(registryMetrics, metricsReporter)
+		proxyMetrics = append(proxyMetrics, metricsReporter)
+		monitorMetrics = append(monitorMetrics, monitorMetrics)
 	}
 
+	// setup metrics via Prometheus if enabled
 	var promRegistry *mr.Registry
 	var promMetrics *metrics_prometheus.Metrics
 	if c.Prometheus.Enabled {
 		promRegistry = metrics_prometheus.NewMetricsRegistry(c.Prometheus)
 		promMetrics = metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
-	}
 
-	// setup metrics via prometheus
-	var registryMetrics metrics.MultiRouteRegistryReporter
-
-	if metricsReporter != nil {
-		registryMetrics = append(registryMetrics, metricsReporter)
-	}
-	if promMetrics != nil {
 		registryMetrics = append(registryMetrics, promMetrics)
+		proxyMetrics = append(proxyMetrics, promMetrics)
+		monitorMetrics = append(monitorMetrics, promMetrics)
 	}
 
 	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, registryMetrics)
-
 	varz := rvarz.NewVarz(registry)
-
-	var proxyMetrics metrics.MultiProxyReporter
-
-	if metricsReporter != nil {
-		proxyMetrics = append(proxyMetrics, metricsReporter)
-	}
-
-	if promMetrics != nil {
-		proxyMetrics = append(proxyMetrics, promMetrics)
-	}
-
 	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyMetrics}
 
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
 
-	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
+	fdMonitor := initializeFDMonitor(monitorMetrics, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
 		grlog.CreateLoggerWithSource(prefix, "access-grlog"),
@@ -275,7 +267,7 @@ func main() {
 	}
 
 	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, grlog.CreateLoggerWithSource(prefix, "subscriber"))
-	natsMonitor := initializeNATSMonitor(subscriber, sender, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
+	natsMonitor := initializeNATSMonitor(subscriber, monitorMetrics, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
@@ -302,18 +294,18 @@ func main() {
 	os.Exit(0)
 }
 
-func initializeFDMonitor(sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.FileDescriptor {
+func initializeFDMonitor(reporter metrics.MultiMonitorReporter, logger *slog.Logger) *monitor.FileDescriptor {
 	pid := os.Getpid()
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
-	return monitor.NewFileDescriptor(path, ticker, sender, logger)
+	return monitor.NewFileDescriptor(path, ticker, reporter, logger)
 }
 
-func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.NATSMonitor {
+func initializeNATSMonitor(subscriber *mbus.Subscriber, reporter metrics.MultiMonitorReporter, logger *slog.Logger) *monitor.NATSMonitor {
 	ticker := time.NewTicker(time.Second * 5)
 	return &monitor.NATSMonitor{
 		Subscriber: subscriber,
-		Sender:     sender,
+		Reporter:   reporter,
 		TickChan:   ticker.C,
 		Logger:     logger,
 	}

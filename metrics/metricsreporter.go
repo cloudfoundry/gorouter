@@ -166,6 +166,18 @@ func (m *MetricsReporter) CaptureWebSocketFailure() {
 	m.Batcher.BatchIncrementCounter("websocket_failures")
 }
 
+func (m *MetricsReporter) CaptureFoundFileDescriptors(files int) {
+	m.Sender.SendValue("file_descriptors", float64(files), "file")
+}
+
+func (m *MetricsReporter) CaptureNATSBufferedMessages(messages int) {
+	m.Sender.SendValue("buffered_messages", float64(messages), "message")
+}
+
+func (m *MetricsReporter) CaptureNATSDroppedMessages(messages int) {
+	m.Sender.SendValue("total_dropped_messages", float64(messages), "message")
+}
+
 func getResponseCounterName(statusCode int) string {
 	statusCode = statusCode / 100
 	if statusCode >= 2 && statusCode <= 5 {

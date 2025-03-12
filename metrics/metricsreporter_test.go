@@ -561,6 +561,37 @@ var _ = Describe("MetricsReporter", func() {
 		})
 	})
 
+	Describe("Monitor metrics", func() {
+		Context("file descriptor metrics sent", func() {
+			It("increments the fd gauge metric", func() {
+				metricReporter.CaptureFoundFileDescriptors(10)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("file_descriptors"))
+				Expect(value).To(BeEquivalentTo(10))
+				Expect(unit).To(Equal("file"))
+			})
+		})
+		Context("NATS message metrics sent", func() {
+			It("increments the buffered messages metric", func() {
+				metricReporter.CaptureNATSBufferedMessages(100)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("buffered_messages"))
+				Expect(value).To(BeEquivalentTo(100))
+				Expect(unit).To(Equal("message"))
+			})
+			It("increments the dropped messages metric", func() {
+				metricReporter.CaptureNATSDroppedMessages(200)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("total_dropped_messages"))
+				Expect(value).To(BeEquivalentTo(200))
+				Expect(unit).To(Equal("message"))
+			})
+		})
+	})
+
 	Describe("CaptureRouteRegistrationLatency", func() {
 		It("is muzzled by default", func() {
 			metricReporter.CaptureRouteRegistrationLatency(2 * time.Second)

@@ -35,6 +35,9 @@ type Metrics struct {
 	Responses                   mr.CounterVec
 	RouteServicesResponses      mr.CounterVec
 	RoutingResponseLatency      mr.HistogramVec
+	FoundFileDescriptors        mr.Gauge
+	NATSBufferedMessages        mr.Gauge
+	NATSDroppedMessages         mr.Gauge
 	perRequestMetricsReporting  bool
 }
 
@@ -79,6 +82,9 @@ func NewMetrics(registry *mr.Registry, perRequestMetricsReporting bool, meterCon
 		Responses:                   registry.NewCounterVec("responses", "number of responses", []string{"status_group"}),
 		RouteServicesResponses:      registry.NewCounterVec("responses_route_services", "number of responses for route services", []string{"status_group"}),
 		RoutingResponseLatency:      registry.NewHistogramVec("latency", "routing response latency in ms", []string{"component"}, meterConfig.RoutingResponseLatencyHistogramBuckets),
+		FoundFileDescriptors:        registry.NewGauge("file_descriptors", "number of file descriptors found"),
+		NATSBufferedMessages:        registry.NewGauge("buffered_messages", "number of buffered messages in NATS"),
+		NATSDroppedMessages:         registry.NewGauge("total_dropped_messages", "number of total dropped messages in NATS"),
 		perRequestMetricsReporting:  perRequestMetricsReporting,
 	}
 }
@@ -119,7 +125,7 @@ func (metrics *Metrics) CaptureRouteRegistrationLatency(t time.Duration) {
 }
 
 // UnmuzzleRouteRegistrationLatency should set a flag which suppresses metric data.
-// Deprecated: that makes sense for Envelope V1 where we send it to collector any time we got new value
+// That makes sense for Envelope V1 where we send it to collector any time we got new value
 // but is unnecessary for Prometheus where data is buffered and sent to collector on constant frequency base.
 // We still need this method though to fulfil the interface.
 func (metrics *Metrics) UnmuzzleRouteRegistrationLatency() {}
@@ -182,6 +188,18 @@ func (metrics *Metrics) CaptureWebSocketUpdate() {
 
 func (metrics *Metrics) CaptureWebSocketFailure() {
 	metrics.WebsocketFailures.Add(1)
+}
+
+func (metrics *Metrics) CaptureFoundFileDescriptors(files int) {
+	metrics.FoundFileDescriptors.Set(float64(files))
+}
+
+func (metrics *Metrics) CaptureNATSBufferedMessages(messages int) {
+	metrics.NATSBufferedMessages.Set(float64(messages))
+}
+
+func (metrics *Metrics) CaptureNATSDroppedMessages(messages int) {
+	metrics.NATSDroppedMessages.Set(float64(messages))
 }
 
 func statusGroupName(statusCode int) string {

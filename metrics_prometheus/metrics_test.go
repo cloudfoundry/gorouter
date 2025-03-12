@@ -412,6 +412,27 @@ var _ = Describe("Metrics", func() {
 			Expect(getMetrics(r.Port())).NotTo(ContainSubstring("\nlatency_bucket"))
 		})
 	})
+
+	Context("increments the monitor metrics", func() {
+		BeforeEach(func() {
+			var config = config.PrometheusConfig{Port: 0, Meters: getMetersConfig()}
+			r = NewMetricsRegistry(config)
+			m = NewMetrics(r, false, config.Meters)
+		})
+
+		It("sends fd metric", func() {
+			m.CaptureFoundFileDescriptors(10)
+			Expect(getMetrics(r.Port())).To(ContainSubstring("file_descriptors 10"))
+		})
+
+		It("sends NATS metrics", func() {
+			m.CaptureNATSBufferedMessages(100)
+			Expect(getMetrics(r.Port())).To(ContainSubstring("buffered_messages 100"))
+
+			m.CaptureNATSDroppedMessages(200)
+			Expect(getMetrics(r.Port())).To(ContainSubstring("total_dropped_messages 200"))
+		})
+	})
 })
 
 func getMetersConfig() config.MetersConfig {
