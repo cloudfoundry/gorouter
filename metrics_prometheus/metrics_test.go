@@ -433,6 +433,24 @@ var _ = Describe("Metrics", func() {
 			Expect(getMetrics(r.Port())).To(ContainSubstring("total_dropped_messages 200"))
 		})
 	})
+
+	Context("observes http metrics", func() {
+		BeforeEach(func() {
+			var perRequestMetricsReporting = true
+			var config = config.PrometheusConfig{Port: 0, Meters: getMetersConfig()}
+			r = NewMetricsRegistry(config)
+			m = NewMetrics(r, perRequestMetricsReporting, config.Meters)
+		})
+
+		It("sends the latency", func() {
+			m.CaptureHTTPLatency(2*time.Second, "")
+			Expect(getMetrics(r.Port())).To(ContainSubstring("http_latency_seconds_bucket{source_id=\"\",le=\"3.2\"} 1"))
+
+			m.CaptureHTTPLatency(500*time.Millisecond, "some-source")
+			m.CaptureHTTPLatency(630*time.Millisecond, "some-source")
+			Expect(getMetrics(r.Port())).To(ContainSubstring("http_latency_seconds_bucket{source_id=\"some-source\",le=\"0.8\"} 2"))
+		})
+	})
 })
 
 func getMetersConfig() config.MetersConfig {
@@ -440,6 +458,7 @@ func getMetersConfig() config.MetersConfig {
 		RouteLookupTimeHistogramBuckets:          []float64{10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000, 90_000, 100_000},
 		RouteRegistrationLatencyHistogramBuckets: []float64{0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2},
 		RoutingResponseLatencyHistogramBuckets:   []float64{0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2},
+		HTTPLatencyHistogramBuckets:              []float64{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6},
 	}
 }
 

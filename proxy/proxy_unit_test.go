@@ -75,7 +75,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
-			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
+			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, ew, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})

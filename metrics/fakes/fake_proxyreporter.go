@@ -39,6 +39,12 @@ type FakeProxyReporter struct {
 	captureEmptyContentLengthHeaderMutex       sync.RWMutex
 	captureEmptyContentLengthHeaderArgsForCall []struct {
 	}
+	CaptureHTTPLatencyStub        func(time.Duration, string)
+	captureHTTPLatencyMutex       sync.RWMutex
+	captureHTTPLatencyArgsForCall []struct {
+		arg1 time.Duration
+		arg2 string
+	}
 	CaptureRouteServiceResponseStub        func(*http.Response)
 	captureRouteServiceResponseMutex       sync.RWMutex
 	captureRouteServiceResponseArgsForCall []struct {
@@ -242,6 +248,39 @@ func (fake *FakeProxyReporter) CaptureEmptyContentLengthHeaderCalls(stub func())
 	fake.CaptureEmptyContentLengthHeaderStub = stub
 }
 
+func (fake *FakeProxyReporter) CaptureHTTPLatency(arg1 time.Duration, arg2 string) {
+	fake.captureHTTPLatencyMutex.Lock()
+	fake.captureHTTPLatencyArgsForCall = append(fake.captureHTTPLatencyArgsForCall, struct {
+		arg1 time.Duration
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.CaptureHTTPLatencyStub
+	fake.recordInvocation("CaptureHTTPLatency", []interface{}{arg1, arg2})
+	fake.captureHTTPLatencyMutex.Unlock()
+	if stub != nil {
+		fake.CaptureHTTPLatencyStub(arg1, arg2)
+	}
+}
+
+func (fake *FakeProxyReporter) CaptureHTTPLatencyCallCount() int {
+	fake.captureHTTPLatencyMutex.RLock()
+	defer fake.captureHTTPLatencyMutex.RUnlock()
+	return len(fake.captureHTTPLatencyArgsForCall)
+}
+
+func (fake *FakeProxyReporter) CaptureHTTPLatencyCalls(stub func(time.Duration, string)) {
+	fake.captureHTTPLatencyMutex.Lock()
+	defer fake.captureHTTPLatencyMutex.Unlock()
+	fake.CaptureHTTPLatencyStub = stub
+}
+
+func (fake *FakeProxyReporter) CaptureHTTPLatencyArgsForCall(i int) (time.Duration, string) {
+	fake.captureHTTPLatencyMutex.RLock()
+	defer fake.captureHTTPLatencyMutex.RUnlock()
+	argsForCall := fake.captureHTTPLatencyArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
 func (fake *FakeProxyReporter) CaptureRouteServiceResponse(arg1 *http.Response) {
 	fake.captureRouteServiceResponseMutex.Lock()
 	fake.captureRouteServiceResponseArgsForCall = append(fake.captureRouteServiceResponseArgsForCall, struct {
@@ -438,6 +477,8 @@ func (fake *FakeProxyReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureBadRequestMutex.RUnlock()
 	fake.captureEmptyContentLengthHeaderMutex.RLock()
 	defer fake.captureEmptyContentLengthHeaderMutex.RUnlock()
+	fake.captureHTTPLatencyMutex.RLock()
+	defer fake.captureHTTPLatencyMutex.RUnlock()
 	fake.captureRouteServiceResponseMutex.RLock()
 	defer fake.captureRouteServiceResponseMutex.RUnlock()
 	fake.captureRoutingRequestMutex.RLock()

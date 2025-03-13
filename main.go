@@ -11,8 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	mr "code.cloudfoundry.org/go-metric-registry"
-
 	"code.cloudfoundry.org/gorouter/metrics_prometheus"
 
 	"code.cloudfoundry.org/clock"
@@ -127,38 +125,11 @@ func main() {
 
 	}
 
-	var registryMetrics metrics.MultiRouteRegistryReporter
-	var proxyMetrics metrics.MultiProxyReporter
-	var monitorMetrics metrics.MultiMonitorReporter
-
-	// setup metrics via dropsonse if enabled
-	var metricsReporter *metrics.MetricsReporter
-	var dropsondeMetricSender *metric_sender.MetricSender
-	if c.EnableEnvelopeV1Metrics {
-		err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
-		if err != nil {
-			grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
-		}
-
-		dropsondeMetricSender = metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
-		metricsReporter = initializeMetrics(dropsondeMetricSender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
-
-		registryMetrics = append(registryMetrics, metricsReporter)
-		proxyMetrics = append(proxyMetrics, metricsReporter)
-		monitorMetrics = append(monitorMetrics, monitorMetrics)
-	}
-
-	// setup metrics via Prometheus if enabled
-	var promRegistry *mr.Registry
-	var promMetrics *metrics_prometheus.Metrics
-	if c.Prometheus.Enabled {
-		promRegistry = metrics_prometheus.NewMetricsRegistry(c.Prometheus)
-		promMetrics = metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
-
-		registryMetrics = append(registryMetrics, promMetrics)
-		proxyMetrics = append(proxyMetrics, promMetrics)
-		monitorMetrics = append(monitorMetrics, promMetrics)
-	}
+	dropReporter := initializeDropsondeReporter(prefix, logger, c)
+	promReporter := initializePrometheusReporter(c)
+	registryMetrics := metrics.NewMultiRouteRegistryReporter(dropReporter, promReporter)
+	proxyMetrics := metrics.NewMultiProxyReporter(dropReporter, promReporter)
+	monitorMetrics := metrics.NewMultiMonitorReporter(dropReporter, promReporter)
 
 	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, registryMetrics)
 	varz := rvarz.NewVarz(registry)
@@ -226,7 +197,6 @@ func main() {
 	proxyHandler := proxy.NewProxy(
 		logger,
 		accessLogger,
-		promRegistry,
 		ew,
 		c,
 		registry,
@@ -292,6 +262,28 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+// initializeDropsondeReporter setups metrics via dropsonse if enabled
+func initializeDropsondeReporter(prefix string, logger *slog.Logger, c *config.Config) *metrics.MetricsReporter {
+	if !c.EnableEnvelopeV1Metrics {
+		return nil
+	}
+	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	if err != nil {
+		grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
+	}
+	dropsondeMetricSender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	return initializeMetrics(dropsondeMetricSender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+}
+
+// initializePrometheusReporter setups metrics via Prometheus if enabled
+func initializePrometheusReporter(c *config.Config) *metrics_prometheus.Metrics {
+	if !c.Prometheus.Enabled {
+		return nil
+	}
+	promRegistry := metrics_prometheus.NewMetricsRegistry(c.Prometheus)
+	return metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
 }
 
 func initializeFDMonitor(reporter metrics.MultiMonitorReporter, logger *slog.Logger) *monitor.FileDescriptor {

@@ -38,6 +38,7 @@ type Metrics struct {
 	FoundFileDescriptors        mr.Gauge
 	NATSBufferedMessages        mr.Gauge
 	NATSDroppedMessages         mr.Gauge
+	HTTPLatency                 mr.HistogramVec
 	perRequestMetricsReporting  bool
 }
 
@@ -85,6 +86,7 @@ func NewMetrics(registry *mr.Registry, perRequestMetricsReporting bool, meterCon
 		FoundFileDescriptors:        registry.NewGauge("file_descriptors", "number of file descriptors found"),
 		NATSBufferedMessages:        registry.NewGauge("buffered_messages", "number of buffered messages in NATS"),
 		NATSDroppedMessages:         registry.NewGauge("total_dropped_messages", "number of total dropped messages in NATS"),
+		HTTPLatency:                 registry.NewHistogramVec("http_latency_seconds", "the latency of http requests from gorouter and back in sec", []string{"source_id"}, meterConfig.HTTPLatencyHistogramBuckets),
 		perRequestMetricsReporting:  perRequestMetricsReporting,
 	}
 }
@@ -200,6 +202,10 @@ func (metrics *Metrics) CaptureNATSBufferedMessages(messages int) {
 
 func (metrics *Metrics) CaptureNATSDroppedMessages(messages int) {
 	metrics.NATSDroppedMessages.Set(float64(messages))
+}
+
+func (metrics *Metrics) CaptureHTTPLatency(d time.Duration, sourceID string) {
+	metrics.HTTPLatency.Observe(float64(d)/float64(time.Second), []string{sourceID})
 }
 
 func statusGroupName(statusCode int) string {

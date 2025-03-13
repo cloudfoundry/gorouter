@@ -178,6 +178,11 @@ func (m *MetricsReporter) CaptureNATSDroppedMessages(messages int) {
 	m.Sender.SendValue("total_dropped_messages", float64(messages), "message")
 }
 
+// CaptureHTTPLatency observes histogram of HTTP latency metric
+// Empty implementation here is to fulfil interface
+func (m *MetricsReporter) CaptureHTTPLatency(_ time.Duration, _ string) {
+}
+
 func getResponseCounterName(statusCode int) string {
 	statusCode = statusCode / 100
 	if statusCode >= 2 && statusCode <= 5 {
