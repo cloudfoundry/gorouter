@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo/v2"
@@ -33,7 +32,6 @@ import (
 //go:generate counterfeiter -o ../fakes/round_tripper.go --fake-name RoundTripper net/http.RoundTripper
 
 var (
-	fakeRegistry              *fake_registry.SpyMetricsRegistry
 	r                         *registry.RouteRegistry
 	p                         http.Handler
 	f                         *os.File
@@ -82,7 +80,6 @@ var _ = BeforeEach(func() {
 	conf.RouteServiceConfig.MaxAttempts = 3
 	conf.DisableKeepAlives = false
 	fakeReporter = &fakes.FakeProxyReporter{}
-	fakeRegistry = fake_registry.NewMetricsRegistry()
 	strictSignatureValidation = false
 	skipSanitization = func(*http.Request) bool { return false }
 })
@@ -138,7 +135,7 @@ var _ = JustBeforeEach(func() {
 
 	fakeRouteServicesClient = &sharedfakes.RoundTripper{}
 
-	p = proxy.NewProxy(logger.Logger, al, fakeRegistry, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
+	p = proxy.NewProxy(logger.Logger, al, ew, conf, r, fakeReporter, routeServiceConfig, tlsConfig, tlsConfig, healthStatus, fakeRouteServicesClient)
 
 	if conf.EnableHTTP2 {
 		server := http.Server{Handler: p}

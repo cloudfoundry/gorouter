@@ -33,6 +33,7 @@ type ProxyReporter interface {
 	CaptureRouteServiceResponse(res *http.Response)
 	CaptureWebSocketUpdate()
 	CaptureWebSocketFailure()
+	CaptureHTTPLatency(d time.Duration, sourceID string)
 }
 
 type ComponentTagged interface {
@@ -65,6 +66,16 @@ type CompositeReporter struct {
 type MultiRouteRegistryReporter []RouteRegistryReporter
 
 var _ RouteRegistryReporter = MultiRouteRegistryReporter{}
+
+func NewMultiRouteRegistryReporter(reporters ...RouteRegistryReporter) MultiRouteRegistryReporter {
+	multiReporter := MultiRouteRegistryReporter{}
+	for _, r := range reporters {
+		if r != nil {
+			multiReporter = append(multiReporter, r)
+		}
+	}
+	return multiReporter
+}
 
 func (m MultiRouteRegistryReporter) CaptureLookupTime(t time.Duration) {
 	for _, r := range m {
@@ -111,6 +122,16 @@ func (m MultiRouteRegistryReporter) CaptureUnregistryMessage(msg ComponentTagged
 type MultiProxyReporter []ProxyReporter
 
 var _ ProxyReporter = MultiProxyReporter{}
+
+func NewMultiProxyReporter(reporters ...ProxyReporter) MultiProxyReporter {
+	multiReporter := MultiProxyReporter{}
+	for _, r := range reporters {
+		if r != nil {
+			multiReporter = append(multiReporter, r)
+		}
+	}
+	return multiReporter
+}
 
 func (m MultiProxyReporter) CaptureBackendExhaustedConns() {
 	for _, r := range m {
@@ -190,9 +211,25 @@ func (m MultiProxyReporter) CaptureWebSocketFailure() {
 	}
 }
 
+func (m MultiProxyReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
+	for _, r := range m {
+		r.CaptureHTTPLatency(d, sourceID)
+	}
+}
+
 type MultiMonitorReporter []MonitorReporter
 
 var _ MonitorReporter = MultiMonitorReporter{}
+
+func NewMultiMonitorReporter(reporters ...MonitorReporter) MultiMonitorReporter {
+	multiReporter := MultiMonitorReporter{}
+	for _, r := range reporters {
+		if r != nil {
+			multiReporter = append(multiReporter, r)
+		}
+	}
+	return multiReporter
+}
 
 func (m MultiMonitorReporter) CaptureFoundFileDescriptors(files int) {
 	for _, r := range m {
@@ -234,4 +271,8 @@ func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint) {
 func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	c.VarzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
 	c.ProxyReporter.CaptureRoutingResponseLatency(b, 0, time.Time{}, d)
+}
+
+func (c *CompositeReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
+	c.ProxyReporter.CaptureHTTPLatency(d, sourceID)
 }

@@ -4,22 +4,19 @@ import (
 	"net/http"
 	"time"
 
-	metrics "code.cloudfoundry.org/go-metric-registry"
 	"github.com/urfave/negroni/v3"
+
+	"code.cloudfoundry.org/gorouter/metrics"
 )
 
-type Registry interface {
-	NewHistogram(name, helpText string, buckets []float64, opts ...metrics.MetricOption) metrics.Histogram
-}
-
 type httpLatencyPrometheusHandler struct {
-	registry Registry
+	reporter metrics.ProxyReporter
 }
 
 // NewHTTPLatencyPrometheus creates a new handler that handles prometheus metrics for latency
-func NewHTTPLatencyPrometheus(r Registry) negroni.Handler {
+func NewHTTPLatencyPrometheus(reporter metrics.ProxyReporter) negroni.Handler {
 	return &httpLatencyPrometheusHandler{
-		registry: r,
+		reporter: reporter,
 	}
 }
 
@@ -39,8 +36,5 @@ func (hl *httpLatencyPrometheusHandler) ServeHTTP(rw http.ResponseWriter, r *htt
 		}
 	}
 
-	h := hl.registry.NewHistogram("http_latency_seconds", "the latency of http requests from gorouter and back",
-		[]float64{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6},
-		metrics.WithMetricLabels(map[string]string{"source_id": sourceId}))
-	h.Observe(float64(latency))
+	hl.reporter.CaptureHTTPLatency(latency, sourceId)
 }

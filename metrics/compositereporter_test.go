@@ -120,4 +120,10 @@ var _ = Describe("CompositeReporter", func() {
 
 		Expect(fakeProxyReporter.CaptureWebSocketFailureCallCount()).To(Equal(1))
 	})
+
+	It("forwards CaptureHTTPLatency to the proxy reporter", func() {
+		composite.CaptureHTTPLatency(time.Second, "")
+		Expect(fakeProxyReporter.CaptureHTTPLatencyCallCount()).To(Equal(1))
+	})
+
 })

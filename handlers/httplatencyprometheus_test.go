@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	fake_registry "code.cloudfoundry.org/go-metric-registry/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni/v3"
 
 	"code.cloudfoundry.org/gorouter/handlers"
+	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
 )
@@ -24,7 +24,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeRegistry *fake_registry.SpyMetricsRegistry
+		fakeReporter *metrics_fakes.FakeProxyReporter
 
 		nextCalled bool
 	)
@@ -34,7 +34,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		fakeRegistry = fake_registry.NewMetricsRegistry()
+		fakeReporter = new(metrics_fakes.FakeProxyReporter)
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)
@@ -59,7 +59,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		JustBeforeEach(func() {
 			handler = negroni.New()
 			handler.Use(handlers.NewRequestInfo())
-			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeRegistry))
+			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeReporter))
 			handler.UseHandlerFunc(nextHandler)
 		})
 		It("forwards the request", func() {
@@ -71,34 +71,20 @@ var _ = Describe("Http Prometheus Latency", func() {
 		It("records http latency", func() {
 			handler.ServeHTTP(resp, req)
 
-			metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "some-source-id"})
-			Expect(metric.Value()).ToNot(Equal(0))
-		})
-
-		It("http metric has help text", func() {
-			handler.ServeHTTP(resp, req)
-
-			metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "some-source-id"})
-			Expect(metric.HelpText()).To(Equal("the latency of http requests from gorouter and back"))
-		})
-		It("http metrics have expotential buckets", func() {
-			handler.ServeHTTP(resp, req)
-
-			metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "some-source-id"})
-			Expect(metric.Buckets()).To(Equal([]float64{
-				0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6,
-			}))
+			Expect(fakeReporter.CaptureHTTPLatencyCallCount()).ToNot(Equal(0))
 		})
 	})
 
 	Context("when the request info is not set", func() {
 		It("sets source id to gorouter", func() {
 			handler = negroni.New()
-			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeRegistry))
+			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeReporter))
 			handler.ServeHTTP(resp, req)
 
-			metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "gorouter"})
-			Expect(metric.Value()).ToNot(Equal(0))
+			Expect(fakeReporter.CaptureHTTPLatencyCallCount()).ToNot(Equal(0))
+
+			_, sourceID := fakeReporter.CaptureHTTPLatencyArgsForCall(0)
+			Expect(sourceID).To(Equal("gorouter"))
 		})
 
 		It("sets source id to gorouter", func() {
@@ -119,12 +105,14 @@ var _ = Describe("Http Prometheus Latency", func() {
 			})
 			handler = negroni.New()
 			handler.Use(handlers.NewRequestInfo())
-			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeRegistry))
+			handler.Use(handlers.NewHTTPLatencyPrometheus(fakeReporter))
 			handler.UseHandlerFunc(nextHandler)
 			handler.ServeHTTP(resp, req)
 
-			metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "gorouter"})
-			Expect(metric.Value()).ToNot(Equal(0))
+			Expect(fakeReporter.CaptureHTTPLatencyCallCount()).ToNot(Equal(0))
+
+			_, sourceID := fakeReporter.CaptureHTTPLatencyArgsForCall(0)
+			Expect(sourceID).To(Equal("gorouter"))
 		})
 	})
 })
