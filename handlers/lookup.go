@@ -262,7 +262,8 @@ func validateAppInstanceHeader(appInstanceHeader string) error {
 
 func validateProcessInstanceHeader(processInstanceHeader string) error {
 	// Regex to match format of `PROCESS_GUID:INSTANCE_ID`
-	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
+	//   and to match format of `PROCESS_GUID`
+	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}(:\d+)?$`)
 	if !r.MatchString(processInstanceHeader) {
 		return fmt.Errorf("Incorrect %s header : %s", router_http.CfProcessInstance, processInstanceHeader)
 	}
@@ -271,5 +272,8 @@ func validateProcessInstanceHeader(processInstanceHeader string) error {
 
 func splitInstanceHeader(instanceHeader string) (string, string) {
 	details := strings.Split(instanceHeader, ":")
+	if len(details) == 1 {
+		return details[0], ""
+	}
 	return details[0], details[1]
 }
