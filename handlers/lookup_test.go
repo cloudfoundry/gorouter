@@ -446,20 +446,38 @@ var _ = Describe("Lookup", func() {
 				pool.Put(exampleEndpoint)
 				reg.LookupWithAppInstanceReturns(pool)
 
-				req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
 			})
 
 			JustBeforeEach(func() {
 				handler.ServeHTTP(resp, req)
 			})
 
-			It("lookups with instance", func() {
-				Expect(reg.LookupWithProcessInstanceCallCount()).To(Equal(1))
-				uri, processGuid, processIndex := reg.LookupWithProcessInstanceArgsForCall(0)
+			Context("when an index is provided", func() {
+				BeforeEach(func() {
+					req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
+				})
+				It("lookups with process instance", func() {
+					Expect(reg.LookupWithProcessInstanceCallCount()).To(Equal(1))
+					uri, processGuid, processIndex := reg.LookupWithProcessInstanceArgsForCall(0)
 
-				Expect(uri.String()).To(Equal("example.com"))
-				Expect(processGuid).To(Equal(fakeProcessGUID))
-				Expect(processIndex).To(Equal("1"))
+					Expect(uri.String()).To(Equal("example.com"))
+					Expect(processGuid).To(Equal(fakeProcessGUID))
+					Expect(processIndex).To(Equal("1"))
+				})
+			})
+
+			Context("when an index is not provided", func() {
+				BeforeEach(func() {
+					req.Header.Add("X-CF-Process-Instance", fakeProcessGUID)
+				})
+				It("lookups with process instance", func() {
+					Expect(reg.LookupWithProcessInstanceCallCount()).To(Equal(1))
+					uri, processGuid, processIndex := reg.LookupWithProcessInstanceArgsForCall(0)
+
+					Expect(uri.String()).To(Equal("example.com"))
+					Expect(processGuid).To(Equal(fakeProcessGUID))
+					Expect(processIndex).To(Equal(""))
+				})
 			})
 		})
 

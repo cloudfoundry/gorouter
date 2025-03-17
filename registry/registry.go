@@ -288,15 +288,17 @@ func (r *RouteRegistry) LookupWithProcessInstance(uri route.Uri, processID strin
 	var surgicalPool *route.EndpointPool
 
 	p.Each(func(e *route.Endpoint) {
-		if (e.ProcessId() == processID) && (e.PrivateInstanceIndex == processIndex) {
-			surgicalPool = route.NewPool(&route.PoolOpts{
-				Logger:                 r.logger,
-				RetryAfterFailure:      0,
-				Host:                   p.Host(),
-				ContextPath:            p.ContextPath(),
-				MaxConnsPerBackend:     p.MaxConnsPerBackend(),
-				LoadBalancingAlgorithm: p.LoadBalancingAlgorithm,
-			})
+		if (e.ProcessId() == processID) && (e.PrivateInstanceIndex == processIndex || processIndex == "") {
+			if surgicalPool == nil {
+				surgicalPool = route.NewPool(&route.PoolOpts{
+					Logger:                 r.logger,
+					RetryAfterFailure:      0,
+					Host:                   p.Host(),
+					ContextPath:            p.ContextPath(),
+					MaxConnsPerBackend:     p.MaxConnsPerBackend(),
+					LoadBalancingAlgorithm: p.LoadBalancingAlgorithm,
+				})
+			}
 			surgicalPool.Put(e)
 		}
 	})
