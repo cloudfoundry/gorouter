@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"net/http"
+	"reflect"
 	"time"
 
 	"code.cloudfoundry.org/gorouter/route"
@@ -70,7 +71,7 @@ var _ RouteRegistryReporter = MultiRouteRegistryReporter{}
 func NewMultiRouteRegistryReporter(reporters ...RouteRegistryReporter) MultiRouteRegistryReporter {
 	multiReporter := MultiRouteRegistryReporter{}
 	for _, r := range reporters {
-		if r != nil {
+		if !isNil(r) {
 			multiReporter = append(multiReporter, r)
 		}
 	}
@@ -126,7 +127,7 @@ var _ ProxyReporter = MultiProxyReporter{}
 func NewMultiProxyReporter(reporters ...ProxyReporter) MultiProxyReporter {
 	multiReporter := MultiProxyReporter{}
 	for _, r := range reporters {
-		if r != nil {
+		if !isNil(r) {
 			multiReporter = append(multiReporter, r)
 		}
 	}
@@ -224,7 +225,7 @@ var _ MonitorReporter = MultiMonitorReporter{}
 func NewMultiMonitorReporter(reporters ...MonitorReporter) MultiMonitorReporter {
 	multiReporter := MultiMonitorReporter{}
 	for _, r := range reporters {
-		if r != nil {
+		if !isNil(r) {
 			multiReporter = append(multiReporter, r)
 		}
 	}
@@ -275,4 +276,12 @@ func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, sta
 
 func (c *CompositeReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
 	c.ProxyReporter.CaptureHTTPLatency(d, sourceID)
+}
+
+func isNil(in any) bool {
+	if in == nil {
+		return true
+	}
+	v := reflect.ValueOf(in)
+	return v.Kind() == reflect.Ptr && v.IsNil()
 }
