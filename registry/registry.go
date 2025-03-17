@@ -20,7 +20,8 @@ type Registry interface {
 	Register(uri route.Uri, endpoint *route.Endpoint)
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
 	Lookup(uri route.Uri) *route.EndpointPool
-	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.EndpointPool
+	LookupWithAppInstance(uri route.Uri, appID, appIndex string) *route.EndpointPool
+	LookupWithProcessInstance(uri route.Uri, processID, processIndex string) *route.EndpointPool
 }
 
 type PruneStatus int
@@ -249,7 +250,7 @@ func (r *RouteRegistry) endpointInRouterShard(endpoint *route.Endpoint) bool {
 	return false
 }
 
-func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.EndpointPool {
+func (r *RouteRegistry) LookupWithAppInstance(uri route.Uri, appID string, appIndex string) *route.EndpointPool {
 	uri = uri.RouteKey()
 	p := r.Lookup(uri)
 
@@ -261,6 +262,33 @@ func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex
 
 	p.Each(func(e *route.Endpoint) {
 		if (e.ApplicationId == appID) && (e.PrivateInstanceIndex == appIndex) {
+			surgicalPool = route.NewPool(&route.PoolOpts{
+				Logger:                 r.logger,
+				RetryAfterFailure:      0,
+				Host:                   p.Host(),
+				ContextPath:            p.ContextPath(),
+				MaxConnsPerBackend:     p.MaxConnsPerBackend(),
+				LoadBalancingAlgorithm: p.LoadBalancingAlgorithm,
+			})
+			surgicalPool.Put(e)
+		}
+	})
+
+	return surgicalPool
+}
+
+func (r *RouteRegistry) LookupWithProcessInstance(uri route.Uri, processID string, processIndex string) *route.EndpointPool {
+	uri = uri.RouteKey()
+	p := r.Lookup(uri)
+
+	if p == nil {
+		return nil
+	}
+
+	var surgicalPool *route.EndpointPool
+
+	p.Each(func(e *route.Endpoint) {
+		if (e.ProcessId() == processID) && (e.PrivateInstanceIndex == processIndex) {
 			surgicalPool = route.NewPool(&route.PoolOpts{
 				Logger:                 r.logger,
 				RetryAfterFailure:      0,

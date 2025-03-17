@@ -20,17 +20,30 @@ type FakeRegistry struct {
 	lookupReturnsOnCall map[int]struct {
 		result1 *route.EndpointPool
 	}
-	LookupWithInstanceStub        func(route.Uri, string, string) *route.EndpointPool
-	lookupWithInstanceMutex       sync.RWMutex
-	lookupWithInstanceArgsForCall []struct {
+	LookupWithAppInstanceStub        func(route.Uri, string, string) *route.EndpointPool
+	lookupWithAppInstanceMutex       sync.RWMutex
+	lookupWithAppInstanceArgsForCall []struct {
 		arg1 route.Uri
 		arg2 string
 		arg3 string
 	}
-	lookupWithInstanceReturns struct {
+	lookupWithAppInstanceReturns struct {
 		result1 *route.EndpointPool
 	}
-	lookupWithInstanceReturnsOnCall map[int]struct {
+	lookupWithAppInstanceReturnsOnCall map[int]struct {
+		result1 *route.EndpointPool
+	}
+	LookupWithProcessInstanceStub        func(route.Uri, string, string) *route.EndpointPool
+	lookupWithProcessInstanceMutex       sync.RWMutex
+	lookupWithProcessInstanceArgsForCall []struct {
+		arg1 route.Uri
+		arg2 string
+		arg3 string
+	}
+	lookupWithProcessInstanceReturns struct {
+		result1 *route.EndpointPool
+	}
+	lookupWithProcessInstanceReturnsOnCall map[int]struct {
 		result1 *route.EndpointPool
 	}
 	RegisterStub        func(route.Uri, *route.Endpoint)
@@ -110,18 +123,18 @@ func (fake *FakeRegistry) LookupReturnsOnCall(i int, result1 *route.EndpointPool
 	}{result1}
 }
 
-func (fake *FakeRegistry) LookupWithInstance(arg1 route.Uri, arg2 string, arg3 string) *route.EndpointPool {
-	fake.lookupWithInstanceMutex.Lock()
-	ret, specificReturn := fake.lookupWithInstanceReturnsOnCall[len(fake.lookupWithInstanceArgsForCall)]
-	fake.lookupWithInstanceArgsForCall = append(fake.lookupWithInstanceArgsForCall, struct {
+func (fake *FakeRegistry) LookupWithAppInstance(arg1 route.Uri, arg2 string, arg3 string) *route.EndpointPool {
+	fake.lookupWithAppInstanceMutex.Lock()
+	ret, specificReturn := fake.lookupWithAppInstanceReturnsOnCall[len(fake.lookupWithAppInstanceArgsForCall)]
+	fake.lookupWithAppInstanceArgsForCall = append(fake.lookupWithAppInstanceArgsForCall, struct {
 		arg1 route.Uri
 		arg2 string
 		arg3 string
 	}{arg1, arg2, arg3})
-	stub := fake.LookupWithInstanceStub
-	fakeReturns := fake.lookupWithInstanceReturns
-	fake.recordInvocation("LookupWithInstance", []interface{}{arg1, arg2, arg3})
-	fake.lookupWithInstanceMutex.Unlock()
+	stub := fake.LookupWithAppInstanceStub
+	fakeReturns := fake.lookupWithAppInstanceReturns
+	fake.recordInvocation("LookupWithAppInstance", []interface{}{arg1, arg2, arg3})
+	fake.lookupWithAppInstanceMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2, arg3)
 	}
@@ -131,44 +144,107 @@ func (fake *FakeRegistry) LookupWithInstance(arg1 route.Uri, arg2 string, arg3 s
 	return fakeReturns.result1
 }
 
-func (fake *FakeRegistry) LookupWithInstanceCallCount() int {
-	fake.lookupWithInstanceMutex.RLock()
-	defer fake.lookupWithInstanceMutex.RUnlock()
-	return len(fake.lookupWithInstanceArgsForCall)
+func (fake *FakeRegistry) LookupWithAppInstanceCallCount() int {
+	fake.lookupWithAppInstanceMutex.RLock()
+	defer fake.lookupWithAppInstanceMutex.RUnlock()
+	return len(fake.lookupWithAppInstanceArgsForCall)
 }
 
-func (fake *FakeRegistry) LookupWithInstanceCalls(stub func(route.Uri, string, string) *route.EndpointPool) {
-	fake.lookupWithInstanceMutex.Lock()
-	defer fake.lookupWithInstanceMutex.Unlock()
-	fake.LookupWithInstanceStub = stub
+func (fake *FakeRegistry) LookupWithAppInstanceCalls(stub func(route.Uri, string, string) *route.EndpointPool) {
+	fake.lookupWithAppInstanceMutex.Lock()
+	defer fake.lookupWithAppInstanceMutex.Unlock()
+	fake.LookupWithAppInstanceStub = stub
 }
 
-func (fake *FakeRegistry) LookupWithInstanceArgsForCall(i int) (route.Uri, string, string) {
-	fake.lookupWithInstanceMutex.RLock()
-	defer fake.lookupWithInstanceMutex.RUnlock()
-	argsForCall := fake.lookupWithInstanceArgsForCall[i]
+func (fake *FakeRegistry) LookupWithAppInstanceArgsForCall(i int) (route.Uri, string, string) {
+	fake.lookupWithAppInstanceMutex.RLock()
+	defer fake.lookupWithAppInstanceMutex.RUnlock()
+	argsForCall := fake.lookupWithAppInstanceArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeRegistry) LookupWithInstanceReturns(result1 *route.EndpointPool) {
-	fake.lookupWithInstanceMutex.Lock()
-	defer fake.lookupWithInstanceMutex.Unlock()
-	fake.LookupWithInstanceStub = nil
-	fake.lookupWithInstanceReturns = struct {
+func (fake *FakeRegistry) LookupWithAppInstanceReturns(result1 *route.EndpointPool) {
+	fake.lookupWithAppInstanceMutex.Lock()
+	defer fake.lookupWithAppInstanceMutex.Unlock()
+	fake.LookupWithAppInstanceStub = nil
+	fake.lookupWithAppInstanceReturns = struct {
 		result1 *route.EndpointPool
 	}{result1}
 }
 
-func (fake *FakeRegistry) LookupWithInstanceReturnsOnCall(i int, result1 *route.EndpointPool) {
-	fake.lookupWithInstanceMutex.Lock()
-	defer fake.lookupWithInstanceMutex.Unlock()
-	fake.LookupWithInstanceStub = nil
-	if fake.lookupWithInstanceReturnsOnCall == nil {
-		fake.lookupWithInstanceReturnsOnCall = make(map[int]struct {
+func (fake *FakeRegistry) LookupWithAppInstanceReturnsOnCall(i int, result1 *route.EndpointPool) {
+	fake.lookupWithAppInstanceMutex.Lock()
+	defer fake.lookupWithAppInstanceMutex.Unlock()
+	fake.LookupWithAppInstanceStub = nil
+	if fake.lookupWithAppInstanceReturnsOnCall == nil {
+		fake.lookupWithAppInstanceReturnsOnCall = make(map[int]struct {
 			result1 *route.EndpointPool
 		})
 	}
-	fake.lookupWithInstanceReturnsOnCall[i] = struct {
+	fake.lookupWithAppInstanceReturnsOnCall[i] = struct {
+		result1 *route.EndpointPool
+	}{result1}
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstance(arg1 route.Uri, arg2 string, arg3 string) *route.EndpointPool {
+	fake.lookupWithProcessInstanceMutex.Lock()
+	ret, specificReturn := fake.lookupWithProcessInstanceReturnsOnCall[len(fake.lookupWithProcessInstanceArgsForCall)]
+	fake.lookupWithProcessInstanceArgsForCall = append(fake.lookupWithProcessInstanceArgsForCall, struct {
+		arg1 route.Uri
+		arg2 string
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.LookupWithProcessInstanceStub
+	fakeReturns := fake.lookupWithProcessInstanceReturns
+	fake.recordInvocation("LookupWithProcessInstance", []interface{}{arg1, arg2, arg3})
+	fake.lookupWithProcessInstanceMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstanceCallCount() int {
+	fake.lookupWithProcessInstanceMutex.RLock()
+	defer fake.lookupWithProcessInstanceMutex.RUnlock()
+	return len(fake.lookupWithProcessInstanceArgsForCall)
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstanceCalls(stub func(route.Uri, string, string) *route.EndpointPool) {
+	fake.lookupWithProcessInstanceMutex.Lock()
+	defer fake.lookupWithProcessInstanceMutex.Unlock()
+	fake.LookupWithProcessInstanceStub = stub
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstanceArgsForCall(i int) (route.Uri, string, string) {
+	fake.lookupWithProcessInstanceMutex.RLock()
+	defer fake.lookupWithProcessInstanceMutex.RUnlock()
+	argsForCall := fake.lookupWithProcessInstanceArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstanceReturns(result1 *route.EndpointPool) {
+	fake.lookupWithProcessInstanceMutex.Lock()
+	defer fake.lookupWithProcessInstanceMutex.Unlock()
+	fake.LookupWithProcessInstanceStub = nil
+	fake.lookupWithProcessInstanceReturns = struct {
+		result1 *route.EndpointPool
+	}{result1}
+}
+
+func (fake *FakeRegistry) LookupWithProcessInstanceReturnsOnCall(i int, result1 *route.EndpointPool) {
+	fake.lookupWithProcessInstanceMutex.Lock()
+	defer fake.lookupWithProcessInstanceMutex.Unlock()
+	fake.LookupWithProcessInstanceStub = nil
+	if fake.lookupWithProcessInstanceReturnsOnCall == nil {
+		fake.lookupWithProcessInstanceReturnsOnCall = make(map[int]struct {
+			result1 *route.EndpointPool
+		})
+	}
+	fake.lookupWithProcessInstanceReturnsOnCall[i] = struct {
 		result1 *route.EndpointPool
 	}{result1}
 }
@@ -244,8 +320,10 @@ func (fake *FakeRegistry) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.lookupMutex.RLock()
 	defer fake.lookupMutex.RUnlock()
-	fake.lookupWithInstanceMutex.RLock()
-	defer fake.lookupWithInstanceMutex.RUnlock()
+	fake.lookupWithAppInstanceMutex.RLock()
+	defer fake.lookupWithAppInstanceMutex.RUnlock()
+	fake.lookupWithProcessInstanceMutex.RLock()
+	defer fake.lookupWithProcessInstanceMutex.RUnlock()
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	fake.unregisterMutex.RLock()

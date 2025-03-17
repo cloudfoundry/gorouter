@@ -880,4 +880,55 @@ var _ = Describe("EndpointPool", func() {
 			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","availability_zone":"az-meow","protocol":"http2","tls":false,"ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
 		})
 	})
+
+	Describe("ProcessId", func() {
+		Context("when there are no tags", func() {
+			It("returns an empty string", func() {
+				e := route.NewEndpoint(&route.EndpointOpts{
+					AvailabilityZone:        "az-meow",
+					Host:                    "1.2.3.4",
+					Port:                    5678,
+					Protocol:                "http2",
+					RouteServiceUrl:         "https://my-rs.com",
+					StaleThresholdInSeconds: -1,
+				})
+
+				Expect(e.ProcessId()).To(BeEmpty())
+			})
+		})
+
+		Context("when there are tags, but no process_id entry", func() {
+			It("returns an empty string", func() {
+				tags := map[string]string{"meow": "meow"}
+				e := route.NewEndpoint(&route.EndpointOpts{
+					AvailabilityZone:        "az-meow",
+					Host:                    "1.2.3.4",
+					Port:                    5678,
+					Protocol:                "http2",
+					RouteServiceUrl:         "https://my-rs.com",
+					StaleThresholdInSeconds: -1,
+					Tags:                    tags,
+				})
+
+				Expect(e.ProcessId()).To(BeEmpty())
+			})
+		})
+
+		Context("when there are tags, and process_id exists", func() {
+			It("returns the process_id", func() {
+				tags := map[string]string{"process_id": "meow"}
+				e := route.NewEndpoint(&route.EndpointOpts{
+					AvailabilityZone:        "az-meow",
+					Host:                    "1.2.3.4",
+					Port:                    5678,
+					Protocol:                "http2",
+					RouteServiceUrl:         "https://my-rs.com",
+					StaleThresholdInSeconds: -1,
+					Tags:                    tags,
+				})
+
+				Expect(e.ProcessId()).To(Equal("meow"))
+			})
+		})
+	})
 })

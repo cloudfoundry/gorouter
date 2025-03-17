@@ -19,12 +19,20 @@ import (
 
 const CfAppInstance = "X-CF-APP-INSTANCE"
 
-type InvalidInstanceHeaderError struct {
+type InvalidAppInstanceHeaderError struct {
 	headerValue string
 }
 
-func (err InvalidInstanceHeaderError) Error() string {
+func (err InvalidAppInstanceHeaderError) Error() string {
 	return fmt.Sprintf("invalid-app-instance-header: %s", err.headerValue)
+}
+
+type InvalidProcessInstanceHeaderError struct {
+	headerValue string
+}
+
+func (err InvalidProcessInstanceHeaderError) Error() string {
+	return fmt.Sprintf("invalid-process-instance-header: %s", err.headerValue)
 }
 
 type lookupHandler struct {
@@ -75,8 +83,13 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	}
 
 	pool, err := l.lookup(r, logger)
-	if _, ok := err.(InvalidInstanceHeaderError); ok {
-		l.handleInvalidInstanceHeader(rw, r, logger)
+	if _, ok := err.(InvalidAppInstanceHeaderError); ok {
+		l.handleInvalidAppInstanceHeader(rw, r, logger)
+		return
+	}
+
+	if _, ok := err.(InvalidProcessInstanceHeaderError); ok {
+		l.handleInvalidProcessInstanceHeader(rw, r, logger)
 		return
 	}
 
@@ -109,7 +122,7 @@ func (l *lookupHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	next(rw, r)
 }
 
-func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (l *lookupHandler) handleInvalidAppInstanceHeader(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	l.reporter.CaptureBadRequest()
 
 	AddRouterErrorHeader(rw, "invalid_cf_app_instance_header")
@@ -119,6 +132,20 @@ func (l *lookupHandler) handleInvalidInstanceHeader(rw http.ResponseWriter, r *h
 		rw,
 		http.StatusBadRequest,
 		"Invalid X-CF-App-Instance Header",
+		logger,
+	)
+}
+
+func (l *lookupHandler) handleInvalidProcessInstanceHeader(rw http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+	l.reporter.CaptureBadRequest()
+
+	AddRouterErrorHeader(rw, "invalid_cf_process_instance_header")
+	addNoCacheControlHeader(rw)
+
+	l.errorWriter.WriteError(
+		rw,
+		http.StatusBadRequest,
+		"Invalid X-CF-Process-Instance Header",
 		logger,
 	)
 }
@@ -149,6 +176,12 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	if appInstanceHeader := r.Header.Get(router_http.CfAppInstance); appInstanceHeader != "" {
 		guid, idx := splitInstanceHeader(appInstanceHeader)
 		errorMsg = fmt.Sprintf("Requested instance ('%s') with guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
+		returnStatus = http.StatusBadRequest
+	}
+
+	if processInstanceHeader := r.Header.Get(router_http.CfProcessInstance); processInstanceHeader != "" {
+		guid, idx := splitInstanceHeader(processInstanceHeader)
+		errorMsg = fmt.Sprintf("Requested instance ('%s') with process guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
 		returnStatus = http.StatusBadRequest
 	}
 
@@ -193,20 +226,32 @@ func (l *lookupHandler) lookup(r *http.Request, logger *slog.Logger) (*route.End
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {
-		err := validateInstanceHeader(appInstanceHeader)
+		err := validateAppInstanceHeader(appInstanceHeader)
 		if err != nil {
 			logger.Error("invalid-app-instance-header", log.ErrAttr(err))
-			return nil, InvalidInstanceHeaderError{headerValue: appInstanceHeader}
+			return nil, InvalidAppInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 
 		appID, appIndex := splitInstanceHeader(appInstanceHeader)
-		return l.registry.LookupWithInstance(uri, appID, appIndex), nil
+		return l.registry.LookupWithAppInstance(uri, appID, appIndex), nil
+	}
+
+	processInstanceHeader := r.Header.Get(router_http.CfProcessInstance)
+	if processInstanceHeader != "" {
+		err := validateProcessInstanceHeader(processInstanceHeader)
+		if err != nil {
+			logger.Error("invalid-process-instance-header", log.ErrAttr(err))
+			return nil, InvalidProcessInstanceHeaderError{headerValue: processInstanceHeader}
+		}
+
+		processID, processIndex := splitInstanceHeader(processInstanceHeader)
+		return l.registry.LookupWithProcessInstance(uri, processID, processIndex), nil
 	}
 
 	return l.registry.Lookup(uri), nil
 }
 
-func validateInstanceHeader(appInstanceHeader string) error {
+func validateAppInstanceHeader(appInstanceHeader string) error {
 	// Regex to match format of `APP_GUID:INSTANCE_ID`
 	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
 	if !r.MatchString(appInstanceHeader) {
@@ -215,7 +260,16 @@ func validateInstanceHeader(appInstanceHeader string) error {
 	return nil
 }
 
-func splitInstanceHeader(appInstanceHeader string) (string, string) {
-	appDetails := strings.Split(appInstanceHeader, ":")
-	return appDetails[0], appDetails[1]
+func validateProcessInstanceHeader(processInstanceHeader string) error {
+	// Regex to match format of `PROCESS_GUID:INSTANCE_ID`
+	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
+	if !r.MatchString(processInstanceHeader) {
+		return fmt.Errorf("Incorrect %s header : %s", router_http.CfProcessInstance, processInstanceHeader)
+	}
+	return nil
+}
+
+func splitInstanceHeader(instanceHeader string) (string, string) {
+	details := strings.Split(instanceHeader, ":")
+	return details[0], details[1]
 }
