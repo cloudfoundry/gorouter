@@ -122,6 +122,10 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 
 }
 
+func (e *Endpoint) ProcessId() string {
+	return e.Tags["process_id"]
+}
+
 //go:generate counterfeiter -o fakes/fake_endpoint_iterator.go . EndpointIterator
 type EndpointIterator interface {
 	// Next MUST either return the next endpoint available or nil. It MUST NOT return the same endpoint.

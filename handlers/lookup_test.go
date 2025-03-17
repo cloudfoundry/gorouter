@@ -39,6 +39,7 @@ var _ = Describe("Lookup", func() {
 	)
 
 	const fakeAppGUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	const fakeProcessGUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 	nextHandler = http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		nextCalled = true
@@ -155,7 +156,7 @@ var _ = Describe("Lookup", func() {
 			})
 		})
 
-		Context("when an instance header is given", func() {
+		Context("when an app-instance header is given", func() {
 			BeforeEach(func() {
 				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1")
 			})
@@ -179,6 +180,33 @@ var _ = Describe("Lookup", func() {
 
 			It("has a meaningful response", func() {
 				Expect(resp.Body.String()).To(ContainSubstring("Requested instance ('1') with guid ('%s') does not exist for route ('example.com')", fakeAppGUID))
+			})
+		})
+
+		Context("when a process-instance header is given", func() {
+			BeforeEach(func() {
+				req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
+			})
+
+			It("sends a bad request metric", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
+
+			It("sets X-Cf-RouterError to unknown_route", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+			})
+
+			It("sets Cache-Control to contain no-cache, no-store", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+			})
+
+			It("returns a 400 BadRequest and does not call next", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
+			})
+
+			It("has a meaningful response", func() {
+				Expect(resp.Body.String()).To(ContainSubstring("Requested instance ('1') with process guid ('%s') does not exist for route ('example.com')", fakeProcessGUID))
 			})
 		})
 	})
@@ -373,7 +401,7 @@ var _ = Describe("Lookup", func() {
 			})
 		})
 
-		Context("when a specific instance is requested", func() {
+		Context("when a specific app instance is requested", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
 					Logger:             logger,
@@ -388,7 +416,7 @@ var _ = Describe("Lookup", func() {
 
 				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1")
 
-				reg.LookupWithInstanceReturns(pool)
+				reg.LookupWithAppInstanceReturns(pool)
 			})
 
 			JustBeforeEach(func() {
@@ -396,8 +424,8 @@ var _ = Describe("Lookup", func() {
 			})
 
 			It("lookups with instance", func() {
-				Expect(reg.LookupWithInstanceCallCount()).To(Equal(1))
-				uri, appGuid, appIndex := reg.LookupWithInstanceArgsForCall(0)
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(1))
+				uri, appGuid, appIndex := reg.LookupWithAppInstanceArgsForCall(0)
 
 				Expect(uri.String()).To(Equal("example.com"))
 				Expect(appGuid).To(Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
@@ -405,7 +433,37 @@ var _ = Describe("Lookup", func() {
 			})
 		})
 
-		Context("when an invalid instance header is requested", func() {
+		Context("when a specific process instance is requested", func() {
+			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupWithAppInstanceReturns(pool)
+
+				req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
+			})
+
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
+			It("lookups with instance", func() {
+				Expect(reg.LookupWithProcessInstanceCallCount()).To(Equal(1))
+				uri, processGuid, processIndex := reg.LookupWithProcessInstanceArgsForCall(0)
+
+				Expect(uri.String()).To(Equal("example.com"))
+				Expect(processGuid).To(Equal(fakeProcessGUID))
+				Expect(processIndex).To(Equal("1"))
+			})
+		})
+
+		Context("when an invalid app instance header is requested", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
 					Logger:             logger,
@@ -420,7 +478,7 @@ var _ = Describe("Lookup", func() {
 
 				req.Header.Add("X-CF-App-Instance", fakeAppGUID+":1:invalid-part")
 
-				reg.LookupWithInstanceReturns(pool)
+				reg.LookupWithAppInstanceReturns(pool)
 			})
 
 			JustBeforeEach(func() {
@@ -428,7 +486,7 @@ var _ = Describe("Lookup", func() {
 			})
 
 			It("does not lookup the instance", func() {
-				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(0))
 			})
 
 			It("responds with 400", func() {
@@ -455,6 +513,56 @@ var _ = Describe("Lookup", func() {
 			})
 		})
 
+		Context("when an invalid process instance header is requested", func() {
+			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
+				req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1:invalid-part")
+
+				reg.LookupWithAppInstanceReturns(pool)
+			})
+
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
+			It("does not lookup the instance", func() {
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(0))
+			})
+
+			It("responds with 400", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
+			})
+
+			It("responds with an error in the body", func() {
+				body, err := io.ReadAll(resp.Body)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(body)).To(Equal("400 Bad Request: Invalid X-CF-Process-Instance Header\n"))
+			})
+
+			It("reports the bad request", func() {
+				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+			})
+
+			It("responds with a X-CF-RouterError header", func() {
+				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("invalid_cf_process_instance_header"))
+			})
+
+			It("adds a no-cache header to the response", func() {
+				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+			})
+		})
+
 		Context("when given an incomplete app instance header", func() {
 			BeforeEach(func() {
 				pool := route.NewPool(&route.PoolOpts{
@@ -470,7 +578,7 @@ var _ = Describe("Lookup", func() {
 
 				appInstanceHeader := fakeAppGUID + ":"
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
-				reg.LookupWithInstanceReturns(pool)
+				reg.LookupWithAppInstanceReturns(pool)
 			})
 
 			JustBeforeEach(func() {
@@ -478,7 +586,39 @@ var _ = Describe("Lookup", func() {
 			})
 
 			It("does not lookup the instance", func() {
-				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(0))
+			})
+
+			It("responds with 400", func() {
+				Expect(nextCalled).To(BeFalse())
+				Expect(resp.Code).To(Equal(http.StatusBadRequest))
+			})
+		})
+
+		Context("when given an incomplete process instance header", func() {
+			BeforeEach(func() {
+				pool := route.NewPool(&route.PoolOpts{
+					Logger:             logger,
+					RetryAfterFailure:  2 * time.Minute,
+					Host:               "example.com",
+					ContextPath:        "/",
+					MaxConnsPerBackend: maxConnections,
+				})
+				exampleEndpoint := &route.Endpoint{Stats: route.NewStats()}
+				pool.Put(exampleEndpoint)
+				reg.LookupReturns(pool)
+
+				processInstanceHeader := fakeAppGUID + ":"
+				req.Header.Add("X-CF-Process-Instance", processInstanceHeader)
+				reg.LookupWithAppInstanceReturns(pool)
+			})
+
+			JustBeforeEach(func() {
+				handler.ServeHTTP(resp, req)
+			})
+
+			It("does not lookup the instance", func() {
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(0))
 			})
 
 			It("responds with 400", func() {
@@ -502,7 +642,7 @@ var _ = Describe("Lookup", func() {
 
 				appInstanceHeader := fakeAppGUID
 				req.Header.Add("X-CF-App-Instance", appInstanceHeader)
-				reg.LookupWithInstanceReturns(pool)
+				reg.LookupWithAppInstanceReturns(pool)
 			})
 
 			JustBeforeEach(func() {
@@ -510,7 +650,7 @@ var _ = Describe("Lookup", func() {
 			})
 
 			It("does not lookup the instance", func() {
-				Expect(reg.LookupWithInstanceCallCount()).To(Equal(0))
+				Expect(reg.LookupWithAppInstanceCallCount()).To(Equal(0))
 			})
 
 			It("responds with 400", func() {

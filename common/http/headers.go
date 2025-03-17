@@ -9,6 +9,7 @@ const (
 	VcapTraceHeader       = "X-Vcap-Trace"
 	CfInstanceIdHeader    = "X-CF-InstanceID"
 	CfAppInstance         = "X-CF-APP-INSTANCE"
+	CfProcessInstance     = "X-CF-PROCESS-INSTANCE"
 	CfRouterError         = "X-Cf-RouterError"
 )
 
