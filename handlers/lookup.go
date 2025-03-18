@@ -181,7 +181,11 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 
 	if processInstanceHeader := r.Header.Get(router_http.CfProcessInstance); processInstanceHeader != "" {
 		guid, idx := splitInstanceHeader(processInstanceHeader)
-		errorMsg = fmt.Sprintf("Requested instance ('%s') with process guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
+		if idx == "" {
+			errorMsg = fmt.Sprintf("Requested instance with process guid ('%s') does not exist for route ('%s')", guid, r.Host)
+		} else {
+			errorMsg = fmt.Sprintf("Requested instance ('%s') with process guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
+		}
 		returnStatus = http.StatusBadRequest
 	}
 

@@ -184,29 +184,58 @@ var _ = Describe("Lookup", func() {
 		})
 
 		Context("when a process-instance header is given", func() {
-			BeforeEach(func() {
-				req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
+			Context("when an index is given", func() {
+				BeforeEach(func() {
+					req.Header.Add("X-CF-Process-Instance", fakeProcessGUID+":1")
+				})
+
+				It("sends a bad request metric", func() {
+					Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+				})
+
+				It("sets X-Cf-RouterError to unknown_route", func() {
+					Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+				})
+
+				It("sets Cache-Control to contain no-cache, no-store", func() {
+					Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+				})
+
+				It("returns a 400 BadRequest and does not call next", func() {
+					Expect(nextCalled).To(BeFalse())
+					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+				})
+
+				It("has a meaningful response", func() {
+					Expect(resp.Body.String()).To(ContainSubstring("Requested instance ('1') with process guid ('%s') does not exist for route ('example.com')", fakeProcessGUID))
+				})
 			})
 
-			It("sends a bad request metric", func() {
-				Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
-			})
+			Context("when an index is not given", func() {
+				BeforeEach(func() {
+					req.Header.Add("X-CF-Process-Instance", fakeProcessGUID)
+				})
 
-			It("sets X-Cf-RouterError to unknown_route", func() {
-				Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
-			})
+				It("sends a bad request metric", func() {
+					Expect(rep.CaptureBadRequestCallCount()).To(Equal(1))
+				})
 
-			It("sets Cache-Control to contain no-cache, no-store", func() {
-				Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
-			})
+				It("sets X-Cf-RouterError to unknown_route", func() {
+					Expect(resp.Header().Get("X-Cf-RouterError")).To(Equal("unknown_route"))
+				})
 
-			It("returns a 400 BadRequest and does not call next", func() {
-				Expect(nextCalled).To(BeFalse())
-				Expect(resp.Code).To(Equal(http.StatusBadRequest))
-			})
+				It("sets Cache-Control to contain no-cache, no-store", func() {
+					Expect(resp.Header().Get("Cache-Control")).To(Equal("no-cache, no-store"))
+				})
 
-			It("has a meaningful response", func() {
-				Expect(resp.Body.String()).To(ContainSubstring("Requested instance ('1') with process guid ('%s') does not exist for route ('example.com')", fakeProcessGUID))
+				It("returns a 400 BadRequest and does not call next", func() {
+					Expect(nextCalled).To(BeFalse())
+					Expect(resp.Code).To(Equal(http.StatusBadRequest))
+				})
+
+				It("has a meaningful response", func() {
+					Expect(resp.Body.String()).To(ContainSubstring("Requested instance with process guid ('%s') does not exist for route ('example.com')", fakeProcessGUID))
+				})
 			})
 		})
 	})
