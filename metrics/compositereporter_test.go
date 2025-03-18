@@ -15,8 +15,8 @@ import (
 var _ = Describe("CompositeReporter", func() {
 
 	var fakeVarzReporter *fakes.FakeVarzReporter
-	var fakeProxyReporter *fakes.FakeProxyReporter
-	var composite metrics.ProxyReporter
+	var fakeMultiReporter *fakes.FakeMetricReporter
+	var composite metrics.MetricReporter
 
 	var endpoint *route.Endpoint
 	var response *http.Response
@@ -25,9 +25,9 @@ var _ = Describe("CompositeReporter", func() {
 
 	BeforeEach(func() {
 		fakeVarzReporter = new(fakes.FakeVarzReporter)
-		fakeProxyReporter = new(fakes.FakeProxyReporter)
+		fakeMultiReporter = new(fakes.FakeMetricReporter)
 
-		composite = &metrics.CompositeReporter{VarzReporter: fakeVarzReporter, ProxyReporter: fakeProxyReporter}
+		composite = &metrics.CompositeReporter{VarzReporter: fakeVarzReporter, MetricReporter: fakeMultiReporter}
 		endpoint = route.NewEndpoint(&route.EndpointOpts{})
 		response = &http.Response{StatusCode: 200}
 		responseTime = time.Now()
@@ -38,39 +38,39 @@ var _ = Describe("CompositeReporter", func() {
 		composite.CaptureBadRequest()
 
 		Expect(fakeVarzReporter.CaptureBadRequestCallCount()).To(Equal(1))
-		Expect(fakeProxyReporter.CaptureBadRequestCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureBadRequestCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureBackendExhaustedConns to the proxy reporter", func() {
 		composite.CaptureBackendExhaustedConns()
-		Expect(fakeProxyReporter.CaptureBackendExhaustedConnsCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureBackendExhaustedConnsCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureBackendInvalidID() to the proxy reporter", func() {
 		composite.CaptureBackendInvalidID()
-		Expect(fakeProxyReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureBackendInvalidIDCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureBackendInvalidTLSCert() to the proxy reporter", func() {
 		composite.CaptureBackendInvalidTLSCert()
-		Expect(fakeProxyReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureBackendInvalidTLSCertCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureBadGateway to both reporters", func() {
 		composite.CaptureBadGateway()
 		Expect(fakeVarzReporter.CaptureBadGatewayCallCount()).To(Equal(1))
-		Expect(fakeProxyReporter.CaptureBadGatewayCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureBadGatewayCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureRoutingRequest to both reporters", func() {
 		composite.CaptureRoutingRequest(endpoint)
 		Expect(fakeVarzReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
-		Expect(fakeProxyReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureRoutingRequestCallCount()).To(Equal(1))
 
 		callEndpoint := fakeVarzReporter.CaptureRoutingRequestArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
 
-		callEndpoint = fakeProxyReporter.CaptureRoutingRequestArgsForCall(0)
+		callEndpoint = fakeMultiReporter.CaptureRoutingRequestArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
 	})
 
@@ -78,7 +78,7 @@ var _ = Describe("CompositeReporter", func() {
 		composite.CaptureRoutingResponseLatency(endpoint, response.StatusCode, responseTime, responseDuration)
 
 		Expect(fakeVarzReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
-		Expect(fakeProxyReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureRoutingResponseLatencyCallCount()).To(Equal(1))
 
 		callEndpoint, callStatusCode, callTime, callDuration := fakeVarzReporter.CaptureRoutingResponseLatencyArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
@@ -86,7 +86,7 @@ var _ = Describe("CompositeReporter", func() {
 		Expect(callTime).To(Equal(responseTime))
 		Expect(callDuration).To(Equal(responseDuration))
 
-		callEndpoint, _, _, callDuration = fakeProxyReporter.CaptureRoutingResponseLatencyArgsForCall(0)
+		callEndpoint, _, _, callDuration = fakeMultiReporter.CaptureRoutingResponseLatencyArgsForCall(0)
 		Expect(callEndpoint).To(Equal(endpoint))
 		Expect(callDuration).To(Equal(responseDuration))
 	})
@@ -94,36 +94,36 @@ var _ = Describe("CompositeReporter", func() {
 	It("forwards CaptureRoutingServiceResponse to proxy reporter", func() {
 		composite.CaptureRouteServiceResponse(response)
 
-		Expect(fakeProxyReporter.CaptureRouteServiceResponseCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureRouteServiceResponseCallCount()).To(Equal(1))
 
-		callResponse := fakeProxyReporter.CaptureRouteServiceResponseArgsForCall(0)
+		callResponse := fakeMultiReporter.CaptureRouteServiceResponseArgsForCall(0)
 		Expect(callResponse).To(Equal(response))
 	})
 
 	It("forwards CaptureRoutingResponse to proxy reporter", func() {
 		composite.CaptureRoutingResponse(response.StatusCode)
 
-		Expect(fakeProxyReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureRoutingResponseCallCount()).To(Equal(1))
 
-		callResponseCode := fakeProxyReporter.CaptureRoutingResponseArgsForCall(0)
+		callResponseCode := fakeMultiReporter.CaptureRoutingResponseArgsForCall(0)
 		Expect(callResponseCode).To(Equal(response.StatusCode))
 	})
 
 	It("forwards CaptureWebSocketUpdate to proxy reporter", func() {
 		composite.CaptureWebSocketUpdate()
 
-		Expect(fakeProxyReporter.CaptureWebSocketUpdateCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureWebSocketUpdateCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureWebSocketFailure to proxy reporter", func() {
 		composite.CaptureWebSocketFailure()
 
-		Expect(fakeProxyReporter.CaptureWebSocketFailureCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureWebSocketFailureCallCount()).To(Equal(1))
 	})
 
 	It("forwards CaptureHTTPLatency to the proxy reporter", func() {
 		composite.CaptureHTTPLatency(time.Second, "")
-		Expect(fakeProxyReporter.CaptureHTTPLatencyCallCount()).To(Equal(1))
+		Expect(fakeMultiReporter.CaptureHTTPLatencyCallCount()).To(Equal(1))
 	})
 
 })

@@ -15,7 +15,7 @@ import (
 	"github.com/cloudfoundry/dropsonde/metrics"
 )
 
-type MetricsReporter struct {
+type Metrics struct {
 	Sender                     metrics.MetricSender
 	Batcher                    metrics.MetricBatcher
 	PerRequestMetricsReporting bool
@@ -23,35 +23,35 @@ type MetricsReporter struct {
 	unmuzzled                  uint64
 }
 
-func (m *MetricsReporter) CaptureBackendExhaustedConns() {
+func (m *Metrics) CaptureBackendExhaustedConns() {
 	m.Batcher.BatchIncrementCounter("backend_exhausted_conns")
 }
 
-func (m *MetricsReporter) CaptureBackendTLSHandshakeFailed() {
+func (m *Metrics) CaptureBackendTLSHandshakeFailed() {
 	m.Batcher.BatchIncrementCounter("backend_tls_handshake_failed")
 }
 
-func (m *MetricsReporter) CaptureBackendInvalidID() {
+func (m *Metrics) CaptureBackendInvalidID() {
 	m.Batcher.BatchIncrementCounter("backend_invalid_id")
 }
 
-func (m *MetricsReporter) CaptureBackendInvalidTLSCert() {
+func (m *Metrics) CaptureBackendInvalidTLSCert() {
 	m.Batcher.BatchIncrementCounter("backend_invalid_tls_cert")
 }
 
-func (m *MetricsReporter) CaptureBadRequest() {
+func (m *Metrics) CaptureBadRequest() {
 	m.Batcher.BatchIncrementCounter("rejected_requests")
 }
 
-func (m *MetricsReporter) CaptureBadGateway() {
+func (m *Metrics) CaptureBadGateway() {
 	m.Batcher.BatchIncrementCounter("bad_gateways")
 }
 
-func (m *MetricsReporter) CaptureEmptyContentLengthHeader() {
+func (m *Metrics) CaptureEmptyContentLengthHeader() {
 	m.Batcher.BatchIncrementCounter("empty_content_length_header")
 }
 
-func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint) {
+func (m *Metrics) CaptureRoutingRequest(b *route.Endpoint) {
 	m.Batcher.BatchIncrementCounter("total_requests")
 
 	componentName, ok := b.Tags["component"]
@@ -63,7 +63,7 @@ func (m *MetricsReporter) CaptureRoutingRequest(b *route.Endpoint) {
 	}
 }
 
-func (m *MetricsReporter) CaptureRouteServiceResponse(res *http.Response) {
+func (m *Metrics) CaptureRouteServiceResponse(res *http.Response) {
 	var statusCode int
 	if res != nil {
 		statusCode = res.StatusCode
@@ -72,12 +72,12 @@ func (m *MetricsReporter) CaptureRouteServiceResponse(res *http.Response) {
 	m.Batcher.BatchIncrementCounter("responses.route_services")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponse(statusCode int) {
+func (m *Metrics) CaptureRoutingResponse(statusCode int) {
 	m.Batcher.BatchIncrementCounter(fmt.Sprintf("responses.%s", getResponseCounterName(statusCode)))
 	m.Batcher.BatchIncrementCounter("responses")
 }
 
-func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int, _ time.Time, d time.Duration) {
+func (m *Metrics) CaptureRoutingResponseLatency(b *route.Endpoint, _ int, _ time.Time, d time.Duration) {
 	if m.PerRequestMetricsReporting {
 		//this function has extra arguments to match varz reporter
 		latency := float64(d / time.Millisecond)
@@ -97,7 +97,7 @@ func (m *MetricsReporter) CaptureRoutingResponseLatency(b *route.Endpoint, _ int
 	}
 }
 
-func (m *MetricsReporter) CaptureLookupTime(t time.Duration) {
+func (m *Metrics) CaptureLookupTime(t time.Duration) {
 	if m.PerRequestMetricsReporting {
 		unit := "ns"
 		err := m.Sender.SendValue("route_lookup_time", float64(t.Nanoseconds()), unit)
@@ -107,11 +107,11 @@ func (m *MetricsReporter) CaptureLookupTime(t time.Duration) {
 	}
 }
 
-func (m *MetricsReporter) UnmuzzleRouteRegistrationLatency() {
+func (m *Metrics) UnmuzzleRouteRegistrationLatency() {
 	atomic.StoreUint64(&m.unmuzzled, 1)
 }
 
-func (m *MetricsReporter) CaptureRouteRegistrationLatency(t time.Duration) {
+func (m *Metrics) CaptureRouteRegistrationLatency(t time.Duration) {
 	if atomic.LoadUint64(&m.unmuzzled) == 1 {
 		err := m.Sender.SendValue("route_registration_latency", float64(t/time.Millisecond), "ms")
 		if err != nil {
@@ -120,7 +120,7 @@ func (m *MetricsReporter) CaptureRouteRegistrationLatency(t time.Duration) {
 	}
 }
 
-func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
+func (m *Metrics) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
 	err := m.Sender.SendValue("total_routes", float64(totalRoutes), "")
 	if err != nil {
 		m.Logger.Debug("failed-sending-metric", log.ErrAttr(err), slog.String("metric", "total_routes"))
@@ -131,11 +131,11 @@ func (m *MetricsReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate i
 	}
 }
 
-func (m *MetricsReporter) CaptureRoutesPruned(routesPruned uint64) {
+func (m *Metrics) CaptureRoutesPruned(routesPruned uint64) {
 	m.Batcher.BatchAddCounter("routes_pruned", routesPruned)
 }
 
-func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged, _ string) {
+func (m *Metrics) CaptureRegistryMessage(msg ComponentTagged, _ string) {
 	var componentName string
 	if msg.Component() == "" {
 		componentName = "registry_message"
@@ -145,7 +145,7 @@ func (m *MetricsReporter) CaptureRegistryMessage(msg ComponentTagged, _ string) 
 	m.Batcher.BatchIncrementCounter(componentName)
 }
 
-func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
+func (m *Metrics) CaptureUnregistryMessage(msg ComponentTagged) {
 	var componentName string
 	if msg.Component() == "" {
 		componentName = "unregistry_message"
@@ -158,29 +158,29 @@ func (m *MetricsReporter) CaptureUnregistryMessage(msg ComponentTagged) {
 	}
 }
 
-func (m *MetricsReporter) CaptureWebSocketUpdate() {
+func (m *Metrics) CaptureWebSocketUpdate() {
 	m.Batcher.BatchIncrementCounter("websocket_upgrades")
 }
 
-func (m *MetricsReporter) CaptureWebSocketFailure() {
+func (m *Metrics) CaptureWebSocketFailure() {
 	m.Batcher.BatchIncrementCounter("websocket_failures")
 }
 
-func (m *MetricsReporter) CaptureFoundFileDescriptors(files int) {
+func (m *Metrics) CaptureFoundFileDescriptors(files int) {
 	m.Sender.SendValue("file_descriptors", float64(files), "file")
 }
 
-func (m *MetricsReporter) CaptureNATSBufferedMessages(messages int) {
+func (m *Metrics) CaptureNATSBufferedMessages(messages int) {
 	m.Sender.SendValue("buffered_messages", float64(messages), "message")
 }
 
-func (m *MetricsReporter) CaptureNATSDroppedMessages(messages int) {
+func (m *Metrics) CaptureNATSDroppedMessages(messages int) {
 	m.Sender.SendValue("total_dropped_messages", float64(messages), "message")
 }
 
 // CaptureHTTPLatency observes histogram of HTTP latency metric
 // Empty implementation here is to fulfil interface
-func (m *MetricsReporter) CaptureHTTPLatency(_ time.Duration, _ string) {
+func (m *Metrics) CaptureHTTPLatency(_ time.Duration, _ string) {
 }
 
 func getResponseCounterName(statusCode int) string {

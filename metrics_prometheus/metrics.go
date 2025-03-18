@@ -56,10 +56,7 @@ func NewMetricsRegistry(config config.PrometheusConfig) *mr.Registry {
 	return metricsRegistry
 }
 
-var _ interface {
-	metrics.ProxyReporter
-	metrics.RouteRegistryReporter
-} = &Metrics{}
+var _ metrics.MetricReporter = &Metrics{}
 
 func NewMetrics(registry *mr.Registry, perRequestMetricsReporting bool, meterConfig config.MetersConfig) *Metrics {
 	return &Metrics{

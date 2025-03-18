@@ -18,8 +18,8 @@ type VarzReporter interface {
 	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
 }
 
-//go:generate counterfeiter -o fakes/fake_proxyreporter.go . ProxyReporter
-type ProxyReporter interface {
+//go:generate counterfeiter -o fakes/fake_metricreporter.go . MetricReporter
+type MetricReporter interface {
 	CaptureBackendExhaustedConns()
 	CaptureBackendInvalidID()
 	CaptureBackendInvalidTLSCert()
@@ -34,204 +34,176 @@ type ProxyReporter interface {
 	CaptureWebSocketUpdate()
 	CaptureWebSocketFailure()
 	CaptureHTTPLatency(d time.Duration, sourceID string)
-}
-
-type ComponentTagged interface {
-	Component() string
-}
-
-//go:generate counterfeiter -o fakes/fake_registry_reporter.go . RouteRegistryReporter
-type RouteRegistryReporter interface {
 	CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64)
 	CaptureRoutesPruned(prunedRoutes uint64)
 	CaptureLookupTime(t time.Duration)
 	CaptureRegistryMessage(msg ComponentTagged, action string)
 	CaptureRouteRegistrationLatency(t time.Duration)
 	CaptureUnregistryMessage(msg ComponentTagged)
-	UnmuzzleRouteRegistrationLatency()
-}
-
-//go:generate counterfeiter -o fakes/fake_monitorreporter.go . MonitorReporter
-type MonitorReporter interface {
 	CaptureFoundFileDescriptors(files int)
 	CaptureNATSBufferedMessages(messages int)
 	CaptureNATSDroppedMessages(messages int)
+	UnmuzzleRouteRegistrationLatency()
+}
+
+type ComponentTagged interface {
+	Component() string
 }
 
 type CompositeReporter struct {
 	VarzReporter
-	ProxyReporter
+	MetricReporter
 }
 
-type MultiRouteRegistryReporter []RouteRegistryReporter
+type MultiMetricReporter []MetricReporter
 
-var _ RouteRegistryReporter = MultiRouteRegistryReporter{}
+var _ MetricReporter = MultiMetricReporter{}
 
-func NewMultiRouteRegistryReporter(reporters ...RouteRegistryReporter) MultiRouteRegistryReporter {
-	multiReporter := MultiRouteRegistryReporter{}
+func NewMultiMetricReporter(reporters ...MetricReporter) MultiMetricReporter {
+	multiReporter := MultiMetricReporter{}
 	multiReporter = append(multiReporter, reporters...)
 	return multiReporter
 }
 
-func (m MultiRouteRegistryReporter) CaptureLookupTime(t time.Duration) {
-	for _, r := range m {
-		r.CaptureLookupTime(t)
-	}
-}
-
-func (m MultiRouteRegistryReporter) UnmuzzleRouteRegistrationLatency() {
-	for _, r := range m {
-		r.UnmuzzleRouteRegistrationLatency()
-	}
-}
-
-func (m MultiRouteRegistryReporter) CaptureRouteRegistrationLatency(t time.Duration) {
-	for _, r := range m {
-		r.CaptureRouteRegistrationLatency(t)
-	}
-}
-
-func (m MultiRouteRegistryReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
-	for _, r := range m {
-		r.CaptureRouteStats(totalRoutes, msSinceLastUpdate)
-	}
-}
-
-func (m MultiRouteRegistryReporter) CaptureRoutesPruned(routesPruned uint64) {
-	for _, r := range m {
-		r.CaptureRoutesPruned(routesPruned)
-	}
-}
-
-func (m MultiRouteRegistryReporter) CaptureRegistryMessage(msg ComponentTagged, action string) {
-	for _, r := range m {
-		r.CaptureRegistryMessage(msg, action)
-	}
-}
-
-func (m MultiRouteRegistryReporter) CaptureUnregistryMessage(msg ComponentTagged) {
-	for _, r := range m {
-		r.CaptureUnregistryMessage(msg)
-	}
-}
-
-type MultiProxyReporter []ProxyReporter
-
-var _ ProxyReporter = MultiProxyReporter{}
-
-func NewMultiProxyReporter(reporters ...ProxyReporter) MultiProxyReporter {
-	multiReporter := MultiProxyReporter{}
-	multiReporter = append(multiReporter, reporters...)
-	return multiReporter
-}
-
-func (m MultiProxyReporter) CaptureBackendExhaustedConns() {
+func (m MultiMetricReporter) CaptureBackendExhaustedConns() {
 	for _, r := range m {
 		r.CaptureBackendExhaustedConns()
 	}
 }
 
-func (m MultiProxyReporter) CaptureBackendTLSHandshakeFailed() {
+func (m MultiMetricReporter) CaptureBackendTLSHandshakeFailed() {
 	for _, r := range m {
 		r.CaptureBackendTLSHandshakeFailed()
 	}
 }
 
-func (m MultiProxyReporter) CaptureBackendInvalidID() {
+func (m MultiMetricReporter) CaptureBackendInvalidID() {
 	for _, r := range m {
 		r.CaptureBackendInvalidID()
 	}
 }
 
-func (m MultiProxyReporter) CaptureBackendInvalidTLSCert() {
+func (m MultiMetricReporter) CaptureBackendInvalidTLSCert() {
 	for _, r := range m {
 		r.CaptureBackendInvalidTLSCert()
 	}
 }
 
-func (m MultiProxyReporter) CaptureBadRequest() {
+func (m MultiMetricReporter) CaptureBadRequest() {
 	for _, r := range m {
 		r.CaptureBadRequest()
 	}
 }
 
-func (m MultiProxyReporter) CaptureBadGateway() {
+func (m MultiMetricReporter) CaptureBadGateway() {
 	for _, r := range m {
 		r.CaptureBadGateway()
 	}
 }
 
-func (m MultiProxyReporter) CaptureEmptyContentLengthHeader() {
+func (m MultiMetricReporter) CaptureEmptyContentLengthHeader() {
 	for _, r := range m {
 		r.CaptureEmptyContentLengthHeader()
 	}
 }
 
-func (m MultiProxyReporter) CaptureRoutingRequest(b *route.Endpoint) {
+func (m MultiMetricReporter) CaptureRoutingRequest(b *route.Endpoint) {
 	for _, r := range m {
 		r.CaptureRoutingRequest(b)
 	}
 }
 
-func (m MultiProxyReporter) CaptureRouteServiceResponse(res *http.Response) {
+func (m MultiMetricReporter) CaptureRouteServiceResponse(res *http.Response) {
 	for _, r := range m {
 		r.CaptureRouteServiceResponse(res)
 	}
 }
 
-func (m MultiProxyReporter) CaptureRoutingResponse(statusCode int) {
+func (m MultiMetricReporter) CaptureRoutingResponse(statusCode int) {
 	for _, r := range m {
 		r.CaptureRoutingResponse(statusCode)
 	}
 }
 
-func (m MultiProxyReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
+func (m MultiMetricReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	for _, r := range m {
 		r.CaptureRoutingResponseLatency(b, statusCode, t, d)
 	}
 }
 
-func (m MultiProxyReporter) CaptureWebSocketUpdate() {
+func (m MultiMetricReporter) CaptureWebSocketUpdate() {
 	for _, r := range m {
 		r.CaptureWebSocketUpdate()
 	}
 }
 
-func (m MultiProxyReporter) CaptureWebSocketFailure() {
+func (m MultiMetricReporter) CaptureWebSocketFailure() {
 	for _, r := range m {
 		r.CaptureWebSocketFailure()
 	}
 }
 
-func (m MultiProxyReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
+func (m MultiMetricReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
 	for _, r := range m {
 		r.CaptureHTTPLatency(d, sourceID)
 	}
 }
 
-type MultiMonitorReporter []MonitorReporter
-
-var _ MonitorReporter = MultiMonitorReporter{}
-
-func NewMultiMonitorReporter(reporters ...MonitorReporter) MultiMonitorReporter {
-	multiReporter := MultiMonitorReporter{}
-	multiReporter = append(multiReporter, reporters...)
-	return multiReporter
+func (m MultiMetricReporter) CaptureLookupTime(t time.Duration) {
+	for _, r := range m {
+		r.CaptureLookupTime(t)
+	}
 }
 
-func (m MultiMonitorReporter) CaptureFoundFileDescriptors(files int) {
+func (m MultiMetricReporter) UnmuzzleRouteRegistrationLatency() {
+	for _, r := range m {
+		r.UnmuzzleRouteRegistrationLatency()
+	}
+}
+
+func (m MultiMetricReporter) CaptureRouteRegistrationLatency(t time.Duration) {
+	for _, r := range m {
+		r.CaptureRouteRegistrationLatency(t)
+	}
+}
+
+func (m MultiMetricReporter) CaptureRouteStats(totalRoutes int, msSinceLastUpdate int64) {
+	for _, r := range m {
+		r.CaptureRouteStats(totalRoutes, msSinceLastUpdate)
+	}
+}
+
+func (m MultiMetricReporter) CaptureRoutesPruned(routesPruned uint64) {
+	for _, r := range m {
+		r.CaptureRoutesPruned(routesPruned)
+	}
+}
+
+func (m MultiMetricReporter) CaptureRegistryMessage(msg ComponentTagged, action string) {
+	for _, r := range m {
+		r.CaptureRegistryMessage(msg, action)
+	}
+}
+
+func (m MultiMetricReporter) CaptureUnregistryMessage(msg ComponentTagged) {
+	for _, r := range m {
+		r.CaptureUnregistryMessage(msg)
+	}
+}
+
+func (m MultiMetricReporter) CaptureFoundFileDescriptors(files int) {
 	for _, r := range m {
 		r.CaptureFoundFileDescriptors(files)
 	}
 }
 
-func (m MultiMonitorReporter) CaptureNATSBufferedMessages(messages int) {
+func (m MultiMetricReporter) CaptureNATSBufferedMessages(messages int) {
 	for _, r := range m {
 		r.CaptureNATSBufferedMessages(messages)
 	}
 }
 
-func (m MultiMonitorReporter) CaptureNATSDroppedMessages(messages int) {
+func (m MultiMetricReporter) CaptureNATSDroppedMessages(messages int) {
 	for _, r := range m {
 		r.CaptureNATSDroppedMessages(messages)
 	}
@@ -239,28 +211,28 @@ func (m MultiMonitorReporter) CaptureNATSDroppedMessages(messages int) {
 
 func (c *CompositeReporter) CaptureBadRequest() {
 	c.VarzReporter.CaptureBadRequest()
-	c.ProxyReporter.CaptureBadRequest()
+	c.MetricReporter.CaptureBadRequest()
 }
 
 func (c *CompositeReporter) CaptureBadGateway() {
 	c.VarzReporter.CaptureBadGateway()
-	c.ProxyReporter.CaptureBadGateway()
+	c.MetricReporter.CaptureBadGateway()
 }
 
 func (c *CompositeReporter) CaptureEmptyContentLengthHeader() {
-	c.ProxyReporter.CaptureEmptyContentLengthHeader()
+	c.MetricReporter.CaptureEmptyContentLengthHeader()
 }
 
 func (c *CompositeReporter) CaptureRoutingRequest(b *route.Endpoint) {
 	c.VarzReporter.CaptureRoutingRequest(b)
-	c.ProxyReporter.CaptureRoutingRequest(b)
+	c.MetricReporter.CaptureRoutingRequest(b)
 }
 
 func (c *CompositeReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	c.VarzReporter.CaptureRoutingResponseLatency(b, statusCode, t, d)
-	c.ProxyReporter.CaptureRoutingResponseLatency(b, 0, time.Time{}, d)
+	c.MetricReporter.CaptureRoutingResponseLatency(b, 0, time.Time{}, d)
 }
 
 func (c *CompositeReporter) CaptureHTTPLatency(d time.Duration, sourceID string) {
-	c.ProxyReporter.CaptureHTTPLatency(d, sourceID)
+	c.MetricReporter.CaptureHTTPLatency(d, sourceID)
 }

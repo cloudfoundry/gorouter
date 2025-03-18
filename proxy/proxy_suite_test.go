@@ -35,7 +35,7 @@ var (
 	r                         *registry.RouteRegistry
 	p                         http.Handler
 	f                         *os.File
-	fakeReporter              *fakes.FakeProxyReporter
+	fakeReporter              *fakes.FakeMetricReporter
 	conf                      *config.Config
 	proxyServer               net.Listener
 	al                        accesslog.AccessLogger
@@ -79,14 +79,14 @@ var _ = BeforeEach(func() {
 	conf.Backends.MaxAttempts = 3
 	conf.RouteServiceConfig.MaxAttempts = 3
 	conf.DisableKeepAlives = false
-	fakeReporter = &fakes.FakeProxyReporter{}
+	fakeReporter = &fakes.FakeMetricReporter{}
 	strictSignatureValidation = false
 	skipSanitization = func(*http.Request) bool { return false }
 })
 
 var _ = JustBeforeEach(func() {
 	var err error
-	r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
+	r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeMetricReporter))
 
 	fakeEmitter = fake.NewFakeEventEmitter("fake")
 	dropsonde.InitializeWithEmitter(fakeEmitter)

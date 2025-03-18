@@ -26,7 +26,7 @@ var _ = Describe("Varz", func() {
 		logger = test_util.NewTestLogger("test")
 		cfg, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
-		Registry = registry.NewRouteRegistry(logger.Logger, cfg, new(fakes.FakeRouteRegistryReporter))
+		Registry = registry.NewRouteRegistry(logger.Logger, cfg, new(fakes.FakeMetricReporter))
 		Varz = NewVarz(Registry)
 	})
 

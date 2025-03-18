@@ -73,7 +73,7 @@ func NewProxyRoundTripper(
 	roundTripperFactory RoundTripperFactory,
 	retriableClassifiers fails.Classifier,
 	logger *slog.Logger,
-	combinedReporter metrics.ProxyReporter,
+	combinedReporter metrics.MetricReporter,
 	errHandler errorHandler,
 	routeServicesTransport http.RoundTripper,
 	cfg *config.Config,
@@ -92,7 +92,7 @@ func NewProxyRoundTripper(
 
 type roundTripper struct {
 	logger                 *slog.Logger
-	combinedReporter       metrics.ProxyReporter
+	combinedReporter       metrics.MetricReporter
 	roundTripperFactory    RoundTripperFactory
 	retriableClassifier    fails.Classifier
 	errorHandler           errorHandler

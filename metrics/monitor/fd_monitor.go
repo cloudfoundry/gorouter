@@ -16,11 +16,11 @@ import (
 type FileDescriptor struct {
 	path     string
 	ticker   *time.Ticker
-	reporter metrics.MonitorReporter
+	reporter metrics.MetricReporter
 	logger   *slog.Logger
 }
 
-func NewFileDescriptor(path string, ticker *time.Ticker, reporter metrics.MonitorReporter, logger *slog.Logger) *FileDescriptor {
+func NewFileDescriptor(path string, ticker *time.Ticker, reporter metrics.MetricReporter, logger *slog.Logger) *FileDescriptor {
 	return &FileDescriptor{
 		path:     path,
 		ticker:   ticker,

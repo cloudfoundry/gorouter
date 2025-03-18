@@ -17,7 +17,7 @@ import (
 
 var _ = Describe("FileDescriptor", func() {
 	var (
-		reporter *fakes.FakeMonitorReporter
+		reporter *fakes.FakeMetricReporter
 		procPath string
 		tr       *time.Ticker
 		logger   *test_util.TestLogger
@@ -25,7 +25,7 @@ var _ = Describe("FileDescriptor", func() {
 
 	BeforeEach(func() {
 		tr = time.NewTicker(1 * time.Second)
-		reporter = new(fakes.FakeMonitorReporter)
+		reporter = new(fakes.FakeMetricReporter)
 		logger = test_util.NewTestLogger("test")
 	})
 

@@ -45,7 +45,7 @@ type RouteRegistry struct {
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
 
-	reporter metrics.RouteRegistryReporter
+	reporter metrics.MetricReporter
 
 	ticker           *time.Ticker
 	timeOfLastUpdate time.Time
@@ -61,7 +61,7 @@ type RouteRegistry struct {
 	DefaultLoadBalancingAlgorithm string
 }
 
-func NewRouteRegistry(logger *slog.Logger, c *config.Config, reporter metrics.RouteRegistryReporter) *RouteRegistry {
+func NewRouteRegistry(logger *slog.Logger, c *config.Config, reporter metrics.MetricReporter) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byURI = container.NewTrie()
