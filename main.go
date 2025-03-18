@@ -127,9 +127,33 @@ func main() {
 
 	dropReporter := initializeDropsondeReporter(prefix, logger, c)
 	promReporter := initializePrometheusReporter(c)
-	registryMetrics := metrics.NewMultiRouteRegistryReporter(dropReporter, promReporter)
-	proxyMetrics := metrics.NewMultiProxyReporter(dropReporter, promReporter)
-	monitorMetrics := metrics.NewMultiMonitorReporter(dropReporter, promReporter)
+
+	routeRegistryReporters := make([]metrics.RouteRegistryReporter, 0)
+	if dropReporter != nil {
+		routeRegistryReporters = append(routeRegistryReporters, dropReporter)
+	}
+	if promReporter != nil {
+		routeRegistryReporters = append(routeRegistryReporters, promReporter)
+	}
+	registryMetrics := metrics.NewMultiRouteRegistryReporter(routeRegistryReporters...)
+
+	proxyReporters := make([]metrics.ProxyReporter, 0)
+	if dropReporter != nil {
+		proxyReporters = append(proxyReporters, dropReporter)
+	}
+	if promReporter != nil {
+		proxyReporters = append(proxyReporters, promReporter)
+	}
+	proxyMetrics := metrics.NewMultiProxyReporter(proxyReporters...)
+
+	monitorReporters := make([]metrics.MonitorReporter, 0)
+	if dropReporter != nil {
+		monitorReporters = append(monitorReporters, dropReporter)
+	}
+	if promReporter != nil {
+		monitorReporters = append(monitorReporters, promReporter)
+	}
+	monitorMetrics := metrics.NewMultiMonitorReporter(monitorReporters...)
 
 	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, registryMetrics)
 	varz := rvarz.NewVarz(registry)
