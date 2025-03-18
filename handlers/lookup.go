@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"github.com/urfave/negroni/v3"
 
@@ -174,13 +173,15 @@ func (l *lookupHandler) handleMissingRoute(rw http.ResponseWriter, r *http.Reque
 	returnStatus := http.StatusNotFound
 
 	if appInstanceHeader := r.Header.Get(router_http.CfAppInstance); appInstanceHeader != "" {
-		guid, idx := splitInstanceHeader(appInstanceHeader)
+		// parseAppInstanceHeader had already been called. So the error has already been checked.
+		guid, idx, _ := parseAppInstanceHeader(appInstanceHeader)
 		errorMsg = fmt.Sprintf("Requested instance ('%s') with guid ('%s') does not exist for route ('%s')", idx, guid, r.Host)
 		returnStatus = http.StatusBadRequest
 	}
 
 	if processInstanceHeader := r.Header.Get(router_http.CfProcessInstance); processInstanceHeader != "" {
-		guid, idx := splitInstanceHeader(processInstanceHeader)
+		// parseProcessInstanceHeader had already been called. So the error has already been checked.
+		guid, idx, _ := parseProcessInstanceHeader(processInstanceHeader)
 		if idx == "" {
 			errorMsg = fmt.Sprintf("Requested instance with process guid ('%s') does not exist for route ('%s')", guid, r.Host)
 		} else {
@@ -230,25 +231,23 @@ func (l *lookupHandler) lookup(r *http.Request, logger *slog.Logger) (*route.End
 	appInstanceHeader := r.Header.Get(router_http.CfAppInstance)
 
 	if appInstanceHeader != "" {
-		err := validateAppInstanceHeader(appInstanceHeader)
+		appID, appIndex, err := parseAppInstanceHeader(appInstanceHeader)
 		if err != nil {
 			logger.Error("invalid-app-instance-header", log.ErrAttr(err))
 			return nil, InvalidAppInstanceHeaderError{headerValue: appInstanceHeader}
 		}
 
-		appID, appIndex := splitInstanceHeader(appInstanceHeader)
 		return l.registry.LookupWithAppInstance(uri, appID, appIndex), nil
 	}
 
 	processInstanceHeader := r.Header.Get(router_http.CfProcessInstance)
 	if processInstanceHeader != "" {
-		err := validateProcessInstanceHeader(processInstanceHeader)
+		processID, processIndex, err := parseProcessInstanceHeader(processInstanceHeader)
 		if err != nil {
 			logger.Error("invalid-process-instance-header", log.ErrAttr(err))
 			return nil, InvalidProcessInstanceHeaderError{headerValue: processInstanceHeader}
 		}
 
-		processID, processIndex := splitInstanceHeader(processInstanceHeader)
 		return l.registry.LookupWithProcessInstance(uri, processID, processIndex), nil
 	}
 
@@ -256,29 +255,23 @@ func (l *lookupHandler) lookup(r *http.Request, logger *slog.Logger) (*route.End
 }
 
 // Regex to match format of `APP_GUID:INSTANCE_ID`
-var appInstanceHeaderRegex = regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
+var aReg = regexp.MustCompile(`^(?P<id>[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}):(?P<idx>\d+)$`)
 
-func validateAppInstanceHeader(appInstanceHeader string) error {
-	if !appInstanceHeaderRegex.MatchString(appInstanceHeader) {
-		return fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
+func parseAppInstanceHeader(appInstanceHeader string) (string, string, error) {
+	matches := aReg.FindStringSubmatch(appInstanceHeader)
+	if len(matches) == 0 {
+		return "", "", fmt.Errorf("Incorrect %s header : %s", router_http.CfAppInstance, appInstanceHeader)
 	}
-	return nil
+	return matches[aReg.SubexpIndex("id")], matches[aReg.SubexpIndex("idx")], nil
 }
 
 // Regex to match format of `PROCESS_GUID:INSTANCE_ID` and `PROCESS_GUID`
-var processInstanceHeaderRegex = regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}(:\d+)?$`)
+var pReg = regexp.MustCompile(`^(?P<id>[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12})(:(?P<idx>\d+))?$`)
 
-func validateProcessInstanceHeader(processInstanceHeader string) error {
-	if !processInstanceHeaderRegex.MatchString(processInstanceHeader) {
-		return fmt.Errorf("Incorrect %s header : %s", router_http.CfProcessInstance, processInstanceHeader)
+func parseProcessInstanceHeader(processInstanceHeader string) (string, string, error) {
+	matches := pReg.FindStringSubmatch(processInstanceHeader)
+	if len(matches) == 0 {
+		return "", "", fmt.Errorf("Incorrect %s header : %s", router_http.CfProcessInstance, processInstanceHeader)
 	}
-	return nil
-}
-
-func splitInstanceHeader(instanceHeader string) (string, string) {
-	details := strings.Split(instanceHeader, ":")
-	if len(details) == 1 {
-		return details[0], ""
-	}
-	return details[0], details[1]
+	return matches[pReg.SubexpIndex("id")], matches[pReg.SubexpIndex("idx")], nil
 }
