@@ -251,20 +251,21 @@ func (l *lookupHandler) lookup(r *http.Request, logger *slog.Logger) (*route.End
 	return l.registry.Lookup(uri), nil
 }
 
+// Regex to match format of `APP_GUID:INSTANCE_ID`
+var appInstanceHeaderRegex = regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
+
 func validateAppInstanceHeader(appInstanceHeader string) error {
-	// Regex to match format of `APP_GUID:INSTANCE_ID`
-	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}:\d+$`)
-	if !r.MatchString(appInstanceHeader) {
+	if !appInstanceHeaderRegex.MatchString(appInstanceHeader) {
 		return fmt.Errorf("Incorrect %s header : %s", CfAppInstance, appInstanceHeader)
 	}
 	return nil
 }
 
+// Regex to match format of `PROCESS_GUID:INSTANCE_ID` and `PROCESS_GUID`
+var processInstanceHeaderRegex = regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}(:\d+)?$`)
+
 func validateProcessInstanceHeader(processInstanceHeader string) error {
-	// Regex to match format of `PROCESS_GUID:INSTANCE_ID`
-	//   and to match format of `PROCESS_GUID`
-	r := regexp.MustCompile(`^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}(:\d+)?$`)
-	if !r.MatchString(processInstanceHeader) {
+	if !processInstanceHeaderRegex.MatchString(processInstanceHeader) {
 		return fmt.Errorf("Incorrect %s header : %s", router_http.CfProcessInstance, processInstanceHeader)
 	}
 	return nil
