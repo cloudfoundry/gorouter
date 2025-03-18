@@ -14,13 +14,13 @@ import (
 )
 
 type reporterHandler struct {
-	reporter metrics.ProxyReporter
+	reporter metrics.MetricReporter
 	logger   *slog.Logger
 }
 
 // NewReporter creates a new handler that handles reporting backend
 // responses to metrics and missing Content-Length header
-func NewReporter(reporter metrics.ProxyReporter, logger *slog.Logger) negroni.Handler {
+func NewReporter(reporter metrics.MetricReporter, logger *slog.Logger) negroni.Handler {
 	return &reporterHandler{
 		reporter: reporter,
 		logger:   logger,

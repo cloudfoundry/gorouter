@@ -10,11 +10,11 @@ import (
 )
 
 type httpLatencyPrometheusHandler struct {
-	reporter metrics.ProxyReporter
+	reporter metrics.MetricReporter
 }
 
 // NewHTTPLatencyPrometheus creates a new handler that handles prometheus metrics for latency
-func NewHTTPLatencyPrometheus(reporter metrics.ProxyReporter) negroni.Handler {
+func NewHTTPLatencyPrometheus(reporter metrics.MetricReporter) negroni.Handler {
 	return &httpLatencyPrometheusHandler{
 		reporter: reporter,
 	}

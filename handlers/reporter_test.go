@@ -26,7 +26,7 @@ var _ = Describe("Reporter Handler", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeReporter *metrics_fakes.FakeProxyReporter
+		fakeReporter *metrics_fakes.FakeMetricReporter
 		logger       *test_util.TestLogger
 		prevHandler  negroni.Handler
 
@@ -38,7 +38,7 @@ var _ = Describe("Reporter Handler", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		fakeReporter = new(metrics_fakes.FakeProxyReporter)
+		fakeReporter = new(metrics_fakes.FakeMetricReporter)
 		logger = test_util.NewTestLogger("test")
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {

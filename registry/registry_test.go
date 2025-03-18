@@ -19,7 +19,7 @@ import (
 
 var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
-	var reporter *fakes.FakeRouteRegistryReporter
+	var reporter *fakes.FakeMetricReporter
 
 	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
 	var configObj *config.Config
@@ -40,7 +40,7 @@ var _ = Describe("RouteRegistry", func() {
 		configObj.IsolationSegments = []string{"foo", "bar"}
 		configObj.EndpointDialTimeout = 10 * time.Millisecond
 
-		reporter = new(fakes.FakeRouteRegistryReporter)
+		reporter = new(fakes.FakeMetricReporter)
 
 		r = NewRouteRegistry(logger.Logger, configObj, reporter)
 		fooEndpoint = route.NewEndpoint(&route.EndpointOpts{
@@ -1489,7 +1489,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.PruneStaleDropletsInterval = 100 * time.Millisecond
 				configObj.DropletStaleThreshold = 50 * time.Millisecond
 				configObj.EndpointDialTimeout = 10 * time.Millisecond
-				reporter = new(fakes.FakeRouteRegistryReporter)
+				reporter = new(fakes.FakeMetricReporter)
 				fooEndpoint.StaleThreshold = configObj.DropletStaleThreshold
 
 				r = NewRouteRegistry(logger.Logger, configObj, reporter)
@@ -1519,7 +1519,7 @@ var _ = Describe("RouteRegistry", func() {
 				Expect(err).ToNot(HaveOccurred())
 				configObj.PruneStaleDropletsInterval = 50 * time.Millisecond
 				configObj.DropletStaleThreshold = 1 * time.Second
-				reporter = new(fakes.FakeRouteRegistryReporter)
+				reporter = new(fakes.FakeMetricReporter)
 
 				r = NewRouteRegistry(logger.Logger, configObj, reporter)
 			})

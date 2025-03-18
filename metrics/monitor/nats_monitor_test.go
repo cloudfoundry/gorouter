@@ -18,7 +18,7 @@ import (
 var _ = Describe("NATSMonitor", func() {
 	var (
 		subscriber  *fakes.FakeSubscriber
-		reporter    *fakes.FakeMonitorReporter
+		reporter    *fakes.FakeMetricReporter
 		ch          chan time.Time
 		natsMonitor *monitor.NATSMonitor
 		logger      *test_util.TestLogger
@@ -28,7 +28,7 @@ var _ = Describe("NATSMonitor", func() {
 	BeforeEach(func() {
 		ch = make(chan time.Time)
 		subscriber = new(fakes.FakeSubscriber)
-		reporter = new(fakes.FakeMonitorReporter)
+		reporter = new(fakes.FakeMetricReporter)
 
 		logger = test_util.NewTestLogger("test")
 

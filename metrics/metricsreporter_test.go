@@ -31,7 +31,7 @@ var _ = Describe("MetricsReporter", func() {
 		endpoint       *route.Endpoint
 		sender         *fakes.MetricSender
 		batcher        *fakes.MetricBatcher
-		metricReporter *metrics.MetricsReporter
+		metricReporter *metrics.Metrics
 	)
 
 	BeforeEach(func() {
@@ -40,7 +40,7 @@ var _ = Describe("MetricsReporter", func() {
 		batcher = new(fakes.MetricBatcher)
 		cfg, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
-		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: cfg.PerRequestMetricsReporting}
+		metricReporter = &metrics.Metrics{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: cfg.PerRequestMetricsReporting}
 	})
 
 	It("increments the bad_requests metric", func() {

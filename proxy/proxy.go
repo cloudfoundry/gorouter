@@ -37,7 +37,7 @@ var (
 type proxy struct {
 	logger                *slog.Logger
 	errorWriter           errorwriter.ErrorWriter
-	reporter              metrics.ProxyReporter
+	reporter              metrics.MetricReporter
 	accessLogger          accesslog.AccessLogger
 	health                *health.Health
 	routeServiceConfig    *routeservice.RouteServiceConfig
@@ -53,7 +53,7 @@ func NewProxy(
 	errorWriter errorwriter.ErrorWriter,
 	cfg *config.Config,
 	registry registry.Registry,
-	reporter metrics.ProxyReporter,
+	reporter metrics.MetricReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	backendTLSConfig *tls.Config,
 	routeServiceTLSConfig *tls.Config,

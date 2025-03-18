@@ -24,7 +24,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		resp http.ResponseWriter
 		req  *http.Request
 
-		fakeReporter *metrics_fakes.FakeProxyReporter
+		fakeReporter *metrics_fakes.FakeMetricReporter
 
 		nextCalled bool
 	)
@@ -34,7 +34,7 @@ var _ = Describe("Http Prometheus Latency", func() {
 		req = test_util.NewRequest("GET", "example.com", "/", body)
 		resp = httptest.NewRecorder()
 
-		fakeReporter = new(metrics_fakes.FakeProxyReporter)
+		fakeReporter = new(metrics_fakes.FakeMetricReporter)
 
 		nextHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			_, err := io.ReadAll(req.Body)

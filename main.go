@@ -128,42 +128,24 @@ func main() {
 	dropReporter := initializeDropsondeReporter(prefix, logger, c)
 	promReporter := initializePrometheusReporter(c)
 
-	routeRegistryReporters := make([]metrics.RouteRegistryReporter, 0)
+	reporters := make([]metrics.MetricReporter, 0)
 	if dropReporter != nil {
-		routeRegistryReporters = append(routeRegistryReporters, dropReporter)
+		reporters = append(reporters, dropReporter)
 	}
 	if promReporter != nil {
-		routeRegistryReporters = append(routeRegistryReporters, promReporter)
+		reporters = append(reporters, promReporter)
 	}
-	registryMetrics := metrics.NewMultiRouteRegistryReporter(routeRegistryReporters...)
+	metricReporter := metrics.NewMultiMetricReporter(reporters...)
 
-	proxyReporters := make([]metrics.ProxyReporter, 0)
-	if dropReporter != nil {
-		proxyReporters = append(proxyReporters, dropReporter)
-	}
-	if promReporter != nil {
-		proxyReporters = append(proxyReporters, promReporter)
-	}
-	proxyMetrics := metrics.NewMultiProxyReporter(proxyReporters...)
-
-	monitorReporters := make([]metrics.MonitorReporter, 0)
-	if dropReporter != nil {
-		monitorReporters = append(monitorReporters, dropReporter)
-	}
-	if promReporter != nil {
-		monitorReporters = append(monitorReporters, promReporter)
-	}
-	monitorMetrics := metrics.NewMultiMonitorReporter(monitorReporters...)
-
-	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, registryMetrics)
+	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricReporter)
 	varz := rvarz.NewVarz(registry)
-	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyMetrics}
+	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, MetricReporter: metricReporter}
 
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
 
-	fdMonitor := initializeFDMonitor(monitorMetrics, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
+	fdMonitor := initializeFDMonitor(metricReporter, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
 		grlog.CreateLoggerWithSource(prefix, "access-grlog"),
@@ -261,7 +243,7 @@ func main() {
 	}
 
 	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, grlog.CreateLoggerWithSource(prefix, "subscriber"))
-	natsMonitor := initializeNATSMonitor(subscriber, monitorMetrics, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
+	natsMonitor := initializeNATSMonitor(subscriber, metricReporter, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
@@ -273,8 +255,8 @@ func main() {
 	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
 
 	go func() {
-		time.Sleep(c.RouteLatencyMetricMuzzleDuration)     // this way we avoid reporting metrics for pre-existing routes
-		registryMetrics.UnmuzzleRouteRegistrationLatency() // Required for Envelope V1. Keep it while we have both Envelope V1 and Prometheus.
+		time.Sleep(c.RouteLatencyMetricMuzzleDuration)    // this way we avoid reporting metrics for pre-existing routes
+		metricReporter.UnmuzzleRouteRegistrationLatency() // Required for Envelope V1. Keep it while we have both Envelope V1 and Prometheus.
 	}()
 
 	<-monitor.Ready()
@@ -289,7 +271,7 @@ func main() {
 }
 
 // initializeDropsondeReporter setups metrics via dropsonse if enabled
-func initializeDropsondeReporter(prefix string, logger *slog.Logger, c *config.Config) *metrics.MetricsReporter {
+func initializeDropsondeReporter(prefix string, logger *slog.Logger, c *config.Config) *metrics.Metrics {
 	if !c.EnableEnvelopeV1Metrics {
 		return nil
 	}
@@ -310,14 +292,14 @@ func initializePrometheusReporter(c *config.Config) *metrics_prometheus.Metrics 
 	return metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
 }
 
-func initializeFDMonitor(reporter metrics.MultiMonitorReporter, logger *slog.Logger) *monitor.FileDescriptor {
+func initializeFDMonitor(reporter metrics.MetricReporter, logger *slog.Logger) *monitor.FileDescriptor {
 	pid := os.Getpid()
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
 	return monitor.NewFileDescriptor(path, ticker, reporter, logger)
 }
 
-func initializeNATSMonitor(subscriber *mbus.Subscriber, reporter metrics.MultiMonitorReporter, logger *slog.Logger) *monitor.NATSMonitor {
+func initializeNATSMonitor(subscriber *mbus.Subscriber, reporter metrics.MetricReporter, logger *slog.Logger) *monitor.NATSMonitor {
 	ticker := time.NewTicker(time.Second * 5)
 	return &monitor.NATSMonitor{
 		Subscriber: subscriber,
@@ -327,7 +309,7 @@ func initializeNATSMonitor(subscriber *mbus.Subscriber, reporter metrics.MultiMo
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.Metrics {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -349,7 +331,7 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, log
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
+	return &metrics.Metrics{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
 }
 
 func createCrypto(logger *slog.Logger, secret string) *secure.AesGCM {

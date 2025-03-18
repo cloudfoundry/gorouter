@@ -17,7 +17,7 @@ type Subscriber interface {
 
 type NATSMonitor struct {
 	Subscriber Subscriber
-	Reporter   metrics.MonitorReporter
+	Reporter   metrics.MetricReporter
 	TickChan   <-chan time.Time
 	Logger     *slog.Logger
 }
