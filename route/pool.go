@@ -20,12 +20,33 @@ type Counter struct {
 	value int64
 }
 
-type PoolPutResult int
+type PoolRegisterEndpointResult string
 
 const (
-	UNMODIFIED = PoolPutResult(iota)
-	UPDATED
-	ADDED
+	EndpointNotUpdated PoolRegisterEndpointResult = "endpoint-not-updated"
+	EndpointUpdated    PoolRegisterEndpointResult = "endpoint-updated"
+	EndpointAdded      PoolRegisterEndpointResult = "endpoint-added"
+)
+
+type PoolRegisterRouteResult string
+
+const (
+	RouteRegistered    PoolRegisterRouteResult = "route-registered"
+	RouteAlreadyExists PoolRegisterRouteResult = "route-already-exists"
+)
+
+type PoolRemoveEndpointResult string
+
+const (
+	EndpointUnregistered    PoolRemoveEndpointResult = "endpoint-unregistered"
+	EndpointNotUnregistered PoolRemoveEndpointResult = "endpoint-not-unregistered"
+)
+
+type PoolRemoveRouteResult string
+
+const (
+	RouteUnregistered    PoolRemoveRouteResult = "route-unregistered"
+	RouteNotUnregistered PoolRemoveRouteResult = "route-not-unregistered"
 )
 
 func NewCounter(initial int64) *Counter {
@@ -258,20 +279,20 @@ func (p *EndpointPool) Update() {
 	p.updatedAt = time.Now()
 }
 
-func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
+func (p *EndpointPool) Put(endpoint *Endpoint) PoolRegisterEndpointResult {
 	p.Lock()
 	defer p.Unlock()
 
-	var result PoolPutResult
+	var result PoolRegisterEndpointResult
 	e, found := p.index[endpoint.CanonicalAddr()]
 	if found {
-		result = UPDATED
+		result = EndpointUpdated
 		if !e.endpoint.Equal(endpoint) {
 			e.Lock()
 			defer e.Unlock()
 
 			if !e.endpoint.ModificationTag.SucceededBy(&endpoint.ModificationTag) {
-				return UNMODIFIED
+				return EndpointNotUpdated
 			}
 
 			oldEndpoint := e.endpoint
@@ -287,7 +308,7 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 			}
 		}
 	} else {
-		result = ADDED
+		result = EndpointAdded
 		e = &endpointElem{
 			endpoint:           endpoint,
 			index:              len(p.endpoints),
@@ -345,8 +366,8 @@ func (p *EndpointPool) PruneEndpoints() []*Endpoint {
 	return prunedEndpoints
 }
 
-// Returns true if the endpoint was removed from the EndpointPool, false otherwise.
-func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
+// Remove Returns true if the endpoint was removed from the EndpointPool, false otherwise.
+func (p *EndpointPool) Remove(endpoint *Endpoint) PoolRemoveEndpointResult {
 	var e *endpointElem
 
 	p.Lock()
@@ -356,11 +377,11 @@ func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
 		e = p.index[endpoint.CanonicalAddr()]
 		if e != nil && e.endpoint.modificationTagSameOrNewer(endpoint) {
 			p.removeEndpoint(e)
-			return true
+			return EndpointUnregistered
 		}
 	}
 
-	return false
+	return EndpointNotUnregistered
 }
 
 func (p *EndpointPool) removeEndpoint(e *endpointElem) {

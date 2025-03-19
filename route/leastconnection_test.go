@@ -187,7 +187,7 @@ var _ = Describe("LeastConnection", func() {
 
 					Context("when there is only one endpoint", func() {
 						BeforeEach(func() {
-							Expect(pool.Remove(epOne)).To(BeTrue())
+							Expect(pool.Remove(epOne)).To(Equal(route.EndpointUnregistered))
 							epTwo.Stats.NumberConnections.Increment()
 							epTwo.Stats.NumberConnections.Increment()
 						})
