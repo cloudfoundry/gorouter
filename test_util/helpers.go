@@ -321,8 +321,9 @@ type CertChain struct {
 	CertPEM, CACertPEM       []byte
 	PrivKeyPEM, CAPrivKeyPEM []byte
 
-	CACert    *x509.Certificate
-	CAPrivKey *rsa.PrivateKey
+	CACert         *x509.Certificate
+	CAPrivKey      *rsa.PrivateKey
+	CAPrivKeyECDSA *ecdsa.PrivateKey
 }
 
 func (cc *CertChain) AsTLSConfig() *tls.Config {
@@ -397,6 +398,50 @@ func CreateExpiredSignedCertWithRootCA(cert CertNames) CertChain {
 	}
 }
 
+func CreateSignedECDSACertWithRootCA(cert CertNames) CertChain {
+	rootPrivateKey, rootCADER := CreateECDSACertDER("theCA")
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+
+	certTemplate := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.ECDSAWithSHA256,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+	}
+	if cert.SANs.IP != "" {
+		certTemplate.IPAddresses = []net.IP{net.ParseIP(cert.SANs.IP)}
+	}
+
+	if cert.SANs.DNS != "" {
+		certTemplate.DNSNames = []string{cert.SANs.DNS}
+	}
+	rootCert, err := x509.ParseCertificate(rootCADER)
+	Expect(err).NotTo(HaveOccurred())
+
+	ownKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	Expect(err).NotTo(HaveOccurred())
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, rootCert, &ownKey.PublicKey, rootPrivateKey)
+	Expect(err).NotTo(HaveOccurred())
+	ownKeyPEM, ownCertPEM := CreateECDSAKeyPairFromDER(certDER, ownKey)
+	rootKeyPEM, rootCertPEM := CreateECDSAKeyPairFromDER(rootCADER, rootPrivateKey)
+	return CertChain{
+		CertPEM:        ownCertPEM,
+		PrivKeyPEM:     ownKeyPEM,
+		CACertPEM:      rootCertPEM,
+		CAPrivKeyPEM:   rootKeyPEM,
+		CACert:         rootCert,
+		CAPrivKeyECDSA: rootPrivateKey,
+	}
+}
+
 func CreateSignedCertWithRootCA(cert CertNames) CertChain {
 	rootPrivateKey, rootCADER := CreateCertDER("theCA")
 	// generate a random serial number (a real cert authority would have some logic behind this)
@@ -446,6 +491,37 @@ func (c *CertChain) TLSCert() tls.Certificate {
 	return cert
 }
 
+func CreateECDSACertDER(cname string) (*ecdsa.PrivateKey, []byte) {
+	// generate a random serial number (a real cert authority would have some logic behind this)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	Expect(err).ToNot(HaveOccurred())
+
+	subject := pkix.Name{Organization: []string{"xyz, Inc."}}
+	if cname != "" {
+		subject.CommonName = cname
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               subject,
+		SignatureAlgorithm:    x509.ECDSAWithSHA256,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour), // valid for an hour
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{cname},
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:                  true,
+	}
+
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	Expect(err).ToNot(HaveOccurred())
+	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &privKey.PublicKey, privKey)
+	Expect(err).ToNot(HaveOccurred())
+	return privKey, certDER
+}
 func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	// generate a random serial number (a real cert authority would have some logic behind this)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -478,6 +554,18 @@ func CreateCertDER(cname string) (*rsa.PrivateKey, []byte) {
 	return privKey, certDER
 }
 
+func CreateECDSAKeyPairFromDER(certDER []byte, privKey *ecdsa.PrivateKey) (keyPEM, certPEM []byte) {
+	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
+	certPEM = pem.EncodeToMemory(&b)
+	keyB, err := x509.MarshalECPrivateKey(privKey)
+	Expect(err).ToNot(HaveOccurred())
+	keyPEM = pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: keyB,
+	})
+
+	return
+}
 func CreateKeyPairFromDER(certDER []byte, privKey *rsa.PrivateKey) (keyPEM, certPEM []byte) {
 	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
 	certPEM = pem.EncodeToMemory(&b)
