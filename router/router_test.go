@@ -1715,6 +1715,49 @@ var _ = Describe("Router", func() {
 			defer resp.Body.Close()
 		})
 
+		Context("when using ECDSA cert", func() {
+			BeforeEach(func() {
+				certChain := test_util.CreateSignedECDSACertWithRootCA(test_util.CertNames{SANs: test_util.SubjectAltNames{DNS: "test." + test_util.LocalhostDNS}})
+				config.CACerts = []string{string(certChain.CACertPEM)}
+				config.SSLCertificates = append(config.SSLCertificates, certChain.TLSCert())
+				config.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256}
+				cert = certChain.CertPEM
+
+				rootCAs := x509.NewCertPool()
+				rootCAs.AddCert(certChain.CACert)
+				tlsClientConfig = &tls.Config{
+					RootCAs: rootCAs,
+				}
+				tlsClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256}
+				client = &http.Client{Transport: &http.Transport{
+					TLSClientConfig: tlsClientConfig,
+				}}
+			})
+
+			It("serves ssl traffic", func() {
+				app := test.NewGreetApp([]route.Uri{"test." + test_util.LocalhostDNS}, config.Port, mbusClient, nil)
+				app.RegisterAndListen()
+				Eventually(func() bool {
+					return appRegistered(registry, app)
+				}).Should(BeTrue())
+
+				uri := fmt.Sprintf("https://test.%s:%d/", test_util.LocalhostDNS, config.SSLPort)
+				req, _ := http.NewRequest("GET", uri, nil)
+
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp).ToNot(BeNil())
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				bytes, err := io.ReadAll(resp.Body)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(bytes).To(ContainSubstring("Hello"))
+				defer resp.Body.Close()
+			})
+
+		})
+
 		It("fails when the client uses an unsupported cipher suite", func() {
 			tlsClientConfig.MaxVersion = tls.VersionTLS12 // Can not configure cipher suites for TLS1.3
 			tlsClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA}
