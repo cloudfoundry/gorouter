@@ -3096,28 +3096,8 @@ var _ = Describe("Proxy", func() {
 				resp, _ := conn.ReadResponse()
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				metric := fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "gorouter"})
-				Expect(metric.Value()).ToNot(Equal(0))
+				Expect(fakeReporter.CaptureHTTPLatencyCallCount()).ToNot(Equal(0))
 			})
-		})
-
-		It("does not register http prometheus metrics", func() {
-			ln := test_util.RegisterConnHandler(r, "app", func(conn *test_util.HttpConn) {
-				conn.ReadRequest()
-				resp := test_util.NewResponse(http.StatusOK)
-				conn.WriteResponse(resp)
-				conn.Close()
-			}, test_util.RegisterConfig{InstanceId: "fake-instance-id"})
-			defer ln.Close()
-			conn := dialProxy(proxyServer)
-
-			req := test_util.NewRequest("GET", "app", "/", nil)
-			conn.WriteRequest(req)
-
-			resp, _ := conn.ReadResponse()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-			Expect(func() { fakeRegistry.GetMetric("http_latency_seconds", map[string]string{"source_id": "gorouter"}) }).To(Panic())
 		})
 
 		Context("when the endpoint is nil", func() {

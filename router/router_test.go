@@ -72,7 +72,7 @@ var _ = Describe("Router", func() {
 		statusTLSPort       uint16
 		statusRoutesPort    uint16
 		natsPort            uint16
-		fakeReporter        *fakeMetrics.FakeRouteRegistryReporter
+		fakeReporter        *fakeMetrics.FakeMetricReporter
 		routeServicesServer *sharedfakes.RouteServicesServer
 		err                 error
 		backendIdleTimeout  time.Duration
@@ -107,7 +107,7 @@ var _ = Describe("Router", func() {
 
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestLogger("router-test")
-		fakeReporter = new(fakeMetrics.FakeRouteRegistryReporter)
+		fakeReporter = new(fakeMetrics.FakeMetricReporter)
 		registry = rregistry.NewRouteRegistry(logger.Logger, config, fakeReporter)
 		varz = vvarz.NewVarz(registry)
 	})
@@ -2472,8 +2472,8 @@ func badCertTemplate(cname string) (*x509.Certificate, error) {
 func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout time.Duration, registry *rregistry.RouteRegistry, varz vvarz.Varz, mbusClient *nats.Conn, logger *slog.Logger, routeServicesServer *sharedfakes.RouteServicesServer) (*Router, error) {
 	sender := new(fakeMetrics.MetricSender)
 	batcher := new(fakeMetrics.MetricBatcher)
-	metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
-	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
+	metricReporter := &metrics.Metrics{Sender: sender, Batcher: batcher}
+	combinedReporter := &metrics.CompositeReporter{VarzReporter: varz, MetricReporter: metricReporter}
 	routeServiceConfig := routeservice.NewRouteServiceConfig(logger, true, config.RouteServicesHairpinning, config.RouteServicesHairpinningAllowlist, config.EndpointTimeout, nil, nil, false, false)
 
 	ew := errorwriter.NewPlaintextErrorWriter()
@@ -2481,7 +2481,7 @@ func initializeRouter(config *cfg.Config, backendIdleTimeout, requestTimeout tim
 	proxyConfig := *config
 	proxyConfig.EndpointTimeout = requestTimeout
 	routeServicesTransport := &sharedfakes.RoundTripper{}
-	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, nil, ew, &proxyConfig, registry, combinedReporter,
+	p := proxy.NewProxy(logger, &accesslog.NullAccessLogger{}, ew, &proxyConfig, registry, combinedReporter,
 		routeServiceConfig, &tls.Config{}, &tls.Config{}, &health.Health{}, routeServicesTransport)
 
 	h := &health.Health{}

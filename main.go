@@ -5,16 +5,16 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"runtime"
 	"syscall"
 	"time"
 
+	"code.cloudfoundry.org/gorouter/metrics_prometheus"
+
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
-	mr "code.cloudfoundry.org/go-metric-registry"
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/tlsconfig"
 	"github.com/cloudfoundry/dropsonde"
@@ -91,11 +91,6 @@ func main() {
 		ew = errorwriter.NewPlaintextErrorWriter()
 	}
 
-	err = dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
-	if err != nil {
-		grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
-	}
-
 	logger.Info("retrieved-isolation-segments",
 		slog.Any("isolation_segments", c.IsolationSegments),
 		slog.String("routing_table_sharding_mode", c.RoutingTableShardingMode),
@@ -130,17 +125,27 @@ func main() {
 
 	}
 
-	sender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	dropReporter := initializeDropsondeReporter(prefix, logger, c)
+	promReporter := initializePrometheusReporter(c)
 
-	metricsReporter := initializeMetrics(sender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
-	fdMonitor := initializeFDMonitor(sender, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
-	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricsReporter)
+	reporters := make([]metrics.MetricReporter, 0)
+	if dropReporter != nil {
+		reporters = append(reporters, dropReporter)
+	}
+	if promReporter != nil {
+		reporters = append(reporters, promReporter)
+	}
+	metricReporter := metrics.NewMultiMetricReporter(reporters...)
+
+	registry := rregistry.NewRouteRegistry(grlog.CreateLoggerWithSource(prefix, "registry"), c, metricReporter)
+	varz := rvarz.NewVarz(registry)
+	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, MetricReporter: metricReporter}
+
 	if c.SuspendPruningIfNatsUnavailable {
 		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
 	}
 
-	varz := rvarz.NewVarz(registry)
-	compositeReporter := &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricsReporter}
+	fdMonitor := initializeFDMonitor(metricReporter, grlog.CreateLoggerWithSource(prefix, "FileDescriptor"))
 
 	accessLogger, err := accesslog.CreateRunningAccessLogger(
 		grlog.CreateLoggerWithSource(prefix, "access-grlog"),
@@ -194,17 +199,10 @@ func main() {
 		grlog.Fatal(logger, "new-route-services-server", grlog.ErrAttr(err))
 	}
 
-	var metricsRegistry *mr.Registry
-	if c.Prometheus.Port != 0 {
-		metricsRegistry = mr.NewRegistry(log.Default(),
-			mr.WithTLSServer(int(c.Prometheus.Port), c.Prometheus.CertPath, c.Prometheus.KeyPath, c.Prometheus.CAPath))
-	}
-
 	h = &health.Health{}
 	proxyHandler := proxy.NewProxy(
 		logger,
 		accessLogger,
-		metricsRegistry,
 		ew,
 		c,
 		registry,
@@ -245,7 +243,7 @@ func main() {
 	}
 
 	subscriber := mbus.NewSubscriber(natsClient, registry, c, natsReconnected, grlog.CreateLoggerWithSource(prefix, "subscriber"))
-	natsMonitor := initializeNATSMonitor(subscriber, sender, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
+	natsMonitor := initializeNATSMonitor(subscriber, metricReporter, grlog.CreateLoggerWithSource(prefix, "NATSMonitor"))
 
 	members = append(members, grouper.Member{Name: "fdMonitor", Runner: fdMonitor})
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
@@ -257,8 +255,8 @@ func main() {
 	monitor := ifrit.Invoke(sigmon.New(group, syscall.SIGTERM, syscall.SIGINT, syscall.SIGUSR1))
 
 	go func() {
-		time.Sleep(c.RouteLatencyMetricMuzzleDuration) // this way we avoid reporting metrics for pre-existing routes
-		metricsReporter.UnmuzzleRouteRegistrationLatency()
+		time.Sleep(c.RouteLatencyMetricMuzzleDuration)    // this way we avoid reporting metrics for pre-existing routes
+		metricReporter.UnmuzzleRouteRegistrationLatency() // Required for Envelope V1. Keep it while we have both Envelope V1 and Prometheus.
 	}()
 
 	<-monitor.Ready()
@@ -272,24 +270,46 @@ func main() {
 	os.Exit(0)
 }
 
-func initializeFDMonitor(sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.FileDescriptor {
+// initializeDropsondeReporter setups metrics via dropsonse if enabled
+func initializeDropsondeReporter(prefix string, logger *slog.Logger, c *config.Config) *metrics.Metrics {
+	if !c.EnableEnvelopeV1Metrics {
+		return nil
+	}
+	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
+	if err != nil {
+		grlog.Fatal(logger, "dropsonde-initialize-error", grlog.ErrAttr(err))
+	}
+	dropsondeMetricSender := metric_sender.NewMetricSender(dropsonde.AutowiredEmitter())
+	return initializeMetrics(dropsondeMetricSender, c, grlog.CreateLoggerWithSource(prefix, "metricsreporter"))
+}
+
+// initializePrometheusReporter setups metrics via Prometheus if enabled
+func initializePrometheusReporter(c *config.Config) *metrics_prometheus.Metrics {
+	if !c.Prometheus.Enabled {
+		return nil
+	}
+	promRegistry := metrics_prometheus.NewMetricsRegistry(c.Prometheus)
+	return metrics_prometheus.NewMetrics(promRegistry, c.PerRequestMetricsReporting, c.Prometheus.Meters)
+}
+
+func initializeFDMonitor(reporter metrics.MetricReporter, logger *slog.Logger) *monitor.FileDescriptor {
 	pid := os.Getpid()
 	path := fmt.Sprintf("/proc/%d/fd", pid)
 	ticker := time.NewTicker(time.Second * 5)
-	return monitor.NewFileDescriptor(path, ticker, sender, logger)
+	return monitor.NewFileDescriptor(path, ticker, reporter, logger)
 }
 
-func initializeNATSMonitor(subscriber *mbus.Subscriber, sender *metric_sender.MetricSender, logger *slog.Logger) *monitor.NATSMonitor {
+func initializeNATSMonitor(subscriber *mbus.Subscriber, reporter metrics.MetricReporter, logger *slog.Logger) *monitor.NATSMonitor {
 	ticker := time.NewTicker(time.Second * 5)
 	return &monitor.NATSMonitor{
 		Subscriber: subscriber,
-		Sender:     sender,
+		Reporter:   reporter,
 		TickChan:   ticker.C,
 		Logger:     logger,
 	}
 }
 
-func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.MetricsReporter {
+func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, logger *slog.Logger) *metrics.Metrics {
 	// 5 sec is dropsonde default batching interval
 	batcher := metricbatcher.New(sender, 5*time.Second)
 	batcher.AddConsistentlyEmittedMetrics("bad_gateways",
@@ -311,7 +331,7 @@ func initializeMetrics(sender *metric_sender.MetricSender, c *config.Config, log
 		"websocket_upgrades",
 	)
 
-	return &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
+	return &metrics.Metrics{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: c.PerRequestMetricsReporting, Logger: logger}
 }
 
 func createCrypto(logger *slog.Logger, secret string) *secure.AesGCM {

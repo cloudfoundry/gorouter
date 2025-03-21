@@ -29,7 +29,7 @@ var _ = Describe("Lookup", func() {
 		testSink       *test_util.TestSink
 		logger         *slog.Logger
 		reg            *fakeRegistry.FakeRegistry
-		rep            *fakes.FakeProxyReporter
+		rep            *fakes.FakeMetricReporter
 		resp           *httptest.ResponseRecorder
 		req            *http.Request
 		nextCalled     bool
@@ -54,7 +54,7 @@ var _ = Describe("Lookup", func() {
 		testSink = &test_util.TestSink{Buffer: gbytes.NewBuffer()}
 		log.SetDynamicWriteSyncer(zapcore.NewMultiWriteSyncer(testSink, zapcore.AddSync(GinkgoWriter)))
 		log.SetLoggingLevel("Debug")
-		rep = &fakes.FakeProxyReporter{}
+		rep = &fakes.FakeMetricReporter{}
 		reg = &fakeRegistry.FakeRegistry{}
 		handler = negroni.New()
 		req = test_util.NewRequest("GET", "example.com", "/", nil)

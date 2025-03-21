@@ -42,7 +42,7 @@ var _ = Describe("Router", func() {
 		config     *cfg.Config
 		p          http.Handler
 
-		combinedReporter metrics.ProxyReporter
+		combinedReporter metrics.MetricReporter
 		mbusClient       *nats.Conn
 		registry         *rregistry.RouteRegistry
 		varz             vvarz.Varz
@@ -173,7 +173,7 @@ var _ = Describe("Router", func() {
 		config.EndpointTimeout = 1 * time.Second
 
 		mbusClient = natsRunner.MessageBus
-		registry = rregistry.NewRouteRegistry(logger.Logger, config, new(fakeMetrics.FakeRouteRegistryReporter))
+		registry = rregistry.NewRouteRegistry(logger.Logger, config, new(fakeMetrics.FakeMetricReporter))
 		logcounter := schema.NewLogCounter()
 		healthStatus = &health.Health{}
 		healthStatus.SetHealth(health.Healthy)
@@ -181,12 +181,12 @@ var _ = Describe("Router", func() {
 		varz = vvarz.NewVarz(registry)
 		sender := new(fakeMetrics.MetricSender)
 		batcher := new(fakeMetrics.MetricBatcher)
-		metricReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
-		combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: metricReporter}
+		metricReporter := &metrics.Metrics{Sender: sender, Batcher: batcher}
+		combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, MetricReporter: metricReporter}
 		config.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 		rt := &sharedfakes.RoundTripper{}
-		p = proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
+		p = proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
 			&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, healthStatus, rt)
 
 		errChan := make(chan error, 2)
@@ -421,7 +421,7 @@ var _ = Describe("Router", func() {
 				config.Status.TLS.Port = test_util.NextAvailPort()
 				config.Status.Routes.Port = test_util.NextAvailPort()
 				rt := &sharedfakes.RoundTripper{}
-				p := proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, nil, ew, config, registry, combinedReporter,
+				p := proxy.NewProxy(logger.Logger, &accesslog.NullAccessLogger{}, ew, config, registry, combinedReporter,
 					&routeservice.RouteServiceConfig{}, &tls.Config{}, &tls.Config{}, h, rt)
 
 				errChan = make(chan error, 2)

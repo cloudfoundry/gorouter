@@ -34,7 +34,7 @@ var _ = Describe("Proxy Unit tests", func() {
 		fakeAccessLogger   *fakelogger.FakeAccessLogger
 		logger             *test_util.TestLogger
 		resp               utils.ProxyResponseWriter
-		combinedReporter   metrics.ProxyReporter
+		combinedReporter   metrics.MetricReporter
 		routeServiceConfig *routeservice.RouteServiceConfig
 		rt                 *sharedfakes.RoundTripper
 		tlsConfig          *tls.Config
@@ -52,7 +52,7 @@ var _ = Describe("Proxy Unit tests", func() {
 			fakeAccessLogger = &fakelogger.FakeAccessLogger{}
 
 			logger = test_util.NewTestLogger("test")
-			r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeRouteRegistryReporter))
+			r = registry.NewRouteRegistry(logger.Logger, conf, new(fakes.FakeMetricReporter))
 
 			routeServiceConfig = routeservice.NewRouteServiceConfig(
 				logger.Logger,
@@ -68,14 +68,14 @@ var _ = Describe("Proxy Unit tests", func() {
 			varz := test_helpers.NullVarz{}
 			sender := new(fakes.MetricSender)
 			batcher := new(fakes.MetricBatcher)
-			proxyReporter := &metrics.MetricsReporter{Sender: sender, Batcher: batcher}
-			combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, ProxyReporter: proxyReporter}
+			metricReporter := &metrics.Metrics{Sender: sender, Batcher: batcher}
+			combinedReporter = &metrics.CompositeReporter{VarzReporter: varz, MetricReporter: metricReporter}
 
 			rt = &sharedfakes.RoundTripper{}
 			conf.HealthCheckUserAgent = "HTTP-Monitor/1.1"
 
 			skipSanitization = func(req *http.Request) bool { return false }
-			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, fakeRegistry, ew, conf, r, combinedReporter,
+			proxyObj = proxy.NewProxy(logger.Logger, fakeAccessLogger, ew, conf, r, combinedReporter,
 				routeServiceConfig, tlsConfig, tlsConfig, &health.Health{}, rt)
 
 			r.Register(route.Uri("some-app"), &route.Endpoint{Stats: route.NewStats()})

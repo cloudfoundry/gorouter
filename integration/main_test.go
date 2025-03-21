@@ -703,6 +703,7 @@ var _ = Describe("Router Integration", func() {
 			metricsPort := test_util.NextAvailPort()
 			serverCAPath, serverCertPath, serverKeyPath, clientCert := tls_helpers.GenerateCaAndMutualTlsCerts()
 
+			c.Prometheus.Enabled = true
 			c.Prometheus.Port = metricsPort
 			c.Prometheus.CertPath = serverCertPath
 			c.Prometheus.KeyPath = serverKeyPath

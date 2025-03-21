@@ -22,7 +22,7 @@ import (
 
 var _ = Describe("HandleError", func() {
 	var (
-		metricReporter   *fakes.FakeProxyReporter
+		metricReporter   *fakes.FakeMetricReporter
 		errorHandler     *round_tripper.ErrorHandler
 		responseWriter   utils.ProxyResponseWriter
 		responseRecorder *httptest.ResponseRecorder
@@ -30,7 +30,7 @@ var _ = Describe("HandleError", func() {
 	)
 
 	BeforeEach(func() {
-		metricReporter = new(fakes.FakeProxyReporter)
+		metricReporter = new(fakes.FakeMetricReporter)
 		errorHandled = false
 		errorHandler = &round_tripper.ErrorHandler{
 			MetricReporter: metricReporter,
@@ -48,7 +48,7 @@ var _ = Describe("HandleError", func() {
 					Classifier: fails.ClassifierFunc(func(err error) bool {
 						return err.Error() == "i'm a tomato"
 					}),
-					HandleError: func(_ metrics.ProxyReporter) {
+					HandleError: func(_ metrics.MetricReporter) {
 						errorHandled = true
 					},
 				},

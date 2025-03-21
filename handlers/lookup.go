@@ -36,7 +36,7 @@ func (err InvalidProcessInstanceHeaderError) Error() string {
 
 type lookupHandler struct {
 	registry                 registry.Registry
-	reporter                 metrics.ProxyReporter
+	reporter                 metrics.MetricReporter
 	logger                   *slog.Logger
 	errorWriter              errorwriter.ErrorWriter
 	EmptyPoolResponseCode503 bool
@@ -45,7 +45,7 @@ type lookupHandler struct {
 // NewLookup creates a handler responsible for looking up a route.
 func NewLookup(
 	registry registry.Registry,
-	rep metrics.ProxyReporter,
+	rep metrics.MetricReporter,
 	logger *slog.Logger,
 	ew errorwriter.ErrorWriter,
 	emptyPoolResponseCode503 bool,

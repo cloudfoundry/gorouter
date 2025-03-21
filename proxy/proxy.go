@@ -37,9 +37,8 @@ var (
 type proxy struct {
 	logger                *slog.Logger
 	errorWriter           errorwriter.ErrorWriter
-	reporter              metrics.ProxyReporter
+	reporter              metrics.MetricReporter
 	accessLogger          accesslog.AccessLogger
-	promRegistry          handlers.Registry
 	health                *health.Health
 	routeServiceConfig    *routeservice.RouteServiceConfig
 	bufferPool            httputil.BufferPool
@@ -51,11 +50,10 @@ type proxy struct {
 func NewProxy(
 	logger *slog.Logger,
 	accessLogger accesslog.AccessLogger,
-	promRegistry handlers.Registry,
 	errorWriter errorwriter.ErrorWriter,
 	cfg *config.Config,
 	registry registry.Registry,
-	reporter metrics.ProxyReporter,
+	reporter metrics.MetricReporter,
 	routeServiceConfig *routeservice.RouteServiceConfig,
 	backendTLSConfig *tls.Config,
 	routeServiceTLSConfig *tls.Config,
@@ -65,7 +63,6 @@ func NewProxy(
 
 	p := &proxy{
 		accessLogger:          accessLogger,
-		promRegistry:          promRegistry,
 		logger:                logger,
 		errorWriter:           errorWriter,
 		reporter:              reporter,
@@ -168,10 +165,8 @@ func NewProxy(
 	if cfg.SendHttpStartStopServerEvent {
 		n.Use(handlers.NewHTTPStartStop(dropsonde.DefaultEmitter, logger))
 	}
-	if p.promRegistry != nil {
-		if cfg.PerAppPrometheusHttpMetricsReporting {
-			n.Use(handlers.NewHTTPLatencyPrometheus(p.promRegistry))
-		}
+	if cfg.PerAppPrometheusHttpMetricsReporting {
+		n.Use(handlers.NewHTTPLatencyPrometheus(p.reporter))
 	}
 	n.Use(handlers.NewAccessLog(accessLogger, headersToLog, cfg.Logging.ExtraAccessLogFields, logger))
 	n.Use(handlers.NewQueryParam(logger))

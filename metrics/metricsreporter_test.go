@@ -31,7 +31,7 @@ var _ = Describe("MetricsReporter", func() {
 		endpoint       *route.Endpoint
 		sender         *fakes.MetricSender
 		batcher        *fakes.MetricBatcher
-		metricReporter *metrics.MetricsReporter
+		metricReporter *metrics.Metrics
 	)
 
 	BeforeEach(func() {
@@ -40,7 +40,7 @@ var _ = Describe("MetricsReporter", func() {
 		batcher = new(fakes.MetricBatcher)
 		cfg, err := config.DefaultConfig()
 		Expect(err).ToNot(HaveOccurred())
-		metricReporter = &metrics.MetricsReporter{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: cfg.PerRequestMetricsReporting}
+		metricReporter = &metrics.Metrics{Sender: sender, Batcher: batcher, PerRequestMetricsReporting: cfg.PerRequestMetricsReporting}
 	})
 
 	It("increments the bad_requests metric", func() {
@@ -448,7 +448,7 @@ var _ = Describe("MetricsReporter", func() {
 
 		It("sends number of nats messages received from each component", func() {
 			endpoint.Tags = map[string]string{}
-			metricReporter.CaptureRegistryMessage(endpoint)
+			metricReporter.CaptureRegistryMessage(endpoint, route.ADDED.String())
 
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message"))
@@ -456,10 +456,10 @@ var _ = Describe("MetricsReporter", func() {
 
 		It("sends number of nats messages received from each component", func() {
 			endpoint.Tags = map[string]string{"component": "uaa"}
-			metricReporter.CaptureRegistryMessage(endpoint)
+			metricReporter.CaptureRegistryMessage(endpoint, route.ADDED.String())
 
 			endpoint.Tags = map[string]string{"component": "route-emitter"}
-			metricReporter.CaptureRegistryMessage(endpoint)
+			metricReporter.CaptureRegistryMessage(endpoint, route.ADDED.String())
 
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(2))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("registry_message.uaa"))
@@ -558,6 +558,37 @@ var _ = Describe("MetricsReporter", func() {
 			metricReporter.CaptureWebSocketFailure()
 			Expect(batcher.BatchIncrementCounterCallCount()).To(Equal(1))
 			Expect(batcher.BatchIncrementCounterArgsForCall(0)).To(Equal("websocket_failures"))
+		})
+	})
+
+	Describe("Monitor metrics", func() {
+		Context("file descriptor metrics sent", func() {
+			It("increments the fd gauge metric", func() {
+				metricReporter.CaptureFoundFileDescriptors(10)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("file_descriptors"))
+				Expect(value).To(BeEquivalentTo(10))
+				Expect(unit).To(Equal("file"))
+			})
+		})
+		Context("NATS message metrics sent", func() {
+			It("increments the buffered messages metric", func() {
+				metricReporter.CaptureNATSBufferedMessages(100)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("buffered_messages"))
+				Expect(value).To(BeEquivalentTo(100))
+				Expect(unit).To(Equal("message"))
+			})
+			It("increments the dropped messages metric", func() {
+				metricReporter.CaptureNATSDroppedMessages(200)
+				Expect(sender.SendValueCallCount()).To(Equal(1))
+				name, value, unit := sender.SendValueArgsForCall(0)
+				Expect(name).To(Equal("total_dropped_messages"))
+				Expect(value).To(BeEquivalentTo(200))
+				Expect(unit).To(Equal("message"))
+			})
 		})
 	})
 
