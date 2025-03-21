@@ -109,10 +109,6 @@ func (metrics *Metrics) CaptureTotalRoutes(totalRoutes int) {
 	metrics.TotalRoutes.Set(float64(totalRoutes))
 }
 
-func (metrics *Metrics) CaptureTimeSinceLastRegistryUpdate(msSinceLastUpdate int64) {
-	metrics.TimeSinceLastRegistryUpdate.Set(float64(msSinceLastUpdate))
-}
-
 func (metrics *Metrics) CaptureLookupTime(t time.Duration) {
 	if metrics.perRequestMetricsReporting {
 		metrics.RouteLookupTime.Observe(float64(t.Nanoseconds()))

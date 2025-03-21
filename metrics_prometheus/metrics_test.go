@@ -76,11 +76,6 @@ var _ = Describe("Metrics", func() {
 			Expect(getMetrics(r.Port())).To(ContainSubstring("total_routes 12"))
 		})
 
-		It("sends the time since last update", func() {
-			m.CaptureTimeSinceLastRegistryUpdate(int64(100))
-			Expect(getMetrics(r.Port())).To(ContainSubstring("ms_since_last_registry_update 100"))
-		})
-
 		It("sends the lookup time for routing table", func() {
 			m.CaptureLookupTime(time.Duration(95) * time.Microsecond)
 			Expect(getMetrics(r.Port())).To(ContainSubstring("route_lookup_time_bucket{le=\"100000\"} 1"))
