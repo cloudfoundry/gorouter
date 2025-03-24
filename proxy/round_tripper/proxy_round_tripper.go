@@ -151,10 +151,11 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 	var selectEndpointErr error
 	var maxAttempts int
 	if reqInfo.RouteServiceURL == nil {
-		maxAttempts = max(min(rt.config.Backends.MaxAttempts, reqInfo.RoutePool.NumEndpoints()), 1)
+		maxAttempts = max(rt.config.Backends.MaxAttempts, 1)
 	} else {
 		maxAttempts = rt.config.RouteServiceConfig.MaxAttempts
 	}
+	lastUpdated := reqInfo.RoutePool.LastUpdated()
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		logger := rt.logger
@@ -163,9 +164,14 @@ func (rt *roundTripper) RoundTrip(originalRequest *http.Request) (*http.Response
 		trace.Reset()
 
 		if reqInfo.RouteServiceURL == nil {
+			if attempt > 1 {
+				if attempt > reqInfo.RoutePool.NumEndpoints() && reqInfo.RoutePool.LastUpdated().Equal(lastUpdated) {
+					break
+				}
+			}
 			// Because this for-loop is 1-indexed, we substract one from the attempt value passed to selectEndpoint,
 			// which expects a 0-indexed value
-			endpoint, selectEndpointErr = rt.selectEndpoint(iter, request, attempt-1)
+			endpoint, selectEndpointErr = rt.selectEndpoint(iter, attempt-1)
 			if selectEndpointErr != nil {
 				logger.Error("select-endpoint-failed", slog.String("host", reqInfo.RoutePool.Host()), log.ErrAttr(selectEndpointErr))
 				break
@@ -418,7 +424,7 @@ func (rt *roundTripper) timedRoundTrip(tr http.RoundTripper, request *http.Reque
 	return resp, err
 }
 
-func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, request *http.Request, attempt int) (*route.Endpoint, error) {
+func (rt *roundTripper) selectEndpoint(iter route.EndpointIterator, attempt int) (*route.Endpoint, error) {
 	endpoint := iter.Next(attempt)
 	if endpoint == nil {
 		return nil, NoEndpointsAvailable
