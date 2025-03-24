@@ -379,11 +379,10 @@ func (p *EndpointPool) Remove(endpoint *Endpoint) bool {
 func (p *EndpointPool) removeEndpoint(e *endpointElem) {
 	i := e.index
 	es := p.endpoints
-	last := len(es)
-	// re-ordering delete
-	es[last-1], es[i], es = nil, es[last-1], es[:last-1]
-	if i < last-1 {
-		es[i].index = i
+
+	es = append(es[:i], es[i+1:]...)
+	for j := i; j < len(es); j++ {
+		es[j].index = j
 	}
 	p.endpoints = es
 
