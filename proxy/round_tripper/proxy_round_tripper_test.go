@@ -65,6 +65,17 @@ func (f *FakeRoundTripperFactory) New(expectedServerName string, isRouteService 
 	return f.ReturnValue
 }
 
+func endpointFor(i int) *route.Endpoint {
+	return route.NewEndpoint(&route.EndpointOpts{
+		AppId:                fmt.Sprintf("appID%d", i),
+		Host:                 fmt.Sprintf("%d.%d.%d.%d", i, i, i, i),
+		Port:                 9090,
+		PrivateInstanceId:    fmt.Sprintf("instanceID%d", i),
+		PrivateInstanceIndex: fmt.Sprintf("%d", i),
+		AvailabilityZone:     AZ,
+	})
+}
+
 var _ = Describe("ProxyRoundTripper", func() {
 	Context("RoundTrip", func() {
 		var (
@@ -391,12 +402,123 @@ var _ = Describe("ProxyRoundTripper", func() {
 						cfg.Backends.MaxAttempts = 10
 					})
 
-					It("still stops after 5 tries when all backends have been tried, returning an error", func() {
-						_, err := proxyRoundTripper.RoundTrip(req)
-						Expect(err).To(MatchError(ContainSubstring("connection refused")))
-						Expect(transport.RoundTripCallCount()).To(Equal(5))
-						Expect(retriableClassifier.ClassifyCallCount()).To(Equal(5))
-						Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+					Context("when no new endpoints were added", func() {
+						It("stops after 5 tries when all backends have been tried, returning an error", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).To(MatchError(ContainSubstring("connection refused")))
+							Expect(transport.RoundTripCallCount()).To(Equal(5))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(5))
+							Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+						})
+					})
+
+					Context("when no new endpoints were added but some were updated", func() {
+						BeforeEach(func() {
+							transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+								if transport.RoundTripCallCount() == 1 {
+									endpoint := endpointFor(4)
+									updated := routePool.Put(endpoint)
+									Expect(updated).To(Equal(route.UPDATED))
+
+									endpoint = endpointFor(5)
+									updated = routePool.Put(endpoint)
+									Expect(updated).To(Equal(route.UPDATED))
+								}
+
+								return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+							}
+						})
+
+						It("stops after 5 tries when all backends have been tried, returning an error", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).To(MatchError(ContainSubstring("connection refused")))
+							Expect(transport.RoundTripCallCount()).To(Equal(5))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(5))
+							Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+						})
+					})
+
+					Context("when 2 new endpoints are added after first failure", func() {
+						BeforeEach(func() {
+							transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+								if transport.RoundTripCallCount() == 1 {
+									for i := 6; i <= 7; i++ {
+										endpoint := endpointFor(i)
+										added := routePool.Put(endpoint)
+										Expect(added).To(Equal(route.ADDED))
+									}
+								}
+
+								return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+							}
+						})
+
+						It("retries for new endpoints only", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).To(MatchError(ContainSubstring("connection refused")))
+							Expect(transport.RoundTripCallCount()).To(Equal(7))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(7))
+							Expect(reqInfo.RoundTripSuccessful).To(BeFalse())
+						})
+					})
+
+					Context("when 1 new endpoint is added and 1 is removed", func() {
+						BeforeEach(func() {
+							transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+								if transport.RoundTripCallCount() == 2 {
+									added := routePool.Put(endpointFor(6))
+									Expect(added).To(Equal(route.ADDED))
+
+									removed := routePool.Remove(endpointFor(2))
+									Expect(removed).To(BeTrue())
+								}
+
+								if transport.RoundTripCallCount() < 5 {
+									return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+								} else {
+									return &http.Response{StatusCode: http.StatusTeapot}, nil
+								}
+							}
+						})
+
+						It("retries for new endpoints", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(transport.RoundTripCallCount()).To(Equal(5))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(4))
+							Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
+						})
+					})
+
+					Context("when 1 new endpoint is added and 1 is removed on last attempt", func() {
+						BeforeEach(func() {
+							transport.RoundTripStub = func(*http.Request) (*http.Response, error) {
+								if transport.RoundTripCallCount() == 5 {
+									added := routePool.Put(endpointFor(6))
+									Expect(added).To(Equal(route.ADDED))
+
+									removed := routePool.Remove(endpointFor(2))
+									Expect(removed).To(BeTrue())
+								}
+
+								if transport.RoundTripCallCount() < 6 {
+									return nil, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+								} else {
+									return &http.Response{StatusCode: http.StatusTeapot}, nil
+								}
+							}
+						})
+
+						It("retries for new endpoints", func() {
+							_, err := proxyRoundTripper.RoundTrip(req)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(transport.RoundTripCallCount()).To(Equal(6))
+							Expect(retriableClassifier.ClassifyCallCount()).To(Equal(5))
+							Expect(reqInfo.RoundTripSuccessful).To(BeTrue())
+
+							req := transport.RoundTripArgsForCall(5)
+							Expect(req.URL.Host).To(Equal("6.6.6.6:9090"))
+						})
 					})
 				})
 
