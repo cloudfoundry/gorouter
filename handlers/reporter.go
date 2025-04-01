@@ -57,6 +57,9 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		requestInfo.RouteEndpoint, proxyWriter.Status(),
 		requestInfo.ReceivedAt, requestInfo.AppRequestFinishedAt.Sub(requestInfo.ReceivedAt),
 	)
+	appTime := requestInfo.AppRequestFinishedAt.Sub(requestInfo.AppRequestStartedAt).Seconds()
+	rtTime := requestInfo.FinishedAt.Sub(requestInfo.ReceivedAt).Seconds()
+	rh.reporter.CaptureGoRouterTime(rtTime, appTime)
 }
 
 // validContentLength ensures that if the `Content-Length` header is set, it is not empty.

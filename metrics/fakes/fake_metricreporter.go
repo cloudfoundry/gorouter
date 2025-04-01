@@ -44,6 +44,12 @@ type FakeMetricReporter struct {
 	captureFoundFileDescriptorsArgsForCall []struct {
 		arg1 int
 	}
+	CaptureGoRouterTimeStub        func(float64, float64)
+	captureGoRouterTimeMutex       sync.RWMutex
+	captureGoRouterTimeArgsForCall []struct {
+		arg1 float64
+		arg2 float64
+	}
 	CaptureHTTPLatencyStub        func(time.Duration, string)
 	captureHTTPLatencyMutex       sync.RWMutex
 	captureHTTPLatencyArgsForCall []struct {
@@ -329,6 +335,39 @@ func (fake *FakeMetricReporter) CaptureFoundFileDescriptorsArgsForCall(i int) in
 	defer fake.captureFoundFileDescriptorsMutex.RUnlock()
 	argsForCall := fake.captureFoundFileDescriptorsArgsForCall[i]
 	return argsForCall.arg1
+}
+
+func (fake *FakeMetricReporter) CaptureGoRouterTime(arg1 float64, arg2 float64) {
+	fake.captureGoRouterTimeMutex.Lock()
+	fake.captureGoRouterTimeArgsForCall = append(fake.captureGoRouterTimeArgsForCall, struct {
+		arg1 float64
+		arg2 float64
+	}{arg1, arg2})
+	stub := fake.CaptureGoRouterTimeStub
+	fake.recordInvocation("CaptureGoRouterTime", []interface{}{arg1, arg2})
+	fake.captureGoRouterTimeMutex.Unlock()
+	if stub != nil {
+		fake.CaptureGoRouterTimeStub(arg1, arg2)
+	}
+}
+
+func (fake *FakeMetricReporter) CaptureGoRouterTimeCallCount() int {
+	fake.captureGoRouterTimeMutex.RLock()
+	defer fake.captureGoRouterTimeMutex.RUnlock()
+	return len(fake.captureGoRouterTimeArgsForCall)
+}
+
+func (fake *FakeMetricReporter) CaptureGoRouterTimeCalls(stub func(float64, float64)) {
+	fake.captureGoRouterTimeMutex.Lock()
+	defer fake.captureGoRouterTimeMutex.Unlock()
+	fake.CaptureGoRouterTimeStub = stub
+}
+
+func (fake *FakeMetricReporter) CaptureGoRouterTimeArgsForCall(i int) (float64, float64) {
+	fake.captureGoRouterTimeMutex.RLock()
+	defer fake.captureGoRouterTimeMutex.RUnlock()
+	argsForCall := fake.captureGoRouterTimeArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeMetricReporter) CaptureHTTPLatency(arg1 time.Duration, arg2 string) {
@@ -844,6 +883,8 @@ func (fake *FakeMetricReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureEmptyContentLengthHeaderMutex.RUnlock()
 	fake.captureFoundFileDescriptorsMutex.RLock()
 	defer fake.captureFoundFileDescriptorsMutex.RUnlock()
+	fake.captureGoRouterTimeMutex.RLock()
+	defer fake.captureGoRouterTimeMutex.RUnlock()
 	fake.captureHTTPLatencyMutex.RLock()
 	defer fake.captureHTTPLatencyMutex.RUnlock()
 	fake.captureLookupTimeMutex.RLock()

@@ -30,6 +30,7 @@ type MetricReporter interface {
 	CaptureRoutingRequest(b *route.Endpoint)
 	CaptureRoutingResponse(statusCode int)
 	CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration)
+	CaptureGoRouterTime(rt, at float64)
 	CaptureRouteServiceResponse(res *http.Response)
 	CaptureWebSocketUpdate()
 	CaptureWebSocketFailure()
@@ -128,6 +129,12 @@ func (m MultiMetricReporter) CaptureRoutingResponse(statusCode int) {
 func (m MultiMetricReporter) CaptureRoutingResponseLatency(b *route.Endpoint, statusCode int, t time.Time, d time.Duration) {
 	for _, r := range m {
 		r.CaptureRoutingResponseLatency(b, statusCode, t, d)
+	}
+}
+
+func (m MultiMetricReporter) CaptureGoRouterTime(rt, at float64) {
+	for _, r := range m {
+		r.CaptureGoRouterTime(rt, at)
 	}
 }
 
