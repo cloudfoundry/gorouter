@@ -77,6 +77,22 @@ func (m *Metrics) CaptureRoutingResponse(statusCode int) {
 	m.Batcher.BatchIncrementCounter("responses")
 }
 
+func (m *Metrics) CaptureGoRouterTime(rt, at float64) {
+	if m.PerRequestMetricsReporting {
+		unit := "ms"
+		var goRouterTime float64
+		if rt >= 0 && at >= 0 {
+			goRouterTime = rt - at
+		} else {
+			goRouterTime = -1
+		}
+		err := m.Sender.SendValue("gorouter_time", goRouterTime, unit)
+		if err != nil {
+			m.Logger.Debug("failed-sending-metric", log.ErrAttr(err), slog.String("metric", "gorouter_time"))
+		}
+	}
+}
+
 func (m *Metrics) CaptureRoutingResponseLatency(b *route.Endpoint, _ int, _ time.Time, d time.Duration) {
 	if m.PerRequestMetricsReporting {
 		//this function has extra arguments to match varz reporter
