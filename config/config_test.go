@@ -252,6 +252,7 @@ prometheus:
   meters:
     route_lookup_time_histogram_buckets: [0, 100, 10000]
     route_registration_latency_histogram_buckets: [-10, 0, 10]
+    gorouter_time_histogram_buckets: [1,2,4]
     routing_response_latency_histogram_buckets: [0.1, 0.5, 1]
 `)
 
@@ -260,6 +261,7 @@ prometheus:
 
 			Expect(config.Prometheus.Meters.RouteLookupTimeHistogramBuckets).To(Equal([]float64{0, 100, 10000}))
 			Expect(config.Prometheus.Meters.RouteRegistrationLatencyHistogramBuckets).To(Equal([]float64{-10, 0, 10}))
+			Expect(config.Prometheus.Meters.GorouterTimeHistogramBuckets).To(Equal([]float64{1, 2, 4}))
 			Expect(config.Prometheus.Meters.RoutingResponseLatencyHistogramBuckets).To(Equal([]float64{0.1, 0.5, 1}))
 		})
 

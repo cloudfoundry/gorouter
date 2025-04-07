@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,6 +13,7 @@ import (
 
 	"code.cloudfoundry.org/gorouter/accesslog/fakes"
 	"code.cloudfoundry.org/gorouter/handlers"
+	metrics_fakes "code.cloudfoundry.org/gorouter/metrics/fakes"
 	"code.cloudfoundry.org/gorouter/proxy/utils"
 	"code.cloudfoundry.org/gorouter/route"
 	"code.cloudfoundry.org/gorouter/test_util"
@@ -26,6 +28,7 @@ var _ = Describe("AccessLog", func() {
 
 		logger            *test_util.TestLogger
 		accessLogger      *fakes.FakeAccessLogger
+		fakeReporter      *metrics_fakes.FakeMetricReporter
 		extraHeadersToLog []string
 
 		nextCalled bool
@@ -52,6 +55,10 @@ var _ = Describe("AccessLog", func() {
 		reqInfo, err := handlers.ContextRequestInfo(req)
 		if err == nil {
 			reqInfo.RouteEndpoint = testEndpoint
+			timeNow := time.Now()
+			reqInfo.ReceivedAt = timeNow.Add(-1 * time.Millisecond)
+			reqInfo.AppRequestStartedAt = timeNow.Add(1 * time.Millisecond)
+			reqInfo.AppRequestFinishedAt = timeNow.Add(2 * time.Millisecond)
 		}
 
 		if next != nil {
@@ -75,6 +82,7 @@ var _ = Describe("AccessLog", func() {
 		extraHeadersToLog = []string{}
 
 		accessLogger = &fakes.FakeAccessLogger{}
+		fakeReporter = new(metrics_fakes.FakeMetricReporter)
 
 		logger = test_util.NewTestLogger("test")
 
@@ -82,6 +90,7 @@ var _ = Describe("AccessLog", func() {
 		handler.Use(handlers.NewRequestInfo())
 		handler.Use(handlers.NewProxyWriter(logger.Logger))
 		handler.Use(handlers.NewAccessLog(accessLogger, extraHeadersToLog, nil, logger.Logger))
+		handler.Use(handlers.NewReporter(fakeReporter, logger.Logger))
 		handler.Use(nextHandler)
 
 		reqChan = make(chan *http.Request, 1)
@@ -107,8 +116,8 @@ var _ = Describe("AccessLog", func() {
 		Expect(alr.Request.URL).To(Equal(req.URL))
 		Expect(alr.Request.RemoteAddr).To(Equal(req.RemoteAddr))
 		Expect(alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
-		Expect(alr.FinishedAt).ToNot(BeZero())
 		Expect(alr.RequestBytesReceived).To(Equal(13))
+		Expect(alr.GorouterTime).ToNot(BeZero())
 		Expect(alr.BodyBytesSent).To(Equal(37))
 		Expect(alr.StatusCode).To(Equal(http.StatusTeapot))
 		Expect(alr.RouteEndpoint).To(Equal(testEndpoint))
