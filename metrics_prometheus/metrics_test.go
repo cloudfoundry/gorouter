@@ -85,6 +85,15 @@ var _ = Describe("Metrics", func() {
 			Expect(getMetrics(r.Port())).To(ContainSubstring("route_lookup_time_bucket{le=\"100000\"} 1"))
 		})
 
+		It("sends the gorouter time per request", func() {
+			m.CaptureGorouterTime(1)
+			Expect(getMetrics(r.Port())).To(ContainSubstring("gorouter_time_bucket{le=\"1.2\"} 1"))
+
+			m.perRequestMetricsReporting = false
+			m.CaptureGorouterTime(1)
+			Expect(getMetrics(r.Port())).To(ContainSubstring("gorouter_time_bucket{le=\"1.2\"} 1"))
+		})
+
 		It("increments the routes pruned metric", func() {
 			m.CaptureRoutesPruned(50)
 			Expect(getMetrics(r.Port())).To(ContainSubstring(`routes_pruned 50`))
@@ -451,6 +460,7 @@ var _ = Describe("Metrics", func() {
 func getMetersConfig() config.MetersConfig {
 	return config.MetersConfig{
 		RouteLookupTimeHistogramBuckets:          []float64{10_000, 20_000, 30_000, 40_000, 50_000, 60_000, 70_000, 80_000, 90_000, 100_000},
+		GorouterTimeHistogramBuckets:             []float64{0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2},
 		RouteRegistrationLatencyHistogramBuckets: []float64{0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2},
 		RoutingResponseLatencyHistogramBuckets:   []float64{0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2},
 		HTTPLatencyHistogramBuckets:              []float64{0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 25.6},

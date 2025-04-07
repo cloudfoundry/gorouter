@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +52,10 @@ var _ = Describe("Reporter Handler", func() {
 			reqInfo, err := handlers.ContextRequestInfo(req)
 			Expect(err).NotTo(HaveOccurred())
 			reqInfo.RouteEndpoint = route.NewEndpoint(&route.EndpointOpts{AppId: "appID", PrivateInstanceIndex: "1", PrivateInstanceId: "id"})
-			reqInfo.AppRequestFinishedAt = time.Now()
+			timeNow := time.Now()
+			reqInfo.ReceivedAt = timeNow.Add(-1 * time.Millisecond)
+			reqInfo.AppRequestStartedAt = timeNow.Add(1 * time.Millisecond)
+			reqInfo.AppRequestFinishedAt = timeNow.Add(2 * time.Millisecond)
 
 			nextCalled = true
 		})
@@ -102,6 +106,12 @@ var _ = Describe("Reporter Handler", func() {
 		Expect(startTime).To(BeTemporally("~", time.Now(), 100*time.Millisecond))
 		Expect(latency).To(BeNumerically(">", 0))
 		Expect(latency).To(BeNumerically("<", 10*time.Millisecond))
+
+		Expect(fakeReporter.CaptureGorouterTimeCallCount()).To(Equal(1))
+		gorouterTime := fakeReporter.CaptureGorouterTimeArgsForCall(0)
+		fmt.Println(gorouterTime)
+		Expect(gorouterTime).To(BeNumerically(">", 0))
+		Expect(gorouterTime).To(BeNumerically("<", 1*time.Millisecond))
 
 		Expect(nextCalled).To(BeTrue(), "Expected the next handler to be called.")
 	})

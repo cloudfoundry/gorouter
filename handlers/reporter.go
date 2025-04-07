@@ -57,6 +57,22 @@ func (rh *reporterHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, ne
 		requestInfo.RouteEndpoint, proxyWriter.Status(),
 		requestInfo.ReceivedAt, requestInfo.AppRequestFinishedAt.Sub(requestInfo.ReceivedAt),
 	)
+	rh.calculateGorouterTime(requestInfo)
+	rh.reporter.CaptureGorouterTime(requestInfo.GorouterTime)
+}
+
+// calculateGorouterTime
+// calculate the gorouter time by subtracting app response time from the total roundtrip time.
+// Parameters:
+//   - requestInfo *RequestInfo
+func (rh *reporterHandler) calculateGorouterTime(requestInfo *RequestInfo) {
+	requestInfo.FinishedAt = time.Now()
+	requestInfo.GorouterTime = -1
+	appTime := requestInfo.AppRequestFinishedAt.Sub(requestInfo.AppRequestStartedAt).Seconds()
+	rtTime := requestInfo.FinishedAt.Sub(requestInfo.ReceivedAt).Seconds()
+	if rtTime >= 0 && appTime >= 0 {
+		requestInfo.GorouterTime = rtTime - appTime
+	}
 }
 
 // validContentLength ensures that if the `Content-Length` header is set, it is not empty.

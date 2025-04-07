@@ -44,6 +44,11 @@ type FakeMetricReporter struct {
 	captureFoundFileDescriptorsArgsForCall []struct {
 		arg1 int
 	}
+	CaptureGorouterTimeStub        func(float64)
+	captureGorouterTimeMutex       sync.RWMutex
+	captureGorouterTimeArgsForCall []struct {
+		arg1 float64
+	}
 	CaptureHTTPLatencyStub        func(time.Duration, string)
 	captureHTTPLatencyMutex       sync.RWMutex
 	captureHTTPLatencyArgsForCall []struct {
@@ -328,6 +333,38 @@ func (fake *FakeMetricReporter) CaptureFoundFileDescriptorsArgsForCall(i int) in
 	fake.captureFoundFileDescriptorsMutex.RLock()
 	defer fake.captureFoundFileDescriptorsMutex.RUnlock()
 	argsForCall := fake.captureFoundFileDescriptorsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeMetricReporter) CaptureGorouterTime(arg1 float64) {
+	fake.captureGorouterTimeMutex.Lock()
+	fake.captureGorouterTimeArgsForCall = append(fake.captureGorouterTimeArgsForCall, struct {
+		arg1 float64
+	}{arg1})
+	stub := fake.CaptureGorouterTimeStub
+	fake.recordInvocation("CaptureGorouterTime", []interface{}{arg1})
+	fake.captureGorouterTimeMutex.Unlock()
+	if stub != nil {
+		fake.CaptureGorouterTimeStub(arg1)
+	}
+}
+
+func (fake *FakeMetricReporter) CaptureGorouterTimeCallCount() int {
+	fake.captureGorouterTimeMutex.RLock()
+	defer fake.captureGorouterTimeMutex.RUnlock()
+	return len(fake.captureGorouterTimeArgsForCall)
+}
+
+func (fake *FakeMetricReporter) CaptureGorouterTimeCalls(stub func(float64)) {
+	fake.captureGorouterTimeMutex.Lock()
+	defer fake.captureGorouterTimeMutex.Unlock()
+	fake.CaptureGorouterTimeStub = stub
+}
+
+func (fake *FakeMetricReporter) CaptureGorouterTimeArgsForCall(i int) float64 {
+	fake.captureGorouterTimeMutex.RLock()
+	defer fake.captureGorouterTimeMutex.RUnlock()
+	argsForCall := fake.captureGorouterTimeArgsForCall[i]
 	return argsForCall.arg1
 }
 
@@ -844,6 +881,8 @@ func (fake *FakeMetricReporter) Invocations() map[string][][]interface{} {
 	defer fake.captureEmptyContentLengthHeaderMutex.RUnlock()
 	fake.captureFoundFileDescriptorsMutex.RLock()
 	defer fake.captureFoundFileDescriptorsMutex.RUnlock()
+	fake.captureGorouterTimeMutex.RLock()
+	defer fake.captureGorouterTimeMutex.RUnlock()
 	fake.captureHTTPLatencyMutex.RLock()
 	defer fake.captureHTTPLatencyMutex.RUnlock()
 	fake.captureLookupTimeMutex.RLock()

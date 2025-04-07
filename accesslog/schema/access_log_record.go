@@ -124,6 +124,7 @@ type AccessLogRecord struct {
 	TlsHandshakeFinishedAt      time.Time
 	AppRequestFinishedAt        time.Time
 	FinishedAt                  time.Time
+	GorouterTime                float64
 
 	LocalAddress string
 }
@@ -134,17 +135,6 @@ func (r *AccessLogRecord) formatStartedAt() string {
 
 func (r *AccessLogRecord) roundtripTime() float64 {
 	return r.FinishedAt.Sub(r.ReceivedAt).Seconds()
-}
-
-func (r *AccessLogRecord) gorouterTime() float64 {
-	rt := r.roundtripTime()
-	at := r.appTime()
-
-	if rt >= 0 && at >= 0 {
-		return rt - at
-	} else {
-		return -1
-	}
 }
 
 func (r *AccessLogRecord) dialTime() float64 {
@@ -166,10 +156,6 @@ func (r *AccessLogRecord) tlsTime() float64 {
 		return -1
 	}
 	return r.TlsHandshakeFinishedAt.Sub(r.TlsHandshakeStartedAt).Seconds()
-}
-
-func (r *AccessLogRecord) appTime() float64 {
-	return r.AppRequestFinishedAt.Sub(r.AppRequestStartedAt).Seconds()
 }
 
 // failedAttemptsTime will be negative if there was no failed attempt.
@@ -281,7 +267,7 @@ func (r *AccessLogRecord) makeRecord(performTruncate bool) []byte {
 
 	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`gorouter_time:`)
-	b.WriteDashOrFloatValue(r.gorouterTime())
+	b.WriteDashOrFloatValue(r.GorouterTime)
 
 	// #nosec  G104 - ignore errors from writing the access log as it will only cause more errors to log this error
 	b.WriteString(`app_id:`)

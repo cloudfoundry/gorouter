@@ -63,6 +63,8 @@ type RequestInfo struct {
 	// recorded before the access log, but we need the value to be able to
 	// produce the log.
 	FinishedAt time.Time
+	// GorouterTime is calculated in the reporter
+	GorouterTime float64
 
 	RoutePool                         *route.EndpointPool
 	RouteEndpoint                     *route.Endpoint
