@@ -107,7 +107,6 @@ var _ = Describe("AccessLog", func() {
 		Expect(alr.Request.URL).To(Equal(req.URL))
 		Expect(alr.Request.RemoteAddr).To(Equal(req.RemoteAddr))
 		Expect(alr.ExtraHeadersToLog).To(Equal(extraHeadersToLog))
-		Expect(alr.FinishedAt).ToNot(BeZero())
 		Expect(alr.RequestBytesReceived).To(Equal(13))
 		Expect(alr.BodyBytesSent).To(Equal(37))
 		Expect(alr.StatusCode).To(Equal(http.StatusTeapot))

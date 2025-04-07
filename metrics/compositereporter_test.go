@@ -91,6 +91,14 @@ var _ = Describe("CompositeReporter", func() {
 		Expect(callDuration).To(Equal(responseDuration))
 	})
 
+	It("forwards CaptureGorouterTime to Multireporter", func() {
+		composite.CaptureGorouterTime(3000)
+
+		Expect(fakeMultiReporter.CaptureGorouterTimeCallCount()).To(Equal(1))
+		value := fakeMultiReporter.CaptureGorouterTimeArgsForCall(0)
+		Expect(value).To(BeEquivalentTo(3000))
+	})
+
 	It("forwards CaptureRoutingServiceResponse to proxy reporter", func() {
 		composite.CaptureRouteServiceResponse(response)
 

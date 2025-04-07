@@ -439,6 +439,25 @@ var _ = Describe("MetricsReporter", func() {
 		Expect(sender.SendValueCallCount()).To(Equal(0))
 	})
 
+	It("sends the gorouter time", func() {
+		metricReporter.CaptureGorouterTime(3)
+
+		Expect(sender.SendValueCallCount()).To(Equal(1))
+		name, value, unit := sender.SendValueArgsForCall(0)
+		Expect(name).To(Equal("gorouter_time"))
+		Expect(value).To(BeEquivalentTo(3000))
+		Expect(unit).To(Equal("ms"))
+
+	})
+
+	It("does not send the goroutertime if switched off", func() {
+		metricReporter.PerRequestMetricsReporting = false
+		metricReporter.CaptureGorouterTime(3)
+
+		Expect(sender.SendValueCallCount()).To(Equal(0))
+
+	})
+
 	Context("sends route metrics", func() {
 		var endpoint *route.Endpoint
 
