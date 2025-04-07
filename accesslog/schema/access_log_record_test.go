@@ -60,6 +60,7 @@ var _ = Describe("AccessLogRecord", func() {
 			AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 			RequestBytesReceived: 30,
 			RouterError:          "some-router-error",
+			GorouterTime:         10,
 		}
 	})
 
@@ -227,6 +228,7 @@ var _ = Describe("AccessLogRecord", func() {
 				record.AppRequestFinishedAt = time.Time{}
 				record.RequestBytesReceived = 0
 				record.RouterError = ""
+				record.GorouterTime = -1
 			})
 
 			It("makes a record", func() {
@@ -301,6 +303,7 @@ var _ = Describe("AccessLogRecord", func() {
 					AppRequestFinishedAt: time.Date(2000, time.January, 1, 0, 0, 55, 0, time.UTC),
 					RequestBytesReceived: 30,
 					ExtraHeadersToLog:    []string{},
+					GorouterTime:         10,
 				}
 
 				r := BufferReader(bytes.NewBufferString(record.LogMessage()))
