@@ -131,6 +131,7 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 		e.IsolationSegment == e2.IsolationSegment &&
 		e.useTls == e2.useTls &&
 		e.UpdatedAt.Equal(e2.UpdatedAt) &&
+		e.LoadBalancingAlgorithm == e2.LoadBalancingAlgorithm &&
 		maps.Equal(e.Tags, e2.Tags)
 
 }
