@@ -335,6 +335,33 @@ var _ = Describe("EndpointPool", func() {
 		})
 	})
 
+	Context("Load balancing algorithm of a updated endpoint", func() {
+		It("is will overwrite the load balancing algorithm of the endpoint and pool", func() {
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger.Logger,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+			})
+
+			endpointOpts := route.EndpointOpts{
+				Host:                   "host-1",
+				Port:                   1234,
+				RouteServiceUrl:        "url",
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+			}
+
+			initalEndpoint := route.NewEndpoint(&endpointOpts)
+
+			pool.Put(initalEndpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+
+			endpointOpts.LoadBalancingAlgorithm = config.LOAD_BALANCE_RR
+			updatedEndpoint := route.NewEndpoint(&endpointOpts)
+
+			pool.Put(updatedEndpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+		})
+	})
+
 	Context("RouteServiceUrl", func() {
 		It("returns the route_service_url associated with the pool", func() {
 			endpoint := &route.Endpoint{}
