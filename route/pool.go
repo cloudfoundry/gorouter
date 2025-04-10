@@ -122,7 +122,6 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 	return e.ApplicationId == e2.ApplicationId &&
 		e.addr == e2.addr &&
 		e.Protocol == e2.Protocol &&
-		maps.Equal(e.Tags, e2.Tags) &&
 		e.ServerCertDomainSAN == e2.ServerCertDomainSAN &&
 		e.PrivateInstanceId == e2.PrivateInstanceId &&
 		e.StaleThreshold == e2.StaleThreshold &&
@@ -131,7 +130,9 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 		e.ModificationTag == e2.ModificationTag &&
 		e.IsolationSegment == e2.IsolationSegment &&
 		e.useTls == e2.useTls &&
-		e.UpdatedAt == e2.UpdatedAt
+		e.UpdatedAt.Equal(e2.UpdatedAt) &&
+		e.LoadBalancingAlgorithm == e2.LoadBalancingAlgorithm &&
+		maps.Equal(e.Tags, e2.Tags)
 
 }
 
@@ -314,6 +315,7 @@ func (p *EndpointPool) Put(endpoint *Endpoint) PoolPutResult {
 
 	}
 	p.RouteSvcUrl = e.endpoint.RouteServiceUrl
+	p.setPoolLoadBalancingAlgorithm(e.endpoint)
 	e.updated = time.Now()
 	// set the update time of the pool
 	p.Update()
@@ -516,10 +518,8 @@ func (p *EndpointPool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(endpoints)
 }
 
-// SetPoolLoadBalancingAlgorithm overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
-func (p *EndpointPool) SetPoolLoadBalancingAlgorithm(endpoint *Endpoint) {
-	p.Lock()
-	defer p.Unlock()
+// setPoolLoadBalancingAlgorithm overwrites the load balancing algorithm of a pool by that of a specified endpoint, if that is valid.
+func (p *EndpointPool) setPoolLoadBalancingAlgorithm(endpoint *Endpoint) {
 	if len(endpoint.LoadBalancingAlgorithm) > 0 && endpoint.LoadBalancingAlgorithm != p.LoadBalancingAlgorithm {
 		if config.IsLoadBalancingAlgorithmValid(endpoint.LoadBalancingAlgorithm) {
 			p.LoadBalancingAlgorithm = endpoint.LoadBalancingAlgorithm

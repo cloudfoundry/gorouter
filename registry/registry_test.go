@@ -87,6 +87,42 @@ var _ = Describe("RouteRegistry", func() {
 			})
 		})
 
+		Context("when the endpoint has a modified loadbalancing algorithm", func() {
+			It("overwrites the loadbalacing algorithm of the pool", func() {
+				opts := route.EndpointOpts{
+					Host: "192.168.1.1",
+					Port: 8080,
+					Tags: map[string]string{
+						"runtime":   "ruby18",
+						"framework": "sinatra",
+					},
+					LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+				}
+
+				initialEndpoint := route.NewEndpoint(&opts)
+				r.Register("example.com/foo", initialEndpoint)
+
+				p1 := r.Lookup("example.com/foo")
+				Expect(p1).NotTo(BeNil())
+				Expect(p1.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+				p1.Each(func(endpoint *route.Endpoint) {
+					Expect(endpoint.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+				})
+
+				opts.LoadBalancingAlgorithm = config.LOAD_BALANCE_RR
+				updatedEndpoint := route.NewEndpoint(&opts)
+
+				r.Register("example.com/foo", updatedEndpoint)
+
+				p2 := r.Lookup("example.com/foo")
+				Expect(p2).NotTo(BeNil())
+				Expect(p2.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+				p2.Each(func(endpoint *route.Endpoint) {
+					Expect(endpoint.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
+				})
+			})
+		})
+
 		Context("when the endpoint has a zero UpdatedAt timestamp", func() {
 			BeforeEach(func() {
 				fooEndpoint.UpdatedAt = time.Time{}

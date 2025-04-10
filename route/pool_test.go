@@ -285,7 +285,7 @@ var _ = Describe("EndpointPool", func() {
 				RouteServiceUrl:        "url",
 				LoadBalancingAlgorithm: expectedLBAlgo,
 			})
-			pool.SetPoolLoadBalancingAlgorithm(endpoint)
+			pool.Put(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 			Eventually(logger).Should(gbytes.Say(`setting-pool-load-balancing-algorithm-to-that-of-an-endpoint`))
 		})
@@ -300,7 +300,7 @@ var _ = Describe("EndpointPool", func() {
 				Host: "host-1", Port: 1234,
 				RouteServiceUrl: "url",
 			})
-			pool.SetPoolLoadBalancingAlgorithm(endpoint)
+			pool.Put(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 		})
 
@@ -314,7 +314,7 @@ var _ = Describe("EndpointPool", func() {
 				Host: "host-1", Port: 1234,
 				RouteServiceUrl: "url",
 			})
-			pool.SetPoolLoadBalancingAlgorithm(endpoint)
+			pool.Put(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 		})
 
@@ -329,9 +329,36 @@ var _ = Describe("EndpointPool", func() {
 				RouteServiceUrl:        "url",
 				LoadBalancingAlgorithm: "invalid-lb-algo",
 			})
-			pool.SetPoolLoadBalancingAlgorithm(endpoint)
+			pool.Put(endpoint)
 			Expect(pool.LoadBalancingAlgorithm).To(Equal(expectedLBAlgo))
 			Eventually(logger).Should(gbytes.Say(`invalid-endpoint-load-balancing-algorithm-provided-keeping-pool-lb-algo`))
+		})
+	})
+
+	Context("Load balancing algorithm of a updated endpoint", func() {
+		It("is will overwrite the load balancing algorithm of the endpoint and pool", func() {
+			pool := route.NewPool(&route.PoolOpts{
+				Logger:                 logger.Logger,
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_RR,
+			})
+
+			endpointOpts := route.EndpointOpts{
+				Host:                   "host-1",
+				Port:                   1234,
+				RouteServiceUrl:        "url",
+				LoadBalancingAlgorithm: config.LOAD_BALANCE_LC,
+			}
+
+			initalEndpoint := route.NewEndpoint(&endpointOpts)
+
+			pool.Put(initalEndpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_LC))
+
+			endpointOpts.LoadBalancingAlgorithm = config.LOAD_BALANCE_RR
+			updatedEndpoint := route.NewEndpoint(&endpointOpts)
+
+			pool.Put(updatedEndpoint)
+			Expect(pool.LoadBalancingAlgorithm).To(Equal(config.LOAD_BALANCE_RR))
 		})
 	})
 
