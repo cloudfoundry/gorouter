@@ -122,7 +122,6 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 	return e.ApplicationId == e2.ApplicationId &&
 		e.addr == e2.addr &&
 		e.Protocol == e2.Protocol &&
-		maps.Equal(e.Tags, e2.Tags) &&
 		e.ServerCertDomainSAN == e2.ServerCertDomainSAN &&
 		e.PrivateInstanceId == e2.PrivateInstanceId &&
 		e.StaleThreshold == e2.StaleThreshold &&
@@ -132,6 +131,7 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 		e.IsolationSegment == e2.IsolationSegment &&
 		e.useTls == e2.useTls &&
 		e.UpdatedAt == e2.UpdatedAt
+		maps.Equal(e.Tags, e2.Tags)
 
 }
 
