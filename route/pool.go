@@ -130,7 +130,7 @@ func (e *Endpoint) Equal(e2 *Endpoint) bool {
 		e.ModificationTag == e2.ModificationTag &&
 		e.IsolationSegment == e2.IsolationSegment &&
 		e.useTls == e2.useTls &&
-		e.UpdatedAt == e2.UpdatedAt
+		e.UpdatedAt.Equal(e2.UpdatedAt) &&
 		maps.Equal(e.Tags, e2.Tags)
 
 }
