@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"slices"
 	"sync/atomic"
-	"time"
 
 	"github.com/urfave/negroni/v3"
 
@@ -60,8 +59,6 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 		return
 	}
 
-	reqInfo.FinishedAt = time.Now()
-
 	alr.HeadersOverride = reqInfo.BackendReqHeaders
 	alr.RouteEndpoint = reqInfo.RouteEndpoint
 	alr.RequestBytesReceived = requestBodyCounter.GetCount()
@@ -82,6 +79,7 @@ func (a *accessLog) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http
 	alr.TlsHandshakeFinishedAt = reqInfo.TlsHandshakeFinishedAt
 	alr.AppRequestFinishedAt = reqInfo.AppRequestFinishedAt
 	alr.FinishedAt = reqInfo.FinishedAt
+	alr.GorouterTime = reqInfo.GorouterTime
 
 	alr.LocalAddress = reqInfo.LocalAddress
 

@@ -21,6 +21,7 @@ type Metrics struct {
 	TotalRoutes                 mr.Gauge
 	TimeSinceLastRegistryUpdate mr.Gauge
 	RouteLookupTime             mr.Histogram
+	GorouterTime                mr.Histogram
 	RouteRegistrationLatency    mr.Histogram
 	RoutingRequest              mr.CounterVec
 	BadRequest                  mr.Counter
@@ -66,6 +67,7 @@ func NewMetrics(registry *mr.Registry, perRequestMetricsReporting bool, meterCon
 		TotalRoutes:                 registry.NewGauge("total_routes", "number of total routes"),
 		TimeSinceLastRegistryUpdate: registry.NewGauge("ms_since_last_registry_update", "time since last registry update in ms"),
 		RouteLookupTime:             registry.NewHistogram("route_lookup_time", "route lookup time per request in ns", meterConfig.RouteLookupTimeHistogramBuckets),
+		GorouterTime:                registry.NewHistogram("gorouter_time", "gorouter time per request in seconds", meterConfig.GorouterTimeHistogramBuckets),
 		RouteRegistrationLatency:    registry.NewHistogram("route_registration_latency", "route registration latency in ms", meterConfig.RouteRegistrationLatencyHistogramBuckets),
 		RoutingRequest:              registry.NewCounterVec("total_requests", "number of routing requests", []string{"component"}),
 		BadRequest:                  registry.NewCounter("rejected_requests", "number of rejected requests"),
@@ -112,6 +114,12 @@ func (metrics *Metrics) CaptureTotalRoutes(totalRoutes int) {
 func (metrics *Metrics) CaptureLookupTime(t time.Duration) {
 	if metrics.perRequestMetricsReporting {
 		metrics.RouteLookupTime.Observe(float64(t.Nanoseconds()))
+	}
+}
+
+func (metrics *Metrics) CaptureGorouterTime(t float64) {
+	if metrics.perRequestMetricsReporting {
+		metrics.GorouterTime.Observe(t)
 	}
 }
 
