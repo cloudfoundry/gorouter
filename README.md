@@ -1,5 +1,9 @@
 # gorouter
 
+> [!CAUTION]
+> This repository has been in-lined (using git-subtree) into routing-release. Please make any
+> future contributions directly to routing-release.
+
 [![Go Report
 Card](https://goreportcard.com/badge/code.cloudfoundry.org/gorouter)](https://goreportcard.com/report/code.cloudfoundry.org/gorouter)
 [![Go
