@@ -375,11 +375,11 @@ var _ = Describe("RoundRobin", func() {
 						Expect(iter.Next(0)).To(Equal(epOne))
 						iter.EndpointFailed(&net.OpError{Op: "dial"})
 
-						Expect(iter.Next(0)).To(Equal(epTwo))
-						iter.EndpointFailed(&net.OpError{Op: "dial"})
-
 						Expect(iter.Next(0)).To(Equal(epThree))
 						epThree.Stats.NumberConnections.Increment()
+
+						Expect(iter.Next(0)).To(Equal(epTwo))
+						iter.EndpointFailed(&net.OpError{Op: "dial"})
 
 						Expect(iter.Next(0)).To(Equal(epThree))
 						epThree.Stats.NumberConnections.Increment()
